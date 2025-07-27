@@ -1,0 +1,26 @@
+name: Dev Version
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Install Semantic Release
+      run: npm install semantic-release @semantic-release/github @semantic-release/exec semantic-release-gitmoji -D
+    - name: Run Semantic Release
+      run: npx semantic-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+    - name: Upload version artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: version
+        path: VERSION.txt
