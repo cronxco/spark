@@ -1,4 +1,6 @@
 {
+    "name": "Spark",
+    "author": "CronxCo",
     "private": true,
     "type": "module",
     "scripts": {
