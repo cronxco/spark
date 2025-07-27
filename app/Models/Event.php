@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
+
+class Event extends Model
+{
+    use HasFactory;
+
+    protected $table = 'events';
+    protected $keyType = 'string';
+    public $incrementing = false;
+
+    protected $fillable = [
+        'source_id',
+        'time',
+        'integration_id',
+        'actor_id',
+        'actor_metadata',
+        'service',
+        'domain',
+        'action',
+        'value',
+        'value_multiplier',
+        'value_unit',
+        'event_metadata',
+        'target_id',
+        'target_metadata',
+        'embeddings',
+    ];
+
+    protected $casts = [
+        'time' => 'datetime',
+        'actor_metadata' => 'array',
+        'event_metadata' => 'array',
+        'target_metadata' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (empty($model->id)) {
+                $model->id = Str::uuid();
+            }
+        });
+    }
+
+    public function integration()
+    {
+        return $this->belongsTo(Integration::class);
+    }
+
+    public function actor()
+    {
+        return $this->belongsTo(EventObject::class, 'actor_id');
+    }
+
+    public function target()
+    {
+        return $this->belongsTo(EventObject::class, 'target_id');
+    }
+
+    public function blocks()
+    {
+        return $this->hasMany(Block::class);
+    }
+} 
