@@ -18,7 +18,7 @@ jobs:
     - name: Run Semantic Release
       run: npx semantic-release
       env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Upload version artifact
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
