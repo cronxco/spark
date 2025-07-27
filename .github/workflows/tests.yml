@@ -19,10 +19,10 @@ jobs:
       postgres:
         image: "pgvector/pgvector:0.8.0-pg17@sha256:a34f9992bd1b393b45dfa958bf278af54cad6ce90ecba88284923ccebd14895a"
         env:
-          PGPASSWORD: "${DB_PASSWORD:-secret}"
-          POSTGRES_DB: "${DB_DATABASE}"
-          POSTGRES_USER: "${DB_USERNAME}"
-          POSTGRES_PASSWORD: "${DB_PASSWORD:-secret}"
+          PGPASSWORD: "postgres"
+          POSTGRES_DB: "test"
+          POSTGRES_USER: "postgres"
+          POSTGRES_PASSWORD: "postgres
         ports:
         - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
