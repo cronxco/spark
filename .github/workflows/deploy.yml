@@ -1,0 +1,73 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v1
+      with:
+        ref: main
+    - name: Install Semantic Release
+      run: npm install semantic-release @semantic-release/github @semantic-release/exec semantic-release-gitmoji -D
+    - name: Run Semantic Release
+      run: npx semantic-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+    - name: Upload version artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: version
+        path: VERSION.txt
+  # sentry_production:
+  #   runs-on: ubuntu-latest
+  #   needs: version
+  #   steps:
+  #   - name: checkout
+  #     uses: actions/checkout@v1
+  #     with:
+  #       ref: master
+  #   - name: Download version artifact
+  #     uses: actions/download-artifact@v1
+  #     with:
+  #       name: version
+  #   - name: Set version variable
+  #     run: export VERSION=$(cat version/VERSION.txt)
+  #   - name: install Sentry CLI
+  #     run: curl -sL https://sentry.io/get-cli/ | bash
+  #   - name: Set Sentry release
+  #     run: |
+  #       sentry-cli releases --org cronx new $VERSION-$GITHUB_RUN_ID
+  #       sentry-cli releases --org cronx set-commits --auto $VERSION-$GITHUB_RUN_ID
+  #       sentry-cli releases --org cronx deploys $VERSION-$GITHUB_RUN_ID new --env "production"
+  # deploy_production:
+  #   runs-on: ubuntu-latest
+  #   needs: version
+  #   steps:
+  #   - name: checkout
+  #     uses: actions/checkout@v1
+  #     with:
+  #       ref: master
+  #   - name: Download version artifact
+  #     uses: actions/download-artifact@v1
+  #     with:
+  #       name: version
+  #   - name: Set version variable
+  #     run: export VERSION=$(cat version/VERSION.txt) && echo "$VERSION"
+  #   - name: Set-up ssh environment
+  #     run: |
+  #       'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  #       eval $(ssh-agent -s)
+  #       ssh-add <(echo "${{ secrets.SSH_PRIVATE_KEY }}")
+  #       mkdir -p ~/.ssh
+  #       '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  #   - name: Deploy
+  #     run: ~/.composer/vendor/bin/envoy run deploy --env="production" --commit="$GITHUB_SHA" --branch="$GITHUB_REF" --build="$GITHUB_RUN_ID" --ver="$VERSION"
+  #     env:
+  #       name: production
+  #       url: demo.cronx.co
