@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Integration;
 
 
 class User extends Authenticatable
@@ -69,6 +70,22 @@ class User extends Authenticatable
             ->take(2)
             ->map(fn($word) => Str::substr($word, 0, 1))
             ->implode('');
+    }
+
+    /**
+     * Get the user's integrations
+     */
+    public function integrations()
+    {
+        return $this->hasMany(Integration::class);
+    }
+
+    /**
+     * Get the user's events
+     */
+    public function events()
+    {
+        return $this->hasMany(Event::class);
     }
 
     /**

@@ -20,7 +20,7 @@ jobs:
         image: "pgvector/pgvector:0.8.0-pg17@sha256:a34f9992bd1b393b45dfa958bf278af54cad6ce90ecba88284923ccebd14895a"
         env:
           PGPASSWORD: postgres
-          POSTGRES_DB: test
+          POSTGRES_DB: laravel
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:

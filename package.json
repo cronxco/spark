@@ -5,7 +5,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "release": "semantic-release"
     },
     "dependencies": {
         "@tailwindcss/vite": "^4.1.11",
@@ -21,5 +22,9 @@
         "@rollup/rollup-linux-x64-gnu": "4.46.0",
         "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
         "lightningcss-linux-x64-gnu": "^1.29.1"
+    },
+    "devDependencies": {
+        "semantic-release": "^24.2.7",
+        "semantic-release-gitmoji": "^1.6.8"
     }
 }

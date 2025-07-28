@@ -23,6 +23,7 @@ class Integration extends Model
         'refresh_token',
         'expiry',
         'refresh_expiry',
+        'configuration',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class Integration extends Model
         'refresh_expiry' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'configuration' => 'array',
     ];
 
     protected static function booted()
