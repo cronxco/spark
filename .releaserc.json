@@ -1,0 +1,48 @@
+{
+  "plugins": [
+    [
+      "semantic-release-gitmoji", {
+        "releaseRules": {
+          "major": {
+            "include": [
+              ":building_construction:",
+              ":boom:",
+              ":rocket:"
+            ]
+          },
+          "minor": {
+            "include": [
+              ":tada:",
+              ":alembic:",
+              ":heavy_plus_sign:",
+              ":sparkles:"
+            ]
+          },
+          "patch": {
+            "exclude": [
+              ":building_construction:",
+              ":boom:",
+              ":rocket:",
+              ":tada:",
+              ":alembic:",
+              ":heavy_plus_sign:",
+              ":sparkles:",
+              ":pushpin:"
+            ]
+          }
+        }
+      }
+    ],
+    [
+      "@semantic-release/exec", {
+        "verifyReleaseCmd": "echo ${nextRelease.version} > VERSION.txt"
+      }
+    ],
+    "@semantic-release/github"
+  ],
+  "branches": [
+    "main",
+    "+([0-9])?(.{+([0-9]),x}).x",
+    "**"
+  ]
+}
