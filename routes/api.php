@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\EventApiController;
 use App\Http\Controllers\IntegrationController;
 use Illuminate\Http\Request;
@@ -63,93 +64,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Integrations API
-    Route::get('/integrations', function (Request $request) {
-        $plugins = \App\Integrations\PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
-            return [
-                'identifier' => $pluginClass::getIdentifier(),
-                'name' => $pluginClass::getDisplayName(),
-                'description' => $pluginClass::getDescription(),
-                'type' => $pluginClass::getServiceType(),
-                'configuration_schema' => $pluginClass::getConfigurationSchema(),
-            ];
-        });
-        
-        $userIntegrations = $request->user()->integrations()->get();
-        
-        return response()->json([
-            'plugins' => $plugins,
-            'integrations' => $userIntegrations,
-        ]);
-    });
-
-    Route::get('/integrations/{integration}', function (Request $request, $integrationId) {
-        $integration = $request->user()->integrations()->findOrFail($integrationId);
-        
-        return response()->json($integration);
-    });
-
-    Route::post('/integrations/{integration}/configure', function (Request $request, $integrationId) {
-        $integration = $request->user()->integrations()->findOrFail($integrationId);
-        
-        $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration->service);
-        if (!$pluginClass) {
-            return response()->json(['error' => 'Plugin not found'], 404);
-        }
-        
-        $schema = $pluginClass::getConfigurationSchema();
-        
-        // Build validation rules
-        $rules = [];
-        foreach ($schema as $field => $config) {
-            $fieldRules = [];
-            
-            if ($config['required'] ?? false) {
-                $fieldRules[] = 'required';
-            } else {
-                $fieldRules[] = 'nullable';
-            }
-            
-            switch ($config['type']) {
-                case 'array':
-                    $fieldRules[] = 'array';
-                    break;
-                case 'string':
-                    $fieldRules[] = 'string';
-                    break;
-                case 'integer':
-                    $fieldRules[] = 'integer';
-                    break;
-            }
-            
-            $rules[$field] = $fieldRules;
-        }
-        
-        $validated = $request->validate($rules);
-        
-        // Process array fields that come as comma-separated strings
-        foreach ($validated as $field => $value) {
-            if ($schema[$field]['type'] === 'array' && is_string($value)) {
-                $validated[$field] = array_filter(array_map('trim', explode(',', $value)));
-            }
-        }
-        
-        $integration->update([
-            'configuration' => $validated,
-        ]);
-        
-        return response()->json([
-            'message' => 'Integration configured successfully',
-            'integration' => $integration->fresh(),
-        ]);
-    });
-
-    Route::delete('/integrations/{integration}', function (Request $request, $integrationId) {
-        $integration = $request->user()->integrations()->findOrFail($integrationId);
-        
-        $integration->delete();
-        
-        return response()->json(['message' => 'Integration deleted successfully']);
-    });
+    Route::apiResource('integrations', IntegrationApiController::class)->only(['index', 'show']);
+    Route::post('/integrations/{integration}/configure', [IntegrationApiController::class, 'configure']);
+    Route::delete('/integrations/{integration}', [IntegrationApiController::class, 'destroy']);
 });
 
 Route::get('/user', function (Request $request) {

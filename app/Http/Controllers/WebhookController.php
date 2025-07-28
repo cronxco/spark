@@ -5,14 +5,12 @@ namespace App\Http\Controllers;
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller
 {
     public function handle(Request $request, string $service, string $secret)
     {
-        // Add rate limiting
-        $this->middleware('throttle:webhook')->only('handle');
-
         $pluginClass = PluginRegistry::getPlugin($service);
         if (!$pluginClass) {
             abort(404);
@@ -27,8 +25,9 @@ class WebhookController extends Controller
         }
 
         // Verify webhook signature if plugin supports it
-        if (method_exists($pluginClass, 'verifyWebhookSignature')) {
-            if (!$pluginClass::verifyWebhookSignature($request, $integration)) {
+        $plugin = new $pluginClass();
+        if (method_exists($plugin, 'verifyWebhookSignature')) {
+            if (!$plugin->verifyWebhookSignature($request, $integration)) {
                 abort(401, 'Invalid signature');
             }
         }
@@ -40,7 +39,7 @@ class WebhookController extends Controller
             return response()->json(['status' => 'success']);
         } catch (\Exception $e) {
             // Log the actual error but return generic message
-            \Log::error('Webhook handling failed', ['exception' => $e]);
+            Log::error('Webhook handling failed', ['exception' => $e]);
             return response()->json(['error' => 'Webhook processing failed'], 500);
         }
     }

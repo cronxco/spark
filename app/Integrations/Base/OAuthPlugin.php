@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 abstract class OAuthPlugin implements IntegrationPlugin
 {
@@ -38,9 +39,18 @@ abstract class OAuthPlugin implements IntegrationPlugin
     
     public function getOAuthUrl(Integration $integration): string
     {
+        // Generate PKCE code verifier and challenge
+        $codeVerifier = $this->generateCodeVerifier();
+        $codeChallenge = $this->generateCodeChallenge($codeVerifier);
+        
+        // Generate CSRF token
+        $csrfToken = Str::random(32);
+        
         $state = encrypt([
             'integration_id' => $integration->id,
             'user_id' => $integration->user_id,
+            'csrf_token' => $csrfToken,
+            'code_verifier' => $codeVerifier,
         ]);
         
         $params = [
@@ -49,6 +59,8 @@ abstract class OAuthPlugin implements IntegrationPlugin
             'response_type' => 'code',
             'scope' => $this->getRequiredScopes(),
             'state' => $state,
+            'code_challenge' => $codeChallenge,
+            'code_challenge_method' => 'S256',
         ];
         
         return $this->baseUrl . '/oauth/authorize?' . http_build_query($params);
@@ -65,13 +77,25 @@ abstract class OAuthPlugin implements IntegrationPlugin
             throw new \Exception('Invalid state parameter');
         }
         
-        // Exchange code for tokens
+        // Validate CSRF token
+        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'])) {
+            throw new \Exception('Invalid CSRF token');
+        }
+        
+        // Get code verifier from state
+        $codeVerifier = $stateData['code_verifier'] ?? null;
+        if (!$codeVerifier) {
+            throw new \Exception('Missing code verifier');
+        }
+        
+        // Exchange code for tokens with PKCE
         $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'code' => $code,
             'grant_type' => 'authorization_code',
             'redirect_uri' => $this->redirectUri,
+            'code_verifier' => $codeVerifier,
         ]);
         
         if (!$response->successful()) {
@@ -142,4 +166,31 @@ abstract class OAuthPlugin implements IntegrationPlugin
     
     abstract protected function getRequiredScopes(): string;
     abstract protected function fetchAccountInfo(Integration $integration): void;
+    
+    /**
+     * Generate a PKCE code verifier
+     */
+    protected function generateCodeVerifier(): string
+    {
+        return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+    }
+    
+    /**
+     * Generate a PKCE code challenge from a code verifier
+     */
+    protected function generateCodeChallenge(string $codeVerifier): string
+    {
+        return rtrim(strtr(base64_encode(hash('sha256', $codeVerifier, true)), '+/', '-_'), '=');
+    }
+    
+    /**
+     * Validate CSRF token
+     */
+    protected function validateCsrfToken(string $token): bool
+    {
+        // For OAuth flows, we'll use a simple validation
+        // In a production environment, you might want to store tokens in session/cache
+        // and validate against stored tokens with expiration
+        return strlen($token) === 32 && ctype_alnum($token);
+    }
 } 

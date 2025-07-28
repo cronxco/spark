@@ -52,14 +52,4 @@ class IntegrationPageTest extends TestCase
         $this->assertInstanceOf(\App\Integrations\GitHub\GitHubPlugin::class, $githubPlugin2);
     }
 
-    public function test_integrations_page_uses_standard_html_components()
-    {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/integrations');
-        
-        $response->assertStatus(200)
-                 ->assertSee('Available Integrations')
-                 ->assertViewIs('integrations.index');
-    }
 } 

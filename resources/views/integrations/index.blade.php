@@ -93,14 +93,30 @@
                                                 @endif
                                                 
                                                 @if($plugin['type'] === 'webhook' && $integration->account_id)
-                                                    <div class="text-xs">
+                                                    <div class="text-xs" x-data="{ 
+                                                        webhookUrl: '{{ route('webhook.handle', ['service' => $integration->service, 'secret' => $integration->account_id]) }}',
+                                                        copied: false,
+                                                        copyToClipboard() {
+                                                            navigator.clipboard.writeText(this.webhookUrl).then(() => {
+                                                                this.copied = true;
+                                                                setTimeout(() => {
+                                                                    this.copied = false;
+                                                                }, 2000);
+                                                            }).catch(err => {
+                                                                console.error('Failed to copy: ', err);
+                                                            });
+                                                        }
+                                                    }">
                                                         <div class="text-gray-500 dark:text-gray-400 mb-1">Webhook URL:</div>
                                                         <div class="flex items-center space-x-2">
                                                             <code class="text-xs bg-gray-100 dark:bg-gray-600 px-2 py-1 rounded flex-1 truncate">
                                                                 {{ route('webhook.handle', ['service' => $integration->service, 'secret' => $integration->account_id]) }}
                                                             </code>
-                                                            <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" 
-                                                                    onclick="navigator.clipboard.writeText('{{ route('webhook.handle', ['service' => $integration->service, 'secret' => $integration->account_id]) }}')">
+                                                            <button type="button" 
+                                                                    @click="copyToClipboard()"
+                                                                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+                                                                    :class="{ 'text-green-500': copied }"
+                                                                    :title="copied ? 'Copied!' : 'Copy to clipboard'">
                                                                 <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                                                     <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path>
                                                                     <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path>

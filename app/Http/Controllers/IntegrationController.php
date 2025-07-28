@@ -70,8 +70,17 @@ class IntegrationController extends Controller
             return redirect()->route('integrations.index')
                 ->with('success', 'Integration connected successfully!');
         } catch (\Exception $e) {
+            // Log the full exception details for debugging
+            Log::error('OAuth callback failed', [
+                'service' => $service,
+                'user_id' => $user->id,
+                'integration_id' => $integration->id,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
             return redirect()->route('integrations.index')
-                ->with('error', 'Failed to connect integration: ' . $e->getMessage());
+                ->with('error', 'Failed to connect integration. Please try again or contact support if the problem persists.');
         }
     }
     
@@ -91,8 +100,16 @@ class IntegrationController extends Controller
             return redirect()->route('integrations.index')
                 ->with('success', 'Integration initialized successfully! Webhook URL: ' . route('webhook.handle', ['service' => $service, 'secret' => $integration->account_id]));
         } catch (\Exception $e) {
+            // Log the full exception details for debugging
+            Log::error('Integration initialization failed', [
+                'service' => $service,
+                'user_id' => $user->id,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
             return redirect()->route('integrations.index')
-                ->with('error', 'Failed to initialize integration: ' . $e->getMessage());
+                ->with('error', 'Failed to initialize integration. Please try again or contact support if the problem persists.');
         }
     }
     

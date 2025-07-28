@@ -111,6 +111,11 @@ class GitHubPlugin extends OAuthPlugin
         return hash_equals($expectedSignature, $signature);
     }
     
+    public function verifyWebhookSignature(Request $request, Integration $integration): bool
+    {
+        return $this->verifyGitHubSignature($request, $integration);
+    }
+    
     protected function handlePushEvent(array $payload, Integration $integration): void
     {
         // For testing, if payload doesn't have required fields, skip processing

@@ -72,6 +72,11 @@ class SlackPlugin extends WebhookPlugin
         return hash_equals($expectedSignature, $signature);
     }
     
+    public function verifyWebhookSignature(Request $request, Integration $integration): bool
+    {
+        return $this->verifySlackSignature($request, $integration);
+    }
+    
     public function convertData(array $externalData, Integration $integration): array
     {
         $event = $externalData['event'] ?? [];
