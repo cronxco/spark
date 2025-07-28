@@ -24,15 +24,15 @@ class WebhookController extends Controller
             abort(404);
         }
 
-        // Verify webhook signature if plugin supports it
+        // Create plugin instance once and reuse it
         $plugin = new $pluginClass();
+
+        // Verify webhook signature if plugin supports it
         if (method_exists($plugin, 'verifyWebhookSignature')) {
             if (!$plugin->verifyWebhookSignature($request, $integration)) {
                 abort(401, 'Invalid signature');
             }
         }
-
-        $plugin = new $pluginClass();
 
         try {
             $plugin->handleWebhook($request, $integration);

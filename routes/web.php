@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\EventApiController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;

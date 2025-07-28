@@ -266,32 +266,42 @@ class GitHubPlugin extends OAuthPlugin
     
     protected function convertPullRequestEvent(array $data, Integration $integration): array
     {
+        // Check for required top-level keys
+        if (!isset($data['actor'], $data['payload'], $data['repo'], $data['id'], $data['created_at'])) {
+            return ['events' => []];
+        }
+        
+        // Check for required payload keys
+        if (!isset($data['payload']['pull_request'], $data['payload']['action'])) {
+            return ['events' => []];
+        }
+        
         $actor = [
             'concept' => 'user',
             'type' => 'github_user',
-            'title' => $data['actor']['login'],
-            'content' => $data['actor']['login'],
+            'title' => $data['actor']['login'] ?? 'Unknown User',
+            'content' => $data['actor']['login'] ?? 'Unknown User',
             'metadata' => [
-                'github_id' => $data['actor']['id'],
-                'avatar_url' => $data['actor']['avatar_url'],
+                'github_id' => $data['actor']['id'] ?? null,
+                'avatar_url' => $data['actor']['avatar_url'] ?? null,
             ],
-            'url' => $data['actor']['html_url'],
-            'image_url' => $data['actor']['avatar_url'],
+            'url' => $data['actor']['html_url'] ?? null,
+            'image_url' => $data['actor']['avatar_url'] ?? null,
         ];
         
         $pr = $data['payload']['pull_request'];
         $target = [
             'concept' => 'pull_request',
             'type' => 'github_pr',
-            'title' => $pr['title'],
+            'title' => $pr['title'] ?? 'Untitled Pull Request',
             'content' => $pr['body'] ?? '',
             'metadata' => [
-                'github_id' => $pr['id'],
-                'number' => $pr['number'],
-                'state' => $pr['state'],
-                'repository' => $data['repo']['full_name'],
+                'github_id' => $pr['id'] ?? null,
+                'number' => $pr['number'] ?? null,
+                'state' => $pr['state'] ?? 'unknown',
+                'repository' => $data['repo']['full_name'] ?? 'unknown/repository',
             ],
-            'url' => $pr['html_url'],
+            'url' => $pr['html_url'] ?? null,
         ];
         
         return [
@@ -305,8 +315,8 @@ class GitHubPlugin extends OAuthPlugin
                 'value' => 1,
                 'value_unit' => 'pull_request',
                 'event_metadata' => [
-                    'repository' => $data['repo']['full_name'],
-                    'number' => $pr['number'],
+                    'repository' => $data['repo']['full_name'] ?? 'unknown/repository',
+                    'number' => $pr['number'] ?? null,
                 ],
             ]],
         ];
@@ -314,32 +324,42 @@ class GitHubPlugin extends OAuthPlugin
     
     protected function convertIssueEvent(array $data, Integration $integration): array
     {
+        // Check for required top-level keys
+        if (!isset($data['actor'], $data['payload'], $data['repo'], $data['id'], $data['created_at'])) {
+            return ['events' => []];
+        }
+        
+        // Check for required payload keys
+        if (!isset($data['payload']['issue'], $data['payload']['action'])) {
+            return ['events' => []];
+        }
+        
         $actor = [
             'concept' => 'user',
             'type' => 'github_user',
-            'title' => $data['actor']['login'],
-            'content' => $data['actor']['login'],
+            'title' => $data['actor']['login'] ?? 'Unknown User',
+            'content' => $data['actor']['login'] ?? 'Unknown User',
             'metadata' => [
-                'github_id' => $data['actor']['id'],
-                'avatar_url' => $data['actor']['avatar_url'],
+                'github_id' => $data['actor']['id'] ?? null,
+                'avatar_url' => $data['actor']['avatar_url'] ?? null,
             ],
-            'url' => $data['actor']['html_url'],
-            'image_url' => $data['actor']['avatar_url'],
+            'url' => $data['actor']['html_url'] ?? null,
+            'image_url' => $data['actor']['avatar_url'] ?? null,
         ];
         
         $issue = $data['payload']['issue'];
         $target = [
             'concept' => 'issue',
             'type' => 'github_issue',
-            'title' => $issue['title'],
+            'title' => $issue['title'] ?? 'Untitled Issue',
             'content' => $issue['body'] ?? '',
             'metadata' => [
-                'github_id' => $issue['id'],
-                'number' => $issue['number'],
-                'state' => $issue['state'],
-                'repository' => $data['repo']['full_name'],
+                'github_id' => $issue['id'] ?? null,
+                'number' => $issue['number'] ?? null,
+                'state' => $issue['state'] ?? 'unknown',
+                'repository' => $data['repo']['full_name'] ?? 'unknown/repository',
             ],
-            'url' => $issue['html_url'],
+            'url' => $issue['html_url'] ?? null,
         ];
         
         return [
@@ -353,8 +373,8 @@ class GitHubPlugin extends OAuthPlugin
                 'value' => 1,
                 'value_unit' => 'issue',
                 'event_metadata' => [
-                    'repository' => $data['repo']['full_name'],
-                    'number' => $issue['number'],
+                    'repository' => $data['repo']['full_name'] ?? 'unknown/repository',
+                    'number' => $issue['number'] ?? null,
                 ],
             ]],
         ];

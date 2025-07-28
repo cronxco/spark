@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 
 abstract class OAuthPlugin implements IntegrationPlugin
@@ -46,6 +47,10 @@ abstract class OAuthPlugin implements IntegrationPlugin
         // Generate CSRF token
         $csrfToken = Str::random(32);
         
+        // Store CSRF token in session for validation
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $integration->id;
+        Session::put($sessionKey, $csrfToken);
+        
         $state = encrypt([
             'integration_id' => $integration->id,
             'user_id' => $integration->user_id,
@@ -78,7 +83,7 @@ abstract class OAuthPlugin implements IntegrationPlugin
         }
         
         // Validate CSRF token
-        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'])) {
+        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $integration)) {
             throw new \Exception('Invalid CSRF token');
         }
         
@@ -184,13 +189,28 @@ abstract class OAuthPlugin implements IntegrationPlugin
     }
     
     /**
-     * Validate CSRF token
+     * Validate CSRF token against stored session value
      */
-    protected function validateCsrfToken(string $token): bool
+    protected function validateCsrfToken(string $token, Integration $integration): bool
     {
-        // For OAuth flows, we'll use a simple validation
-        // In a production environment, you might want to store tokens in session/cache
-        // and validate against stored tokens with expiration
-        return strlen($token) === 32 && ctype_alnum($token);
+        // Get the session key for this integration
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $integration->id;
+        
+        // Retrieve stored token from session
+        $storedToken = Session::get($sessionKey);
+        
+        if (!$storedToken) {
+            return false; // No stored token found
+        }
+        
+        // Compare tokens
+        $isValid = hash_equals($storedToken, $token);
+        
+        // Remove the token from session after validation (one-time use)
+        if ($isValid) {
+            Session::forget($sessionKey);
+        }
+        
+        return $isValid;
     }
 } 

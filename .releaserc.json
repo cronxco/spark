@@ -20,13 +20,6 @@
           },
           "patch": {
             "exclude": [
-              ":building_construction:",
-              ":boom:",
-              ":rocket:",
-              ":tada:",
-              ":alembic:",
-              ":heavy_plus_sign:",
-              ":sparkles:",
               ":pushpin:"
             ]
           }

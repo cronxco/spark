@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('integrations', function (Blueprint $table) {
-            $table->json('configuration')->nullable()->after('refresh_expiry');
+            $table->jsonb('configuration')->nullable()->after('refresh_expiry');
         });
     }
 
