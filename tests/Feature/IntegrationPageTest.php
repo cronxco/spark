@@ -54,7 +54,12 @@ class IntegrationPageTest extends TestCase
 
     public function test_integrations_page_uses_standard_html_components()
     {
-        // This test verifies that we're not using problematic Flux UI components
-        $this->assertTrue(true); // Placeholder - the real test is that the page loads without errors
+        $user = User::factory()->create();
+        
+        $response = $this->actingAs($user)->get('/integrations');
+        
+        $response->assertStatus(200)
+                 ->assertSee('Available Integrations')
+                 ->assertViewIs('integrations.index');
     }
 } 
