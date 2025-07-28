@@ -31,7 +31,9 @@ class FetchIntegrationData extends Command
         
         if ($service) {
             $this->info("Fetching data for {$service} integrations...");
-            $integrations = Integration::where('service', $service)->get();
+            $integrations = Integration::where('service', $service)
+                ->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
+                ->get();
         } else {
             $this->info('Fetching data from all OAuth integrations...');
             $oauthIntegrations = Integration::whereHas('user')
