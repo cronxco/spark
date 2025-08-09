@@ -6,13 +6,10 @@ use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Models\Integration;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class IntegrationTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -137,6 +134,7 @@ class IntegrationTest extends TestCase
             ->post("/integrations/{$integration->id}/configure", [
                 'repositories' => ['owner/repo1', 'owner/repo2'],
                 'events' => ['push', 'pull_request'],
+                'update_frequency_minutes' => 15,
             ]);
         
         $response->assertStatus(302);
@@ -144,6 +142,7 @@ class IntegrationTest extends TestCase
         $integration->refresh();
         $this->assertEquals(['owner/repo1', 'owner/repo2'], $integration->configuration['repositories']);
         $this->assertEquals(['push', 'pull_request'], $integration->configuration['events']);
+        $this->assertEquals(15, $integration->update_frequency_minutes);
     }
 
     public function test_can_disconnect_integration()

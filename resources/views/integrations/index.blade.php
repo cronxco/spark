@@ -92,6 +92,39 @@
                                                     </div>
                                                 @endif
                                                 
+                                                @if($plugin['type'] === 'oauth')
+                                                    @php
+                                                        $frequency = $integration->configuration['update_frequency_minutes'] ?? 15;
+                                                        $lastUpdate = $integration->last_successful_update_at;
+                                                        $nextUpdate = $integration->getNextUpdateTime();
+                                                        $needsUpdate = $integration->needsUpdate();
+                                                    @endphp
+                                                    
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                                        <div class="flex items-center justify-between">
+                                                            <span>Update frequency: {{ $frequency }} minutes</span>
+                                                            <span class="px-2 py-1 rounded-full text-xs {{ $needsUpdate ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }}">
+                                                                {{ $needsUpdate ? 'Needs update' : 'Up to date' }}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        @if($lastUpdate)
+                                                            <div class="mt-1">
+                                                                Last update: {{ $lastUpdate->diffForHumans() }}
+                                                            </div>
+                                                            @if($nextUpdate)
+                                                                <div class="mt-1">
+                                                                    Next update: {{ $nextUpdate->diffForHumans() }}
+                                                                </div>
+                                                            @endif
+                                                        @else
+                                                            <div class="mt-1 text-yellow-600 dark:text-yellow-400">
+                                                                Never updated
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                                
                                                 @if($plugin['type'] === 'webhook' && $integration->account_id)
                                                     <div class="text-xs" x-data="{ 
                                                         webhookUrl: '{{ route('webhook.handle', ['service' => $integration->service, 'secret' => $integration->account_id]) }}',

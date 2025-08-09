@@ -153,8 +153,13 @@ class IntegrationController extends Controller
             }
         }
         
+        // Extract update frequency if it exists in the configuration
+        $updateFrequency = $validated['update_frequency_minutes'] ?? 15;
+        unset($validated['update_frequency_minutes']);
+        
         $integration->update([
             'configuration' => $validated,
+            'update_frequency_minutes' => $updateFrequency,
         ]);
         
         return redirect()->route('integrations.index')
@@ -196,6 +201,9 @@ class IntegrationController extends Controller
                     break;
                 case 'integer':
                     $fieldRules[] = 'integer';
+                    if (isset($config['min'])) {
+                        $fieldRules[] = "min:{$config['min']}";
+                    }
                     break;
             }
             

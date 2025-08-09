@@ -59,6 +59,14 @@ class GitHubPlugin extends OAuthPlugin
                 ],
                 'required' => true,
             ],
+            'update_frequency_minutes' => [
+                'type' => 'integer',
+                'label' => 'Update Frequency (minutes)',
+                'description' => 'How often to fetch new data (minimum 1 minute)',
+                'required' => true,
+                'min' => 1,
+                'default' => 15,
+            ],
         ];
     }
     

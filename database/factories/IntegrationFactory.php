@@ -22,6 +22,10 @@ class IntegrationFactory extends Factory
             'refresh_token' => $this->faker->sha256(),
             'expiry' => $this->faker->dateTime(),
             'refresh_expiry' => $this->faker->dateTime(),
+            'configuration' => [],
+            'update_frequency_minutes' => 15,
+            'last_triggered_at' => null,
+            'last_successful_update_at' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
