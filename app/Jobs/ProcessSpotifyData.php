@@ -10,6 +10,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Sentry\SentrySdk;
+use Sentry\Tracing\SpanContext;
+use Sentry\Tracing\TransactionContext;
 
 class ProcessSpotifyData implements ShouldQueue
 {
@@ -34,6 +37,13 @@ class ProcessSpotifyData implements ShouldQueue
      */
     public function handle(): void
     {
+        $hub = SentrySdk::getCurrentHub();
+        $txContext = new TransactionContext();
+        $txContext->setName('job.process_spotify');
+        $txContext->setOp('job');
+        $transaction = $hub->startTransaction($txContext);
+        $hub->setSpan($transaction);
+
         try {
             $pluginClass = PluginRegistry::getPlugin('spotify');
             if (!$pluginClass) {
@@ -47,20 +57,28 @@ class ProcessSpotifyData implements ShouldQueue
             // Mark as triggered before processing
             $this->integration->markAsTriggered();
             
+            $span = $transaction->startChild((new SpanContext())->setOp('integration.fetch')->setDescription('spotify'));
             $plugin->fetchData($this->integration);
+            $span->finish();
             
             // Mark as successfully updated after processing
             $this->integration->markAsSuccessfullyUpdated();
             
             Log::info("Successfully processed Spotify data for integration {$this->integration->id}");
+            $transaction->setStatus(\Sentry\Tracing\SpanStatus::ok());
             
         } catch (\Exception $e) {
             Log::error("Failed to process Spotify data for integration {$this->integration->id}", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+            \Sentry\captureException($e);
             
+            $transaction->setStatus(\Sentry\Tracing\SpanStatus::internalError());
             throw $e; // Re-throw to trigger retry
+        } finally {
+            $transaction->finish();
+            $hub->setSpan(null);
         }
     }
 
@@ -73,5 +91,6 @@ class ProcessSpotifyData implements ShouldQueue
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
+        \Sentry\captureException($exception);
     }
 }

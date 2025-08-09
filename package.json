@@ -25,6 +25,8 @@
     },
     "devDependencies": {
         "@semantic-release/exec": "^7.1.0",
+        "@sentry/browser": "^10.3.0",
+        "@sentry/vite-plugin": "^4.0.2",
         "@tailwindcss/vite": "^4.1.11",
         "daisyui": "^5.0.50",
         "semantic-release": "^24.2.7",

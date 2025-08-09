@@ -3,6 +3,7 @@ import {
 } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from "@tailwindcss/vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 export default defineConfig({
     plugins: [
@@ -11,6 +12,15 @@ export default defineConfig({
             refresh: true,
         }),
         tailwindcss(),
+        process.env.SENTRY_AUTH_TOKEN &&
+        sentryVitePlugin({
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            include: ['./public/build'],
+            release: process.env.SENTRY_RELEASE,
+            dryRun: !process.env.CI,   // avoid local upload failures
+        }),
     ],
     server: {
         cors: true,

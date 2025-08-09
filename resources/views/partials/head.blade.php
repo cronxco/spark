@@ -12,3 +12,13 @@
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
+
+@if (env('VITE_SENTRY_DSN'))
+<script>
+    window.SENTRY_DSN = '{{ env('VITE_SENTRY_DSN') }}';
+</script>
+@endif
+<script>
+    window.SENTRY_RELEASE = '{{ env('SENTRY_RELEASE') }}';
+    window.SENTRY_ENVIRONMENT = '{{ app()->environment() }}';
+</script>

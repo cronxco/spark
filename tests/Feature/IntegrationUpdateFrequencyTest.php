@@ -120,6 +120,48 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($fresh->last_successful_update_at);
     }
 
+    public function test_mark_as_failed_clears_triggered_state()
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'last_triggered_at' => Carbon::now(),
+            'last_successful_update_at' => Carbon::now()->subMinutes(30),
+        ]);
+
+        $integration->markAsFailed();
+
+        $fresh = $integration->fresh();
+        $this->assertNull($fresh->last_triggered_at);
+        $this->assertNotNull($fresh->last_successful_update_at); // Should remain unchanged
+    }
+
+    public function test_is_processing_with_time_window()
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'update_frequency_minutes' => 15,
+        ]);
+
+        // Not processing initially
+        $this->assertFalse($integration->isProcessing());
+
+        // Mark as triggered - should be processing
+        $integration->markAsTriggered();
+        $this->assertTrue($integration->isProcessing());
+
+        // Wait for time window to expire (simulate old trigger)
+        $integration->update(['last_triggered_at' => Carbon::now()->subMinutes(20)]);
+        $this->assertFalse($integration->isProcessing());
+
+        // Mark as triggered again - should be processing
+        $integration->markAsTriggered();
+        $this->assertTrue($integration->isProcessing());
+    }
+
     public function test_scope_needs_update_returns_correct_integrations()
     {
         $user = User::factory()->create();

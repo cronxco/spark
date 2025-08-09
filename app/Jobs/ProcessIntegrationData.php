@@ -10,6 +10,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Sentry\SentrySdk;
+use Sentry\Tracing\SpanContext;
+use Sentry\Tracing\TransactionContext;
 
 class ProcessIntegrationData implements ShouldQueue
 {
@@ -34,6 +37,13 @@ class ProcessIntegrationData implements ShouldQueue
      */
     public function handle(): void
     {
+        $hub = SentrySdk::getCurrentHub();
+        $txContext = new TransactionContext();
+        $txContext->setName('job.process_integration: '.$this->integration->service);
+        $txContext->setOp('job');
+        $transaction = $hub->startTransaction($txContext);
+        $hub->setSpan($transaction);
+
         try {
             $pluginClass = PluginRegistry::getPlugin($this->integration->service);
             if (!$pluginClass) {
@@ -46,24 +56,32 @@ class ProcessIntegrationData implements ShouldQueue
             
             // Mark as triggered before processing
             $this->integration->markAsTriggered();
-            
+
+            $span = $transaction->startChild((new SpanContext())->setOp('integration.fetch')->setDescription($this->integration->service));
             $plugin->fetchData($this->integration);
+            $span->finish();
             
             // Mark as successfully updated after processing
             $this->integration->markAsSuccessfullyUpdated();
             
             Log::info("Successfully processed data for integration {$this->integration->id} ({$this->integration->service})");
+            $transaction->setStatus(\Sentry\Tracing\SpanStatus::ok());
             
         } catch (\Exception $e) {
             Log::error("Failed to process data for integration {$this->integration->id} ({$this->integration->service})", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+            \Sentry\captureException($e);
             
             // Mark as failed so it can be retried
             $this->integration->markAsFailed();
             
+            $transaction->setStatus(\Sentry\Tracing\SpanStatus::internalError());
             throw $e; // Re-throw to trigger retry
+        } finally {
+            $transaction->finish();
+            $hub->setSpan(null);
         }
     }
 
@@ -76,6 +94,7 @@ class ProcessIntegrationData implements ShouldQueue
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
+        \Sentry\captureException($exception);
         
         // Mark as failed so it can be retried in the future
         $this->integration->markAsFailed();
