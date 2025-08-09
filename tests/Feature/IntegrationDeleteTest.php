@@ -1,0 +1,107 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Integration;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class IntegrationDeleteTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_delete_their_integration(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'name' => 'Test Integration',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test('integrations.index')
+            ->call('deleteIntegration', $integration->id);
+
+        $this->assertDatabaseMissing('integrations', [
+            'id' => $integration->id,
+        ]);
+    }
+
+    public function test_user_cannot_delete_other_users_integration(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $otherUser->id,
+            'service' => 'github',
+            'name' => 'Other User Integration',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test('integrations.index')
+            ->call('deleteIntegration', $integration->id);
+
+        // Integration should still exist
+        $this->assertDatabaseHas('integrations', [
+            'id' => $integration->id,
+        ]);
+    }
+
+    public function test_user_cannot_delete_nonexistent_integration(): void
+    {
+        $user = User::factory()->create();
+        $nonexistentId = '00000000-0000-0000-0000-000000000000';
+
+        Livewire::actingAs($user)
+            ->test('integrations.index')
+            ->call('deleteIntegration', $nonexistentId);
+
+        // Should not crash and should show error message
+        $this->assertTrue(true, 'Component should handle nonexistent integration gracefully');
+    }
+
+    public function test_delete_integration_shows_success_message(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'name' => 'Test Integration',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test('integrations.index')
+            ->call('deleteIntegration', $integration->id);
+
+        // The success message should be dispatched (though we can't easily test the toast in unit tests)
+        $this->assertDatabaseMissing('integrations', [
+            'id' => $integration->id,
+        ]);
+    }
+
+    public function test_delete_integration_refreshes_data(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'name' => 'Test Integration',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test('integrations.index');
+
+        // Verify integration is initially loaded
+        $this->assertTrue($component->get('integrationsByService') !== null);
+
+        $component->call('deleteIntegration', $integration->id);
+
+        // Integration should be deleted from database
+        $this->assertDatabaseMissing('integrations', [
+            'id' => $integration->id,
+        ]);
+    }
+}

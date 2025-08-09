@@ -5,21 +5,30 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "release": "semantic-release"
     },
     "dependencies": {
-        "@tailwindcss/vite": "^4.1.11",
+        "@tailwindcss/forms": "^0.5.10",
+        "@tailwindcss/typography": "^0.5.16",
         "autoprefixer": "^10.4.20",
         "axios": "^1.7.4",
         "concurrently": "^9.0.1",
         "gitmoji-cli": "^9.7.0",
         "laravel-vite-plugin": "^2.0",
-        "tailwindcss": "^4.0.7",
         "vite": "^7.0.4"
     },
     "optionalDependencies": {
         "@rollup/rollup-linux-x64-gnu": "4.46.2",
         "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
         "lightningcss-linux-x64-gnu": "^1.29.1"
+    },
+    "devDependencies": {
+        "@semantic-release/exec": "^7.1.0",
+        "@tailwindcss/vite": "^4.1.11",
+        "daisyui": "^5.0.50",
+        "semantic-release": "^24.2.7",
+        "semantic-release-gitmoji": "^1.6.8",
+        "tailwindcss": "^4.1.11"
     }
 }

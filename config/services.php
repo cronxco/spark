@@ -40,6 +40,13 @@ return [
         'client_secret' => env('AUTHELIA_CLIENT_SECRET'),
         'redirect' => env('AUTHELIA_REDIRECT_URI'),
         'base_url' => env('AUTHELIA_BASE_URL'),
+        'token_endpoint_auth_method' => 'client_secret_basic',
+    ],
+
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env('GITHUB_REDIRECT_URI'),
     ],
 
 ];

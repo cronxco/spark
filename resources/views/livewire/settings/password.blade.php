@@ -5,8 +5,11 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Livewire\Volt\Component;
+use Mary\Traits\Toast;
 
 new class extends Component {
+    use Toast;
+    
     public string $current_password = '';
     public string $password = '';
     public string $password_confirmation = '';
@@ -23,7 +26,6 @@ new class extends Component {
             ]);
         } catch (ValidationException $e) {
             $this->reset('current_password', 'password', 'password_confirmation');
-
             throw $e;
         }
 
@@ -33,46 +35,81 @@ new class extends Component {
 
         $this->reset('current_password', 'password', 'password_confirmation');
 
+        $this->success('Password updated successfully!');
         $this->dispatch('password-updated');
     }
 }; ?>
 
-<section class="w-full">
-    @include('partials.settings-heading')
-
-    <x-settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
-        <form wire:submit="updatePassword" class="mt-6 space-y-6">
-            <flux:input
-                wire:model="current_password"
-                :label="__('Current password')"
-                type="password"
-                required
-                autocomplete="current-password"
-            />
-            <flux:input
-                wire:model="password"
-                :label="__('New password')"
-                type="password"
-                required
-                autocomplete="new-password"
-            />
-            <flux:input
-                wire:model="password_confirmation"
-                :label="__('Confirm Password')"
-                type="password"
-                required
-                autocomplete="new-password"
-            />
-
-            <div class="flex items-center gap-4">
-                <div class="flex items-center justify-end">
-                    <flux:button variant="primary" type="submit" class="w-full">{{ __('Save') }}</flux:button>
+<div class="py-12">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <x-card title="{{ __('Update Password') }}" shadow>
+            <div class="space-y-6">
+                <!-- Current Password Section -->
+                <div class="p-4 bg-base-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-lg font-medium">{{ __('Current Password') }}</h4>
+                            <p class="text-sm text-base-content/70">{{ __('Enter your current password to verify your identity') }}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <x-input
+                                wire:model="current_password"
+                                type="password"
+                                placeholder="Enter current password"
+                                class="w-64"
+                                required
+                                autocomplete="current-password"
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                <x-action-message class="me-3" on="password-updated">
-                    {{ __('Saved.') }}
-                </x-action-message>
+                <!-- New Password Section -->
+                <div class="p-4 bg-base-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-lg font-medium">{{ __('New Password') }}</h4>
+                            <p class="text-sm text-base-content/70">{{ __('Enter your new password') }}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <x-input
+                                wire:model="password"
+                                type="password"
+                                placeholder="Enter new password"
+                                class="w-64"
+                                required
+                                autocomplete="new-password"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Confirm Password Section -->
+                <div class="p-4 bg-base-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-lg font-medium">{{ __('Confirm Password') }}</h4>
+                            <p class="text-sm text-base-content/70">{{ __('Confirm your new password') }}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <x-input
+                                wire:model="password_confirmation"
+                                type="password"
+                                placeholder="Confirm new password"
+                                class="w-64"
+                                required
+                                autocomplete="new-password"
+                            />
+                            <x-button 
+                                label="{{ __('Update Password') }}"
+                                wire:click="updatePassword"
+                                class="btn-primary"
+                                spinner="updatePassword"
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
-        </form>
-    </x-settings.layout>
-</section>
+        </x-card>
+    </div>
+</div>

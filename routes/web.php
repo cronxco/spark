@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 use Laravel\Socialite\Facades\Socialite;
@@ -23,6 +25,19 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
     Volt::route('settings/api-tokens', 'settings.api-tokens')->name('settings.api-tokens');
 });
+
+// Integration routes
+Route::middleware(['auth'])->group(function () {
+    Volt::route('/integrations', 'integrations.index')->name('integrations.index');
+    Route::get('/integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
+    Route::get('/integrations/{service}/oauth/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
+    Route::post('/integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
+
+});
+
+// Webhook routes (no auth required)
+Route::post('/webhook/{service}/{secret}', [WebhookController::class, 'handle'])->name('webhook.handle');
 
 require __DIR__.'/auth.php';
 

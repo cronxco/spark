@@ -22,6 +22,10 @@ return new class extends Migration
             $table->text('refresh_token')->nullable();
             $table->timestampTz('expiry')->nullable();
             $table->timestampTz('refresh_expiry')->nullable();
+            $table->jsonb('configuration')->nullable();
+            $table->integer('update_frequency_minutes')->default(15);
+            $table->timestampTz('last_triggered_at')->nullable();
+            $table->timestampTz('last_successful_update_at')->nullable();
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->foreign('user_id')->references('id')->on('users');

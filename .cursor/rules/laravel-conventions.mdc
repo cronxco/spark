@@ -1,0 +1,35 @@
+---
+description: Laravel Conventions
+globs:
+alwaysApply: true
+---
+### Routes
+- URLs: kebab-case (`/open-source`)
+- Route names: camelCase (`->name('openSource')`)
+- Parameters: camelCase (`{userId}`)
+- Use tuple notation: `[Controller::class, 'method']`
+
+### Controllers
+- Plural resource names (`PostsController`)
+- Stick to CRUD methods (`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`)
+- Extract new controllers for non-CRUD actions
+
+### Configuration
+- Files: kebab-case (`pdf-generator.php`)
+- Keys: snake_case (`chrome_path`)
+- Add service configs to `config/services.php`, don't create new files
+- Use `config()` helper, avoid `env()` outside config files
+
+### Artisan Commands
+- Names: kebab-case (`delete-old-records`)
+- Always provide feedback (`$this->comment('All ok!')`)
+- Show progress for loops, summary at end
+- Put output BEFORE processing item (easier debugging):
+  ```php
+  $items->each(function(Item $item) {
+      $this->info("Processing item id `{$item->id}`...");
+      $this->processItem($item);
+  });
+  
+  $this->comment("Processed {$items->count()} items.");
+  ```
