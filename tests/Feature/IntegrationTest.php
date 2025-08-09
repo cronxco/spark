@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Models\Integration;
 use App\Models\User;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class IntegrationTest extends TestCase
@@ -130,16 +131,28 @@ class IntegrationTest extends TestCase
             'service' => 'github',
         ]);
         
-        $response = $this->actingAs($user)
-            ->post("/integrations/{$integration->id}/configure", [
-                'repositories' => ['owner/repo1', 'owner/repo2'],
+        $component = Livewire::actingAs($user)
+            ->test('integrations.configure', ['integration' => $integration])
+            ->set('configuration', [
+                'repositories' => 'owner/repo1, owner/repo2',
                 'events' => ['push', 'pull_request'],
                 'update_frequency_minutes' => 15,
             ]);
         
-        $response->assertStatus(302);
+        // Debug: Check if there are validation errors
+        $component->call('updateConfiguration');
         
         $integration->refresh();
+        
+        // Debug: Check what was actually saved
+        $this->assertNotNull($integration->configuration, 'Configuration should not be null');
+        $this->assertIsArray($integration->configuration, 'Configuration should be an array');
+        
+        // Debug: Print the actual configuration
+        $this->assertNotEmpty($integration->configuration, 'Configuration should not be empty');
+        $this->assertArrayHasKey('repositories', $integration->configuration, 'Configuration should have repositories key');
+        $this->assertArrayHasKey('events', $integration->configuration, 'Configuration should have events key');
+        
         $this->assertEquals(['owner/repo1', 'owner/repo2'], $integration->configuration['repositories']);
         $this->assertEquals(['push', 'pull_request'], $integration->configuration['events']);
         $this->assertEquals(15, $integration->update_frequency_minutes);

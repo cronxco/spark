@@ -10,25 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 class IntegrationController extends Controller
 {
-    public function index()
-    {
-        $plugins = PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
-            return [
-                'identifier' => $pluginClass::getIdentifier(),
-                'name' => $pluginClass::getDisplayName(),
-                'description' => $pluginClass::getDescription(),
-                'type' => $pluginClass::getServiceType(),
-                'configuration_schema' => $pluginClass::getConfigurationSchema(),
-            ];
-        });
-        
-        $userIntegrations = Auth::user()->integrations()->with('user')->get();
-        
-        // Group integrations by service for easier display
-        $integrationsByService = $userIntegrations->groupBy('service');
-        
-        return view('integrations.index', compact('plugins', 'integrationsByService'));
-    }
+
     
     public function oauth(string $service)
     {
