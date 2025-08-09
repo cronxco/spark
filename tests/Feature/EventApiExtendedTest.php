@@ -216,8 +216,16 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson(['message' => 'Event deleted successfully']);
 
-        $this->assertDatabaseMissing('events', ['id' => $event->id]);
-        $this->assertDatabaseMissing('blocks', ['event_id' => $event->id]);
+        // Since we now use soft deletes, the records should still exist but be soft deleted
+        $this->assertDatabaseHas('events', ['id' => $event->id]);
+        $this->assertDatabaseHas('blocks', ['event_id' => $event->id]);
+        
+        // Check that they are soft deleted
+        $deletedEvent = Event::withTrashed()->find($event->id);
+        $this->assertNotNull($deletedEvent->deleted_at);
+        
+        $deletedBlock = Block::withTrashed()->where('event_id', $event->id)->first();
+        $this->assertNotNull($deletedBlock->deleted_at);
     }
 
     public function test_user_cannot_delete_other_users_event()
