@@ -27,6 +27,7 @@ return new class extends Migration
             $table->text('embeddings')->nullable();
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestampTz('deleted_at')->nullable();
             $table->foreign('event_id')->references('id')->on('events');
             $table->foreign('integration_id')->references('id')->on('integrations');
         });

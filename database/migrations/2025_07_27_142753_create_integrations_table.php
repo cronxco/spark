@@ -28,6 +28,7 @@ return new class extends Migration
             $table->timestampTz('last_successful_update_at')->nullable();
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestampTz('deleted_at')->nullable();
             $table->foreign('user_id')->references('id')->on('users');
         });
     }

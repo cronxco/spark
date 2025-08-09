@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Spatie\Tags\HasTags;
 
 class EventObject extends Model
 {
-    use HasFactory;
+    use HasFactory, HasTags, SoftDeletes;
 
     protected $table = 'objects';
     protected $keyType = 'string';
@@ -33,6 +35,7 @@ class EventObject extends Model
         'embeddings' => 'array', // You may need a custom cast for vector fields
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -46,6 +49,6 @@ class EventObject extends Model
 
     public function integration()
     {
-        return $this->belongsTo(Integration::class);
+        return $this->belongsTo(Integration::class)->withTrashed();
     }
 }

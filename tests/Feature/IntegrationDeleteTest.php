@@ -25,9 +25,12 @@ class IntegrationDeleteTest extends TestCase
             ->test('integrations.index')
             ->call('deleteIntegration', $integration->id);
 
-        $this->assertDatabaseMissing('integrations', [
-            'id' => $integration->id,
-        ]);
+        // Since we now use soft deletes, the integration should still exist but be soft deleted
+        $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
+        
+        // Check that it is soft deleted
+        $deletedIntegration = Integration::withTrashed()->find($integration->id);
+        $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
     public function test_user_cannot_delete_other_users_integration(): void
@@ -77,9 +80,12 @@ class IntegrationDeleteTest extends TestCase
             ->call('deleteIntegration', $integration->id);
 
         // The success message should be dispatched (though we can't easily test the toast in unit tests)
-        $this->assertDatabaseMissing('integrations', [
-            'id' => $integration->id,
-        ]);
+        // Since we now use soft deletes, the integration should still exist but be soft deleted
+        $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
+        
+        // Check that it is soft deleted
+        $deletedIntegration = Integration::withTrashed()->find($integration->id);
+        $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
     public function test_delete_integration_refreshes_data(): void
@@ -99,9 +105,11 @@ class IntegrationDeleteTest extends TestCase
 
         $component->call('deleteIntegration', $integration->id);
 
-        // Integration should be deleted from database
-        $this->assertDatabaseMissing('integrations', [
-            'id' => $integration->id,
-        ]);
+        // Since we now use soft deletes, the integration should still exist but be soft deleted
+        $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
+        
+        // Check that it is soft deleted
+        $deletedIntegration = Integration::withTrashed()->find($integration->id);
+        $this->assertNotNull($deletedIntegration->deleted_at);
     }
 }
