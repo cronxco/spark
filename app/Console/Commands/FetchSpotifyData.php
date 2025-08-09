@@ -61,6 +61,12 @@ class FetchSpotifyData extends Command
         
         foreach ($integrations as $integration) {
             try {
+                // Skip integrations already in progress
+                if ($integration->isProcessing()) {
+                    $this->line("Skipping integration {$integration->id} - currently processing");
+                    continue;
+                }
+
                 $pluginClass = PluginRegistry::getPlugin('spotify');
                 if (!$pluginClass) {
                     $this->error("Spotify plugin not found");
