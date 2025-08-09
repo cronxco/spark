@@ -12,16 +12,14 @@ export default defineConfig({
             refresh: true,
         }),
         tailwindcss(),
+        process.env.SENTRY_AUTH_TOKEN &&
         sentry({
-            org: process.env.SENTRY_ORG || undefined,
-            project: process.env.SENTRY_PROJECT || undefined,
-            authToken: process.env.SENTRY_AUTH_TOKEN || undefined,
-            sourcemaps: {
-                assets: ['./public/build/**'],
-            },
-            release: {
-                name: process.env.SENTRY_RELEASE || undefined,
-            },
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            include: ['./public/build'],
+            release: process.env.SENTRY_RELEASE,
+            dryRun: !process.env.CI,   // avoid local upload failures
         }),
     ],
     server: {

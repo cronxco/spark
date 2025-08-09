@@ -53,14 +53,14 @@ Route::middleware('sentry.api.logging')->group(function () {
         });
 
         // Revoke a token
-        Route::delete('/tokens/{token}', function (Request $request, $tokenId) {
-            $token = $request->user()->tokens()->find($tokenId);
+        Route::delete('/tokens/{token}', function (Request $request, $token) {
+            $personalAccessToken = $request->user()->tokens()->find($token);
 
-            if (!$token) {
+            if (!$personalAccessToken) {
                 return response()->json(['error' => 'Token not found'], 404);
             }
 
-            $token->delete();
+            $personalAccessToken->delete();
 
             return response()->json(['message' => 'Token revoked successfully']);
         });

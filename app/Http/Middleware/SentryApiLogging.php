@@ -17,7 +17,7 @@ class SentryApiLogging
 
         \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($request, $response) {
             $scope->setContext('api_request', [
-                'url' => $request->fullUrl(),
+                'url' => $request->url(),
                 'method' => $request->method(),
                 'ip' => $request->ip(),
                 'user_id' => optional($request->user())->id,
