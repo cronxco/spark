@@ -10,25 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 class IntegrationController extends Controller
 {
-    public function index()
-    {
-        $plugins = PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
-            return [
-                'identifier' => $pluginClass::getIdentifier(),
-                'name' => $pluginClass::getDisplayName(),
-                'description' => $pluginClass::getDescription(),
-                'type' => $pluginClass::getServiceType(),
-                'configuration_schema' => $pluginClass::getConfigurationSchema(),
-            ];
-        });
-        
-        $userIntegrations = Auth::user()->integrations()->with('user')->get();
-        
-        // Group integrations by service for easier display
-        $integrationsByService = $userIntegrations->groupBy('service');
-        
-        return view('integrations.index', compact('plugins', 'integrationsByService'));
-    }
+
     
     public function oauth(string $service)
     {
@@ -113,103 +95,9 @@ class IntegrationController extends Controller
         }
     }
     
-    public function configure(Integration $integration)
-    {
-        // Ensure user owns this integration - convert both to strings for comparison
-        if ((string) $integration->user_id !== (string) Auth::id()) {
-            abort(403);
-        }
-        
-        $pluginClass = PluginRegistry::getPlugin($integration->service);
-        if (!$pluginClass) {
-            abort(404);
-        }
-        
-        $schema = $pluginClass::getConfigurationSchema();
-        
-        return view('integrations.configure', compact('integration', 'schema'));
-    }
+
     
-    public function updateConfiguration(Request $request, Integration $integration)
-    {
-        // Ensure user owns this integration - convert both to strings for comparison
-        if ((string) $integration->user_id !== (string) Auth::id()) {
-            abort(403);
-        }
-        
-        $pluginClass = PluginRegistry::getPlugin($integration->service);
-        if (!$pluginClass) {
-            abort(404);
-        }
-        
-        $schema = $pluginClass::getConfigurationSchema();
-        
-        $validated = $request->validate($this->buildValidationRules($schema));
-        
-        // Process array fields that come as comma-separated strings
-        foreach ($validated as $field => $value) {
-            if ($schema[$field]['type'] === 'array' && is_string($value)) {
-                $validated[$field] = array_filter(array_map('trim', explode(',', $value)));
-            }
-        }
-        
-        // Extract update frequency if it exists in the configuration
-        $updateFrequency = $validated['update_frequency_minutes'] ?? 15;
-        unset($validated['update_frequency_minutes']);
-        
-        $integration->update([
-            'configuration' => $validated,
-            'update_frequency_minutes' => $updateFrequency,
-        ]);
-        
-        return redirect()->route('integrations.index')
-            ->with('success', 'Integration configured successfully!');
-    }
+
     
-    public function disconnect(Integration $integration)
-    {
-        // Ensure user owns this integration - convert both to strings for comparison
-        if ((string) $integration->user_id !== (string) Auth::id()) {
-            abort(403);
-        }
-        
-        $integration->delete();
-        
-        return redirect()->route('integrations.index')
-            ->with('success', 'Integration disconnected successfully!');
-    }
-    
-    protected function buildValidationRules(array $schema): array
-    {
-        $rules = [];
-        
-        foreach ($schema as $field => $config) {
-            $fieldRules = [];
-            
-            if ($config['required'] ?? false) {
-                $fieldRules[] = 'required';
-            } else {
-                $fieldRules[] = 'nullable';
-            }
-            
-            switch ($config['type']) {
-                case 'array':
-                    $fieldRules[] = 'array';
-                    break;
-                case 'string':
-                    $fieldRules[] = 'string';
-                    break;
-                case 'integer':
-                    $fieldRules[] = 'integer';
-                    if (isset($config['min'])) {
-                        $fieldRules[] = "min:{$config['min']}";
-                    }
-                    break;
-            }
-            
-            $rules[$field] = $fieldRules;
-        }
-        
-        return $rules;
-    }
+
 }

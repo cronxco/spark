@@ -28,13 +28,12 @@ Route::middleware(['auth'])->group(function () {
 
 // Integration routes
 Route::middleware(['auth'])->group(function () {
-    Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
+    Volt::route('/integrations', 'integrations.index')->name('integrations.index');
     Route::get('/integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('/integrations/{service}/oauth/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('/integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
-    Route::get('/integrations/{integration}/configure', [IntegrationController::class, 'configure'])->name('integrations.configure');
-    Route::post('/integrations/{integration}/configure', [IntegrationController::class, 'updateConfiguration'])->name('integrations.configure.update');
-    Route::delete('/integrations/{integration}/disconnect', [IntegrationController::class, 'disconnect'])->name('integrations.disconnect');
+    Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
+
 });
 
 // Webhook routes (no auth required)

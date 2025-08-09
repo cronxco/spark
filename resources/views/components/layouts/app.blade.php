@@ -106,7 +106,14 @@
             </x-menu>
 
             <x-menu title="" class="p-1">
-                <x-menu-item title="Integrations" icon="fas.gear" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')"/>
+                <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')"/>
+                
+                <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')">
+                    <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')"/>
+                    <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')"/>
+                    <x-menu-item title="Appearance" icon="fas.palette" link="{{ route('settings.appearance') }}" :active="request()->routeIs('settings.appearance')"/>
+                    <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')"/>
+                </x-menu-sub>
             </x-menu>
         </x-slot:sidebar>
 
