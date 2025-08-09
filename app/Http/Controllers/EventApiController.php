@@ -19,7 +19,7 @@ class EventApiController extends Controller
     {
         $user = Auth::user();
         
-        $query = Event::with(['actor', 'target', 'blocks', 'integration'])
+        $query = Event::with(['actor', 'target', 'blocks', 'integration', 'tags'])
             ->whereHas('integration', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             });
@@ -64,7 +64,7 @@ class EventApiController extends Controller
     {
         $user = Auth::user();
         
-        $event = Event::with(['actor', 'target', 'blocks', 'integration'])
+        $event = Event::with(['actor', 'target', 'blocks', 'integration', 'tags'])
             ->whereHas('integration', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
@@ -145,7 +145,7 @@ class EventApiController extends Controller
 
         $event->update($validated);
 
-        return response()->json($event->load(['actor', 'target', 'blocks', 'integration']));
+        return response()->json($event->load(['actor', 'target', 'blocks', 'integration', 'tags']));
     }
 
     /**
@@ -160,10 +160,10 @@ class EventApiController extends Controller
         })->findOrFail($id);
 
         DB::transaction(function () use ($event) {
-            // Delete associated blocks
+            // Soft delete associated blocks
             $event->blocks()->delete();
             
-            // Delete the event
+            // Soft delete the event
             $event->delete();
             
             // Note: We don't delete actor/target objects as they might be used by other events

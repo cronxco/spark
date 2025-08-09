@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class Block extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'blocks';
     protected $keyType = 'string';
@@ -32,6 +33,7 @@ class Block extends Model
         'time' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -45,11 +47,11 @@ class Block extends Model
 
     public function event()
     {
-        return $this->belongsTo(Event::class);
+        return $this->belongsTo(Event::class)->withTrashed();
     }
 
     public function integration()
     {
-        return $this->belongsTo(Integration::class);
+        return $this->belongsTo(Integration::class)->withTrashed();
     }
 } 

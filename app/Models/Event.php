@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Spatie\Tags\HasTags;
 
 class Event extends Model
 {
-    use HasFactory;
+    use HasFactory, HasTags, SoftDeletes;
 
     protected $table = 'events';
     protected $keyType = 'string';
@@ -39,6 +41,7 @@ class Event extends Model
         'target_metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -52,21 +55,21 @@ class Event extends Model
 
     public function integration()
     {
-        return $this->belongsTo(Integration::class);
+        return $this->belongsTo(Integration::class)->withTrashed();
     }
 
     public function actor()
     {
-        return $this->belongsTo(EventObject::class, 'actor_id');
+        return $this->belongsTo(EventObject::class, 'actor_id')->withTrashed();
     }
 
     public function target()
     {
-        return $this->belongsTo(EventObject::class, 'target_id');
+        return $this->belongsTo(EventObject::class, 'target_id')->withTrashed();
     }
 
     public function blocks()
     {
-        return $this->hasMany(Block::class);
+        return $this->hasMany(Block::class)->withTrashed();
     }
 } 

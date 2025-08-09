@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class Integration extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'integrations';
     protected $keyType = 'string';
@@ -35,6 +36,7 @@ class Integration extends Model
         'refresh_expiry' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
         'configuration' => 'array',
         'last_triggered_at' => 'datetime',
         'last_successful_update_at' => 'datetime',
