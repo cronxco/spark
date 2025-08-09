@@ -1,0 +1,106 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Jobs\ProcessIntegrationData;
+use App\Models\Integration;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+
+class CheckIntegrationUpdates implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 60; // 1 minute
+    public $tries = 1; // Don't retry this job
+
+    /**
+     * Create a new job instance.
+     */
+    public function __construct()
+    {
+        //
+    }
+
+    /**
+     * Execute the job.
+     */
+    public function handle(): void
+    {
+        try {
+            Log::info('Starting integration update check');
+            
+            // Get integrations that need updating
+            $integrations = Integration::whereHas('user')
+                ->whereNotNull('access_token') // Only active integrations
+                ->needsUpdate()
+                ->get();
+            
+            if ($integrations->isEmpty()) {
+                Log::info('No integrations found that need updating');
+                return;
+            }
+            
+            Log::info("Found {$integrations->count()} integration(s) that need updating");
+            
+            $scheduledCount = 0;
+            $skippedCount = 0;
+            
+            foreach ($integrations as $integration) {
+                try {
+                    // Skip if currently processing
+                    if ($integration->isProcessing()) {
+                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - currently processing");
+                        $skippedCount++;
+                        continue;
+                    }
+                    
+                    // Check if it's time to fetch data based on update frequency
+                    if ($integration->last_triggered_at && 
+                        $integration->last_triggered_at->addMinutes($integration->update_frequency_minutes)->isFuture()) {
+                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - too soon since last update");
+                        $skippedCount++;
+                        continue;
+                    }
+                    
+                    // Dispatch the processing job
+                    ProcessIntegrationData::dispatch($integration);
+                    
+                    Log::info("Scheduled processing job for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
+                    $scheduledCount++;
+                    
+                } catch (\Exception $e) {
+                    Log::error("Failed to schedule job for integration {$integration->id} ({$integration->service})", [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
+            }
+            
+            Log::info("Integration update check completed: {$scheduledCount} scheduled, {$skippedCount} skipped");
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to check integration updates', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            throw $e;
+        }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('Integration update check job failed permanently', [
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+    }
+}

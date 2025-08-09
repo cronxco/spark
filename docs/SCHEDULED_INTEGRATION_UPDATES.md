@@ -8,9 +8,9 @@ The application automatically checks for integrations that are due for updates e
 
 ## How It Works
 
-### 1. Scheduled Command
+### 1. Scheduled Job
 
-The `integrations:fetch` command runs every minute via Laravel's task scheduler. This command:
+The `CheckIntegrationUpdates` job runs every minute via Laravel's task scheduler. This job:
 
 - Checks for integrations that need updating based on their `update_frequency_minutes` setting
 - Skips integrations that are currently being processed
@@ -21,10 +21,11 @@ The `integrations:fetch` command runs every minute via Laravel's task scheduler.
 
 Each integration update is processed as a background job using Laravel's queue system:
 
+- The `CheckIntegrationUpdates` job runs every minute to check for integrations that need updating
+- For each integration that needs updating, a `ProcessIntegrationData` job is dispatched
 - Jobs are dispatched to the `default` queue
-- Each job has a 5-minute timeout
-- Failed jobs are retried up to 3 times with increasing delays (1, 5, 10 minutes)
-- Jobs are processed by the `ProcessIntegrationData` job class
+- Each `ProcessIntegrationData` job has a 5-minute timeout
+- Failed `ProcessIntegrationData` jobs are retried up to 3 times with increasing delays (1, 5, 10 minutes)
 
 ### 3. Integration Frequency
 
@@ -53,10 +54,9 @@ php artisan queue:work --daemon
 The task scheduler is already configured in `routes/console.php`:
 
 ```php
-Schedule::command('integrations:fetch')
+Schedule::job(new CheckIntegrationUpdates())
     ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 ```
 
 ### 3. Cron Job (Production)
@@ -74,7 +74,13 @@ For production, add this cron job to run Laravel's scheduler:
 You can manually run the integration updates:
 
 ```bash
-# Update all integrations that need updating
+# Dispatch the check job manually
+sail artisan tinker --execute="App\Jobs\CheckIntegrationUpdates::dispatch()"
+
+# Or run the check job synchronously for testing
+sail artisan tinker --execute="(new App\Jobs\CheckIntegrationUpdates())->handle()"
+
+# You can also still use the original command for manual updates
 sail artisan integrations:fetch
 
 # Update a specific service
@@ -98,6 +104,21 @@ sail artisan schedule:test
 
 ## Job Processing
 
+### CheckIntegrationUpdates Job
+
+The `CheckIntegrationUpdates` job:
+
+1. Queries for integrations that need updating
+2. Checks if integrations are currently processing
+3. Verifies update frequency requirements
+4. Dispatches `ProcessIntegrationData` jobs for eligible integrations
+5. Logs the results
+
+**Job Configuration:**
+- **Timeout**: 1 minute
+- **Retries**: 1 attempt (no retry)
+- **Queue**: `default`
+
 ### ProcessIntegrationData Job
 
 The `ProcessIntegrationData` job:
@@ -106,14 +127,18 @@ The `ProcessIntegrationData` job:
 2. Marks the integration as triggered
 3. Calls the plugin's `fetchData()` method
 4. Marks the integration as successfully updated
-5. Handles errors and retries
+5. Handles errors and retries with proper state management
 
-### Job Configuration
-
+**Job Configuration:**
 - **Timeout**: 5 minutes
 - **Retries**: 3 attempts
 - **Backoff**: 60, 300, 600 seconds (1, 5, 10 minutes)
 - **Queue**: `default`
+
+**Error Handling:**
+- If an exception occurs during processing, the integration is marked as failed
+- Failed integrations have their `last_triggered_at` cleared, allowing them to be retried
+- The `failed()` callback ensures permanent failures are also properly marked
 
 ## Monitoring and Debugging
 
@@ -147,6 +172,13 @@ sail artisan queue:flush
 An integration is considered "processing" if:
 - `last_triggered_at` is more recent than `last_successful_update_at`
 - This prevents duplicate jobs from being dispatched
+
+### Failed State
+
+An integration is marked as failed when:
+- An exception occurs during processing (in the catch block)
+- The job fails permanently after all retries (in the failed callback)
+- The `last_triggered_at` field is cleared, allowing the integration to be retried
 
 ### Update Frequency
 

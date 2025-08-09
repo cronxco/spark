@@ -104,6 +104,16 @@ class Integration extends Model
     }
 
     /**
+     * Mark the integration as failed
+     */
+    public function markAsFailed(): void
+    {
+        // Clear the triggered state so it can be retried
+        // Don't update last_successful_update_at since the update failed
+        $this->update(['last_triggered_at' => null]);
+    }
+
+    /**
      * Check if this integration is currently being processed
      */
     public function isProcessing(): bool

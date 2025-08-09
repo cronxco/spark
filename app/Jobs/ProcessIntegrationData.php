@@ -60,6 +60,9 @@ class ProcessIntegrationData implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
             
+            // Mark as failed so it can be retried
+            $this->integration->markAsFailed();
+            
             throw $e; // Re-throw to trigger retry
         }
     }
@@ -73,5 +76,8 @@ class ProcessIntegrationData implements ShouldQueue
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
+        
+        // Mark as failed so it can be retried in the future
+        $this->integration->markAsFailed();
     }
 }
