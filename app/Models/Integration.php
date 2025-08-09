@@ -104,6 +104,21 @@ class Integration extends Model
     }
 
     /**
+     * Check if this integration is currently being processed
+     */
+    public function isProcessing(): bool
+    {
+        // If last_triggered_at is more recent than last_successful_update_at, it's likely processing
+        if ($this->last_triggered_at && 
+            (!$this->last_successful_update_at || 
+             $this->last_triggered_at->isAfter($this->last_successful_update_at))) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
      * Get integrations that need updating
      */
     public static function scopeNeedsUpdate($query)

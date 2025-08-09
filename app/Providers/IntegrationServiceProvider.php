@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\Slack\SlackPlugin;
+use App\Integrations\Spotify\SpotifyPlugin;
 use Illuminate\Support\ServiceProvider;
 
 class IntegrationServiceProvider extends ServiceProvider
@@ -17,6 +18,7 @@ class IntegrationServiceProvider extends ServiceProvider
         // Register plugins
         PluginRegistry::register(GitHubPlugin::class);
         PluginRegistry::register(SlackPlugin::class);
+        PluginRegistry::register(SpotifyPlugin::class);
     }
 
     /**

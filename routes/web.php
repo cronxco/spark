@@ -29,8 +29,10 @@ Route::middleware(['auth'])->group(function () {
 // Integration routes
 Route::middleware(['auth'])->group(function () {
     Volt::route('/integrations', 'integrations.index')->name('integrations.index');
+    Volt::route('/updates', 'updates.index')->name('updates.index');
+    Volt::route('/events', 'events')->name('events.index');
     Route::get('/integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
-    Route::get('/integrations/{service}/oauth/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
+    Route::get('/integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('/integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
 

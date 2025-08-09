@@ -106,7 +106,9 @@
             </x-menu>
 
             <x-menu title="" class="p-1">
+                <x-menu-item title="Events" icon="fas.bolt" link="{{ route('events.index') }}" :active="request()->routeIs('events.*')"/>
                 <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')"/>
+                <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')"/>
                 
                 <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')"/>

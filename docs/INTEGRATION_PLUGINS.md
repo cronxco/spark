@@ -415,7 +415,7 @@ class GitHubPlugin extends OAuthPlugin
     {
         $this->clientId = config('services.github.client_id');
         $this->clientSecret = config('services.github.client_secret');
-        $this->redirectUri = route('integrations.oauth.callback', ['service' => 'github']);
+        $this->redirectUri = config('services.github.redirect') ?? route('integrations.oauth.callback', ['service' => 'github']);
     }
     
     public static function getIdentifier(): string
@@ -934,7 +934,7 @@ class IntegrationServiceProvider extends ServiceProvider
         Route::middleware(['auth'])->group(function () {
             Route::get('/integrations/{service}/oauth', [IntegrationController::class, 'oauth'])
                 ->name('integrations.oauth');
-            Route::get('/integrations/{service}/oauth/callback', [IntegrationController::class, 'oauthCallback'])
+            Route::get('/integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])
                 ->name('integrations.oauth.callback');
         });
         

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Integrations\PluginRegistry;
+use App\Jobs\ProcessIntegrationData;
 use App\Models\Integration;
 use Illuminate\Console\Command;
 
@@ -64,29 +65,27 @@ class FetchIntegrationData extends Command
         
         foreach ($integrations as $integration) {
             try {
-                $pluginClass = PluginRegistry::getPlugin($integration->service);
-                if (!$pluginClass) {
-                    $this->error("Plugin not found for service: {$integration->service}");
-                    $errorCount++;
+                // Skip if currently processing
+                if ($integration->isProcessing()) {
+                    $this->line("Skipping integration {$integration->id} ({$integration->service}) - currently processing");
                     continue;
                 }
                 
-                $plugin = new $pluginClass();
+                // Check if it's time to fetch data based on update frequency
+                if ($integration->last_triggered_at && 
+                    $integration->last_triggered_at->addMinutes($integration->update_frequency_minutes)->isFuture()) {
+                    $this->line("Skipping integration {$integration->id} ({$integration->service}) - too soon since last update");
+                    continue;
+                }
                 
-                $this->info("Fetching data for {$integration->service} integration {$integration->id} (frequency: {$integration->update_frequency_minutes} minutes)");
+                // Dispatch the job instead of processing directly
+                ProcessIntegrationData::dispatch($integration);
                 
-                // Mark as triggered before processing
-                $integration->markAsTriggered();
-                
-                $plugin->fetchData($integration);
-                
-                // Mark as successfully updated after processing
-                $integration->markAsSuccessfullyUpdated();
-                
+                $this->line("Scheduled job for user: {$integration->user->name} (ID: {$integration->user_id}) - Service: {$integration->service}");
                 $successCount++;
                 
             } catch (\Exception $e) {
-                $this->error("Failed to fetch data for integration {$integration->id}: " . $e->getMessage());
+                $this->error("Failed to schedule job for integration {$integration->id} ({$integration->service}): " . $e->getMessage());
                 $errorCount++;
             }
         }
