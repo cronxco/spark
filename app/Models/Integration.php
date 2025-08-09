@@ -104,6 +104,37 @@ class Integration extends Model
     }
 
     /**
+     * Mark the integration as failed
+     */
+    public function markAsFailed(): void
+    {
+        // Clear the triggered state so it can be retried
+        // Don't update last_successful_update_at since the update failed
+        $this->update(['last_triggered_at' => null]);
+    }
+
+    /**
+     * Check if this integration is currently being processed
+     */
+    public function isProcessing(): bool
+    {
+        if (! $this->last_triggered_at) {
+            return false;
+        }
+
+        // Bound the "processing" window to avoid indefinite lockout if a job fails/crashes.
+        // Use update_frequency_minutes where available, clamped to [5, 30] minutes.
+        $windowMinutes = (int) ($this->update_frequency_minutes ?? 15);
+        $windowMinutes = max(5, min(30, $windowMinutes));
+
+        $triggerIsRecent = $this->last_triggered_at->gt(now()->subMinutes($windowMinutes));
+        $triggerAfterLastSuccess = ! $this->last_successful_update_at
+            || $this->last_triggered_at->gt($this->last_successful_update_at);
+
+        return $triggerIsRecent && $triggerAfterLastSuccess;
+    }
+
+    /**
      * Get integrations that need updating
      */
     public static function scopeNeedsUpdate($query)

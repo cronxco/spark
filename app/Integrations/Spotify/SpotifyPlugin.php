@@ -1,0 +1,557 @@
+<?php
+
+namespace App\Integrations\Spotify;
+
+use App\Integrations\Base\OAuthPlugin;
+use App\Models\Integration;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Block;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+
+class SpotifyPlugin extends OAuthPlugin
+{
+    protected string $baseUrl = 'https://api.spotify.com/v1';
+    protected string $authUrl = 'https://accounts.spotify.com';
+    protected string $clientId;
+    protected string $clientSecret;
+    protected string $redirectUri;
+    
+    public function __construct()
+    {
+        $this->clientId = config('services.spotify.client_id') ?? '';
+        $this->clientSecret = config('services.spotify.client_secret') ?? '';
+        $this->redirectUri = config('services.spotify.redirect') ?? route('integrations.oauth.callback', ['service' => 'spotify']);
+
+        // Only validate credentials in non-testing environments
+        if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
+            throw new \InvalidArgumentException('Spotify OAuth credentials are not configured');
+        }
+    }
+    
+    public static function getIdentifier(): string
+    {
+        return 'spotify';
+    }
+    
+    public static function getDisplayName(): string
+    {
+        return 'Spotify';
+    }
+    
+    public static function getDescription(): string
+    {
+        return 'Connect your Spotify account to track your listening activity and create events for each track you play';
+    }
+    
+    public static function getConfigurationSchema(): array
+    {
+        return [
+            'update_frequency_minutes' => [
+                'type' => 'integer',
+                'label' => 'Update Frequency (minutes)',
+                'description' => 'How often to check for new tracks (minimum 1 minute, Spotify API rate limits apply)',
+                'required' => true,
+                'min' => 1,
+                'default' => 1,
+            ],
+            'auto_tag_genres' => [
+                'type' => 'array',
+                'label' => 'Auto-tag by Genre',
+                'description' => 'Automatically tag events with track genres',
+                'options' => [
+                    'enabled' => 'Enable genre tagging',
+                ],
+            ],
+            'auto_tag_artists' => [
+                'type' => 'array',
+                'label' => 'Auto-tag by Artist',
+                'description' => 'Automatically tag events with artist names',
+                'options' => [
+                    'enabled' => 'Enable artist tagging',
+                ],
+            ],
+            'include_album_art' => [
+                'type' => 'array',
+                'label' => 'Include Album Art',
+                'description' => 'Create blocks with album artwork',
+                'options' => [
+                    'enabled' => 'Include album artwork',
+                ],
+            ],
+        ];
+    }
+    
+    protected function getRequiredScopes(): string
+    {
+        return 'user-read-currently-playing user-read-recently-played user-read-email user-read-private';
+    }
+    
+    public function getOAuthUrl(Integration $integration): string
+    {
+        // Generate PKCE code verifier and challenge
+        $codeVerifier = $this->generateCodeVerifier();
+        $codeChallenge = $this->generateCodeChallenge($codeVerifier);
+        
+        // Generate CSRF token
+        $csrfToken = Str::random(32);
+        
+        // Store CSRF token in session for validation
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $integration->id;
+        Session::put($sessionKey, $csrfToken);
+        
+        $state = encrypt([
+            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
+            'csrf_token' => $csrfToken,
+            'code_verifier' => $codeVerifier,
+        ]);
+        
+        $params = [
+            'client_id' => $this->clientId,
+            'redirect_uri' => $this->redirectUri,
+            'response_type' => 'code',
+            'scope' => $this->getRequiredScopes(),
+            'state' => $state,
+            'code_challenge' => $codeChallenge,
+            'code_challenge_method' => 'S256',
+        ];
+        
+        // Spotify uses accounts.spotify.com for authorization
+        return $this->authUrl . '/authorize?' . http_build_query($params);
+    }
+    
+    public function handleOAuthCallback(Request $request, Integration $integration): void
+    {
+        $code = $request->get('code');
+        $state = $request->get('state');
+        
+        // Verify state
+        $stateData = decrypt($state);
+        
+        Log::info('Spotify OAuth state validation', [
+            'state_integration_id' => $stateData['integration_id'],
+            'integration_id' => $integration->id,
+            'state_integration_id_type' => gettype($stateData['integration_id']),
+            'integration_id_type' => gettype($integration->id),
+            'comparison_result' => $stateData['integration_id'] === $integration->id,
+        ]);
+        
+        if ((string) $stateData['integration_id'] !== (string) $integration->id) {
+            throw new \Exception('Invalid state parameter');
+        }
+        
+        // Validate CSRF token
+        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $integration)) {
+            throw new \Exception('Invalid CSRF token');
+        }
+        
+        // Get code verifier from state
+        $codeVerifier = $stateData['code_verifier'] ?? null;
+        if (!$codeVerifier) {
+            throw new \Exception('Missing code verifier');
+        }
+        
+        // Exchange code for tokens with PKCE - Spotify uses accounts.spotify.com for token exchange
+        $response = Http::asForm()->post('https://accounts.spotify.com/api/token', [
+            'client_id' => $this->clientId,
+            'client_secret' => $this->clientSecret,
+            'code' => $code,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->redirectUri,
+            'code_verifier' => $codeVerifier,
+        ]);
+        
+        if (!$response->successful()) {
+            Log::error('Spotify token exchange failed', [
+                'response' => $response->body(),
+                'status' => $response->status(),
+            ]);
+            throw new \Exception('Failed to exchange code for tokens: ' . $response->body());
+        }
+        
+        $tokenData = $response->json();
+        
+        Log::info('Spotify token exchange successful', [
+            'integration_id' => $integration->id,
+            'has_access_token' => isset($tokenData['access_token']),
+            'has_refresh_token' => isset($tokenData['refresh_token']),
+            'expires_in' => $tokenData['expires_in'] ?? null,
+        ]);
+        
+        // Update integration with tokens
+        $integration->update([
+            'access_token' => $tokenData['access_token'],
+            'refresh_token' => $tokenData['refresh_token'] ?? null,
+            'expiry' => isset($tokenData['expires_in']) 
+                ? now()->addSeconds($tokenData['expires_in']) 
+                : null,
+        ]);
+        
+        // Fetch account information
+        $this->fetchAccountInfo($integration);
+    }
+    
+    protected function refreshToken(Integration $integration): void
+    {
+        $response = Http::asForm()->post('https://accounts.spotify.com/api/token', [
+            'client_id' => $this->clientId,
+            'client_secret' => $this->clientSecret,
+            'refresh_token' => $integration->refresh_token,
+            'grant_type' => 'refresh_token',
+        ]);
+        
+        if (!$response->successful()) {
+            Log::error('Spotify token refresh failed', [
+                'integration_id' => $integration->id,
+                'response' => $response->body(),
+                'status' => $response->status(),
+            ]);
+            throw new \Exception('Failed to refresh token: ' . $response->body());
+        }
+        
+        $tokenData = $response->json();
+        
+        Log::info('Spotify token refresh successful', [
+            'integration_id' => $integration->id,
+            'has_access_token' => isset($tokenData['access_token']),
+            'has_refresh_token' => isset($tokenData['refresh_token']),
+            'expires_in' => $tokenData['expires_in'] ?? null,
+        ]);
+        
+        $integration->update([
+            'access_token' => $tokenData['access_token'],
+            'refresh_token' => $tokenData['refresh_token'] ?? $integration->refresh_token,
+            'expiry' => isset($tokenData['expires_in']) 
+                ? now()->addSeconds($tokenData['expires_in']) 
+                : null,
+        ]);
+    }
+    
+    protected function fetchAccountInfo(Integration $integration): void
+    {
+        $userData = $this->makeAuthenticatedRequest('/me', $integration);
+        
+        $integration->update([
+            'account_id' => $userData['id'],
+            'name' => $userData['display_name'] ?? 'Spotify User',
+            'configuration' => array_merge($integration->configuration ?? [], [
+                'email' => $userData['email'] ?? null,
+                'country' => $userData['country'] ?? null,
+                'product' => $userData['product'] ?? null,
+            ]),
+        ]);
+    }
+    
+    public function fetchData(Integration $integration): void
+    {
+        Log::info("Fetching Spotify data for user {$integration->account_id}");
+        
+        // Get currently playing track
+        $currentlyPlaying = $this->getCurrentlyPlaying($integration);
+        
+        if ($currentlyPlaying) {
+            $this->processTrackPlay($integration, $currentlyPlaying, 'currently_playing');
+        }
+        
+        // Get recently played tracks (last 50)
+        $recentlyPlayed = $this->getRecentlyPlayed($integration);
+        
+        foreach ($recentlyPlayed as $playedItem) {
+            $this->processTrackPlay($integration, $playedItem, 'recently_played');
+        }
+    }
+    
+    protected function getCurrentlyPlaying(Integration $integration): ?array
+    {
+        try {
+            $response = Http::withToken($integration->access_token)
+                ->get($this->baseUrl . '/me/player/currently-playing');
+                
+            if ($response->status() === 204) {
+                // No track currently playing
+                return null;
+            }
+            
+            if (!$response->successful()) {
+                Log::warning('Failed to get currently playing track', [
+                    'integration_id' => $integration->id,
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+                return null;
+            }
+            
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('Exception getting currently playing track', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+    
+    protected function getRecentlyPlayed(Integration $integration): array
+    {
+        try {
+            $response = Http::withToken($integration->access_token)
+                ->get($this->baseUrl . '/me/player/recently-played', [
+                    'limit' => 50,
+                ]);
+                
+            if (!$response->successful()) {
+                Log::warning('Failed to get recently played tracks', [
+                    'integration_id' => $integration->id,
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+                return [];
+            }
+            
+            $data = $response->json();
+            return $data['items'] ?? [];
+        } catch (\Exception $e) {
+            Log::error('Exception getting recently played tracks', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+    
+    protected function processTrackPlay(Integration $integration, array $playData, string $source): void
+    {
+        $track = $playData['track'] ?? $playData['item'] ?? null;
+        if (!$track) {
+            return;
+        }
+        
+        $playedAt = $playData['played_at'] ?? $playData['timestamp'] ?? now();
+        $progressMs = $playData['progress_ms'] ?? 0;
+        
+        // Create unique source ID for this play
+        $sourceId = "spotify_{$track['id']}_{$playedAt}";
+        
+        // Check if we already processed this play
+        $existingEvent = Event::where('source_id', $sourceId)
+            ->where('integration_id', $integration->id)
+            ->first();
+            
+        if ($existingEvent) {
+            return; // Already processed
+        }
+        
+        // Create or update user (actor)
+        $user = $this->createOrUpdateUser($integration);
+        
+        // Create or update track (target)
+        $trackObject = $this->createOrUpdateTrack($integration, $track);
+        
+        // Create the event
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $playedAt,
+            'integration_id' => $integration->id,
+            'actor_id' => $user->id,
+            'actor_metadata' => [
+                'spotify_user_id' => $integration->account_id,
+            ],
+            'service' => 'spotify',
+            'domain' => 'music',
+            'action' => 'played',
+            'value' => $track['duration_ms'] ?? 0,
+            'value_multiplier' => 1,
+            'value_unit' => 'milliseconds',
+            'event_metadata' => [
+                'source' => $source,
+                'progress_ms' => $progressMs,
+                'is_playing' => $source === 'currently_playing',
+                'track_id' => $track['id'],
+                'album_id' => $track['album']['id'] ?? null,
+                'artist_ids' => collect($track['artists'])->pluck('id')->toArray(),
+            ],
+            'target_id' => $trackObject->id,
+            'target_metadata' => [
+                'spotify_track_id' => $track['id'],
+                'spotify_album_id' => $track['album']['id'] ?? null,
+                'spotify_artist_ids' => collect($track['artists'])->pluck('id')->toArray(),
+            ],
+        ]);
+        
+        // Create blocks for rich content
+        $this->createTrackBlocks($event, $track, $integration);
+        
+        // Auto-tag the event
+        $this->autoTagEvent($event, $track, $integration);
+        
+        Log::info("Created event for track: {$track['name']} by " . collect($track['artists'])->pluck('name')->implode(', '));
+    }
+    
+    protected function createOrUpdateUser(Integration $integration): EventObject
+    {
+        return EventObject::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'concept' => 'user',
+                'type' => 'spotify_user',
+                'title' => $integration->name,
+            ],
+            [
+                'time' => now(),
+                'content' => 'Spotify user account',
+                'metadata' => [
+                    'spotify_user_id' => $integration->account_id,
+                    'email' => $integration->configuration['email'] ?? null,
+                    'country' => $integration->configuration['country'] ?? null,
+                    'product' => $integration->configuration['product'] ?? null,
+                ],
+                'url' => "https://open.spotify.com/user/{$integration->account_id}",
+                'media_url' => null,
+            ]
+        );
+    }
+    
+    protected function createOrUpdateTrack(Integration $integration, array $track): EventObject
+    {
+        $artists = collect($track['artists'])->pluck('name')->implode(', ');
+        $album = $track['album']['name'] ?? 'Unknown Album';
+        
+        return EventObject::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'concept' => 'track',
+                'type' => 'spotify_track',
+                'title' => $track['name'],
+            ],
+            [
+                'time' => now(),
+                'content' => "Track: {$track['name']}\nArtist: {$artists}\nAlbum: {$album}",
+                'metadata' => [
+                    'spotify_track_id' => $track['id'],
+                    'spotify_album_id' => $track['album']['id'] ?? null,
+                    'spotify_artist_ids' => collect($track['artists'])->pluck('id')->toArray(),
+                    'duration_ms' => $track['duration_ms'] ?? 0,
+                    'explicit' => $track['explicit'] ?? false,
+                    'popularity' => $track['popularity'] ?? 0,
+                    'track_number' => $track['track_number'] ?? null,
+                    'disc_number' => $track['disc_number'] ?? 1,
+                ],
+                'url' => $track['external_urls']['spotify'] ?? null,
+                'media_url' => $track['album']['images'][0]['url'] ?? null,
+            ]
+        );
+    }
+    
+    protected function createTrackBlocks(Event $event, array $track, Integration $integration): void
+    {
+        $configuration = $integration->configuration ?? [];
+        
+        // Album art block (check if enabled in configuration)
+        $includeAlbumArt = $configuration['include_album_art'] ?? ['enabled'];
+        if (in_array('enabled', $includeAlbumArt) && !empty($track['album']['images'])) {
+            $albumImage = $track['album']['images'][0];
+            $event->blocks()->create([
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Album Art',
+                'content' => "Album artwork for {$track['album']['name']}",
+                'url' => $track['external_urls']['spotify'] ?? null,
+                'media_url' => $albumImage['url'],
+                'value' => $albumImage['width'] ?? 300,
+                'value_multiplier' => 1,
+                'value_unit' => 'pixels',
+            ]);
+        }
+        
+        // Track details block
+        $artists = collect($track['artists'])->pluck('name')->implode(', ');
+        $duration = gmdate('i:s', ($track['duration_ms'] ?? 0) / 1000);
+        
+        $event->blocks()->create([
+            'time' => $event->time,
+            'integration_id' => $integration->id,
+            'title' => 'Track Details',
+            'content' => "**Track:** {$track['name']}\n**Artist:** {$artists}\n**Album:** {$track['album']['name']}\n**Duration:** {$duration}\n**Popularity:** {$track['popularity']}/100",
+            'url' => $track['external_urls']['spotify'] ?? null,
+            'media_url' => null,
+            'value' => $track['popularity'] ?? 0,
+            'value_multiplier' => 1,
+            'value_unit' => 'popularity',
+        ]);
+        
+        // Artist information block
+        if (!empty($track['artists'])) {
+            $artist = $track['artists'][0];
+            $event->blocks()->create([
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Artist Info',
+                'content' => "**Artist:** {$artist['name']}\n**Spotify ID:** {$artist['id']}",
+                'url' => $artist['external_urls']['spotify'] ?? null,
+                'media_url' => null,
+                'value' => null,
+                'value_multiplier' => 1,
+                'value_unit' => null,
+            ]);
+        }
+    }
+    
+    protected function autoTagEvent(Event $event, array $track, Integration $integration): void
+    {
+        $configuration = $integration->configuration ?? [];
+        
+        // Tag by artist (check if enabled in configuration)
+        $autoTagArtists = $configuration['auto_tag_artists'] ?? ['enabled'];
+        if (in_array('enabled', $autoTagArtists)) {
+            foreach ($track['artists'] as $artist) {
+                $event->attachTag($artist['name']);
+            }
+        }
+        
+        // Tag by album (always enabled)
+        if (!empty($track['album']['name'])) {
+            $event->attachTag($track['album']['name']);
+        }
+        
+        // Tag by year (from album release date)
+        if (!empty($track['album']['release_date'])) {
+            $year = date('Y', strtotime($track['album']['release_date']));
+            $event->attachTag($year);
+            
+            // Tag by decade
+            $decade = floor($year / 10) * 10;
+            $event->attachTag("{$decade}s");
+        }
+        
+        // Tag by explicit content
+        if ($track['explicit'] ?? false) {
+            $event->attachTag('explicit');
+        }
+        
+        // Tag by popularity level
+        $popularity = $track['popularity'] ?? 0;
+        if ($popularity >= 80) {
+            $event->attachTag('very-popular');
+        } elseif ($popularity >= 60) {
+            $event->attachTag('popular');
+        } elseif ($popularity >= 40) {
+            $event->attachTag('moderate');
+        } else {
+            $event->attachTag('niche');
+        }
+        
+        // Note: Genre tagging would require additional API calls to get track/artist genres
+        // This could be implemented as a separate job to avoid rate limiting
+    }
+    
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        // This method is not used for OAuth plugins
+        return [];
+    }
+}

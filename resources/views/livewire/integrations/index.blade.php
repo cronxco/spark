@@ -314,12 +314,11 @@ new class extends Component {
                         
                         <div class="mt-4 pt-4 border-t border-base-300">
                             @if($plugin['type'] === 'oauth')
-                                <x-button 
-                                    label="{{ __('Add Instance') }}"
-                                    icon="o-plus"
-                                    link="{{ route('integrations.oauth', $plugin['identifier']) }}"
-                                    class="btn-primary w-full"
-                                />
+                                <a href="{{ route('integrations.oauth', $plugin['identifier']) }}" 
+                                   class="btn btn-primary w-full">
+                                    <x-icon name="o-plus" class="w-4 h-4 mr-2" />
+                                    {{ __('Add Instance') }}
+                                </a>
                             @else
                                 <x-button 
                                     label="{{ __('Add Instance') }}"

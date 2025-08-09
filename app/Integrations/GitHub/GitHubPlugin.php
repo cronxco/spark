@@ -15,13 +15,16 @@ class GitHubPlugin extends OAuthPlugin
     
     public function __construct()
     {
-        $this->clientId = config('services.github.client_id') ?? '';
+        $this->clientId     = config('services.github.client_id')     ?? '';
         $this->clientSecret = config('services.github.client_secret') ?? '';
-        $this->redirectUri = route('integrations.oauth.callback', ['service' => 'github']);
+        $this->redirectUri  = config('services.github.redirect')      ?? route(
+            'integrations.oauth.callback',
+            ['service' => self::getIdentifier()]
+        );
 
-        if (empty($this->clientId) || empty($this->clientSecret)) {  
-          throw new \InvalidArgumentException('GitHub OAuth credentials are not configured');  
-        } 
+        if (! app()->environment('testing') && (empty($this->clientId) || empty($this->clientSecret))) {
+            throw new \InvalidArgumentException('GitHub OAuth credentials are not configured');
+        }
     }
     
     public static function getIdentifier(): string
