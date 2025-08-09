@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Sentry\SentrySdk;
+use Sentry\Tracing\SpanContext;
 
 abstract class OAuthPlugin implements IntegrationPlugin
 {
@@ -94,6 +96,9 @@ abstract class OAuthPlugin implements IntegrationPlugin
         }
         
         // Exchange code for tokens with PKCE
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST '.$this->baseUrl.'/oauth/token'));
         $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -102,6 +107,7 @@ abstract class OAuthPlugin implements IntegrationPlugin
             'redirect_uri' => $this->redirectUri,
             'code_verifier' => $codeVerifier,
         ]);
+        $span?->finish();
         
         if (!$response->successful()) {
             throw new \Exception('Failed to exchange code for tokens');
@@ -124,12 +130,16 @@ abstract class OAuthPlugin implements IntegrationPlugin
     
     protected function refreshToken(Integration $integration): void
     {
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST '.$this->baseUrl.'/oauth/token'));
         $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'refresh_token' => $integration->refresh_token,
             'grant_type' => 'refresh_token',
         ]);
+        $span?->finish();
         
         if (!$response->successful()) {
             throw new \Exception('Failed to refresh token');
@@ -153,8 +163,12 @@ abstract class OAuthPlugin implements IntegrationPlugin
             $this->refreshToken($integration);
         }
         
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.$endpoint));
         $response = Http::withToken($integration->access_token)
             ->get($this->baseUrl . $endpoint);
+        $span?->finish();
             
         if (!$response->successful()) {
             throw new \Exception('API request failed: ' . $response->body());

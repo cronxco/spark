@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Sentry\SentrySdk;
+use Sentry\Tracing\SpanContext;
 
 class SpotifyPlugin extends OAuthPlugin
 {
@@ -157,6 +159,9 @@ class SpotifyPlugin extends OAuthPlugin
         }
         
         // Exchange code for tokens with PKCE - Spotify uses accounts.spotify.com for token exchange
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST https://accounts.spotify.com/api/token'));
         $response = Http::asForm()->post('https://accounts.spotify.com/api/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -165,6 +170,7 @@ class SpotifyPlugin extends OAuthPlugin
             'redirect_uri' => $this->redirectUri,
             'code_verifier' => $codeVerifier,
         ]);
+        $span?->finish();
         
         if (!$response->successful()) {
             Log::error('Spotify token exchange failed', [
@@ -198,12 +204,16 @@ class SpotifyPlugin extends OAuthPlugin
     
     protected function refreshToken(Integration $integration): void
     {
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST https://accounts.spotify.com/api/token'));
         $response = Http::asForm()->post('https://accounts.spotify.com/api/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'refresh_token' => $integration->refresh_token,
             'grant_type' => 'refresh_token',
         ]);
+        $span?->finish();
         
         if (!$response->successful()) {
             Log::error('Spotify token refresh failed', [
@@ -269,8 +279,12 @@ class SpotifyPlugin extends OAuthPlugin
     protected function getCurrentlyPlaying(Integration $integration): ?array
     {
         try {
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/me/player/currently-playing'));
             $response = Http::withToken($integration->access_token)
                 ->get($this->baseUrl . '/me/player/currently-playing');
+            $span?->finish();
                 
             if ($response->status() === 204) {
                 // No track currently playing
@@ -299,10 +313,14 @@ class SpotifyPlugin extends OAuthPlugin
     protected function getRecentlyPlayed(Integration $integration): array
     {
         try {
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/me/player/recently-played'));
             $response = Http::withToken($integration->access_token)
                 ->get($this->baseUrl . '/me/player/recently-played', [
                     'limit' => 50,
                 ]);
+            $span?->finish();
                 
             if (!$response->successful()) {
                 Log::warning('Failed to get recently played tracks', [

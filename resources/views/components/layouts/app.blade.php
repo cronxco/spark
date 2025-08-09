@@ -47,6 +47,16 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <!-- <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css"> -->
+
+        @if (env('VITE_SENTRY_DSN'))
+        <script>
+            window.SENTRY_DSN = '{{ env('VITE_SENTRY_DSN') }}';
+        </script>
+        @endif
+        <script>
+            window.SENTRY_RELEASE = '{{ env('SENTRY_RELEASE') }}';
+            window.SENTRY_ENVIRONMENT = '{{ app()->environment() }}';
+        </script>
 </head>
 <body class="font-sans antialiased">
 
