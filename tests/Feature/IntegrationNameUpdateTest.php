@@ -22,10 +22,13 @@ class IntegrationNameUpdateTest extends TestCase
             'name' => 'Original Name',
         ]);
 
-        $this->actingAs($user);
-
-        Livewire::test('integrations.index')
-            ->call('updateIntegrationNameFromIndex', $integration->id, 'New Custom Name');
+        $component = Livewire::actingAs($user)
+            ->test('integrations.index');
+        
+        // Debug: Check if the component loaded correctly
+        $this->assertNotNull($component);
+        
+        $component->call('updateIntegrationNameFromIndex', $integration->id, 'New Custom Name');
 
         $this->assertDatabaseHas('integrations', [
             'id' => $integration->id,
@@ -172,9 +175,8 @@ class IntegrationNameUpdateTest extends TestCase
             'name' => 'Original Name',
         ]);
 
-        $this->actingAs($user);
-
-        Livewire::test('integrations.index')
+        Livewire::actingAs($user)
+            ->test('integrations.index')
             ->call('updateIntegrationNameFromIndex', $integration->id, '  Trimmed Name  ');
 
         $this->assertDatabaseHas('integrations', [

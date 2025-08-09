@@ -102,7 +102,7 @@ new class extends Component {
             return;
         }
         
-        if ($integration->user_id !== Auth::id()) {
+        if ((string) $integration->user_id !== (string) Auth::id()) {
             $this->error('Integration not found.');
             return;
         }
