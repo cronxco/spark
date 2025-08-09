@@ -1,10 +1,9 @@
 import * as Sentry from '@sentry/browser';
-import { BrowserTracing } from '@sentry/browser';
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || window.SENTRY_DSN || undefined,
   integrations: [
-    new BrowserTracing({
+    Sentry.browserTracingIntegration({
       traceFetch: true,
       traceXHR: true,
       // Adjust targets to your domains and API paths
