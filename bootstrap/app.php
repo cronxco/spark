@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\SentryApiLogging;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Enable Sentry HTTP request tracing
         $middleware->append(SentryTracingMiddleware::class);
+        
+        // Register Sentry API logging middleware
+        $middleware->alias([
+            'sentry.api.logging' => SentryApiLogging::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         SentryIntegration::handles($exceptions);

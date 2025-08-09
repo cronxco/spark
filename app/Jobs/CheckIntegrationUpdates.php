@@ -92,7 +92,7 @@ class CheckIntegrationUpdates implements ShouldQueue
                 }
             }
             
-            \Sentry\captureMessage('CheckIntegrationUpdates summary', \Sentry\EventHint::fromArray(['extra' => [
+            \Sentry\captureMessage('CheckIntegrationUpdates summary', \Sentry\Severity::info(), \Sentry\EventHint::fromArray(['extra' => [
                 'scheduled' => $scheduledCount,
                 'skipped' => $skippedCount,
                 'total_due' => $integrations->count(),

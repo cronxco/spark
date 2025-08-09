@@ -18,23 +18,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Sentry API request/response logging middleware
-Route::middleware(function ($request, $next) {
-    $response = $next($request);
-
-    \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($request, $response) {
-        $scope->setContext('api_request', [
-            'url' => $request->fullUrl(),
-            'method' => $request->method(),
-            'ip' => $request->ip(),
-            'user_id' => optional($request->user())->id,
-        ]);
-        $scope->setContext('api_response', [
-            'status' => $response->getStatusCode(),
-        ]);
-    });
-
-    return $response;
-})->group(function () {
+Route::middleware('sentry.api.logging')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         // Events API
         Route::get('/events', [EventApiController::class, 'index']);
