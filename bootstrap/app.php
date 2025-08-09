@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Sentry\Laravel\Integration as SentryIntegration;
+use Sentry\Laravel\Tracing\Middleware as SentryTracingMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,7 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // Enable Sentry HTTP request tracing
+        $middleware->append(SentryTracingMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         SentryIntegration::handles($exceptions);

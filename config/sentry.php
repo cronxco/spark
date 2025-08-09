@@ -19,4 +19,10 @@ return [
         'queue_info' => true,
         'command_info' => true,
     ],
+
+    // Continue incoming distributed traces from the browser (sentry-trace + baggage)
+    'tracing' => [
+        'queue_job_transactions' => true,
+        'queue_job_transactions_trim_uuids' => true,
+    ],
 ];
