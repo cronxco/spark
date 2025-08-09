@@ -1,66 +1,351 @@
-@import 'tailwindcss';
-@import '../../vendor/livewire/flux/dist/flux.css';
+/* @import "../../vendor/wire-elements/pro/resources/css/tailwind/spotlight-component.css"; */
 
-@source '../views';
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
-@source '../../vendor/livewire/flux/stubs/**/*.blade.php';
+/* Tailwind */
+@import "tailwindcss";
+/* @plugin 'tailwindcss-animate'; */
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
 
+/* daisyUI */
+@plugin "daisyui" {
+    themes: spark --default, spark-dark --prefersdark;
+}
+@plugin "daisyui/theme" {
+    name: "spark";
+    default: true;
+    prefersdark: false;
+    color-scheme: "light";
+    --color-base-100: #fcfcfc;
+    --color-base-200: #f5f5f5;
+    --color-base-300: #ebebeb;
+    --color-base-content: #161616;
+    --color-primary: #ffbf00;
+    --color-primary-content: #011627;
+    --color-secondary: #f79129;
+    --color-secondary-content: #150701;
+    --color-accent: #244f83;
+    --color-accent-content: #d1dae6;
+    --color-neutral: oklch(27% 0.041 260.031);
+    --color-neutral-content: oklch(98% 0.003 247.858);
+    --color-info: #649ec0;
+    --color-info-content: #03090e;
+    --color-success: #7abaa1;
+    --color-success-content: oklch(26% 0.051 172.552);
+    --color-warning: #b16c89;
+    --color-warning-content: #0c0407;
+    --color-error: #e26969;
+    --color-error-content: #120404;
+    --radius-selector: 0.25rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 1;
+}
+
+@plugin "daisyui/theme" {
+    name: "spark-dark";
+    default: false;
+    prefersdark: true;
+    color-scheme: "dark";
+    --color-base-100: #011627;
+    --color-base-200: #011220;
+    --color-base-300: #010d1a;
+    --color-base-content: oklch(97% 0.001 106.424);
+    --color-primary: #ffd966;
+    --color-primary-content: #011627;
+    --color-secondary: #f5a499;
+    --color-secondary-content: #011627;
+    --color-accent: #8db9dd;
+    --color-accent-content: #011627;
+    --color-neutral: #011220;
+    --color-neutral-content: #ebebeb;
+    --color-info: #a7c7db;
+    --color-info-content: #011220;
+    --color-success: #b3d8c9;
+    --color-success-content: #011220;
+    --color-warning: #d2abbb;
+    --color-warning-content: #011220;
+    --color-error: #e26969;
+    --color-error-content: #011220;
+    --radius-selector: 0.25rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 1;
+}
+
+/* maryUI */
+@source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
+
+/* Dark theme variant support */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Laravel 12 defaults */
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+@source "../../storage/framework/views/*.php";
+@source "../**/*.blade.php";
+@source "../**/*.js";
+@source "../**/*.vue";
+
+/* Theme */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
-
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    --font-display: "Comfortaa", "Nunito", sans-serif;
+    --font-sans: "Nunito", sans-serif;
+    --font-mono: "PT Mono", monospace;
 }
 
-@layer theme {
-    .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+[x-cloak] {
+    display: none;
+}
+
+pretty-json {
+    --key-color: #b02411;
+    --arrow-color: #011627;
+    --brace-color: #244f83;
+    --bracket-color: #244f83;
+    --string-color: #f79129;
+    --number-color: #ffbf00;
+    --null-color: #8f2d56;
+    --boolean-color: #419d78;
+    --comma-color: #011627;
+    --ellipsis-color: #011627;
+
+    --indent: 2rem;
+}
+
+/* Also handle the dark mode */
+@media (prefers-color-scheme: dark) {
+    pretty-json {
+        --key-color: #f5a499;
+        --arrow-color: #ebebeb;
+        --brace-color: #8db9dd;
+        --bracket-color: #8db9dd;
+        --string-color: #fabd7f;
+        --number-color: #ffd966;
+        --null-color: #d2abbb;
+        --boolean-color: #b3d8c9;
+        --comma-color: #ebebeb;
+        --ellipsis-color: #ebebeb;
     }
 }
 
-@layer base {
-
-    *,
-    ::after,
-    ::before,
-    ::backdrop,
-    ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
-    }
+.wep-spotlight-inner-container {
+    @apply mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl bg-base-100 rounded-sm shadow-sm overflow-hidden divide-y antialiased;
+    z-index: 999;
 }
 
-[data-flux-field]:not(ui-radio, ui-checkbox) {
-    @apply grid gap-2;
+.wep-spotlight-input-search-icon {
+    @apply text-base-content pointer-events-none h-5 w-5;
 }
 
-[data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+.wep-spotlight-token-container {
+    @apply flex space-x-1 text-sm;
 }
 
-input:focus[data-flux-control],
-textarea:focus[data-flux-control],
-select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+.wep-spotlight-input {
+    @apply text-base-content rounded-sm pl-1 py-3 bg-base-100 text-sm border-0 block w-full focus:outline-hidden focus:ring-0;
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
+.wep-spotlight-input-escape-icon {
+    @apply w-5 h-5;
+}
+
+/* .wep-spotlight-token-divider {
+    @apply;
 } */
+
+.wep-spotlight-backdrop {
+    @apply fixed inset-0 bg-black/25 transition-opacity backdrop-blur-sm;
+    z-index: 888;
+}
+
+.wep-spotlight-footer {
+    @apply flex flex-wrap items-center justify-between py-2.5 px-4 text-xs bg-base-300 text-base-content;
+}
+
+.wep-spotlight-footer-tip kbd {
+    @apply mx-1 flex h-5 w-5 items-center justify-center rounded-sm border bg-base-100 text-base-content sm:mx-2;
+}
+
+.wep-spotlight-footer-helper-key {
+    @apply mx-1 flex h-5 w-5 items-center justify-center rounded-sm border bg-base-100 sm:mx-2;
+}
+
+.wep-spotlight-group {
+    @apply border-b border-base-300 px-2.5 pb-2 mb-4;
+}
+
+.wep-spotlight-group-title {
+    @apply font-display text-base-content text-xs font-semibold px-2 pb-2;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active {
+    @apply bg-primary/80 dark:bg-primary text-primary-content;
+}
+
+.wep-spotlight-item-icon {
+    @apply h-5 w-5 mr-2 flex-none shrink-0 text-base-content;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-icon {
+    @apply text-primary-content;
+}
+
+.wep-spotlight-item-title {
+    @apply truncate whitespace-nowrap text-base-content;
+}
+
+.wep-spotlight-item-subtitle {
+    @apply text-xs ml-2 truncate whitespace-nowrap font-mono text-base-content;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-title {
+    @apply font-semibold text-primary-content;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-subtitle {
+    @apply text-xs ml-2 truncate whitespace-nowrap font-mono text-primary-content;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-instructions {
+    @apply flex text-primary-content;
+}
+
+.wep-spotlight-item-action-key,
+.wep-spotlight-item-token-key {
+    @apply border rounded-xs text-xs border-secondary font-mono text-primary-content;
+}
+
+.wep-spotlight-no-results-icon {
+    @apply mx-auto h-6 w-6;
+}
+.wep-spotlight-no-results-heading {
+    @apply mt-4 font-semibold;
+}
+.wep-spotlight-no-results-message {
+    @apply mt-2;
+}
+
+.wep-spotlight {
+    @apply relative;
+}
+
+.wep-spotlight-outer-container {
+    @apply fixed inset-0 overflow-y-auto p-4 sm:p-6 md:p-20;
+    z-index: 900;
+}
+
+.wep-spotlight-inner-container.enter {
+    @apply ease-out duration-300;
+}
+
+.wep-spotlight-inner-container.enter.start,
+.wep-spotlight-inner-container.leave.end {
+    @apply opacity-0 scale-95;
+}
+
+.wep-spotlight-inner-container.enter.end,
+.wep-spotlight-inner-container.leave.start {
+    @apply opacity-100 scale-100;
+}
+
+.wep-spotlight-inner-container.leave {
+    @apply ease-in duration-200;
+}
+
+.wep-spotlight-input-container {
+    @apply relative flex items-center space-x-0.5;
+}
+
+.wep-spotlight-input-icon {
+    @apply ml-4 flex items-center w-6;
+}
+
+.wep-spotlight-input-loading-icon {
+    @apply animate-spin h-4 w-4;
+}
+
+.wep-spotlight-input-inner-container {
+    @apply w-full relative;
+}
+
+.wep-spotlight-input-escape {
+    @apply absolute top-0 right-3 h-full flex items-center;
+}
+
+.wep-spotlight-token {
+    @apply text-base-content font-medium whitespace-nowrap;
+}
+
+.wep-spotlight-backdrop.enter {
+    @apply ease-out duration-300;
+}
+
+.wep-spotlight-backdrop.enter.start,
+.wep-spotlight-backdrop.leave.end {
+    @apply opacity-0;
+}
+
+.wep-spotlight-backdrop.enter.end,
+.wep-spotlight-backdrop.leave.start {
+    @apply opacity-100;
+}
+
+.wep-spotlight-backdrop.leave {
+    @apply ease-in duration-200;
+}
+
+.wep-spotlight-footer-tip {
+    @apply flex items-center;
+}
+
+.wep-spotlight-footer-tip-label {
+    @apply font-semibold mr-1;
+}
+
+.wep-spotlight-footer-helper {
+    @apply flex items-center;
+}
+
+.wep-spotlight-footer-helper {
+    @apply flex items-center;
+}
+
+.wep-spotlight-groups {
+    @apply pt-4 pb-2 space-y-2 max-h-96 overflow-y-auto;
+}
+
+.wep-spotlight-groups .wep-spotlight-group:last-child {
+    @apply pb-0 mb-0 border-0;
+}
+
+.wep-spotlight-item {
+    @apply flex px-3 py-2 items-center text-sm rounded-sm relative cursor-pointer;
+}
+
+.wep-spotlight-item-icon img {
+    @apply rounded-full;
+}
+
+.wep-spotlight-item-instructions {
+    @apply hidden ml-auto text-xs space-x-2 shrink-0;
+}
+
+.wep-spotlight-item-action,
+.wep-spotlight-item-token {
+    @apply flex space-x-2;
+}
+
+.wep-spotlight-item-action-description {
+    @apply lowercase;
+}
+
+.wep-spotlight-no-results {
+    @apply py-10 px-6 text-center text-sm sm:px-10;
+}

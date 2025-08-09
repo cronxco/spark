@@ -1,0 +1,9 @@
+---
+description: PHP Standards
+globs:
+alwaysApply: true
+---
+- Follow PSR-1, PSR-2, and PSR-12
+- Use camelCase for non-public-facing strings
+- Use short nullable notation: `?string` not `string|null`
+- Always specify `void` return types when methods return nothing

@@ -15,6 +15,9 @@
                             <div>
                                 <label for="{{ $field }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {{ $config['label'] }}
+                                    @if($config['required'] ?? false)
+                                        <span class="text-red-500">*</span>
+                                    @endif
                                 </label>
                                 
                                 @if(isset($config['description']))
@@ -53,7 +56,8 @@
                                     <input type="number" 
                                            id="{{ $field }}" 
                                            name="{{ $field }}" 
-                                           value="{{ old($field, $integration->configuration[$field] ?? '') }}"
+                                           value="{{ old($field, $integration->configuration[$field] ?? $config['default'] ?? '') }}"
+                                           min="{{ $config['min'] ?? 1 }}"
                                            class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                 @endif
                                 
