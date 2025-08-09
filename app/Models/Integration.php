@@ -108,14 +108,20 @@ class Integration extends Model
      */
     public function isProcessing(): bool
     {
-        // If last_triggered_at is more recent than last_successful_update_at, it's likely processing
-        if ($this->last_triggered_at && 
-            (!$this->last_successful_update_at || 
-             $this->last_triggered_at->isAfter($this->last_successful_update_at))) {
-            return true;
+        if (! $this->last_triggered_at) {
+            return false;
         }
-        
-        return false;
+
+        // Bound the "processing" window to avoid indefinite lockout if a job fails/crashes.
+        // Use update_frequency_minutes where available, clamped to [5, 30] minutes.
+        $windowMinutes = (int) ($this->update_frequency_minutes ?? 15);
+        $windowMinutes = max(5, min(30, $windowMinutes));
+
+        $triggerIsRecent = $this->last_triggered_at->gt(now()->subMinutes($windowMinutes));
+        $triggerAfterLastSuccess = ! $this->last_successful_update_at
+            || $this->last_triggered_at->gt($this->last_successful_update_at);
+
+        return $triggerIsRecent && $triggerAfterLastSuccess;
     }
 
     /**
