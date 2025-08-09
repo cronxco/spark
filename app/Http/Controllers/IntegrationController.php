@@ -97,18 +97,7 @@ class IntegrationController extends Controller
     
 
     
-    public function disconnect(Integration $integration)
-    {
-        // Ensure user owns this integration - convert both to strings for comparison
-        if ((string) $integration->user_id !== (string) Auth::id()) {
-            abort(403);
-        }
-        
-        $integration->delete();
-        
-        return redirect()->route('integrations.index')
-            ->with('success', 'Integration disconnected successfully!');
-    }
+
     
 
 }

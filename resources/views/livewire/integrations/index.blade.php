@@ -2,6 +2,7 @@
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -37,7 +38,10 @@ new class extends Component {
                     'service' => $integration->service,
                     'account_id' => $integration->account_id,
                     'configuration' => $integration->configuration,
+                    'update_frequency_minutes' => $integration->update_frequency_minutes,
                     'last_successful_update_at' => $integration->last_successful_update_at ? $integration->last_successful_update_at->toISOString() : null,
+                    'needs_update' => $integration->needsUpdate(),
+                    'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,
                     'user_id' => $integration->user_id,
                 ];
             })->toArray();
@@ -64,21 +68,34 @@ new class extends Component {
         }
     }
     
-    public function disconnectIntegration(int $integrationId): void
+    public function deleteIntegration($integrationId): void
     {
+        // Convert to string if it's a UUID object
+        $integrationId = (string) $integrationId;
+        
         $integration = Integration::find($integrationId);
         
-        if (!$integration || $integration->user_id !== Auth::id()) {
+        if (!$integration) {
+            $this->error('Integration not found.');
+            return;
+        }
+        
+        if ((string) $integration->user_id !== (string) Auth::id()) {
             $this->error('Integration not found.');
             return;
         }
         
         try {
-            $integration->delete();
-            $this->success('Integration disconnected successfully!');
-            $this->loadData();
+            $result = $integration->delete();
+            
+            if ($result) {
+                $this->success('Integration deleted successfully!');
+                $this->loadData();
+            } else {
+                $this->error('Failed to delete integration. Delete returned false.');
+            }
         } catch (\Exception $e) {
-            $this->error('Failed to disconnect integration. Please try again.');
+            $this->error('Failed to delete integration. Please try again.');
         }
     }
     
@@ -226,8 +243,8 @@ new class extends Component {
                                                 </x-slot:trigger>
                                                 <x-menu-item title="{{ __('Configure') }}" link="{{ route('integrations.configure', $integration['id']) }}" />
                                                 <x-menu-item 
-                                                    title="{{ __('Disconnect') }}" 
-                                                    wire:click="disconnectIntegration({{ $integration['id'] }})"
+                                                    title="{{ __('Delete') }}" 
+                                                    wire:click="deleteIntegration('{{ $integration['id'] }}')"
                                                     class="text-error"
                                                 />
                                             </x-dropdown>
@@ -241,10 +258,10 @@ new class extends Component {
                                         
                                         @if($plugin['type'] === 'oauth')
                                             @php
-                                                $frequency = $integration['configuration']['update_frequency_minutes'] ?? 15;
+                                                $frequency = $integration['update_frequency_minutes'] ?? 15;
                                                 $lastUpdate = $integration['last_successful_update_at'];
-                                                $nextUpdate = null; // We'll need to calculate this differently
-                                                $needsUpdate = false; // We'll need to calculate this differently
+                                                $nextUpdate = $integration['next_update_time'];
+                                                $needsUpdate = $integration['needs_update'];
                                             @endphp
                                             
                                             <div class="text-xs text-base-content/70 mb-2">
@@ -263,7 +280,7 @@ new class extends Component {
                                                     </div>
                                                     @if($nextUpdate)
                                                         <div class="mt-1">
-                                                            Next update: {{ $nextUpdate->diffForHumans() }}
+                                                            Next update: {{ \Carbon\Carbon::parse($nextUpdate)->diffForHumans() }}
                                                         </div>
                                                     @endif
                                                 @else

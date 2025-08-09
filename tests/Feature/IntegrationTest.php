@@ -158,36 +158,7 @@ class IntegrationTest extends TestCase
         $this->assertEquals(15, $integration->update_frequency_minutes);
     }
 
-    public function test_can_disconnect_integration()
-    {
-        $user = User::factory()->create();
-        $integration = Integration::factory()->create([
-            'user_id' => $user->id,
-            'service' => 'github',
-        ]);
-        
-        $response = $this->actingAs($user)
-            ->delete("/integrations/{$integration->id}/disconnect");
-        
-        $response->assertStatus(302);
-        $this->assertDatabaseMissing('integrations', ['id' => $integration->id]);
-    }
 
-    public function test_disconnect_requires_ownership()
-    {
-        $user1 = User::factory()->create();
-        $user2 = User::factory()->create();
-        $integration = Integration::factory()->create([
-            'user_id' => $user1->id,
-            'service' => 'github',
-        ]);
-        
-        $response = $this->actingAs($user2)
-            ->delete("/integrations/{$integration->id}/disconnect");
-        
-        $response->assertStatus(403);
-        $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
-    }
 
     public function test_webhook_handles_valid_request()
     {

@@ -33,7 +33,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/integrations/{service}/oauth/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('/integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
-    Route::delete('/integrations/{integration}/disconnect', [IntegrationController::class, 'disconnect'])->name('integrations.disconnect');
+
 });
 
 // Webhook routes (no auth required)
