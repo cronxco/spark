@@ -25,7 +25,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             @foreach(($types ?? []) as $key => $meta)
                                 <label class="flex items-center gap-3 p-3 rounded-lg bg-base-100">
-                                    <input type="checkbox" name="types[]" value="{{ $key }}" class="checkbox">
+                                    <input type="checkbox" name="types[]" value="{{ $key }}" class="checkbox" @checked(in_array($key, old('types', [])))>
                                     <div>
                                         <div class="font-medium">{{ $meta['label'] ?? ucfirst($key) }}</div>
                                         @if(!empty($meta['description']))
@@ -35,6 +35,9 @@
                                 </label>
                             @endforeach
                         </div>
+                        @error('types')
+                            <div class="text-xs text-error mt-2">{{ $message }}</div>
+                        @enderror
                     </div>
 
                     <!-- Per-type configuration sections -->
@@ -54,16 +57,31 @@
                                         @if(($config['type'] ?? 'string') === 'array' && isset($config['options']))
                                             @foreach($config['options'] as $value => $label)
                                                 <label class="flex items-center gap-2">
-                                                    <input type="checkbox" name="config[{{ $typeKey }}][{{ $field }}][]" value="{{ $value }}" class="checkbox">
+                                                    <input type="checkbox" name="config[{{ $typeKey }}][{{ $field }}][]" value="{{ $value }}" class="checkbox" @checked(in_array($value, old('config.'.$typeKey.'.'.$field, [])))>
                                                     <span>{{ $label }}</span>
                                                 </label>
                                             @endforeach
+                                             @error('config.'.$typeKey.'.'.$field)
+                                                 <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                             @enderror
+                                             @error('config.'.$typeKey.'.'.$field.'.*')
+                                                 <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                             @enderror
                                         @elseif(($config['type'] ?? 'string') === 'array')
-                                            <x-textarea name="config[{{ $typeKey }}][{{ $field }}]" rows="3" placeholder="{{ __('Comma-separated values') }}" />
+                                             <x-textarea name="config[{{ $typeKey }}][{{ $field }}]" rows="3" placeholder="{{ __('Comma-separated values') }}" value="{{ old('config.'.$typeKey.'.'.$field) }}" />
+                                             @error('config.'.$typeKey.'.'.$field)
+                                                 <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                             @enderror
                                         @elseif(($config['type'] ?? 'string') === 'integer')
-                                            <x-input type="number" name="config[{{ $typeKey }}][{{ $field }}]" min="{{ $config['min'] ?? 1 }}" />
+                                             <x-input type="number" name="config[{{ $typeKey }}][{{ $field }}]" min="{{ $config['min'] ?? 1 }}" value="{{ old('config.'.$typeKey.'.'.$field) }}" />
+                                             @error('config.'.$typeKey.'.'.$field)
+                                                 <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                             @enderror
                                         @else
-                                            <x-input name="config[{{ $typeKey }}][{{ $field }}]" />
+                                             <x-input name="config[{{ $typeKey }}][{{ $field }}]" value="{{ old('config.'.$typeKey.'.'.$field) }}" />
+                                             @error('config.'.$typeKey.'.'.$field)
+                                                 <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                             @enderror
                                         @endif
                                         @if(isset($config['description']))
                                             <div class="text-xs text-base-content/70 mt-1">{{ $config['description'] }}</div>

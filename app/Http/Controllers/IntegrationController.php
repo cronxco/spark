@@ -9,6 +9,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Arr;
+use Illuminate\Validation\Rule;
 
 class IntegrationController extends Controller
 {
@@ -26,15 +28,11 @@ class IntegrationController extends Controller
         
         try {
             // Create a new auth group and start OAuth
-            if (!method_exists($plugin, 'initializeGroup')) {
-                // Back-compat fallback
-                $integration = $plugin->initialize($user);
-                $oauthUrl = method_exists($plugin, 'getOAuthUrl')
-                    ? $plugin->getOAuthUrl($integration)
-                    : '';
-            } else {
+            if ($plugin instanceof \App\Integrations\Contracts\OAuthIntegrationPlugin) {
                 $group = $plugin->initializeGroup($user);
                 $oauthUrl = $plugin->getOAuthUrl($group);
+            } else {
+                throw new \Exception('Plugin does not support OAuth');
             }
             
             Log::info('OAuth flow initiated', [
@@ -210,14 +208,50 @@ class IntegrationController extends Controller
             abort(404);
         }
         $plugin = new $pluginClass();
-        $data = $request->validate([
+        // Allowed instance types from plugin
+        $typesMeta = method_exists($pluginClass, 'getInstanceTypes') ? $pluginClass::getInstanceTypes() : [];
+        $allowedTypes = array_keys($typesMeta);
+
+        // Build validation rules
+        $rules = [
             'types' => ['required','array','min:1'],
+            'types.*' => ['string', Rule::in($allowedTypes)],
             'config' => ['array'],
-        ]);
-        // Retrieve schema for normalization of array-type fields
-        $schema = method_exists($pluginClass, 'getConfigurationSchema')
-            ? $pluginClass::getConfigurationSchema()
-            : [];
+        ];
+
+        // Add per-field rules based on schema for each allowed type
+        foreach ($allowedTypes as $typeKey) {
+            $schema = $typesMeta[$typeKey]['schema'] ?? [];
+            foreach ($schema as $field => $fieldConfig) {
+                $fieldRules = [];
+                $isRequired = (bool) ($fieldConfig['required'] ?? false);
+                $fieldType = $fieldConfig['type'] ?? 'string';
+                $min = $fieldConfig['min'] ?? null;
+
+                $fieldRules[] = $isRequired ? 'required' : 'nullable';
+                switch ($fieldType) {
+                    case 'integer':
+                        $fieldRules[] = 'integer';
+                        if ($min !== null) {
+                            $fieldRules[] = 'min:'.$min;
+                        }
+                        break;
+                    case 'array':
+                        $fieldRules[] = 'array';
+                        break;
+                    default:
+                        $fieldRules[] = 'string';
+                        break;
+                }
+                $rules["config.$typeKey.$field"] = $fieldRules;
+            }
+        }
+
+        $data = $request->validate($rules);
+
+        // Only keep config entries for selected types
+        $selectedTypes = $data['types'];
+        $data['config'] = Arr::only(($data['config'] ?? []), $selectedTypes);
         foreach ($data['types'] as $type) {
             $initial = $data['config'][$type] ?? [];
             // Extract frequency to instance column if present
@@ -226,7 +260,8 @@ class IntegrationController extends Controller
                 unset($initial['update_frequency_minutes']);
             }
             // Normalize schema-declared array fields that may arrive as strings
-            foreach ($schema as $field => $fieldConfig) {
+            $schemaForType = $typesMeta[$type]['schema'] ?? [];
+            foreach ($schemaForType as $field => $fieldConfig) {
                 if (($fieldConfig['type'] ?? null) === 'array' && isset($initial[$field]) && is_string($initial[$field])) {
                     $raw = $initial[$field];
                     $decoded = json_decode($raw, true);

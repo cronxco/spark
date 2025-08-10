@@ -13,9 +13,22 @@ state([
 ]);
 
 $events = computed(function () {
-    $selectedDate = Carbon::parse($this->date);
+    try {
+        $selectedDate = Carbon::parse($this->date);
+    } catch (\Throwable $e) {
+        $selectedDate = Carbon::today();
+    }
 
     $query = Event::with(['actor', 'target', 'integration', 'tags'])
+        ->whereHas('integration', function ($q) {
+            $userId = optional(auth()->guard('web')->user())->id;
+            if ($userId) {
+                $q->where('user_id', $userId);
+            } else {
+                // Force empty result if no auth user
+                $q->whereRaw('1 = 0');
+            }
+        })
         ->whereDate('time', $selectedDate)
         ->orderBy('time', 'desc');
 
@@ -37,7 +50,11 @@ $events = computed(function () {
 });
 
 $dateLabel = computed(function () {
-    $date = Carbon::parse($this->date);
+    try {
+        $date = Carbon::parse($this->date);
+    } catch (\Throwable $e) {
+        $date = Carbon::today();
+    }
 
     if ($date->isToday()) {
         return 'Today';
@@ -67,7 +84,17 @@ $event = computed(function () {
         'tags',
         'actor.tags',
         'target.tags'
-    ])->find($this->eventId);
+    ])
+    ->where('id', $this->eventId)
+    ->whereHas('integration', function ($q) {
+        $userId = optional(auth()->guard('web')->user())->id;
+        if ($userId) {
+            $q->where('user_id', $userId);
+        } else {
+            $q->whereRaw('1 = 0');
+        }
+    })
+    ->first();
 });
 
 $viewEvent = function ($id) {
@@ -81,11 +108,21 @@ $goBack = function () {
 };
 
 $previousDay = function () {
-    $this->date = Carbon::parse($this->date)->subDay()->format('Y-m-d');
+    try {
+        $current = Carbon::parse($this->date);
+    } catch (\Throwable $e) {
+        $current = Carbon::today();
+    }
+    $this->date = $current->copy()->subDay()->format('Y-m-d');
 };
 
 $nextDay = function () {
-    $this->date = Carbon::parse($this->date)->addDay()->format('Y-m-d');
+    try {
+        $current = Carbon::parse($this->date);
+    } catch (\Throwable $e) {
+        $current = Carbon::today();
+    }
+    $this->date = $current->copy()->addDay()->format('Y-m-d');
 };
 
 ?>

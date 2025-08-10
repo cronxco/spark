@@ -12,4 +12,5 @@ Artisan::command('inspire', function () {
 // Schedule integration update check job every minute
 Schedule::job(new CheckIntegrationUpdates())
     ->everyThirtySeconds()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();

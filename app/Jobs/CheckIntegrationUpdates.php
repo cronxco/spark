@@ -44,10 +44,13 @@ class CheckIntegrationUpdates implements ShouldQueue
             Log::info('Starting integration update check');
             
             // Get integrations that need updating (OAuth instances with a valid group token)
-            $integrations = Integration::whereHas('user')
+            $integrations = Integration::with(['user', 'group'])
+                ->whereHas('user')
                 ->whereHas('group', function ($q) {
                     $q->whereNotNull('access_token');
                 })
+                // Only OAuth service integrations
+                ->whereIn('service', \App\Integrations\PluginRegistry::getOAuthPlugins()->keys())
                 ->needsUpdate()
                 ->get();
             

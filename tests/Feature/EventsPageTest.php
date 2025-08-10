@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Event;
+use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -35,16 +36,21 @@ class EventsPageTest extends TestCase
         /** @var User $user */
         $user = User::factory()->createOne();
         
+        // Ensure events belong to the acting user via integration
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+
         // Create an event from today
         $todayEvent = Event::factory()->create([
             'time' => now(),
             'action' => 'test_action_today',
+            'integration_id' => $integration->id,
         ]);
 
-        // Create an event from yesterday
+        // Create an event from yesterday (same user)
         $yesterdayEvent = Event::factory()->create([
             'time' => now()->subDay(),
             'action' => 'test_action_yesterday',
+            'integration_id' => $integration->id,
         ]);
 
         $response = $this->actingAs($user)

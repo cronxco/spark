@@ -19,6 +19,7 @@ class IntegrationGroup extends Model
         'user_id',
         'service',
         'account_id',
+        'webhook_secret',
         'access_token',
         'refresh_token',
         'expiry',

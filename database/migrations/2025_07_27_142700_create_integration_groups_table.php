@@ -14,16 +14,27 @@ class CreateIntegrationGroupsTable extends Migration
             $table->uuid('user_id');
             $table->text('service');
             $table->text('account_id')->nullable();
+            $table->text('webhook_secret')->nullable();
             $table->text('access_token')->nullable();
             $table->text('refresh_token')->nullable();
             $table->timestampTz('expiry')->nullable();
             $table->timestampTz('refresh_expiry')->nullable();
-            $table->jsonb('auth_metadata')->nullable();
+            $table->jsonb('auth_metadata')->default(DB::raw("'{}'::jsonb"));
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
-            $table->foreign('user_id')->references('id')->on('users');
+            // Indexes for performance
+            $table->index('user_id');
+            $table->index('service');
+            $table->index('account_id');
+            // If a user is deleted, remove their integration groups
+            $table->foreign('user_id')
+                ->references('id')
+                ->on('users')
+                ->onDelete('cascade');
         });
+        // Partial unique index (user_id, service, account_id) where account_id IS NOT NULL
+        DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS integration_groups_user_service_account_unique ON integration_groups (user_id, service, account_id) WHERE account_id IS NOT NULL');
     }
 
     public function down(): void

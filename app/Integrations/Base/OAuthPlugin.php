@@ -2,7 +2,7 @@
 
 namespace App\Integrations\Base;
 
-use App\Integrations\Contracts\IntegrationPlugin;
+use App\Integrations\Contracts\OAuthIntegrationPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
 
-abstract class OAuthPlugin implements IntegrationPlugin
+abstract class OAuthPlugin implements OAuthIntegrationPlugin
 {
     protected string $baseUrl;
     protected string $clientId;
@@ -109,7 +109,7 @@ abstract class OAuthPlugin implements IntegrationPlugin
         
         // Verify state
         $stateData = decrypt($state);
-        if ($stateData['group_id'] !== $group->id) {
+        if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
             throw new \Exception('Invalid state parameter');
         }
         
@@ -195,6 +195,10 @@ abstract class OAuthPlugin implements IntegrationPlugin
                 $this->refreshToken($group);
             }
             $token = $group->access_token;
+        }
+
+        if (empty($token)) {
+            throw new \Exception('Missing access token for authenticated request');
         }
         
         $hub = SentrySdk::getCurrentHub();

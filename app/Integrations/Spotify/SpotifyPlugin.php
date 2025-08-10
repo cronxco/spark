@@ -140,11 +140,42 @@ class SpotifyPlugin extends OAuthPlugin
     
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
+        $error = $request->get('error');
+        if ($error) {
+            Log::error('Spotify OAuth callback returned error', [
+                'group_id' => $group->id,
+                'error' => $error,
+                'error_description' => $request->get('error_description'),
+            ]);
+            throw new \Exception('Spotify authorization failed: ' . $error);
+        }
+
         $code = $request->get('code');
+        if (!$code) {
+            Log::error('Spotify OAuth callback missing authorization code', [
+                'group_id' => $group->id,
+            ]);
+            throw new \Exception('Invalid OAuth callback: missing authorization code');
+        }
+
         $state = $request->get('state');
+        if (!$state) {
+            Log::error('Spotify OAuth callback missing state parameter', [
+                'group_id' => $group->id,
+            ]);
+            throw new \Exception('Invalid OAuth callback: missing state parameter');
+        }
         
         // Verify state
-        $stateData = decrypt($state);
+        try {
+            $stateData = decrypt($state);
+        } catch (\Throwable $e) {
+            Log::error('Spotify OAuth state decryption failed', [
+                'group_id' => $group->id,
+                'exception' => $e->getMessage(),
+            ]);
+            throw new \Exception('Invalid OAuth callback: state decryption failed');
+        }
         
         if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
             throw new \Exception('Invalid state parameter');
@@ -207,6 +238,12 @@ class SpotifyPlugin extends OAuthPlugin
     
     protected function refreshToken(IntegrationGroup $group): void
     {
+        if (empty($group->refresh_token)) {
+            Log::error('Spotify token refresh skipped: missing refresh_token', [
+                'group_id' => $group->id,
+            ]);
+            return;
+        }
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST https://accounts.spotify.com/api/token'));

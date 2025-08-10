@@ -131,10 +131,43 @@ class GitHubPlugin extends OAuthPlugin
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
-        $code = $request->get('code');
-        $state = $request->get('state');
+        // Handle explicit OAuth error first
+        $error = $request->get('error');
+        if ($error) {
+            Log::error('GitHub OAuth callback returned error', [
+                'group_id' => $group->id,
+                'error' => $error,
+                'error_description' => $request->get('error_description'),
+            ]);
+            throw new \Exception('GitHub authorization failed: ' . $error);
+        }
 
-        $stateData = decrypt($state);
+        $code = $request->get('code');
+        if (!$code) {
+            Log::error('GitHub OAuth callback missing authorization code', [
+                'group_id' => $group->id,
+            ]);
+            throw new \Exception('Invalid OAuth callback: missing authorization code');
+        }
+
+        $state = $request->get('state');
+        if (!$state) {
+            Log::error('GitHub OAuth callback missing state parameter', [
+                'group_id' => $group->id,
+            ]);
+            throw new \Exception('Invalid OAuth callback: missing state parameter');
+        }
+
+        try {
+            $stateData = decrypt($state);
+        } catch (\Throwable $e) {
+            Log::error('GitHub OAuth state decryption failed', [
+                'group_id' => $group->id,
+                'exception' => $e->getMessage(),
+            ]);
+            throw new \Exception('Invalid OAuth callback: state decryption failed');
+        }
+
         if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
             throw new \Exception('Invalid state parameter');
         }
@@ -264,7 +297,11 @@ class GitHubPlugin extends OAuthPlugin
             return true;
         }
         
-        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $integration->account_id);
+        $secret = $integration->group?->webhook_secret;
+        if (empty($secret)) {
+            return true;
+        }
+        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
         
         return hash_equals($expectedSignature, $signature);
     }
@@ -320,9 +357,13 @@ class GitHubPlugin extends OAuthPlugin
         $tempIntegration->setRelation('group', $group);
         $userData = $this->makeAuthenticatedRequest('/user', $tempIntegration);
 
-        $group->update([
-            'account_id' => $userData['login'],
-        ]);
+        $updates = [
+            'account_id' => $userData['login'] ?? $group->account_id,
+        ];
+        if (empty($group->webhook_secret)) {
+            $updates['webhook_secret'] = bin2hex(random_bytes(16));
+        }
+        $group->update($updates);
     }
     
     public function fetchData(Integration $integration): void
@@ -445,6 +486,11 @@ class GitHubPlugin extends OAuthPlugin
     
     protected function convertPushEvent(array $data, Integration $integration): array
     {
+        // Ensure we have a stable unique source ID
+        if (empty($data['id'])) {
+            return ['events' => []];
+        }
+
         $actor = [
             'concept' => 'user',
             'type' => 'github_user',

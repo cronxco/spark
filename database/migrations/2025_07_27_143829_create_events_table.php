@@ -32,9 +32,14 @@ return new class extends Migration
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
+            
+            // Foreign keys
             $table->foreign('target_id')->references('id')->on('objects');
             $table->foreign('actor_id')->references('id')->on('objects');
             $table->foreign('integration_id')->references('id')->on('integrations');
+
+            // Ensure no duplicate events per integration
+            $table->unique(['integration_id', 'source_id'], 'events_integration_source_unique');
         });
     }
 

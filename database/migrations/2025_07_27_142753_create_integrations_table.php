@@ -27,8 +27,15 @@ return new class extends Migration
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
+            // Indexes for performance
+            $table->index('user_id');
+            $table->index('integration_group_id');
+            // Foreign keys
             $table->foreign('user_id')->references('id')->on('users');
-            $table->foreign('integration_group_id')->references('id')->on('integration_groups');
+            $table->foreign('integration_group_id')
+                ->references('id')
+                ->on('integration_groups')
+                ->onDelete('cascade');
         });
     }
 

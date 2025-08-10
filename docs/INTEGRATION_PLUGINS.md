@@ -90,7 +90,7 @@ interface IntegrationPlugin
 }
 ```
 
-### 2. OAuth Plugin Base Class
+### 2. OAuth Plugin Base Class (Group-first lifecycle)
 
 ```php
 <?php
@@ -115,27 +115,37 @@ abstract class OAuthPlugin implements IntegrationPlugin
         return 'oauth';
     }
     
-    public function initialize(User $user): Integration
+    // Group-first lifecycle
+    public function initializeGroup(User $user): IntegrationGroup
     {
-        $integration = Integration::create([
+        return IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => static::getIdentifier(),
-            'name' => static::getDisplayName(),
             'account_id' => null,
             'access_token' => null,
             'refresh_token' => null,
             'expiry' => null,
             'refresh_expiry' => null,
         ]);
-        
-        return $integration;
     }
     
-    public function getOAuthUrl(Integration $integration): string
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    {
+        return Integration::create([
+            'user_id' => $group->user_id,
+            'integration_group_id' => $group->id,
+            'service' => static::getIdentifier(),
+            'name' => static::getDisplayName(),
+            'instance_type' => $instanceType,
+            'configuration' => $initialConfig,
+        ]);
+    }
+    
+    public function getOAuthUrl(IntegrationGroup $group): string
     {
         $state = encrypt([
-            'integration_id' => $integration->id,
-            'user_id' => $integration->user_id,
+            'group_id' => $group->id,
+            'user_id' => $group->user_id,
         ]);
         
         $params = [
@@ -149,14 +159,14 @@ abstract class OAuthPlugin implements IntegrationPlugin
         return $this->baseUrl . '/oauth/authorize?' . http_build_query($params);
     }
     
-    public function handleOAuthCallback(Request $request, Integration $integration): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         $code = $request->get('code');
         $state = $request->get('state');
         
         // Verify state
         $stateData = decrypt($state);
-        if ($stateData['integration_id'] !== $integration->id) {
+        if ($stateData['group_id'] !== $group->id) {
             throw new \Exception('Invalid state parameter');
         }
         
@@ -175,25 +185,23 @@ abstract class OAuthPlugin implements IntegrationPlugin
         
         $tokenData = $response->json();
         
-        // Update integration with tokens
-        $integration->update([
-            'access_token' => $tokenData['access_token'],
+        // Update group with tokens
+        $group->update([
+            'access_token' => $tokenData['access_token'] ?? null,
             'refresh_token' => $tokenData['refresh_token'] ?? null,
-            'expiry' => isset($tokenData['expires_in']) 
-                ? now()->addSeconds($tokenData['expires_in']) 
-                : null,
+            'expiry' => isset($tokenData['expires_in']) ? now()->addSeconds($tokenData['expires_in']) : null,
         ]);
         
         // Fetch account information
-        $this->fetchAccountInfo($integration);
+        $this->fetchAccountInfoForGroup($group);
     }
     
-    protected function refreshToken(Integration $integration): void
+    protected function refreshToken(IntegrationGroup $group): void
     {
         $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
-            'refresh_token' => $integration->refresh_token,
+            'refresh_token' => $group->refresh_token,
             'grant_type' => 'refresh_token',
         ]);
         
@@ -203,23 +211,25 @@ abstract class OAuthPlugin implements IntegrationPlugin
         
         $tokenData = $response->json();
         
-        $integration->update([
+        $group->update([
             'access_token' => $tokenData['access_token'],
-            'refresh_token' => $tokenData['refresh_token'] ?? $integration->refresh_token,
-            'expiry' => isset($tokenData['expires_in']) 
-                ? now()->addSeconds($tokenData['expires_in']) 
-                : null,
+            'refresh_token' => $tokenData['refresh_token'] ?? $group->refresh_token,
+            'expiry' => isset($tokenData['expires_in']) ? now()->addSeconds($tokenData['expires_in']) : null,
         ]);
     }
     
     protected function makeAuthenticatedRequest(string $endpoint, Integration $integration): array
     {
-        // Check if token needs refresh
-        if ($integration->expiry && $integration->expiry->isPast()) {
-            $this->refreshToken($integration);
+        $group = $integration->group;
+        $token = $integration->access_token;
+        if ($group) {
+            if ($group->expiry && $group->expiry->isPast()) {
+                $this->refreshToken($group);
+            }
+            $token = $group->access_token;
         }
         
-        $response = Http::withToken($integration->access_token)
+        $response = Http::withToken($token)
             ->get($this->baseUrl . $endpoint);
             
         if (!$response->successful()) {
@@ -230,11 +240,11 @@ abstract class OAuthPlugin implements IntegrationPlugin
     }
     
     abstract protected function getRequiredScopes(): string;
-    abstract protected function fetchAccountInfo(Integration $integration): void;
+    abstract protected function fetchAccountInfoForGroup(IntegrationGroup $group): void;
 }
 ```
 
-### 3. Webhook Plugin Base Class
+### 3. Webhook Plugin Base Class (Group-first aware)
 
 ```php
 <?php
@@ -254,23 +264,26 @@ abstract class WebhookPlugin implements IntegrationPlugin
         return 'webhook';
     }
     
-    public function initialize(User $user): Integration
+    public function initializeGroup(User $user): IntegrationGroup
     {
         $webhookSecret = Str::random(32);
-        $webhookUrl = route('webhook.' . static::getIdentifier(), ['secret' => $webhookSecret]);
-        
-        $integration = Integration::create([
+        return IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => static::getIdentifier(),
-            'name' => static::getDisplayName(),
-            'account_id' => $webhookSecret,
-            'access_token' => $webhookUrl,
-            'refresh_token' => null,
-            'expiry' => null,
-            'refresh_expiry' => null,
+            'account_id' => $webhookSecret, // used as signing secret
         ]);
-        
-        return $integration;
+    }
+    
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    {
+        return Integration::create([
+            'user_id' => $group->user_id,
+            'integration_group_id' => $group->id,
+            'service' => static::getIdentifier(),
+            'name' => static::getDisplayName(),
+            'instance_type' => $instanceType,
+            'configuration' => $initialConfig,
+        ]);
     }
     
     public function handleWebhook(Request $request, Integration $integration): void
@@ -412,7 +425,7 @@ class PluginRegistry
 }
 ```
 
-### 5. Example OAuth Plugin Implementation
+### 5. Example OAuth Plugin Implementation (Group-first)
 
 ```php
 <?php
@@ -480,13 +493,13 @@ class GitHubPlugin extends OAuthPlugin
         return 'repo read:user';
     }
     
-    protected function fetchAccountInfo(Integration $integration): void
+    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
     {
-        $userData = $this->makeAuthenticatedRequest('/user', $integration);
-        
-        $integration->update([
-            'account_id' => $userData['login'],
-        ]);
+        // Create a temp Integration bound to the group to reuse HTTP helper
+        $temp = new Integration();
+        $temp->setRelation('group', $group);
+        $userData = $this->makeAuthenticatedRequest('/user', $temp);
+        $group->update(['account_id' => $userData['login']]);
     }
     
     public function fetchData(Integration $integration): void
@@ -1203,19 +1216,25 @@ return new class extends Migration
 PluginRegistry::register(GitHubPlugin::class);
 ```
 
-### Creating an Integration
+### Initializing and Creating Instances
 
 ```php
 $user = Auth::user();
 $plugin = new GitHubPlugin();
-$integration = $plugin->initialize($user);
+$group = $plugin->initializeGroup($user);
+
+// After OAuth callback succeeds, create instances during onboarding
+$instance = $plugin->createInstance($group, 'activity', [
+    'repositories' => ['owner/repo'],
+    'events' => ['push','pull_request'],
+]);
 ```
 
-### Handling OAuth Callback
+### Handling OAuth Callback (Group)
 
 ```php
 $plugin = new GitHubPlugin();
-$plugin->handleOAuthCallback($request, $integration);
+$plugin->handleOAuthCallback($request, $group);
 ```
 
 ### Processing Webhooks
