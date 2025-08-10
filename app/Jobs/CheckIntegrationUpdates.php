@@ -10,6 +10,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Sentry\SentrySdk;
+use Sentry\Tracing\TransactionContext;
 
 class CheckIntegrationUpdates implements ShouldQueue
 {
@@ -31,6 +33,13 @@ class CheckIntegrationUpdates implements ShouldQueue
      */
     public function handle(): void
     {
+        $hub = SentrySdk::getCurrentHub();
+        $txContext = new TransactionContext();
+        $txContext->setName('job.check_integration_updates');
+        $txContext->setOp('job');
+        $transaction = $hub->startTransaction($txContext);
+        $hub->setSpan($transaction);
+
         try {
             Log::info('Starting integration update check');
             
@@ -78,18 +87,31 @@ class CheckIntegrationUpdates implements ShouldQueue
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
                     ]);
+                    \Sentry\captureException($e);
                 }
             }
             
+            \Sentry\captureMessage('CheckIntegrationUpdates summary', \Sentry\Severity::info(), \Sentry\EventHint::fromArray(['extra' => [
+                'scheduled' => $scheduledCount,
+                'skipped' => $skippedCount,
+                'total_due' => $integrations->count(),
+            ]]));
+            
             Log::info("Integration update check completed: {$scheduledCount} scheduled, {$skippedCount} skipped");
+            $transaction->setStatus(\Sentry\Tracing\SpanStatus::ok());
             
         } catch (\Exception $e) {
             Log::error('Failed to check integration updates', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+            \Sentry\captureException($e);
+            $transaction->setStatus(\Sentry\Tracing\SpanStatus::internalError());
             
             throw $e;
+        } finally {
+            $transaction->finish();
+            $hub->setSpan(null);
         }
     }
 
@@ -102,5 +124,6 @@ class CheckIntegrationUpdates implements ShouldQueue
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
+        \Sentry\captureException($exception);
     }
 }
