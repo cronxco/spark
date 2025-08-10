@@ -248,6 +248,14 @@ class IntegrationController extends Controller
         }
 
         $data = $request->validate($rules);
+        // Validate optional migration timebox
+        $timeboxMinutes = null;
+        if ($request->filled('migration_timebox_minutes')) {
+            $timeboxMinutes = (int) $request->input('migration_timebox_minutes');
+            if ($timeboxMinutes < 1) {
+                $timeboxMinutes = null;
+            }
+        }
 
         // Only keep config entries for selected types
         $selectedTypes = $data['types'];
@@ -285,6 +293,14 @@ class IntegrationController extends Controller
                 }
                 if ($frequency !== null) {
                     $instance->update(['update_frequency_minutes' => (int) $frequency]);
+                }
+
+                // Optional historical migration trigger
+                if ($request->boolean('run_migration')) {
+                    $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
+                    \App\Jobs\Migrations\StartIntegrationMigration::dispatch($instance, $timeboxUntil)
+                        ->onConnection('redis')
+                        ->onQueue('migration');
                 }
             }
         }

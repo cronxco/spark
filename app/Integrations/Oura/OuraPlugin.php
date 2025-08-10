@@ -1065,6 +1065,275 @@ class OuraPlugin extends OAuthPlugin
             'content' => (string) $label,
         ]);
     }
+
+    // Public helper for migration processing: converts items into events per instance type
+    public function processOuraMigrationItems(Integration $integration, string $instanceType, array $items): void
+    {
+        switch ($instanceType) {
+            case 'activity':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'activity', $item, [
+                        'score_field' => 'score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Activity',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                        'details_fields' => ['steps', 'cal_total', 'equivalent_walking_distance', 'target_calories', 'non_wear_time'],
+                    ]);
+                }
+                break;
+            case 'sleep_records':
+                foreach ($items as $item) {
+                    $this->createSleepRecordFromItem($integration, $item);
+                }
+                break;
+            case 'sleep':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'sleep', $item, [
+                        'score_field' => 'score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Sleep',
+                        'value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'readiness':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'readiness', $item, [
+                        'score_field' => 'score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Readiness',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'resilience':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'resilience', $item, [
+                        'score_field' => 'resilience_score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Resilience',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'stress':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'stress', $item, [
+                        'score_field' => 'stress_score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Stress',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'spo2':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'spo2', $item, [
+                        'score_field' => 'spo2_average',
+                        'contributors_field' => null,
+                        'title' => 'SpO2',
+                        'value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'workouts':
+                foreach ($items as $item) {
+                    $this->createWorkoutEvent($integration, $item);
+                }
+                break;
+            case 'sessions':
+                foreach ($items as $item) {
+                    $this->createSessionEvent($integration, $item);
+                }
+                break;
+            case 'tags':
+                foreach ($items as $item) {
+                    $this->createTagEvent($integration, $item);
+                }
+                break;
+            default:
+                // leave unsupported types to other paths
+                break;
+        }
+    }
+
+    /**
+     * Public helper for migration: fetch a window for a given instance type with headers/status.
+     * Cursor: start_date/end_date (Y-m-d) or start_datetime/end_datetime (ISO8601 for heartrate)
+     * Returns array with keys: ok, status, headers, items
+     */
+    public function fetchWindowWithMeta(Integration $integration, string $instanceType, array $cursor): array
+    {
+        $endpoint = null;
+        $query = [];
+        if ($instanceType === 'heartrate') {
+            $endpoint = '/usercollection/heartrate';
+            $query = [
+                'start_datetime' => $cursor['start_datetime'] ?? now()->subDays(6)->toIso8601String(),
+                'end_datetime' => $cursor['end_datetime'] ?? now()->toIso8601String(),
+            ];
+        } else {
+            $endpoint = match ($instanceType) {
+                'activity' => '/usercollection/daily_activity',
+                'sleep' => '/usercollection/daily_sleep',
+                'sleep_records' => '/usercollection/sleep',
+                'readiness' => '/usercollection/daily_readiness',
+                'resilience' => '/usercollection/daily_resilience',
+                'stress' => '/usercollection/daily_stress',
+                'workouts' => '/usercollection/workout',
+                'sessions' => '/usercollection/session',
+                'tags' => '/usercollection/tag',
+                'spo2' => '/usercollection/daily_spo2',
+                default => null,
+            };
+            $query = [
+                'start_date' => $cursor['start_date'] ?? now()->subDays(29)->toDateString(),
+                'end_date' => $cursor['end_date'] ?? now()->toDateString(),
+            ];
+        }
+
+        if (!$endpoint) {
+            return [
+                'ok' => false,
+                'status' => 400,
+                'headers' => [],
+                'items' => [],
+            ];
+        }
+
+        // Token handling like getJson, but we need headers/status
+        $group = $integration->group;
+        $token = $group?->access_token;
+        if ($group && $group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+            $token = $group->access_token;
+        }
+        if (empty($token)) {
+            return [
+                'ok' => false,
+                'status' => 401,
+                'headers' => [],
+                'items' => [],
+            ];
+        }
+
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $desc = 'GET ' . $this->baseUrl . $endpoint . (!empty($query) ? '?' . http_build_query($query) : '');
+        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription($desc));
+        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
+        $span?->finish();
+
+        $ok = $response->successful();
+        $status = $response->status();
+        $headers = $response->headers();
+        $json = $ok ? ($response->json() ?? []) : [];
+        $items = $json['data'] ?? $json ?? [];
+
+        if (!$ok) {
+            Log::warning('Oura window fetch failed', [
+                'endpoint' => $endpoint,
+                'status' => $status,
+                'response' => $response->body(),
+            ]);
+        }
+
+        return [
+            'ok' => $ok,
+            'status' => $status,
+            'headers' => $headers,
+            'items' => is_array($items) ? $items : [],
+        ];
+    }
+
+    /**
+     * Helper used by migration for sleep_records
+     */
+    private function createSleepRecordFromItem(Integration $integration, array $item): void
+    {
+        $start = Arr::get($item, 'bedtime_start');
+        $end = Arr::get($item, 'bedtime_end');
+        $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
+        $id = Arr::get($item, 'id') ?? md5(json_encode([$day, Arr::get($item, 'duration', 0), Arr::get($item, 'total', 0)]));
+        $sourceId = "oura_sleep_record_{$integration->id}_{$id}";
+        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+        if ($exists) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+        $target = EventObject::updateOrCreate([
+            'integration_id' => $integration->id,
+            'concept' => 'sleep',
+            'type' => 'oura_sleep_record',
+            'title' => 'Sleep Record',
+        ], [
+            'time' => $start ?? ($day . ' 00:00:00'),
+            'content' => 'Detailed sleep record including stages and efficiency',
+            'metadata' => $item,
+        ]);
+
+        $duration = (int) Arr::get($item, 'duration', 0);
+        $efficiency = Arr::get($item, 'efficiency');
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $start ?? ($day . ' 00:00:00'),
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => 'sleep',
+            'action' => 'slept_for',
+            'value' => $duration,
+            'value_multiplier' => 1,
+            'value_unit' => 'seconds',
+            'event_metadata' => [
+                'end' => $end,
+                'efficiency' => $efficiency,
+            ],
+            'target_id' => $target->id,
+        ]);
+
+        $stages = Arr::get($item, 'sleep_stages', []);
+        $stageMap = [
+            'deep' => 'Deep Sleep',
+            'light' => 'Light Sleep',
+            'rem' => 'REM Sleep',
+            'awake' => 'Awake Time',
+        ];
+        foreach (['deep', 'light', 'rem', 'awake'] as $stage) {
+            $seconds = Arr::get($stages, $stage);
+            if ($seconds === null) {
+                continue;
+            }
+            $event->blocks()->create([
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
+                'content' => 'Stage duration',
+                'value' => (int) $seconds,
+                'value_multiplier' => 1,
+                'value_unit' => 'seconds',
+            ]);
+        }
+
+        $hrAvg = Arr::get($item, 'average_heart_rate');
+        if ($hrAvg !== null) {
+            [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
+            $event->blocks()->create([
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Average Heart Rate',
+                'content' => 'Average sleeping heart rate',
+                'value' => $encodedHrAvg,
+                'value_multiplier' => $hrAvgMultiplier,
+                'value_unit' => 'bpm',
+            ]);
+        }
+    }
 }
 
 
