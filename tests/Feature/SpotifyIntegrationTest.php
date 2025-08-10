@@ -26,6 +26,8 @@ class SpotifyIntegrationTest extends TestCase
 
     public function test_spotify_plugin_can_be_initialized()
     {
+        // Note: when SpotifyPlugin migrates fully to IntegrationGroup, update this test
+        // to assert group creation and onboarding redirect.
         $user = User::factory()->create();
         $plugin = new SpotifyPlugin();
         
@@ -78,7 +80,6 @@ class SpotifyIntegrationTest extends TestCase
             'user_id' => $user->id,
             'service' => 'spotify',
             'account_id' => 'test_user_123',
-            'access_token' => 'test_token',
             'name' => 'Test Spotify User',
         ]);
 
@@ -194,7 +195,6 @@ class SpotifyIntegrationTest extends TestCase
             'user_id' => $user->id,
             'service' => 'spotify',
             'account_id' => 'test_user_123',
-            'access_token' => 'test_token',
             'name' => 'Test Spotify User',
         ]);
 

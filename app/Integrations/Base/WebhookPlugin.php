@@ -5,6 +5,7 @@ namespace App\Integrations\Base;
 use App\Integrations\Contracts\IntegrationPlugin;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -16,7 +17,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
         return 'webhook';
     }
     
-    public function initialize(User $user): Integration
+    public function initializeGroup(User $user): IntegrationGroup
     {
         $webhookSecret = Str::random(32);
         $webhookUrl = route('webhook.handle', [
@@ -24,18 +25,29 @@ abstract class WebhookPlugin implements IntegrationPlugin
             'secret' => $webhookSecret
         ]);
         
-        $integration = Integration::create([
+        return IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => static::getIdentifier(),
-            'name' => static::getDisplayName(),
             'account_id' => $webhookSecret,
             'access_token' => $webhookUrl,
             'refresh_token' => null,
             'expiry' => null,
             'refresh_expiry' => null,
         ]);
-        
-        return $integration;
+    }
+
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    {
+        return Integration::create([
+            'user_id' => $group->user_id,
+            'integration_group_id' => $group->id,
+            'service' => static::getIdentifier(),
+            'name' => static::getDisplayName(),
+            'instance_type' => $instanceType,
+            'configuration' => $initialConfig,
+            'account_id' => $group->account_id, // reuse secret if relevant
+            'access_token' => $group->access_token, // webhook url for convenience
+        ]);
     }
     
     public function handleWebhook(Request $request, Integration $integration): void
@@ -125,7 +137,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
         );
     }
     
-    public function handleOAuthCallback(Request $request, Integration $integration): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         // Webhook plugins don't handle OAuth callbacks
         throw new \Exception('Webhook plugins do not handle OAuth callbacks');

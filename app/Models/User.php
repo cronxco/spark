@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 
 
 class User extends Authenticatable
@@ -78,6 +79,11 @@ class User extends Authenticatable
     public function integrations()
     {
         return $this->hasMany(Integration::class);
+    }
+
+    public function integrationGroups()
+    {
+        return $this->hasMany(IntegrationGroup::class);
     }
 
     /**

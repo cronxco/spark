@@ -2,8 +2,9 @@
 
 namespace App\Integrations\Base;
 
-use App\Integrations\Contracts\IntegrationPlugin;
+use App\Integrations\Contracts\OAuthIntegrationPlugin;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -12,7 +13,7 @@ use Illuminate\Support\Str;
 use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
 
-abstract class OAuthPlugin implements IntegrationPlugin
+abstract class OAuthPlugin implements OAuthIntegrationPlugin
 {
     protected string $baseUrl;
     protected string $clientId;
@@ -24,23 +25,51 @@ abstract class OAuthPlugin implements IntegrationPlugin
         return 'oauth';
     }
     
+    /**
+     * Back-compat: old method signature created an instance immediately.
+     * We now create a group first. This helper returns a placeholder instance
+     * bound to the group so existing flows that expect an Integration still work
+     * until callers migrate to initializeGroup + onboarding.
+     */
     public function initialize(User $user): Integration
     {
-        $integration = Integration::create([
+        $group = $this->initializeGroup($user);
+        return Integration::create([
             'user_id' => $user->id,
+            'integration_group_id' => $group->id,
             'service' => static::getIdentifier(),
             'name' => static::getDisplayName(),
+            'instance_type' => null,
+            'configuration' => [],
+        ]);
+    }
+    
+    public function initializeGroup(User $user): IntegrationGroup
+    {
+        return IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => static::getIdentifier(),
             'account_id' => null,
             'access_token' => null,
             'refresh_token' => null,
             'expiry' => null,
             'refresh_expiry' => null,
         ]);
-        
-        return $integration;
     }
-    
-    public function getOAuthUrl(Integration $integration): string
+
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    {
+        return Integration::create([
+            'user_id' => $group->user_id,
+            'integration_group_id' => $group->id,
+            'service' => static::getIdentifier(),
+            'name' => static::getDisplayName(),
+            'instance_type' => $instanceType,
+            'configuration' => $initialConfig,
+        ]);
+    }
+
+    public function getOAuthUrl(IntegrationGroup $group): string
     {
         // Generate PKCE code verifier and challenge
         $codeVerifier = $this->generateCodeVerifier();
@@ -50,12 +79,12 @@ abstract class OAuthPlugin implements IntegrationPlugin
         $csrfToken = Str::random(32);
         
         // Store CSRF token in session for validation
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $integration->id;
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
         Session::put($sessionKey, $csrfToken);
         
         $state = encrypt([
-            'integration_id' => $integration->id,
-            'user_id' => $integration->user_id,
+            'group_id' => $group->id,
+            'user_id' => $group->user_id,
             'csrf_token' => $csrfToken,
             'code_verifier' => $codeVerifier,
         ]);
@@ -73,19 +102,19 @@ abstract class OAuthPlugin implements IntegrationPlugin
         return $this->baseUrl . '/oauth/authorize?' . http_build_query($params);
     }
     
-    public function handleOAuthCallback(Request $request, Integration $integration): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         $code = $request->get('code');
         $state = $request->get('state');
         
         // Verify state
         $stateData = decrypt($state);
-        if ($stateData['integration_id'] !== $integration->id) {
+        if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
             throw new \Exception('Invalid state parameter');
         }
         
         // Validate CSRF token
-        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $integration)) {
+        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $group)) {
             throw new \Exception('Invalid CSRF token');
         }
         
@@ -115,20 +144,20 @@ abstract class OAuthPlugin implements IntegrationPlugin
         
         $tokenData = $response->json();
         
-        // Update integration with tokens
-        $integration->update([
+        // Update group with tokens
+        $group->update([
             'access_token' => $tokenData['access_token'],
             'refresh_token' => $tokenData['refresh_token'] ?? null,
-            'expiry' => isset($tokenData['expires_in']) 
-                ? now()->addSeconds($tokenData['expires_in']) 
+            'expiry' => isset($tokenData['expires_in'])
+                ? now()->addSeconds($tokenData['expires_in'])
                 : null,
         ]);
         
         // Fetch account information
-        $this->fetchAccountInfo($integration);
+        $this->fetchAccountInfoForGroup($group);
     }
     
-    protected function refreshToken(Integration $integration): void
+    protected function refreshToken(IntegrationGroup $group): void
     {
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
@@ -136,7 +165,7 @@ abstract class OAuthPlugin implements IntegrationPlugin
         $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
-            'refresh_token' => $integration->refresh_token,
+            'refresh_token' => $group->refresh_token,
             'grant_type' => 'refresh_token',
         ]);
         $span?->finish();
@@ -147,26 +176,35 @@ abstract class OAuthPlugin implements IntegrationPlugin
         
         $tokenData = $response->json();
         
-        $integration->update([
+        $group->update([
             'access_token' => $tokenData['access_token'],
-            'refresh_token' => $tokenData['refresh_token'] ?? $integration->refresh_token,
-            'expiry' => isset($tokenData['expires_in']) 
-                ? now()->addSeconds($tokenData['expires_in']) 
+            'refresh_token' => $tokenData['refresh_token'] ?? $group->refresh_token,
+            'expiry' => isset($tokenData['expires_in'])
+                ? now()->addSeconds($tokenData['expires_in'])
                 : null,
         ]);
     }
     
     protected function makeAuthenticatedRequest(string $endpoint, Integration $integration): array
     {
-        // Check if token needs refresh
-        if ($integration->expiry && $integration->expiry->isPast()) {
-            $this->refreshToken($integration);
+        // Prefer group token if available
+        $group = $integration->group;
+        $token = $integration->access_token; // legacy fallback only
+        if ($group) {
+            if ($group->expiry && $group->expiry->isPast()) {
+                $this->refreshToken($group);
+            }
+            $token = $group->access_token;
+        }
+
+        if (empty($token)) {
+            throw new \Exception('Missing access token for authenticated request');
         }
         
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.$endpoint));
-        $response = Http::withToken($integration->access_token)
+        $response = Http::withToken($token)
             ->get($this->baseUrl . $endpoint);
         $span?->finish();
             
@@ -184,7 +222,7 @@ abstract class OAuthPlugin implements IntegrationPlugin
     }
     
     abstract protected function getRequiredScopes(): string;
-    abstract protected function fetchAccountInfo(Integration $integration): void;
+    abstract protected function fetchAccountInfoForGroup(IntegrationGroup $group): void;
     
     /**
      * Generate a PKCE code verifier
@@ -205,10 +243,10 @@ abstract class OAuthPlugin implements IntegrationPlugin
     /**
      * Validate CSRF token against stored session value
      */
-    protected function validateCsrfToken(string $token, Integration $integration): bool
+    protected function validateCsrfToken(string $token, IntegrationGroup $group): bool
     {
-        // Get the session key for this integration
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $integration->id;
+        // Get the session key for this group
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
         
         // Retrieve stored token from session
         $storedToken = Session::get($sessionKey);

@@ -15,13 +15,11 @@ return new class extends Migration
         Schema::create('integrations', function (Blueprint $table) {
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->uuid('user_id');
+            $table->uuid('integration_group_id')->nullable();
             $table->text('service')->nullable();
             $table->text('name')->nullable();
             $table->text('account_id')->nullable();
-            $table->text('access_token')->nullable();
-            $table->text('refresh_token')->nullable();
-            $table->timestampTz('expiry')->nullable();
-            $table->timestampTz('refresh_expiry')->nullable();
+            $table->text('instance_type')->nullable();
             $table->jsonb('configuration')->nullable();
             $table->integer('update_frequency_minutes')->default(15);
             $table->timestampTz('last_triggered_at')->nullable();
@@ -29,7 +27,15 @@ return new class extends Migration
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
+            // Indexes for performance
+            $table->index('user_id');
+            $table->index('integration_group_id');
+            // Foreign keys
             $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('integration_group_id')
+                ->references('id')
+                ->on('integration_groups')
+                ->onDelete('cascade');
         });
     }
 

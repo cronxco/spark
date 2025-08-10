@@ -51,17 +51,24 @@ php artisan queue:work --daemon
 
 ### 2. Task Scheduler
 
-The task scheduler is already configured in `routes/console.php`:
+The task scheduler is configured in `routes/console.php` to run every 30 seconds and avoid overlaps. If running multiple instances, it uses `onOneServer()`:
 
 ```php
 Schedule::job(new CheckIntegrationUpdates())
-    ->everyMinute()
-    ->withoutOverlapping();
+    ->everyThirtySeconds()
+    ->withoutOverlapping()
+    ->onOneServer();
 ```
 
-### 3. Cron Job (Production)
+### 3. Scheduler Invocation (Production)
 
-For production, add this cron job to run Laravel's scheduler:
+To achieve true 30-second intervals, run the scheduler worker instead of relying on cron-per-minute:
+
+```bash
+php artisan schedule:work
+```
+
+If you must use cron, note it will only trigger once per minute and won’t honor sub-minute intervals:
 
 ```bash
 * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -21,17 +22,20 @@ class IntegrationTest extends TestCase
 
 
 
-    public function test_plugin_can_initialize_integration()
+    public function test_plugin_can_initialize_group_and_instance()
     {
         $user = User::factory()->create();
         $plugin = new GitHubPlugin();
         
-        $integration = $plugin->initialize($user);
-        
-        $this->assertInstanceOf(Integration::class, $integration);
-        $this->assertEquals($user->id, $integration->user_id);
-        $this->assertEquals('github', $integration->service);
-        $this->assertEquals('GitHub', $integration->name);
+        $group = $plugin->initializeGroup($user);
+        $this->assertInstanceOf(IntegrationGroup::class, $group);
+        $this->assertEquals($user->id, $group->user_id);
+        $this->assertEquals('github', $group->service);
+
+        $instance = $plugin->createInstance($group, 'activity', ['events' => ['push'], 'repositories' => ['owner/repo']]);
+        $this->assertInstanceOf(Integration::class, $instance);
+        $this->assertEquals($group->id, $instance->integration_group_id);
+        $this->assertEquals('activity', $instance->instance_type);
     }
 
     public function test_integrations_index_page_loads()

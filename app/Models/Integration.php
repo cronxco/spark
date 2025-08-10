@@ -18,13 +18,11 @@ class Integration extends Model
 
     protected $fillable = [
         'user_id',
+        'integration_group_id',
         'service',
         'name',
+        'instance_type',
         'account_id',
-        'access_token',
-        'refresh_token',
-        'expiry',
-        'refresh_expiry',
         'configuration',
         'update_frequency_minutes',
         'last_triggered_at',
@@ -32,8 +30,7 @@ class Integration extends Model
     ];
 
     protected $casts = [
-        'expiry' => 'datetime',
-        'refresh_expiry' => 'datetime',
+        // tokens now live on IntegrationGroup
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -54,6 +51,11 @@ class Integration extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function group()
+    {
+        return $this->belongsTo(IntegrationGroup::class, 'integration_group_id');
     }
 
     /**

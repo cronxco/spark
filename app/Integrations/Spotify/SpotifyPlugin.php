@@ -4,6 +4,7 @@ namespace App\Integrations\Spotify;
 
 use App\Integrations\Base\OAuthPlugin;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Block;
@@ -87,13 +88,23 @@ class SpotifyPlugin extends OAuthPlugin
             ],
         ];
     }
+
+    public static function getInstanceTypes(): array
+    {
+        return [
+            'listening' => [
+                'label' => 'Listening Activity',
+                'schema' => self::getConfigurationSchema(),
+            ],
+        ];
+    }
     
     protected function getRequiredScopes(): string
     {
         return 'user-read-currently-playing user-read-recently-played user-read-email user-read-private';
     }
     
-    public function getOAuthUrl(Integration $integration): string
+    public function getOAuthUrl(IntegrationGroup $group): string
     {
         // Generate PKCE code verifier and challenge
         $codeVerifier = $this->generateCodeVerifier();
@@ -103,12 +114,12 @@ class SpotifyPlugin extends OAuthPlugin
         $csrfToken = Str::random(32);
         
         // Store CSRF token in session for validation
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $integration->id;
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
         Session::put($sessionKey, $csrfToken);
         
         $state = encrypt([
-            'integration_id' => $integration->id,
-            'user_id' => $integration->user_id,
+            'group_id' => $group->id,
+            'user_id' => $group->user_id,
             'csrf_token' => $csrfToken,
             'code_verifier' => $codeVerifier,
         ]);
@@ -127,28 +138,51 @@ class SpotifyPlugin extends OAuthPlugin
         return $this->authUrl . '/authorize?' . http_build_query($params);
     }
     
-    public function handleOAuthCallback(Request $request, Integration $integration): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
+        $error = $request->get('error');
+        if ($error) {
+            Log::error('Spotify OAuth callback returned error', [
+                'group_id' => $group->id,
+                'error' => $error,
+                'error_description' => $request->get('error_description'),
+            ]);
+            throw new \Exception('Spotify authorization failed: ' . $error);
+        }
+
         $code = $request->get('code');
+        if (!$code) {
+            Log::error('Spotify OAuth callback missing authorization code', [
+                'group_id' => $group->id,
+            ]);
+            throw new \Exception('Invalid OAuth callback: missing authorization code');
+        }
+
         $state = $request->get('state');
+        if (!$state) {
+            Log::error('Spotify OAuth callback missing state parameter', [
+                'group_id' => $group->id,
+            ]);
+            throw new \Exception('Invalid OAuth callback: missing state parameter');
+        }
         
         // Verify state
-        $stateData = decrypt($state);
+        try {
+            $stateData = decrypt($state);
+        } catch (\Throwable $e) {
+            Log::error('Spotify OAuth state decryption failed', [
+                'group_id' => $group->id,
+                'exception' => $e->getMessage(),
+            ]);
+            throw new \Exception('Invalid OAuth callback: state decryption failed');
+        }
         
-        Log::info('Spotify OAuth state validation', [
-            'state_integration_id' => $stateData['integration_id'],
-            'integration_id' => $integration->id,
-            'state_integration_id_type' => gettype($stateData['integration_id']),
-            'integration_id_type' => gettype($integration->id),
-            'comparison_result' => $stateData['integration_id'] === $integration->id,
-        ]);
-        
-        if ((string) $stateData['integration_id'] !== (string) $integration->id) {
+        if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
             throw new \Exception('Invalid state parameter');
         }
         
         // Validate CSRF token
-        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $integration)) {
+        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $group)) {
             throw new \Exception('Invalid CSRF token');
         }
         
@@ -183,14 +217,14 @@ class SpotifyPlugin extends OAuthPlugin
         $tokenData = $response->json();
         
         Log::info('Spotify token exchange successful', [
-            'integration_id' => $integration->id,
+            'group_id' => $group->id,
             'has_access_token' => isset($tokenData['access_token']),
             'has_refresh_token' => isset($tokenData['refresh_token']),
             'expires_in' => $tokenData['expires_in'] ?? null,
         ]);
         
-        // Update integration with tokens
-        $integration->update([
+        // Update group with tokens
+        $group->update([
             'access_token' => $tokenData['access_token'],
             'refresh_token' => $tokenData['refresh_token'] ?? null,
             'expiry' => isset($tokenData['expires_in']) 
@@ -199,25 +233,31 @@ class SpotifyPlugin extends OAuthPlugin
         ]);
         
         // Fetch account information
-        $this->fetchAccountInfo($integration);
+        $this->fetchAccountInfoForGroup($group);
     }
     
-    protected function refreshToken(Integration $integration): void
+    protected function refreshToken(IntegrationGroup $group): void
     {
+        if (empty($group->refresh_token)) {
+            Log::error('Spotify token refresh skipped: missing refresh_token', [
+                'group_id' => $group->id,
+            ]);
+            return;
+        }
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST https://accounts.spotify.com/api/token'));
         $response = Http::asForm()->post('https://accounts.spotify.com/api/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
-            'refresh_token' => $integration->refresh_token,
+            'refresh_token' => $group->refresh_token,
             'grant_type' => 'refresh_token',
         ]);
         $span?->finish();
         
         if (!$response->successful()) {
             Log::error('Spotify token refresh failed', [
-                'integration_id' => $integration->id,
+                'group_id' => $group->id,
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
@@ -227,39 +267,37 @@ class SpotifyPlugin extends OAuthPlugin
         $tokenData = $response->json();
         
         Log::info('Spotify token refresh successful', [
-            'integration_id' => $integration->id,
+            'group_id' => $group->id,
             'has_access_token' => isset($tokenData['access_token']),
             'has_refresh_token' => isset($tokenData['refresh_token']),
             'expires_in' => $tokenData['expires_in'] ?? null,
         ]);
         
-        $integration->update([
+        $group->update([
             'access_token' => $tokenData['access_token'],
-            'refresh_token' => $tokenData['refresh_token'] ?? $integration->refresh_token,
+            'refresh_token' => $tokenData['refresh_token'] ?? $group->refresh_token,
             'expiry' => isset($tokenData['expires_in']) 
                 ? now()->addSeconds($tokenData['expires_in']) 
                 : null,
         ]);
     }
     
-    protected function fetchAccountInfo(Integration $integration): void
+    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
     {
-        $userData = $this->makeAuthenticatedRequest('/me', $integration);
+        // Create a temp Integration bound to the group to reuse HTTP helper
+        $temp = new Integration();
+        $temp->setRelation('group', $group);
+        $userData = $this->makeAuthenticatedRequest('/me', $temp);
         
-        $integration->update([
+        $group->update([
             'account_id' => $userData['id'],
-            'name' => $userData['display_name'] ?? 'Spotify User',
-            'configuration' => array_merge($integration->configuration ?? [], [
-                'email' => $userData['email'] ?? null,
-                'country' => $userData['country'] ?? null,
-                'product' => $userData['product'] ?? null,
-            ]),
         ]);
     }
     
     public function fetchData(Integration $integration): void
     {
-        Log::info("Fetching Spotify data for user {$integration->account_id}");
+        $accountId = $integration->group?->account_id ?? $integration->account_id;
+        Log::info("Fetching Spotify data for user {$accountId}");
         
         // Get currently playing track
         $currentlyPlaying = $this->getCurrentlyPlaying($integration);
@@ -282,7 +320,16 @@ class SpotifyPlugin extends OAuthPlugin
             $hub = SentrySdk::getCurrentHub();
             $parentSpan = $hub->getSpan();
             $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/me/player/currently-playing'));
-            $response = Http::withToken($integration->access_token)
+            // Use group token if available (new architecture)
+            $group = $integration->group;
+            $token = $integration->access_token; // legacy fallback
+            if ($group) {
+                if ($group->expiry && $group->expiry->isPast()) {
+                    $this->refreshToken($group);
+                }
+                $token = $group->access_token;
+            }
+            $response = Http::withToken($token)
                 ->get($this->baseUrl . '/me/player/currently-playing');
             $span?->finish();
                 
@@ -316,7 +363,16 @@ class SpotifyPlugin extends OAuthPlugin
             $hub = SentrySdk::getCurrentHub();
             $parentSpan = $hub->getSpan();
             $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/me/player/recently-played'));
-            $response = Http::withToken($integration->access_token)
+            // Use group token if available (new architecture)
+            $group = $integration->group;
+            $token = $integration->access_token; // legacy fallback
+            if ($group) {
+                if ($group->expiry && $group->expiry->isPast()) {
+                    $this->refreshToken($group);
+                }
+                $token = $group->access_token;
+            }
+            $response = Http::withToken($token)
                 ->get($this->baseUrl . '/me/player/recently-played', [
                     'limit' => 50,
                 ]);
@@ -377,7 +433,7 @@ class SpotifyPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'actor_id' => $user->id,
             'actor_metadata' => [
-                'spotify_user_id' => $integration->account_id,
+                'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
             ],
             'service' => 'spotify',
             'domain' => 'music',
@@ -423,12 +479,14 @@ class SpotifyPlugin extends OAuthPlugin
                 'time' => now(),
                 'content' => 'Spotify user account',
                 'metadata' => [
-                    'spotify_user_id' => $integration->account_id,
+                    'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
                     'email' => $integration->configuration['email'] ?? null,
                     'country' => $integration->configuration['country'] ?? null,
                     'product' => $integration->configuration['product'] ?? null,
                 ],
-                'url' => "https://open.spotify.com/user/{$integration->account_id}",
+                'url' => $integration->group?->account_id
+                    ? "https://open.spotify.com/user/{$integration->group->account_id}"
+                    : ($integration->account_id ? "https://open.spotify.com/user/{$integration->account_id}" : null),
                 'media_url' => null,
             ]
         );
