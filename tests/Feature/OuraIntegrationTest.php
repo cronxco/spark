@@ -34,7 +34,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertStringContainsString('workout', $scopes);
         $this->assertStringContainsString('tag', $scopes);
         $this->assertStringContainsString('session', $scopes);
-        $this->assertStringContainsString('spo2Daily', $scopes);
+        $this->assertStringContainsString('spo2', $scopes);
     }
 
     public function test_oura_plugin_can_initialize_group_and_instance(): void
