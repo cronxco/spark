@@ -40,7 +40,7 @@
                         @enderror
                     </div>
 
-                    <!-- Per-type configuration sections -->
+                    <!-- Per-type configuration sections (includes per-instance refresh time) -->
                     @foreach(($types ?? []) as $typeKey => $meta)
                         <div class="p-4 bg-base-200 rounded-lg">
                             <div class="mb-4">
@@ -51,6 +51,19 @@
                             </div>
 
                             <div class="space-y-3">
+                                <!-- Instance display name (defaults to label) -->
+                                <div>
+                                    <div class="mb-1 text-sm font-medium">{{ __('Instance Name') }}</div>
+                                    <x-input name="config[{{ $typeKey }}][name]" value="{{ old('config.'.$typeKey.'.name', $meta['label'] ?? ucfirst($typeKey)) }}" />
+                                </div>
+
+                                <!-- Per-instance update frequency -->
+                                <div>
+                                    <div class="mb-1 text-sm font-medium">{{ __('Update frequency (minutes)') }}</div>
+                                    <x-input type="number" min="5" name="config[{{ $typeKey }}][update_frequency_minutes]" value="{{ old('config.'.$typeKey.'.update_frequency_minutes', 60) }}" />
+                                    <div class="text-xs text-base-content/70 mt-1">{{ __('How often to fetch data for this instance') }}</div>
+                                </div>
+
                                 @foreach(($meta['schema'] ?? []) as $field => $config)
                                     <div>
                                         <div class="mb-1 text-sm font-medium">{{ $config['label'] ?? ucfirst($field) }}</div>

@@ -274,7 +274,15 @@ class IntegrationController extends Controller
                 }
             }
             if (method_exists($plugin, 'createInstance')) {
+                // Pull an optional custom name from initial config
+                $customName = $initial['name'] ?? null;
+                if (array_key_exists('name', $initial)) {
+                    unset($initial['name']);
+                }
                 $instance = $plugin->createInstance($group, $type, $initial);
+                if ($customName) {
+                    $instance->update(['name' => $customName]);
+                }
                 if ($frequency !== null) {
                     $instance->update(['update_frequency_minutes' => (int) $frequency]);
                 }

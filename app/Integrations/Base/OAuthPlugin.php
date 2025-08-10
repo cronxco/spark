@@ -59,11 +59,24 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
 
     public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
     {
+        // Derive a sensible default name from plugin instance types if available
+        $defaultName = static::getDisplayName();
+        if (method_exists(static::class, 'getInstanceTypes')) {
+            try {
+                $types = static::getInstanceTypes();
+                $defaultName = $types[$instanceType]['label'] ?? ucfirst($instanceType);
+            } catch (\Throwable $e) {
+                $defaultName = ucfirst($instanceType);
+            }
+        } else {
+            $defaultName = ucfirst($instanceType);
+        }
+
         return Integration::create([
             'user_id' => $group->user_id,
             'integration_group_id' => $group->id,
             'service' => static::getIdentifier(),
-            'name' => static::getDisplayName(),
+            'name' => $defaultName,
             'instance_type' => $instanceType,
             'configuration' => $initialConfig,
         ]);
