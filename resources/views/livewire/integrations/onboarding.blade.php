@@ -40,7 +40,7 @@
                         @enderror
                     </div>
 
-                    <!-- Per-type configuration sections -->
+                    <!-- Per-type configuration sections (includes per-instance refresh time) -->
                     @foreach(($types ?? []) as $typeKey => $meta)
                         <div class="p-4 bg-base-200 rounded-lg">
                             <div class="mb-4">
@@ -51,6 +51,22 @@
                             </div>
 
                             <div class="space-y-3">
+                                <!-- Instance display name (defaults to label) -->
+                                <div>
+                                    <div class="mb-1 text-sm font-medium">{{ __('Instance Name') }}</div>
+                                    <x-input name="config[{{ $typeKey }}][name]" value="{{ old('config.'.$typeKey.'.name', $meta['label'] ?? ucfirst($typeKey)) }}" />
+                                </div>
+
+                                <!-- Per-instance update frequency -->
+                                <div>
+                                    <div class="mb-1 text-sm font-medium">{{ __('Update frequency (minutes)') }}</div>
+                                    <x-input type="number" min="5" step="1" name="config[{{ $typeKey }}][update_frequency_minutes]" value="{{ old('config.'.$typeKey.'.update_frequency_minutes', 60) }}" />
+                                    @error('config.'.$typeKey.'.update_frequency_minutes')
+                                        <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                    @enderror
+                                    <div class="text-xs text-base-content/70 mt-1">{{ __('How often to fetch data for this instance') }}</div>
+                                </div>
+
                                 @foreach(($meta['schema'] ?? []) as $field => $config)
                                     <div>
                                         <div class="mb-1 text-sm font-medium">{{ $config['label'] ?? ucfirst($field) }}</div>
@@ -91,6 +107,25 @@
                             </div>
                         </div>
                     @endforeach
+
+                    <div class="p-4 bg-base-200 rounded-lg space-y-3">
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" name="run_migration" class="checkbox" @checked(old('run_migration', false))>
+                            <span class="font-medium">{{ __('Run initial historical import now') }}</span>
+                        </label>
+                        <div class="text-xs text-base-content/70">
+                            {{ __('This queues a one-time backfill on the migration queue. It may take a while depending on data size and API limits.') }}
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <div class="mb-1 text-sm font-medium">{{ __('Historic import time limit (minutes, optional)') }}</div>
+                                <x-input type="number" min="1" name="migration_timebox_minutes" value="{{ old('migration_timebox_minutes') }}" placeholder="{{ __('Leave blank for no limit') }}" />
+                                <div class="text-xs text-base-content/70 mt-1">
+                                    {{ __('If set, the migration will stop when this many minutes have elapsed since queueing. Useful for providers with post-auth timeboxes (e.g. Monzo).') }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="flex justify-end space-x-3 pt-6 border-t border-base-300">
                         <x-button 

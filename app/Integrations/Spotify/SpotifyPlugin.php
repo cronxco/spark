@@ -630,4 +630,18 @@ class SpotifyPlugin extends OAuthPlugin
         // This method is not used for OAuth plugins
         return [];
     }
+
+    // Public helper for migration: process a single recently played item
+    public function processRecentlyPlayedMigrationItem(Integration $integration, array $playedItem): void
+    {
+        $this->processTrackPlay($integration, $playedItem, 'recently_played');
+    }
+
+    // Public helper for migration: ensure token is fresh; refresh if expired
+    public function ensureFreshToken(IntegrationGroup $group): void
+    {
+        if ($group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+        }
+    }
 }

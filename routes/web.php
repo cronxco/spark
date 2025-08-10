@@ -3,6 +3,7 @@
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Horizon\Horizon;
 use Livewire\Volt\Volt;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Auth;

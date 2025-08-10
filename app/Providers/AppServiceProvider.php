@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
+/** @phpstan-ignore-next-line */
+use Laravel\Horizon\Horizon;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Sentry\SentrySdk;
@@ -79,5 +81,11 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ScheduledTaskFailed::class, function (ScheduledTaskFailed $event) {
             \Sentry\captureException($event->exception);
         });
+
+        if ($this->app->environment('local')) {
+            Horizon::auth(function ($request) {
+                return true;
+            });
+        }
     }
 }

@@ -55,6 +55,12 @@ return [
         'redirect' => env('SPOTIFY_REDIRECT_URI'),
     ],
 
+    'oura' => [
+        'client_id' => env('OURA_CLIENT_ID'),
+        'client_secret' => env('OURA_CLIENT_SECRET'),
+        'redirect' => env('OURA_REDIRECT_URI'),
+    ],
+
     'sentry' => [
         'dsn' => env('SENTRY_LARAVEL_DSN'),
         'traces_sample_rate' => (float) env('SENTRY_TRACES_SAMPLE_RATE', 0.2),

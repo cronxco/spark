@@ -483,6 +483,15 @@ class GitHubPlugin extends OAuthPlugin
                 return [];
         }
     }
+
+    // Public helper for migration: process one events API payload item
+    public function processEventPayload(Integration $integration, array $event): void
+    {
+        $converted = $this->convertData($event, $integration);
+        if (!empty($converted) && !empty($converted['events'])) {
+            $this->createEventFromData($converted, $integration);
+        }
+    }
     
     protected function convertPushEvent(array $data, Integration $integration): array
     {

@@ -217,6 +217,7 @@ class IntegrationController extends Controller
             'types' => ['required','array','min:1'],
             'types.*' => ['string', Rule::in($allowedTypes)],
             'config' => ['array'],
+            'migration_timebox_minutes' => ['nullable', 'integer', 'min:1'],
         ];
 
         // Add per-field rules based on schema for each allowed type
@@ -248,6 +249,8 @@ class IntegrationController extends Controller
         }
 
         $data = $request->validate($rules);
+        // Read optional migration timebox from validated data
+        $timeboxMinutes = $data['migration_timebox_minutes'] ?? null;
 
         // Only keep config entries for selected types
         $selectedTypes = $data['types'];
@@ -274,9 +277,25 @@ class IntegrationController extends Controller
                 }
             }
             if (method_exists($plugin, 'createInstance')) {
+                // Pull an optional custom name from initial config
+                $customName = $initial['name'] ?? null;
+                if (array_key_exists('name', $initial)) {
+                    unset($initial['name']);
+                }
                 $instance = $plugin->createInstance($group, $type, $initial);
+                if ($customName) {
+                    $instance->update(['name' => $customName]);
+                }
                 if ($frequency !== null) {
                     $instance->update(['update_frequency_minutes' => (int) $frequency]);
+                }
+
+                // Optional historical migration trigger
+                if ($request->boolean('run_migration')) {
+                    $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
+                    \App\Jobs\Migrations\StartIntegrationMigration::dispatch($instance, $timeboxUntil)
+                        ->onConnection('redis')
+                        ->onQueue('migration');
                 }
             }
         }

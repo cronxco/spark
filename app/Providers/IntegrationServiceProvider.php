@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
+use App\Integrations\Oura\OuraPlugin;
 use Illuminate\Support\ServiceProvider;
 
 class IntegrationServiceProvider extends ServiceProvider
@@ -19,6 +20,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(GitHubPlugin::class);
         PluginRegistry::register(SlackPlugin::class);
         PluginRegistry::register(SpotifyPlugin::class);
+        PluginRegistry::register(OuraPlugin::class);
     }
 
     /**
