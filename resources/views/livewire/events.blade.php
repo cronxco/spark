@@ -4,11 +4,19 @@ use function Livewire\Volt\{state, computed, on};
 use App\Models\Event;
 use Carbon\Carbon;
 
-state(['view' => 'index', 'eventId' => null, 'search' => '']);
+state([
+    'view' => 'index',
+    'eventId' => null,
+    'search' => '',
+    // Selected date in Y-m-d format for native date input
+    'date' => Carbon::today()->format('Y-m-d'),
+]);
 
 $events = computed(function () {
+    $selectedDate = Carbon::parse($this->date);
+
     $query = Event::with(['actor', 'target', 'integration', 'tags'])
-        ->whereDate('time', Carbon::today())
+        ->whereDate('time', $selectedDate)
         ->orderBy('time', 'desc');
 
     if ($this->search) {
@@ -26,6 +34,24 @@ $events = computed(function () {
     }
 
     return $query->get();
+});
+
+$dateLabel = computed(function () {
+    $date = Carbon::parse($this->date);
+
+    if ($date->isToday()) {
+        return 'Today';
+    }
+
+    if ($date->isYesterday()) {
+        return 'Yesterday';
+    }
+
+    if ($date->isTomorrow()) {
+        return 'Tomorrow';
+    }
+
+    return $date->format('M j, Y');
 });
 
 $event = computed(function () {
@@ -54,19 +80,45 @@ $goBack = function () {
     $this->eventId = null;
 };
 
+$previousDay = function () {
+    $this->date = Carbon::parse($this->date)->subDay()->format('Y-m-d');
+};
+
+$nextDay = function () {
+    $this->date = Carbon::parse($this->date)->addDay()->format('Y-m-d');
+};
+
 ?>
 
 <div>
     @if($this->view === 'index')
         <!-- Events Index -->
         <div>
-            <x-header title="Today's Events" separator>
+            <x-header :title="'Events — ' . $this->dateLabel" separator>
                 <x-slot:actions>
-                    <x-input 
-                        wire:model.live.debounce.300ms="search" 
-                        placeholder="Search events..." 
-                        class="w-64"
-                    />
+                    <div class="flex items-center gap-3">
+                        <div class="join">
+                            <x-button class="join-item btn-ghost btn-sm" wire:click="previousDay">
+                                <x-icon name="o-chevron-left" class="w-4 h-4" />
+                            </x-button>
+                            <label class="join-item">
+                                <input 
+                                    type="date" 
+                                    class="input input-sm"
+                                    wire:model.live="date"
+                                />
+                            </label>
+                            <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">
+                                <x-icon name="o-chevron-right" class="w-4 h-4" />
+                            </x-button>
+                        </div>
+
+                        <x-input 
+                            wire:model.live.debounce.300ms="search" 
+                            placeholder="Search events..." 
+                            class="w-64"
+                        />
+                    </div>
                 </x-slot:actions>
             </x-header>
 
@@ -75,8 +127,8 @@ $goBack = function () {
                     <x-card>
                         <div class="text-center py-8">
                             <x-icon name="o-calendar" class="w-12 h-12 text-base-300 mx-auto mb-4" />
-                            <h3 class="text-lg font-semibold text-base-content mb-2">No events today</h3>
-                            <p class="text-base-content/70">There are no events recorded for today.</p>
+                            <h3 class="text-lg font-semibold text-base-content mb-2">No events for this date</h3>
+                            <p class="text-base-content/70">Try another day using the arrows or date picker.</p>
                         </div>
                     </x-card>
                 @else
