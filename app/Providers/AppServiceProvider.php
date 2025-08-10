@@ -44,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
 
                     // finish span after response
                     $options['on_stats'] = function ($stats) use ($span) {
-                        $span->setData('transfer_time_ms', $stats->getTransferTime() * 1000);
+                        $span->setData(['transfer_time_ms' => $stats->getTransferTime() * 1000]);
                         $span->finish();
                     };
                 }
@@ -60,19 +60,19 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ScheduledTaskFinished::class, function (ScheduledTaskFinished $event) {
             // Track success or failure of scheduled tasks
             $context = [
-                'task' => (string) $event->task,
-                'description' => $event->task->description,
-                'expression' => $event->task->expression,
+                'task_class' => get_class($event->task),
+                'description' => $event->task->description ?? 'No description',
+                'expression' => $event->task->expression ?? 'No expression',
                 'exit_code' => $event->task->exitCode,
-                'connection' => $event->task->onConnection,
-                'queue' => $event->task->onQueue,
-                'mutex_name' => $event->task->mutexName(),
+                'connection' => $event->task->onConnection ?? 'default',
+                'queue' => $event->task->onQueue ?? 'default',
+                'mutex_name' => method_exists($event->task, 'mutexName') ? $event->task->mutexName() : 'No mutex',
             ];
 
             if ($event->task->exitCode === 0) {
-                \Sentry\captureMessage('Scheduled task completed', \Sentry\EventHint::fromArray(['extra' => $context]));
+                \Sentry\captureMessage('Scheduled task completed', \Sentry\Severity::info(), \Sentry\EventHint::fromArray(['extra' => $context]));
             } else {
-                \Sentry\captureMessage('Scheduled task finished with non-zero exit code', \Sentry\EventHint::fromArray(['extra' => $context]));
+                \Sentry\captureMessage('Scheduled task finished with non-zero exit code', \Sentry\Severity::warning(), \Sentry\EventHint::fromArray(['extra' => $context]));
             }
         });
 

@@ -51,7 +51,6 @@ class CheckIntegrationUpdates implements ShouldQueue
             
             if ($integrations->isEmpty()) {
                 Log::info('No integrations found that need updating');
-                \Sentry\captureMessage('CheckIntegrationUpdates: no integrations need updating');
                 return;
             }
             
