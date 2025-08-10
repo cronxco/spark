@@ -73,7 +73,14 @@ class FetchIntegrationPage implements ShouldQueue
         if (!$resp['ok']) {
             $status = (int) ($resp['status'] ?? 0);
             if ($status === 429) {
-                $retryAfter = (int) (is_array($resp['headers']) ? ($resp['headers']['Retry-After'][0] ?? 30) : 30);
+                $headers = is_array($resp['headers'] ?? null) ? ($resp['headers'] ?? []) : [];
+                $headersLower = [];
+                foreach ($headers as $name => $values) {
+                    $headersLower[strtolower((string) $name)] = $values;
+                }
+                $retryAfterHeader = $headersLower['retry-after'] ?? null;
+                $retryAfterValue = is_array($retryAfterHeader) ? ($retryAfterHeader[0] ?? null) : $retryAfterHeader;
+                $retryAfter = (int) ($retryAfterValue ?? 30);
                 static::dispatch($this->integration, $this->context)
                     ->onConnection('redis')->onQueue('migration')->delay(now()->addSeconds(max(5, $retryAfter)));
                 return;
@@ -211,9 +218,27 @@ class FetchIntegrationPage implements ShouldQueue
             ])->get($url, ['per_page' => 100, 'page' => $page]);
 
         if ($resp->status() === 429 || $resp->status() === 403) {
-            $retryAfter = (int) ($resp->header('Retry-After') ?? 60);
+            // Prefer GitHub's X-RateLimit-Reset (epoch seconds) when available
+            $resetHeader = $resp->header('X-RateLimit-Reset');
+            $delaySeconds = null;
+            if ($resetHeader !== null) {
+                $resetAt = (int) $resetHeader; // epoch seconds
+                if ($resetAt > 0) {
+                    $nowTs = now()->getTimestamp();
+                    $diff = $resetAt - $nowTs;
+                    if ($diff > 0) {
+                        $delaySeconds = $diff;
+                    }
+                }
+            }
+
+            if ($delaySeconds === null) {
+                $retryAfter = (int) ($resp->header('Retry-After') ?? 60);
+                $delaySeconds = max(30, $retryAfter);
+            }
+
             static::dispatch($this->integration, $this->context)
-                ->onConnection('redis')->onQueue('migration')->delay(now()->addSeconds(max(30, $retryAfter)));
+                ->onConnection('redis')->onQueue('migration')->delay(now()->addSeconds($delaySeconds));
             return;
         }
         if (!$resp->successful()) {

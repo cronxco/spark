@@ -217,6 +217,7 @@ class IntegrationController extends Controller
             'types' => ['required','array','min:1'],
             'types.*' => ['string', Rule::in($allowedTypes)],
             'config' => ['array'],
+            'migration_timebox_minutes' => ['nullable', 'integer', 'min:1'],
         ];
 
         // Add per-field rules based on schema for each allowed type
@@ -248,14 +249,8 @@ class IntegrationController extends Controller
         }
 
         $data = $request->validate($rules);
-        // Validate optional migration timebox
-        $timeboxMinutes = null;
-        if ($request->filled('migration_timebox_minutes')) {
-            $timeboxMinutes = (int) $request->input('migration_timebox_minutes');
-            if ($timeboxMinutes < 1) {
-                $timeboxMinutes = null;
-            }
-        }
+        // Read optional migration timebox from validated data
+        $timeboxMinutes = $data['migration_timebox_minutes'] ?? null;
 
         // Only keep config entries for selected types
         $selectedTypes = $data['types'];

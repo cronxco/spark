@@ -12,8 +12,16 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Horizon snapshots (optional, enable if needed)
-        $schedule->command('horizon:snapshot')->everyFiveMinutes();
+        // Schedule Horizon snapshots only if Horizon is installed, and ensure single-server execution without overlap
+        if (! class_exists(\Laravel\Horizon\Horizon::class) && ! class_exists(\Laravel\Horizon\Console\SnapshotCommand::class)) {
+            return;
+        }
+
+        $schedule
+            ->command('horizon:snapshot')
+            ->everyFiveMinutes()
+            ->onOneServer()
+            ->withoutOverlapping();
     }
 
     /**

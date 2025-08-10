@@ -60,7 +60,10 @@
                                 <!-- Per-instance update frequency -->
                                 <div>
                                     <div class="mb-1 text-sm font-medium">{{ __('Update frequency (minutes)') }}</div>
-                                    <x-input type="number" min="5" name="config[{{ $typeKey }}][update_frequency_minutes]" value="{{ old('config.'.$typeKey.'.update_frequency_minutes', 60) }}" />
+                                    <x-input type="number" min="5" step="1" name="config[{{ $typeKey }}][update_frequency_minutes]" value="{{ old('config.'.$typeKey.'.update_frequency_minutes', 60) }}" />
+                                    @error('config.'.$typeKey.'.update_frequency_minutes')
+                                        <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                    @enderror
                                     <div class="text-xs text-base-content/70 mt-1">{{ __('How often to fetch data for this instance') }}</div>
                                 </div>
 

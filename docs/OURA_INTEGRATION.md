@@ -5,7 +5,7 @@ This document describes what Spark creates per Oura instance type: event values,
 ## OAuth & Scopes
 - Authorization: `https://cloud.ouraring.com/oauth/authorize`
 - Token: `https://api.ouraring.com/oauth/token`
-- Scopes: `email personal daily heartrate workout tag session spo2Daily`
+- Scopes: `email personal daily heartrate workout tag session spo2`
 
 ## Common Structures (applies to all instances)
 - Actor (created/updated once and reused):

@@ -34,31 +34,54 @@ class ProcessIntegrationPage implements ShouldQueue
 
     public function handle(): void
     {
-        $service = $this->context['service'] ?? $this->integration->service;
-        if ($service === 'oura') {
-            $pluginClass = PluginRegistry::getPlugin('oura');
-            (new $pluginClass())->processOuraMigrationItems($this->integration, $this->context['instance_type'] ?? ($this->integration->instance_type ?: 'activity'), $this->items);
+        if (empty($this->items)) {
             return;
         }
-        if ($service === 'spotify') {
-            $pluginClass = PluginRegistry::getPlugin('spotify');
-            $plugin = new $pluginClass();
-            foreach ($this->items as $item) {
-                $plugin->processRecentlyPlayedMigrationItem($this->integration, $item);
+
+        try {
+            $service = $this->context['service'] ?? $this->integration->service;
+
+            if ($service === 'oura') {
+                $pluginClass = PluginRegistry::getPlugin('oura');
+                (new $pluginClass())->processOuraMigrationItems(
+                    $this->integration,
+                    $this->context['instance_type'] ?? ($this->integration->instance_type ?: 'activity'),
+                    $this->items
+                );
+                return;
             }
-            return;
-        }
-        if ($service === 'github') {
-            $pluginClass = PluginRegistry::getPlugin('github');
-            $plugin = new $pluginClass();
-            foreach ($this->items as $event) {
-                $plugin->processEventPayload($this->integration, $event);
+
+            if ($service === 'spotify') {
+                $pluginClass = PluginRegistry::getPlugin('spotify');
+                $plugin = new $pluginClass();
+                foreach ($this->items as $item) {
+                    $plugin->processRecentlyPlayedMigrationItem($this->integration, $item);
+                }
+                return;
             }
-            return;
+
+            if ($service === 'github') {
+                $pluginClass = PluginRegistry::getPlugin('github');
+                $plugin = new $pluginClass();
+                foreach ($this->items as $event) {
+                    $plugin->processEventPayload($this->integration, $event);
+                }
+                return;
+            }
+
+            Log::info('ProcessIntegrationPage: unsupported service, skipping', [
+                'service' => $service,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('ProcessIntegrationPage failed', [
+                'integration_id' => $this->integration->id,
+                'service' => $this->context['service'] ?? $this->integration->service,
+                'context' => $this->context,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
         }
-        Log::info('ProcessIntegrationPage: unsupported service, skipping', [
-            'service' => $service,
-        ]);
     }
 }
 

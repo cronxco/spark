@@ -9,7 +9,10 @@ return [
 
     'prefix' => env('HORIZON_PREFIX'),
 
-    'middleware' => ['web'],
+    'middleware' => ['web', 'auth', 'verified'],
+
+    // Emails allowed to view Horizon dashboard in non-local environments
+    'allowed_emails' => array_filter(array_map('trim', explode(',', env('HORIZON_ALLOWED_EMAILS', '')))),
 
     'waits' => [
         'redis:default' => 60,

@@ -1008,7 +1008,7 @@ class OuraPlugin extends OAuthPlugin
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'State',
-                'content' => 'Session state/mood',
+                'content' => (string) $state,
                 'value' => null,
                 'value_multiplier' => 1,
                 'value_unit' => null,
