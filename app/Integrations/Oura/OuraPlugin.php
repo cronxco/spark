@@ -133,7 +133,7 @@ class OuraPlugin extends OAuthPlugin
             'workout',
             'tag',
             'session',
-            'spo2Daily',
+            'spo2',
         ]);
     }
 
@@ -465,6 +465,8 @@ class OuraPlugin extends OAuthPlugin
                 'score_field' => 'score',
                 'contributors_field' => 'contributors',
                 'title' => 'Sleep',
+                'value_unit' => 'percent',
+                'contributors_value_unit' => 'percent',
             ]);
         }
     }
