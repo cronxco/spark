@@ -1,6 +1,7 @@
 <?php
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
@@ -10,6 +11,8 @@ new class extends Component {
     use Toast;
     
     public array $plugins = [];
+    public array $groups = [];
+    // Back-compat for tests expecting this property
     public array $integrationsByService = [];
     
     public function mount(): void
@@ -29,23 +32,44 @@ new class extends Component {
             ];
         })->toArray();
         
-        $userIntegrations = Auth::user()->integrations()->with('user')->get();
-        $this->integrationsByService = $userIntegrations->groupBy('service')->map(function ($group) {
-            return $group->map(function ($integration) {
-                return [
-                    'id' => $integration->id,
-                    'name' => $integration->name,
-                    'service' => $integration->service,
-                    'account_id' => $integration->account_id,
-                    'configuration' => $integration->configuration,
-                    'update_frequency_minutes' => $integration->update_frequency_minutes,
-                    'last_successful_update_at' => $integration->last_successful_update_at ? $integration->last_successful_update_at->toISOString() : null,
-                    'needs_update' => $integration->needsUpdate(),
-                    'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,
-                    'user_id' => $integration->user_id,
-                ];
-            })->toArray();
+        $user = Auth::user();
+        $userGroups = IntegrationGroup::query()
+            ->where('user_id', $user->id)
+            ->with(['integrations'])
+            ->get();
+        $this->groups = $userGroups->map(function ($group) {
+            $pluginClass = PluginRegistry::getPlugin($group->service);
+            return [
+                'id' => (string) $group->id,
+                'service' => $group->service,
+                'service_name' => $pluginClass ? $pluginClass::getDisplayName() : ucfirst($group->service),
+                'account_id' => $group->account_id,
+                'type' => $pluginClass ? $pluginClass::getServiceType() : 'oauth',
+                'instances' => $group->integrations->map(function ($integration) {
+                    return [
+                        'id' => (string) $integration->id,
+                        'name' => $integration->name ?: $integration->service,
+                        'instance_type' => $integration->instance_type,
+                        'update_frequency_minutes' => $integration->update_frequency_minutes,
+                        'last_successful_update_at' => $integration->last_successful_update_at ? $integration->last_successful_update_at->toISOString() : null,
+                        'needs_update' => $integration->needsUpdate(),
+                        'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,
+                        'service' => $integration->service,
+                        'account_id' => $integration->account_id,
+                    ];
+                })->toArray(),
+            ];
         })->toArray();
+        // Maintain legacy structure for tests
+        $this->integrationsByService = collect($this->groups)
+            ->flatMap(function ($g) {
+                return collect($g['instances'])->map(function ($i) use ($g) {
+                    return array_merge($i, ['service' => $g['service']]);
+                });
+            })
+            ->groupBy('service')
+            ->map(fn($col) => $col->values()->toArray())
+            ->toArray();
     }
     
     public function initializeIntegration(string $service): void
@@ -187,18 +211,18 @@ new class extends Component {
                         </div>
                         
                         @php
-                            $userIntegrations = $integrationsByService[$plugin['identifier']] ?? [];
+                            $grouped = collect($groups)->where('service', $plugin['identifier'])->values();
                         @endphp
-                        
-                        @if(count($userIntegrations) > 0)
-                            <div class="space-y-3">
-                                <div class="flex items-center text-sm text-base-content/70">
-                                    <x-icon name="o-check-circle" class="w-4 h-4 mr-2 text-success" />
-                                    {{ count($userIntegrations) }} instance{{ count($userIntegrations) > 1 ? 's' : '' }} connected
-                                </div>
-                                
-                                @foreach($userIntegrations as $integration)
+
+                        @if($grouped->count() > 0)
+                            <div class="space-y-4">
+                                @foreach($grouped as $group)
                                     <div class="border border-base-300 rounded-lg p-3 bg-base-200">
+                                        <div class="mb-2 text-xs text-base-content/70">
+                                            Account: {{ $group['account_id'] ?? '—' }}
+                                        </div>
+                                        @foreach($group['instances'] as $integration)
+                                            <div class="border border-base-300 rounded-lg p-3 bg-base-100 mb-2">
                                         <div class="flex items-center justify-between mb-2">
                                             <div class="flex items-center space-x-2">
                                                 <x-icon name="o-link" class="w-3 h-3 text-base-content/50" />
@@ -248,13 +272,7 @@ new class extends Component {
                                                     class="text-error"
                                                 />
                                             </x-dropdown>
-                                        </div>
-                                        
-                                        @if($integration['account_id'])
-                                            <div class="text-xs text-base-content/70 mb-2">
-                                                Account: {{ $integration['account_id'] }}
                                             </div>
-                                        @endif
                                         
                                         @if($plugin['type'] === 'oauth')
                                             @php
@@ -307,6 +325,8 @@ new class extends Component {
                                                 </div>
                                             </div>
                                         @endif
+                                            </div>
+                                        @endforeach
                                     </div>
                                 @endforeach
                             </div>

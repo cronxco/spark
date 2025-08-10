@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,15 +25,22 @@ class IntegrationController extends Controller
         $user = Auth::user();
         
         try {
-            // Always create a new integration for OAuth flow
-            $integration = $plugin->initialize($user);
-            
-            $oauthUrl = $plugin->getOAuthUrl($integration);
+            // Create a new auth group and start OAuth
+            if (!method_exists($plugin, 'initializeGroup')) {
+                // Back-compat fallback
+                $integration = $plugin->initialize($user);
+                $oauthUrl = method_exists($plugin, 'getOAuthUrl')
+                    ? $plugin->getOAuthUrl($integration)
+                    : '';
+            } else {
+                $group = $plugin->initializeGroup($user);
+                $oauthUrl = $plugin->getOAuthUrl($group);
+            }
             
             Log::info('OAuth flow initiated', [
                 'service' => $service,
                 'user_id' => $user->id,
-                'integration_id' => $integration->id,
+                'group_id' => isset($group) ? $group->id : null,
                 'oauth_url' => $oauthUrl,
             ]);
             
@@ -70,7 +78,7 @@ class IntegrationController extends Controller
         /** @var User $user */
         $user = Auth::user();
         
-        // Extract integration ID from state parameter
+        // Extract group ID from state parameter
         $state = $request->get('state');
         if (!$state) {
             Log::error('OAuth callback missing state parameter', [
@@ -83,21 +91,22 @@ class IntegrationController extends Controller
         
         try {
             $stateData = decrypt($state);
-            $integrationId = $stateData['integration_id'] ?? null;
+            $groupId = $stateData['group_id'] ?? null;
             
-            if (!$integrationId) {
-                Log::error('OAuth callback missing integration_id in state', [
+            if (!$groupId) {
+                Log::error('OAuth callback missing group_id in state', [
                     'service' => $service,
                     'user_id' => $user->id,
                     'state_data' => $stateData,
                 ]);
                 return redirect()->route('integrations.index')
-                    ->with('error', 'Invalid OAuth callback: missing integration ID');
+                    ->with('error', 'Invalid OAuth callback: missing group ID');
             }
             
-            // Get the specific integration from the state
-            $integration = $user->integrations()
-                ->where('id', $integrationId)
+            // Get the specific group from the state
+            $group = IntegrationGroup::query()
+                ->where('id', $groupId)
+                ->where('user_id', $user->id)
                 ->where('service', $service)
                 ->firstOrFail();
                 
@@ -112,16 +121,18 @@ class IntegrationController extends Controller
         }
             
         try {
-            $plugin->handleOAuthCallback($request, $integration);
-            
-            return redirect()->route('integrations.index')
-                ->with('success', 'Integration connected successfully!');
+            if (method_exists($plugin, 'handleOAuthCallback')) {
+                $plugin->handleOAuthCallback($request, $group);
+            }
+            // Redirect to onboarding to select instance types
+            return redirect()->route('integrations.onboarding', ['group' => $group->id])
+                ->with('success', 'Connected! Now choose what to track.');
         } catch (\Exception $e) {
             // Log the full exception details for debugging
             Log::error('OAuth callback failed', [
                 'service' => $service,
                 'user_id' => $user->id,
-                'integration_id' => $integration->id,
+                'group_id' => $group->id ?? null,
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -142,10 +153,22 @@ class IntegrationController extends Controller
         $user = Auth::user();
         
         try {
-            $integration = $plugin->initialize($user);
-            
-            return redirect()->route('integrations.index')
-                ->with('success', 'Integration initialized successfully! Webhook URL: ' . route('webhook.handle', ['service' => $service, 'secret' => $integration->account_id]));
+            if (method_exists($plugin, 'initializeGroup')) {
+                $group = $plugin->initializeGroup($user);
+            } else {
+                // Back-compat path
+                $integration = $plugin->initialize($user);
+                $group = IntegrationGroup::create([
+                    'user_id' => $integration->user_id,
+                    'service' => $integration->service,
+                    'account_id' => $integration->account_id,
+                    'access_token' => $integration->access_token,
+                ]);
+                $integration->update(['integration_group_id' => $group->id]);
+            }
+
+            return redirect()->route('integrations.onboarding', ['group' => $group->id])
+                ->with('success', 'Integration initialized! Configure instances next.');
         } catch (\Exception $e) {
             // Log the full exception details for debugging
             Log::error('Integration initialization failed', [
@@ -158,6 +181,72 @@ class IntegrationController extends Controller
             return redirect()->route('integrations.index')
                 ->with('error', 'Failed to initialize integration. Please try again or contact support if the problem persists.');
         }
+    }
+    
+    public function onboarding(IntegrationGroup $group)
+    {
+        // Authorization
+        if ((string) $group->user_id !== (string) Auth::id()) {
+            abort(403);
+        }
+        $pluginClass = PluginRegistry::getPlugin($group->service);
+        $pluginName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($group->service);
+        $types = $pluginClass ? $pluginClass::getInstanceTypes() : [];
+
+        return view('livewire.integrations.onboarding', [
+            'group' => $group,
+            'pluginName' => $pluginName,
+            'types' => $types,
+        ]);
+    }
+    
+    public function storeInstances(Request $request, IntegrationGroup $group)
+    {
+        if ((string) $group->user_id !== (string) Auth::id()) {
+            abort(403);
+        }
+        $pluginClass = PluginRegistry::getPlugin($group->service);
+        if (!$pluginClass) {
+            abort(404);
+        }
+        $plugin = new $pluginClass();
+        $data = $request->validate([
+            'types' => ['required','array','min:1'],
+            'config' => ['array'],
+        ]);
+        // Retrieve schema for normalization of array-type fields
+        $schema = method_exists($pluginClass, 'getConfigurationSchema')
+            ? $pluginClass::getConfigurationSchema()
+            : [];
+        foreach ($data['types'] as $type) {
+            $initial = $data['config'][$type] ?? [];
+            // Extract frequency to instance column if present
+            $frequency = $initial['update_frequency_minutes'] ?? null;
+            if (array_key_exists('update_frequency_minutes', $initial)) {
+                unset($initial['update_frequency_minutes']);
+            }
+            // Normalize schema-declared array fields that may arrive as strings
+            foreach ($schema as $field => $fieldConfig) {
+                if (($fieldConfig['type'] ?? null) === 'array' && isset($initial[$field]) && is_string($initial[$field])) {
+                    $raw = $initial[$field];
+                    $decoded = json_decode($raw, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $initial[$field] = array_values(array_filter(array_map('trim', $decoded)));
+                    } else {
+                        $parts = preg_split('/[,\n]/', $raw) ?: [];
+                        $initial[$field] = array_values(array_filter(array_map('trim', $parts)));
+                    }
+                }
+            }
+            if (method_exists($plugin, 'createInstance')) {
+                $instance = $plugin->createInstance($group, $type, $initial);
+                if ($frequency !== null) {
+                    $instance->update(['update_frequency_minutes' => (int) $frequency]);
+                }
+            }
+        }
+        return redirect()->route('integrations.index')
+            ->with('success', 'Instances created successfully.');
     }
     
 

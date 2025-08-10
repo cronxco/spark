@@ -38,6 +38,16 @@ class SlackPlugin extends WebhookPlugin
             ],
         ];
     }
+
+    public static function getInstanceTypes(): array
+    {
+        return [
+            'events' => [
+                'label' => 'Events',
+                'schema' => self::getConfigurationSchema(),
+            ],
+        ];
+    }
     
     public function handleWebhook(Request $request, Integration $integration): void
     {

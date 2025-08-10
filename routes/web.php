@@ -34,6 +34,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('/integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('/integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Route::get('/integrations/groups/{group}/onboarding', [IntegrationController::class, 'onboarding'])->name('integrations.onboarding');
+    Route::post('/integrations/groups/{group}/instances', [IntegrationController::class, 'storeInstances'])->name('integrations.storeInstances');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
 
 });

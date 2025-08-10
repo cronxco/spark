@@ -3,6 +3,7 @@
 namespace App\Integrations\Contracts;
 
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -34,14 +35,28 @@ interface IntegrationPlugin
     public static function getConfigurationSchema(): array;
     
     /**
+     * Return the available instance types and their initial config schemas
+     * e.g. ['sleep' => ['label' => 'Sleep', 'schema' => [...]], ...]
+     */
+    public static function getInstanceTypes(): array;
+    
+    /**
      * Initialize the integration for a user
      */
-    public function initialize(User $user): Integration;
+    /**
+     * Initialize an auth group (for OAuth/webhook setup)
+     */
+    public function initializeGroup(User $user): IntegrationGroup;
+    
+    /**
+     * Create an instance attached to a group
+     */
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration;
     
     /**
      * Handle OAuth callback
      */
-    public function handleOAuthCallback(Request $request, Integration $integration): void;
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void;
     
     /**
      * Handle webhook payload

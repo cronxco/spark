@@ -9,6 +9,13 @@ The Spark API provides comprehensive event management capabilities with secure a
 **Authentication**: Bearer token authentication using Laravel Sanctum
 
 ## Authentication
+### OAuth/Webhook Integration Flow (Web UI)
+
+- OAuth: `/integrations/{service}/oauth` -> provider -> `/integrations/{service}/callback`
+  - Creates an `IntegrationGroup` and stores tokens
+  - Redirects to `/integrations/groups/{group}/onboarding` to create one or more instances
+  - Each instance can later be configured via `/integrations/{integration}/configure`
+
 
 ### Getting Started
 

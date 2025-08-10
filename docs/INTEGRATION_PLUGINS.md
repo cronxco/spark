@@ -1,5 +1,15 @@
 # Integration Plugins Architecture
 
+## Multi-instance with instance groups
+
+Integrations can now create multiple instances that share the same authentication. Tokens and account metadata are stored on `integration_groups` and each logical instance is an `integrations` row with its own `instance_type` and `configuration`.
+
+Key changes:
+- New table: `integration_groups` (owns OAuth/webhook credentials)
+- `integrations` now includes `integration_group_id` and `instance_type`; token fields were removed from `integrations`
+- Plugins expose instance types via `getInstanceTypes()`
+- OAuth/Webhook plugins initialize a group first, then instances are created during onboarding
+
 ## Overview
 
 The Spark integration plugin system provides a flexible architecture for connecting external services and converting their data into our standardized event/object/block format. The system supports both OAuth-based APIs and webhook-based integrations.
@@ -14,6 +24,7 @@ The Spark integration plugin system provides a flexible architecture for connect
 namespace App\Integrations\Contracts;
 
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -45,14 +56,22 @@ interface IntegrationPlugin
     public static function getConfigurationSchema(): array;
     
     /**
+     * Each plugin returns available instance types and their schemas
+     * e.g. ['sleep' => ['label' => 'Sleep', 'schema' => [...]], ...]
+     */
+    public static function getInstanceTypes(): array;
+    
+    /**
      * Initialize the integration for a user
      */
-    public function initialize(User $user): Integration;
+    // Group-first lifecycle
+    public function initializeGroup(User $user): IntegrationGroup;
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration;
     
     /**
      * Handle OAuth callback
      */
-    public function handleOAuthCallback(Request $request, Integration $integration): void;
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void;
     
     /**
      * Handle webhook payload

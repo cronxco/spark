@@ -49,7 +49,8 @@ The Updates interface is accessible via:
 ## Integration with Existing System
 
 - Uses existing `Integration` model and relationships
-- Leverages existing plugin architecture
+- Each instance can belong to an `IntegrationGroup` that owns auth (OAuth tokens / webhook secrets)
+- Plugins read tokens via `$integration->group` when present
 - Compatible with all OAuth and webhook integrations
 - Follows existing Laravel Sail and Volt patterns
 
