@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\ProcessIntegrationData;
 use App\Models\Integration;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Bus;
 
 class FetchIntegrationData extends Command
 {
@@ -71,9 +72,22 @@ class FetchIntegrationData extends Command
                     continue;
                 }
                 
-                // Guard: if any migration job is running for this group+service, skip polling to avoid duplicates
-                if ($integration->group && \Illuminate\Support\Facades\Queue::size('migration') > 0) {
-                    $this->line("Skipping integration {$integration->id} ({$integration->service}) - migration queue active");
+                // Guard: if a migration batch for this integration (or its group) is active, skip polling to avoid duplicates
+                $activeMigration = false;
+                if ($integration->migration_batch_id) {
+                    $batch = \Illuminate\Support\Facades\Bus::findBatch($integration->migration_batch_id);
+                    $activeMigration = $batch && ! $batch->finished();
+                } elseif ($integration->integration_group_id) {
+                    $activeMigration = \App\Models\Integration::where('integration_group_id', $integration->integration_group_id)
+                        ->whereNotNull('migration_batch_id')
+                        ->get()
+                        ->contains(function ($i) {
+                            $b = \Illuminate\Support\Facades\Bus::findBatch($i->migration_batch_id);
+                            return $b && ! $b->finished();
+                        });
+                }
+                if ($activeMigration) {
+                    $this->line("Skipping integration {$integration->id} ({$integration->service}) - migration batch active");
                     continue;
                 }
 

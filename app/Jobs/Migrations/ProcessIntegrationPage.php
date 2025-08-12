@@ -72,6 +72,13 @@ class ProcessIntegrationPage implements ShouldQueue
 
             if ($service === 'monzo') {
                 $pluginClass = PluginRegistry::getPlugin('monzo');
+                if (!$pluginClass) {
+                    Log::error('ProcessIntegrationPage: Monzo plugin not registered; aborting processing', [
+                        'integration_id' => $this->integration->id,
+                        'context' => $this->context,
+                    ]);
+                    return;
+                }
                 $plugin = new $pluginClass();
                 $type = $this->context['instance_type'] ?? 'transactions';
                 $processingPhase = (bool) ($this->context['processing_phase'] ?? false);
@@ -219,21 +226,34 @@ class ProcessIntegrationPage implements ShouldQueue
                     if ($since && $before) {
                         $accounts = $this->listMonzoAccounts();
                         foreach ($accounts as $account) {
-                            $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
-                                ->get('https://api.monzo.com/transactions', [
-                                    'account_id' => $account['id'],
-                                    'expand[]' => 'merchant',
-                                    'since' => $since,
-                                    'before' => $before,
-                                    'limit' => 100,
-                                ]);
-                            if (!$resp->successful()) {
-                                continue;
-                            }
-                            $txs = $resp->json('transactions') ?? [];
-                            foreach ($txs as $tx) {
-                                $plugin->processTransactionItem($this->integration, $tx, $account['id']);
-                            }
+                            $currentBefore = $before;
+                            do {
+                                $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                                    ->get('https://api.monzo.com/transactions', [
+                                        'account_id' => $account['id'],
+                                        'expand[]' => 'merchant',
+                                        'since' => $since,
+                                        'before' => $currentBefore,
+                                        'limit' => 100,
+                                    ]);
+                                if (!$resp->successful()) {
+                                    // Stop paging for this account on error
+                                    break;
+                                }
+                                $txs = $resp->json('transactions') ?? [];
+                                if (empty($txs)) {
+                                    break;
+                                }
+                                foreach ($txs as $tx) {
+                                    $plugin->processTransactionItem($this->integration, $tx, $account['id']);
+                                }
+                                $last = end($txs);
+                                $nextBefore = $last['created'] ?? ($last['id'] ?? null);
+                                if ($nextBefore === null || $nextBefore === $currentBefore) {
+                                    break;
+                                }
+                                $currentBefore = $nextBefore;
+                            } while (count($txs) === 100);
                         }
                         return;
                     }
@@ -243,21 +263,38 @@ class ProcessIntegrationPage implements ShouldQueue
                     foreach ($windows as $win) {
                         $accounts = $this->listMonzoAccounts();
                         foreach ($accounts as $account) {
-                            $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
-                                ->get('https://api.monzo.com/transactions', [
-                                    'account_id' => $account['id'],
-                                    'expand[]' => 'merchant',
-                                    'since' => $win['since'] ?? null,
-                                    'before' => $win['before'] ?? null,
-                                    'limit' => 100,
-                                ]);
-                            if (!$resp->successful()) {
+                            $currentBefore = $win['before'] ?? null;
+                            $sinceWin = $win['since'] ?? null;
+                            if ($sinceWin === null || $currentBefore === null) {
                                 continue;
                             }
-                            $txs = $resp->json('transactions') ?? [];
-                            foreach ($txs as $tx) {
-                                $plugin->processTransactionItem($this->integration, $tx, $account['id']);
-                            }
+                            do {
+                                $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                                    ->get('https://api.monzo.com/transactions', [
+                                        'account_id' => $account['id'],
+                                        'expand[]' => 'merchant',
+                                        'since' => $sinceWin,
+                                        'before' => $currentBefore,
+                                        'limit' => 100,
+                                    ]);
+                                if (!$resp->successful()) {
+                                    // Move on to next account/window on error
+                                    break;
+                                }
+                                $txs = $resp->json('transactions') ?? [];
+                                if (empty($txs)) {
+                                    break;
+                                }
+                                foreach ($txs as $tx) {
+                                    $plugin->processTransactionItem($this->integration, $tx, $account['id']);
+                                }
+                                $last = end($txs);
+                                $nextBefore = $last['created'] ?? ($last['id'] ?? null);
+                                if ($nextBefore === null || $nextBefore === $currentBefore) {
+                                    break;
+                                }
+                                $currentBefore = $nextBefore;
+                            } while (count($txs) === 100);
                         }
                     }
                 }

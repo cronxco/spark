@@ -181,6 +181,7 @@ class StartIntegrationMigration implements ShouldQueue
         $batchBuilder = Bus::batch([
             // Exclude master 'accounts' from fetching; just seed once above
             new FetchIntegrationPage($this->integration, $contextTx),
+            new FetchIntegrationPage($this->integration, $contextPots),
             new FetchIntegrationPage($this->integration, $contextBalances),
         ])->name('monzo_fetch_'.$this->integration->id)
           ->onConnection('redis')->onQueue('migration');

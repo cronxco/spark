@@ -25,6 +25,17 @@ class MonitorBatchAndStartProcessing implements ShouldQueue
         $this->onQueue('migration');
     }
 
+    /**
+     * Prevent overlapping monitor loops for the same batch by locking per batch id.
+     */
+    public function middleware(): array
+    {
+        return [
+            (new \Illuminate\Queue\Middleware\WithoutOverlapping('monitor_batch_' . $this->targetBatchId))
+                ->releaseAfter(10),
+        ];
+    }
+
     public function handle(): void
     {
         $batch = Bus::findBatch($this->targetBatchId);

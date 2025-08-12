@@ -352,8 +352,9 @@ class MonzoPlugin extends OAuthPlugin
             ->orderBy('time', 'desc')
             ->first();
         if ($prev) {
-            $prevVal = (int) ($prev->value ?? 0);
-            $delta = $balance - $prevVal; // cents
+            $prevVal = (int) abs($prev->value ?? 0);
+            $currentVal = (int) abs($balance);
+            $delta = $currentVal - $prevVal; // cents
             if ($delta !== 0) {
                 $event->blocks()->create([
                     'time' => $event->time,

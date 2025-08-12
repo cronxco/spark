@@ -9,15 +9,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('integrations', function (Blueprint $table) {
-            $table->text('migration_batch_id')->nullable()->after('last_successful_update_at');
-            $table->index('migration_batch_id');
+            // Use fixed length UUID-friendly string; avoid after() for cross-DB compatibility
+            $table->string('migration_batch_id', 36)->nullable();
+            $table->index('migration_batch_id', 'integrations_migration_batch_id_index');
         });
     }
 
     public function down(): void
     {
         Schema::table('integrations', function (Blueprint $table) {
-            $table->dropIndex(['migration_batch_id']);
+            $table->dropIndex('integrations_migration_batch_id_index');
             $table->dropColumn('migration_batch_id');
         });
     }

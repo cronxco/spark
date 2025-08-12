@@ -59,7 +59,7 @@ class Integration extends Model
                 return;
             }
 
-            if ($group->integrations()->count() > 0) {
+            if ($group->integrations()->exists()) {
                 return;
             }
 
@@ -77,7 +77,7 @@ class Integration extends Model
                 return;
             }
 
-            if ($group->integrations()->count() > 0) {
+            if ($group->integrations()->exists()) {
                 return;
             }
 
