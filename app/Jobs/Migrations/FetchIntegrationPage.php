@@ -4,6 +4,7 @@ namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use Illuminate\Bus\Batchable;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 
 class FetchIntegrationPage implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
 
     public int $timeout = 300;
     public int $tries = 3;
@@ -30,6 +31,18 @@ class FetchIntegrationPage implements ShouldQueue
         $this->context = $context;
         $this->onConnection('redis');
         $this->onQueue('migration');
+    }
+
+    /**
+     * Ensure only one migration fetch runs per integration at a time.
+     * This prevents overlapping windows and duplicate work.
+     */
+    public function middleware(): array
+    {
+        return [
+            (new \Illuminate\Queue\Middleware\WithoutOverlapping('monzo:migration:' . $this->integration->id))
+                ->expireAfter(120),
+        ];
     }
 
     public function handle(): void
@@ -55,6 +68,10 @@ class FetchIntegrationPage implements ShouldQueue
         }
         if ($service === 'github') {
             $this->fetchGitHub();
+            return;
+        }
+        if ($service === 'monzo') {
+            $this->fetchMonzo();
             return;
         }
     }
@@ -264,6 +281,109 @@ class FetchIntegrationPage implements ShouldQueue
             new ProcessIntegrationPage($this->integration, $items, $this->context),
             new FetchIntegrationPage($this->integration, $nextContext),
         ])->onConnection('redis')->onQueue('migration')->dispatch();
+    }
+
+    protected function fetchMonzo(): void
+    {
+        $type = $this->context['instance_type'] ?? 'transactions';
+        if ($type === 'pots') {
+            // Single-shot: add the processing job to the current batch so progress reflects reality
+            // In fetch-only phase, just record marker in cache and return; processing will happen later
+            \Illuminate\Support\Facades\Cache::put($this->cacheKey('pots_fetched'), true, now()->addHours(6));
+            return;
+        }
+
+        if ($type === 'balances') {
+            // Record one snapshot cutoff date; do not enqueue further balances fetch jobs
+            $cursor = $this->context['cursor'] ?? ['end_date' => now()->toDateString()];
+            $endDate = \Carbon\Carbon::parse($cursor['end_date']);
+            \Illuminate\Support\Facades\Cache::put($this->cacheKey('balances_last_date'), $endDate->toDateString(), now()->addHours(6));
+            return;
+        }
+
+        // transactions
+        $cursor = $this->context['cursor'] ?? [];
+        $endIso = isset($cursor['end_iso']) ? \Carbon\Carbon::parse($cursor['end_iso']) : now();
+        $windowDays = (int) ($cursor['window_days'] ?? 89);
+        $startIso = $endIso->copy()->subDays($windowDays)->startOfDay();
+
+        $nextContext = $this->context;
+        // Step back strictly before the earliest window timestamp to avoid overlap
+        $nextContext['cursor']['end_iso'] = $startIso->copy()->subMicrosecond()->toIso8601String();
+
+        // Probe each account with limit=1; only record and continue if any account returns data
+        $group = $this->integration->group;
+        $token = $group?->access_token ?? $this->integration->access_token;
+        $hasData = false;
+        if (!empty($token)) {
+            $accountsResp = \Illuminate\Support\Facades\Http::withToken($token)
+                ->get('https://api.monzo.com/accounts');
+
+            // Handle Monzo rate limiting for accounts call
+            if ($accountsResp->status() === 429) {
+                $retryAfter = (int) ($accountsResp->header('Retry-After') ?? 30);
+                static::dispatch($this->integration, $this->context)
+                    ->onConnection('redis')->onQueue('migration')
+                    ->delay(now()->addSeconds(max(5, $retryAfter)));
+                return;
+            }
+
+            if (!$accountsResp->successful()) {
+                throw new \RuntimeException('Monzo accounts fetch failed: ' . $accountsResp->status());
+            }
+
+            $accounts = $accountsResp->json('accounts') ?? [];
+            foreach ($accounts as $account) {
+                $resp = \Illuminate\Support\Facades\Http::withToken($token)
+                    ->get('https://api.monzo.com/transactions', [
+                        'account_id' => $account['id'] ?? null,
+                        'since' => $startIso->toIso8601String(),
+                        'before' => $endIso->toIso8601String(),
+                        'limit' => 1,
+                    ]);
+
+                // Handle Monzo rate limiting for transactions probe
+                if ($resp->status() === 429) {
+                    $retryAfter = (int) ($resp->header('Retry-After') ?? 30);
+                    static::dispatch($this->integration, $this->context)
+                        ->onConnection('redis')->onQueue('migration')
+                        ->delay(now()->addSeconds(max(5, $retryAfter)));
+                    return;
+                }
+
+                if ($resp->successful() && !empty($resp->json('transactions'))) {
+                    $hasData = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$hasData) {
+            // No data in this window; stop without recording window to avoid empty windows
+            return;
+        }
+
+        // Record that this window was fetched so processing can replay deterministically later
+        $window = [
+            'since' => $startIso->toIso8601String(),
+            'before' => $endIso->toIso8601String(),
+        ];
+        $key = $this->cacheKey('tx_windows');
+        $windows = (array) (\Illuminate\Support\Facades\Cache::get($key) ?? []);
+        $windows[] = $window;
+        \Illuminate\Support\Facades\Cache::put($key, $windows, now()->addHours(6));
+        // Update a simple fetched-back-to marker based on the window start (earliest reached so far)
+        \Illuminate\Support\Facades\Cache::put($this->cacheKey('fetched_back_to'), $startIso->toDateString(), now()->addHours(6));
+
+        // Enqueue next fetch only after confirming data exists
+        $this->batch()?->add([
+            (new FetchIntegrationPage($this->integration, $nextContext))->onConnection('redis')->onQueue('migration'),
+        ]);
+    }
+
+    private function cacheKey(string $suffix): string
+    {
+        return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
     }
 }
 

@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
+use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Oura\OuraPlugin;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +22,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(SlackPlugin::class);
         PluginRegistry::register(SpotifyPlugin::class);
         PluginRegistry::register(OuraPlugin::class);
+        PluginRegistry::register(MonzoPlugin::class);
     }
 
     /**

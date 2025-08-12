@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\ProcessIntegrationData;
 use App\Models\Integration;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Bus;
 
 class FetchIntegrationData extends Command
 {
@@ -65,12 +66,31 @@ class FetchIntegrationData extends Command
         
         foreach ($integrations as $integration) {
             try {
-                // Skip if currently processing
+                // Skip if currently processing (includes migration)
                 if ($integration->isProcessing()) {
                     $this->line("Skipping integration {$integration->id} ({$integration->service}) - currently processing");
                     continue;
                 }
                 
+                // Guard: if a migration batch for this integration (or its group) is active, skip polling to avoid duplicates
+                $activeMigration = false;
+                if ($integration->migration_batch_id) {
+                    $batch = \Illuminate\Support\Facades\Bus::findBatch($integration->migration_batch_id);
+                    $activeMigration = $batch && ! $batch->finished();
+                } elseif ($integration->integration_group_id) {
+                    $activeMigration = \App\Models\Integration::where('integration_group_id', $integration->integration_group_id)
+                        ->whereNotNull('migration_batch_id')
+                        ->get()
+                        ->contains(function ($i) {
+                            $b = \Illuminate\Support\Facades\Bus::findBatch($i->migration_batch_id);
+                            return $b && ! $b->finished();
+                        });
+                }
+                if ($activeMigration) {
+                    $this->line("Skipping integration {$integration->id} ({$integration->service}) - migration batch active");
+                    continue;
+                }
+
                 // Check if it's time to fetch data based on update frequency
                 if ($integration->last_triggered_at && 
                     $integration->last_triggered_at->addMinutes($integration->update_frequency_minutes)->isFuture()) {

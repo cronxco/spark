@@ -1,6 +1,8 @@
 <?php
 use App\Jobs\ProcessIntegrationData;
 use App\Models\Integration;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
@@ -28,6 +30,39 @@ new class extends Component {
             ->get();
             
         $this->integrations = $userIntegrations->map(function ($integration) {
+            $batchName = null;
+            $batchProgress = null;
+            $migrationPhase = null;
+            if (!empty($integration->migration_batch_id)) {
+                try {
+                    $batch = Bus::findBatch($integration->migration_batch_id);
+                    if ($batch) {
+                        $batchName = $batch->name;
+                        $batchProgress = $batch->progress();
+                        if (str_starts_with((string) $batchName, 'monzo_fetch_')) {
+                            $migrationPhase = 'fetch';
+                        } elseif (str_starts_with((string) $batchName, 'monzo_process_')) {
+                            $migrationPhase = 'process';
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+
+            // Monzo migration hints from cache (fetched back to date and tx window count)
+            $fetchedBackTo = null;
+            $txWindowCount = null;
+            if ($integration->service === 'monzo') {
+                // Prefer the generic fetched_back_to (from transactions windows); fallback to balances marker
+                $fetchedBackTo = Cache::get('monzo:migration:' . $integration->id . ':fetched_back_to')
+                    ?: Cache::get('monzo:migration:' . $integration->id . ':balances_last_date');
+                $windows = Cache::get('monzo:migration:' . $integration->id . ':tx_windows');
+                if (is_array($windows)) {
+                    $txWindowCount = count($windows);
+                }
+            }
+
             return [
                 'id' => $integration->id,
                 'name' => $integration->name ?: $integration->service,
@@ -40,6 +75,12 @@ new class extends Component {
                 'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,
                 'is_processing' => $integration->isProcessing(),
                 'status' => $this->getIntegrationStatus($integration),
+                'migration_progress' => $batchProgress,
+                'migration_batch_id' => $integration->migration_batch_id,
+                'migration_batch_name' => $batchName,
+                'migration_phase' => $migrationPhase,
+                'migration_fetched_back_to' => $fetchedBackTo,
+                'migration_tx_window_count' => $txWindowCount,
             ];
         })->toArray();
     }
@@ -99,7 +140,7 @@ new class extends Component {
     
 }; ?>
 
-<div class="py-12" wire:poll="{{ $this->getPollingInterval() }}">
+<div class="py-12" wire:poll.5s="refreshData">
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <x-card title="{{ __('Integration Updates') }}" shadow>
             <div class="flex items-center justify-between mb-6">
@@ -180,6 +221,23 @@ new class extends Component {
                                             class="badge-sm"
                                         />
                                     @endif
+
+                                    @if(!is_null($integration['migration_progress']))
+                                        @php $phase = $integration['migration_phase']; @endphp
+                                        @if($integration['migration_progress'] >= 100)
+                                            <x-badge value="{{ __('Migrated') }}" class="badge-success badge-sm" />
+                                        @else
+                                            <div class="flex items-center space-x-2">
+                                                @if($phase === 'process')
+                                                    <progress class="progress progress-accent progress-xs w-32" value="{{ $integration['migration_progress'] }}" max="100"></progress>
+                                                    <span class="text-xs text-base-content/70">{{ $integration['migration_progress'] }}%</span>
+                                                @else
+                                                    <progress class="progress progress-info progress-xs w-32" value="0" max="100"></progress>
+                                                    <span class="text-xs text-base-content/70">{{ __('Fetching…') }}</span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    @endif
                                     
                                     @if(!$integration['is_processing'])
                                         <x-button 
@@ -192,6 +250,15 @@ new class extends Component {
                                     @endif
                                 </div>
                             </div>
+
+                            @if($integration['service'] === 'monzo' 
+                                && !is_null($integration['migration_progress']) 
+                                && $integration['migration_progress'] < 100 
+                                && $integration['migration_fetched_back_to'])
+                                <div class="mt-1 text-xs text-base-content/60 flex flex-wrap items-center gap-x-2">
+                                    <span>{{ __('Fetched to') }}: {{ $integration['migration_fetched_back_to'] }}</span>
+                                </div>
+                            @endif
                             
                             @if($integration['account_id'])
                                 <div class="text-sm text-base-content/70 mb-3">
@@ -200,7 +267,7 @@ new class extends Component {
                                 </div>
                             @endif
                             
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                 <div class="bg-base-300 rounded-lg p-3">
                                     <div class="font-medium mb-1">{{ __('Update Frequency') }}</div>
                                     <div class="text-base-content/70">{{ $integration['update_frequency_minutes'] }} {{ __('minutes') }}</div>
@@ -216,6 +283,8 @@ new class extends Component {
                                         @endif
                                     </div>
                                 </div>
+
+                                
                                 
                                 <div class="bg-base-300 rounded-lg p-3">
                                     <div class="font-medium mb-1">{{ __('Next Update') }}</div>

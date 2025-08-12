@@ -27,6 +27,7 @@ class Integration extends Model
         'update_frequency_minutes',
         'last_triggered_at',
         'last_successful_update_at',
+        'migration_batch_id',
     ];
 
     protected $casts = [
@@ -39,12 +40,48 @@ class Integration extends Model
         'last_successful_update_at' => 'datetime',
     ];
 
-    protected static function booted()
+    protected static function booted(): void
     {
         static::creating(function ($model) {
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
+        });
+
+        static::deleted(function (Integration $integration): void {
+            if (! $integration->integration_group_id) {
+                return;
+            }
+
+            $group = $integration->group;
+
+            if (! $group) {
+                return;
+            }
+
+            if ($group->integrations()->exists()) {
+                return;
+            }
+
+            $group->delete();
+        });
+
+        static::forceDeleted(function (Integration $integration): void {
+            if (! $integration->integration_group_id) {
+                return;
+            }
+
+            $group = $integration->group;
+
+            if (! $group) {
+                return;
+            }
+
+            if ($group->integrations()->exists()) {
+                return;
+            }
+
+            $group->delete();
         });
     }
 
