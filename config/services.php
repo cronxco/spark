@@ -55,6 +55,13 @@ return [
         'redirect' => env('SPOTIFY_REDIRECT_URI'),
     ],
 
+    'monzo' => [
+        'client_id' => env('MONZO_CLIENT_ID'),
+        'client_secret' => env('MONZO_CLIENT_SECRET'),
+        'redirect' => env('MONZO_REDIRECT_URI'),
+        'salary_name' => env('MONZO_SALARY_NAME'),
+    ],
+
     'oura' => [
         'client_id' => env('OURA_CLIENT_ID'),
         'client_secret' => env('OURA_CLIENT_SECRET'),

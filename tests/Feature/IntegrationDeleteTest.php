@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -111,5 +112,64 @@ class IntegrationDeleteTest extends TestCase
         // Check that it is soft deleted
         $deletedIntegration = Integration::withTrashed()->find($integration->id);
         $this->assertNotNull($deletedIntegration->deleted_at);
+    }
+
+    public function test_deleting_last_integration_soft_deletes_group(): void
+    {
+        $user = User::factory()->create();
+
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'account_id' => 'acct-1',
+        ]);
+
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'name' => 'Only Integration',
+            'integration_group_id' => $group->id,
+        ]);
+
+        $integration->delete();
+
+        $this->assertNotNull(
+            IntegrationGroup::withTrashed()->find($group->id)?->deleted_at
+        );
+    }
+
+    public function test_deleting_non_last_integration_does_not_delete_group(): void
+    {
+        $user = User::factory()->create();
+
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'account_id' => 'acct-2',
+        ]);
+
+        $first = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'name' => 'First',
+            'integration_group_id' => $group->id,
+        ]);
+
+        $second = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'name' => 'Second',
+            'integration_group_id' => $group->id,
+        ]);
+
+        $first->delete();
+
+        $this->assertNull(IntegrationGroup::find($group->id)?->deleted_at);
+
+        $second->delete();
+
+        $this->assertNotNull(
+            IntegrationGroup::withTrashed()->find($group->id)?->deleted_at
+        );
     }
 }

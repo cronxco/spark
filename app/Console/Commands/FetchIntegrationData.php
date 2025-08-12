@@ -65,12 +65,18 @@ class FetchIntegrationData extends Command
         
         foreach ($integrations as $integration) {
             try {
-                // Skip if currently processing
+                // Skip if currently processing (includes migration)
                 if ($integration->isProcessing()) {
                     $this->line("Skipping integration {$integration->id} ({$integration->service}) - currently processing");
                     continue;
                 }
                 
+                // Guard: if any migration job is running for this group+service, skip polling to avoid duplicates
+                if ($integration->group && \Illuminate\Support\Facades\Queue::size('migration') > 0) {
+                    $this->line("Skipping integration {$integration->id} ({$integration->service}) - migration queue active");
+                    continue;
+                }
+
                 // Check if it's time to fetch data based on update frequency
                 if ($integration->last_triggered_at && 
                     $integration->last_triggered_at->addMinutes($integration->update_frequency_minutes)->isFuture()) {
