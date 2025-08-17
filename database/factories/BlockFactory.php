@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\Block;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class BlockFactory extends Factory
 {
@@ -29,4 +28,4 @@ class BlockFactory extends Factory
             'updated_at' => now(),
         ];
     }
-} 
+}

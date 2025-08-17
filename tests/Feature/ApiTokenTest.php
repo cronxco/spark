@@ -11,27 +11,33 @@ class ApiTokenTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_create_api_token()
+    /**
+     * @test
+     */
+    public function user_can_create_api_token()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/tokens/create', [
-            'token_name' => 'Test Token'
+            'token_name' => 'Test Token',
         ]);
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'token',
             'token_name',
-            'created_at'
+            'created_at',
         ]);
         $response->assertJson([
-            'token_name' => 'Test Token'
+            'token_name' => 'Test Token',
         ]);
     }
 
-    public function test_user_can_list_their_tokens()
+    /**
+     * @test
+     */
+    public function user_can_list_their_tokens()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
@@ -48,20 +54,23 @@ class ApiTokenTest extends TestCase
                     'id',
                     'name',
                     'created_at',
-                    'last_used_at'
-                ]
-            ]
+                    'last_used_at',
+                ],
+            ],
         ]);
         $response->assertJson([
             'tokens' => [
                 [
-                    'name' => 'Test Token'
-                ]
-            ]
+                    'name' => 'Test Token',
+                ],
+            ],
         ]);
     }
 
-    public function test_user_can_revoke_token()
+    /**
+     * @test
+     */
+    public function user_can_revoke_token()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
@@ -73,16 +82,19 @@ class ApiTokenTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJson([
-            'message' => 'Token revoked successfully'
+            'message' => 'Token revoked successfully',
         ]);
 
         // Verify token is deleted
         $this->assertDatabaseMissing('personal_access_tokens', [
-            'id' => $token->accessToken->id
+            'id' => $token->accessToken->id,
         ]);
     }
 
-    public function test_user_cannot_revoke_nonexistent_token()
+    /**
+     * @test
+     */
+    public function user_cannot_revoke_nonexistent_token()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
@@ -91,11 +103,14 @@ class ApiTokenTest extends TestCase
 
         $response->assertStatus(404);
         $response->assertJson([
-            'error' => 'Token not found'
+            'error' => 'Token not found',
         ]);
     }
 
-    public function test_unauthenticated_user_cannot_access_token_endpoints()
+    /**
+     * @test
+     */
+    public function unauthenticated_user_cannot_access_token_endpoints()
     {
         $response = $this->postJson('/api/tokens/create');
         $response->assertStatus(401);
@@ -106,4 +121,4 @@ class ApiTokenTest extends TestCase
         $response = $this->deleteJson('/api/tokens/1');
         $response->assertStatus(401);
     }
-} 
+}

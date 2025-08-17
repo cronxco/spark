@@ -3,15 +3,20 @@
 namespace App\Integrations\GitHub;
 
 use App\Integrations\Base\OAuthPlugin;
+use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
+use Throwable;
 
 class GitHubPlugin extends OAuthPlugin
 {
@@ -21,36 +26,36 @@ class GitHubPlugin extends OAuthPlugin
     protected string $clientId;
     protected string $clientSecret;
     protected string $redirectUri;
-    
+
     public function __construct()
     {
-        $this->clientId     = config('services.github.client_id')     ?? '';
+        $this->clientId = config('services.github.client_id') ?? '';
         $this->clientSecret = config('services.github.client_secret') ?? '';
-        $this->redirectUri  = config('services.github.redirect')      ?? route(
+        $this->redirectUri = config('services.github.redirect') ?? route(
             'integrations.oauth.callback',
             ['service' => self::getIdentifier()]
         );
 
         if (! app()->environment('testing') && (empty($this->clientId) || empty($this->clientSecret))) {
-            throw new \InvalidArgumentException('GitHub OAuth credentials are not configured');
+            throw new InvalidArgumentException('GitHub OAuth credentials are not configured');
         }
     }
-    
+
     public static function getIdentifier(): string
     {
         return 'github';
     }
-    
+
     public static function getDisplayName(): string
     {
         return 'GitHub';
     }
-    
+
     public static function getDescription(): string
     {
         return 'Connect your GitHub account to track repository activity';
     }
-    
+
     public static function getConfigurationSchema(): array
     {
         return [
@@ -91,11 +96,6 @@ class GitHubPlugin extends OAuthPlugin
                 'schema' => self::getConfigurationSchema(),
             ],
         ];
-    }
-    
-    protected function getRequiredScopes(): string
-    {
-        return 'repo read:user';
     }
 
     public function getOAuthUrl(IntegrationGroup $group): string
@@ -139,52 +139,52 @@ class GitHubPlugin extends OAuthPlugin
                 'error' => $error,
                 'error_description' => $request->get('error_description'),
             ]);
-            throw new \Exception('GitHub authorization failed: ' . $error);
+            throw new Exception('GitHub authorization failed: ' . $error);
         }
 
         $code = $request->get('code');
-        if (!$code) {
+        if (! $code) {
             Log::error('GitHub OAuth callback missing authorization code', [
                 'group_id' => $group->id,
             ]);
-            throw new \Exception('Invalid OAuth callback: missing authorization code');
+            throw new Exception('Invalid OAuth callback: missing authorization code');
         }
 
         $state = $request->get('state');
-        if (!$state) {
+        if (! $state) {
             Log::error('GitHub OAuth callback missing state parameter', [
                 'group_id' => $group->id,
             ]);
-            throw new \Exception('Invalid OAuth callback: missing state parameter');
+            throw new Exception('Invalid OAuth callback: missing state parameter');
         }
 
         try {
             $stateData = decrypt($state);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('GitHub OAuth state decryption failed', [
                 'group_id' => $group->id,
                 'exception' => $e->getMessage(),
             ]);
-            throw new \Exception('Invalid OAuth callback: state decryption failed');
+            throw new Exception('Invalid OAuth callback: state decryption failed');
         }
 
         if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
-            throw new \Exception('Invalid state parameter');
+            throw new Exception('Invalid state parameter');
         }
 
-        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $group)) {
-            throw new \Exception('Invalid CSRF token');
+        if (! isset($stateData['csrf_token']) || ! $this->validateCsrfToken($stateData['csrf_token'], $group)) {
+            throw new Exception('Invalid CSRF token');
         }
 
         $codeVerifier = $stateData['code_verifier'] ?? null;
-        if (!$codeVerifier) {
-            throw new \Exception('Missing code verifier');
+        if (! $codeVerifier) {
+            throw new Exception('Missing code verifier');
         }
 
         // Exchange code for token on github.com/login/oauth/access_token
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST '.$this->authUrl.'/access_token'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $this->authUrl . '/access_token'));
         $response = Http::asForm()
             ->withHeaders(['Accept' => 'application/json'])
             ->post($this->authUrl . '/access_token', [
@@ -197,12 +197,12 @@ class GitHubPlugin extends OAuthPlugin
             ]);
         $span?->finish();
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             Log::error('GitHub token exchange failed', [
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new \Exception('Failed to exchange code for tokens: ' . $response->body());
+            throw new Exception('Failed to exchange code for tokens: ' . $response->body());
         }
 
         $tokenData = $response->json();
@@ -216,61 +216,23 @@ class GitHubPlugin extends OAuthPlugin
         $this->fetchAccountInfoForGroup($group);
     }
 
-    protected function refreshToken(IntegrationGroup $group): void
-    {
-        // GitHub OAuth app tokens typically do not use refresh tokens; no-op
-        Log::info('GitHub refreshToken called; skipping as not applicable', [
-            'group_id' => $group->id,
-        ]);
-    }
-
-    protected function makeAuthenticatedRequest(string $endpoint, Integration $integration): array
-    {
-        $group = $integration->group;
-        $token = $integration->access_token;
-        if ($group) {
-            if ($group->expiry && $group->expiry->isPast()) {
-                $this->refreshToken($group);
-            }
-            $token = $group->access_token;
-        }
-
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('GET '.$this->baseUrl.$endpoint));
-        $response = Http::withToken($token)
-            ->withHeaders([
-                'Accept' => 'application/vnd.github+json',
-                'X-GitHub-Api-Version' => $this->apiVersion,
-                'User-Agent' => config('app.name', 'SparkApp'),
-            ])
-            ->get($this->baseUrl . $endpoint);
-        $span?->finish();
-
-        if (!$response->successful()) {
-            throw new \Exception('API request failed: ' . $response->body());
-        }
-
-        return $response->json();
-    }
-    
     public function handleWebhook(Request $request, Integration $integration): void
     {
         $payload = $request->all();
-        
+
         // Verify GitHub webhook signature
-        if (!$this->verifyGitHubSignature($request, $integration)) {
+        if (! $this->verifyGitHubSignature($request, $integration)) {
             abort(401, 'Invalid GitHub signature');
         }
-        
+
         // Handle GitHub webhook events
         $eventType = $request->header('X-GitHub-Event');
-        
+
         // If no event type is provided (e.g., in testing), use a default
-        if (!$eventType) {
+        if (! $eventType) {
             $eventType = 'push';
         }
-        
+
         switch ($eventType) {
             case 'push':
                 $this->handlePushEvent($payload, $integration);
@@ -286,90 +248,16 @@ class GitHubPlugin extends OAuthPlugin
                 break;
         }
     }
-    
-    protected function verifyGitHubSignature(Request $request, Integration $integration): bool
-    {
-        $signature = $request->header('X-Hub-Signature-256');
-        $payload = $request->getContent();
-        
-        // If no signature is provided (e.g., in testing), skip verification
-        if (!$signature) {
-            return true;
-        }
-        
-        $secret = $integration->group?->webhook_secret;
-        if (empty($secret)) {
-            return true;
-        }
-        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
-        
-        return hash_equals($expectedSignature, $signature);
-    }
-    
+
     public function verifyWebhookSignature(Request $request, Integration $integration): bool
     {
         return $this->verifyGitHubSignature($request, $integration);
     }
-    
-    protected function handlePushEvent(array $payload, Integration $integration): void
-    {
-        // For testing, if payload doesn't have required fields, skip processing
-        if (!isset($payload['type']) || !isset($payload['actor'])) {
-            return;
-        }
-        
-        $convertedData = $this->convertData($payload, $integration);
-        if (!empty($convertedData)) {
-            $this->createEventFromData($convertedData, $integration);
-        }
-    }
-    
-    protected function handlePullRequestEvent(array $payload, Integration $integration): void
-    {
-        // For testing, if payload doesn't have required fields, skip processing
-        if (!isset($payload['type']) || !isset($payload['actor'])) {
-            return;
-        }
-        
-        $convertedData = $this->convertData($payload, $integration);
-        if (!empty($convertedData)) {
-            $this->createEventFromData($convertedData, $integration);
-        }
-    }
-    
-    protected function handleIssueEvent(array $payload, Integration $integration): void
-    {
-        // For testing, if payload doesn't have required fields, skip processing
-        if (!isset($payload['type']) || !isset($payload['actor'])) {
-            return;
-        }
-        
-        $convertedData = $this->convertData($payload, $integration);
-        if (!empty($convertedData)) {
-            $this->createEventFromData($convertedData, $integration);
-        }
-    }
-    
-    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
-    {
-        // Create a temporary minimal Integration bound to the group to reuse HTTP helper
-        $tempIntegration = new Integration();
-        $tempIntegration->setRelation('group', $group);
-        $userData = $this->makeAuthenticatedRequest('/user', $tempIntegration);
 
-        $updates = [
-            'account_id' => $userData['login'] ?? $group->account_id,
-        ];
-        if (empty($group->webhook_secret)) {
-            $updates['webhook_secret'] = bin2hex(random_bytes(16));
-        }
-        $group->update($updates);
-    }
-    
     public function fetchData(Integration $integration): void
     {
         $config = $integration->configuration ?? [];
-        if (!is_array($config)) {
+        if (! is_array($config)) {
             $config = [];
         }
 
@@ -408,18 +296,160 @@ class GitHubPlugin extends OAuthPlugin
         }
 
         // Final guards against strings
-        if (!is_array($repositories)) {
+        if (! is_array($repositories)) {
             $repositories = $repositories ? [trim((string) $repositories)] : [];
         }
-        if (!is_array($events)) {
+        if (! is_array($events)) {
             $events = $events ? [trim((string) $events)] : ['push', 'pull_request'];
         }
-        
+
         foreach ($repositories as $repo) {
             $this->fetchRepositoryEvents($repo, $events, $integration);
         }
     }
-    
+
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        $eventType = $externalData['type'];
+
+        switch ($eventType) {
+            case 'PushEvent':
+                return $this->convertPushEvent($externalData, $integration);
+            case 'PullRequestEvent':
+                return $this->convertPullRequestEvent($externalData, $integration);
+            case 'IssuesEvent':
+                return $this->convertIssueEvent($externalData, $integration);
+            default:
+                return [];
+        }
+    }
+
+    // Public helper for migration: process one events API payload item
+    public function processEventPayload(Integration $integration, array $event): void
+    {
+        $converted = $this->convertData($event, $integration);
+        if (! empty($converted) && ! empty($converted['events'])) {
+            $this->createEventFromData($converted, $integration);
+        }
+    }
+
+    protected function getRequiredScopes(): string
+    {
+        return 'repo read:user';
+    }
+
+    protected function refreshToken(IntegrationGroup $group): void
+    {
+        // GitHub OAuth app tokens typically do not use refresh tokens; no-op
+        Log::info('GitHub refreshToken called; skipping as not applicable', [
+            'group_id' => $group->id,
+        ]);
+    }
+
+    protected function makeAuthenticatedRequest(string $endpoint, Integration $integration): array
+    {
+        $group = $integration->group;
+        $token = $integration->access_token;
+        if ($group) {
+            if ($group->expiry && $group->expiry->isPast()) {
+                $this->refreshToken($group);
+            }
+            $token = $group->access_token;
+        }
+
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . $endpoint));
+        $response = Http::withToken($token)
+            ->withHeaders([
+                'Accept' => 'application/vnd.github+json',
+                'X-GitHub-Api-Version' => $this->apiVersion,
+                'User-Agent' => config('app.name', 'SparkApp'),
+            ])
+            ->get($this->baseUrl . $endpoint);
+        $span?->finish();
+
+        if (! $response->successful()) {
+            throw new Exception('API request failed: ' . $response->body());
+        }
+
+        return $response->json();
+    }
+
+    protected function verifyGitHubSignature(Request $request, Integration $integration): bool
+    {
+        $signature = $request->header('X-Hub-Signature-256');
+        $payload = $request->getContent();
+
+        // If no signature is provided (e.g., in testing), skip verification
+        if (! $signature) {
+            return true;
+        }
+
+        $secret = $integration->group?->webhook_secret;
+        if (empty($secret)) {
+            return true;
+        }
+        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
+
+        return hash_equals($expectedSignature, $signature);
+    }
+
+    protected function handlePushEvent(array $payload, Integration $integration): void
+    {
+        // For testing, if payload doesn't have required fields, skip processing
+        if (! isset($payload['type']) || ! isset($payload['actor'])) {
+            return;
+        }
+
+        $convertedData = $this->convertData($payload, $integration);
+        if (! empty($convertedData)) {
+            $this->createEventFromData($convertedData, $integration);
+        }
+    }
+
+    protected function handlePullRequestEvent(array $payload, Integration $integration): void
+    {
+        // For testing, if payload doesn't have required fields, skip processing
+        if (! isset($payload['type']) || ! isset($payload['actor'])) {
+            return;
+        }
+
+        $convertedData = $this->convertData($payload, $integration);
+        if (! empty($convertedData)) {
+            $this->createEventFromData($convertedData, $integration);
+        }
+    }
+
+    protected function handleIssueEvent(array $payload, Integration $integration): void
+    {
+        // For testing, if payload doesn't have required fields, skip processing
+        if (! isset($payload['type']) || ! isset($payload['actor'])) {
+            return;
+        }
+
+        $convertedData = $this->convertData($payload, $integration);
+        if (! empty($convertedData)) {
+            $this->createEventFromData($convertedData, $integration);
+        }
+    }
+
+    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
+    {
+        // Create a temporary minimal Integration bound to the group to reuse HTTP helper
+        $tempIntegration = new Integration;
+        $tempIntegration->setRelation('group', $group);
+        $userData = $this->makeAuthenticatedRequest('/user', $tempIntegration);
+
+        $updates = [
+            'account_id' => $userData['login'] ?? $group->account_id,
+        ];
+        if (empty($group->webhook_secret)) {
+            $updates['webhook_secret'] = bin2hex(random_bytes(16));
+        }
+        $group->update($updates);
+    }
+
     protected function fetchRepositoryEvents(string $repo, array $events, Integration $integration): void
     {
         $repo = trim($repo);
@@ -430,7 +460,7 @@ class GitHubPlugin extends OAuthPlugin
         $endpoint = "/repos/{$repo}/events";
         $eventsData = $this->makeAuthenticatedRequest($endpoint, $integration);
 
-        if (!is_array($eventsData)) {
+        if (! is_array($eventsData)) {
             return;
         }
 
@@ -452,47 +482,22 @@ class GitHubPlugin extends OAuthPlugin
         $allowedTypes = array_values(array_unique($allowedTypes));
 
         foreach ($eventsData as $eventData) {
-            if (!is_array($eventData)) {
+            if (! is_array($eventData)) {
                 continue;
             }
-            if (!isset($eventData['type'])) {
+            if (! isset($eventData['type'])) {
                 continue;
             }
-            if (!empty($allowedTypes) && !in_array($eventData['type'], $allowedTypes, true)) {
+            if (! empty($allowedTypes) && ! in_array($eventData['type'], $allowedTypes, true)) {
                 continue;
             }
             $convertedData = $this->convertData($eventData, $integration);
-            if (!empty($convertedData) && !empty($convertedData['events'])) {
+            if (! empty($convertedData) && ! empty($convertedData['events'])) {
                 $this->createEventFromData($convertedData, $integration);
             }
         }
     }
-    
-    public function convertData(array $externalData, Integration $integration): array
-    {
-        $eventType = $externalData['type'];
-        
-        switch ($eventType) {
-            case 'PushEvent':
-                return $this->convertPushEvent($externalData, $integration);
-            case 'PullRequestEvent':
-                return $this->convertPullRequestEvent($externalData, $integration);
-            case 'IssuesEvent':
-                return $this->convertIssueEvent($externalData, $integration);
-            default:
-                return [];
-        }
-    }
 
-    // Public helper for migration: process one events API payload item
-    public function processEventPayload(Integration $integration, array $event): void
-    {
-        $converted = $this->convertData($event, $integration);
-        if (!empty($converted) && !empty($converted['events'])) {
-            $this->createEventFromData($converted, $integration);
-        }
-    }
-    
     protected function convertPushEvent(array $data, Integration $integration): array
     {
         // Ensure we have a stable unique source ID
@@ -511,10 +516,10 @@ class GitHubPlugin extends OAuthPlugin
             ],
             'url' => $data['actor']['html_url']
                 ?? $data['actor']['url']
-                ?? (isset($data['actor']['login']) ? 'https://github.com/'.$data['actor']['login'] : null),
+                ?? (isset($data['actor']['login']) ? 'https://github.com/' . $data['actor']['login'] : null),
             'image_url' => $data['actor']['avatar_url'],
         ];
-        
+
         $target = [
             'concept' => 'repository',
             'type' => 'github_repo',
@@ -525,12 +530,12 @@ class GitHubPlugin extends OAuthPlugin
                 'full_name' => $data['repo']['full_name'] ?? $data['repo']['name'] ?? null,
             ],
             'url' => $data['repo']['html_url']
-                ?? (isset($data['repo']['name']) ? 'https://github.com/'.$data['repo']['name'] : null),
+                ?? (isset($data['repo']['name']) ? 'https://github.com/' . $data['repo']['name'] : null),
         ];
-        
+
         $commits = $data['payload']['commits'] ?? [];
         $blocks = [];
-        
+
         foreach ($commits as $commit) {
             $blocks[] = [
                 'title' => 'Commit: ' . substr($commit['sha'], 0, 7),
@@ -540,7 +545,7 @@ class GitHubPlugin extends OAuthPlugin
                 'value_unit' => 'commit',
             ];
         }
-        
+
         return [
             'events' => [[
                 'source_id' => $data['id'],
@@ -560,19 +565,19 @@ class GitHubPlugin extends OAuthPlugin
             ]],
         ];
     }
-    
+
     protected function convertPullRequestEvent(array $data, Integration $integration): array
     {
         // Check for required top-level keys
-        if (!isset($data['actor'], $data['payload'], $data['repo'], $data['id'], $data['created_at'])) {
+        if (! isset($data['actor'], $data['payload'], $data['repo'], $data['id'], $data['created_at'])) {
             return ['events' => []];
         }
-        
+
         // Check for required payload keys
-        if (!isset($data['payload']['pull_request'], $data['payload']['action'])) {
+        if (! isset($data['payload']['pull_request'], $data['payload']['action'])) {
             return ['events' => []];
         }
-        
+
         $actor = [
             'concept' => 'user',
             'type' => 'github_user',
@@ -585,7 +590,7 @@ class GitHubPlugin extends OAuthPlugin
             'url' => $data['actor']['html_url'] ?? null,
             'image_url' => $data['actor']['avatar_url'] ?? null,
         ];
-        
+
         $pr = $data['payload']['pull_request'];
         $target = [
             'concept' => 'pull_request',
@@ -600,7 +605,7 @@ class GitHubPlugin extends OAuthPlugin
             ],
             'url' => $pr['html_url'] ?? null,
         ];
-        
+
         return [
             'events' => [[
                 'source_id' => $data['id'],
@@ -618,19 +623,19 @@ class GitHubPlugin extends OAuthPlugin
             ]],
         ];
     }
-    
+
     protected function convertIssueEvent(array $data, Integration $integration): array
     {
         // Check for required top-level keys
-        if (!isset($data['actor'], $data['payload'], $data['repo'], $data['id'], $data['created_at'])) {
+        if (! isset($data['actor'], $data['payload'], $data['repo'], $data['id'], $data['created_at'])) {
             return ['events' => []];
         }
-        
+
         // Check for required payload keys
-        if (!isset($data['payload']['issue'], $data['payload']['action'])) {
+        if (! isset($data['payload']['issue'], $data['payload']['action'])) {
             return ['events' => []];
         }
-        
+
         $actor = [
             'concept' => 'user',
             'type' => 'github_user',
@@ -643,7 +648,7 @@ class GitHubPlugin extends OAuthPlugin
             'url' => $data['actor']['html_url'] ?? null,
             'image_url' => $data['actor']['avatar_url'] ?? null,
         ];
-        
+
         $issue = $data['payload']['issue'];
         $target = [
             'concept' => 'issue',
@@ -658,7 +663,7 @@ class GitHubPlugin extends OAuthPlugin
             ],
             'url' => $issue['html_url'] ?? null,
         ];
-        
+
         return [
             'events' => [[
                 'source_id' => $data['id'],
@@ -676,49 +681,49 @@ class GitHubPlugin extends OAuthPlugin
             ]],
         ];
     }
-    
+
     protected function createEventFromData(array $convertedData, Integration $integration): void
     {
         $eventsList = $convertedData['events'] ?? [];
-        if (!is_array($eventsList)) {
+        if (! is_array($eventsList)) {
             $eventsList = [];
         }
 
         foreach ($eventsList as $eventData) {
             // Create actor object
             $actor = $this->createOrUpdateObject($eventData['actor'], $integration);
-            
+
             // Create target object
             $target = $this->createOrUpdateObject($eventData['target'], $integration);
-            
+
             // Create event
-            $event = \App\Models\Event::updateOrCreate(
+            $event = Event::updateOrCreate(
                 [
                     'integration_id' => $integration->id,
                     'source_id' => $eventData['source_id'],
                 ],
                 [
-                'source_id' => $eventData['source_id'],
-                'time' => $eventData['time'],
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'actor_metadata' => $eventData['actor_metadata'] ?? [],
-                'service' => $integration->service,
-                'domain' => $eventData['domain'],
-                'action' => $eventData['action'],
-                'value' => $eventData['value'] ?? null,
-                'value_multiplier' => $eventData['value_multiplier'] ?? 1,
-                'value_unit' => $eventData['value_unit'] ?? null,
-                'event_metadata' => $eventData['event_metadata'] ?? [],
-                'target_id' => $target->id,
-                'target_metadata' => $eventData['target_metadata'] ?? [],
-                'embeddings' => $eventData['embeddings'] ?? null,
+                    'source_id' => $eventData['source_id'],
+                    'time' => $eventData['time'],
+                    'integration_id' => $integration->id,
+                    'actor_id' => $actor->id,
+                    'actor_metadata' => $eventData['actor_metadata'] ?? [],
+                    'service' => $integration->service,
+                    'domain' => $eventData['domain'],
+                    'action' => $eventData['action'],
+                    'value' => $eventData['value'] ?? null,
+                    'value_multiplier' => $eventData['value_multiplier'] ?? 1,
+                    'value_unit' => $eventData['value_unit'] ?? null,
+                    'event_metadata' => $eventData['event_metadata'] ?? [],
+                    'target_id' => $target->id,
+                    'target_metadata' => $eventData['target_metadata'] ?? [],
+                    'embeddings' => $eventData['embeddings'] ?? null,
                 ]
             );
-            
+
             // Create blocks if any
             $blocks = $eventData['blocks'] ?? [];
-            if (!is_array($blocks)) {
+            if (! is_array($blocks)) {
                 $blocks = [];
             }
             foreach ($blocks as $blockData) {
@@ -737,10 +742,10 @@ class GitHubPlugin extends OAuthPlugin
             }
         }
     }
-    
-    protected function createOrUpdateObject(array $objectData, Integration $integration): \App\Models\EventObject
+
+    protected function createOrUpdateObject(array $objectData, Integration $integration): EventObject
     {
-        return \App\Models\EventObject::updateOrCreate(
+        return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
                 'concept' => $objectData['concept'],
@@ -757,4 +762,4 @@ class GitHubPlugin extends OAuthPlugin
             ]
         );
     }
-} 
+}

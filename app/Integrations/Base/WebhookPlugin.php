@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -16,15 +17,15 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         return 'webhook';
     }
-    
+
     public function initializeGroup(User $user): IntegrationGroup
     {
         $webhookSecret = Str::random(32);
         $webhookUrl = route('webhook.handle', [
             'service' => static::getIdentifier(),
-            'secret' => $webhookSecret
+            'secret' => $webhookSecret,
         ]);
-        
+
         return IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => static::getIdentifier(),
@@ -49,37 +50,49 @@ abstract class WebhookPlugin implements IntegrationPlugin
             'access_token' => $group->access_token, // webhook url for convenience
         ]);
     }
-    
+
     public function handleWebhook(Request $request, Integration $integration): void
     {
         // Verify webhook signature if required
-        if (!$this->verifyWebhookSignature($request, $integration)) {
+        if (! $this->verifyWebhookSignature($request, $integration)) {
             abort(401, 'Invalid webhook signature');
         }
-        
+
         // Process the webhook payload
         $payload = $request->all();
         $convertedData = $this->convertData($payload, $integration);
-        
+
         // Create events, objects, and blocks
         $this->createEventsFromWebhook($convertedData, $integration);
     }
-    
+
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
+    {
+        // Webhook plugins don't handle OAuth callbacks
+        throw new Exception('Webhook plugins do not handle OAuth callbacks');
+    }
+
+    public function fetchData(Integration $integration): void
+    {
+        // Webhook plugins don't fetch data
+        throw new Exception('Webhook plugins do not fetch data');
+    }
+
     protected function verifyWebhookSignature(Request $request, Integration $integration): bool
     {
         // Override in child classes if signature verification is needed
         return true;
     }
-    
+
     protected function createEventsFromWebhook(array $convertedData, Integration $integration): void
     {
         foreach ($convertedData['events'] ?? [] as $eventData) {
             // Create actor object
             $actor = $this->createOrUpdateObject($eventData['actor'], $integration);
-            
+
             // Create target object
             $target = $this->createOrUpdateObject($eventData['target'], $integration);
-            
+
             // Create event
             $event = $integration->user->events()->create([
                 'source_id' => $eventData['source_id'],
@@ -98,7 +111,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
                 'target_metadata' => $eventData['target_metadata'] ?? [],
                 'embeddings' => $eventData['embeddings'] ?? null,
             ]);
-            
+
             // Create blocks if any
             foreach ($eventData['blocks'] ?? [] as $blockData) {
                 $event->blocks()->create([
@@ -116,7 +129,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
             }
         }
     }
-    
+
     protected function createOrUpdateObject(array $objectData, Integration $integration): EventObject
     {
         return EventObject::updateOrCreate(
@@ -136,16 +149,4 @@ abstract class WebhookPlugin implements IntegrationPlugin
             ]
         );
     }
-    
-    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
-    {
-        // Webhook plugins don't handle OAuth callbacks
-        throw new \Exception('Webhook plugins do not handle OAuth callbacks');
-    }
-    
-    public function fetchData(Integration $integration): void
-    {
-        // Webhook plugins don't fetch data
-        throw new \Exception('Webhook plugins do not fetch data');
-    }
-} 
+}

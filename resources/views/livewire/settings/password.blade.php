@@ -9,7 +9,7 @@ use Mary\Traits\Toast;
 
 new class extends Component {
     use Toast;
-    
+
     public string $current_password = '';
     public string $password = '';
     public string $password_confirmation = '';
@@ -100,7 +100,7 @@ new class extends Component {
                                 required
                                 autocomplete="new-password"
                             />
-                            <x-button 
+                            <x-button
                                 label="{{ __('Update Password') }}"
                                 wire:click="updatePassword"
                                 class="btn-primary"

@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use App\Models\EventObject;
-use App\Models\Event;
 use App\Models\Block;
-use Illuminate\Support\Facades\DB;
+use App\Models\Event;
+use App\Models\EventObject;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class EventApiController extends Controller
 {
@@ -18,7 +18,7 @@ class EventApiController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = Auth::user();
-        
+
         $query = Event::with(['actor', 'target', 'blocks', 'integration', 'tags'])
             ->whereHas('integration', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
@@ -58,22 +58,6 @@ class EventApiController extends Controller
     }
 
     /**
-     * Get a specific event.
-     */
-    public function show(string $id): JsonResponse
-    {
-        $user = Auth::user();
-        
-        $event = Event::with(['actor', 'target', 'blocks', 'integration', 'tags'])
-            ->whereHas('integration', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($id);
-
-        return response()->json($event);
-    }
-
-    /**
      * Create a new event.
      */
     public function store(Request $request): JsonResponse
@@ -99,7 +83,7 @@ class EventApiController extends Controller
             $event = Event::create($eventData);
             // Create blocks if provided
             $blocks = [];
-            if (!empty($validated['blocks'])) {
+            if (! empty($validated['blocks'])) {
                 foreach ($validated['blocks'] as $blockData) {
                     $block = Block::create(array_merge($blockData, [
                         'event_id' => $event->id,
@@ -108,6 +92,7 @@ class EventApiController extends Controller
                     $blocks[] = $block;
                 }
             }
+
             return [
                 'event' => $event,
                 'actor' => $actor,
@@ -120,12 +105,28 @@ class EventApiController extends Controller
     }
 
     /**
+     * Get a specific event.
+     */
+    public function show(string $id): JsonResponse
+    {
+        $user = Auth::user();
+
+        $event = Event::with(['actor', 'target', 'blocks', 'integration', 'tags'])
+            ->whereHas('integration', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->findOrFail($id);
+
+        return response()->json($event);
+    }
+
+    /**
      * Update an event.
      */
     public function update(Request $request, string $id): JsonResponse
     {
         $user = Auth::user();
-        
+
         $event = Event::whereHas('integration', function ($query) use ($user) {
             $query->where('user_id', $user->id);
         })->findOrFail($id);
@@ -154,7 +155,7 @@ class EventApiController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $user = Auth::user();
-        
+
         $event = Event::whereHas('integration', function ($query) use ($user) {
             $query->where('user_id', $user->id);
         })->findOrFail($id);
@@ -162,13 +163,13 @@ class EventApiController extends Controller
         DB::transaction(function () use ($event) {
             // Soft delete associated blocks
             $event->blocks()->delete();
-            
+
             // Soft delete the event
             $event->delete();
-            
+
             // Note: We don't delete actor/target objects as they might be used by other events
         });
 
         return response()->json(['message' => 'Event deleted successfully']);
     }
-} 
+}

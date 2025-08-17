@@ -9,35 +9,35 @@ use Mary\Traits\Toast;
 
 new class extends Component {
     use Toast;
-    
+
     public Integration $integration;
     public array $schema = [];
     public array $configuration = [];
     public string $name = '';
-    
+
     public function mount(Integration $integration): void
     {
         // Ensure user owns this integration
         if ((string) $integration->user_id !== (string) Auth::id()) {
             abort(403);
         }
-        
+
         $this->integration = $integration;
         $this->name = $integration->name ?: $integration->service;
-        
+
         $pluginClass = PluginRegistry::getPlugin($integration->service);
         if (!$pluginClass) {
             abort(404);
         }
-        
+
         $this->schema = $pluginClass::getConfigurationSchema();
         $this->configuration = $integration->configuration ?? [];
-        
+
         // Ensure update_frequency_minutes is in configuration if it exists in schema
         if (isset($this->schema['update_frequency_minutes'])) {
             $this->configuration['update_frequency_minutes'] = $integration->update_frequency_minutes ?? 15;
         }
-        
+
         // Ensure array fields are properly initialized as arrays
         foreach ($this->schema as $field => $config) {
             if ($config['type'] === 'array' && !isset($this->configuration[$field])) {
@@ -45,14 +45,14 @@ new class extends Component {
             }
         }
     }
-    
+
     public function updateName(): void
     {
         if (empty(trim($this->name))) {
             $this->error('Integration name cannot be empty.');
             return;
         }
-        
+
         try {
             $this->integration->update(['name' => trim($this->name)]);
             $this->success('Integration name updated successfully!');
@@ -60,15 +60,15 @@ new class extends Component {
             $this->error('Failed to update integration name. Please try again.');
         }
     }
-    
+
     public function toggleCheckbox(string $field, string $value): void
     {
         if (!isset($this->configuration[$field])) {
             $this->configuration[$field] = [];
         }
-        
+
         $currentValues = $this->configuration[$field];
-        
+
         if (in_array($value, $currentValues)) {
             // Remove value if already present
             $this->configuration[$field] = array_values(array_filter($currentValues, fn($v) => $v !== $value));
@@ -77,12 +77,12 @@ new class extends Component {
             $this->configuration[$field][] = $value;
         }
     }
-    
+
     public function updateConfiguration(): void
     {
         try {
             $updateData = ['configuration' => []];
-            
+
             // Process the current configuration state
             foreach ($this->configuration as $field => $value) {
                 if ($field === 'update_frequency_minutes') {
@@ -96,29 +96,29 @@ new class extends Component {
                     }
                 }
             }
-            
+
             $this->integration->update($updateData);
-            
+
             $this->success('Integration configured successfully!');
             $this->redirect(route('integrations.index'));
         } catch (\Exception $e) {
             $this->error('Failed to update configuration. Please try again.');
         }
     }
-    
+
     protected function buildValidationRules(): array
     {
         $rules = [];
-        
+
         foreach ($this->schema as $field => $config) {
             $fieldRules = [];
-            
+
             if ($config['required'] ?? false) {
                 $fieldRules[] = 'required';
             } else {
                 $fieldRules[] = 'nullable';
             }
-            
+
             switch ($config['type']) {
                 case 'array':
                     $fieldRules[] = 'array';
@@ -133,13 +133,13 @@ new class extends Component {
                     }
                     break;
             }
-            
+
             $rules["configuration.{$field}"] = $fieldRules;
         }
-        
+
         return $rules;
     }
-    
+
     public function rules(): array
     {
         return [
@@ -160,12 +160,12 @@ new class extends Component {
                             <p class="text-sm text-base-content/70">{{ __('Give this integration instance a custom name') }}</p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <x-input 
+                            <x-input
                                 wire:model.live.debounce.500ms="name"
                                 placeholder="Enter integration name"
                                 class="w-64"
                             />
-                            <x-button 
+                            <x-button
                                 label="{{ __('Update Name') }}"
                                 wire:click="updateName"
                                 class="btn-primary"
@@ -173,27 +173,27 @@ new class extends Component {
                         </div>
                     </div>
                 </div>
-                
+
 
 
                 <!-- Configuration Form -->
                 <form wire:submit="updateConfiguration" class="space-y-6">
-                    @foreach($schema as $field => $config)
+                    @foreach ($schema as $field => $config)
                         <div class="p-4 bg-base-200 rounded-lg">
                             <div class="mb-4">
                                 <h4 class="text-lg font-medium">{{ $config['label'] }}</h4>
-                                @if(isset($config['description']))
+                                @if (isset($config['description']))
                                     <p class="text-sm text-base-content/70">{{ $config['description'] }}</p>
                                 @endif
                             </div>
-                            
+
                             <div class="space-y-3">
-                                @if($config['type'] === 'array' && isset($config['options']))
-                                    @foreach($config['options'] as $value => $label)
+                                @if ($config['type'] === 'array' && isset($config['options']))
+                                    @foreach ($config['options'] as $value => $label)
                                         <div class="flex items-center">
-                                            <input 
+                                            <input
                                                 type="checkbox"
-                                                id="{{ $field }}_{{ $value }}" 
+                                                id="{{ $field }}_{{ $value }}"
                                                 wire:click="toggleCheckbox('{{ $field }}', '{{ $value }}')"
                                                 @checked(in_array($value, $configuration[$field] ?? []))
                                                 class="checkbox"
@@ -203,41 +203,41 @@ new class extends Component {
                                             </label>
                                         </div>
                                     @endforeach
-                                @elseif($config['type'] === 'array')
-                                    <x-textarea 
+                                @elseif ($config['type'] === 'array')
+                                    <x-textarea
                                         wire:model="configuration.{{ $field }}"
                                         rows="3"
                                         placeholder="Enter values separated by commas"
                                     />
-                                @elseif($config['type'] === 'string')
-                                    <x-input 
+                                @elseif ($config['type'] === 'string')
+                                    <x-input
                                         wire:model="configuration.{{ $field }}"
                                         placeholder="Enter {{ strtolower($config['label']) }}"
                                     />
-                                @elseif($config['type'] === 'integer')
-                                    <x-input 
+                                @elseif ($config['type'] === 'integer')
+                                    <x-input
                                         type="number"
                                         wire:model="configuration.{{ $field }}"
                                         min="{{ $config['min'] ?? 1 }}"
                                         placeholder="Enter {{ strtolower($config['label']) }}"
                                     />
                                 @endif
-                                
+
                                 @error("configuration.{$field}")
                                     <p class="text-sm text-error">{{ $message }}</p>
                                 @enderror
                             </div>
                         </div>
                     @endforeach
-                    
+
                     <div class="flex justify-end space-x-3 pt-6 border-t border-base-300">
-                        <x-button 
+                        <x-button
                             label="{{ __('Cancel') }}"
                             link="{{ route('integrations.index') }}"
                             class="btn-outline"
                         />
-                        
-                        <x-button 
+
+                        <x-button
                             label="{{ __('Save Configuration') }}"
                             type="submit"
                             class="btn-primary"
@@ -246,4 +246,4 @@ new class extends Component {
                 </form>
             </x-card>
         </div>
-    </div> 
+    </div>

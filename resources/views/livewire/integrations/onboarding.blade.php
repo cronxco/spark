@@ -23,12 +23,12 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            @foreach(($types ?? []) as $key => $meta)
+                            @foreach (($types ?? []) as $key => $meta)
                                 <label class="flex items-center gap-3 p-3 rounded-lg bg-base-100">
                                     <input type="checkbox" name="types[]" value="{{ $key }}" class="checkbox" @checked(in_array($key, old('types', [])))>
                                     <div>
                                         <div class="font-medium">{{ $meta['label'] ?? ucfirst($key) }}</div>
-                                        @if(!empty($meta['description']))
+                                        @if (!empty($meta['description']))
                                             <div class="text-xs text-base-content/70">{{ $meta['description'] }}</div>
                                         @endif
                                     </div>
@@ -41,11 +41,11 @@
                     </div>
 
                     <!-- Per-type configuration sections (includes per-instance refresh time) -->
-                    @foreach(($types ?? []) as $typeKey => $meta)
+                    @foreach (($types ?? []) as $typeKey => $meta)
                         <div class="p-4 bg-base-200 rounded-lg">
                             <div class="mb-4">
                                 <h4 class="text-lg font-medium">{{ $meta['label'] ?? ucfirst($typeKey) }}</h4>
-                                @if(!empty($meta['description']))
+                                @if (!empty($meta['description']))
                                     <p class="text-sm text-base-content/70">{{ $meta['description'] }}</p>
                                 @endif
                             </div>
@@ -67,11 +67,11 @@
                                     <div class="text-xs text-base-content/70 mt-1">{{ __('How often to fetch data for this instance') }}</div>
                                 </div>
 
-                                @foreach(($meta['schema'] ?? []) as $field => $config)
+                                @foreach (($meta['schema'] ?? []) as $field => $config)
                                     <div>
                                         <div class="mb-1 text-sm font-medium">{{ $config['label'] ?? ucfirst($field) }}</div>
-                                        @if(($config['type'] ?? 'string') === 'array' && isset($config['options']))
-                                            @foreach($config['options'] as $value => $label)
+                                        @if (($config['type'] ?? 'string') === 'array' && isset($config['options']))
+                                            @foreach ($config['options'] as $value => $label)
                                                 <label class="flex items-center gap-2">
                                                     <input type="checkbox" name="config[{{ $typeKey }}][{{ $field }}][]" value="{{ $value }}" class="checkbox" @checked(in_array($value, old('config.'.$typeKey.'.'.$field, [])))>
                                                     <span>{{ $label }}</span>
@@ -83,12 +83,12 @@
                                              @error('config.'.$typeKey.'.'.$field.'.*')
                                                  <div class="text-xs text-error mt-1">{{ $message }}</div>
                                              @enderror
-                                        @elseif(($config['type'] ?? 'string') === 'array')
+                                        @elseif (($config['type'] ?? 'string') === 'array')
                                              <x-textarea name="config[{{ $typeKey }}][{{ $field }}]" rows="3" placeholder="{{ __('Comma-separated values') }}" value="{{ old('config.'.$typeKey.'.'.$field) }}" />
                                              @error('config.'.$typeKey.'.'.$field)
                                                  <div class="text-xs text-error mt-1">{{ $message }}</div>
                                              @enderror
-                                        @elseif(($config['type'] ?? 'string') === 'integer')
+                                        @elseif (($config['type'] ?? 'string') === 'integer')
                                              <x-input type="number" name="config[{{ $typeKey }}][{{ $field }}]" min="{{ $config['min'] ?? 1 }}" value="{{ old('config.'.$typeKey.'.'.$field) }}" />
                                              @error('config.'.$typeKey.'.'.$field)
                                                  <div class="text-xs text-error mt-1">{{ $message }}</div>
@@ -99,7 +99,7 @@
                                                  <div class="text-xs text-error mt-1">{{ $message }}</div>
                                              @enderror
                                         @endif
-                                        @if(isset($config['description']))
+                                        @if (isset($config['description']))
                                             <div class="text-xs text-base-content/70 mt-1">{{ $config['description'] }}</div>
                                         @endif
                                     </div>
@@ -128,12 +128,12 @@
                     </div>
 
                     <div class="flex justify-end space-x-3 pt-6 border-t border-base-300">
-                        <x-button 
+                        <x-button
                             label="{{ __('Cancel') }}"
                             link="{{ route('integrations.index') }}"
                             class="btn-outline"
                         />
-                        <x-button 
+                        <x-button
                             label="{{ __('Create Instances') }}"
                             type="submit"
                             class="btn-primary"

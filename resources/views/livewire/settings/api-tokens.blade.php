@@ -8,7 +8,7 @@ use Mary\Traits\Toast;
 
 new class extends Component {
     use Toast;
-    
+
     public string $tokenName = '';
     public array $tokens = [];
     public bool $showNewToken = false;
@@ -55,7 +55,7 @@ new class extends Component {
             $this->showNewToken = true;
             $this->tokenName = '';
             $this->loadTokens();
-            
+
             $this->success('API token created successfully!');
         } catch (\Exception $e) {
             $this->error('Failed to create token: ' . $e->getMessage());
@@ -111,25 +111,25 @@ new class extends Component {
                             <p class="text-sm text-base-content/70">{{ __('Create a new API token to access the API') }}</p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <x-input 
-                                wire:model="tokenName" 
+                            <x-input
+                                wire:model="tokenName"
                                 placeholder="Enter token name"
                                 class="w-64"
-                                required 
+                                required
                                 autocomplete="off"
                             />
-                            <x-button 
-                                label="{{ __('Create Token') }}" 
-                                wire:click="createToken" 
-                                class="btn-primary" 
-                                spinner="createToken" 
+                            <x-button
+                                label="{{ __('Create Token') }}"
+                                wire:click="createToken"
+                                class="btn-primary"
+                                spinner="createToken"
                             />
                         </div>
                     </div>
                 </div>
 
                 <!-- New Token Display -->
-                @if($showNewToken)
+                @if ($showNewToken)
                     <div class="p-4 bg-success/10 border border-success/20 rounded-lg">
                         <div class="flex items-center justify-between mb-4">
                             <div>
@@ -137,18 +137,18 @@ new class extends Component {
                                 <p class="text-sm text-base-content/70">{{ __('Please copy your new API token. For your security, it won\'t be shown again.') }}</p>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="text" 
-                                    value="{{ $newToken }}" 
-                                    readonly 
+                                <input
+                                    type="text"
+                                    value="{{ $newToken }}"
+                                    readonly
                                     class="input input-bordered w-64 font-mono text-sm"
                                 />
-                                <x-button 
+                                <x-button
                                     label="{{ __('Copy') }}"
                                     class="btn-success"
                                     onclick="navigator.clipboard.writeText('{{ $newToken }}').then(() => { $wire.copyToken(); })"
                                 />
-                                <x-button 
+                                <x-button
                                     label="{{ __('Close') }}"
                                     class="btn-outline"
                                     wire:click="hideNewToken"
@@ -164,8 +164,8 @@ new class extends Component {
                         <h4 class="text-lg font-medium">{{ __('Your API Tokens') }}</h4>
                         <p class="text-sm text-base-content/70">{{ __('Manage your existing API tokens') }}</p>
                     </div>
-                    
-                    @if(count($tokens) > 0)
+
+                    @if (count($tokens) > 0)
                         <div class="overflow-x-auto">
                             <table class="table table-zebra">
                                 <thead>
@@ -177,19 +177,19 @@ new class extends Component {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($tokens as $token)
+                                    @foreach ($tokens as $token)
                                         <tr>
                                             <td class="font-medium">{{ $token['name'] }}</td>
                                             <td>{{ \Carbon\Carbon::parse($token['created_at'])->format('M j, Y g:i A') }}</td>
                                             <td>
-                                                @if($token['last_used_at'])
+                                                @if ($token['last_used_at'])
                                                     {{ \Carbon\Carbon::parse($token['last_used_at'])->format('M j, Y g:i A') }}
                                                 @else
                                                     <span class="text-base-content/50">{{ __('Never') }}</span>
                                                 @endif
                                             </td>
                                             <td class="text-right">
-                                                <x-button 
+                                                <x-button
                                                     label="{{ __('Revoke') }}"
                                                     class="btn-sm btn-error"
                                                     wire:click="revokeToken({{ $token['id'] }})"

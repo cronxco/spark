@@ -16,5 +16,3 @@ interface OAuthIntegrationPlugin extends IntegrationPlugin
      */
     public function getOAuthUrl(IntegrationGroup $group): string;
 }
-
-

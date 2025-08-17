@@ -2,14 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Integration;
-use App\Models\Event;
-use App\Models\EventObject;
-use App\Models\Block;
 use App\Integrations\Spotify\SpotifyPlugin;
+use App\Models\Event;
+use App\Models\Integration;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
+use ReflectionClass;
 use Tests\TestCase;
 
 class SpotifyIntegrationTest extends TestCase
@@ -19,61 +17,76 @@ class SpotifyIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Mock Spotify API responses
         $this->mockSpotifyApi();
     }
 
-    public function test_spotify_plugin_can_be_initialized()
+    /**
+     * @test
+     */
+    public function spotify_plugin_can_be_initialized()
     {
         // Note: when SpotifyPlugin migrates fully to IntegrationGroup, update this test
         // to assert group creation and onboarding redirect.
         $user = User::factory()->create();
-        $plugin = new SpotifyPlugin();
-        
+        $plugin = new SpotifyPlugin;
+
         $integration = $plugin->initialize($user);
-        
+
         $this->assertEquals('spotify', $integration->service);
         $this->assertEquals('Spotify', $integration->name);
         $this->assertEquals($user->id, $integration->user_id);
     }
 
-    public function test_spotify_plugin_has_correct_metadata()
+    /**
+     * @test
+     */
+    public function spotify_plugin_has_correct_metadata()
     {
         $this->assertEquals('spotify', SpotifyPlugin::getIdentifier());
         $this->assertEquals('Spotify', SpotifyPlugin::getDisplayName());
         $this->assertEquals('oauth', SpotifyPlugin::getServiceType());
-        
+
         $description = SpotifyPlugin::getDescription();
         $this->assertStringContainsString('Spotify', $description);
         $this->assertStringContainsString('listening', $description);
     }
 
-    public function test_spotify_plugin_has_configuration_schema()
+    /**
+     * @test
+     */
+    public function spotify_plugin_has_configuration_schema()
     {
         $schema = SpotifyPlugin::getConfigurationSchema();
-        
+
         $this->assertIsArray($schema);
         $this->assertArrayHasKey('update_frequency_minutes', $schema);
         $this->assertArrayHasKey('auto_tag_artists', $schema);
         $this->assertArrayHasKey('include_album_art', $schema);
     }
 
-    public function test_spotify_plugin_requires_correct_scopes()
+    /**
+     * @test
+     */
+    public function spotify_plugin_requires_correct_scopes()
     {
-        $plugin = new SpotifyPlugin();
-        $reflection = new \ReflectionClass($plugin);
+        $plugin = new SpotifyPlugin;
+        $reflection = new ReflectionClass($plugin);
         $method = $reflection->getMethod('getRequiredScopes');
         $method->setAccessible(true);
         $scopes = $method->invoke($plugin);
-        
+
         $this->assertStringContainsString('user-read-currently-playing', $scopes);
         $this->assertStringContainsString('user-read-recently-played', $scopes);
         $this->assertStringContainsString('user-read-email', $scopes);
         $this->assertStringContainsString('user-read-private', $scopes);
     }
 
-    public function test_spotify_plugin_can_process_track_play()
+    /**
+     * @test
+     */
+    public function spotify_plugin_can_process_track_play()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -83,8 +96,8 @@ class SpotifyIntegrationTest extends TestCase
             'name' => 'Test Spotify User',
         ]);
 
-        $plugin = new SpotifyPlugin();
-        
+        $plugin = new SpotifyPlugin;
+
         // Mock track data
         $trackData = [
             'track' => [
@@ -125,7 +138,7 @@ class SpotifyIntegrationTest extends TestCase
         ];
 
         // Process the track play using reflection
-        $reflection = new \ReflectionClass($plugin);
+        $reflection = new ReflectionClass($plugin);
         $method = $reflection->getMethod('processTrackPlay');
         $method->setAccessible(true);
         $method->invoke($plugin, $integration, $trackData, 'recently_played');
@@ -158,7 +171,7 @@ class SpotifyIntegrationTest extends TestCase
         // Verify blocks were created
         $blocks = $event->blocks;
         $this->assertGreaterThan(0, $blocks->count());
-        
+
         $albumArtBlock = $blocks->where('title', 'Album Art')->first();
         $this->assertNotNull($albumArtBlock);
         $this->assertEquals('https://example.com/album.jpg', $albumArtBlock->media_url);
@@ -171,24 +184,27 @@ class SpotifyIntegrationTest extends TestCase
         // Verify tags were attached
         $tags = $event->tags;
         $this->assertGreaterThan(0, $tags->count());
-        
+
         $artistTag = $tags->where('name', 'Test Artist')->first();
         $this->assertNotNull($artistTag);
-        
+
         $albumTag = $tags->where('name', 'Test Album')->first();
         $this->assertNotNull($albumTag);
-        
+
         $yearTag = $tags->where('name', '2023')->first();
         $this->assertNotNull($yearTag);
-        
+
         $decadeTag = $tags->where('name', '2020s')->first();
         $this->assertNotNull($decadeTag);
-        
+
         $popularityTag = $tags->where('name', 'very-popular')->first();
         $this->assertNotNull($popularityTag);
     }
 
-    public function test_spotify_plugin_prevents_duplicate_events()
+    /**
+     * @test
+     */
+    public function spotify_plugin_prevents_duplicate_events()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -198,8 +214,8 @@ class SpotifyIntegrationTest extends TestCase
             'name' => 'Test Spotify User',
         ]);
 
-        $plugin = new SpotifyPlugin();
-        
+        $plugin = new SpotifyPlugin;
+
         $trackData = [
             'track' => [
                 'id' => 'track_123',
@@ -227,7 +243,7 @@ class SpotifyIntegrationTest extends TestCase
         ];
 
         // Process the same track play twice using reflection
-        $reflection = new \ReflectionClass($plugin);
+        $reflection = new ReflectionClass($plugin);
         $method = $reflection->getMethod('processTrackPlay');
         $method->setAccessible(true);
         $method->invoke($plugin, $integration, $trackData, 'recently_played');

@@ -2,11 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Integration;
-use App\Models\Event;
-use App\Models\EventObject;
 use App\Models\Block;
+use App\Models\Event;
+use App\Models\Integration;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -21,14 +20,17 @@ class EventApiExtendedTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create();
         $this->integration = Integration::factory()->create([
             'user_id' => $this->user->id,
         ]);
     }
 
-    public function test_user_can_list_events()
+    /**
+     * @test
+     */
+    public function user_can_list_events()
     {
         Sanctum::actingAs($this->user);
 
@@ -38,7 +40,7 @@ class EventApiExtendedTest extends TestCase
             'service' => 'test-service',
             'domain' => 'test-domain',
         ]);
-        
+
         $event2 = Event::factory()->create([
             'integration_id' => $this->integration->id,
             'service' => 'another-service',
@@ -60,17 +62,20 @@ class EventApiExtendedTest extends TestCase
                     'action',
                     'created_at',
                     'updated_at',
-                ]
+                ],
             ],
             'current_page',
             'per_page',
             'total',
         ]);
-        
+
         $this->assertCount(2, $response->json('data'));
     }
 
-    public function test_user_can_filter_events_by_service()
+    /**
+     * @test
+     */
+    public function user_can_filter_events_by_service()
     {
         Sanctum::actingAs($this->user);
 
@@ -78,7 +83,7 @@ class EventApiExtendedTest extends TestCase
             'integration_id' => $this->integration->id,
             'service' => 'test-service',
         ]);
-        
+
         Event::factory()->create([
             'integration_id' => $this->integration->id,
             'service' => 'another-service',
@@ -91,7 +96,10 @@ class EventApiExtendedTest extends TestCase
         $this->assertEquals('test-service', $response->json('data.0.service'));
     }
 
-    public function test_user_can_filter_events_by_domain()
+    /**
+     * @test
+     */
+    public function user_can_filter_events_by_domain()
     {
         Sanctum::actingAs($this->user);
 
@@ -99,7 +107,7 @@ class EventApiExtendedTest extends TestCase
             'integration_id' => $this->integration->id,
             'domain' => 'test-domain',
         ]);
-        
+
         Event::factory()->create([
             'integration_id' => $this->integration->id,
             'domain' => 'another-domain',
@@ -112,7 +120,10 @@ class EventApiExtendedTest extends TestCase
         $this->assertEquals('test-domain', $response->json('data.0.domain'));
     }
 
-    public function test_user_can_get_specific_event()
+    /**
+     * @test
+     */
+    public function user_can_get_specific_event()
     {
         Sanctum::actingAs($this->user);
 
@@ -129,7 +140,10 @@ class EventApiExtendedTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_access_other_users_event()
+    /**
+     * @test
+     */
+    public function user_cannot_access_other_users_event()
     {
         Sanctum::actingAs($this->user);
 
@@ -137,7 +151,7 @@ class EventApiExtendedTest extends TestCase
         $otherIntegration = Integration::factory()->create([
             'user_id' => $otherUser->id,
         ]);
-        
+
         $event = Event::factory()->create([
             'integration_id' => $otherIntegration->id,
         ]);
@@ -147,7 +161,10 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_user_can_update_event()
+    /**
+     * @test
+     */
+    public function user_can_update_event()
     {
         Sanctum::actingAs($this->user);
 
@@ -177,7 +194,10 @@ class EventApiExtendedTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_update_other_users_event()
+    /**
+     * @test
+     */
+    public function user_cannot_update_other_users_event()
     {
         Sanctum::actingAs($this->user);
 
@@ -185,7 +205,7 @@ class EventApiExtendedTest extends TestCase
         $otherIntegration = Integration::factory()->create([
             'user_id' => $otherUser->id,
         ]);
-        
+
         $event = Event::factory()->create([
             'integration_id' => $otherIntegration->id,
         ]);
@@ -197,7 +217,10 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_user_can_delete_event()
+    /**
+     * @test
+     */
+    public function user_can_delete_event()
     {
         Sanctum::actingAs($this->user);
 
@@ -219,16 +242,19 @@ class EventApiExtendedTest extends TestCase
         // Since we now use soft deletes, the records should still exist but be soft deleted
         $this->assertDatabaseHas('events', ['id' => $event->id]);
         $this->assertDatabaseHas('blocks', ['event_id' => $event->id]);
-        
+
         // Check that they are soft deleted
         $deletedEvent = Event::withTrashed()->find($event->id);
         $this->assertNotNull($deletedEvent->deleted_at);
-        
+
         $deletedBlock = Block::withTrashed()->where('event_id', $event->id)->first();
         $this->assertNotNull($deletedBlock->deleted_at);
     }
 
-    public function test_user_cannot_delete_other_users_event()
+    /**
+     * @test
+     */
+    public function user_cannot_delete_other_users_event()
     {
         Sanctum::actingAs($this->user);
 
@@ -236,7 +262,7 @@ class EventApiExtendedTest extends TestCase
         $otherIntegration = Integration::factory()->create([
             'user_id' => $otherUser->id,
         ]);
-        
+
         $event = Event::factory()->create([
             'integration_id' => $otherIntegration->id,
         ]);
@@ -246,13 +272,16 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_unauthenticated_user_cannot_access_events()
+    /**
+     * @test
+     */
+    public function unauthenticated_user_cannot_access_events()
     {
         $response = $this->getJson('/api/events');
         $response->assertStatus(401);
 
         $event = Event::factory()->create();
-        
+
         $response = $this->getJson("/api/events/{$event->id}");
         $response->assertStatus(401);
 
@@ -263,7 +292,10 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_events_are_paginated()
+    /**
+     * @test
+     */
+    public function events_are_paginated()
     {
         Sanctum::actingAs($this->user);
 
@@ -282,12 +314,15 @@ class EventApiExtendedTest extends TestCase
             'total',
             'last_page',
         ]);
-        
+
         $this->assertCount(15, $response->json('data')); // Default per_page
         $this->assertEquals(20, $response->json('total'));
     }
 
-    public function test_user_can_specify_per_page()
+    /**
+     * @test
+     */
+    public function user_can_specify_per_page()
     {
         Sanctum::actingAs($this->user);
 
@@ -301,4 +336,4 @@ class EventApiExtendedTest extends TestCase
         $this->assertCount(5, $response->json('data'));
         $this->assertEquals(5, $response->json('per_page'));
     }
-} 
+}

@@ -12,17 +12,17 @@ class SlackPlugin extends WebhookPlugin
     {
         return 'slack';
     }
-    
+
     public static function getDisplayName(): string
     {
         return 'Slack';
     }
-    
+
     public static function getDescription(): string
     {
         return 'Receive Slack events via webhook';
     }
-    
+
     public static function getConfigurationSchema(): array
     {
         return [
@@ -48,50 +48,38 @@ class SlackPlugin extends WebhookPlugin
             ],
         ];
     }
-    
+
     public function handleWebhook(Request $request, Integration $integration): void
     {
         $payload = $request->all();
-        
+
         // Verify Slack signature
-        if (!$this->verifySlackSignature($request, $integration)) {
+        if (! $this->verifySlackSignature($request, $integration)) {
             abort(401, 'Invalid Slack signature');
         }
-        
+
         // Handle Slack URL verification
         if ($payload['type'] === 'url_verification') {
             // For URL verification, we need to return a response
             // This is handled by the controller, so we'll just return
             return;
         }
-        
+
         // Process the event
         $convertedData = $this->convertData($payload, $integration);
         $this->createEventsFromWebhook($convertedData, $integration);
     }
-    
-    protected function verifySlackSignature(Request $request, Integration $integration): bool
-    {
-        $signature = $request->header('X-Slack-Signature');
-        $timestamp = $request->header('X-Slack-Request-Timestamp');
-        $body = $request->getContent();
-        
-        $baseString = "v0:{$timestamp}:{$body}";
-        $expectedSignature = 'v0=' . hash_hmac('sha256', $baseString, $integration->account_id);
-        
-        return hash_equals($expectedSignature, $signature);
-    }
-    
+
     public function verifyWebhookSignature(Request $request, Integration $integration): bool
     {
         return $this->verifySlackSignature($request, $integration);
     }
-    
+
     public function convertData(array $externalData, Integration $integration): array
     {
         $event = $externalData['event'] ?? [];
         $eventType = $event['type'] ?? '';
-        
+
         switch ($eventType) {
             case 'message':
                 return $this->convertMessageEvent($externalData, $integration);
@@ -103,11 +91,23 @@ class SlackPlugin extends WebhookPlugin
                 return [];
         }
     }
-    
+
+    protected function verifySlackSignature(Request $request, Integration $integration): bool
+    {
+        $signature = $request->header('X-Slack-Signature');
+        $timestamp = $request->header('X-Slack-Request-Timestamp');
+        $body = $request->getContent();
+
+        $baseString = "v0:{$timestamp}:{$body}";
+        $expectedSignature = 'v0=' . hash_hmac('sha256', $baseString, $integration->account_id);
+
+        return hash_equals($expectedSignature, $signature);
+    }
+
     protected function convertMessageEvent(array $data, Integration $integration): array
     {
         $event = $data['event'];
-        
+
         $actor = [
             'concept' => 'user',
             'type' => 'slack_user',
@@ -119,7 +119,7 @@ class SlackPlugin extends WebhookPlugin
             ],
             'url' => null,
         ];
-        
+
         $target = [
             'concept' => 'message',
             'type' => 'slack_message',
@@ -132,7 +132,7 @@ class SlackPlugin extends WebhookPlugin
             ],
             'url' => null,
         ];
-        
+
         return [
             'events' => [[
                 'source_id' => $data['event_id'],
@@ -150,11 +150,11 @@ class SlackPlugin extends WebhookPlugin
             ]],
         ];
     }
-    
+
     protected function convertReactionEvent(array $data, Integration $integration): array
     {
         $event = $data['event'];
-        
+
         $actor = [
             'concept' => 'user',
             'type' => 'slack_user',
@@ -165,7 +165,7 @@ class SlackPlugin extends WebhookPlugin
             ],
             'url' => null,
         ];
-        
+
         $target = [
             'concept' => 'reaction',
             'type' => 'slack_reaction',
@@ -178,7 +178,7 @@ class SlackPlugin extends WebhookPlugin
             ],
             'url' => null,
         ];
-        
+
         return [
             'events' => [[
                 'source_id' => $data['event_id'],
@@ -195,12 +195,12 @@ class SlackPlugin extends WebhookPlugin
             ]],
         ];
     }
-    
+
     protected function convertFileEvent(array $data, Integration $integration): array
     {
         $event = $data['event'];
         $file = $event['file'] ?? [];
-        
+
         $actor = [
             'concept' => 'user',
             'type' => 'slack_user',
@@ -211,7 +211,7 @@ class SlackPlugin extends WebhookPlugin
             ],
             'url' => null,
         ];
-        
+
         $target = [
             'concept' => 'file',
             'type' => 'slack_file',
@@ -224,7 +224,7 @@ class SlackPlugin extends WebhookPlugin
             ],
             'url' => $file['url_private'] ?? null,
         ];
-        
+
         return [
             'events' => [[
                 'source_id' => $data['event_id'],
@@ -242,4 +242,4 @@ class SlackPlugin extends WebhookPlugin
             ]],
         ];
     }
-} 
+}
