@@ -287,12 +287,13 @@ class MonzoPlugin extends OAuthPlugin
         // Create or update the target "day" object (target_id is NOT NULL in events)
         $dayObject = EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'day',
                 'type' => 'day',
                 'title' => $date,
             ],
             [
+                'integration_id' => $integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $date],
@@ -399,7 +400,7 @@ class MonzoPlugin extends OAuthPlugin
         $counterpartyId = $tx['counterparty']['account_id'] ?? $tx['counterparty']['id'] ?? $tx['counterparty'] ?? null;
         $target = null;
         if ($counterpartyId) {
-            $target = EventObject::where('integration_id', $master->id)
+            $target = EventObject::where('user_id', $integration->user_id)
                 ->where('concept', 'account')
                 ->where('type', 'monzo_pot')
                 ->whereJsonContains('metadata->pot_id', $counterpartyId)
@@ -411,12 +412,13 @@ class MonzoPlugin extends OAuthPlugin
             $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
             $target = EventObject::updateOrCreate(
                 [
-                    'integration_id' => $master->id,
+                    'user_id' => $integration->user_id,
                     'concept' => 'counterparty',
                     'type' => 'monzo_counterparty',
                     'title' => $targetTitle,
                 ],
                 [
+                    'integration_id' => $master->id,
                     'time' => $tx['created'] ?? now(),
                     'content' => $tx['description'] ?? null,
                     'metadata' => [
@@ -722,12 +724,13 @@ class MonzoPlugin extends OAuthPlugin
         $master = $this->resolveMasterIntegration($integration);
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $master->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'account',
                 'type' => 'monzo_pot',
                 'title' => $pot['name'] ?? 'Pot',
             ],
             [
+                'integration_id' => $master->id,
                 'time' => $pot['created'] ?? now(),
                 'content' => (string) ($pot['balance'] ?? 0),
                 'metadata' => [
@@ -751,12 +754,13 @@ class MonzoPlugin extends OAuthPlugin
         $master = $this->resolveMasterIntegration($integration);
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $master->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'account',
                 'type' => 'monzo_account',
                 'title' => $title,
             ],
             [
+                'integration_id' => $master->id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [

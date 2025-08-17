@@ -43,6 +43,160 @@ Route::middleware(['auth'])->group(function () {
         ->name('integrations.storeInstances');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
 
+    // GoCardless bank selection page
+    Route::get('/integrations/groups/{group}/gocardless/bank-selection', function (\App\Models\IntegrationGroup $group) {
+        if ((string) $group->user_id !== (string) \Illuminate\Support\Facades\Auth::id()) {
+            abort(403);
+        }
+        
+        // Load institutions if not already in session
+        if (empty(session('gocardless_institutions_'.$group->id, []))) {
+            try {
+                $plugin = new \App\Integrations\GoCardless\GoCardlessBankPlugin();
+                $institutions = $plugin->getInstitutions();
+                
+                \Illuminate\Support\Facades\Log::info('GoCardless institutions loaded', [
+                    'count' => count($institutions),
+                    'country' => config('services.gocardless.country', 'GB'),
+                    'first_few' => array_slice($institutions, 0, 3),
+                ]);
+                
+                if (!empty($institutions)) {
+                    session(['gocardless_institutions_'.$group->id => $institutions]);
+                    \Illuminate\Support\Facades\Log::info('Institutions saved to session', [
+                        'session_key' => 'gocardless_institutions_'.$group->id,
+                        'count' => count($institutions),
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::warning('GoCardless API returned empty institutions');
+                    session(['gocardless_institutions_'.$group->id => []]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('GoCardless API call failed', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'country' => config('services.gocardless.country', 'GB'),
+                ]);
+                session(['gocardless_institutions_'.$group->id => []]);
+            }
+        }
+        
+        return view('livewire.integrations.bank-selection', ['group' => $group]);
+    })->whereUuid('group')->name('integrations.gocardless.bankSelection');
+
+    // GoCardless institution selection helper
+    Route::post('/integrations/groups/{group}/gocardless/institution', function (\App\Models\IntegrationGroup $group) {
+        if ((string) $group->user_id !== (string) \Illuminate\Support\Facades\Auth::id()) {
+            abort(403);
+        }
+        
+        $institutionId = request('institution_id');
+        
+        \Illuminate\Support\Facades\Log::info('GoCardless setInstitution route called', [
+            'group_id' => $group->id,
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
+            'institution_id' => $institutionId,
+            'request_data' => request()->all(),
+            'session_id' => session()->getId(),
+            'session_data_before' => session()->all(),
+        ]);
+        
+        if ($institutionId) {
+            session(['gocardless_institution_id_'.$group->id => (string) $institutionId]);
+            
+            \Illuminate\Support\Facades\Log::info('GoCardless institution ID stored in session', [
+                'group_id' => $group->id,
+                'institution_id' => $institutionId,
+                'session_key' => 'gocardless_institution_id_'.$group->id,
+                'session_value' => session('gocardless_institution_id_'.$group->id),
+                'session_data_after' => session()->all(),
+            ]);
+        } else {
+            \Illuminate\Support\Facades\Log::warning('No institution ID provided in request');
+        }
+        
+        // Redirect to OAuth flow instead of onboarding
+        $oauthUrl = route('integrations.oauth', ['service' => 'gocardless']);
+        
+        \Illuminate\Support\Facades\Log::info('GoCardless redirecting to OAuth', [
+            'group_id' => $group->id,
+            'oauth_url' => $oauthUrl,
+            'session_data_final' => session()->all(),
+        ]);
+        
+        return redirect()->route('integrations.oauth', ['service' => 'gocardless'])
+            ->with('success', __('Bank selection saved.'));
+    })->whereUuid('group')->name('integrations.gocardless.setInstitution');
+
+
+
+    // Debug route for testing Nordigen API (remove in production)
+    Route::get('/debug/gocardless-test', function () {
+        if (!app()->environment('local')) {
+            abort(404);
+        }
+        
+        $secretId = config('services.gocardless.secret_id');
+        $secretKey = config('services.gocardless.secret_key');
+        $country = config('services.gocardless.country', 'GB');
+        
+        $result = [
+            'credentials_loaded' => !empty($secretId) && !empty($secretKey),
+            'secret_id_length' => strlen($secretId),
+            'secret_key_length' => strlen($secretKey),
+            'country' => $country,
+        ];
+        
+        try {
+            $plugin = new \App\Integrations\GoCardless\GoCardlessBankPlugin();
+            $result['plugin_created'] = true;
+            
+            $institutions = $plugin->getInstitutions($country);
+            $result['institutions_loaded'] = true;
+            $result['institution_count'] = count($institutions);
+            $result['first_institution'] = $institutions[0] ?? null;
+            
+        } catch (\Throwable $e) {
+            $result['error'] = $e->getMessage();
+            $result['error_class'] = get_class($e);
+            $result['trace'] = $e->getTraceAsString();
+        }
+        
+        return response()->json($result);
+    })->name('debug.gocardless');
+
+    // Debug route for refreshing GoCardless integration names
+    Route::get('/debug/gocardless-refresh-names/{groupId}', function (string $groupId) {
+        if (!app()->environment('local')) {
+            abort(404);
+        }
+        
+        $group = \App\Models\IntegrationGroup::find($groupId);
+        if (!$group || $group->service !== 'gocardless') {
+            return response()->json(['error' => 'Invalid group ID or not GoCardless'], 400);
+        }
+        
+        $plugin = new \App\Integrations\GoCardless\GoCardlessBankPlugin();
+        $result = $plugin->refreshIntegrationNames($group);
+        return response()->json($result);
+    })->name('debug.gocardless-refresh-names');
+
+    // Test route for OAuth redirect
+    Route::get('/debug/oauth-test', function () {
+        if (!app()->environment('local')) {
+            abort(404);
+        }
+        
+        // Test the OAuth route directly
+        $oauthUrl = route('integrations.oauth', ['service' => 'gocardless']);
+        
+        return response()->json([
+            'oauth_route_exists' => true,
+            'oauth_url' => $oauthUrl,
+            'current_user' => \Illuminate\Support\Facades\Auth::check() ? \Illuminate\Support\Facades\Auth::id() : null,
+        ]);
+    })->name('debug.oauth-test');
+
 });
 
 // Webhook routes (no auth required)
@@ -71,3 +225,10 @@ Route::get('/auth/authelia/callback', function () {
     \Illuminate\Support\Facades\Auth::login($authUser);
     return redirect('/dashboard');
 });
+
+              // Admin routes
+              Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+                  Route::get('/gocardless', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'index'])->name('gocardless.index');
+                  Route::delete('/gocardless/agreements/{agreementId}', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
+                  Route::delete('/gocardless/requisitions/{requisitionId}', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+              });

@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
+use App\Jobs\Migrations\MonitorBatchAndStartProcessing;
 use Illuminate\Support\Facades\Log;
 
 class StartIntegrationMigration implements ShouldQueue
@@ -52,6 +53,10 @@ class StartIntegrationMigration implements ShouldQueue
         }
         if ($service === 'monzo') {
             $this->startMonzo();
+            return;
+        }
+        if ($service === 'gocardless') {
+            $this->startGoCardless();
             return;
         }
         Log::info('StartIntegrationMigration: unsupported service, skipping', [
@@ -192,6 +197,40 @@ class StartIntegrationMigration implements ShouldQueue
         $this->integration->update(['migration_batch_id' => $batch->id]);
 
         // Monitor completion without closures (avoids SerializableClosure issues)
+        MonitorBatchAndStartProcessing::dispatch($this->integration, $batch->id)
+            ->onConnection('redis')->onQueue('migration');
+    }
+
+    protected function startGoCardless(): void
+    {
+        // Seed contexts for transactions and balances. Accounts (master) is handled by plugin when needed.
+        $now = Carbon::now();
+        $contextTx = [
+            'service' => 'gocardless',
+            'instance_type' => 'transactions',
+            'cursor' => [
+                'end_iso' => $now->toIso8601String(),
+                'window_days' => 89,
+            ],
+            'timebox_until' => $this->timeboxUntil?->toIso8601String(),
+        ];
+        $contextBalances = [
+            'service' => 'gocardless',
+            'instance_type' => 'balances',
+            'cursor' => [
+                'end_date' => $now->toDateString(),
+            ],
+            'timebox_until' => $this->timeboxUntil?->toIso8601String(),
+        ];
+
+        $batch = Bus::batch([
+            new FetchIntegrationPage($this->integration, $contextTx),
+            new FetchIntegrationPage($this->integration, $contextBalances),
+        ])->name('gocardless_fetch_'.$this->integration->id)
+          ->onConnection('redis')->onQueue('migration')
+          ->dispatch();
+
+        $this->integration->update(['migration_batch_id' => $batch->id]);
         MonitorBatchAndStartProcessing::dispatch($this->integration, $batch->id)
             ->onConnection('redis')->onQueue('migration');
     }

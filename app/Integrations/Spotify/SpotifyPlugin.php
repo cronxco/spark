@@ -470,7 +470,7 @@ class SpotifyPlugin extends OAuthPlugin
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'user',
                 'type' => 'spotify_user',
                 'title' => $integration->name,
@@ -499,7 +499,7 @@ class SpotifyPlugin extends OAuthPlugin
         
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'track',
                 'type' => 'spotify_track',
                 'title' => $track['name'],

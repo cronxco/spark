@@ -42,6 +42,13 @@ class PluginRegistry
             return $pluginClass::getServiceType() === 'webhook';
         });
     }
+
+    public static function getApiKeyPlugins(): Collection
+    {
+        return self::getAllPlugins()->filter(function ($pluginClass) {
+            return $pluginClass::getServiceType() === 'apikey';
+        });
+    }
     
     public static function getPluginInstance(string $identifier): ?IntegrationPlugin
     {

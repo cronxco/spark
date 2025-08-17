@@ -43,14 +43,25 @@ class CheckIntegrationUpdates implements ShouldQueue
         try {
             Log::info('Starting integration update check');
             
-            // Get integrations that need updating (OAuth instances with a valid group token)
+            // Get integrations that need updating
+            // - OAuth: require a valid group token
+            // - API key: no token requirement
+            $oauthServices = \App\Integrations\PluginRegistry::getOAuthPlugins()->keys();
+            $apiKeyServices = \App\Integrations\PluginRegistry::getApiKeyPlugins()->keys();
+
             $integrations = Integration::with(['user', 'group'])
                 ->whereHas('user')
-                ->whereHas('group', function ($q) {
-                    $q->whereNotNull('access_token');
+                ->where(function ($query) use ($oauthServices, $apiKeyServices) {
+                    // OAuth integrations with a token
+                    $query->whereIn('service', $oauthServices)
+                        ->whereHas('group', function ($q) {
+                            $q->whereNotNull('access_token');
+                        });
                 })
-                // Only OAuth service integrations
-                ->whereIn('service', \App\Integrations\PluginRegistry::getOAuthPlugins()->keys())
+                ->orWhere(function ($query) use ($apiKeyServices) {
+                    // API key integrations (no token required)
+                    $query->whereIn('service', $apiKeyServices);
+                })
                 ->needsUpdate()
                 ->get();
             

@@ -18,7 +18,7 @@ class EventObject extends Model
 
     protected $fillable = [
         'time',
-        'integration_id',
+        'user_id',
         'concept',
         'type',
         'title',
@@ -44,11 +44,14 @@ class EventObject extends Model
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
+
+            // no-op: user_id must be provided by callers now
         });
     }
 
-    public function integration()
+    public function user()
     {
-        return $this->belongsTo(Integration::class)->withTrashed();
+        return $this->belongsTo(User::class)->withTrashed();
     }
+
 }

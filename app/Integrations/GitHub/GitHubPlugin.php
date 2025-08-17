@@ -742,7 +742,7 @@ class GitHubPlugin extends OAuthPlugin
     {
         return \App\Models\EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => $objectData['concept'],
                 'type' => $objectData['type'],
                 'title' => $objectData['title'],

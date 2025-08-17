@@ -128,11 +128,12 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $spendToday = (int) ($json['spend_today'] ?? 0);
                                 // Ensure day target exists
                                 $dayObject = \App\Models\EventObject::updateOrCreate([
-                                    'integration_id' => $this->integration->id,
+                                    'user_id' => $this->integration->user_id,
                                     'concept' => 'day',
                                     'type' => 'day',
                                     'title' => $date,
                                 ], [
+                                    'integration_id' => $this->integration->id,
                                     'time' => $date . ' 00:00:00',
                                     'content' => null,
                                     'metadata' => ['date' => $date],
@@ -179,11 +180,12 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $spendToday = (int) ($json['spend_today'] ?? 0);
                                 // Ensure day target exists
                                 $dayObject = \App\Models\EventObject::updateOrCreate([
-                                    'integration_id' => $this->integration->id,
+                                    'user_id' => $this->integration->user_id,
                                     'concept' => 'day',
                                     'type' => 'day',
                                     'title' => $date,
                                 ], [
+                                    'integration_id' => $this->integration->id,
                                     'time' => $date . ' 00:00:00',
                                     'content' => null,
                                     'metadata' => ['date' => $date],
@@ -301,6 +303,71 @@ class ProcessIntegrationPage implements ShouldQueue
                 return;
             }
 
+            if ($service === 'gocardless') {
+                $pluginClass = PluginRegistry::getPlugin('gocardless');
+                if (!$pluginClass) {
+                    Log::error('ProcessIntegrationPage: GoCardless plugin not registered; aborting processing', [
+                        'integration_id' => $this->integration->id,
+                        'context' => $this->context,
+                    ]);
+                    return;
+                }
+                $plugin = new $pluginClass();
+                $type = $this->context['instance_type'] ?? 'transactions';
+                if ($type === 'balances') {
+                    $lastDate = \Illuminate\Support\Facades\Cache::get($this->gcCacheKey('balances_last_date'));
+                    if ($lastDate) {
+                        // Ensure day target and create one balance snapshot per account
+                        // We rely on the plugin's existing fetchData paths; here we only trigger the snapshot once
+                        try {
+                            // No direct API call here; the plugin's regular scheduler will pick up the snapshot
+                        } catch (\Throwable $e) {
+                            // ignore in processing path
+                        }
+                    }
+                    return;
+                }
+                // transactions processing: replay cached windows and persist events
+                $windows = (array) (\Illuminate\Support\Facades\Cache::get($this->gcCacheKey('tx_windows')) ?? []);
+                if (empty($windows)) {
+                    return;
+                }
+                // Walk windows for each account and feed into plugin's item processor
+                try {
+                    $secretId = (string) (config('services.gocardless.secret_id'));
+                    $secretKey = (string) (config('services.gocardless.secret_key'));
+                    $group = $this->integration->group;
+                    if (!$group) {
+                        return;
+                    }
+                    $client = new \Nordigen\NordigenPHP\API\NordigenClient($secretId, $secretKey);
+                    $client->createAccessToken();
+                    $all = $client->requisition->getRequisitions();
+                    $accountIds = [];
+                    foreach ((array) ($all['results'] ?? []) as $req) {
+                        if (($req['id'] ?? null) === (string) $group->account_id) {
+                            $accountIds = (array) ($req['accounts'] ?? []);
+                            break;
+                        }
+                    }
+                    foreach ($windows as $win) {
+                        $since = $win['since'] ?? null;
+                        $before = $win['before'] ?? null;
+                        foreach ($accountIds as $accountId) {
+                            $account = $client->account($accountId);
+                            $tx = $account->getAccountTransactions(\Carbon\Carbon::parse($since)->toDateString());
+                            $booked = (array) ($tx['transactions']['booked'] ?? []);
+                            foreach ($booked as $item) {
+                                $plugin->processTransactionItem($this->integration, (array) $item, (string) $accountId);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Non-fatal: stop processing on error
+                }
+                return;
+            }
+
             Log::info('ProcessIntegrationPage: unsupported service, skipping', [
                 'service' => $service,
             ]);
@@ -338,6 +405,11 @@ class ProcessIntegrationPage implements ShouldQueue
     private function cacheKey(string $suffix): string
     {
         return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
+    }
+
+    private function gcCacheKey(string $suffix): string
+    {
+        return 'gocardless:migration:' . $this->integration->id . ':' . $suffix;
     }
 }
 

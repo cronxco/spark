@@ -22,7 +22,7 @@ class FetchIntegrationData extends Command
      *
      * @var string
      */
-    protected $description = 'Fetch data from OAuth integrations that need updating based on their frequency settings';
+    protected $description = 'Fetch data from integrations (OAuth/API key) that need updating based on their frequency settings';
 
     /**
      * Execute the console command.
@@ -34,8 +34,9 @@ class FetchIntegrationData extends Command
         
         if ($service) {
             $this->info("Fetching data for {$service} integrations...");
+            $services = PluginRegistry::getOAuthPlugins()->keys()->merge(PluginRegistry::getApiKeyPlugins()->keys());
             $query = Integration::where('service', $service)
-                ->whereIn('service', PluginRegistry::getOAuthPlugins()->keys());
+                ->whereIn('service', $services);
             
             if (!$force) {
                 $query->needsUpdate();
@@ -43,9 +44,10 @@ class FetchIntegrationData extends Command
             
             $integrations = $query->get();
         } else {
-            $this->info('Fetching data from OAuth integrations that need updating...');
+            $this->info('Fetching data from integrations that need updating...');
+            $services = PluginRegistry::getOAuthPlugins()->keys()->merge(PluginRegistry::getApiKeyPlugins()->keys());
             $query = Integration::whereHas('user')
-                ->whereIn('service', PluginRegistry::getOAuthPlugins()->keys());
+                ->whereIn('service', $services);
             
             if (!$force) {
                 $query->needsUpdate();

@@ -15,8 +15,8 @@ class EventFactory extends Factory
     {
         // Create actor and target objects with the same integration
         $integration = \App\Models\Integration::factory()->create();
-        $actor = EventObject::factory()->create(['integration_id' => $integration->id]);
-        $target = EventObject::factory()->create(['integration_id' => $integration->id]);
+        $actor = EventObject::factory()->create(['user_id' => $integration->user_id]);
+        $target = EventObject::factory()->create(['user_id' => $integration->user_id]);
 
         return [
             'id' => $this->faker->uuid(),

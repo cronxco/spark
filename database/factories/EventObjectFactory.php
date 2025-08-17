@@ -15,7 +15,7 @@ class EventObjectFactory extends Factory
         return [
             'id' => $this->faker->uuid(),
             'time' => $this->faker->dateTime(),
-            'integration_id' => \App\Models\Integration::factory(),
+            'user_id' => \App\Models\Integration::factory()->create()->user_id,
             'concept' => $this->faker->word(),
             'type' => $this->faker->word(),
             'title' => $this->faker->sentence(),

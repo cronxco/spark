@@ -209,6 +209,12 @@ new class extends Component {
                                         rows="3"
                                         placeholder="Enter values separated by commas"
                                     />
+                                @elseif($config['type'] === 'string' && ($config['options'] ?? null))
+                                    <select class="select select-bordered" wire:model="configuration.{{ $field }}">
+                                        @foreach(($config['options'] ?? []) as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
                                 @elseif($config['type'] === 'string')
                                     <x-input 
                                         wire:model="configuration.{{ $field }}"

@@ -65,7 +65,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
         $this->createEventsFromWebhook($convertedData, $integration);
     }
     
-    protected function verifyWebhookSignature(Request $request, Integration $integration): bool
+    public function verifyWebhookSignature(Request $request, Integration $integration): bool
     {
         // Override in child classes if signature verification is needed
         return true;
@@ -81,7 +81,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
             $target = $this->createOrUpdateObject($eventData['target'], $integration);
             
             // Create event
-            $event = $integration->user->events()->create([
+            $event = \App\Models\Event::create([
                 'source_id' => $eventData['source_id'],
                 'time' => $eventData['time'],
                 'integration_id' => $integration->id,
@@ -121,7 +121,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => $objectData['concept'],
                 'type' => $objectData['type'],
                 'title' => $objectData['title'],
