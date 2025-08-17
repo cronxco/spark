@@ -65,13 +65,11 @@ class AppleHealthPlugin extends WebhookPlugin
 
     public function convertData(array $externalData, Integration $integration): array
     {
-        $instanceType = (string) ($integration->instance_type ?? 'workouts');
         $events = [];
 
-        // Accept either a top-level {workouts:[...]} or {metrics:[...]} payload
-        if ($instanceType === 'workouts') {
-            $workouts = is_array($externalData['workouts'] ?? null) ? $externalData['workouts'] : [];
-            foreach ($workouts as $workout) {
+        // Process workouts data if present in payload
+        if (isset($externalData['workouts']) && is_array($externalData['workouts'])) {
+            foreach ($externalData['workouts'] as $workout) {
                 if (! is_array($workout)) {
                     continue;
                 }
@@ -79,9 +77,9 @@ class AppleHealthPlugin extends WebhookPlugin
             }
         }
 
-        if ($instanceType === 'metrics') {
-            $metrics = is_array($externalData['metrics'] ?? null) ? $externalData['metrics'] : [];
-            foreach ($metrics as $metricEntry) {
+        // Process metrics data if present in payload
+        if (isset($externalData['metrics']) && is_array($externalData['metrics'])) {
+            foreach ($externalData['metrics'] as $metricEntry) {
                 if (! is_array($metricEntry)) {
                     continue;
                 }
