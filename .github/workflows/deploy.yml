@@ -187,7 +187,7 @@ jobs:
     name: Deploy to Prod
     runs-on: ubuntu-latest
     needs: version
-    if: github.ref == 'refs/heads/main' && needs.version.outputs.version != ''
+    if: github.ref == 'refs/heads/main'
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     permissions:
@@ -233,6 +233,7 @@ jobs:
           dep: deploy prod
 
       - name: Get version
+        if: github.ref == 'refs/heads/main' && needs.version.outputs.version != ''
         id: get_version
         run: |
           echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
@@ -240,6 +241,7 @@ jobs:
           git add .
 
       - name: Commit Changes
+        if: github.ref == 'refs/heads/main' && needs.version.outputs.version != ''
         id: auto_commit_action
         uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
         with:
@@ -258,7 +260,7 @@ jobs:
     name: Deploy to Dev
     runs-on: ubuntu-latest
     needs: version
-    if: github.ref == 'refs/heads/dev' && needs.version.outputs.version != ''
+    if: github.ref == 'refs/heads/dev'
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     permissions:
@@ -299,6 +301,7 @@ jobs:
           dep: deploy dev
 
       - name: Get version
+        if: github.ref == 'refs/heads/dev' && needs.version.outputs.version != ''
         id: get_version
         run: |
           echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
@@ -306,6 +309,7 @@ jobs:
           git add .
 
       - name: Commit Changes
+        if: github.ref == 'refs/heads/main'
         id: auto_commit_action
         uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
         with:
