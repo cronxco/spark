@@ -1,73 +1,439 @@
-name: Deploy
+name: Deployer
 
 on:
   push:
     branches:
       - main
+      - dev
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  version:
+  ci:
+    name: Test
     runs-on: ubuntu-latest
+    environment: CI
+
+    services:
+      postgres:
+        image: "pgvector/pgvector:0.8.0-pg17@sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87"
+        env:
+          PGPASSWORD: postgres
+          POSTGRES_DB: laravel
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
-    - name: checkout
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      with:
-        ref: main
-    - name: Install Semantic Release
-      run: npm install semantic-release @semantic-release/github @semantic-release/exec semantic-release-gitmoji -D
-    - name: Run Semantic Release
-      run: npx semantic-release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Upload version artifact
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-      with:
-        name: version
-        path: VERSION.txt
-  # sentry_production:
-  #   runs-on: ubuntu-latest
-  #   needs: version
-  #   steps:
-  #   - name: checkout
-  #     uses: actions/checkout@v4
-  #     with:
-  #       ref: master
-  #   - name: Download version artifact
-  #     uses: actions/download-artifact@v4
-  #     with:
-  #       name: version
-  #   - name: Set version variable
-  #     run: export VERSION=$(cat version/VERSION.txt)
-  #   - name: install Sentry CLI
-  #     run: curl -sL https://sentry.io/get-cli/ | bash
-  #   - name: Set Sentry release
-  #     run: |
-  #       sentry-cli releases --org cronx new $VERSION-$GITHUB_RUN_ID
-  #       sentry-cli releases --org cronx set-commits --auto $VERSION-$GITHUB_RUN_ID
-  #       sentry-cli releases --org cronx deploys $VERSION-$GITHUB_RUN_ID new --env "production"
-  # deploy_production:
-  #   runs-on: ubuntu-latest
-  #   needs: version
-  #   steps:
-  #   - name: checkout
-  #     uses: actions/checkout@v4
-  #     with:
-  #       ref: master
-  #   - name: Download version artifact
-  #     uses: actions/download-artifact@v4
-  #     with:
-  #       name: version
-  #   - name: Set version variable
-  #     run: export VERSION=$(cat version/VERSION.txt) && echo "$VERSION"
-  #   - name: Set-up ssh environment
-  #     run: |
-  #       'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
-  #       eval $(ssh-agent -s)
-  #       ssh-add <(echo "${{ secrets.SSH_PRIVATE_KEY }}")
-  #       mkdir -p ~/.ssh
-  #       '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
-  #   - name: Deploy
-  #     run: ~/.composer/vendor/bin/envoy run deploy --env="production" --commit="$GITHUB_SHA" --branch="$GITHUB_REF" --build="$GITHUB_RUN_ID" --ver="$VERSION"
-  #     env:
-  #       name: production
-  #       url: demo.cronx.co
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@20529878ed81ef8e78ddf08b480401e6101a850f # v2
+        with:
+          php-version: 8.2
+          tools: composer:v2
+          coverage: xdebug
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Node Dependencies
+        run: npm i
+
+      - name: Add Wire Credentials Loaded From ENV
+        run: composer config http-basic.wire-elements-pro.composer.sh ${{ secrets.WIRE_SECRET}}
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Build Assets
+        run: npm run build
+
+      - name: Run Tests
+        id: tests
+        run: |
+          # Run PHPUnit with output capturing all test results
+          # Use tee so we still see output in Actions logs
+          ./vendor/bin/phpunit --teamcity | tee test_output.txt || true
+
+          # Extract finished and failed test names
+          grep "##teamcity\[testFinished" test_output.txt \
+            | sed "s/.*name='\([^']*\)'.*/\1/" > all_finished.txt
+          grep "##teamcity\[testFailed" test_output.txt \
+            | sed "s/.*name='\([^']*\)'.*/\1/" | sort -u > failed_tests.txt
+
+          # Compute passed = finished − failed
+          sort -u all_finished.txt > all_finished_sorted.txt
+          comm -23 all_finished_sorted.txt failed_tests.txt > passed_tests.txt
+
+          # Derive counts from lists
+          TOTAL=$(wc -l < all_finished_sorted.txt)
+          FAILED=$(wc -l < failed_tests.txt)
+          PASSED=$(wc -l < passed_tests.txt)
+
+          # Clean up intermediate lists
+          rm -f all_finished.txt all_finished_sorted.txt
+
+          # Store test results for summary step
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+          # Exit with error if any tests failed
+          if [ "${FAILED:-0}" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Add Test Results to Summary
+        if: always()
+        run: |
+          echo "# Deployment Summary :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Build & Test Results" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.tests.outputs.failed }}" = "0" ]; then
+            echo "- ✅ CI Tests Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ CI Tests Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "- Total Tests: \`${{ steps.tests.outputs.total }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Passed: \`${{ steps.tests.outputs.passed }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Failed: \`${{ steps.tests.outputs.failed }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add passed tests in expandable section
+          echo "<details><summary>✅ Passed Tests (${{ steps.tests.outputs.passed }})</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat passed_tests.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add failed tests in expandable section if any
+          if [ "${{ steps.tests.outputs.failed }}" != "0" ]; then
+            echo "<details><summary>❌ Failed Tests (${{ steps.tests.outputs.failed }})</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat failed_tests.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    needs: ci
+    permissions:
+      contents: write # to be able to publish a GitHub release
+      issues: write # to be able to comment on released issues
+      pull-requests: write # to be able to comment on released pull requests
+      id-token: write # to enable use of OIDC for npm provenance
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      hash: ${{ steps.get_hash.outputs.hash }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "lts/*"
+      - name: Install dependencies
+        run: npm clean-install
+      - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
+        run: npm audit signatures
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+      - name: Get version
+        id: get_version
+        run: echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
+      - name: Get hash
+        id: get_hash
+        run: echo "hash=$(git rev-parse --short=6 HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Upload version artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: version
+          path: VERSION.txt
+      - name: Add Version Info to Summary
+        run: |
+          echo "- 📦 Version: \`$(cat VERSION.txt)\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Commit: [\`$(git rev-parse --short=6 HEAD)\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/$(git rev-parse HEAD))" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  deploy-prod:
+    name: Deploy to Prod
+    runs-on: ubuntu-latest
+    needs: version
+    if: github.ref == 'refs/heads/main' && needs.version.outputs.version != ''
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    permissions:
+      contents: write
+    steps:
+      - name: App Token
+        id: app_token
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@20529878ed81ef8e78ddf08b480401e6101a850f # v2
+        with:
+          php-version: "8.2"
+
+      - name: Add Wire Credentials Loaded From ENV
+        run: composer config http-basic.wire-elements-pro.composer.sh ${{ secrets.WIRE_SECRET}}
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Deploy
+        uses: deployphp/action@6242095e7207facf115ac4439760356bc52760ac # v1
+        env:
+          DEPLOYER_USER: ${{ vars.DEPLOYER_USER }}
+          DEPLOYER_HOSTNAME: ${{ vars.DEPLOYER_HOSTNAME }}
+          DEPLOYER_PATH: ${{ vars.DEPLOYER_PATH }}
+          DEPLOYER_APP: ${{ vars.DEPLOYER_APP }}
+          DEPLPOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_PREFIX: ${{ vars.SENTRY_PREFIX }}
+          SENTRY_SERVER: ${{ vars.SENTRY_SERVER }}
+          SENTRY_PROJECT_ARRAY: ${{ vars.SENTRY_PROJECT_ARRAY }}
+          WIRE_SECRET: ${{ secrets.WIRE_SECRET }}
+        with:
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          dep: deploy prod
+
+      - name: Get version
+        id: get_version
+        run: |
+          echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
+          php artisan version:absorb
+          git add .
+
+      - name: Commit Changes
+        id: auto_commit_action
+        uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
+        with:
+          message: ":pushpin: Update version"
+          token: ${{ steps.app_token.outputs.token }}
+          fail-on-no-changes: false
+
+      - name: Add Deployment Info to Summary
+        run: |
+          echo "## Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 Environment: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 URL: https://${{ vars.DEPLOYER_HOSTNAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: version
+    if: github.ref == 'refs/heads/dev' && needs.version.outputs.version != ''
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    permissions:
+      contents: write
+    steps:
+      - name: App Token
+        id: app_token
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@20529878ed81ef8e78ddf08b480401e6101a850f # v2
+        with:
+          php-version: "8.2"
+
+      - name: Add Wire Credentials Loaded From ENV
+        run: composer config http-basic.wire-elements-pro.composer.sh ${{ secrets.WIRE_SECRET}}
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Deploy
+        uses: deployphp/action@6242095e7207facf115ac4439760356bc52760ac # v1
+        env:
+          DEPLOYER_USER: ${{ vars.DEV_DEPLOYER_USER }}
+          DEPLOYER_HOSTNAME: ${{ vars.DEV_DEPLOYER_HOSTNAME }}
+          DEPLOYER_PATH: ${{ vars.DEV_DEPLOYER_PATH }}
+          DEPLOYER_APP: ${{ vars.DEV_DEPLOYER_APP }}
+          DEPLPOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          WIRE_SECRET: ${{ secrets.WIRE_SECRET }}
+        with:
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          dep: deploy dev
+
+      - name: Get version
+        id: get_version
+        run: |
+          echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
+          php artisan version:absorb
+          git add .
+
+      - name: Commit Changes
+        id: auto_commit_action
+        uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
+        with:
+          message: ":pushpin: Update version"
+          token: ${{ steps.app_token.outputs.token }}
+          fail-on-no-changes: false
+
+      - name: Add Deployment Info to Summary
+        run: |
+          echo "## Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 Environment: Development" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 URL: https://${{ vars.DEV_DEPLOYER_HOSTNAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - deploy-prod
+      - version
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+      - name: Create Sentry release
+        uses: getsentry/action-release@526942b68292201ac6bbb99b9a0747d4abee354c # v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_URL: ${{ vars.SENTRY_SERVER }}
+        with:
+          environment: production
+          release: ${{ needs.deploy-prod.outputs.version }}
+          release_prefix: ${{ vars.SENTRY_PREFIX }}
+          projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
+          disable_telemetry: true
+          ignore_missing: true
+      - name: Add Monitoring Info to Summary
+        run: |
+          echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+      - name: Add Related Changes to Summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## Related Changes" >> $GITHUB_STEP_SUMMARY
+          echo "### Pull Requests" >> $GITHUB_STEP_SUMMARY
+          gh pr list --search "${{ needs.version.outputs.hash }}" --json number,title,url --jq '.[] | "- [#\(.number) \(.title)](\(.url))"' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Issues" >> $GITHUB_STEP_SUMMARY
+          gh issue list --search "${{ needs.version.outputs.hash }}" --json number,title,url --jq '.[] | "- [#\(.number) \(.title)](\(.url))"' >> $GITHUB_STEP_SUMMARY
+
+  release-dev:
+    name: Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+    needs:
+      - deploy-dev
+      - version
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+      - name: Create Sentry release
+        uses: getsentry/action-release@526942b68292201ac6bbb99b9a0747d4abee354c # v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_URL: ${{ vars.SENTRY_SERVER }}
+        with:
+          environment: dev
+          release: ${{ needs.deploy-dev.outputs.version }}
+          release_prefix: ${{ vars.SENTRY_PREFIX }}
+          projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
+          disable_telemetry: true
+          ignore_missing: true
+      - name: Add Monitoring Info to Summary
+        run: |
+          echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+      - name: Add Related Changes to Summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## Related Changes" >> $GITHUB_STEP_SUMMARY
+          echo "### Pull Requests" >> $GITHUB_STEP_SUMMARY
+          gh pr list --search "${{ needs.version.outputs.hash }}" --json number,title,url --jq '.[] | "- [#\(.number) \(.title)](\(.url))"' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Issues" >> $GITHUB_STEP_SUMMARY
+          gh issue list --search "${{ needs.version.outputs.hash }}" --json number,title,url --jq '.[] | "- [#\(.number) \(.title)](\(.url))"' >> $GITHUB_STEP_SUMMARY
+
+  sync-branch:
+    name: Sync
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - deploy-prod
+    permissions:
+      contents: write
+      pull-requests: write
+      repository-projects: write
+    steps:
+      - name: App Token
+        id: app_token
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+      - name: Sync Branch
+        uses: remarkablemark/sync-branch@6bdd47dc563c19329241d933c9d8038f8bdaaf21 # v1
+        with:
+          base: dev
+          title: ":twisted_rightwards_arrows: Sync back to dev"
+          token: ${{ steps.app_token.outputs.token }}
+          admin: true
+          body: |
+            This PR is automatically created to sync the main branch back to dev after a production deployment.

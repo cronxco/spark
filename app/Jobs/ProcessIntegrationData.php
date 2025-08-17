@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -12,7 +13,11 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
+use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
+use Throwable;
+
+use function Sentry\captureException;
 
 class ProcessIntegrationData implements ShouldQueue
 {
@@ -38,46 +43,46 @@ class ProcessIntegrationData implements ShouldQueue
     public function handle(): void
     {
         $hub = SentrySdk::getCurrentHub();
-        $txContext = new TransactionContext();
-        $txContext->setName('job.process_integration: '.$this->integration->service);
+        $txContext = new TransactionContext;
+        $txContext->setName('job.process_integration: ' . $this->integration->service);
         $txContext->setOp('job');
         $transaction = $hub->startTransaction($txContext);
         $hub->setSpan($transaction);
 
         try {
             $pluginClass = PluginRegistry::getPlugin($this->integration->service);
-            if (!$pluginClass) {
-                throw new \Exception("Plugin for service '{$this->integration->service}' not found");
+            if (! $pluginClass) {
+                throw new Exception("Plugin for service '{$this->integration->service}' not found");
             }
 
-            $plugin = new $pluginClass();
-            
+            $plugin = new $pluginClass;
+
             Log::info("Processing data for integration {$this->integration->id} ({$this->integration->service})");
-            
+
             // Mark as triggered before processing
             $this->integration->markAsTriggered();
 
-            $span = $transaction->startChild((new SpanContext())->setOp('integration.fetch')->setDescription($this->integration->service));
+            $span = $transaction->startChild((new SpanContext)->setOp('integration.fetch')->setDescription($this->integration->service));
             $plugin->fetchData($this->integration);
             $span->finish();
-            
+
             // Mark as successfully updated after processing
             $this->integration->markAsSuccessfullyUpdated();
-            
+
             Log::info("Successfully processed data for integration {$this->integration->id} ({$this->integration->service})");
-            $transaction->setStatus(\Sentry\Tracing\SpanStatus::ok());
-            
-        } catch (\Exception $e) {
+            $transaction->setStatus(SpanStatus::ok());
+
+        } catch (Exception $e) {
             Log::error("Failed to process data for integration {$this->integration->id} ({$this->integration->service})", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            \Sentry\captureException($e);
-            
+            captureException($e);
+
             // Mark as failed so it can be retried
             $this->integration->markAsFailed();
-            
-            $transaction->setStatus(\Sentry\Tracing\SpanStatus::internalError());
+
+            $transaction->setStatus(SpanStatus::internalError());
             throw $e; // Re-throw to trigger retry
         } finally {
             $transaction->finish();
@@ -88,14 +93,14 @@ class ProcessIntegrationData implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::error("Integration data processing job failed permanently for integration {$this->integration->id} ({$this->integration->service})", [
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
         \Sentry\captureException($exception);
-        
+
         // Mark as failed so it can be retried in the future
         $this->integration->markAsFailed();
     }

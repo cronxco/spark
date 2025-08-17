@@ -4,8 +4,8 @@ namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
-use Illuminate\Bus\Batchable;
 use Carbon\Carbon;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 
 class StartIntegrationMigration implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
     public int $tries = 3;
@@ -40,18 +40,22 @@ class StartIntegrationMigration implements ShouldQueue
         $service = $this->integration->service;
         if ($service === 'oura') {
             $this->startOura();
+
             return;
         }
         if ($service === 'spotify') {
             $this->startSpotify();
+
             return;
         }
         if ($service === 'github') {
             $this->startGitHub();
+
             return;
         }
         if ($service === 'monzo') {
             $this->startMonzo();
+
             return;
         }
         Log::info('StartIntegrationMigration: unsupported service, skipping', [
@@ -134,15 +138,15 @@ class StartIntegrationMigration implements ShouldQueue
         // Ensure master accounts instance exists before any migration
         $pluginClass = PluginRegistry::getPlugin('monzo');
         if ($pluginClass) {
-            $plugin = new $pluginClass();
+            $plugin = new $pluginClass;
             // Create or find master 'accounts' instance for the group
             $group = $this->integration->group;
             if ($group) {
-                $existingMaster = \App\Models\Integration::where('integration_group_id', $group->id)
+                $existingMaster = Integration::where('integration_group_id', $group->id)
                     ->where('service', 'monzo')
                     ->where('instance_type', 'accounts')
                     ->first();
-                if (!$existingMaster) {
+                if (! $existingMaster) {
                     $existingMaster = $plugin->createInstance($group, 'accounts');
                 }
                 // Seed the master with account and pot objects (no events)
@@ -183,8 +187,8 @@ class StartIntegrationMigration implements ShouldQueue
             new FetchIntegrationPage($this->integration, $contextTx),
             new FetchIntegrationPage($this->integration, $contextPots),
             new FetchIntegrationPage($this->integration, $contextBalances),
-        ])->name('monzo_fetch_'.$this->integration->id)
-          ->onConnection('redis')->onQueue('migration');
+        ])->name('monzo_fetch_' . $this->integration->id)
+            ->onConnection('redis')->onQueue('migration');
 
         $batch = $batchBuilder->dispatch();
 
@@ -196,7 +200,3 @@ class StartIntegrationMigration implements ShouldQueue
             ->onConnection('redis')->onQueue('migration');
     }
 }
-
-
-
-

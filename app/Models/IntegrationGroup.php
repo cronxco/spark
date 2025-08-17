@@ -11,9 +11,10 @@ class IntegrationGroup extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public $incrementing = false;
+
     protected $table = 'integration_groups';
     protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'user_id',
@@ -55,5 +56,3 @@ class IntegrationGroup extends Model
         return $this->hasMany(Integration::class, 'integration_group_id');
     }
 }
-
-

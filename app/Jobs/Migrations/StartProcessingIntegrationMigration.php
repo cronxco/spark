@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Cache;
 
 class StartProcessingIntegrationMigration implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected Integration $integration;
 
@@ -35,7 +35,7 @@ class StartProcessingIntegrationMigration implements ShouldQueue
         ];
 
         // Transactions windows
-        $windows = (array) (\Illuminate\Support\Facades\Cache::get('monzo:migration:' . $this->integration->id . ':tx_windows') ?? []);
+        $windows = (array) (Cache::get('monzo:migration:' . $this->integration->id . ':tx_windows') ?? []);
         foreach ($windows as $win) {
             $jobs[] = (new ProcessIntegrationPage($this->integration, [[
                 'kind' => 'transactions_window',
@@ -50,7 +50,7 @@ class StartProcessingIntegrationMigration implements ShouldQueue
             ->onConnection('redis')->onQueue('migration');
 
         // Balances snapshot using last fetched date if present
-        $lastDate = \Illuminate\Support\Facades\Cache::get('monzo:migration:' . $this->integration->id . ':balances_last_date');
+        $lastDate = Cache::get('monzo:migration:' . $this->integration->id . ':balances_last_date');
         if ($lastDate) {
             $jobs[] = (new ProcessIntegrationPage($this->integration, [[
                 'kind' => 'balance_snapshot',
@@ -68,5 +68,3 @@ class StartProcessingIntegrationMigration implements ShouldQueue
         $this->integration->update(['migration_batch_id' => $batch->id]);
     }
 }
-
-

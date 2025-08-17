@@ -3,6 +3,8 @@
 namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
+use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -10,11 +12,14 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProcessIntegrationPage implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
     public int $tries = 3;
@@ -44,42 +49,46 @@ class ProcessIntegrationPage implements ShouldQueue
 
             if ($service === 'oura') {
                 $pluginClass = PluginRegistry::getPlugin('oura');
-                (new $pluginClass())->processOuraMigrationItems(
+                (new $pluginClass)->processOuraMigrationItems(
                     $this->integration,
                     $this->context['instance_type'] ?? ($this->integration->instance_type ?: 'activity'),
                     $this->items
                 );
+
                 return;
             }
 
             if ($service === 'spotify') {
                 $pluginClass = PluginRegistry::getPlugin('spotify');
-                $plugin = new $pluginClass();
+                $plugin = new $pluginClass;
                 foreach ($this->items as $item) {
                     $plugin->processRecentlyPlayedMigrationItem($this->integration, $item);
                 }
+
                 return;
             }
 
             if ($service === 'github') {
                 $pluginClass = PluginRegistry::getPlugin('github');
-                $plugin = new $pluginClass();
+                $plugin = new $pluginClass;
                 foreach ($this->items as $event) {
                     $plugin->processEventPayload($this->integration, $event);
                 }
+
                 return;
             }
 
             if ($service === 'monzo') {
                 $pluginClass = PluginRegistry::getPlugin('monzo');
-                if (!$pluginClass) {
+                if (! $pluginClass) {
                     Log::error('ProcessIntegrationPage: Monzo plugin not registered; aborting processing', [
                         'integration_id' => $this->integration->id,
                         'context' => $this->context,
                     ]);
+
                     return;
                 }
-                $plugin = new $pluginClass();
+                $plugin = new $pluginClass;
                 $type = $this->context['instance_type'] ?? 'transactions';
                 $processingPhase = (bool) ($this->context['processing_phase'] ?? false);
                 if ($type === 'pots') {
@@ -89,13 +98,14 @@ class ProcessIntegrationPage implements ShouldQueue
                         $accounts = $this->listMonzoAccounts();
                         foreach ($accounts as $account) {
                             $plugin->upsertAccountObject($this->integration, $account);
-                            $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                            $resp = Http::withHeaders($this->authHeaders())
                                 ->get('https://api.monzo.com/pots', ['current_account_id' => $account['id']]);
                             $pots = $resp->successful() ? ($resp->json('pots') ?? []) : [];
                             foreach ($pots as $pot) {
                                 $plugin->upsertPotObject($this->integration, $pot);
                             }
                         }
+
                         return;
                     }
 
@@ -103,13 +113,14 @@ class ProcessIntegrationPage implements ShouldQueue
                     $accounts = $this->listMonzoAccounts();
                     foreach ($accounts as $account) {
                         $plugin->upsertAccountObject($this->integration, $account);
-                        $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                        $resp = Http::withHeaders($this->authHeaders())
                             ->get('https://api.monzo.com/pots', ['current_account_id' => $account['id']]);
                         $pots = $resp->successful() ? ($resp->json('pots') ?? []) : [];
                         foreach ($pots as $pot) {
                             $plugin->upsertPotObject($this->integration, $pot);
                         }
                     }
+
                     // No next page for pots
                     return;
                 }
@@ -120,14 +131,14 @@ class ProcessIntegrationPage implements ShouldQueue
                         $date = $this->items[0]['date'] ?? now()->toDateString();
                         $accounts = $this->listMonzoAccounts();
                         foreach ($accounts as $account) {
-                            $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                            $resp = Http::withHeaders($this->authHeaders())
                                 ->get('https://api.monzo.com/balance', ['account_id' => $account['id']]);
                             if ($resp->successful()) {
                                 $json = $resp->json();
                                 $balance = (int) ($json['balance'] ?? 0);
                                 $spendToday = (int) ($json['spend_today'] ?? 0);
                                 // Ensure day target exists
-                                $dayObject = \App\Models\EventObject::updateOrCreate([
+                                $dayObject = EventObject::updateOrCreate([
                                     'integration_id' => $this->integration->id,
                                     'concept' => 'day',
                                     'type' => 'day',
@@ -137,7 +148,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                     'content' => null,
                                     'metadata' => ['date' => $date],
                                 ]);
-                                $event = \App\Models\Event::updateOrCreate(
+                                $event = Event::updateOrCreate(
                                     [
                                         'integration_id' => $this->integration->id,
                                         'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
@@ -162,23 +173,24 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $plugin->addBalanceBlocks($event, $this->integration, $account, $date, $balance, $spendToday);
                             }
                         }
+
                         return;
                     }
 
                     // Processing phase for balances: use cache range and generate snapshots
-                    $lastDate = \Illuminate\Support\Facades\Cache::get($this->cacheKey('balances_last_date'));
+                    $lastDate = Cache::get($this->cacheKey('balances_last_date'));
                     if ($lastDate) {
                         $date = $lastDate;
                         $accounts = $this->listMonzoAccounts();
                         foreach ($accounts as $account) {
-                            $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                            $resp = Http::withHeaders($this->authHeaders())
                                 ->get('https://api.monzo.com/balance', ['account_id' => $account['id']]);
                             if ($resp->successful()) {
                                 $json = $resp->json();
                                 $balance = (int) ($json['balance'] ?? 0);
                                 $spendToday = (int) ($json['spend_today'] ?? 0);
                                 // Ensure day target exists
-                                $dayObject = \App\Models\EventObject::updateOrCreate([
+                                $dayObject = EventObject::updateOrCreate([
                                     'integration_id' => $this->integration->id,
                                     'concept' => 'day',
                                     'type' => 'day',
@@ -188,7 +200,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                     'content' => null,
                                     'metadata' => ['date' => $date],
                                 ]);
-                                $event = \App\Models\Event::updateOrCreate(
+                                $event = Event::updateOrCreate(
                                     [
                                         'integration_id' => $this->integration->id,
                                         'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
@@ -214,6 +226,7 @@ class ProcessIntegrationPage implements ShouldQueue
                             }
                         }
                     }
+
                     return;
                 }
                 // transactions window - only act if this integration is a transactions instance
@@ -228,7 +241,7 @@ class ProcessIntegrationPage implements ShouldQueue
                         foreach ($accounts as $account) {
                             $currentBefore = $before;
                             do {
-                                $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                                $resp = Http::withHeaders($this->authHeaders())
                                     ->get('https://api.monzo.com/transactions', [
                                         'account_id' => $account['id'],
                                         'expand[]' => 'merchant',
@@ -236,7 +249,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                         'before' => $currentBefore,
                                         'limit' => 100,
                                     ]);
-                                if (!$resp->successful()) {
+                                if (! $resp->successful()) {
                                     // Stop paging for this account on error
                                     break;
                                 }
@@ -255,11 +268,12 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $currentBefore = $nextBefore;
                             } while (count($txs) === 100);
                         }
+
                         return;
                     }
 
                     // In processing phase: replay cached windows
-                    $windows = (array) (\Illuminate\Support\Facades\Cache::get($this->cacheKey('tx_windows')) ?? []);
+                    $windows = (array) (Cache::get($this->cacheKey('tx_windows')) ?? []);
                     foreach ($windows as $win) {
                         $accounts = $this->listMonzoAccounts();
                         foreach ($accounts as $account) {
@@ -269,7 +283,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                 continue;
                             }
                             do {
-                                $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+                                $resp = Http::withHeaders($this->authHeaders())
                                     ->get('https://api.monzo.com/transactions', [
                                         'account_id' => $account['id'],
                                         'expand[]' => 'merchant',
@@ -277,7 +291,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                         'before' => $currentBefore,
                                         'limit' => 100,
                                     ]);
-                                if (!$resp->successful()) {
+                                if (! $resp->successful()) {
                                     // Move on to next account/window on error
                                     break;
                                 }
@@ -298,13 +312,14 @@ class ProcessIntegrationPage implements ShouldQueue
                         }
                     }
                 }
+
                 return;
             }
 
             Log::info('ProcessIntegrationPage: unsupported service, skipping', [
                 'service' => $service,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('ProcessIntegrationPage failed', [
                 'integration_id' => $this->integration->id,
                 'service' => $this->context['service'] ?? $this->integration->service,
@@ -320,6 +335,7 @@ class ProcessIntegrationPage implements ShouldQueue
     {
         $group = $this->integration->group;
         $token = $group?->access_token ?? $this->integration->access_token;
+
         return [
             'Authorization' => 'Bearer ' . $token,
         ];
@@ -327,11 +343,12 @@ class ProcessIntegrationPage implements ShouldQueue
 
     private function listMonzoAccounts(): array
     {
-        $resp = \Illuminate\Support\Facades\Http::withHeaders($this->authHeaders())
+        $resp = Http::withHeaders($this->authHeaders())
             ->get('https://api.monzo.com/accounts');
-        if (!$resp->successful()) {
+        if (! $resp->successful()) {
             return [];
         }
+
         return $resp->json('accounts') ?? [];
     }
 
@@ -340,7 +357,3 @@ class ProcessIntegrationPage implements ShouldQueue
         return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
     }
 }
-
-
-
-

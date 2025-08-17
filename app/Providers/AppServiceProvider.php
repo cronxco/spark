@@ -2,15 +2,21 @@
 
 namespace App\Providers;
 
+use Illuminate\Console\Events\ScheduledTaskFailed;
+use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Support\Facades\Event;
+/** @phpstan-ignore-next-line */
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
-/** @phpstan-ignore-next-line */
 use Laravel\Horizon\Horizon;
-use Illuminate\Console\Events\ScheduledTaskFinished;
-use Illuminate\Console\Events\ScheduledTaskFailed;
+use Sentry\Breadcrumb;
+use Sentry\EventHint;
 use Sentry\SentrySdk;
+use Sentry\Severity;
 use Sentry\Tracing\SpanContext;
+
+use function Sentry\addBreadcrumb;
+use function Sentry\captureMessage;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,9 +45,9 @@ class AppServiceProvider extends ServiceProvider
                 $hub = SentrySdk::getCurrentHub();
                 $parentSpan = $hub->getSpan();
                 if ($parentSpan) {
-                    $spanContext = new SpanContext();
+                    $spanContext = new SpanContext;
                     $spanContext->setOp('http.client');
-                    $spanContext->setDescription($request->getMethod().' '.$request->getUri());
+                    $spanContext->setDescription($request->getMethod() . ' ' . $request->getUri());
                     $span = $parentSpan->startChild($spanContext);
 
                     // finish span after response
@@ -50,13 +56,14 @@ class AppServiceProvider extends ServiceProvider
                         $span->finish();
                     };
                 }
+
                 return $request;
             });
         });
 
         // Always apply beforeSending for breadcrumbs of responses
         Http::beforeSending(function ($request, $options) {
-            \Sentry\addBreadcrumb(new \Sentry\Breadcrumb(\Sentry\Breadcrumb::LEVEL_INFO, \Sentry\Breadcrumb::TYPE_HTTP, 'http', sprintf('%s %s', $request->getMethod(), (string) $request->getUri())));
+            addBreadcrumb(new Breadcrumb(Breadcrumb::LEVEL_INFO, Breadcrumb::TYPE_HTTP, 'http', sprintf('%s %s', $request->getMethod(), (string) $request->getUri())));
         });
 
         Event::listen(ScheduledTaskFinished::class, function (ScheduledTaskFinished $event) {
@@ -72,9 +79,9 @@ class AppServiceProvider extends ServiceProvider
             ];
 
             if ($event->task->exitCode === 0) {
-                \Sentry\captureMessage('Scheduled task completed', \Sentry\Severity::info(), \Sentry\EventHint::fromArray(['extra' => $context]));
+                captureMessage('Scheduled task completed', Severity::info(), EventHint::fromArray(['extra' => $context]));
             } else {
-                \Sentry\captureMessage('Scheduled task finished with non-zero exit code', \Sentry\Severity::warning(), \Sentry\EventHint::fromArray(['extra' => $context]));
+                captureMessage('Scheduled task finished with non-zero exit code', Severity::warning(), EventHint::fromArray(['extra' => $context]));
             }
         });
 

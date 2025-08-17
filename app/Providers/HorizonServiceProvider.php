@@ -37,7 +37,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
             }
 
             $allowed = config('horizon.allowed_emails', []);
-            if (!is_array($allowed)) {
+            if (! is_array($allowed)) {
                 $allowed = [];
             }
 

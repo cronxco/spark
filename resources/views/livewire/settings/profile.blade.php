@@ -9,7 +9,7 @@ use Mary\Traits\Toast;
 
 new class extends Component {
     use Toast;
-    
+
     public string $name = '';
     public string $email = '';
 
@@ -84,7 +84,7 @@ new class extends Component {
                             <p class="text-sm text-base-content/70">{{ __('Update your display name') }}</p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <x-input 
+                            <x-input
                                 wire:model="name"
                                 placeholder="Enter your name"
                                 class="w-64"
@@ -92,7 +92,7 @@ new class extends Component {
                                 autofocus
                                 autocomplete="name"
                             />
-                            <x-button 
+                            <x-button
                                 label="{{ __('Update Name') }}"
                                 wire:click="updateProfileInformation"
                                 class="btn-primary"
@@ -110,7 +110,7 @@ new class extends Component {
                             <p class="text-sm text-base-content/70">{{ __('Update your email address') }}</p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <x-input 
+                            <x-input
                                 wire:model="email"
                                 type="email"
                                 placeholder="Enter your email"
@@ -118,7 +118,7 @@ new class extends Component {
                                 required
                                 autocomplete="email"
                             />
-                            <x-button 
+                            <x-button
                                 label="{{ __('Update Email') }}"
                                 wire:click="updateProfileInformation"
                                 class="btn-primary"
@@ -135,7 +135,7 @@ new class extends Component {
                                 <h4 class="text-lg font-medium text-warning">{{ __('Email Verification') }}</h4>
                                 <p class="text-sm text-base-content/70">{{ __('Your email address is unverified.') }}</p>
                             </div>
-                            <x-button 
+                            <x-button
                                 label="{{ __('Resend Verification') }}"
                                 wire:click="resendVerificationNotification"
                                 class="btn-warning"

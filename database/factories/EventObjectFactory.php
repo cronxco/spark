@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Models\EventObject;
+use App\Models\Integration;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class EventObjectFactory extends Factory
 {
@@ -15,7 +15,7 @@ class EventObjectFactory extends Factory
         return [
             'id' => $this->faker->uuid(),
             'time' => $this->faker->dateTime(),
-            'integration_id' => \App\Models\Integration::factory(),
+            'integration_id' => Integration::factory(),
             'concept' => $this->faker->word(),
             'type' => $this->faker->word(),
             'title' => $this->faker->sentence(),
@@ -23,9 +23,9 @@ class EventObjectFactory extends Factory
             'metadata' => [],
             'url' => $this->faker->url(),
             'media_url' => $this->faker->imageUrl(),
-            'embeddings' => array_map(fn() => $this->faker->randomFloat(4, -1, 1), range(1, 3)),
+            'embeddings' => array_map(fn () => $this->faker->randomFloat(4, -1, 1), range(1, 3)),
             'created_at' => now(),
             'updated_at' => now(),
         ];
     }
-} 
+}

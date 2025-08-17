@@ -21,11 +21,11 @@ new class extends Component {
                             <x-radio label="{{ __('Light') }}" value="light" wire:model="appearance">
                                 <x-icon name="o-sun" class="w-5 h-5" />
                             </x-radio>
-                            
+
                             <x-radio label="{{ __('Dark') }}" value="dark" wire:model="appearance">
                                 <x-icon name="o-moon" class="w-5 h-5" />
                             </x-radio>
-                            
+
                             <x-radio label="{{ __('System') }}" value="system" wire:model="appearance">
                                 <x-icon name="o-computer-desktop" class="w-5 h-5" />
                             </x-radio>

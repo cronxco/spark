@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
 
@@ -31,7 +32,7 @@ class MonitorBatchAndStartProcessing implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new \Illuminate\Queue\Middleware\WithoutOverlapping('monitor_batch_' . $this->targetBatchId))
+            (new WithoutOverlapping('monitor_batch_' . $this->targetBatchId))
                 ->releaseAfter(10),
         ];
     }
@@ -39,16 +40,18 @@ class MonitorBatchAndStartProcessing implements ShouldQueue
     public function handle(): void
     {
         $batch = Bus::findBatch($this->targetBatchId);
-        if (!$batch) {
+        if (! $batch) {
             // If batch not found, start processing anyway
             StartProcessingIntegrationMigration::dispatch($this->integration)
                 ->onConnection('redis')->onQueue('migration');
+
             return;
         }
 
         if ($batch->finished()) {
             StartProcessingIntegrationMigration::dispatch($this->integration)
                 ->onConnection('redis')->onQueue('migration');
+
             return;
         }
 
@@ -58,5 +61,3 @@ class MonitorBatchAndStartProcessing implements ShouldQueue
             ->onConnection('redis')->onQueue('migration');
     }
 }
-
-

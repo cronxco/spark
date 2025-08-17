@@ -1,0 +1,153 @@
+name: Dust and Test
+
+on:
+  pull_request:
+
+jobs:
+  duster:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: "Duster Fix"
+        uses: tighten/duster-action@557d11cf6d55a7f7cf6324806c633af0062759eb # v3
+        with:
+          args: fix
+
+      - uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6
+        id: auto_commit_action
+        with:
+          commit_message: 🚨 Fix code style
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
+
+  ci:
+    runs-on: ubuntu-latest
+    environment: CI
+    needs: duster
+
+    services:
+      postgres:
+        image: "pgvector/pgvector:0.8.0-pg17@sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87"
+        env:
+          PGPASSWORD: postgres
+          POSTGRES_DB: laravel
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@20529878ed81ef8e78ddf08b480401e6101a850f # v2
+        with:
+          php-version: 8.2
+          tools: composer:v2
+          coverage: xdebug
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Node Dependencies
+        run: npm i
+
+      - name: Add Wire Credentials Loaded From ENV
+        run: composer config http-basic.wire-elements-pro.composer.sh ${{ secrets.WIRE_SECRET}}
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Build Assets
+        run: npm run build
+
+      - name: Run Tests
+        id: tests
+        run: |
+          # Run PHPUnit with output capturing all test results
+          # Use tee so we still see output in Actions logs
+          ./vendor/bin/phpunit --teamcity | tee test_output.txt || true
+
+          # Extract finished and failed test names
+          grep "##teamcity\[testFinished" test_output.txt \
+            | sed "s/.*name='\([^']*\)'.*/\1/" > all_finished.txt
+          grep "##teamcity\[testFailed" test_output.txt \
+            | sed "s/.*name='\([^']*\)'.*/\1/" | sort -u > failed_tests.txt
+
+          # Compute passed = finished − failed
+          sort -u all_finished.txt > all_finished_sorted.txt
+          comm -23 all_finished_sorted.txt failed_tests.txt > passed_tests.txt
+
+          # Derive counts from lists
+          TOTAL=$(wc -l < all_finished_sorted.txt)
+          FAILED=$(wc -l < failed_tests.txt)
+          PASSED=$(wc -l < passed_tests.txt)
+
+          # Clean up intermediate lists
+          rm -f all_finished.txt all_finished_sorted.txt
+
+          # Store test results for summary step
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+          # Exit with error if any tests failed
+          if [ "${FAILED:-0}" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Add Test Results to Summary
+        if: always()
+        run: |
+          echo "# Deployment Summary :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Build & Test Results" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.tests.outputs.failed }}" = "0" ]; then
+            echo "- ✅ CI Tests Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ CI Tests Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "- Total Tests: \`${{ steps.tests.outputs.total }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Passed: \`${{ steps.tests.outputs.passed }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Failed: \`${{ steps.tests.outputs.failed }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add passed tests in expandable section
+          echo "<details><summary>✅ Passed Tests (${{ steps.tests.outputs.passed }})</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat passed_tests.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add failed tests in expandable section if any
+          if [ "${{ steps.tests.outputs.failed }}" != "0" ]; then
+            echo "<details><summary>❌ Failed Tests (${{ steps.tests.outputs.failed }})</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat failed_tests.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi

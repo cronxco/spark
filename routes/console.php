@@ -10,7 +10,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule integration update check job every minute
-Schedule::job(new CheckIntegrationUpdates())
+Schedule::job(new CheckIntegrationUpdates)
     ->everyThirtySeconds()
     ->withoutOverlapping()
     ->onOneServer();
