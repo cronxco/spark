@@ -3,6 +3,7 @@
 namespace App\Integrations\Base;
 
 use App\Integrations\Contracts\IntegrationPlugin;
+use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -94,7 +95,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
             $target = $this->createOrUpdateObject($eventData['target'], $integration);
 
             // Create event
-            $event = $integration->user->events()->create([
+            $event = Event::create([
                 'source_id' => $eventData['source_id'],
                 'time' => $eventData['time'],
                 'integration_id' => $integration->id,

@@ -28,8 +28,21 @@ jobs:
 
   ci:
     runs-on: ubuntu-latest
-    environment: Testing
+    environment: CI
     needs: duster
+
+    services:
+      postgres:
+        image: "pgvector/pgvector:0.8.0-pg17@sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87"
+        env:
+          PGPASSWORD: postgres
+          POSTGRES_DB: test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5

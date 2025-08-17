@@ -190,10 +190,19 @@ class IntegrationTest extends TestCase
     public function webhook_handles_valid_request()
     {
         $user = User::factory()->create();
-        $integration = Integration::factory()->create([
+
+        // Create an integration group with the test_secret
+        $group = IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => 'github',
             'account_id' => 'test_secret',
+        ]);
+
+        // Create an integration that belongs to this group
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'integration_group_id' => $group->id,
         ]);
 
         $response = $this->post('/webhook/github/test_secret', [
