@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Integration;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -48,7 +46,7 @@ class EventObject extends Model
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
-            
+
             // Automatically set user_id from integration if not provided
             if (empty($model->user_id) && $model->integration_id) {
                 $integration = Integration::find($model->integration_id);
