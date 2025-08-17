@@ -8,17 +8,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
-use App\Models\Integration;
-use App\Models\IntegrationGroup;
-
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
-
-
-    protected $keyType = 'string';
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * Indicates if the IDs are auto-incrementing.
@@ -26,6 +20,8 @@ class User extends Authenticatable
      * @var bool
      */
     public $incrementing = false;
+
+    protected $keyType = 'string';
 
     /**
      * The attributes that are mass assignable.
@@ -49,16 +45,13 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Boot the model and set the ID to a UUID on creation.
      */
-    protected function casts(): array
+    public static function booted()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        static::creating(function ($model) {
+            $model->id = Str::uuid();
+        });
     }
 
     /**
@@ -69,7 +62,7 @@ class User extends Authenticatable
         return Str::of($this->name)
             ->explode(' ')
             ->take(2)
-            ->map(fn($word) => Str::substr($word, 0, 1))
+            ->map(fn ($word) => Str::substr($word, 0, 1))
             ->implode('');
     }
 
@@ -95,12 +88,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Boot the model and set the ID to a UUID on creation.
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
      */
-    public static function booted()
+    protected function casts(): array
     {
-        static::creating(function ($model) {
-            $model->id = Str::uuid();
-        });
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
     }
 }

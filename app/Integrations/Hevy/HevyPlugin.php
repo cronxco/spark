@@ -3,15 +3,18 @@
 namespace App\Integrations\Hevy;
 
 use App\Integrations\Contracts\IntegrationPlugin;
-use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
 class HevyPlugin implements IntegrationPlugin
 {
@@ -116,6 +119,7 @@ class HevyPlugin implements IntegrationPlugin
     public function initialize(\App\Models\User $user): Integration
     {
         $group = $this->initializeGroup($user);
+
         return Integration::create([
             'user_id' => $user->id,
             'integration_group_id' => $group->id,
@@ -138,9 +142,9 @@ class HevyPlugin implements IntegrationPlugin
         ]);
     }
 
-    public function handleOAuthCallback(\Illuminate\Http\Request $request, IntegrationGroup $group): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
-        throw new \Exception('Hevy integration uses API key authentication and does not support OAuth');
+        throw new Exception('Hevy integration uses API key authentication and does not support OAuth');
     }
 
     public function fetchData(Integration $integration): void
@@ -159,11 +163,12 @@ class HevyPlugin implements IntegrationPlugin
         $json = [];
         try {
             $json = $this->getJson($endpoint, $integration);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Hevy workouts fetch failed', [
                 'integration_id' => $integration->id,
                 'error' => $e->getMessage(),
             ]);
+
             return;
         }
 
@@ -180,16 +185,47 @@ class HevyPlugin implements IntegrationPlugin
         }
 
         foreach ($items as $idx => $workout) {
-            if (!is_array($workout)) {
+            if (! is_array($workout)) {
                 Log::warning('Skipping non-array workout item from Hevy response', [
                     'integration_id' => $integration->id,
                     'index' => $idx,
                     'type' => gettype($workout),
                 ]);
+
                 continue;
             }
             $this->createWorkoutEvent($integration, $workout);
         }
+    }
+
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        // Not used; data is fetched directly and persisted as events/blocks
+        return [];
+    }
+
+    public function handleWebhook(Request $request, Integration $integration): void
+    {
+        // Hevy integration is pull-based via API key; no webhooks
+        throw new Exception('Hevy integration does not support webhooks');
+    }
+
+    /**
+     * Simple HTTP helper using API key authentication.
+     */
+    protected function getJson(string $endpoint, Integration $integration): array
+    {
+        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
+        // In tests we allow empty; in production recommend providing api key
+        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
+        $response = Http::withHeaders([
+            'api-key' => $apiKey,
+        ])->get($url);
+        if (! $response->successful()) {
+            throw new RuntimeException('Hevy API request failed with status ' . $response->status());
+        }
+
+        return $response->json() ?? [];
     }
 
     private function createWorkoutEvent(Integration $integration, array $workout): void
@@ -301,11 +337,12 @@ class HevyPlugin implements IntegrationPlugin
         $profile = [];
         try {
             $profile = $this->getJson('/v1/me', $integration);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // ignore, create minimal object
         }
 
         $title = $integration->name ?: 'Hevy Account';
+
         return EventObject::updateOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'user',
@@ -331,14 +368,16 @@ class HevyPlugin implements IntegrationPlugin
             return [null, null];
         }
         $float = (float) $raw;
-        if (!is_finite($float)) {
+        if (! is_finite($float)) {
             return [null, null];
         }
         if (fmod($float, 1.0) !== 0.0) {
             $multiplier = 1000;
             $intValue = (int) round($float * $multiplier);
+
             return [$intValue, $multiplier];
         }
+
         return [(int) $float, $defaultMultiplier];
     }
 
@@ -346,37 +385,7 @@ class HevyPlugin implements IntegrationPlugin
     {
         $unit = $candidate ?: ($integration->configuration['units'] ?? 'kg');
         $unit = strtolower((string) $unit);
+
         return in_array($unit, ['kg', 'lb'], true) ? $unit : 'kg';
     }
-
-    public function convertData(array $externalData, Integration $integration): array
-    {
-        // Not used; data is fetched directly and persisted as events/blocks
-        return [];
-    }
-
-    /**
-     * Simple HTTP helper using API key authentication.
-     */
-    protected function getJson(string $endpoint, Integration $integration): array
-    {
-        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
-        // In tests we allow empty; in production recommend providing api key
-        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
-        $response = Http::withHeaders([
-            'api-key' => $apiKey,
-        ])->get($url);
-        if (!$response->successful()) {
-            throw new \RuntimeException('Hevy API request failed with status '.$response->status());
-        }
-        return $response->json() ?? [];
-    }
-
-    public function handleWebhook(\Illuminate\Http\Request $request, Integration $integration): void
-    {
-        // Hevy integration is pull-based via API key; no webhooks
-        throw new \Exception('Hevy integration does not support webhooks');
-    }
 }
-
-

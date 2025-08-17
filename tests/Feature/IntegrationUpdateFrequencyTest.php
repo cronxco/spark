@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Integrations\PluginRegistry;
 use App\Integrations\GitHub\GitHubPlugin;
+use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use App\Models\User;
 use Carbon\Carbon;
@@ -15,12 +15,15 @@ class IntegrationUpdateFrequencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Register the GitHub plugin for testing
         PluginRegistry::register(GitHubPlugin::class);
     }
 
-    public function test_integration_needs_update_when_never_updated()
+    /**
+     * @test
+     */
+    public function integration_needs_update_when_never_updated()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -33,7 +36,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertTrue($integration->needsUpdate());
     }
 
-    public function test_integration_needs_update_when_frequency_elapsed()
+    /**
+     * @test
+     */
+    public function integration_needs_update_when_frequency_elapsed()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -46,7 +52,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertTrue($integration->needsUpdate());
     }
 
-    public function test_integration_does_not_need_update_when_frequency_not_elapsed()
+    /**
+     * @test
+     */
+    public function integration_does_not_need_update_when_frequency_not_elapsed()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -59,7 +68,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertFalse($integration->needsUpdate());
     }
 
-    public function test_get_next_update_time_returns_correct_time()
+    /**
+     * @test
+     */
+    public function get_next_update_time_returns_correct_time()
     {
         $user = User::factory()->create();
         $lastUpdate = Carbon::now()->subMinutes(10);
@@ -72,11 +84,14 @@ class IntegrationUpdateFrequencyTest extends TestCase
 
         $nextUpdate = $integration->getNextUpdateTime();
         $expectedTime = $lastUpdate->copy()->addMinutes(15);
-        
+
         $this->assertEquals($expectedTime->format('Y-m-d H:i:s'), $nextUpdate->format('Y-m-d H:i:s'));
     }
 
-    public function test_get_next_update_time_returns_null_when_never_updated()
+    /**
+     * @test
+     */
+    public function get_next_update_time_returns_null_when_never_updated()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -89,7 +104,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNull($integration->getNextUpdateTime());
     }
 
-    public function test_mark_as_triggered_updates_last_triggered_at()
+    /**
+     * @test
+     */
+    public function mark_as_triggered_updates_last_triggered_at()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -103,7 +121,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($integration->fresh()->last_triggered_at);
     }
 
-    public function test_mark_as_successfully_updated_updates_both_timestamps()
+    /**
+     * @test
+     */
+    public function mark_as_successfully_updated_updates_both_timestamps()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -120,7 +141,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($fresh->last_successful_update_at);
     }
 
-    public function test_mark_as_failed_clears_triggered_state()
+    /**
+     * @test
+     */
+    public function mark_as_failed_clears_triggered_state()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -137,7 +161,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($fresh->last_successful_update_at); // Should remain unchanged
     }
 
-    public function test_is_processing_with_time_window()
+    /**
+     * @test
+     */
+    public function is_processing_with_time_window()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -162,10 +189,13 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertTrue($integration->isProcessing());
     }
 
-    public function test_scope_needs_update_returns_correct_integrations()
+    /**
+     * @test
+     */
+    public function scope_needs_update_returns_correct_integrations()
     {
         $user = User::factory()->create();
-        
+
         // Integration that needs update (never updated)
         $integration1 = Integration::factory()->create([
             'user_id' => $user->id,
@@ -196,10 +226,13 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertFalse($needsUpdate->contains($integration3));
     }
 
-    public function test_scope_oauth_needs_update_returns_only_oauth_integrations()
+    /**
+     * @test
+     */
+    public function scope_oauth_needs_update_returns_only_oauth_integrations()
     {
         $user = User::factory()->create();
-        
+
         // OAuth integration that needs update
         $oauthIntegration = Integration::factory()->create([
             'user_id' => $user->id,
@@ -220,7 +253,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertFalse($oauthNeedsUpdate->contains($webhookIntegration));
     }
 
-    public function test_can_configure_update_frequency()
+    /**
+     * @test
+     */
+    public function can_configure_update_frequency()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -244,7 +280,10 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertEquals(['push'], $integration->configuration['events']);
     }
 
-    public function test_update_frequency_validation_requires_minimum_one_minute()
+    /**
+     * @test
+     */
+    public function update_frequency_validation_requires_minimum_one_minute()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -261,14 +300,17 @@ class IntegrationUpdateFrequencyTest extends TestCase
             ]);
 
         $component->call('updateConfiguration');
-        
+
         // Since we removed validation, this test is no longer relevant
         // The update frequency will be saved as 0, which is technically valid
         // We'll just verify the component doesn't crash
         $this->assertTrue(true, 'Component handles zero update frequency without crashing');
     }
 
-    public function test_integration_index_shows_update_frequency_info()
+    /**
+     * @test
+     */
+    public function integration_index_shows_update_frequency_info()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -282,13 +324,16 @@ class IntegrationUpdateFrequencyTest extends TestCase
             ->get('/integrations');
 
         $response->assertStatus(200);
-        
+
         // For now, just verify the page loads successfully
         // The UI integration is complex and would require more setup
         $this->assertTrue(true, 'Integration index page loads successfully');
     }
 
-    public function test_integration_index_shows_up_to_date_status()
+    /**
+     * @test
+     */
+    public function integration_index_shows_up_to_date_status()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -302,7 +347,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
             ->get('/integrations');
 
         $response->assertStatus(200);
-        
+
         // For now, just verify the page loads successfully
         // The UI integration is complex and would require more setup
         $this->assertTrue(true, 'Integration index page loads successfully');

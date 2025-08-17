@@ -11,9 +11,10 @@ class Block extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public $incrementing = false;
+
     protected $table = 'blocks';
     protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'event_id',
@@ -54,4 +55,4 @@ class Block extends Model
     {
         return $this->belongsTo(Integration::class)->withTrashed();
     }
-} 
+}

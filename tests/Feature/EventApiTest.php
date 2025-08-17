@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Integration;
-use App\Models\EventObject;
-use App\Models\Event;
 use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -15,13 +15,19 @@ class EventApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_unauthenticated_users_cannot_create_events()
+    /**
+     * @test
+     */
+    public function unauthenticated_users_cannot_create_events()
     {
         $response = $this->postJson('/api/events', []);
         $response->assertStatus(401);
     }
 
-    public function test_authenticated_user_can_create_event_with_objects_and_blocks()
+    /**
+     * @test
+     */
+    public function authenticated_user_can_create_event_with_objects_and_blocks()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
@@ -60,4 +66,4 @@ class EventApiTest extends TestCase
             $this->assertDatabaseHas('blocks', ['id' => $block['id']]);
         }
     }
-} 
+}

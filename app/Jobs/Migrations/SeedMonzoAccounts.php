@@ -29,10 +29,10 @@ class SeedMonzoAccounts implements ShouldQueue
     public function handle(): void
     {
         $pluginClass = PluginRegistry::getPlugin('monzo');
-        if (!$pluginClass) {
+        if (! $pluginClass) {
             return;
         }
-        $plugin = new $pluginClass();
+        $plugin = new $pluginClass;
 
         // Ensure we have a valid access token (refresh if needed)
         $token = $this->getValidAccessToken();
@@ -49,7 +49,7 @@ class SeedMonzoAccounts implements ShouldQueue
             }
             $accountsResp = Http::withToken($token)->get('https://api.monzo.com/accounts');
         }
-        if (!$accountsResp->successful()) {
+        if (! $accountsResp->successful()) {
             return;
         }
         $accounts = $accountsResp->json('accounts') ?? [];
@@ -102,6 +102,7 @@ class SeedMonzoAccounts implements ShouldQueue
             Log::warning('Monzo refresh skipped due to missing credentials or refresh_token', [
                 'group_id' => $group->id,
             ]);
+
             return null;
         }
 
@@ -112,12 +113,13 @@ class SeedMonzoAccounts implements ShouldQueue
             'refresh_token' => $refreshToken,
         ]);
 
-        if (!$resp->successful()) {
+        if (! $resp->successful()) {
             Log::error('Monzo token refresh failed', [
                 'group_id' => $group->id,
                 'status' => $resp->status(),
                 'body' => $resp->body(),
             ]);
+
             return null;
         }
 
@@ -131,5 +133,3 @@ class SeedMonzoAccounts implements ShouldQueue
         return $group->access_token;
     }
 }
-
-

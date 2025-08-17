@@ -9,7 +9,10 @@ class ExampleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_returns_a_successful_response(): void
+    /**
+     * @test
+     */
+    public function returns_a_successful_response(): void
     {
         $response = $this->get('/');
 

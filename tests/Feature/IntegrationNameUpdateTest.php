@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -13,7 +12,10 @@ class IntegrationNameUpdateTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_update_integration_name_from_index_page(): void
+    /**
+     * @test
+     */
+    public function user_can_update_integration_name_from_index_page(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -24,10 +26,10 @@ class IntegrationNameUpdateTest extends TestCase
 
         $component = Livewire::actingAs($user)
             ->test('integrations.index');
-        
+
         // Debug: Check if the component loaded correctly
         $this->assertNotNull($component);
-        
+
         $component->call('updateIntegrationNameFromIndex', $integration->id, 'New Custom Name');
 
         $this->assertDatabaseHas('integrations', [
@@ -36,7 +38,10 @@ class IntegrationNameUpdateTest extends TestCase
         ]);
     }
 
-    public function test_user_can_update_integration_name_from_configure_page(): void
+    /**
+     * @test
+     */
+    public function user_can_update_integration_name_from_configure_page(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -57,7 +62,10 @@ class IntegrationNameUpdateTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_update_other_users_integration_name_from_index_page(): void
+    /**
+     * @test
+     */
+    public function user_cannot_update_other_users_integration_name_from_index_page(): void
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
@@ -78,7 +86,10 @@ class IntegrationNameUpdateTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_update_other_users_integration_name_from_configure_page(): void
+    /**
+     * @test
+     */
+    public function user_cannot_update_other_users_integration_name_from_configure_page(): void
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
@@ -95,7 +106,10 @@ class IntegrationNameUpdateTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_user_cannot_set_empty_integration_name_from_index_page(): void
+    /**
+     * @test
+     */
+    public function user_cannot_set_empty_integration_name_from_index_page(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -115,7 +129,10 @@ class IntegrationNameUpdateTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_set_empty_integration_name_from_configure_page(): void
+    /**
+     * @test
+     */
+    public function user_cannot_set_empty_integration_name_from_configure_page(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -136,7 +153,10 @@ class IntegrationNameUpdateTest extends TestCase
         ]);
     }
 
-    public function test_configure_page_loads_with_correct_initial_name(): void
+    /**
+     * @test
+     */
+    public function configure_page_loads_with_correct_initial_name(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -151,7 +171,10 @@ class IntegrationNameUpdateTest extends TestCase
             ->assertSet('name', 'Custom GitHub Integration');
     }
 
-    public function test_configure_page_uses_service_name_when_no_custom_name(): void
+    /**
+     * @test
+     */
+    public function configure_page_uses_service_name_when_no_custom_name(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -166,7 +189,10 @@ class IntegrationNameUpdateTest extends TestCase
             ->assertSet('name', 'github');
     }
 
-    public function test_name_update_trims_whitespace(): void
+    /**
+     * @test
+     */
+    public function name_update_trims_whitespace(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -185,7 +211,10 @@ class IntegrationNameUpdateTest extends TestCase
         ]);
     }
 
-    public function test_configure_page_name_update_trims_whitespace(): void
+    /**
+     * @test
+     */
+    public function configure_page_name_update_trims_whitespace(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -205,6 +234,4 @@ class IntegrationNameUpdateTest extends TestCase
             'name' => 'Trimmed Name',
         ]);
     }
-
-
-} 
+}

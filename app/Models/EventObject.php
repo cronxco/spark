@@ -12,9 +12,10 @@ class EventObject extends Model
 {
     use HasFactory, HasTags, SoftDeletes;
 
+    public $incrementing = false;
+
     protected $table = 'objects';
     protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'time',

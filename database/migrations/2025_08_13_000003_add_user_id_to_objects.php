@@ -2,14 +2,11 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('objects', function (Blueprint $table) {
@@ -18,7 +15,7 @@ return new class extends Migration
 
         // Backfill user_id based on the owning integration's user_id
         DB::statement(
-            "UPDATE objects o SET user_id = i.user_id FROM integrations i WHERE o.integration_id = i.id"
+            'UPDATE objects o SET user_id = i.user_id FROM integrations i WHERE o.integration_id = i.id'
         );
 
         Schema::table('objects', function (Blueprint $table) {
@@ -26,12 +23,9 @@ return new class extends Migration
         });
 
         // Ensure user_id is required going forward
-        DB::statement("ALTER TABLE objects ALTER COLUMN user_id SET NOT NULL");
+        DB::statement('ALTER TABLE objects ALTER COLUMN user_id SET NOT NULL');
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('objects', function (Blueprint $table) {
@@ -40,5 +34,3 @@ return new class extends Migration
         });
     }
 };
-
-

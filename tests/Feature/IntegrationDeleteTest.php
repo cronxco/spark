@@ -13,7 +13,10 @@ class IntegrationDeleteTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_delete_their_integration(): void
+    /**
+     * @test
+     */
+    public function user_can_delete_their_integration(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -28,13 +31,16 @@ class IntegrationDeleteTest extends TestCase
 
         // Since we now use soft deletes, the integration should still exist but be soft deleted
         $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
-        
+
         // Check that it is soft deleted
         $deletedIntegration = Integration::withTrashed()->find($integration->id);
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    public function test_user_cannot_delete_other_users_integration(): void
+    /**
+     * @test
+     */
+    public function user_cannot_delete_other_users_integration(): void
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
@@ -54,7 +60,10 @@ class IntegrationDeleteTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_delete_nonexistent_integration(): void
+    /**
+     * @test
+     */
+    public function user_cannot_delete_nonexistent_integration(): void
     {
         $user = User::factory()->create();
         $nonexistentId = '00000000-0000-0000-0000-000000000000';
@@ -67,7 +76,10 @@ class IntegrationDeleteTest extends TestCase
         $this->assertTrue(true, 'Component should handle nonexistent integration gracefully');
     }
 
-    public function test_delete_integration_shows_success_message(): void
+    /**
+     * @test
+     */
+    public function delete_integration_shows_success_message(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -83,13 +95,16 @@ class IntegrationDeleteTest extends TestCase
         // The success message should be dispatched (though we can't easily test the toast in unit tests)
         // Since we now use soft deletes, the integration should still exist but be soft deleted
         $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
-        
+
         // Check that it is soft deleted
         $deletedIntegration = Integration::withTrashed()->find($integration->id);
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    public function test_delete_integration_refreshes_data(): void
+    /**
+     * @test
+     */
+    public function delete_integration_refreshes_data(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -108,13 +123,16 @@ class IntegrationDeleteTest extends TestCase
 
         // Since we now use soft deletes, the integration should still exist but be soft deleted
         $this->assertDatabaseHas('integrations', ['id' => $integration->id]);
-        
+
         // Check that it is soft deleted
         $deletedIntegration = Integration::withTrashed()->find($integration->id);
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    public function test_deleting_last_integration_soft_deletes_group(): void
+    /**
+     * @test
+     */
+    public function deleting_last_integration_soft_deletes_group(): void
     {
         $user = User::factory()->create();
 
@@ -138,7 +156,10 @@ class IntegrationDeleteTest extends TestCase
         );
     }
 
-    public function test_deleting_non_last_integration_does_not_delete_group(): void
+    /**
+     * @test
+     */
+    public function deleting_non_last_integration_does_not_delete_group(): void
     {
         $user = User::factory()->create();
 

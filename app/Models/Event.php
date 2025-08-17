@@ -12,9 +12,10 @@ class Event extends Model
 {
     use HasFactory, HasTags, SoftDeletes;
 
+    public $incrementing = false;
+
     protected $table = 'events';
     protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'source_id',
@@ -72,4 +73,4 @@ class Event extends Model
     {
         return $this->hasMany(Block::class)->withTrashed();
     }
-} 
+}

@@ -3,19 +3,21 @@
 namespace App\Integrations\Oura;
 
 use App\Integrations\Base\OAuthPlugin;
-use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
+use Throwable;
 
 class OuraPlugin extends OAuthPlugin
 {
@@ -32,7 +34,7 @@ class OuraPlugin extends OAuthPlugin
         $this->redirectUri = config('services.oura.redirect') ?? route('integrations.oauth.callback', ['service' => 'oura']);
 
         if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
-            throw new \InvalidArgumentException('Oura OAuth credentials are not configured');
+            throw new InvalidArgumentException('Oura OAuth credentials are not configured');
         }
     }
 
@@ -121,22 +123,6 @@ class OuraPlugin extends OAuthPlugin
         ];
     }
 
-    protected function getRequiredScopes(): string
-    {
-        // Scopes per Oura docs (treating search results as authoritative)
-        // Request broad scopes to support all instance types; callers can scope down later if needed
-        return implode(' ', [
-            'email',
-            'personal',
-            'daily',
-            'heartrate',
-            'workout',
-            'tag',
-            'session',
-            'spo2',
-        ]);
-    }
-
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         // Use cloud.ouraring.com for authorization endpoint
@@ -176,52 +162,52 @@ class OuraPlugin extends OAuthPlugin
                 'error' => $error,
                 'error_description' => $request->get('error_description'),
             ]);
-            throw new \Exception('Oura authorization failed: ' . $error);
+            throw new Exception('Oura authorization failed: ' . $error);
         }
 
         $code = $request->get('code');
-        if (!$code) {
+        if (! $code) {
             Log::error('Oura OAuth callback missing authorization code', [
                 'group_id' => $group->id,
             ]);
-            throw new \Exception('Invalid OAuth callback: missing authorization code');
+            throw new Exception('Invalid OAuth callback: missing authorization code');
         }
 
         $state = $request->get('state');
-        if (!$state) {
+        if (! $state) {
             Log::error('Oura OAuth callback missing state parameter', [
                 'group_id' => $group->id,
             ]);
-            throw new \Exception('Invalid OAuth callback: missing state parameter');
+            throw new Exception('Invalid OAuth callback: missing state parameter');
         }
 
         try {
             $stateData = decrypt($state);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Oura OAuth state decryption failed', [
                 'group_id' => $group->id,
                 'exception' => $e->getMessage(),
             ]);
-            throw new \Exception('Invalid OAuth callback: state decryption failed');
+            throw new Exception('Invalid OAuth callback: state decryption failed');
         }
 
         if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
-            throw new \Exception('Invalid state parameter');
+            throw new Exception('Invalid state parameter');
         }
 
-        if (!isset($stateData['csrf_token']) || !$this->validateCsrfToken($stateData['csrf_token'], $group)) {
-            throw new \Exception('Invalid CSRF token');
+        if (! isset($stateData['csrf_token']) || ! $this->validateCsrfToken($stateData['csrf_token'], $group)) {
+            throw new Exception('Invalid CSRF token');
         }
 
         $codeVerifier = $stateData['code_verifier'] ?? null;
-        if (!$codeVerifier) {
-            throw new \Exception('Missing code verifier');
+        if (! $codeVerifier) {
+            throw new Exception('Missing code verifier');
         }
 
         // Exchange code for tokens with PKCE against api.ouraring.com
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST https://api.ouraring.com/oauth/token'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST https://api.ouraring.com/oauth/token'));
         $response = Http::asForm()->post('https://api.ouraring.com/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -232,12 +218,12 @@ class OuraPlugin extends OAuthPlugin
         ]);
         $span?->finish();
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             Log::error('Oura token exchange failed', [
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new \Exception('Failed to exchange code for tokens: ' . $response->body());
+            throw new Exception('Failed to exchange code for tokens: ' . $response->body());
         }
 
         $tokenData = $response->json();
@@ -252,11 +238,291 @@ class OuraPlugin extends OAuthPlugin
         $this->fetchAccountInfoForGroup($group);
     }
 
+    public function fetchData(Integration $integration): void
+    {
+        $type = $integration->instance_type ?? 'activity';
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        if ($type === 'sleep') {
+            $this->fetchDailySleep($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'sleep_records') {
+            $this->fetchSleepRecords($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'activity') {
+            $this->fetchDailyActivity($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'readiness') {
+            $this->fetchDailyReadiness($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'resilience') {
+            $this->fetchDailyResilience($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'stress') {
+            $this->fetchDailyStress($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'workouts') {
+            $this->fetchWorkouts($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'sessions') {
+            $this->fetchSessions($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'tags') {
+            $this->fetchTags($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'heartrate') {
+            $this->fetchHeartRateSeries($integration, now()->subDays($daysBack)->toIso8601String(), now()->toIso8601String());
+
+            return;
+        }
+
+        if ($type === 'spo2') {
+            $this->fetchDailySpO2($integration, $startDate, $endDate);
+
+            return;
+        }
+    }
+
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        // Not used for Oura (we directly create events), but required by interface
+        return [];
+    }
+
+    // Public helper for migration processing: converts items into events per instance type
+    public function processOuraMigrationItems(Integration $integration, string $instanceType, array $items): void
+    {
+        switch ($instanceType) {
+            case 'activity':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'activity', $item, [
+                        'score_field' => 'score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Activity',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                        'details_fields' => ['steps', 'cal_total', 'equivalent_walking_distance', 'target_calories', 'non_wear_time'],
+                    ]);
+                }
+                break;
+            case 'sleep_records':
+                foreach ($items as $item) {
+                    $this->createSleepRecordFromItem($integration, $item);
+                }
+                break;
+            case 'sleep':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'sleep', $item, [
+                        'score_field' => 'score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Sleep',
+                        'value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'readiness':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'readiness', $item, [
+                        'score_field' => 'score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Readiness',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'resilience':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'resilience', $item, [
+                        'score_field' => 'resilience_score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Resilience',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'stress':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'stress', $item, [
+                        'score_field' => 'stress_score',
+                        'contributors_field' => 'contributors',
+                        'title' => 'Stress',
+                        'value_unit' => 'percent',
+                        'contributors_value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'spo2':
+                foreach ($items as $item) {
+                    $this->createDailyRecordEvent($integration, 'spo2', $item, [
+                        'score_field' => 'spo2_average',
+                        'contributors_field' => null,
+                        'title' => 'SpO2',
+                        'value_unit' => 'percent',
+                    ]);
+                }
+                break;
+            case 'workouts':
+                foreach ($items as $item) {
+                    $this->createWorkoutEvent($integration, $item);
+                }
+                break;
+            case 'sessions':
+                foreach ($items as $item) {
+                    $this->createSessionEvent($integration, $item);
+                }
+                break;
+            case 'tags':
+                foreach ($items as $item) {
+                    $this->createTagEvent($integration, $item);
+                }
+                break;
+            default:
+                // leave unsupported types to other paths
+                break;
+        }
+    }
+
+    /**
+     * Public helper for migration: fetch a window for a given instance type with headers/status.
+     * Cursor: start_date/end_date (Y-m-d) or start_datetime/end_datetime (ISO8601 for heartrate)
+     * Returns array with keys: ok, status, headers, items
+     */
+    public function fetchWindowWithMeta(Integration $integration, string $instanceType, array $cursor): array
+    {
+        $endpoint = null;
+        $query = [];
+        if ($instanceType === 'heartrate') {
+            $endpoint = '/usercollection/heartrate';
+            $query = [
+                'start_datetime' => $cursor['start_datetime'] ?? now()->subDays(6)->toIso8601String(),
+                'end_datetime' => $cursor['end_datetime'] ?? now()->toIso8601String(),
+            ];
+        } else {
+            $endpoint = match ($instanceType) {
+                'activity' => '/usercollection/daily_activity',
+                'sleep' => '/usercollection/daily_sleep',
+                'sleep_records' => '/usercollection/sleep',
+                'readiness' => '/usercollection/daily_readiness',
+                'resilience' => '/usercollection/daily_resilience',
+                'stress' => '/usercollection/daily_stress',
+                'workouts' => '/usercollection/workout',
+                'sessions' => '/usercollection/session',
+                'tags' => '/usercollection/tag',
+                'spo2' => '/usercollection/daily_spo2',
+                default => null,
+            };
+            $query = [
+                'start_date' => $cursor['start_date'] ?? now()->subDays(29)->toDateString(),
+                'end_date' => $cursor['end_date'] ?? now()->toDateString(),
+            ];
+        }
+
+        if (! $endpoint) {
+            return [
+                'ok' => false,
+                'status' => 400,
+                'headers' => [],
+                'items' => [],
+            ];
+        }
+
+        // Token handling like getJson, but we need headers/status
+        $group = $integration->group;
+        $token = $group?->access_token;
+        if ($group && $group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+            $token = $group->access_token;
+        }
+        if (empty($token)) {
+            return [
+                'ok' => false,
+                'status' => 401,
+                'headers' => [],
+                'items' => [],
+            ];
+        }
+
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
+        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
+        $span?->finish();
+
+        $ok = $response->successful();
+        $status = $response->status();
+        $headers = $response->headers();
+        $json = $ok ? ($response->json() ?? []) : [];
+        $items = $json['data'] ?? $json ?? [];
+
+        if (! $ok) {
+            Log::warning('Oura window fetch failed', [
+                'endpoint' => $endpoint,
+                'status' => $status,
+                'response' => $response->body(),
+            ]);
+        }
+
+        return [
+            'ok' => $ok,
+            'status' => $status,
+            'headers' => $headers,
+            'items' => is_array($items) ? $items : [],
+        ];
+    }
+
+    protected function getRequiredScopes(): string
+    {
+        // Scopes per Oura docs (treating search results as authoritative)
+        // Request broad scopes to support all instance types; callers can scope down later if needed
+        return implode(' ', [
+            'email',
+            'personal',
+            'daily',
+            'heartrate',
+            'workout',
+            'tag',
+            'session',
+            'spo2',
+        ]);
+    }
+
     protected function refreshToken(IntegrationGroup $group): void
     {
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription('POST https://api.ouraring.com/oauth/token'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST https://api.ouraring.com/oauth/token'));
         $response = Http::asForm()->post('https://api.ouraring.com/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -265,8 +531,8 @@ class OuraPlugin extends OAuthPlugin
         ]);
         $span?->finish();
 
-        if (!$response->successful()) {
-            throw new \Exception('Failed to refresh token');
+        if (! $response->successful()) {
+            throw new Exception('Failed to refresh token');
         }
 
         $tokenData = $response->json();
@@ -281,104 +547,13 @@ class OuraPlugin extends OAuthPlugin
     protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
     {
         // Create a temp Integration bound to the group to reuse token handling
-        $temp = new Integration();
+        $temp = new Integration;
         $temp->setRelation('group', $group);
         $info = $this->getJson('/usercollection/personal_info', $temp);
 
         $group->update([
             'account_id' => Arr::get($info, 'data.0.user_id') ?? Arr::get($info, 'user_id') ?? Arr::get($info, 'email'),
         ]);
-    }
-
-    public function fetchData(Integration $integration): void
-    {
-        $type = $integration->instance_type ?? 'activity';
-        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
-        $startDate = now()->subDays($daysBack)->toDateString();
-        $endDate = now()->toDateString();
-
-        if ($type === 'sleep') {
-            $this->fetchDailySleep($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'sleep_records') {
-            $this->fetchSleepRecords($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'activity') {
-            $this->fetchDailyActivity($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'readiness') {
-            $this->fetchDailyReadiness($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'resilience') {
-            $this->fetchDailyResilience($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'stress') {
-            $this->fetchDailyStress($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'workouts') {
-            $this->fetchWorkouts($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'sessions') {
-            $this->fetchSessions($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'tags') {
-            $this->fetchTags($integration, $startDate, $endDate);
-            return;
-        }
-
-        if ($type === 'heartrate') {
-            $this->fetchHeartRateSeries($integration, now()->subDays($daysBack)->toIso8601String(), now()->toIso8601String());
-            return;
-        }
-
-        if ($type === 'spo2') {
-            $this->fetchDailySpO2($integration, $startDate, $endDate);
-            return;
-        }
-    }
-
-    public function convertData(array $externalData, Integration $integration): array
-    {
-        // Not used for Oura (we directly create events), but required by interface
-        return [];
-    }
-
-    /**
-     * Encode a numeric value into an integer with a multiplier to retain precision.
-     * If the value has a fractional part, scale by 1000 and round.
-     * Returns [encodedInt|null, multiplier|null].
-     */
-    private function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
-    {
-        if ($raw === null || $raw === '') {
-            return [null, null];
-        }
-        $float = (float) $raw;
-        if (!is_finite($float)) {
-            return [null, null];
-        }
-        if (fmod($float, 1.0) !== 0.0) {
-            $multiplier = 1000;
-            $intValue = (int) round($float * $multiplier);
-            return [$intValue, $multiplier];
-        }
-        return [(int) $float, $defaultMultiplier];
     }
 
     /**
@@ -394,22 +569,23 @@ class OuraPlugin extends OAuthPlugin
         }
 
         if (empty($token)) {
-            throw new \Exception('Missing access token for authenticated request');
+            throw new Exception('Missing access token for authenticated request');
         }
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (!empty($query) ? '?' . http_build_query($query) : '');
-        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription($desc));
+        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
         $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
         $span?->finish();
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             Log::warning('Oura API request failed', [
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+
             return [];
         }
 
@@ -419,6 +595,7 @@ class OuraPlugin extends OAuthPlugin
     protected function createOrUpdateUser(Integration $integration, array $profile = []): EventObject
     {
         $title = $integration->name ?: 'Oura Account';
+
         return EventObject::updateOrCreate(
             [
                 'user_id' => $integration->user_id,
@@ -450,6 +627,7 @@ class OuraPlugin extends OAuthPlugin
             'height' => Arr::get($data, 'height'),
             'dominant_hand' => Arr::get($data, 'dominant_hand'),
         ];
+
         return $this->createOrUpdateUser($integration, $profile);
     }
 
@@ -800,7 +978,7 @@ class OuraPlugin extends OAuthPlugin
     protected function createDailyRecordEvent(Integration $integration, string $kind, array $item, array $options): void
     {
         $day = $item['day'] ?? $item['date'] ?? null;
-        if (!$day) {
+        if (! $day) {
             return;
         }
 
@@ -871,7 +1049,7 @@ class OuraPlugin extends OAuthPlugin
         }
 
         $detailsFields = $options['details_fields'] ?? [];
-        if (!empty($detailsFields)) {
+        if (! empty($detailsFields)) {
             $unitMap = [
                 'steps' => 'count',
                 'cal_total' => 'kcal',
@@ -880,7 +1058,7 @@ class OuraPlugin extends OAuthPlugin
                 'non_wear_time' => 'seconds',
             ];
             foreach ($detailsFields as $field) {
-                if (!array_key_exists($field, $item)) {
+                if (! array_key_exists($field, $item)) {
                     continue;
                 }
                 $label = Str::title(str_replace('_', ' ', $field));
@@ -1069,188 +1247,28 @@ class OuraPlugin extends OAuthPlugin
         ]);
     }
 
-    // Public helper for migration processing: converts items into events per instance type
-    public function processOuraMigrationItems(Integration $integration, string $instanceType, array $items): void
-    {
-        switch ($instanceType) {
-            case 'activity':
-                foreach ($items as $item) {
-                    $this->createDailyRecordEvent($integration, 'activity', $item, [
-                        'score_field' => 'score',
-                        'contributors_field' => 'contributors',
-                        'title' => 'Activity',
-                        'value_unit' => 'percent',
-                        'contributors_value_unit' => 'percent',
-                        'details_fields' => ['steps', 'cal_total', 'equivalent_walking_distance', 'target_calories', 'non_wear_time'],
-                    ]);
-                }
-                break;
-            case 'sleep_records':
-                foreach ($items as $item) {
-                    $this->createSleepRecordFromItem($integration, $item);
-                }
-                break;
-            case 'sleep':
-                foreach ($items as $item) {
-                    $this->createDailyRecordEvent($integration, 'sleep', $item, [
-                        'score_field' => 'score',
-                        'contributors_field' => 'contributors',
-                        'title' => 'Sleep',
-                        'value_unit' => 'percent',
-                    ]);
-                }
-                break;
-            case 'readiness':
-                foreach ($items as $item) {
-                    $this->createDailyRecordEvent($integration, 'readiness', $item, [
-                        'score_field' => 'score',
-                        'contributors_field' => 'contributors',
-                        'title' => 'Readiness',
-                        'value_unit' => 'percent',
-                        'contributors_value_unit' => 'percent',
-                    ]);
-                }
-                break;
-            case 'resilience':
-                foreach ($items as $item) {
-                    $this->createDailyRecordEvent($integration, 'resilience', $item, [
-                        'score_field' => 'resilience_score',
-                        'contributors_field' => 'contributors',
-                        'title' => 'Resilience',
-                        'value_unit' => 'percent',
-                        'contributors_value_unit' => 'percent',
-                    ]);
-                }
-                break;
-            case 'stress':
-                foreach ($items as $item) {
-                    $this->createDailyRecordEvent($integration, 'stress', $item, [
-                        'score_field' => 'stress_score',
-                        'contributors_field' => 'contributors',
-                        'title' => 'Stress',
-                        'value_unit' => 'percent',
-                        'contributors_value_unit' => 'percent',
-                    ]);
-                }
-                break;
-            case 'spo2':
-                foreach ($items as $item) {
-                    $this->createDailyRecordEvent($integration, 'spo2', $item, [
-                        'score_field' => 'spo2_average',
-                        'contributors_field' => null,
-                        'title' => 'SpO2',
-                        'value_unit' => 'percent',
-                    ]);
-                }
-                break;
-            case 'workouts':
-                foreach ($items as $item) {
-                    $this->createWorkoutEvent($integration, $item);
-                }
-                break;
-            case 'sessions':
-                foreach ($items as $item) {
-                    $this->createSessionEvent($integration, $item);
-                }
-                break;
-            case 'tags':
-                foreach ($items as $item) {
-                    $this->createTagEvent($integration, $item);
-                }
-                break;
-            default:
-                // leave unsupported types to other paths
-                break;
-        }
-    }
-
     /**
-     * Public helper for migration: fetch a window for a given instance type with headers/status.
-     * Cursor: start_date/end_date (Y-m-d) or start_datetime/end_datetime (ISO8601 for heartrate)
-     * Returns array with keys: ok, status, headers, items
+     * Encode a numeric value into an integer with a multiplier to retain precision.
+     * If the value has a fractional part, scale by 1000 and round.
+     * Returns [encodedInt|null, multiplier|null].
      */
-    public function fetchWindowWithMeta(Integration $integration, string $instanceType, array $cursor): array
+    private function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
     {
-        $endpoint = null;
-        $query = [];
-        if ($instanceType === 'heartrate') {
-            $endpoint = '/usercollection/heartrate';
-            $query = [
-                'start_datetime' => $cursor['start_datetime'] ?? now()->subDays(6)->toIso8601String(),
-                'end_datetime' => $cursor['end_datetime'] ?? now()->toIso8601String(),
-            ];
-        } else {
-            $endpoint = match ($instanceType) {
-                'activity' => '/usercollection/daily_activity',
-                'sleep' => '/usercollection/daily_sleep',
-                'sleep_records' => '/usercollection/sleep',
-                'readiness' => '/usercollection/daily_readiness',
-                'resilience' => '/usercollection/daily_resilience',
-                'stress' => '/usercollection/daily_stress',
-                'workouts' => '/usercollection/workout',
-                'sessions' => '/usercollection/session',
-                'tags' => '/usercollection/tag',
-                'spo2' => '/usercollection/daily_spo2',
-                default => null,
-            };
-            $query = [
-                'start_date' => $cursor['start_date'] ?? now()->subDays(29)->toDateString(),
-                'end_date' => $cursor['end_date'] ?? now()->toDateString(),
-            ];
+        if ($raw === null || $raw === '') {
+            return [null, null];
+        }
+        $float = (float) $raw;
+        if (! is_finite($float)) {
+            return [null, null];
+        }
+        if (fmod($float, 1.0) !== 0.0) {
+            $multiplier = 1000;
+            $intValue = (int) round($float * $multiplier);
+
+            return [$intValue, $multiplier];
         }
 
-        if (!$endpoint) {
-            return [
-                'ok' => false,
-                'status' => 400,
-                'headers' => [],
-                'items' => [],
-            ];
-        }
-
-        // Token handling like getJson, but we need headers/status
-        $group = $integration->group;
-        $token = $group?->access_token;
-        if ($group && $group->expiry && $group->expiry->isPast()) {
-            $this->refreshToken($group);
-            $token = $group->access_token;
-        }
-        if (empty($token)) {
-            return [
-                'ok' => false,
-                'status' => 401,
-                'headers' => [],
-                'items' => [],
-            ];
-        }
-
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (!empty($query) ? '?' . http_build_query($query) : '');
-        $span = $parentSpan?->startChild((new SpanContext())->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
-        $span?->finish();
-
-        $ok = $response->successful();
-        $status = $response->status();
-        $headers = $response->headers();
-        $json = $ok ? ($response->json() ?? []) : [];
-        $items = $json['data'] ?? $json ?? [];
-
-        if (!$ok) {
-            Log::warning('Oura window fetch failed', [
-                'endpoint' => $endpoint,
-                'status' => $status,
-                'response' => $response->body(),
-            ]);
-        }
-
-        return [
-            'ok' => $ok,
-            'status' => $status,
-            'headers' => $headers,
-            'items' => is_array($items) ? $items : [],
-        ];
+        return [(int) $float, $defaultMultiplier];
     }
 
     /**
@@ -1338,5 +1356,3 @@ class OuraPlugin extends OAuthPlugin
         }
     }
 }
-
-

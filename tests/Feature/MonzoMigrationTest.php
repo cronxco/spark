@@ -16,28 +16,10 @@ class MonzoMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeMonzoIntegration(string $instanceType = 'transactions'): Integration
-    {
-        $user = User::factory()->create();
-        $group = IntegrationGroup::create([
-            'user_id' => $user->id,
-            'service' => 'monzo',
-            'account_id' => null,
-            'access_token' => 'test-token',
-            'refresh_token' => null,
-        ]);
-
-        return Integration::create([
-            'user_id' => $user->id,
-            'integration_group_id' => $group->id,
-            'service' => 'monzo',
-            'name' => 'Monzo ' . ucfirst($instanceType),
-            'instance_type' => $instanceType,
-            'configuration' => [],
-        ]);
-    }
-
-    public function test_migration_processes_transactions_window_creates_events(): void
+    /**
+     * @test
+     */
+    public function migration_processes_transactions_window_creates_events(): void
     {
         $integration = $this->makeMonzoIntegration('transactions');
 
@@ -119,7 +101,10 @@ class MonzoMigrationTest extends TestCase
         }));
     }
 
-    public function test_migration_pots_snapshot_creates_pot_objects(): void
+    /**
+     * @test
+     */
+    public function migration_pots_snapshot_creates_pot_objects(): void
     {
         $integration = $this->makeMonzoIntegration('pots');
 
@@ -157,7 +142,10 @@ class MonzoMigrationTest extends TestCase
         ]);
     }
 
-    public function test_migration_balance_snapshot_creates_daily_event(): void
+    /**
+     * @test
+     */
+    public function migration_balance_snapshot_creates_daily_event(): void
     {
         $integration = $this->makeMonzoIntegration('balances');
 
@@ -203,6 +191,25 @@ class MonzoMigrationTest extends TestCase
             return $b->title === 'Spend Today' && (int) $b->value === 200 && (int) $b->value_multiplier === 100 && $b->value_unit === 'GBP';
         }));
     }
+
+    private function makeMonzoIntegration(string $instanceType = 'transactions'): Integration
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'monzo',
+            'account_id' => null,
+            'access_token' => 'test-token',
+            'refresh_token' => null,
+        ]);
+
+        return Integration::create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'monzo',
+            'name' => 'Monzo ' . ucfirst($instanceType),
+            'instance_type' => $instanceType,
+            'configuration' => [],
+        ]);
+    }
 }
-
-

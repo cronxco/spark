@@ -14,7 +14,10 @@ use Tests\TestCase;
 
 class MigrationJobsTest extends TestCase
 {
-    public function test_onboarding_can_trigger_migration_with_optional_timebox(): void
+    /**
+     * @test
+     */
+    public function onboarding_can_trigger_migration_with_optional_timebox(): void
     {
         $this->withoutExceptionHandling();
         Queue::fake();
@@ -50,7 +53,10 @@ class MigrationJobsTest extends TestCase
         Queue::assertPushedOn('migration', StartIntegrationMigration::class);
     }
 
-    public function test_fetch_integration_page_respects_timebox_and_stops(): void
+    /**
+     * @test
+     */
+    public function fetch_integration_page_respects_timebox_and_stops(): void
     {
         Bus::fake();
 
@@ -82,7 +88,10 @@ class MigrationJobsTest extends TestCase
         Bus::assertNothingDispatched();
     }
 
-    public function test_spotify_fetch_handles_429_and_redispatches(): void
+    /**
+     * @test
+     */
+    public function spotify_fetch_handles_429_and_redispatches(): void
     {
         Queue::fake();
         Http::fake([
@@ -116,7 +125,10 @@ class MigrationJobsTest extends TestCase
         Queue::assertPushedOn('migration', FetchIntegrationPage::class);
     }
 
-    public function test_github_fetch_paginates_and_chains_processing(): void
+    /**
+     * @test
+     */
+    public function github_fetch_paginates_and_chains_processing(): void
     {
         Bus::fake();
         Http::fake([
@@ -161,7 +173,10 @@ class MigrationJobsTest extends TestCase
         ]);
     }
 
-    public function test_oura_fetch_handles_429_and_empty_window(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_handles_429_and_empty_window(): void
     {
         // First call 429, then empty window -> final stop
         Queue::fake();
@@ -210,5 +225,3 @@ class MigrationJobsTest extends TestCase
         $this->assertTrue(true);
     }
 }
-
-

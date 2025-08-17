@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -15,7 +15,7 @@ return new class extends Migration
             $rows = DB::select(
                 "select 1 from pg_indexes where tablename = 'events' and indexname = 'events_integration_source_unique' limit 1"
             );
-            $exists = !empty($rows);
+            $exists = ! empty($rows);
         } catch (\Throwable $e) {
             $exists = false;
         }
@@ -46,5 +46,3 @@ return new class extends Migration
         }
     }
 };
-
-

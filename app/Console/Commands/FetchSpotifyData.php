@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Integrations\PluginRegistry;
+use App\Models\Event;
 use App\Models\Integration;
+use Exception;
 use Illuminate\Console\Command;
 
 class FetchSpotifyData extends Command
@@ -29,87 +31,90 @@ class FetchSpotifyData extends Command
     {
         $userId = $this->option('user');
         $force = $this->option('force');
-        
+
         $query = Integration::where('service', 'spotify')
             ->whereHas('user');
-            
+
         if ($userId) {
             $query->where('user_id', $userId);
         }
-        
-        if (!$force) {
+
+        if (! $force) {
             // For Spotify, we want to check more frequently than other integrations
             // Check if it's been more than 30 seconds since last update
             $query->where(function ($q) {
                 $q->whereNull('last_triggered_at')
-                  ->orWhere('last_triggered_at', '<=', now()->subSeconds(30));
+                    ->orWhere('last_triggered_at', '<=', now()->subSeconds(30));
             });
         }
-        
+
         $integrations = $query->get();
-        
+
         if ($integrations->isEmpty()) {
             $this->info('No Spotify integrations need updating at this time.');
+
             return 0;
         }
-        
+
         $this->info("Found {$integrations->count()} Spotify integration(s) to update.");
-        
+
         $successCount = 0;
         $errorCount = 0;
         $eventsCreated = 0;
-        
+
         foreach ($integrations as $integration) {
             try {
                 // Skip integrations already in progress
                 if ($integration->isProcessing()) {
                     $this->line("Skipping integration {$integration->id} - currently processing");
+
                     continue;
                 }
 
                 $pluginClass = PluginRegistry::getPlugin('spotify');
-                if (!$pluginClass) {
-                    $this->error("Spotify plugin not found");
+                if (! $pluginClass) {
+                    $this->error('Spotify plugin not found');
                     $errorCount++;
+
                     continue;
                 }
-                
-                $plugin = new $pluginClass();
-                
+
+                $plugin = new $pluginClass;
+
                 $this->info("Fetching Spotify data for user {$integration->user->name} (ID: {$integration->user_id})");
-                
+
                 // Mark as triggered before processing
                 $integration->markAsTriggered();
-                
+
                 // Count events before processing
-                $eventsBefore = \App\Models\Event::where('integration_id', $integration->id)->count();
-                
+                $eventsBefore = Event::where('integration_id', $integration->id)->count();
+
                 $plugin->fetchData($integration);
-                
+
                 // Count events after processing
-                $eventsAfter = \App\Models\Event::where('integration_id', $integration->id)->count();
+                $eventsAfter = Event::where('integration_id', $integration->id)->count();
                 $newEvents = $eventsAfter - $eventsBefore;
-                
+
                 if ($newEvents > 0) {
                     $this->info("Created {$newEvents} new event(s)");
                     $eventsCreated += $newEvents;
                 } else {
-                    $this->info("No new events created");
+                    $this->info('No new events created');
                 }
-                
+
                 // Mark as successfully updated after processing
                 $integration->markAsSuccessfullyUpdated();
-                
+
                 $successCount++;
-                
-            } catch (\Exception $e) {
+
+            } catch (Exception $e) {
                 $this->error("Failed to fetch Spotify data for integration {$integration->id}: " . $e->getMessage());
                 $errorCount++;
             }
         }
-        
+
         $this->info("Completed: {$successCount} successful, {$errorCount} failed, {$eventsCreated} total events created");
-        
+
         return $errorCount === 0 ? 0 : 1;
     }
 }

@@ -4,19 +4,23 @@ namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
-use Illuminate\Bus\Batchable;
 use Carbon\Carbon;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class FetchIntegrationPage implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
     public int $tries = 3;
@@ -40,7 +44,7 @@ class FetchIntegrationPage implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new \Illuminate\Queue\Middleware\WithoutOverlapping('monzo:migration:' . $this->integration->id))
+            (new WithoutOverlapping('monzo:migration:' . $this->integration->id))
                 ->expireAfter(120),
         ];
     }
@@ -54,24 +58,29 @@ class FetchIntegrationPage implements ShouldQueue
                 'integration_id' => $this->integration->id,
                 'service' => $this->context['service'] ?? null,
             ]);
+
             return;
         }
 
         $service = $this->context['service'] ?? $this->integration->service;
         if ($service === 'oura') {
             $this->fetchOura();
+
             return;
         }
         if ($service === 'spotify') {
             $this->fetchSpotify();
+
             return;
         }
         if ($service === 'github') {
             $this->fetchGitHub();
+
             return;
         }
         if ($service === 'monzo') {
             $this->fetchMonzo();
+
             return;
         }
         if ($service === 'gocardless') {
@@ -87,11 +96,11 @@ class FetchIntegrationPage implements ShouldQueue
 
         // Use plugin helper to fetch with headers/status
         $pluginClass = PluginRegistry::getPlugin('oura');
-        $plugin = new $pluginClass();
+        $plugin = new $pluginClass;
         $resp = $plugin->fetchWindowWithMeta($this->integration, $type, $cursor);
 
         // Rate limit handling
-        if (!$resp['ok']) {
+        if (! $resp['ok']) {
             $status = (int) ($resp['status'] ?? 0);
             if ($status === 429) {
                 $headers = is_array($resp['headers'] ?? null) ? ($resp['headers'] ?? []) : [];
@@ -104,10 +113,11 @@ class FetchIntegrationPage implements ShouldQueue
                 $retryAfter = (int) ($retryAfterValue ?? 30);
                 static::dispatch($this->integration, $this->context)
                     ->onConnection('redis')->onQueue('migration')->delay(now()->addSeconds(max(5, $retryAfter)));
+
                 return;
             }
             // Backoff and retry via job retries
-            throw new \RuntimeException('Oura fetch failed with status ' . $status);
+            throw new RuntimeException('Oura fetch failed with status ' . $status);
         }
 
         $items = $resp['items'] ?? [];
@@ -154,21 +164,22 @@ class FetchIntegrationPage implements ShouldQueue
         $token = $group?->access_token ?? $this->integration->access_token;
         if ($group) {
             $pluginClass = PluginRegistry::getPlugin('spotify');
-            (new $pluginClass())->ensureFreshToken($group);
+            (new $pluginClass)->ensureFreshToken($group);
             $token = $group->access_token ?? $token;
         }
         $url = 'https://api.spotify.com/v1/me/player/recently-played';
-        $resp = \Illuminate\Support\Facades\Http::withToken($token)
+        $resp = Http::withToken($token)
             ->get($url, ['limit' => 50, 'before' => $beforeMs]);
 
         if ($resp->status() === 429) {
             $retryAfter = (int) ($resp->header('Retry-After') ?? 30);
             static::dispatch($this->integration, $this->context)
                 ->onConnection('redis')->onQueue('migration')->delay(now()->addSeconds(max(5, $retryAfter)));
+
             return;
         }
-        if (!$resp->successful()) {
-            throw new \RuntimeException('Spotify fetch failed: ' . $resp->status());
+        if (! $resp->successful()) {
+            throw new RuntimeException('Spotify fetch failed: ' . $resp->status());
         }
         $json = $resp->json();
         $items = $json['items'] ?? [];
@@ -179,7 +190,7 @@ class FetchIntegrationPage implements ShouldQueue
         // Prefer API-provided cursors; fall back to min played_at
         $nextBefore = null;
         $cursors = $json['cursors'] ?? [];
-        if (!empty($cursors) && isset($cursors['before'])) {
+        if (! empty($cursors) && isset($cursors['before'])) {
             $nextBefore = (int) $cursors['before'];
         }
         if ($nextBefore === null) {
@@ -224,14 +235,14 @@ class FetchIntegrationPage implements ShouldQueue
         $cursor = $this->context['cursor'] ?? ['repo_index' => 0, 'page' => 1];
         $repoIndex = (int) ($cursor['repo_index'] ?? 0);
         $page = (int) ($cursor['page'] ?? 1);
-        if (!isset($repositories[$repoIndex])) {
+        if (! isset($repositories[$repoIndex])) {
             return; // finished all repos
         }
         $repo = $repositories[$repoIndex];
         $group = $this->integration->group;
         $token = $group?->access_token ?? $this->integration->access_token;
         $url = "https://api.github.com/repos/{$repo}/events";
-        $resp = \Illuminate\Support\Facades\Http::withToken($token)
+        $resp = Http::withToken($token)
             ->withHeaders([
                 'Accept' => 'application/vnd.github+json',
                 'User-Agent' => config('app.name', 'SparkApp'),
@@ -260,10 +271,11 @@ class FetchIntegrationPage implements ShouldQueue
 
             static::dispatch($this->integration, $this->context)
                 ->onConnection('redis')->onQueue('migration')->delay(now()->addSeconds($delaySeconds));
+
             return;
         }
-        if (!$resp->successful()) {
-            throw new \RuntimeException('GitHub fetch failed: ' . $resp->status());
+        if (! $resp->successful()) {
+            throw new RuntimeException('GitHub fetch failed: ' . $resp->status());
         }
         $items = $resp->json() ?? [];
         if (empty($items)) {
@@ -274,6 +286,7 @@ class FetchIntegrationPage implements ShouldQueue
             Bus::chain([
                 new FetchIntegrationPage($this->integration, $nextContext),
             ])->onConnection('redis')->onQueue('migration')->dispatch();
+
             return;
         }
 
@@ -293,21 +306,23 @@ class FetchIntegrationPage implements ShouldQueue
         if ($type === 'pots') {
             // Single-shot: add the processing job to the current batch so progress reflects reality
             // In fetch-only phase, just record marker in cache and return; processing will happen later
-            \Illuminate\Support\Facades\Cache::put($this->cacheKey('pots_fetched'), true, now()->addHours(6));
+            Cache::put($this->cacheKey('pots_fetched'), true, now()->addHours(6));
+
             return;
         }
 
         if ($type === 'balances') {
             // Record one snapshot cutoff date; do not enqueue further balances fetch jobs
             $cursor = $this->context['cursor'] ?? ['end_date' => now()->toDateString()];
-            $endDate = \Carbon\Carbon::parse($cursor['end_date']);
-            \Illuminate\Support\Facades\Cache::put($this->cacheKey('balances_last_date'), $endDate->toDateString(), now()->addHours(6));
+            $endDate = Carbon::parse($cursor['end_date']);
+            Cache::put($this->cacheKey('balances_last_date'), $endDate->toDateString(), now()->addHours(6));
+
             return;
         }
 
         // transactions
         $cursor = $this->context['cursor'] ?? [];
-        $endIso = isset($cursor['end_iso']) ? \Carbon\Carbon::parse($cursor['end_iso']) : now();
+        $endIso = isset($cursor['end_iso']) ? Carbon::parse($cursor['end_iso']) : now();
         $windowDays = (int) ($cursor['window_days'] ?? 89);
         $startIso = $endIso->copy()->subDays($windowDays)->startOfDay();
 
@@ -319,8 +334,8 @@ class FetchIntegrationPage implements ShouldQueue
         $group = $this->integration->group;
         $token = $group?->access_token ?? $this->integration->access_token;
         $hasData = false;
-        if (!empty($token)) {
-            $accountsResp = \Illuminate\Support\Facades\Http::withToken($token)
+        if (! empty($token)) {
+            $accountsResp = Http::withToken($token)
                 ->get('https://api.monzo.com/accounts');
 
             // Handle Monzo rate limiting for accounts call
@@ -329,16 +344,17 @@ class FetchIntegrationPage implements ShouldQueue
                 static::dispatch($this->integration, $this->context)
                     ->onConnection('redis')->onQueue('migration')
                     ->delay(now()->addSeconds(max(5, $retryAfter)));
+
                 return;
             }
 
-            if (!$accountsResp->successful()) {
-                throw new \RuntimeException('Monzo accounts fetch failed: ' . $accountsResp->status());
+            if (! $accountsResp->successful()) {
+                throw new RuntimeException('Monzo accounts fetch failed: ' . $accountsResp->status());
             }
 
             $accounts = $accountsResp->json('accounts') ?? [];
             foreach ($accounts as $account) {
-                $resp = \Illuminate\Support\Facades\Http::withToken($token)
+                $resp = Http::withToken($token)
                     ->get('https://api.monzo.com/transactions', [
                         'account_id' => $account['id'] ?? null,
                         'since' => $startIso->toIso8601String(),
@@ -352,17 +368,18 @@ class FetchIntegrationPage implements ShouldQueue
                     static::dispatch($this->integration, $this->context)
                         ->onConnection('redis')->onQueue('migration')
                         ->delay(now()->addSeconds(max(5, $retryAfter)));
+
                     return;
                 }
 
-                if ($resp->successful() && !empty($resp->json('transactions'))) {
+                if ($resp->successful() && ! empty($resp->json('transactions'))) {
                     $hasData = true;
                     break;
                 }
             }
         }
 
-        if (!$hasData) {
+        if (! $hasData) {
             // No data in this window; stop without recording window to avoid empty windows
             return;
         }
@@ -373,11 +390,11 @@ class FetchIntegrationPage implements ShouldQueue
             'before' => $endIso->toIso8601String(),
         ];
         $key = $this->cacheKey('tx_windows');
-        $windows = (array) (\Illuminate\Support\Facades\Cache::get($key) ?? []);
+        $windows = (array) (Cache::get($key) ?? []);
         $windows[] = $window;
-        \Illuminate\Support\Facades\Cache::put($key, $windows, now()->addHours(6));
+        Cache::put($key, $windows, now()->addHours(6));
         // Update a simple fetched-back-to marker based on the window start (earliest reached so far)
-        \Illuminate\Support\Facades\Cache::put($this->cacheKey('fetched_back_to'), $startIso->toDateString(), now()->addHours(6));
+        Cache::put($this->cacheKey('fetched_back_to'), $startIso->toDateString(), now()->addHours(6));
 
         // Enqueue next fetch only after confirming data exists
         $this->batch()?->add([
@@ -468,6 +485,3 @@ class FetchIntegrationPage implements ShouldQueue
         return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
     }
 }
-
-
-

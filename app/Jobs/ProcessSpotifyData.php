@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -12,7 +13,11 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
+use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
+use Throwable;
+
+use function Sentry\captureException;
 
 class ProcessSpotifyData implements ShouldQueue
 {
@@ -38,7 +43,7 @@ class ProcessSpotifyData implements ShouldQueue
     public function handle(): void
     {
         $hub = SentrySdk::getCurrentHub();
-        $txContext = new TransactionContext();
+        $txContext = new TransactionContext;
         $txContext->setName('job.process_spotify');
         $txContext->setOp('job');
         $transaction = $hub->startTransaction($txContext);
@@ -46,35 +51,35 @@ class ProcessSpotifyData implements ShouldQueue
 
         try {
             $pluginClass = PluginRegistry::getPlugin('spotify');
-            if (!$pluginClass) {
-                throw new \Exception('Spotify plugin not found');
+            if (! $pluginClass) {
+                throw new Exception('Spotify plugin not found');
             }
 
-            $plugin = new $pluginClass();
-            
+            $plugin = new $pluginClass;
+
             Log::info("Processing Spotify data for integration {$this->integration->id}");
-            
+
             // Mark as triggered before processing
             $this->integration->markAsTriggered();
-            
-            $span = $transaction->startChild((new SpanContext())->setOp('integration.fetch')->setDescription('spotify'));
+
+            $span = $transaction->startChild((new SpanContext)->setOp('integration.fetch')->setDescription('spotify'));
             $plugin->fetchData($this->integration);
             $span->finish();
-            
+
             // Mark as successfully updated after processing
             $this->integration->markAsSuccessfullyUpdated();
-            
+
             Log::info("Successfully processed Spotify data for integration {$this->integration->id}");
-            $transaction->setStatus(\Sentry\Tracing\SpanStatus::ok());
-            
-        } catch (\Exception $e) {
+            $transaction->setStatus(SpanStatus::ok());
+
+        } catch (Exception $e) {
             Log::error("Failed to process Spotify data for integration {$this->integration->id}", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            \Sentry\captureException($e);
-            
-            $transaction->setStatus(\Sentry\Tracing\SpanStatus::internalError());
+            captureException($e);
+
+            $transaction->setStatus(SpanStatus::internalError());
             throw $e; // Re-throw to trigger retry
         } finally {
             $transaction->finish();
@@ -85,12 +90,12 @@ class ProcessSpotifyData implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::error("Spotify data processing job failed permanently for integration {$this->integration->id}", [
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
-        \Sentry\captureException($exception);
+        captureException($exception);
     }
 }

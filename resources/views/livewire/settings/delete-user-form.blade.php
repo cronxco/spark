@@ -7,7 +7,7 @@ use Mary\Traits\Toast;
 
 new class extends Component {
     use Toast;
-    
+
     public string $password = '';
     public bool $showDeleteModal = false;
 
@@ -32,9 +32,9 @@ new class extends Component {
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('Delete your account and all of its resources') }}</p>
     </div>
 
-    <x-button 
-        label="{{ __('Delete account') }}" 
-        class="btn-error" 
+    <x-button
+        label="{{ __('Delete account') }}"
+        class="btn-error"
         wire:click="$set('showDeleteModal', true)"
     />
 
@@ -43,9 +43,9 @@ new class extends Component {
             <x-input wire:model="password" :label="__('Password')" type="password" required />
 
             <x-slot:actions>
-                <x-button 
-                    label="{{ __('Cancel') }}" 
-                    class="btn-outline" 
+                <x-button
+                    label="{{ __('Cancel') }}"
+                    class="btn-outline"
                     wire:click="$set('showDeleteModal', false)"
                 />
                 <x-button label="{{ __('Delete account') }}" type="submit" class="btn-error" spinner="deleteUser" />

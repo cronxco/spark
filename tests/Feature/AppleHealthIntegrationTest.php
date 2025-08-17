@@ -5,8 +5,6 @@ namespace Tests\Feature;
 use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
-use App\Models\Integration;
-use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 //
@@ -23,16 +21,10 @@ class AppleHealthIntegrationTest extends TestCase
         PluginRegistry::register(AppleHealthPlugin::class);
     }
 
-    private function createGroupWithInstances(User $user): array
-    {
-        $plugin = new AppleHealthPlugin();
-        $group = $plugin->initializeGroup($user);
-        $workouts = $plugin->createInstance($group, 'workouts');
-        $metrics = $plugin->createInstance($group, 'metrics');
-        return [$group, $workouts, $metrics];
-    }
-
-    public function test_webhook_ingests_workouts_creating_event_and_blocks(): void
+    /**
+     * @test
+     */
+    public function webhook_ingests_workouts_creating_event_and_blocks(): void
     {
         $user = User::factory()->create();
         [$group, $workouts, $metrics] = $this->createGroupWithInstances($user);
@@ -81,7 +73,10 @@ class AppleHealthIntegrationTest extends TestCase
         $this->assertTrue($event->blocks()->count() >= 1);
     }
 
-    public function test_webhook_ingests_metrics_creating_events(): void
+    /**
+     * @test
+     */
+    public function webhook_ingests_metrics_creating_events(): void
     {
         $user = User::factory()->create();
         [$group, $workouts, $metrics] = $this->createGroupWithInstances($user);
@@ -124,6 +119,14 @@ class AppleHealthIntegrationTest extends TestCase
             'action' => 'measurement',
         ]);
     }
+
+    private function createGroupWithInstances(User $user): array
+    {
+        $plugin = new AppleHealthPlugin;
+        $group = $plugin->initializeGroup($user);
+        $workouts = $plugin->createInstance($group, 'workouts');
+        $metrics = $plugin->createInstance($group, 'metrics');
+
+        return [$group, $workouts, $metrics];
+    }
 }
-
-

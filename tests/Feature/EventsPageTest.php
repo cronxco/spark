@@ -12,11 +12,14 @@ class EventsPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_events_page_loads_for_authenticated_user(): void
+    /**
+     * @test
+     */
+    public function events_page_loads_for_authenticated_user(): void
     {
         /** @var User $user */
         $user = User::factory()->createOne();
-        
+
         $response = $this->actingAs($user)
             ->get('/events');
 
@@ -24,18 +27,24 @@ class EventsPageTest extends TestCase
         $response->assertSee('Events — Today');
     }
 
-    public function test_events_page_requires_authentication(): void
+    /**
+     * @test
+     */
+    public function events_page_requires_authentication(): void
     {
         $response = $this->get('/events');
 
         $response->assertRedirect('/login');
     }
 
-    public function test_events_page_shows_events_from_today(): void
+    /**
+     * @test
+     */
+    public function events_page_shows_events_from_today(): void
     {
         /** @var User $user */
         $user = User::factory()->createOne();
-        
+
         // Ensure events belong to the acting user via integration
         $integration = Integration::factory()->create(['user_id' => $user->id]);
 
@@ -61,11 +70,14 @@ class EventsPageTest extends TestCase
         $response->assertDontSee('test_action_yesterday');
     }
 
-    public function test_events_page_shows_no_events_message_when_empty(): void
+    /**
+     * @test
+     */
+    public function events_page_shows_no_events_message_when_empty(): void
     {
         /** @var User $user */
         $user = User::factory()->createOne();
-        
+
         // Delete all events from today
         Event::whereDate('time', now())->delete();
 

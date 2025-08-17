@@ -3,13 +3,13 @@
     'size' => 'w-5 h-5',
 ])
 
-@if($name)
+@if ($name)
     @php
         $iconClass = $attributes->get('class', $size);
         $iconName = str_replace('o-', '', $name);
     @endphp
-    
-    @if(str_starts_with($name, 'o-'))
+
+    @if (str_starts_with($name, 'o-'))
         <svg {{ $attributes->merge(['class' => $iconClass]) }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             @switch($iconName)
                 @case('user')

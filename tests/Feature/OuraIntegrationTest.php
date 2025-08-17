@@ -9,20 +9,24 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use ReflectionClass;
 use Tests\TestCase;
 
 class OuraIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_oura_plugin_has_correct_metadata_and_scopes(): void
+    /**
+     * @test
+     */
+    public function oura_plugin_has_correct_metadata_and_scopes(): void
     {
         $this->assertEquals('oura', OuraPlugin::getIdentifier());
         $this->assertEquals('Oura', OuraPlugin::getDisplayName());
         $this->assertEquals('oauth', OuraPlugin::getServiceType());
 
-        $plugin = new OuraPlugin();
-        $reflection = new \ReflectionClass($plugin);
+        $plugin = new OuraPlugin;
+        $reflection = new ReflectionClass($plugin);
         $method = $reflection->getMethod('getRequiredScopes');
         $method->setAccessible(true);
         $scopes = $method->invoke($plugin);
@@ -37,10 +41,13 @@ class OuraIntegrationTest extends TestCase
         $this->assertStringContainsString('spo2', $scopes);
     }
 
-    public function test_oura_plugin_can_initialize_group_and_instance(): void
+    /**
+     * @test
+     */
+    public function oura_plugin_can_initialize_group_and_instance(): void
     {
         $user = User::factory()->create();
-        $plugin = new OuraPlugin();
+        $plugin = new OuraPlugin;
 
         $group = $plugin->initializeGroup($user);
         $this->assertInstanceOf(IntegrationGroup::class, $group);
@@ -54,7 +61,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertEquals('oura', $instance->service);
     }
 
-    public function test_oura_fetch_daily_activity_creates_event_and_blocks(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_daily_activity_creates_event_and_blocks(): void
     {
         $user = User::factory()->create();
 
@@ -112,7 +122,7 @@ class OuraIntegrationTest extends TestCase
             ], 200),
         ]);
 
-        $plugin = new OuraPlugin();
+        $plugin = new OuraPlugin;
         $plugin->fetchData($integration);
 
         $event = Event::where('integration_id', $integration->id)->first();
@@ -133,7 +143,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($blocks->where('title', 'Cal Total')->first());
     }
 
-    public function test_oura_fetch_sleep_records_creates_event_with_stages_and_avg_hr(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_sleep_records_creates_event_with_stages_and_avg_hr(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -171,7 +184,7 @@ class OuraIntegrationTest extends TestCase
             ], 200),
         ]);
 
-        (new OuraPlugin())->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration);
 
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
@@ -188,7 +201,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($blocks->where('title', 'Average Heart Rate')->first());
     }
 
-    public function test_oura_fetch_heartrate_series_creates_daily_event_with_min_max_blocks(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_heartrate_series_creates_daily_event_with_min_max_blocks(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -211,14 +227,14 @@ class OuraIntegrationTest extends TestCase
             'https://api.ouraring.com/v2/usercollection/personal_info*' => Http::response(['data' => [['user_id' => 'user_abc']]], 200),
             'https://api.ouraring.com/v2/usercollection/heartrate*' => Http::response([
                 'data' => [
-                    ['timestamp' => $day.'T00:00:00Z', 'bpm' => 50],
-                    ['timestamp' => $day.'T01:00:00Z', 'bpm' => 70],
-                    ['timestamp' => $day.'T02:00:00Z', 'bpm' => 60],
+                    ['timestamp' => $day . 'T00:00:00Z', 'bpm' => 50],
+                    ['timestamp' => $day . 'T01:00:00Z', 'bpm' => 70],
+                    ['timestamp' => $day . 'T02:00:00Z', 'bpm' => 60],
                 ],
             ], 200),
         ]);
 
-        (new OuraPlugin())->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration);
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('had_heart_rate', $event->action);
@@ -227,7 +243,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($event->blocks->where('title', 'Max Heart Rate')->first());
     }
 
-    public function test_oura_fetch_workouts_creates_event_seconds_and_blocks(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_workouts_creates_event_seconds_and_blocks(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -260,7 +279,7 @@ class OuraIntegrationTest extends TestCase
             ], 200),
         ]);
 
-        (new OuraPlugin())->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration);
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('did_workout', $event->action);
@@ -269,7 +288,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($event->blocks->where('title', 'Average Heart Rate')->first());
     }
 
-    public function test_oura_fetch_sessions_creates_event_seconds_and_mindfulness_concept(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_sessions_creates_event_seconds_and_mindfulness_concept(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -300,7 +322,7 @@ class OuraIntegrationTest extends TestCase
             ], 200),
         ]);
 
-        (new OuraPlugin())->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration);
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('health', $event->domain);
@@ -308,7 +330,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertEquals('seconds', $event->value_unit);
     }
 
-    public function test_oura_fetch_tags_creates_event_and_tag_block(): void
+    /**
+     * @test
+     */
+    public function oura_fetch_tags_creates_event_and_tag_block(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -336,7 +361,7 @@ class OuraIntegrationTest extends TestCase
             ], 200),
         ]);
 
-        (new OuraPlugin())->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration);
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('health', $event->domain);
@@ -345,7 +370,10 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($event->blocks->where('title', 'Tag')->first());
     }
 
-    public function test_oura_daily_readiness_resilience_stress_spo2_actions(): void
+    /**
+     * @test
+     */
+    public function oura_daily_readiness_resilience_stress_spo2_actions(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -373,7 +401,7 @@ class OuraIntegrationTest extends TestCase
             'instance_type' => 'readiness',
             'configuration' => ['days_back' => 1],
         ]);
-        (new OuraPlugin())->fetchData($readiness);
+        (new OuraPlugin)->fetchData($readiness);
         $this->assertEquals('had_readiness_score', Event::where('integration_id', $readiness->id)->first()->action);
 
         // Resilience
@@ -384,7 +412,7 @@ class OuraIntegrationTest extends TestCase
             'instance_type' => 'resilience',
             'configuration' => ['days_back' => 1],
         ]);
-        (new OuraPlugin())->fetchData($resilience);
+        (new OuraPlugin)->fetchData($resilience);
         $this->assertEquals('had_resilience_score', Event::where('integration_id', $resilience->id)->first()->action);
 
         // Stress
@@ -395,7 +423,7 @@ class OuraIntegrationTest extends TestCase
             'instance_type' => 'stress',
             'configuration' => ['days_back' => 1],
         ]);
-        (new OuraPlugin())->fetchData($stress);
+        (new OuraPlugin)->fetchData($stress);
         $this->assertEquals('had_stress_score', Event::where('integration_id', $stress->id)->first()->action);
 
         // SpO2
@@ -406,9 +434,7 @@ class OuraIntegrationTest extends TestCase
             'instance_type' => 'spo2',
             'configuration' => ['days_back' => 1],
         ]);
-        (new OuraPlugin())->fetchData($spo2);
+        (new OuraPlugin)->fetchData($spo2);
         $this->assertEquals('had_spo2', Event::where('integration_id', $spo2->id)->first()->action);
     }
 }
-
-
