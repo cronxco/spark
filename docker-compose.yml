@@ -69,7 +69,7 @@ services:
             retries: 3
             timeout: 5s
     redis:
-        image: "redis:alpine@sha256:7521abdff715d396aa482183942f3fe643344287c29ccb66eee16ac08a92190f"
+        image: "redis:alpine@sha256:987c376c727652f99625c7d205a1cba3cb2c53b92b0b62aade2bd48ee1593232"
         ports:
             - "${FORWARD_REDIS_PORT:-6379}:6379"
         volumes:
