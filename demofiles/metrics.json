@@ -1,0 +1,405 @@
+{
+  "metrics": [
+    {
+      "name": "walking_heart_rate_average",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 135.5
+        },
+        {
+          "qty": 129,
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ],
+      "units": "count/min"
+    },
+    {
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 36.72
+        }
+      ],
+      "name": "vo2_max",
+      "units": "ml/(kg·min)"
+    },
+    {
+      "name": "time_in_daylight",
+      "units": "min",
+      "data": [
+        {
+          "qty": 29,
+          "source": "Will’s Apple Watch",
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "source": "Will’s Apple Watch",
+          "qty": 4
+        }
+      ]
+    },
+    {
+      "units": "km",
+      "data": [
+        {
+          "qty": 5.484679297695868,
+          "source": "Will’s Apple Watch|iPhone",
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "source": "Will’s Apple Watch|iPhone",
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 0.5655471841150429
+        }
+      ],
+      "name": "walking_running_distance"
+    },
+    {
+      "units": "m/s",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 0.26025699973106386
+        }
+      ],
+      "name": "stair_speed_up"
+    },
+    {
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 500
+        }
+      ],
+      "name": "six_minute_walking_test_distance",
+      "units": "m"
+    },
+    {
+      "units": "m/s",
+      "name": "stair_speed_down",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 0.4312867522239685
+        },
+        {
+          "qty": 0.3460769057273865,
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ]
+    },
+    {
+      "units": "%",
+      "name": "walking_asymmetry_percentage",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 0.10526315789473684
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 0
+        }
+      ]
+    },
+    {
+      "units": "count/min",
+      "data": [
+        {
+          "qty": 79,
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "qty": 79,
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ],
+      "name": "resting_heart_rate"
+    },
+    {
+      "units": "count",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 8990,
+          "source": "Will’s Apple Watch|iPhone|Oura"
+        },
+        {
+          "qty": 747,
+          "date": "2025-08-13 00:00:00 +0100",
+          "source": "Will’s Apple Watch|iPhone|Oura"
+        }
+      ],
+      "name": "step_count"
+    },
+    {
+      "name": "walking_speed",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 5.02904347826087
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 5.472
+        }
+      ],
+      "units": "km/hr"
+    },
+    {
+      "units": "cm",
+      "name": "walking_step_length",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 73.56521739130434
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 74
+        }
+      ]
+    },
+    {
+      "name": "walking_double_support_percentage",
+      "units": "%",
+      "data": [
+        {
+          "qty": 27.156521739130437,
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "qty": 26.166666666666668,
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ]
+    },
+    {
+      "units": "kcal",
+      "data": [
+        {
+          "qty": 1745.0043153641825,
+          "source": "Will’s Apple Watch",
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 567.7346846357595,
+          "source": "Will’s Apple Watch"
+        }
+      ],
+      "name": "basal_energy_burned"
+    },
+    {
+      "units": "count",
+      "name": "flights_climbed",
+      "data": [
+        {
+          "source": "Will’s Apple Watch|iPhone",
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 5
+        }
+      ]
+    },
+    {
+      "units": "count/min",
+      "data": [
+        {
+          "Min": 59,
+          "date": "2025-08-12 00:00:00 +0100",
+          "source": "Will’s Apple Watch|Oura",
+          "Max": 180,
+          "Avg": 90.50026665345655
+        },
+        {
+          "source": "Will’s Apple Watch|Oura",
+          "Max": 138,
+          "date": "2025-08-13 00:00:00 +0100",
+          "Min": 55,
+          "Avg": 76.00876070790811
+        }
+      ],
+      "name": "heart_rate"
+    },
+    {
+      "units": "count",
+      "data": [
+        {
+          "qty": 7,
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 1
+        }
+      ],
+      "name": "apple_stand_hour"
+    },
+    {
+      "units": "min",
+      "name": "apple_stand_time",
+      "data": [
+        {
+          "qty": 73,
+          "source": "Will’s Apple Watch|iPhone",
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 9,
+          "source": "Will’s Apple Watch|iPhone"
+        }
+      ]
+    },
+    {
+      "name": "apple_exercise_time",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "source": "Will’s Apple Watch|iPhone",
+          "qty": 117
+        },
+        {
+          "qty": 5,
+          "source": "Will’s Apple Watch|iPhone",
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ],
+      "units": "min"
+    },
+    {
+      "units": "count/min",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 31.025204527016776
+        }
+      ],
+      "name": "cardio_recovery"
+    },
+    {
+      "name": "heart_rate_variability",
+      "units": "ms",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 61.25363147708836
+        },
+        {
+          "qty": 49.16207671842074,
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ]
+    },
+    {
+      "data": [
+        {
+          "date": "2025-08-11 00:00:00 +0100",
+          "qty": 35.275169372558594
+        },
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 34.631996154785156
+        }
+      ],
+      "name": "apple_sleeping_wrist_temperature",
+      "units": "degC"
+    },
+    {
+      "units": "kcal",
+      "data": [
+        {
+          "qty": 753.3319999999859,
+          "date": "2025-08-12 00:00:00 +0100",
+          "source": "Will’s Apple Watch|Oura"
+        },
+        {
+          "source": "Will’s Apple Watch|Oura",
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 24.235000000000007
+        }
+      ],
+      "name": "active_energy"
+    },
+    {
+      "name": "blood_oxygen_saturation",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 97.0625
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 97.85714285714286
+        }
+      ],
+      "units": "%"
+    },
+    {
+      "name": "headphone_audio_exposure",
+      "units": "dBASPL",
+      "data": [
+        {
+          "qty": 55.31061475299801,
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 50.593485269563935
+        }
+      ]
+    },
+    {
+      "name": "respiratory_rate",
+      "data": [
+        {
+          "date": "2025-08-12 00:00:00 +0100",
+          "qty": 13.554545454545455
+        },
+        {
+          "qty": 13.240384615384615,
+          "date": "2025-08-13 00:00:00 +0100"
+        }
+      ],
+      "units": "count/min"
+    },
+    {
+      "data": [
+        {
+          "date": "2025-08-11 00:00:00 +0100",
+          "qty": 41.500415167153655
+        },
+        {
+          "qty": 49.7736281311892,
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 43.13487389245012
+        }
+      ],
+      "name": "environmental_audio_exposure",
+      "units": "dBASPL"
+    },
+    {
+      "data": [
+        {
+          "date": "2025-08-11 00:00:00 +0100",
+          "qty": 1
+        },
+        {
+          "qty": 3.8564220267698306,
+          "date": "2025-08-12 00:00:00 +0100"
+        },
+        {
+          "date": "2025-08-13 00:00:00 +0100",
+          "qty": 3.893181790005077
+        }
+      ],
+      "name": "physical_effort",
+      "units": "kcal/hr·kg"
+    }
+  ]
+}
