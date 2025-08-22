@@ -9456,16 +9456,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "11.5.30",
+            "version": "11.5.34",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "33fa3d10fed43f51bdd874965497a4925a123a53"
+                "reference": "3e4c6ef395f7cb61a6206c23e0e04b31724174f2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/33fa3d10fed43f51bdd874965497a4925a123a53",
-                "reference": "33fa3d10fed43f51bdd874965497a4925a123a53",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/3e4c6ef395f7cb61a6206c23e0e04b31724174f2",
+                "reference": "3e4c6ef395f7cb61a6206c23e0e04b31724174f2",
                 "shasum": ""
             },
             "require": {
@@ -9537,7 +9537,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/11.5.30"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/11.5.34"
             },
             "funding": [
                 {
@@ -9561,7 +9561,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-08-10T08:35:26+00:00"
+            "time": "2025-08-20T14:41:45+00:00"
         },
         {
             "name": "ryoluo/sail-ssl",
