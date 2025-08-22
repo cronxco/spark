@@ -1,0 +1,128 @@
+{
+  "workouts": [
+    {
+      "distance": {
+        "qty": 1.8251686498265018,
+        "units": "km"
+      },
+      "end": "2025-08-13 19:56:37 +0100",
+      "metadata": [],
+      "intensity": {
+        "qty": 4.335439755992295,
+        "units": "kcal/hr·kg"
+      },
+      "start": "2025-08-13 19:37:47 +0100",
+      "duration": 1130.0801928043365,
+      "name": "Outdoor Walk",
+      "activeEnergyBurned": {
+        "qty": 77.31842723339633,
+        "units": "kcal"
+      },
+      "id": "1F088C46-09AD-4259-A78F-6CBE9F90BD94",
+      "location": "Outdoor"
+    },
+    {
+      "metadata": [],
+      "start": "2025-08-13 12:12:00 +0100",
+      "name": "Walk",
+      "end": "2025-08-13 12:28:00 +0100",
+      "duration": 960,
+      "activeEnergyBurned": {
+        "units": "kcal",
+        "qty": 59.1571044921875
+      },
+      "id": "229809D3-057F-43B4-A5B5-81F383DE6E9E"
+    },
+    {
+      "id": "0A38C1F7-D607-4C37-87DE-C789C73E8B5E",
+      "distance": {
+        "units": "km",
+        "qty": 1.638549294765587
+      },
+      "duration": 1107.9819749593735,
+      "end": "2025-08-13 08:33:31 +0100",
+      "activeEnergyBurned": {
+        "qty": 129.88400000000024,
+        "units": "kcal"
+      },
+      "intensity": {
+        "qty": 6.817569770668788,
+        "units": "kcal/hr·kg"
+      },
+      "metadata": [],
+      "start": "2025-08-13 08:15:03 +0100",
+      "name": "Indoor Walk",
+      "location": "Indoor"
+    },
+    {
+      "duration": 2775.014256954193,
+      "id": "5F2ACB80-C0F0-4646-92C9-1779373709FB",
+      "activeEnergyBurned": {
+        "qty": 201.71899999999653,
+        "units": "kcal"
+      },
+      "metadata": [],
+      "name": "Mind & Body",
+      "end": "2025-08-12 22:45:13 +0100",
+      "start": "2025-08-12 21:58:58 +0100",
+      "intensity": {
+        "units": "kcal/hr·kg",
+        "qty": 1.626014091522546
+      }
+    },
+    {
+      "location": "Outdoor",
+      "metadata": [],
+      "distance": {
+        "qty": 1.8310834852153064,
+        "units": "km"
+      },
+      "end": "2025-08-12 17:32:35 +0100",
+      "duration": 1684.0192742347717,
+      "activeEnergyBurned": {
+        "qty": 102.93025719250981,
+        "units": "kcal"
+      },
+      "name": "Outdoor Walk",
+      "id": "5DA5FA50-BCF0-4C65-85C6-32F644EF877A",
+      "start": "2025-08-12 17:04:30 +0100",
+      "intensity": {
+        "units": "kcal/hr·kg",
+        "qty": 4.161462198340885
+      }
+    },
+    {
+      "activeEnergyBurned": {
+        "qty": 78.951416015625,
+        "units": "kcal"
+      },
+      "end": "2025-08-12 12:33:00 +0100",
+      "id": "5F7BDB8E-B02B-4158-B715-42D599BE8DEC",
+      "start": "2025-08-12 12:12:00 +0100",
+      "metadata": [],
+      "duration": 1260,
+      "name": "Walk"
+    },
+    {
+      "start": "2025-08-12 08:17:51 +0100",
+      "location": "Indoor",
+      "duration": 1143.2859460115433,
+      "end": "2025-08-12 08:36:54 +0100",
+      "name": "Indoor Walk",
+      "activeEnergyBurned": {
+        "units": "kcal",
+        "qty": 155.83100000000013
+      },
+      "id": "2B21B5D8-3982-4CAB-BE80-07708FC6C541",
+      "distance": {
+        "qty": 1.5827897063356358,
+        "units": "km"
+      },
+      "metadata": [],
+      "intensity": {
+        "qty": 7.719036938199091,
+        "units": "kcal/hr·kg"
+      }
+    }
+  ]
+}
