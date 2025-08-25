@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class FinancialPlugin extends ManualPlugin
@@ -236,6 +237,116 @@ class FinancialPlugin extends ManualPlugin
     }
 
     /**
+     * Update account metadata for any account type
+     */
+    public function updateAccountMetadata(EventObject $accountObject, array $metadata): bool
+    {
+        try {
+            $currentMetadata = $accountObject->metadata;
+            $updatedMetadata = array_merge($currentMetadata, $metadata);
+
+            $accountObject->update([
+                'metadata' => $updatedMetadata,
+            ]);
+
+            return true;
+        } catch (Exception $e) {
+            Log::error('Failed to update account metadata', [
+                'account_id' => $accountObject->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Get editable metadata fields for an account
+     */
+    public function getEditableMetadataFields(EventObject $accountObject): array
+    {
+        $service = $accountObject->metadata['service'] ?? 'financial';
+
+        // Base fields that can be edited for any account
+        $editableFields = [
+            'sort_code' => [
+                'type' => 'text',
+                'label' => 'Sort Code',
+                'description' => 'Sort code for UK bank accounts',
+                'required' => false,
+            ],
+            'interest_rate' => [
+                'type' => 'number',
+                'label' => 'Interest Rate (%)',
+                'description' => 'Annual interest rate',
+                'required' => false,
+                'step' => 0.01,
+                'min' => 0,
+                'max' => 100,
+            ],
+            'start_date' => [
+                'type' => 'date',
+                'label' => 'Start Date',
+                'description' => 'When you opened this account',
+                'required' => false,
+            ],
+        ];
+
+        // Add service-specific fields
+        if ($service === 'financial') {
+            $editableFields = array_merge($editableFields, [
+                'account_number' => [
+                    'type' => 'text',
+                    'label' => 'Account Number',
+                    'description' => 'Account number or identifier',
+                    'required' => false,
+                ],
+                'currency' => [
+                    'type' => 'select',
+                    'label' => 'Currency',
+                    'description' => 'The currency for this account',
+                    'options' => [
+                        'GBP' => 'British Pound (£)',
+                        'USD' => 'US Dollar ($)',
+                        'EUR' => 'Euro (€)',
+                    ],
+                    'required' => false,
+                ],
+            ]);
+        }
+
+        return $editableFields;
+    }
+
+    /**
+     * Get balance events for a specific account
+     */
+    public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
+    {
+        $service = $accountObject->metadata['service'] ?? 'financial';
+
+        return Event::where('actor_id', $accountObject->id)
+            ->where('service', $service)
+            ->where('action', 'had_balance')
+            ->orderBy('time', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get the latest balance for an account
+     */
+    public function getLatestBalance(EventObject $accountObject): ?Event
+    {
+        $service = $accountObject->metadata['service'] ?? 'financial';
+
+        return Event::where('actor_id', $accountObject->id)
+            ->where('service', $service)
+            ->where('action', 'had_balance')
+            ->latest('time')
+            ->first();
+    }
+
+    /**
      * Get Monzo accounts for a user
      */
     protected function getMonzoAccounts(User $user): \Illuminate\Database\Eloquent\Collection
@@ -245,7 +356,7 @@ class FinancialPlugin extends ManualPlugin
             ->get();
 
         $accounts = collect();
-        
+
         foreach ($monzoIntegrations as $integration) {
             try {
                 // Get existing Monzo account objects
@@ -253,7 +364,7 @@ class FinancialPlugin extends ManualPlugin
                     ->where('concept', 'account')
                     ->where('type', 'monzo_account')
                     ->get();
-                
+
                 foreach ($monzoAccountObjects as $accountObject) {
                     // Add Monzo-specific metadata
                     $accountObject->metadata = array_merge($accountObject->metadata, [
@@ -266,13 +377,13 @@ class FinancialPlugin extends ManualPlugin
                         'interest_rate' => null, // Monzo doesn't provide interest rates via API
                         'start_date' => $accountObject->metadata['monzo_created'] ?? null,
                     ]);
-                    
+
                     $accounts->push($accountObject);
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Log error but continue with other integrations
                 Log::warning('Failed to fetch Monzo accounts for integration ' . $integration->id, [
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -290,7 +401,7 @@ class FinancialPlugin extends ManualPlugin
             ->get();
 
         $accounts = collect();
-        
+
         foreach ($gocardlessIntegrations as $integration) {
             try {
                 // Get existing GoCardless account objects
@@ -298,7 +409,7 @@ class FinancialPlugin extends ManualPlugin
                     ->where('concept', 'account')
                     ->where('type', 'gocardless_account')
                     ->get();
-                
+
                 foreach ($gocardlessAccountObjects as $accountObject) {
                     // Add GoCardless-specific metadata
                     $accountObject->metadata = array_merge($accountObject->metadata, [
@@ -311,13 +422,13 @@ class FinancialPlugin extends ManualPlugin
                         'interest_rate' => null, // GoCardless doesn't provide interest rates
                         'start_date' => $accountObject->metadata['gocardless_created'] ?? null,
                     ]);
-                    
+
                     $accounts->push($accountObject);
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Log error but continue with other integrations
                 Log::warning('Failed to fetch GoCardless accounts for integration ' . $integration->id, [
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -349,114 +460,5 @@ class FinancialPlugin extends ManualPlugin
             'credit' => 'credit_card',
             default => 'other',
         };
-    }
-
-    /**
-     * Update account metadata for any account type
-     */
-    public function updateAccountMetadata(EventObject $accountObject, array $metadata): bool
-    {
-        try {
-            $currentMetadata = $accountObject->metadata;
-            $updatedMetadata = array_merge($currentMetadata, $metadata);
-            
-            $accountObject->update([
-                'metadata' => $updatedMetadata,
-            ]);
-            
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Failed to update account metadata', [
-                'account_id' => $accountObject->id,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
-
-    /**
-     * Get editable metadata fields for an account
-     */
-    public function getEditableMetadataFields(EventObject $accountObject): array
-    {
-        $service = $accountObject->metadata['service'] ?? 'financial';
-        
-        // Base fields that can be edited for any account
-        $editableFields = [
-            'sort_code' => [
-                'type' => 'text',
-                'label' => 'Sort Code',
-                'description' => 'Sort code for UK bank accounts',
-                'required' => false,
-            ],
-            'interest_rate' => [
-                'type' => 'number',
-                'label' => 'Interest Rate (%)',
-                'description' => 'Annual interest rate',
-                'required' => false,
-                'step' => 0.01,
-                'min' => 0,
-                'max' => 100,
-            ],
-            'start_date' => [
-                'type' => 'date',
-                'label' => 'Start Date',
-                'description' => 'When you opened this account',
-                'required' => false,
-            ],
-        ];
-        
-        // Add service-specific fields
-        if ($service === 'financial') {
-            $editableFields = array_merge($editableFields, [
-                'account_number' => [
-                    'type' => 'text',
-                    'label' => 'Account Number',
-                    'description' => 'Account number or identifier',
-                    'required' => false,
-                ],
-                'currency' => [
-                    'type' => 'select',
-                    'label' => 'Currency',
-                    'description' => 'The currency for this account',
-                    'options' => [
-                        'GBP' => 'British Pound (£)',
-                        'USD' => 'US Dollar ($)',
-                        'EUR' => 'Euro (€)',
-                    ],
-                    'required' => false,
-                ],
-            ]);
-        }
-        
-        return $editableFields;
-    }
-
-    /**
-     * Get balance events for a specific account
-     */
-    public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
-    {
-        $service = $accountObject->metadata['service'] ?? 'financial';
-        
-        return Event::where('actor_id', $accountObject->id)
-            ->where('service', $service)
-            ->where('action', 'had_balance')
-            ->orderBy('time', 'desc')
-            ->get();
-    }
-
-    /**
-     * Get the latest balance for an account
-     */
-    public function getLatestBalance(EventObject $accountObject): ?Event
-    {
-        $service = $accountObject->metadata['service'] ?? 'financial';
-        
-        return Event::where('actor_id', $accountObject->id)
-            ->where('service', $service)
-            ->where('action', 'had_balance')
-            ->latest('time')
-            ->first();
     }
 }

@@ -25,7 +25,7 @@ class EditFinancialAccount extends Component
 
         $this->account = $account;
         $this->metadata = $account->metadata;
-        
+
         $plugin = new FinancialPlugin;
         $this->editableFields = $plugin->getEditableMetadataFields($account);
     }
