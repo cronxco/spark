@@ -83,10 +83,6 @@ class FetchIntegrationPage implements ShouldQueue
 
             return;
         }
-        if ($service === 'gocardless') {
-            $this->fetchGoCardless();
-            return;
-        }
     }
 
     protected function fetchOura(): void
@@ -400,84 +396,6 @@ class FetchIntegrationPage implements ShouldQueue
         $this->batch()?->add([
             (new FetchIntegrationPage($this->integration, $nextContext))->onConnection('redis')->onQueue('migration'),
         ]);
-    }
-
-    protected function fetchGoCardless(): void
-    {
-        $type = $this->context['instance_type'] ?? 'transactions';
-        $group = $this->integration->group;
-        if (!$group || empty($group->account_id)) {
-            return;
-        }
-
-        // For balances: record a last-date marker like Monzo's balances path
-        if ($type === 'balances') {
-            $cursor = $this->context['cursor'] ?? ['end_date' => now()->toDateString()];
-            $endDate = \Carbon\Carbon::parse($cursor['end_date']);
-            \Illuminate\Support\Facades\Cache::put($this->gcCacheKey('balances_last_date'), $endDate->toDateString(), now()->addHours(6));
-            return;
-        }
-
-        // For transactions: backfill in windows; probe for data existence by checking one account
-        $cursor = $this->context['cursor'] ?? [];
-        $endIso = isset($cursor['end_iso']) ? \Carbon\Carbon::parse($cursor['end_iso']) : now();
-        $windowDays = (int) ($cursor['window_days'] ?? 89);
-        $startIso = $endIso->copy()->subDays($windowDays)->startOfDay();
-
-        $nextContext = $this->context;
-        $nextContext['cursor']['end_iso'] = $startIso->copy()->subMicrosecond()->toIso8601String();
-
-        $hasData = false;
-        try {
-            $secretId = (string) (config('services.gocardless.secret_id'));
-            $secretKey = (string) (config('services.gocardless.secret_key'));
-            $client = new \Nordigen\NordigenPHP\API\NordigenClient($secretId, $secretKey);
-            $client->createAccessToken();
-            $all = $client->requisition->getRequisitions();
-            $accountIds = [];
-            foreach ((array) ($all['results'] ?? []) as $req) {
-                if (($req['id'] ?? null) === (string) $group->account_id) {
-                    $accountIds = (array) ($req['accounts'] ?? []);
-                    break;
-                }
-            }
-            foreach ($accountIds as $accountId) {
-                $account = $client->account($accountId);
-                // If any booked transaction exists within window, mark hasData
-                $tx = $account->getAccountTransactions($startIso->toDateString());
-                $booked = (array) ($tx['transactions']['booked'] ?? []);
-                if (!empty($booked)) {
-                    $hasData = true;
-                    break;
-                }
-            }
-        } catch (\Throwable $e) {
-            // On failure probing, do not schedule further windows
-            return;
-        }
-
-        if (!$hasData) {
-            return;
-        }
-
-        $window = [
-            'since' => $startIso->toIso8601String(),
-            'before' => $endIso->toIso8601String(),
-        ];
-        $key = $this->gcCacheKey('tx_windows');
-        $windows = (array) (\Illuminate\Support\Facades\Cache::get($key) ?? []);
-        $windows[] = $window;
-        \Illuminate\Support\Facades\Cache::put($key, $windows, now()->addHours(6));
-        \Illuminate\Support\Facades\Cache::put($this->gcCacheKey('fetched_back_to'), $startIso->toDateString(), now()->addHours(6));
-
-        $this->batch()?->add([
-            (new FetchIntegrationPage($this->integration, $nextContext))->onConnection('redis')->onQueue('migration'),
-        ]);
-    }
-
-    private function gcCacheKey(string $suffix): string
-    {
-        return 'gocardless:migration:' . $this->integration->id . ':' . $suffix;
     }
 
     private function cacheKey(string $suffix): string

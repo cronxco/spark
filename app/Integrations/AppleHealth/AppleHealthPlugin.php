@@ -33,7 +33,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'default' => 0,
                 'min' => 0,
                 'max' => 1440,
-                'description' => 'Webhook-driven; frequency not used. Leave 0.'
+                'description' => 'Webhook-driven; frequency not used. Leave 0.',
             ],
         ];
     }
@@ -65,31 +65,29 @@ class AppleHealthPlugin extends WebhookPlugin
 
     public function convertData(array $externalData, Integration $integration): array
     {
-        $instanceType = (string) ($integration->instance_type ?? 'workouts');
         $events = [];
 
-        // Accept either a top-level {workouts:[...]} or {metrics:[...]} payload
-        if ($instanceType === 'workouts') {
-            $workouts = is_array($externalData['workouts'] ?? null) ? $externalData['workouts'] : [];
-            foreach ($workouts as $workout) {
-                if (!is_array($workout)) {
+        // Process workouts data if present in payload
+        if (isset($externalData['workouts']) && is_array($externalData['workouts'])) {
+            foreach ($externalData['workouts'] as $workout) {
+                if (! is_array($workout)) {
                     continue;
                 }
                 $events[] = $this->mapWorkoutToEvent($workout, $integration);
             }
         }
 
-        if ($instanceType === 'metrics') {
-            $metrics = is_array($externalData['metrics'] ?? null) ? $externalData['metrics'] : [];
-            foreach ($metrics as $metricEntry) {
-                if (!is_array($metricEntry)) {
+        // Process metrics data if present in payload
+        if (isset($externalData['metrics']) && is_array($externalData['metrics'])) {
+            foreach ($externalData['metrics'] as $metricEntry) {
+                if (! is_array($metricEntry)) {
                     continue;
                 }
                 $name = (string) ($metricEntry['name'] ?? 'unknown_metric');
                 $unit = $metricEntry['units'] ?? null;
                 $dataPoints = is_array($metricEntry['data'] ?? null) ? $metricEntry['data'] : [];
                 foreach ($dataPoints as $point) {
-                    if (!is_array($point)) {
+                    if (! is_array($point)) {
                         continue;
                     }
                     $events[] = $this->mapMetricPointToEvent($name, $unit, $point, $integration);
@@ -154,7 +152,7 @@ class AppleHealthPlugin extends WebhookPlugin
         if ($location) {
             $summaryLines[] = "Location: {$location}";
         }
-        if (!empty($summaryLines)) {
+        if (! empty($summaryLines)) {
             $blocks[] = [
                 'time' => $start,
                 'title' => 'Summary',
@@ -314,16 +312,16 @@ class AppleHealthPlugin extends WebhookPlugin
             return [null, null];
         }
         $float = (float) $raw;
-        if (!is_finite($float)) {
+        if (! is_finite($float)) {
             return [null, null];
         }
         if (fmod($float, 1.0) !== 0.0) {
             $multiplier = 1000;
             $intValue = (int) round($float * $multiplier);
+
             return [$intValue, $multiplier];
         }
+
         return [(int) $float, $defaultMultiplier];
     }
 }
-
-

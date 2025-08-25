@@ -4,8 +4,8 @@ namespace Database\Factories;
 
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class EventFactory extends Factory
 {
@@ -14,9 +14,9 @@ class EventFactory extends Factory
     public function definition(): array
     {
         // Create actor and target objects with the same integration
-        $integration = \App\Models\Integration::factory()->create();
-        $actor = EventObject::factory()->create(['user_id' => $integration->user_id]);
-        $target = EventObject::factory()->create(['user_id' => $integration->user_id]);
+        $integration = Integration::factory()->create();
+        $actor = EventObject::factory()->create(['integration_id' => $integration->id]);
+        $target = EventObject::factory()->create(['integration_id' => $integration->id]);
 
         return [
             'id' => $this->faker->uuid(),
@@ -39,4 +39,4 @@ class EventFactory extends Factory
             'updated_at' => now(),
         ];
     }
-} 
+}
