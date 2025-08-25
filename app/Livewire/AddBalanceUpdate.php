@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\FinancialAccount;
-use App\Models\FinancialBalance;
+use App\Integrations\Financial\FinancialPlugin;
+use App\Models\EventObject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -16,7 +16,7 @@ class AddBalanceUpdate extends Component
     public ?string $notes = null;
 
     protected $rules = [
-        'accountId' => 'required|string|exists:financial_accounts,id',
+        'accountId' => 'required|string|exists:objects,id',
         'balance' => 'required|numeric',
         'date' => 'required|date',
         'notes' => 'nullable|string|max:1000',
@@ -32,18 +32,27 @@ class AddBalanceUpdate extends Component
         $this->validate();
 
         // Check if user owns the account
-        $account = FinancialAccount::where('id', $this->accountId)
+        $account = EventObject::where('id', $this->accountId)
             ->where('user_id', Auth::id())
+            ->where('concept', 'account')
+            ->where('type', 'financial_account')
             ->firstOrFail();
 
-        // Create the balance update
-        FinancialBalance::create([
-            'user_id' => Auth::id(),
-            'financial_account_id' => $this->accountId,
+        // Get the integration for this account
+        $integration = $account->integration;
+        if (!$integration) {
+            abort(404, 'Integration not found');
+        }
+
+        // Create the balance update event using the plugin
+        $plugin = new FinancialPlugin();
+        $balanceData = [
             'balance' => $this->balance,
             'date' => $this->date,
             'notes' => $this->notes,
-        ]);
+        ];
+
+        $plugin->createBalanceEvent($integration, $account, $balanceData);
 
         $this->dispatch('balance-updated');
         $this->reset(['balance', 'notes']);
@@ -52,9 +61,8 @@ class AddBalanceUpdate extends Component
 
     public function render(): View
     {
-        $accounts = FinancialAccount::where('user_id', Auth::id())
-            ->orderBy('name')
-            ->get();
+        $plugin = new FinancialPlugin();
+        $accounts = $plugin->getFinancialAccounts(Auth::user());
 
         return view('livewire.add-balance-update', [
             'accounts' => $accounts,

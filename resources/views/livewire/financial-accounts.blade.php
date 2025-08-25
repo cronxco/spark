@@ -93,15 +93,51 @@
                             </thead>
                             <tbody>
                                 @foreach($accounts as $account)
+                                    @php
+                                        $metadata = $account->metadata;
+                                        $accountType = $metadata['account_type'] ?? '';
+                                        $provider = $metadata['provider'] ?? '';
+                                        $accountNumber = $metadata['account_number'] ?? null;
+                                        $sortCode = $metadata['sort_code'] ?? null;
+                                        $currency = $metadata['currency'] ?? 'GBP';
+                                        $interestRate = $metadata['interest_rate'] ?? null;
+                                        $startDate = $metadata['start_date'] ?? null;
+                                        
+                                        // Get account type label
+                                        $accountTypeLabels = [
+                                            'current_account' => 'Current Account',
+                                            'savings_account' => 'Savings Account',
+                                            'mortgage' => 'Mortgage',
+                                            'investment_account' => 'Investment Account',
+                                            'credit_card' => 'Credit Card',
+                                            'loan' => 'Loan',
+                                            'pension' => 'Pension',
+                                            'other' => 'Other',
+                                        ];
+                                        $accountTypeLabel = $accountTypeLabels[$accountType] ?? $accountType;
+                                        
+                                        // Get currency symbol
+                                        $currencySymbols = [
+                                            'GBP' => '£',
+                                            'USD' => '$',
+                                            'EUR' => '€',
+                                        ];
+                                        $currencySymbol = $currencySymbols[$currency] ?? $currency;
+                                        
+                                        // Get current balance from latest event
+                                        $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                        $latestBalance = $plugin->getLatestBalance($account);
+                                        $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? null : null;
+                                    @endphp
                                     <tr>
                                         <td>
                                             <div>
-                                                <div class="font-medium">{{ $account->name }}</div>
-                                                @if($account->account_number)
+                                                <div class="font-medium">{{ $metadata['name'] ?? 'Unnamed Account' }}</div>
+                                                @if($accountNumber)
                                                     <div class="text-sm text-base-content/70">
-                                                        {{ $account->account_number }}
-                                                        @if($account->sort_code)
-                                                            ({{ $account->sort_code }})
+                                                        {{ $accountNumber }}
+                                                        @if($sortCode)
+                                                            ({{ $sortCode }})
                                                         @endif
                                                     </div>
                                                 @endif
@@ -109,24 +145,24 @@
                                         </td>
                                         <td>
                                             <span class="badge badge-outline">
-                                                {{ $account->account_type_label }}
+                                                {{ $accountTypeLabel }}
                                             </span>
                                         </td>
-                                        <td>{{ $account->provider }}</td>
+                                        <td>{{ $provider }}</td>
                                         <td>
-                                            @if($account->current_balance !== null)
+                                            @if($currentBalance !== null)
                                                 <span class="font-mono font-medium">
-                                                    {{ $account->formatted_current_balance }}
+                                                    {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
                                                 </span>
                                             @else
                                                 <span class="text-base-content/50">No balance</span>
                                             @endif
                                         </td>
-                                        <td>{{ $account->currency }}</td>
+                                        <td>{{ $currency }}</td>
                                         <td>
-                                            @if($account->interest_rate)
+                                            @if($interestRate)
                                                 <span class="text-success font-medium">
-                                                    {{ $account->formatted_interest_rate }}
+                                                    {{ number_format($interestRate, 2) }}%
                                                 </span>
                                             @else
                                                 <span class="text-base-content/50">-</span>

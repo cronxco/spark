@@ -2,8 +2,9 @@
 
 namespace App\Livewire;
 
-use App\Models\FinancialAccount;
-use App\Models\Integration;
+use App\Integrations\Financial\FinancialPlugin;
+use App\Models\Event;
+use App\Models\EventObject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
@@ -46,52 +47,69 @@ class FinancialAccounts extends Component
         $this->resetPage();
     }
 
-    public function deleteAccount(FinancialAccount $account): void
+    public function deleteAccount(EventObject $account): void
     {
         if ($account->user_id !== Auth::id()) {
             abort(403);
         }
 
+        // Delete all related balance events first
+        Event::where('actor_id', $account->id)
+            ->where('service', 'financial')
+            ->delete();
+
+        // Delete the account object
         $account->delete();
+        
         $this->dispatch('account-deleted');
     }
 
     public function render(): View
     {
-        $query = FinancialAccount::where('user_id', Auth::id())
-            ->with(['integration', 'latestBalance']);
+        $plugin = new FinancialPlugin();
+        
+        $query = $plugin->getFinancialAccounts(Auth::user());
 
+        // Apply filters
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'ilike', '%' . $this->search . '%')
-                    ->orWhere('provider', 'ilike', '%' . $this->search . '%')
-                    ->orWhere('account_number', 'ilike', '%' . $this->search . '%');
+            $query = $query->filter(function ($account) {
+                $metadata = $account->metadata;
+                return str_contains(strtolower($metadata['name'] ?? ''), strtolower($this->search)) ||
+                       str_contains(strtolower($metadata['provider'] ?? ''), strtolower($this->search)) ||
+                       str_contains(strtolower($metadata['account_number'] ?? ''), strtolower($this->search));
             });
         }
 
         if ($this->accountTypeFilter) {
-            $query->where('account_type', $this->accountTypeFilter);
+            $query = $query->filter(function ($account) {
+                return ($account->metadata['account_type'] ?? '') === $this->accountTypeFilter;
+            });
         }
 
         if ($this->providerFilter) {
-            $query->where('provider', $this->providerFilter);
+            $query = $query->filter(function ($account) {
+                return ($account->metadata['provider'] ?? '') === $this->providerFilter;
+            });
         }
 
-        $accounts = $query->orderBy('name')
-            ->paginate(10);
-
-        $accountTypes = FinancialAccount::where('user_id', Auth::id())
-            ->distinct()
-            ->pluck('account_type')
+        // Get unique account types and providers for filters
+        $allAccounts = $plugin->getFinancialAccounts(Auth::user());
+        
+        $accountTypes = $allAccounts->pluck('metadata.account_type')
+            ->filter()
+            ->unique()
             ->mapWithKeys(function ($type) {
                 return [$type => $this->getAccountTypeLabel($type)];
             })
             ->sort();
 
-        $providers = FinancialAccount::where('user_id', Auth::id())
-            ->distinct()
-            ->pluck('provider')
+        $providers = $allAccounts->pluck('metadata.provider')
+            ->filter()
+            ->unique()
             ->sort();
+
+        // Paginate the filtered results
+        $accounts = $query->forPage($this->page, 10);
 
         return view('livewire.financial-accounts', [
             'accounts' => $accounts,

@@ -3,7 +3,7 @@
 namespace App\Livewire;
 
 use App\Integrations\Financial\FinancialPlugin;
-use App\Models\FinancialAccount;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Illuminate\Contracts\View\View;
@@ -69,10 +69,9 @@ class CreateFinancialAccount extends Component
             ],
         ]);
 
-        // Create the financial account
-        FinancialAccount::create([
-            'user_id' => Auth::id(),
-            'integration_id' => $integration->id,
+        // Create the financial account object using the plugin
+        $plugin = new FinancialPlugin();
+        $accountData = [
             'name' => $this->name,
             'account_type' => $this->accountType,
             'provider' => $this->provider,
@@ -81,7 +80,9 @@ class CreateFinancialAccount extends Component
             'currency' => $this->currency,
             'interest_rate' => $this->interestRate,
             'start_date' => $this->startDate,
-        ]);
+        ];
+
+        $plugin->upsertAccountObject($integration, $accountData);
 
         $this->dispatch('account-created');
         $this->reset();

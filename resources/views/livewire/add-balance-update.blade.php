@@ -19,8 +19,27 @@
                             <select wire:model="accountId" class="select select-bordered w-full @error('accountId') select-error @enderror">
                                 <option value="">Select an account</option>
                                 @foreach($accounts as $account)
+                                    @php
+                                        $metadata = $account->metadata;
+                                        $name = $metadata['name'] ?? 'Unnamed Account';
+                                        $provider = $metadata['provider'] ?? '';
+                                        $currency = $metadata['currency'] ?? 'GBP';
+                                        
+                                        // Get currency symbol
+                                        $currencySymbols = [
+                                            'GBP' => '£',
+                                            'USD' => '$',
+                                            'EUR' => '€',
+                                        ];
+                                        $currencySymbol = $currencySymbols[$currency] ?? $currency;
+                                        
+                                        // Get current balance from latest event
+                                        $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                        $latestBalance = $plugin->getLatestBalance($account);
+                                        $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? 0 : 0;
+                                    @endphp
                                     <option value="{{ $account->id }}">
-                                        {{ $account->name }} - {{ $account->provider }} ({{ $account->currency_symbol }}{{ number_format($account->current_balance ?? 0, 2) }})
+                                        {{ $name }} - {{ $provider }} ({{ $currencySymbol }}{{ number_format($currentBalance, 2) }})
                                     </option>
                                 @endforeach
                             </select>

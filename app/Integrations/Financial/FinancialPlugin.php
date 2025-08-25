@@ -3,6 +3,12 @@
 namespace App\Integrations\Financial;
 
 use App\Integrations\Base\ManualPlugin;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Models\User;
+use Illuminate\Http\Request;
 
 class FinancialPlugin extends ManualPlugin
 {
@@ -120,5 +126,118 @@ class FinancialPlugin extends ManualPlugin
                 ],
             ],
         ];
+    }
+
+    /**
+     * Create or update a financial account object
+     */
+    public function upsertAccountObject(Integration $integration, array $accountData): EventObject
+    {
+        $title = $accountData['name'] ?? 'Financial Account';
+        
+        return EventObject::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'concept' => 'account',
+                'type' => 'financial_account',
+                'title' => $title,
+            ],
+            [
+                'time' => now(),
+                'content' => null,
+                'metadata' => [
+                    'name' => $accountData['name'],
+                    'account_type' => $accountData['account_type'],
+                    'provider' => $accountData['provider'],
+                    'account_number' => $accountData['account_number'] ?? null,
+                    'sort_code' => $accountData['sort_code'] ?? null,
+                    'currency' => $accountData['currency'] ?? 'GBP',
+                    'interest_rate' => $accountData['interest_rate'] ?? null,
+                    'start_date' => $accountData['start_date'] ?? null,
+                    'raw' => $accountData,
+                ],
+            ]
+        );
+    }
+
+    /**
+     * Create a balance update event
+     */
+    public function createBalanceEvent(Integration $integration, EventObject $accountObject, array $balanceData): Event
+    {
+        $date = $balanceData['date'] ?? now()->toDateString();
+        $balance = (float) ($balanceData['balance'] ?? 0);
+        
+        // Create or update the target "day" object
+        $dayObject = EventObject::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $date,
+            ],
+            [
+                'time' => $date . ' 00:00:00',
+                'content' => null,
+                'metadata' => ['date' => $date],
+            ]
+        );
+
+        return Event::create([
+            'integration_id' => $integration->id,
+            'source_id' => 'financial_balance_' . $accountObject->id . '_' . $date,
+            'time' => $date . ' 23:59:59',
+            'actor_id' => $accountObject->id,
+            'service' => 'financial',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value' => abs($balance),
+            'value_multiplier' => 1,
+            'value_unit' => $accountObject->metadata['currency'] ?? 'GBP',
+            'event_metadata' => [
+                'balance' => $balance,
+                'notes' => $balanceData['notes'] ?? null,
+                'account_name' => $accountObject->metadata['name'],
+                'account_type' => $accountObject->metadata['account_type'],
+                'provider' => $accountObject->metadata['provider'],
+            ],
+            'target_id' => $dayObject->id,
+        ]);
+    }
+
+    /**
+     * Get all financial accounts for a user
+     */
+    public function getFinancialAccounts(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        return EventObject::where('user_id', $user->id)
+            ->where('concept', 'account')
+            ->where('type', 'financial_account')
+            ->orderBy('title')
+            ->get();
+    }
+
+    /**
+     * Get balance events for a specific account
+     */
+    public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
+    {
+        return Event::where('actor_id', $accountObject->id)
+            ->where('service', 'financial')
+            ->where('action', 'had_balance')
+            ->orderBy('time', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get the latest balance for an account
+     */
+    public function getLatestBalance(EventObject $accountObject): ?Event
+    {
+        return Event::where('actor_id', $accountObject->id)
+            ->where('service', 'financial')
+            ->where('action', 'had_balance')
+            ->latest('time')
+            ->first();
     }
 }
