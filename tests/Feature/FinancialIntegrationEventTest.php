@@ -132,6 +132,10 @@ class FinancialIntegrationEventTest extends TestCase
             'provider' => 'Bank B',
         ]);
 
+        // Refresh the objects to ensure user_id is set
+        $account1->refresh();
+        $account2->refresh();
+
         $accounts = $plugin->getFinancialAccounts($user);
 
         $this->assertCount(2, $accounts);
