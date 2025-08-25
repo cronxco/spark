@@ -177,8 +177,15 @@ class FinancialIntegrationEventTest extends TestCase
         $balanceEvents = $plugin->getBalanceEvents($accountObject);
 
         $this->assertCount(2, $balanceEvents);
-        $this->assertTrue($balanceEvents->contains($event1));
-        $this->assertTrue($balanceEvents->contains($event2));
+        
+        // Check that both events are in the collection by ID
+        $eventIds = $balanceEvents->pluck('id')->toArray();
+        $this->assertContains((string) $event1->id, $eventIds);
+        $this->assertContains((string) $event2->id, $eventIds);
+        
+        // Verify the events are ordered by time descending (most recent first)
+        $this->assertEquals((string) $event2->id, (string) $balanceEvents->first()->id);
+        $this->assertEquals((string) $event1->id, (string) $balanceEvents->last()->id);
     }
 
     /**
