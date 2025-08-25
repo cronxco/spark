@@ -96,8 +96,6 @@ new class extends Component {
         return $types[$type] ?? ucfirst($type);
     }
 
-
-
     public function formatBalance(float $balance, string $currency): string
     {
         $symbols = [

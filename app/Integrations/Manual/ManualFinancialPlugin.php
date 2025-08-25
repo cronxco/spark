@@ -127,10 +127,6 @@ class ManualFinancialPlugin extends ManualPlugin
         ];
     }
 
-
-
-
-
     public function fetchData(Integration $integration): void
     {
         // Manual integrations don't fetch data automatically
