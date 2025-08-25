@@ -194,12 +194,33 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="mt-6">
-                        {{ $accounts->links() }}
-                    </div>
+                    @if($pagination['hasPages'])
+                        <div class="mt-6">
+                            <div class="flex items-center justify-between">
+                                <div class="text-sm text-base-content/70">
+                                    Showing {{ $pagination['offset'] + 1 }} to {{ min($pagination['offset'] + $pagination['perPage'], $pagination['total']) }} of {{ $pagination['total'] }} accounts
+                                </div>
+                                <div class="join">
+                                    @if($pagination['currentPage'] > 1)
+                                        <button wire:click="previousPage" class="btn btn-outline btn-sm">
+                                            <x-icon name="o-chevron-left" class="w-4 h-4" />
+                                            Previous
+                                        </button>
+                                    @endif
+                                    
+                                    @if($pagination['hasMorePages'])
+                                        <button wire:click="nextPage" class="btn btn-outline btn-sm">
+                                            Next
+                                            <x-icon name="o-chevron-right" class="w-4 h-4" />
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 @else
                     <div class="text-center py-12">
-                        <x-icon name="o-currency-dollar" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                        <x-icon name="o-currency-dollar" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No financial accounts found</h3>
                         <p class="text-base-content/70 mb-6">
                             @if ($search || $accountTypeFilter || $providerFilter)

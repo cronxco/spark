@@ -64,6 +64,18 @@ class FinancialAccounts extends Component
         $this->dispatch('account-deleted');
     }
 
+    public function nextPage(): void
+    {
+        $this->setPage($this->getPage() + 1);
+    }
+
+    public function previousPage(): void
+    {
+        if ($this->getPage() > 1) {
+            $this->setPage($this->getPage() - 1);
+        }
+    }
+
     public function render(): View
     {
         $plugin = new FinancialPlugin;
@@ -109,13 +121,30 @@ class FinancialAccounts extends Component
             ->unique()
             ->sort();
 
-        // Paginate the filtered results
-        $accounts = $query->forPage($this->page, 10);
+        // Convert to collection and implement manual pagination
+        $allAccounts = $query->values();
+        $perPage = 10;
+        $currentPage = $this->getPage();
+        $total = $allAccounts->count();
+        $offset = ($currentPage - 1) * $perPage;
+        $accounts = $allAccounts->slice($offset, $perPage);
+
+        // Create pagination data for the view
+        $paginationData = [
+            'perPage' => $perPage,
+            'currentPage' => $currentPage,
+            'total' => $total,
+            'offset' => $offset,
+            'lastPage' => ceil($total / $perPage),
+            'hasMorePages' => $currentPage < ceil($total / $perPage),
+            'hasPages' => $total > $perPage,
+        ];
 
         return view('livewire.financial-accounts', [
             'accounts' => $accounts,
             'accountTypes' => $accountTypes,
             'providers' => $providers,
+            'pagination' => $paginationData,
         ]);
     }
 
