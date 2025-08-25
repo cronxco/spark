@@ -18,13 +18,13 @@
                             </label>
                             <select wire:model="accountId" class="select select-bordered w-full @error('accountId') select-error @enderror">
                                 <option value="">Select an account</option>
-                                @foreach($accounts as $account)
+                                @foreach ($accounts as $account)
                                     @php
                                         $metadata = $account->metadata;
                                         $name = $metadata['name'] ?? 'Unnamed Account';
                                         $provider = $metadata['provider'] ?? '';
                                         $currency = $metadata['currency'] ?? 'GBP';
-                                        
+
                                         // Get currency symbol
                                         $currencySymbols = [
                                             'GBP' => '£',
@@ -32,7 +32,7 @@
                                             'EUR' => '€',
                                         ];
                                         $currencySymbol = $currencySymbols[$currency] ?? $currency;
-                                        
+
                                         // Get current balance from latest event
                                         $plugin = new \App\Integrations\Financial\FinancialPlugin();
                                         $latestBalance = $plugin->getLatestBalance($account);
@@ -55,9 +55,9 @@
                             <label class="label">
                                 <span class="label-text">Balance *</span>
                             </label>
-                            <input 
-                                type="number" 
-                                wire:model="balance" 
+                            <input
+                                type="number"
+                                wire:model="balance"
                                 placeholder="0.00"
                                 step="0.01"
                                 class="input input-bordered w-full @error('balance') input-error @enderror"
@@ -74,9 +74,9 @@
                             <label class="label">
                                 <span class="label-text">Date *</span>
                             </label>
-                            <input 
-                                type="date" 
-                                wire:model="date" 
+                            <input
+                                type="date"
+                                wire:model="date"
                                 class="input input-bordered w-full @error('date') input-error @enderror"
                             />
                             @error('date')
@@ -91,8 +91,8 @@
                             <label class="label">
                                 <span class="label-text">Notes</span>
                             </label>
-                            <textarea 
-                                wire:model="notes" 
+                            <textarea
+                                wire:model="notes"
                                 placeholder="Optional notes about this balance update..."
                                 rows="3"
                                 class="textarea textarea-bordered w-full @error('notes') textarea-error @enderror"

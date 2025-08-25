@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Integrations\Financial\FinancialPlugin;
-use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Illuminate\Contracts\View\View;
@@ -46,8 +45,8 @@ class CreateFinancialAccount extends Component
             ->where('service', 'financial')
             ->first();
 
-        if (!$group) {
-            $plugin = new FinancialPlugin();
+        if (! $group) {
+            $plugin = new FinancialPlugin;
             $group = $plugin->initializeGroup(Auth::user());
         }
 
@@ -70,7 +69,7 @@ class CreateFinancialAccount extends Component
         ]);
 
         // Create the financial account object using the plugin
-        $plugin = new FinancialPlugin();
+        $plugin = new FinancialPlugin;
         $accountData = [
             'name' => $this->name,
             'account_type' => $this->accountType,

@@ -60,20 +60,21 @@ class FinancialAccounts extends Component
 
         // Delete the account object
         $account->delete();
-        
+
         $this->dispatch('account-deleted');
     }
 
     public function render(): View
     {
-        $plugin = new FinancialPlugin();
-        
+        $plugin = new FinancialPlugin;
+
         $query = $plugin->getFinancialAccounts(Auth::user());
 
         // Apply filters
         if ($this->search) {
             $query = $query->filter(function ($account) {
                 $metadata = $account->metadata;
+
                 return str_contains(strtolower($metadata['name'] ?? ''), strtolower($this->search)) ||
                        str_contains(strtolower($metadata['provider'] ?? ''), strtolower($this->search)) ||
                        str_contains(strtolower($metadata['account_number'] ?? ''), strtolower($this->search));
@@ -94,7 +95,7 @@ class FinancialAccounts extends Component
 
         // Get unique account types and providers for filters
         $allAccounts = $plugin->getFinancialAccounts(Auth::user());
-        
+
         $accountTypes = $allAccounts->pluck('metadata.account_type')
             ->filter()
             ->unique()

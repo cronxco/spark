@@ -6,9 +6,7 @@ use App\Integrations\Base\ManualPlugin;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Models\IntegrationGroup;
 use App\Models\User;
-use Illuminate\Http\Request;
 
 class FinancialPlugin extends ManualPlugin
 {
@@ -134,7 +132,7 @@ class FinancialPlugin extends ManualPlugin
     public function upsertAccountObject(Integration $integration, array $accountData): EventObject
     {
         $title = $accountData['name'] ?? 'Financial Account';
-        
+
         return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
@@ -167,7 +165,7 @@ class FinancialPlugin extends ManualPlugin
     {
         $date = $balanceData['date'] ?? now()->toDateString();
         $balance = (float) ($balanceData['balance'] ?? 0);
-        
+
         // Create or update the target "day" object
         $dayObject = EventObject::updateOrCreate(
             [

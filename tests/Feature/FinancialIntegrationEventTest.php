@@ -7,9 +7,9 @@ use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class FinancialIntegrationEventTest extends TestCase
@@ -22,7 +22,10 @@ class FinancialIntegrationEventTest extends TestCase
         PluginRegistry::register(FinancialPlugin::class);
     }
 
-    public function test_can_create_financial_account_object(): void
+    /**
+     * @test
+     */
+    public function can_create_financial_account_object(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -30,7 +33,7 @@ class FinancialIntegrationEventTest extends TestCase
             'service' => 'financial',
         ]);
 
-        $plugin = new FinancialPlugin();
+        $plugin = new FinancialPlugin;
         $accountData = [
             'name' => 'Test Savings Account',
             'account_type' => 'savings_account',
@@ -46,7 +49,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals('account', $accountObject->concept);
         $this->assertEquals('financial_account', $accountObject->type);
         $this->assertEquals('Test Savings Account', $accountObject->title);
-        
+
         $metadata = $accountObject->metadata;
         $this->assertEquals('Test Savings Account', $metadata['name']);
         $this->assertEquals('savings_account', $metadata['account_type']);
@@ -55,7 +58,10 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals(2.5, $metadata['interest_rate']);
     }
 
-    public function test_can_create_balance_event(): void
+    /**
+     * @test
+     */
+    public function can_create_balance_event(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -63,8 +69,8 @@ class FinancialIntegrationEventTest extends TestCase
             'service' => 'financial',
         ]);
 
-        $plugin = new FinancialPlugin();
-        
+        $plugin = new FinancialPlugin;
+
         // Create account object first
         $accountData = [
             'name' => 'Test Account',
@@ -100,7 +106,10 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals('Test Bank', $eventMetadata['provider']);
     }
 
-    public function test_can_get_financial_accounts_for_user(): void
+    /**
+     * @test
+     */
+    public function can_get_financial_accounts_for_user(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -108,8 +117,8 @@ class FinancialIntegrationEventTest extends TestCase
             'service' => 'financial',
         ]);
 
-        $plugin = new FinancialPlugin();
-        
+        $plugin = new FinancialPlugin;
+
         // Create multiple accounts
         $account1 = $plugin->upsertAccountObject($integration, [
             'name' => 'Account 1',
@@ -130,7 +139,10 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertTrue($accounts->contains($account2));
     }
 
-    public function test_can_get_balance_events_for_account(): void
+    /**
+     * @test
+     */
+    public function can_get_balance_events_for_account(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -138,8 +150,8 @@ class FinancialIntegrationEventTest extends TestCase
             'service' => 'financial',
         ]);
 
-        $plugin = new FinancialPlugin();
-        
+        $plugin = new FinancialPlugin;
+
         $accountObject = $plugin->upsertAccountObject($integration, [
             'name' => 'Test Account',
             'account_type' => 'current_account',
@@ -164,7 +176,10 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertTrue($balanceEvents->contains($event2));
     }
 
-    public function test_can_get_latest_balance_for_account(): void
+    /**
+     * @test
+     */
+    public function can_get_latest_balance_for_account(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
@@ -172,8 +187,8 @@ class FinancialIntegrationEventTest extends TestCase
             'service' => 'financial',
         ]);
 
-        $plugin = new FinancialPlugin();
-        
+        $plugin = new FinancialPlugin;
+
         $accountObject = $plugin->upsertAccountObject($integration, [
             'name' => 'Test Account',
             'account_type' => 'current_account',
@@ -198,27 +213,33 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals(1100.00, $latestBalance->event_metadata['balance']);
     }
 
-    public function test_manual_plugin_does_not_support_oauth(): void
+    /**
+     * @test
+     */
+    public function manual_plugin_does_not_support_oauth(): void
     {
         $user = User::factory()->create();
-        $plugin = new FinancialPlugin();
+        $plugin = new FinancialPlugin;
         $group = $plugin->initializeGroup($user);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Manual integrations do not support OAuth');
         $plugin->handleOAuthCallback(request(), $group);
     }
 
-    public function test_manual_plugin_does_not_support_webhooks(): void
+    /**
+     * @test
+     */
+    public function manual_plugin_does_not_support_webhooks(): void
     {
         $user = User::factory()->create();
-        $plugin = new FinancialPlugin();
+        $plugin = new FinancialPlugin;
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'financial',
         ]);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Manual integrations do not support webhooks');
         $plugin->handleWebhook(request(), $integration);
     }

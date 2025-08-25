@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use InvalidArgumentException;
+use Throwable;
 
 abstract class ManualPlugin implements IntegrationPlugin
 {
@@ -36,7 +37,7 @@ abstract class ManualPlugin implements IntegrationPlugin
             try {
                 $types = static::getInstanceTypes();
                 $defaultName = $types[$instanceType]['label'] ?? ucfirst($instanceType);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $defaultName = ucfirst($instanceType);
             }
         } else {

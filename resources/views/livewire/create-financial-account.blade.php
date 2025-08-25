@@ -16,9 +16,9 @@
                             <label class="label">
                                 <span class="label-text">Account Name *</span>
                             </label>
-                            <input 
-                                type="text" 
-                                wire:model="name" 
+                            <input
+                                type="text"
+                                wire:model="name"
                                 placeholder="e.g. Main Current Account, ISA, Mortgage"
                                 class="input input-bordered w-full @error('name') input-error @enderror"
                             />
@@ -57,9 +57,9 @@
                             <label class="label">
                                 <span class="label-text">Provider *</span>
                             </label>
-                            <input 
-                                type="text" 
-                                wire:model="provider" 
+                            <input
+                                type="text"
+                                wire:model="provider"
                                 placeholder="e.g. Barclays, Santander, HSBC"
                                 class="input input-bordered w-full @error('provider') input-error @enderror"
                             />
@@ -75,9 +75,9 @@
                             <label class="label">
                                 <span class="label-text">Account Number</span>
                             </label>
-                            <input 
-                                type="text" 
-                                wire:model="accountNumber" 
+                            <input
+                                type="text"
+                                wire:model="accountNumber"
                                 placeholder="Account number or identifier"
                                 class="input input-bordered w-full @error('accountNumber') input-error @enderror"
                             />
@@ -93,9 +93,9 @@
                             <label class="label">
                                 <span class="label-text">Sort Code</span>
                             </label>
-                            <input 
-                                type="text" 
-                                wire:model="sortCode" 
+                            <input
+                                type="text"
+                                wire:model="sortCode"
                                 placeholder="e.g. 12-34-56"
                                 class="input input-bordered w-full @error('sortCode') input-error @enderror"
                             />
@@ -128,9 +128,9 @@
                             <label class="label">
                                 <span class="label-text">Interest Rate (%)</span>
                             </label>
-                            <input 
-                                type="number" 
-                                wire:model="interestRate" 
+                            <input
+                                type="number"
+                                wire:model="interestRate"
                                 placeholder="e.g. 2.5"
                                 step="0.01"
                                 min="0"
@@ -149,9 +149,9 @@
                             <label class="label">
                                 <span class="label-text">Start Date</span>
                             </label>
-                            <input 
-                                type="date" 
-                                wire:model="startDate" 
+                            <input
+                                type="date"
+                                wire:model="startDate"
                                 class="input input-bordered w-full @error('startDate') input-error @enderror"
                             />
                             @error('startDate')

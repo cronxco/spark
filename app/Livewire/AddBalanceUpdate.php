@@ -40,12 +40,12 @@ class AddBalanceUpdate extends Component
 
         // Get the integration for this account
         $integration = $account->integration;
-        if (!$integration) {
+        if (! $integration) {
             abort(404, 'Integration not found');
         }
 
         // Create the balance update event using the plugin
-        $plugin = new FinancialPlugin();
+        $plugin = new FinancialPlugin;
         $balanceData = [
             'balance' => $this->balance,
             'date' => $this->date,
@@ -61,7 +61,7 @@ class AddBalanceUpdate extends Component
 
     public function render(): View
     {
-        $plugin = new FinancialPlugin();
+        $plugin = new FinancialPlugin;
         $accounts = $plugin->getFinancialAccounts(Auth::user());
 
         return view('livewire.add-balance-update', [

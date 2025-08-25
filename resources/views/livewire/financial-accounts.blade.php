@@ -27,9 +27,9 @@
                         <label class="label">
                             <span class="label-text">Search</span>
                         </label>
-                        <input 
-                            type="text" 
-                            wire:model.live.debounce.300ms="search" 
+                        <input
+                            type="text"
+                            wire:model.live.debounce.300ms="search"
                             placeholder="Search accounts, providers, or account numbers..."
                             class="input input-bordered w-full"
                         />
@@ -42,7 +42,7 @@
                         </label>
                         <select wire:model.live="accountTypeFilter" class="select select-bordered">
                             <option value="">All Types</option>
-                            @foreach($accountTypes as $type => $label)
+                            @foreach ($accountTypes as $type => $label)
                                 <option value="{{ $type }}">{{ $label }}</option>
                             @endforeach
                         </select>
@@ -55,7 +55,7 @@
                         </label>
                         <select wire:model.live="providerFilter" class="select select-bordered">
                             <option value="">All Providers</option>
-                            @foreach($providers as $provider)
+                            @foreach ($providers as $provider)
                                 <option value="{{ $provider }}">{{ $provider }}</option>
                             @endforeach
                         </select>
@@ -77,7 +77,7 @@
         <!-- Accounts List -->
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
-                @if($accounts->count() > 0)
+                @if ($accounts->count() > 0)
                     <div class="overflow-x-auto">
                         <table class="table table-zebra">
                             <thead>
@@ -92,7 +92,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($accounts as $account)
+                                @foreach ($accounts as $account)
                                     @php
                                         $metadata = $account->metadata;
                                         $accountType = $metadata['account_type'] ?? '';
@@ -102,7 +102,7 @@
                                         $currency = $metadata['currency'] ?? 'GBP';
                                         $interestRate = $metadata['interest_rate'] ?? null;
                                         $startDate = $metadata['start_date'] ?? null;
-                                        
+
                                         // Get account type label
                                         $accountTypeLabels = [
                                             'current_account' => 'Current Account',
@@ -115,7 +115,7 @@
                                             'other' => 'Other',
                                         ];
                                         $accountTypeLabel = $accountTypeLabels[$accountType] ?? $accountType;
-                                        
+
                                         // Get currency symbol
                                         $currencySymbols = [
                                             'GBP' => '£',
@@ -123,7 +123,7 @@
                                             'EUR' => '€',
                                         ];
                                         $currencySymbol = $currencySymbols[$currency] ?? $currency;
-                                        
+
                                         // Get current balance from latest event
                                         $plugin = new \App\Integrations\Financial\FinancialPlugin();
                                         $latestBalance = $plugin->getLatestBalance($account);
@@ -133,10 +133,10 @@
                                         <td>
                                             <div>
                                                 <div class="font-medium">{{ $metadata['name'] ?? 'Unnamed Account' }}</div>
-                                                @if($accountNumber)
+                                                @if ($accountNumber)
                                                     <div class="text-sm text-base-content/70">
                                                         {{ $accountNumber }}
-                                                        @if($sortCode)
+                                                        @if ($sortCode)
                                                             ({{ $sortCode }})
                                                         @endif
                                                     </div>
@@ -150,7 +150,7 @@
                                         </td>
                                         <td>{{ $provider }}</td>
                                         <td>
-                                            @if($currentBalance !== null)
+                                            @if ($currentBalance !== null)
                                                 <span class="font-mono font-medium">
                                                     {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
                                                 </span>
@@ -160,7 +160,7 @@
                                         </td>
                                         <td>{{ $currency }}</td>
                                         <td>
-                                            @if($interestRate)
+                                            @if ($interestRate)
                                                 <span class="text-success font-medium">
                                                     {{ number_format($interestRate, 2) }}%
                                                 </span>
@@ -170,14 +170,14 @@
                                         </td>
                                         <td>
                                             <div class="flex gap-2">
-                                                <a 
-                                                    href="{{ route('financial-accounts.show', $account) }}" 
+                                                <a
+                                                    href="{{ route('financial-accounts.show', $account) }}"
                                                     class="btn btn-sm btn-outline"
                                                 >
                                                     <x-icon name="o-eye" class="w-4 h-4" />
                                                     View
                                                 </a>
-                                                <button 
+                                                <button
                                                     wire:click="deleteAccount('{{ $account->id }}')"
                                                     wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
                                                     class="btn btn-sm btn-error btn-outline"
@@ -202,13 +202,13 @@
                         <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No financial accounts found</h3>
                         <p class="text-base-content/70 mb-6">
-                            @if($search || $accountTypeFilter || $providerFilter)
+                            @if ($search || $accountTypeFilter || $providerFilter)
                                 Try adjusting your filters or search terms.
                             @else
                                 Get started by adding your first financial account.
                             @endif
                         </p>
-                        @if(!$search && !$accountTypeFilter && !$providerFilter)
+                        @if (!$search && !$accountTypeFilter && !$providerFilter)
                             <a href="{{ route('financial-accounts.create') }}" class="btn btn-primary">
                                 <x-icon name="o-plus" class="w-4 h-4" />
                                 Add Your First Account
