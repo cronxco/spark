@@ -85,6 +85,7 @@
                                     <th>Account</th>
                                     <th>Type</th>
                                     <th>Provider</th>
+                                    <th>Service</th>
                                     <th>Current Balance</th>
                                     <th>Currency</th>
                                     <th>Interest Rate</th>
@@ -97,6 +98,7 @@
                                         $metadata = $account->metadata;
                                         $accountType = $metadata['account_type'] ?? '';
                                         $provider = $metadata['provider'] ?? '';
+                                        $service = $metadata['service'] ?? 'financial';
                                         $accountNumber = $metadata['account_number'] ?? null;
                                         $sortCode = $metadata['sort_code'] ?? null;
                                         $currency = $metadata['currency'] ?? 'GBP';
@@ -150,6 +152,11 @@
                                         </td>
                                         <td>{{ $provider }}</td>
                                         <td>
+                                            <span class="badge badge-{{ $service === 'financial' ? 'primary' : ($service === 'monzo' ? 'success' : 'secondary') }}">
+                                                {{ ucfirst($service) }}
+                                            </span>
+                                        </td>
+                                        <td>
                                             @if ($currentBalance !== null)
                                                 <span class="font-mono font-medium">
                                                     {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
@@ -177,6 +184,15 @@
                                                     <x-icon name="o-eye" class="w-4 h-4" />
                                                     View
                                                 </a>
+                                                @if ($service === 'financial')
+                                                    <button
+                                                        wire:click="openEditModal('{{ $account->id }}')"
+                                                        class="btn btn-sm btn-outline"
+                                                    >
+                                                        <x-icon name="o-pencil" class="w-4 h-4" />
+                                                        Edit
+                                                    </button>
+                                                @endif
                                                 <button
                                                     wire:click="deleteAccount('{{ $account->id }}')"
                                                     wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
@@ -243,4 +259,11 @@
 
     <!-- Toast notifications -->
     <x-toast position="toast-top toast-end" />
+
+    <!-- Edit Account Modal -->
+    <x-modal wire:model="showEditModal" title="Edit Account">
+        @if($showEditModal)
+            <livewire:edit-financial-account :account="$editingAccount" />
+        @endif
+    </x-modal>
 </div>
