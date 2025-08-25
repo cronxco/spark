@@ -139,7 +139,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $spendToday = (int) ($json['spend_today'] ?? 0);
                                 // Ensure day target exists
                                 $dayObject = EventObject::updateOrCreate([
-                                    'integration_id' => $this->integration->id,
+                                    'user_id' => $this->integration->user_id,
                                     'concept' => 'day',
                                     'type' => 'day',
                                     'title' => $date,
@@ -191,7 +191,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $spendToday = (int) ($json['spend_today'] ?? 0);
                                 // Ensure day target exists
                                 $dayObject = EventObject::updateOrCreate([
-                                    'integration_id' => $this->integration->id,
+                                    'user_id' => $this->integration->user_id,
                                     'concept' => 'day',
                                     'type' => 'day',
                                     'title' => $date,

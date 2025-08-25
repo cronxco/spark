@@ -598,7 +598,7 @@ class OuraPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'user',
                 'type' => 'oura_user',
                 'title' => $title,
@@ -670,7 +670,7 @@ class OuraPlugin extends OAuthPlugin
 
             $actor = $this->ensureUserProfile($integration);
             $target = EventObject::updateOrCreate([
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'sleep',
                 'type' => 'oura_sleep_record',
                 'title' => 'Sleep Record',
@@ -902,7 +902,7 @@ class OuraPlugin extends OAuthPlugin
 
             $actor = $this->ensureUserProfile($integration);
             $target = EventObject::updateOrCreate([
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'metric',
                 'type' => 'heartrate_series',
                 'title' => 'Heart Rate',
@@ -939,7 +939,6 @@ class OuraPlugin extends OAuthPlugin
             [$encMin, $minMult] = $this->encodeNumericValue($min);
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Min Heart Rate',
                 'content' => null,
                 'value' => $encMin,
@@ -950,7 +949,6 @@ class OuraPlugin extends OAuthPlugin
             [$encMax, $maxMult] = $this->encodeNumericValue($max);
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Max Heart Rate',
                 'content' => null,
                 'value' => $encMax,
@@ -960,7 +958,6 @@ class OuraPlugin extends OAuthPlugin
 
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Data Points',
                 'content' => 'Count of heart rate points collected for the day',
                 'value' => (int) $points->count(),
@@ -989,7 +986,7 @@ class OuraPlugin extends OAuthPlugin
 
         $actor = $this->ensureUserProfile($integration);
         $target = EventObject::updateOrCreate([
-            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
             'concept' => 'metric',
             'type' => "oura_daily_{$kind}",
             'title' => $options['title'] ?? Str::title($kind),
@@ -1089,7 +1086,7 @@ class OuraPlugin extends OAuthPlugin
 
         $actor = $this->ensureUserProfile($integration);
         $target = EventObject::updateOrCreate([
-            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
             'concept' => 'workout',
             'type' => Arr::get($item, 'activity', 'workout'),
             'title' => Str::title((string) Arr::get($item, 'activity', 'Workout')),
@@ -1157,7 +1154,7 @@ class OuraPlugin extends OAuthPlugin
 
         $actor = $this->ensureUserProfile($integration);
         $target = EventObject::updateOrCreate([
-            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
             'concept' => 'mindfulness_session',
             'type' => Arr::get($item, 'type', 'session'),
             'title' => Str::title((string) Arr::get($item, 'type', 'Session')),
@@ -1209,7 +1206,7 @@ class OuraPlugin extends OAuthPlugin
         $actor = $this->ensureUserProfile($integration);
         // Create a simple target object for tag to satisfy non-null target_id
         $tagTarget = EventObject::updateOrCreate([
-            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
             'concept' => 'tag',
             'type' => 'oura_tag',
             'title' => 'Oura Tag',
@@ -1287,7 +1284,7 @@ class OuraPlugin extends OAuthPlugin
 
         $actor = $this->ensureUserProfile($integration);
         $target = EventObject::updateOrCreate([
-            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
             'concept' => 'sleep',
             'type' => 'oura_sleep_record',
             'title' => 'Sleep Record',
