@@ -193,6 +193,8 @@ new class extends Component {
                                         <svg class="w-4 h-4 text-base-content" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M6.194 14.644c0 1.16-.943 2.107-2.107 2.107-1.164 0-2.107-.947-2.107-2.107 0-1.16.943-2.106 2.107-2.106 1.164 0 2.107.946 2.107 2.106zm5.882-2.107c-1.164 0-2.107.946-2.107 2.106 0 1.16.943 2.107 2.107 2.107 1.164 0 2.107-.947 2.107-2.107 0-1.16-.943-2.106-2.107-2.106zm2.107-5.882c0-1.164-.943-2.107-2.107-2.107-1.164 0-2.107.943-2.107 2.107 0 1.164.943 2.107 2.107 2.107 1.164 0 2.107-.943 2.107-2.107zm2.106 5.882c0-1.164-.943-2.107-2.107-2.107-1.164 0-2.107.943-2.107 2.107 0 1.164.943 2.107 2.107 2.107 1.164 0 2.107-.943 2.107-2.107zm5.882-2.107c-1.164 0-2.107.946-2.107 2.106 0 1.16.943 2.107 2.107 2.107 1.164 0 2.107-.947 2.107-2.107 0-1.16-.943-2.106-2.107-2.106z"/>
                                         </svg>
+                                    @elseif ($plugin['identifier'] === 'manual-financial')
+                                        <x-icon name="o-banknotes" class="w-4 h-4 text-primary" />
                                     @else
                                         <svg class="w-4 h-4 text-base-content" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
@@ -306,6 +308,31 @@ new class extends Component {
                                                         Never updated
                                                     </div>
                                                 @endif
+                                            </div>
+                                        @endif
+
+                                        @if ($plugin['type'] === 'manual' && $integration['service'] === 'manual-financial')
+                                            <div class="text-xs text-base-content/70 mb-2">
+                                                <div class="flex items-center gap-2">
+                                                    <x-button 
+                                                        label="Dashboard" 
+                                                        icon="o-home" 
+                                                        class="btn-xs btn-primary"
+                                                        link="{{ route('manual-financial.dashboard', $integration['id']) }}"
+                                                    />
+                                                    <x-button 
+                                                        label="Accounts" 
+                                                        icon="o-banknotes" 
+                                                        class="btn-xs btn-secondary"
+                                                        link="{{ route('manual-financial.accounts', $integration['id']) }}"
+                                                    />
+                                                    <x-button 
+                                                        label="Balances" 
+                                                        icon="o-chart-line" 
+                                                        class="btn-xs btn-accent"
+                                                        link="{{ route('manual-financial.balances', $integration['id']) }}"
+                                                    />
+                                                </div>
                                             </div>
                                         @endif
 
