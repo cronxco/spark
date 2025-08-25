@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Oura\OuraPlugin;
@@ -18,6 +19,7 @@ class IntegrationServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Register plugins
+        PluginRegistry::register(FinancialPlugin::class);
         PluginRegistry::register(GitHubPlugin::class);
         PluginRegistry::register(SlackPlugin::class);
         PluginRegistry::register(SpotifyPlugin::class);

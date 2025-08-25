@@ -44,6 +44,13 @@ class PluginRegistry
         });
     }
 
+    public static function getManualPlugins(): Collection
+    {
+        return self::getAllPlugins()->filter(function ($pluginClass) {
+            return $pluginClass::getServiceType() === 'manual';
+        });
+    }
+
     public static function getPluginInstance(string $identifier): ?IntegrationPlugin
     {
         $pluginClass = self::getPlugin($identifier);

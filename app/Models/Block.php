@@ -55,4 +55,20 @@ class Block extends Model
     {
         return $this->belongsTo(Integration::class)->withTrashed();
     }
+
+    /**
+     * Get the formatted value considering the multiplier
+     */
+    public function getFormattedValueAttribute()
+    {
+        if ($this->value === null || $this->value_multiplier === null) {
+            return $this->value;
+        }
+
+        if ($this->value_multiplier === 1) {
+            return $this->value;
+        }
+
+        return $this->value / $this->value_multiplier;
+    }
 }
