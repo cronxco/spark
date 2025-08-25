@@ -108,7 +108,7 @@
                     <!-- Form Actions -->
                     <div class="flex gap-3 mt-8">
                         <button type="submit" class="btn btn-primary">
-                            <x-icon name="o-currency-pound" class="w-4 h-4" />
+                            <x-icon name="o-currency-dollar" class="w-4 h-4" />
                             Add Balance Update
                         </button>
                         <a href="{{ route('financial-accounts') }}" class="btn btn-outline">

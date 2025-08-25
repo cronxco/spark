@@ -12,7 +12,7 @@
                     Add Account
                 </a>
                 <a href="{{ route('balance-updates.create') }}" class="btn btn-secondary">
-                    <x-icon name="o-currency-pound" class="w-4 h-4" />
+                    <x-icon name="o-currency-dollar" class="w-4 h-4" />
                     Add Balance Update
                 </a>
             </div>
@@ -199,7 +199,7 @@
                     </div>
                 @else
                     <div class="text-center py-12">
-                        <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                        <x-icon name="o-currency-dollar" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No financial accounts found</h3>
                         <p class="text-base-content/70 mb-6">
                             @if ($search || $accountTypeFilter || $providerFilter)
