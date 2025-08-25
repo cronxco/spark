@@ -314,21 +314,21 @@ new class extends Component {
                                         @if ($plugin['type'] === 'manual' && $integration['service'] === 'manual-financial')
                                             <div class="text-xs text-base-content/70 mb-2">
                                                 <div class="flex items-center gap-2">
-                                                    <x-button 
-                                                        label="Dashboard" 
-                                                        icon="o-home" 
+                                                    <x-button
+                                                        label="Dashboard"
+                                                        icon="o-home"
                                                         class="btn-xs btn-primary"
                                                         link="{{ route('manual-financial.dashboard', $integration['id']) }}"
                                                     />
-                                                    <x-button 
-                                                        label="Accounts" 
-                                                        icon="o-banknotes" 
+                                                    <x-button
+                                                        label="Accounts"
+                                                        icon="o-banknotes"
                                                         class="btn-xs btn-secondary"
                                                         link="{{ route('manual-financial.accounts', $integration['id']) }}"
                                                     />
-                                                    <x-button 
-                                                        label="Balances" 
-                                                        icon="o-chart-line" 
+                                                    <x-button
+                                                        label="Balances"
+                                                        icon="o-chart-line"
                                                         class="btn-xs btn-accent"
                                                         link="{{ route('manual-financial.balances', $integration['id']) }}"
                                                     />

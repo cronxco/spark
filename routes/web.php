@@ -42,7 +42,7 @@ Route::middleware(['auth'])->group(function () {
         ->whereUuid('group')
         ->name('integrations.storeInstances');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
-    
+
     // Manual Financial Integration routes
     Volt::route('/integrations/{integration}/manual-financial', 'manual-financial.dashboard')->name('manual-financial.dashboard');
     Volt::route('/integrations/{integration}/manual-financial/accounts', 'manual-financial.accounts')->name('manual-financial.accounts');

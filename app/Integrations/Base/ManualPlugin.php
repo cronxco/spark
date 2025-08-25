@@ -6,25 +6,26 @@ use App\Integrations\Contracts\IntegrationPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Exception;
+use Illuminate\Http\Request;
+use Throwable;
 
 abstract class ManualPlugin implements IntegrationPlugin
 {
-    abstract public static function getIdentifier(): string;
-    
-    abstract public static function getDisplayName(): string;
-    
-    abstract public static function getDescription(): string;
-    
-    abstract public static function getConfigurationSchema(): array;
-    
-    abstract public static function getInstanceTypes(): array;
-    
     public static function getServiceType(): string
     {
         return 'manual';
     }
+
+    abstract public static function getIdentifier(): string;
+
+    abstract public static function getDisplayName(): string;
+
+    abstract public static function getDescription(): string;
+
+    abstract public static function getConfigurationSchema(): array;
+
+    abstract public static function getInstanceTypes(): array;
 
     public function initialize(User $user): Integration
     {
@@ -60,7 +61,7 @@ abstract class ManualPlugin implements IntegrationPlugin
             try {
                 $types = static::getInstanceTypes();
                 $defaultName = $types[$instanceType]['label'] ?? ucfirst($instanceType);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $defaultName = ucfirst($instanceType);
             }
         } else {

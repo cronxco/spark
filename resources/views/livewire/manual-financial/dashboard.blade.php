@@ -21,19 +21,19 @@ new class extends Component {
     public function loadSummary(): void
     {
         $userId = Auth::id();
-        
+
         // Get total accounts
         $totalAccounts = EventObject::where('user_id', $userId)
             ->where('concept', 'financial_account')
             ->where('type', 'account')
             ->count();
-        
+
         // Get total balance updates
         $totalUpdates = Event::where('integration_id', $this->integration->id)
             ->where('domain', 'finance')
             ->where('action', 'balance_update')
             ->count();
-        
+
         // Get latest balance for each account
         $latestBalances = Event::where('integration_id', $this->integration->id)
             ->where('domain', 'finance')
@@ -46,9 +46,9 @@ new class extends Component {
             })
             ->filter()
             ->values();
-        
+
         $totalValue = $latestBalances->sum('value');
-        
+
         $this->summary = [
             'total_accounts' => $totalAccounts,
             'total_updates' => $totalUpdates,
@@ -160,9 +160,9 @@ new class extends Component {
                 <x-icon name="o-plus-circle" class="w-16 h-16 text-primary mx-auto mb-4" />
                 <h3 class="text-lg font-semibold mb-2">Add New Account</h3>
                 <p class="text-base-content/70 mb-4">Create a new financial account to start tracking.</p>
-                <x-button 
-                    label="Create Account" 
-                    icon="o-plus" 
+                <x-button
+                    label="Create Account"
+                    icon="o-plus"
                     class="btn-primary"
                     link="/integrations/{{ $integration->id }}/accounts"
                 />
@@ -174,9 +174,9 @@ new class extends Component {
                 <x-icon name="o-chart-line" class="w-16 h-16 text-secondary mx-auto mb-4" />
                 <h3 class="text-lg font-semibold mb-2">Update Balance</h3>
                 <p class="text-base-content/70 mb-4">Add a new balance update for any of your accounts.</p>
-                <x-button 
-                    label="Add Update" 
-                    icon="o-plus" 
+                <x-button
+                    label="Add Update"
+                    icon="o-plus"
                     class="btn-secondary"
                     link="/integrations/{{ $integration->id }}/balances"
                 />
@@ -185,20 +185,20 @@ new class extends Component {
     </div>
 
     <!-- Recent Balance Updates -->
-    @if(!empty($recentBalances))
+    @if (!empty($recentBalances))
         <x-card>
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-semibold">Recent Balance Updates</h2>
-                <x-button 
-                    label="View All" 
-                    icon="o-arrow-right" 
+                <x-button
+                    label="View All"
+                    icon="o-arrow-right"
                     class="btn-ghost"
                     link="/integrations/{{ $integration->id }}/balances"
                 />
             </div>
-            
+
             <div class="space-y-4">
-                @foreach($recentBalances as $balance)
+                @foreach ($recentBalances as $balance)
                     <div class="flex items-center justify-between p-4 bg-base-100 rounded-lg border">
                         <div class="flex items-center gap-4">
                             <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -226,15 +226,15 @@ new class extends Component {
     <div class="mt-8">
         <h2 class="text-xl font-semibold mb-4">Manage Your Finances</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <x-button 
-                label="Manage Accounts" 
-                icon="o-banknotes" 
+            <x-button
+                label="Manage Accounts"
+                icon="o-banknotes"
                 class="btn-outline btn-lg justify-start"
                 link="/integrations/{{ $integration->id }}/accounts"
             />
-            <x-button 
-                label="Manage Balances" 
-                icon="o-chart-line" 
+            <x-button
+                label="Manage Balances"
+                icon="o-chart-line"
                 class="btn-outline btn-lg justify-start"
                 link="/integrations/{{ $integration->id }}/balances"
             />
