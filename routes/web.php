@@ -43,6 +43,11 @@ Route::middleware(['auth'])->group(function () {
         ->name('integrations.storeInstances');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
 
+    // Manual Financial Integration routes
+    Volt::route('/integrations/{integration}/manual-financial', 'manual-financial.dashboard')->name('manual-financial.dashboard');
+    Volt::route('/integrations/{integration}/manual-financial/accounts', 'manual-financial.accounts')->name('manual-financial.accounts');
+    Volt::route('/integrations/{integration}/manual-financial/balances', 'manual-financial.balances')->name('manual-financial.balances');
+
 });
 
 // Webhook routes (no auth required)
