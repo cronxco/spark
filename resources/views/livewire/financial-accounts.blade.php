@@ -262,7 +262,7 @@
 
     <!-- Edit Account Modal -->
     <x-modal wire:model="showEditModal" title="Edit Account">
-        @if($showEditModal)
+        @if ($showEditModal)
             <livewire:edit-financial-account :account="$editingAccount" />
         @endif
     </x-modal>

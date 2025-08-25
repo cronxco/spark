@@ -1,6 +1,6 @@
 <div class="modal-box max-w-2xl">
     <h3 class="font-bold text-lg mb-4">Edit Account: {{ $account->title }}</h3>
-    
+
     <form wire:submit="updateMetadata">
         <div class="space-y-4">
             @foreach ($editableFields as $fieldName => $fieldConfig)
@@ -11,10 +11,10 @@
                             <span class="label-text-alt text-base-content/70">{{ $fieldConfig['description'] }}</span>
                         @endif
                     </label>
-                    
+
                     @if ($fieldConfig['type'] === 'select')
-                        <select 
-                            wire:model="metadata.{{ $fieldName }}" 
+                        <select
+                            wire:model="metadata.{{ $fieldName }}"
                             class="select select-bordered w-full"
                             @if (isset($fieldConfig['required']) && $fieldConfig['required']) required @endif
                         >
@@ -26,9 +26,9 @@
                             @endforeach
                         </select>
                     @elseif ($fieldConfig['type'] === 'number')
-                        <input 
-                            type="number" 
-                            wire:model="metadata.{{ $fieldName }}" 
+                        <input
+                            type="number"
+                            wire:model="metadata.{{ $fieldName }}"
                             class="input input-bordered w-full"
                             @if (isset($fieldConfig['step'])) step="{{ $fieldConfig['step'] }}" @endif
                             @if (isset($fieldConfig['min'])) min="{{ $fieldConfig['min'] }}" @endif
@@ -36,16 +36,16 @@
                             @if (isset($fieldConfig['required']) && $fieldConfig['required']) required @endif
                         />
                     @elseif ($fieldConfig['type'] === 'date')
-                        <input 
-                            type="date" 
-                            wire:model="metadata.{{ $fieldName }}" 
+                        <input
+                            type="date"
+                            wire:model="metadata.{{ $fieldName }}"
                             class="input input-bordered w-full"
                             @if (isset($fieldConfig['required']) && $fieldConfig['required']) required @endif
                         />
                     @else
-                        <input 
-                            type="text" 
-                            wire:model="metadata.{{ $fieldName }}" 
+                        <input
+                            type="text"
+                            wire:model="metadata.{{ $fieldName }}"
                             class="input input-bordered w-full"
                             @if (isset($fieldConfig['required']) && $fieldConfig['required']) required @endif
                         />
@@ -53,7 +53,7 @@
                 </div>
             @endforeach
         </div>
-        
+
         <div class="modal-action">
             <button type="button" class="btn btn-outline" wire:click="$dispatch('closeModal')">
                 Cancel
