@@ -141,6 +141,7 @@ class FinancialPlugin extends ManualPlugin
                 'title' => $title,
             ],
             [
+                'user_id' => $integration->user_id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [
@@ -175,6 +176,7 @@ class FinancialPlugin extends ManualPlugin
                 'title' => $date,
             ],
             [
+                'user_id' => $integration->user_id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $date],
