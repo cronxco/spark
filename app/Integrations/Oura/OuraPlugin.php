@@ -604,7 +604,6 @@ class OuraPlugin extends OAuthPlugin
                 'title' => $title,
             ],
             [
-                'integration_id' => $integration->id,
                 'time' => now(),
                 'content' => 'Oura account',
                 'metadata' => $profile,
@@ -902,8 +901,8 @@ class OuraPlugin extends OAuthPlugin
             }
 
             $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
+            $target = EventObject::updateOrCreate([
+                'user_id' => $integration->user_id,
                 'concept' => 'metric',
                 'type' => 'heartrate_series',
                 'title' => 'Heart Rate',
@@ -940,7 +939,6 @@ class OuraPlugin extends OAuthPlugin
             [$encMin, $minMult] = $this->encodeNumericValue($min);
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Min Heart Rate',
                 'content' => null,
                 'value' => $encMin,
@@ -951,7 +949,6 @@ class OuraPlugin extends OAuthPlugin
             [$encMax, $maxMult] = $this->encodeNumericValue($max);
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Max Heart Rate',
                 'content' => null,
                 'value' => $encMax,
@@ -961,7 +958,6 @@ class OuraPlugin extends OAuthPlugin
 
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Data Points',
                 'content' => 'Count of heart rate points collected for the day',
                 'value' => (int) $points->count(),

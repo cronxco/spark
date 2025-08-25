@@ -231,7 +231,6 @@ class EventApiExtendedTest extends TestCase
         // Create some blocks for this event
         Block::factory()->create([
             'event_id' => $event->id,
-            'integration_id' => $this->integration->id,
         ]);
 
         $response = $this->deleteJson("/api/events/{$event->id}");

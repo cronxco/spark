@@ -117,7 +117,6 @@ abstract class WebhookPlugin implements IntegrationPlugin
             foreach ($eventData['blocks'] ?? [] as $blockData) {
                 $event->blocks()->create([
                     'time' => $blockData['time'] ?? now(),
-                    'integration_id' => $integration->id,
                     'title' => $blockData['title'],
                     'content' => $blockData['content'],
                     'url' => $blockData['url'] ?? null,
@@ -135,7 +134,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => $objectData['concept'],
                 'type' => $objectData['type'],
                 'title' => $objectData['title'],

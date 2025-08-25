@@ -244,7 +244,7 @@ class MonzoPlugin extends OAuthPlugin
         $counterpartyId = $tx['counterparty']['account_id'] ?? $tx['counterparty']['id'] ?? $tx['counterparty'] ?? null;
         $target = null;
         if ($counterpartyId) {
-            $target = EventObject::where('integration_id', $master->id)
+            $target = EventObject::where('user_id', $master->user_id)
                 ->where('concept', 'account')
                 ->where('type', 'monzo_pot')
                 ->whereJsonContains('metadata->pot_id', $counterpartyId)
@@ -256,7 +256,7 @@ class MonzoPlugin extends OAuthPlugin
             $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
             $target = EventObject::updateOrCreate(
                 [
-                    'integration_id' => $master->id,
+                    'user_id' => $master->user_id,
                     'concept' => 'counterparty',
                     'type' => 'monzo_counterparty',
                     'title' => $targetTitle,
@@ -310,7 +310,7 @@ class MonzoPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $master->id,
+                'user_id' => $master->user_id,
                 'concept' => 'account',
                 'type' => 'monzo_pot',
                 'title' => $pot['name'] ?? 'Pot',
@@ -340,7 +340,7 @@ class MonzoPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $master->id,
+                'user_id' => $master->user_id,
                 'concept' => 'account',
                 'type' => 'monzo_account',
                 'title' => $title,
@@ -452,7 +452,7 @@ class MonzoPlugin extends OAuthPlugin
         // Create or update the target "day" object (target_id is NOT NULL in events)
         $dayObject = EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'day',
                 'type' => 'day',
                 'title' => $date,

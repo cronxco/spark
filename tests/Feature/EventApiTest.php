@@ -40,8 +40,8 @@ class EventApiTest extends TestCase
         ])->toArray();
         unset($eventData['actor_id'], $eventData['target_id']);
         $blocksData = [
-            Block::factory()->make(['integration_id' => $integration->id])->toArray(),
-            Block::factory()->make(['integration_id' => $integration->id])->toArray(),
+            Block::factory()->make()->toArray(),
+            Block::factory()->make()->toArray(),
         ];
         $payload = [
             'actor' => $actorData,
@@ -56,7 +56,7 @@ class EventApiTest extends TestCase
             'actor' => ['id', 'user_id', 'created_at', 'updated_at'],
             'target' => ['id', 'user_id', 'created_at', 'updated_at'],
             'blocks' => [
-                ['id', 'event_id', 'integration_id', 'created_at', 'updated_at'],
+                ['id', 'event_id', 'created_at', 'updated_at'],
             ],
         ]);
         $this->assertDatabaseHas('events', ['id' => $response['event']['id']]);

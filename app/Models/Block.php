@@ -19,7 +19,6 @@ class Block extends Model
     protected $fillable = [
         'event_id',
         'time',
-        'integration_id',
         'title',
         'content',
         'url',
@@ -49,10 +48,5 @@ class Block extends Model
     public function event()
     {
         return $this->belongsTo(Event::class)->withTrashed();
-    }
-
-    public function integration()
-    {
-        return $this->belongsTo(Integration::class)->withTrashed();
     }
 }

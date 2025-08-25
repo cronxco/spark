@@ -168,6 +168,11 @@ class IntegrationController extends Controller
                 $integration->update(['integration_group_id' => $group->id]);
             }
 
+            // Special handling for GoCardless - redirect to bank selection
+            if ($service === 'gocardless') {
+                return redirect()->route('integrations.gocardless.bankSelection', ['group' => $group->id]);
+            }
+
             return redirect()->route('integrations.onboarding', ['group' => $group->id])
                 ->with('success', 'Integration initialized! Configure instances next.');
         } catch (Exception $e) {
