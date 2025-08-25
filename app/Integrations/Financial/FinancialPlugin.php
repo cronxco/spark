@@ -181,6 +181,10 @@ class FinancialPlugin extends ManualPlugin
             ]
         );
 
+        // Convert decimal to whole number using multiplier
+        $multiplier = 100; // Use 100 for 2 decimal places (cents/pence)
+        $wholeValue = (int) (abs($balance) * $multiplier);
+
         return Event::create([
             'integration_id' => $integration->id,
             'source_id' => 'financial_balance_' . $accountObject->id . '_' . $date,
@@ -189,8 +193,8 @@ class FinancialPlugin extends ManualPlugin
             'service' => 'financial',
             'domain' => 'money',
             'action' => 'had_balance',
-            'value' => abs($balance),
-            'value_multiplier' => 1,
+            'value' => $wholeValue,
+            'value_multiplier' => $multiplier,
             'value_unit' => $accountObject->metadata['currency'] ?? 'GBP',
             'event_metadata' => [
                 'balance' => $balance,

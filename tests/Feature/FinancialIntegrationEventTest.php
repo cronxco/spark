@@ -94,7 +94,8 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals('financial', $balanceEvent->service);
         $this->assertEquals('money', $balanceEvent->domain);
         $this->assertEquals('had_balance', $balanceEvent->action);
-        $this->assertEquals(1000.50, $balanceEvent->value);
+        $this->assertEquals(100050, $balanceEvent->value); // 1000.50 * 100
+        $this->assertEquals(100, $balanceEvent->value_multiplier);
         $this->assertEquals('GBP', $balanceEvent->value_unit);
         $this->assertEquals($accountObject->id, $balanceEvent->actor_id);
 

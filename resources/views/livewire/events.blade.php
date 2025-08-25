@@ -219,7 +219,7 @@ $nextDay = function () {
                                             @if ($event->value)
                                                 <div class="flex items-center gap-1">
                                                     <x-icon name="o-chart-bar" class="w-3 h-3" />
-                                                    {{ $event->value }}
+                                                    {{ $event->formatted_value }}
                                                     @if ($event->value_unit)
                                                         {{ $event->value_unit }}
                                                     @endif
@@ -327,7 +327,7 @@ $nextDay = function () {
                                         <x-icon name="o-chart-bar" class="w-4 h-4 text-base-content/60" />
                                         <span class="text-base-content/70">Value:</span>
                                         <span class="font-medium">
-                                            {{ $this->event->value }}
+                                            {{ $this->event->formatted_value }}
                                             @if ($this->event->value_unit)
                                                 {{ $this->event->value_unit }}
                                             @endif
@@ -474,7 +474,7 @@ $nextDay = function () {
                                     <div class="flex items-start justify-between mb-2">
                                         <h4 class="font-medium text-base-content">{{ $block->title }}</h4>
                                         @if ($block->value)
-                                            <x-badge :value="$block->value . ($block->value_unit ? ' ' . $block->value_unit : '')" class="badge-info" />
+                                            <x-badge :value="$block->formatted_value . ($block->value_unit ? ' ' . $block->value_unit : '')" class="badge-info" />
                                         @endif
                                     </div>
 
