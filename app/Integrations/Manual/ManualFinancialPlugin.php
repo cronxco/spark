@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use InvalidArgumentException;
 
 class ManualFinancialPlugin extends ManualPlugin
 {
@@ -172,7 +173,7 @@ class ManualFinancialPlugin extends ManualPlugin
     {
         $account = EventObject::find($balanceData['account_id']);
         if (!$account) {
-            throw new \InvalidArgumentException('Account not found');
+            throw new InvalidArgumentException('Account not found');
         }
 
         $event = Event::create([

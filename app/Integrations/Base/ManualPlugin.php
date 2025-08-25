@@ -7,9 +7,20 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Exception;
 
 abstract class ManualPlugin implements IntegrationPlugin
 {
+    abstract public static function getIdentifier(): string;
+    
+    abstract public static function getDisplayName(): string;
+    
+    abstract public static function getDescription(): string;
+    
+    abstract public static function getConfigurationSchema(): array;
+    
+    abstract public static function getInstanceTypes(): array;
+    
     public static function getServiceType(): string
     {
         return 'manual';
@@ -69,13 +80,13 @@ abstract class ManualPlugin implements IntegrationPlugin
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         // Manual integrations don't use OAuth
-        throw new \Exception('OAuth is not supported for manual integrations');
+        throw new Exception('OAuth is not supported for manual integrations');
     }
 
     public function handleWebhook(Request $request, Integration $integration): void
     {
         // Manual integrations don't use webhooks
-        throw new \Exception('Webhooks are not supported for manual integrations');
+        throw new Exception('Webhooks are not supported for manual integrations');
     }
 
     public function fetchData(Integration $integration): void
