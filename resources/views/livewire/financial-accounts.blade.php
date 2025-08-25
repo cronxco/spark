@@ -194,21 +194,21 @@
                     </div>
 
                     <!-- Pagination -->
-                    @if($pagination['hasPages'])
+                    @if ($pagination['hasPages'])
                         <div class="mt-6">
                             <div class="flex items-center justify-between">
                                 <div class="text-sm text-base-content/70">
                                     Showing {{ $pagination['offset'] + 1 }} to {{ min($pagination['offset'] + $pagination['perPage'], $pagination['total']) }} of {{ $pagination['total'] }} accounts
                                 </div>
                                 <div class="join">
-                                    @if($pagination['currentPage'] > 1)
+                                    @if ($pagination['currentPage'] > 1)
                                         <button wire:click="previousPage" class="btn btn-outline btn-sm">
                                             <x-icon name="o-chevron-left" class="w-4 h-4" />
                                             Previous
                                         </button>
                                     @endif
-                                    
-                                    @if($pagination['hasMorePages'])
+
+                                    @if ($pagination['hasMorePages'])
                                         <button wire:click="nextPage" class="btn btn-outline btn-sm">
                                             Next
                                             <x-icon name="o-chevron-right" class="w-4 h-4" />

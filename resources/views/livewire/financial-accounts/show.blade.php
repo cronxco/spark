@@ -31,7 +31,7 @@
                             </label>
                             <span class="badge badge-outline">{{ $accountTypeLabel }}</span>
                         </div>
-                        
+
                         <div>
                             <label class="label">
                                 <span class="label-text font-medium">Provider</span>
@@ -39,7 +39,7 @@
                             <p>{{ $provider }}</p>
                         </div>
 
-                        @if($accountNumber)
+                        @if ($accountNumber)
                         <div>
                             <label class="label">
                                 <span class="label-text font-medium">Account Number</span>
@@ -48,7 +48,7 @@
                         </div>
                         @endif
 
-                        @if($sortCode)
+                        @if ($sortCode)
                         <div>
                             <label class="label">
                                 <span class="label-text font-medium">Sort Code</span>
@@ -64,7 +64,7 @@
                             <p>{{ $currency }}</p>
                         </div>
 
-                        @if($interestRate)
+                        @if ($interestRate)
                         <div>
                             <label class="label">
                                 <span class="label-text font-medium">Interest Rate</span>
@@ -73,7 +73,7 @@
                         </div>
                         @endif
 
-                        @if($startDate)
+                        @if ($startDate)
                         <div>
                             <label class="label">
                                 <span class="label-text font-medium">Start Date</span>
