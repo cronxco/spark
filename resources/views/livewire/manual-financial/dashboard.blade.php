@@ -96,18 +96,16 @@ new class extends Component {
         return $types[$type] ?? ucfirst($type);
     }
 
-    public function getCurrencySymbol(string $currency): string
-    {
-        return [
-            'GBP' => '£',
-            'EUR' => '€',
-            'USD' => '$',
-        ][$currency] ?? $currency;
-    }
+
 
     public function formatBalance(float $balance, string $currency): string
     {
-        $symbol = $this->getCurrencySymbol($currency);
+        $symbols = [
+            'GBP' => '£',
+            'EUR' => '€',
+            'USD' => '$',
+        ];
+        $symbol = $symbols[$currency] ?? $currency;
         return $symbol . number_format($balance, 2);
     }
 }; ?>

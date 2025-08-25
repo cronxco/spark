@@ -104,14 +104,7 @@ new class extends Component {
         return $types[$type] ?? ucfirst($type);
     }
 
-    public function getCurrencySymbol(string $currency): string
-    {
-        return [
-            'GBP' => '£',
-            'EUR' => '€',
-            'USD' => '$',
-        ][$currency] ?? $currency;
-    }
+
 }; ?>
 
 <div>

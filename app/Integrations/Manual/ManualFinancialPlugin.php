@@ -8,8 +8,6 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class ManualFinancialPlugin extends ManualPlugin
 {
@@ -129,42 +127,9 @@ class ManualFinancialPlugin extends ManualPlugin
         ];
     }
 
-    public function initializeGroup(User $user): IntegrationGroup
-    {
-        return IntegrationGroup::create([
-            'user_id' => $user->id,
-            'service' => static::getIdentifier(),
-            'account_id' => null,
-            'access_token' => null,
-            'refresh_token' => null,
-            'expiry' => null,
-            'refresh_expiry' => null,
-        ]);
-    }
 
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
-    {
-        $defaultName = static::getDisplayName();
-        if (method_exists(static::class, 'getInstanceTypes')) {
-            try {
-                $types = static::getInstanceTypes();
-                $defaultName = $types[$instanceType]['label'] ?? ucfirst($instanceType);
-            } catch (\Throwable $e) {
-                $defaultName = ucfirst($instanceType);
-            }
-        } else {
-            $defaultName = ucfirst($instanceType);
-        }
 
-        return Integration::create([
-            'user_id' => $group->user_id,
-            'integration_group_id' => $group->id,
-            'service' => static::getIdentifier(),
-            'name' => $defaultName,
-            'instance_type' => $instanceType,
-            'configuration' => $initialConfig,
-        ]);
-    }
+
 
     public function fetchData(Integration $integration): void
     {
