@@ -433,7 +433,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Sync Branch
-        uses: remarkablemark/sync-branch@6bdd47dc563c19329241d933c9d8038f8bdaaf21 # v1
+        uses: remarkablemark/sync-branch@272cff15a71b5961217ab38ff110692668ff0242 # v1
         with:
           base: dev
           title: ":twisted_rightwards_arrows: Sync back to dev"
