@@ -43,7 +43,7 @@ return new class extends Migration
         try {
             // Note: We need to manually handle the prefix for raw SQL statements
             $tableName = Schema::getConnection()->getTablePrefix() . 'events';
-            DB::statement("DROP INDEX IF EXISTS events_integration_source_unique");
+            DB::statement('DROP INDEX IF EXISTS events_integration_source_unique');
         } catch (\Throwable $e) {
             // Fallback: attempt Schema builder drop for other drivers
             Schema::table('events', function (Blueprint $table) {
