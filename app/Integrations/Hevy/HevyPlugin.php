@@ -347,6 +347,7 @@ class HevyPlugin implements IntegrationPlugin
             'type' => 'hevy_user',
             'title' => $title,
         ], [
+            'integration_id' => $integration->id,
             'time' => now(),
             'content' => 'Hevy user account',
             'metadata' => is_array($profile) ? $profile : [],
