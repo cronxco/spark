@@ -15,6 +15,7 @@ class EventObject extends Model
     public $incrementing = false;
 
     protected $table = 'objects';
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -45,11 +46,13 @@ class EventObject extends Model
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
+
+            // no-op: user_id must be provided by callers now
         });
     }
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 }

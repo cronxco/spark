@@ -14,6 +14,7 @@ class Block extends Model
     public $incrementing = false;
 
     protected $table = 'blocks';
+
     protected $keyType = 'string';
 
     protected $fillable = [

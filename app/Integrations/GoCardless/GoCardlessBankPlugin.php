@@ -8,10 +8,13 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use RuntimeException;
+use Throwable;
 
 class GoCardlessBankPlugin extends OAuthPlugin
 {
@@ -20,11 +23,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
      * Uses direct HTTP calls instead of the unmaintained Nordigen package
      */
     protected string $apiBase = 'https://bankaccountdata.gocardless.com/api/v2';
+
     protected string $tokenEndpoint = 'https://bankaccountdata.gocardless.com/api/v2/token/new/';
+
     protected string $secretId;
+
     protected string $secretKey;
+
     protected string $redirectUri;
+
     protected string $countryCode;
+
     protected ?string $accessToken = null;
 
     public function __construct()
@@ -35,8 +44,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ?? route('integrations.oauth.callback', ['service' => self::getIdentifier()]));
         $this->countryCode = (string) (config('services.gocardless.country', 'GB'));
 
-        if (!app()->environment('testing') && (empty($this->secretId) || empty($this->secretKey))) {
-            throw new \InvalidArgumentException('GoCardless credentials are not configured');
+        if (! app()->environment('testing') && (empty($this->secretId) || empty($this->secretKey))) {
+            throw new InvalidArgumentException('GoCardless credentials are not configured');
         }
     }
 
@@ -87,12 +96,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ];
     }
 
-    protected function getRequiredScopes(): string
-    {
-        // Not applicable for GoCardless Bank Account Data API
-        return '';
-    }
-
     /**
      * Get OAuth URL for GoCardless Bank Account Data API
      */
@@ -104,24 +107,24 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Get the selected institution from session
-        $institutionId = (string) (Session::get('gocardless_institution_id_'.$group->id)
+        $institutionId = (string) (Session::get('gocardless_institution_id_' . $group->id)
             ?? config('services.gocardless.institution_id', ''));
 
         Log::info('GoCardless institution ID from session', [
             'group_id' => $group->id,
             'institution_id' => $institutionId,
-            'session_key' => 'gocardless_institution_id_'.$group->id,
+            'session_key' => 'gocardless_institution_id_' . $group->id,
         ]);
 
         if (empty($institutionId)) {
-            throw new \RuntimeException('No institution selected for GoCardless integration');
+            throw new RuntimeException('No institution selected for GoCardless integration');
         }
 
         try {
             // According to GoCardless Quickstart Guide:
             // Step 3: Create End User Agreement (required for proper flow)
             // Step 4: Create Requisition (required - this gives us the authorization link)
-            
+
             Log::info('Creating GoCardless end-user agreement (Step 3)', [
                 'group_id' => $group->id,
                 'institution_id' => $institutionId,
@@ -130,7 +133,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             // Create agreement first (Step 3), then requisition (Step 4)
             $agreement = $this->createEndUserAgreement($group, $institutionId);
             $requisition = $this->createRequisition($institutionId, $agreement['id']);
-            
+
             Log::info('GoCardless requisition created (Step 4)', [
                 'group_id' => $group->id,
                 'requisition_id' => $requisition['id'] ?? null,
@@ -141,7 +144,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             // Store the reference in auth_metadata so we can look it up in the callback
             $reference = $requisition['reference'] ?? null;
             $requisitionId = $requisition['id'] ?? null;
-            
+
             if ($reference && $requisitionId) {
                 // Store both the reference (for callback lookup) and requisition ID
                 $group->update([
@@ -151,7 +154,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'gocardless_requisition_id' => $requisitionId,
                     ]),
                 ]);
-                
+
                 Log::info('Stored GoCardless reference and requisition ID in group', [
                     'group_id' => $group->id,
                     'reference' => $reference,
@@ -167,17 +170,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'requisition_response' => $requisition,
                     'response_keys' => array_keys($requisition),
                 ]);
-                throw new \RuntimeException('Failed to get authorization link from GoCardless requisition response');
+                throw new RuntimeException('Failed to get authorization link from GoCardless requisition response');
             }
-            
+
             Log::info('GoCardless OAuth URL generated successfully', [
                 'group_id' => $group->id,
                 'oauth_url' => $link,
             ]);
-            
+
             return $link;
-            
-        } catch (\Throwable $e) {
+
+        } catch (Throwable $e) {
             Log::error('Failed to create GoCardless OAuth URL', [
                 'group_id' => $group->id,
                 'institution_id' => $institutionId,
@@ -195,31 +198,31 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         // GoCardless redirects back with ?ref={reference}, but we need the actual requisition ID
         $reference = $request->get('ref');
-        
-        if (!$reference) {
-            throw new \RuntimeException('Missing GoCardless reference parameter');
+
+        if (! $reference) {
+            throw new RuntimeException('Missing GoCardless reference parameter');
         }
 
         // Get the actual requisition ID from the group's auth_metadata
         $requisitionId = $group->auth_metadata['gocardless_requisition_id'] ?? null;
-        
-        if (!$requisitionId) {
-            throw new \RuntimeException('No requisition ID found in group metadata');
+
+        if (! $requisitionId) {
+            throw new RuntimeException('No requisition ID found in group metadata');
         }
 
         try {
             // Verify the requisition status using the actual requisition ID
             $requisition = $this->getRequisition($requisitionId);
-            
+
             if (($requisition['status'] ?? '') !== 'LN') {
-                throw new \RuntimeException('Requisition not linked: ' . ($requisition['status'] ?? 'unknown'));
+                throw new RuntimeException('Requisition not linked: ' . ($requisition['status'] ?? 'unknown'));
             }
 
             // Update group with the confirmed requisition id
             $group->update([
                 'account_id' => $requisitionId,
                 // Store a non-null token surrogate so scheduler includes this group
-                'access_token' => 'requisition:'.$requisitionId,
+                'access_token' => 'requisition:' . $requisitionId,
             ]);
 
             Log::info('GoCardless requisition successfully linked', [
@@ -228,7 +231,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'reference' => $reference,
                 'status' => $requisition['status'],
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('GoCardless OAuth callback failed', [
                 'group_id' => $group->id,
                 'requisition_id' => $requisitionId,
@@ -239,35 +242,32 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
     }
 
-    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
-    {
-        // Nothing to pre-fetch here; accounts are tied to requisitions
-    }
-
     public function fetchData(Integration $integration): void
     {
         $instanceType = $integration->instance_type ?: 'transactions';
-        
+
         Log::info('GoCardless fetchData called', [
             'integration_id' => $integration->id,
             'instance_type' => $instanceType,
             'group_id' => $integration->group_id,
         ]);
-        
+
         if ($instanceType === 'accounts') {
             Log::info('GoCardless fetchData: skipping accounts instance type', [
                 'integration_id' => $integration->id,
             ]);
+
             return;
         }
 
         $group = $integration->group;
-        if (!$group || empty($group->account_id)) {
+        if (! $group || empty($group->account_id)) {
             Log::warning('GoCardless fetchData: missing group or account_id', [
                 'integration_id' => $integration->id,
                 'group_id' => $group?->id,
                 'account_id' => $group?->account_id,
             ]);
+
             return;
         }
 
@@ -281,7 +281,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         try {
             // First, try to update integration names if account details are now available
             $this->updateIntegrationNames($group);
-            
+
             if ($instanceType === 'balances') {
                 Log::info('GoCardless fetchData: processing balance snapshot', [
                     'integration_id' => $integration->id,
@@ -293,12 +293,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 ]);
                 $this->processRecentTransactions($integration);
             }
-            
+
             Log::info('GoCardless fetchData: completed successfully', [
                 'integration_id' => $integration->id,
                 'instance_type' => $instanceType,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Failed to fetch GoCardless data', [
                 'integration_id' => $integration->id,
                 'instance_type' => $instanceType,
@@ -317,14 +317,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'group_id' => $integration->group_id,
         ]);
-        
+
         $group = $integration->group;
-        if (!$group || empty($group->account_id)) {
+        if (! $group || empty($group->account_id)) {
             Log::warning('GoCardless listAccounts: missing group or account_id', [
                 'integration_id' => $integration->id,
                 'group_id' => $group?->id,
                 'account_id' => $group?->account_id,
             ]);
+
             return [];
         }
 
@@ -337,21 +338,21 @@ class GoCardlessBankPlugin extends OAuthPlugin
         try {
             $requisition = $this->getRequisition($group->account_id);
             $accountIds = $requisition['accounts'] ?? [];
-            
+
             Log::info('GoCardless listAccounts: found account IDs', [
                 'integration_id' => $integration->id,
                 'requisition_id' => $group->account_id,
                 'account_ids' => $accountIds,
                 'account_count' => count($accountIds),
             ]);
-            
+
             $accounts = [];
             foreach ($accountIds as $accountId) {
                 Log::info('GoCardless listAccounts: getting account details', [
                     'integration_id' => $integration->id,
                     'account_id' => $accountId,
                 ]);
-                
+
                 $accountDetails = $this->getAccount($accountId);
                 if ($accountDetails) {
                     Log::info('GoCardless listAccounts: account details retrieved', [
@@ -367,14 +368,14 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     ]);
                 }
             }
-            
+
             Log::info('GoCardless listAccounts: returning accounts', [
                 'integration_id' => $integration->id,
                 'account_count' => count($accounts),
             ]);
-            
+
             return $accounts;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Failed to list GoCardless accounts', [
                 'integration_id' => $integration->id,
                 'group_id' => $group->id,
@@ -398,11 +399,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         try {
             $requisition = $this->getRequisition($group->account_id);
             $accountIds = $requisition['accounts'] ?? [];
-            
+
             if (empty($accountIds)) {
                 Log::warning('GoCardless updateIntegrationNames: no accounts found', [
                     'group_id' => $group->id,
                 ]);
+
                 return;
             }
 
@@ -423,55 +425,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'group_id' => $group->id,
                 'account_count' => count($accounts),
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Failed to update GoCardless integration names', [
                 'group_id' => $group->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-        }
-    }
-
-    /**
-     * Update integration names for a specific account
-     */
-    protected function updateIntegrationNamesForAccount(IntegrationGroup $group, array $account): void
-    {
-        $accountId = $account['id'];
-        
-        // Find integrations for this account
-        $integrations = $group->integrations()
-            ->where('config->account_id', $accountId)
-            ->get();
-
-        foreach ($integrations as $integration) {
-            $currentName = $integration->name;
-            $newName = $this->generateAccountName($account);
-            
-            if ($currentName !== $newName) {
-                Log::info('GoCardless updateIntegrationNamesForAccount: updating name', [
-                    'integration_id' => $integration->id,
-                    'account_id' => $accountId,
-                    'old_name' => $currentName,
-                    'new_name' => $newName,
-                ]);
-                
-                $integration->update(['name' => $newName]);
-            }
-        }
-    }
-
-    /**
-     * Generate a descriptive name for an account
-     */
-    protected function generateAccountName(array $account): string
-    {
-        if (isset($account['details']) && !empty($account['details'])) {
-            return $account['details'];
-        } elseif (isset($account['ownerName'])) {
-            return $account['ownerName'] . "'s Account";
-        } else {
-            return 'Account ' . substr($account['resourceId'] ?? $account['id'] ?? 'Unknown', 0, 8);
         }
     }
 
@@ -487,28 +446,28 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         try {
             $this->updateIntegrationNames($group);
-            
+
             // Return summary of what was updated
             $integrations = $group->integrations()->get();
             $updatedCount = 0;
-            
+
             foreach ($integrations as $integration) {
                 if (isset($integration->config['account_id'])) {
                     $updatedCount++;
                 }
             }
-            
+
             return [
                 'success' => true,
                 'message' => "Updated names for {$updatedCount} integrations",
                 'updated_count' => $updatedCount,
             ];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Failed to refresh GoCardless integration names', [
                 'group_id' => $group->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             return [
                 'success' => false,
                 'message' => 'Failed to update names: ' . $e->getMessage(),
@@ -529,12 +488,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         try {
             $requisition = $this->getRequisition($group->account_id);
             $accountIds = $requisition['accounts'] ?? [];
-            
+
             Log::info('GoCardless onboarding: found account IDs', [
                 'group_id' => $group->id,
                 'account_ids' => $accountIds,
             ]);
-            
+
             $accounts = [];
             foreach ($accountIds as $accountId) {
                 $accountDetails = $this->getAccount($accountId);
@@ -551,20 +510,159 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     ]);
                 }
             }
-            
+
             Log::info('GoCardless onboarding: returning accounts', [
                 'group_id' => $group->id,
                 'account_count' => count($accounts),
                 'accounts' => $accounts,
             ]);
-            
+
             return $accounts;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Failed to get available accounts for onboarding', [
                 'group_id' => $group->id,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
+        }
+    }
+
+    /**
+     * Get available institutions for a country
+     */
+    public function getInstitutions(?string $country = null): array
+    {
+        $country = $country ?: $this->countryCode;
+
+        try {
+            Log::info('Attempting to get GoCardless institutions', [
+                'country' => $country,
+                'api_base' => $this->apiBase,
+            ]);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ])->get($this->apiBase . '/institutions/', [
+                'country' => $country,
+            ]);
+
+            Log::info('GoCardless institutions API response', [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body' => $response->body(),
+                'country' => $country,
+            ]);
+
+            if (! $response->successful()) {
+                Log::warning('Failed to get institutions', [
+                    'country' => $country,
+                    'response' => $response->body(),
+                    'status' => $response->status(),
+                ]);
+
+                return [];
+            }
+
+            $data = $response->json();
+            Log::info('GoCardless institutions response data', [
+                'data_keys' => array_keys($data),
+                'data_structure' => $data,
+            ]);
+
+            // The API returns institutions directly as an array, not wrapped in 'institutions' key
+            $institutions = is_array($data) ? $data : [];
+            Log::info('Extracted institutions', [
+                'count' => count($institutions),
+                'first_few' => array_slice($institutions, 0, 3),
+            ]);
+
+            return $institutions;
+        } catch (Throwable $e) {
+            Log::error('Failed to get institutions', [
+                'country' => $country,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Required method from IntegrationPlugin interface
+     */
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        // This plugin processes data directly, no conversion needed
+        return $externalData;
+    }
+
+    /**
+     * Migration support methods
+     */
+    public function fetchWindowWithMeta(string $instanceType, ?string $lastDate = null): array
+    {
+        // Implementation for migration jobs
+        return [];
+    }
+
+    public function processGoCardlessMigrationItems(Integration $integration, array $items): void
+    {
+        // Implementation for migration processing
+    }
+
+    protected function getRequiredScopes(): string
+    {
+        // Not applicable for GoCardless Bank Account Data API
+        return '';
+    }
+
+    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
+    {
+        // Nothing to pre-fetch here; accounts are tied to requisitions
+    }
+
+    /**
+     * Update integration names for a specific account
+     */
+    protected function updateIntegrationNamesForAccount(IntegrationGroup $group, array $account): void
+    {
+        $accountId = $account['id'];
+
+        // Find integrations for this account
+        $integrations = $group->integrations()
+            ->where('config->account_id', $accountId)
+            ->get();
+
+        foreach ($integrations as $integration) {
+            $currentName = $integration->name;
+            $newName = $this->generateAccountName($account);
+
+            if ($currentName !== $newName) {
+                Log::info('GoCardless updateIntegrationNamesForAccount: updating name', [
+                    'integration_id' => $integration->id,
+                    'account_id' => $accountId,
+                    'old_name' => $currentName,
+                    'new_name' => $newName,
+                ]);
+
+                $integration->update(['name' => $newName]);
+            }
+        }
+    }
+
+    /**
+     * Generate a descriptive name for an account
+     */
+    protected function generateAccountName(array $account): string
+    {
+        if (isset($account['details']) && ! empty($account['details'])) {
+            return $account['details'];
+        } elseif (isset($account['ownerName'])) {
+            return $account['ownerName'] . "'s Account";
+        } else {
+            return 'Account ' . substr($account['resourceId'] ?? $account['id'] ?? 'Unknown', 0, 8);
         }
     }
 
@@ -576,30 +674,30 @@ class GoCardlessBankPlugin extends OAuthPlugin
         Log::info('GoCardless processBalanceSnapshot called', [
             'integration_id' => $integration->id,
         ]);
-        
+
         $accounts = $this->listAccounts($integration);
-        
+
         Log::info('GoCardless processBalanceSnapshot: got accounts', [
             'integration_id' => $integration->id,
             'account_count' => count($accounts),
         ]);
-        
+
         foreach ($accounts as $account) {
             Log::info('GoCardless processBalanceSnapshot: processing account', [
                 'integration_id' => $integration->id,
                 'account_id' => $account['id'],
                 'account_name' => $account['details'] ?? $account['ownerName'] ?? 'Unknown',
             ]);
-            
+
             $balances = $this->getAccountBalances($account['id']);
-            
+
             Log::info('GoCardless processBalanceSnapshot: got balances', [
                 'integration_id' => $integration->id,
                 'account_id' => $account['id'],
                 'balance_count' => count($balances),
                 'balances' => $balances,
             ]);
-            
+
             foreach ($balances as $balance) {
                 Log::info('GoCardless processBalanceSnapshot: processing balance', [
                     'integration_id' => $integration->id,
@@ -609,13 +707,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'balance_currency' => $balance['balanceAmount']['currency'] ?? 'unknown',
                     'reference_date' => $balance['referenceDate'] ?? 'unknown',
                 ]);
-                
+
                 // According to GoCardless docs, prefer these balance types in order:
                 // 1. interimBooked - most current booked balance
                 // 2. closingBooked - end of day balance
                 // 3. expected - projected end of day balance
                 $preferredTypes = ['interimBooked', 'closingBooked', 'expected'];
-                
+
                 if (in_array(($balance['balanceType'] ?? ''), $preferredTypes)) {
                     Log::info('GoCardless processBalanceSnapshot: creating balance event', [
                         'integration_id' => $integration->id,
@@ -624,13 +722,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'balance_amount' => $balance['balanceAmount']['amount'] ?? 'unknown',
                         'balance_currency' => $balance['balanceAmount']['currency'] ?? 'unknown',
                     ]);
-                    
+
                     $this->createBalanceEvent($integration, $account, $balance);
                     break; // Use the first preferred balance type
                 }
             }
         }
-        
+
         Log::info('GoCardless processBalanceSnapshot: completed', [
             'integration_id' => $integration->id,
         ]);
@@ -644,29 +742,29 @@ class GoCardlessBankPlugin extends OAuthPlugin
         Log::info('GoCardless processRecentTransactions called', [
             'integration_id' => $integration->id,
         ]);
-        
+
         $accounts = $this->listAccounts($integration);
-        
+
         Log::info('GoCardless processRecentTransactions: got accounts', [
             'integration_id' => $integration->id,
             'account_count' => count($accounts),
         ]);
-        
+
         foreach ($accounts as $account) {
             Log::info('GoCardless processRecentTransactions: processing account', [
                 'integration_id' => $integration->id,
                 'account_id' => $account['id'],
                 'account_name' => $account['details'] ?? $account['ownerName'] ?? 'Unknown',
             ]);
-            
+
             $transactions = $this->getAccountTransactions($account['id']);
-            
+
             Log::info('GoCardless processRecentTransactions: got transactions', [
                 'integration_id' => $integration->id,
                 'account_id' => $account['id'],
                 'transaction_count' => count($transactions),
             ]);
-            
+
             foreach ($transactions as $transaction) {
                 Log::info('GoCardless processRecentTransactions: processing transaction', [
                     'integration_id' => $integration->id,
@@ -679,11 +777,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'debtor_name' => $transaction['debtorName'] ?? 'unknown',
                     'creditor_name' => $transaction['creditorName'] ?? 'unknown',
                 ]);
-                
+
                 $this->processTransactionItem($integration, $account, $transaction);
             }
         }
-        
+
         Log::info('GoCardless processRecentTransactions: completed', [
             'integration_id' => $integration->id,
         ]);
@@ -702,7 +800,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'currency' => $tx['transactionAmount']['currency'] ?? 'unknown',
             'description' => $tx['remittanceInformationUnstructured'] ?? 'unknown',
         ]);
-        
+
         // Derive category from transaction code
         $category = 'other';
         if (isset($tx['bankTransactionCode'])) {
@@ -710,7 +808,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         } elseif (isset($tx['proprietaryBankTransactionCode'])) {
             $category = Str::slug($tx['proprietaryBankTransactionCode']);
         }
-        
+
         Log::info('GoCardless processTransactionItem: derived category', [
             'integration_id' => $integration->id,
             'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
@@ -743,13 +841,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'debtor_account' => $tx['debtorAccount'] ?? null,
             ],
         ];
-        
+
         Log::info('GoCardless processTransactionItem: creating event', [
             'integration_id' => $integration->id,
             'source_id' => $sourceId,
             'event_data' => $eventData,
         ]);
-        
+
         $event = Event::updateOrCreate(
             [
                 'integration_id' => $integration->id,
@@ -757,7 +855,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ],
             $eventData
         );
-        
+
         Log::info('GoCardless processTransactionItem: event created/updated', [
             'integration_id' => $integration->id,
             'event_id' => $event->id,
@@ -796,7 +894,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     protected function createBalanceEvent(Integration $integration, array $account, array $balance): void
     {
-        $sourceId = 'balance_'.$account['id'].'_'.($balance['referenceDate'] ?? now()->toDateString());
+        $sourceId = 'balance_' . $account['id'] . '_' . ($balance['referenceDate'] ?? now()->toDateString());
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'had_balance',
@@ -811,7 +909,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'account_id' => $account['id'],
             ],
         ];
-        
+
         Log::info('GoCardless createBalanceEvent: creating balance event', [
             'integration_id' => $integration->id,
             'account_id' => $account['id'],
@@ -821,7 +919,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'balance_currency' => $balance['balanceAmount']['currency'] ?? 'unknown',
             'event_data' => $eventData,
         ]);
-        
+
         $event = Event::updateOrCreate(
             [
                 'integration_id' => $integration->id,
@@ -829,7 +927,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ],
             $eventData
         );
-        
+
         Log::info('GoCardless createBalanceEvent: balance event created/updated', [
             'integration_id' => $integration->id,
             'event_id' => $event->id,
@@ -882,7 +980,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $block = Block::updateOrCreate(
             [
                 'integration_id' => $integration->id,
-                'source_id' => 'balance_'.$account['id'].'_'.now()->toDateString(),
+                'source_id' => 'balance_' . $account['id'] . '_' . now()->toDateString(),
             ],
             [
                 'user_id' => $integration->user_id,
@@ -933,7 +1031,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     protected function upsertCounterpartyObject(Integration $integration, array $tx): EventObject
     {
         $counterpartyName = $tx['creditorName'] ?? $tx['debtorName'] ?? 'Unknown';
-        
+
         return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
@@ -980,7 +1078,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         if ($response->successful()) {
             $data = $response->json();
-            
+
             // Look for an existing requisition for this institution
             if (isset($data['results']) && is_array($data['results'])) {
                 foreach ($data['results'] as $requisition) {
@@ -991,7 +1089,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                             'status' => $requisition['status'] ?? 'unknown',
                             'link' => $requisition['link'] ?? 'missing',
                         ]);
-                        
+
                         // Return the existing requisition
                         return $requisition;
                     }
@@ -1023,7 +1121,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Content-Type' => 'application/json',
         ];
-        
+
         Log::info('GoCardless requisition POST request details', [
             'url' => $requestUrl,
             'method' => 'POST',
@@ -1031,7 +1129,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'body' => $requestData,
             'access_token_length' => strlen($this->getAccessToken()),
         ]);
-        
+
         $response = Http::withHeaders($requestHeaders)->post($requestUrl, $requestData);
 
         Log::info('GoCardless new requisition API response (Step 4)', [
@@ -1041,21 +1139,21 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'request_data' => $requestData,
         ]);
 
-        if (!$response->successful()) {
-            throw new \RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
         }
 
         $data = $response->json();
-        
+
         // Check if the response has the expected structure
-        if (!isset($data['id'])) {
+        if (! isset($data['id'])) {
             Log::error('GoCardless new requisition response missing ID', [
                 'response_data' => $data,
                 'response_keys' => array_keys($data),
                 'response_type' => is_array($data) ? 'array' : gettype($data),
                 'response_length' => is_array($data) ? count($data) : 'N/A',
             ]);
-            throw new \RuntimeException('Invalid response from GoCardless API: missing requisition ID (without agreement)');
+            throw new RuntimeException('Invalid response from GoCardless API: missing requisition ID (without agreement)');
         }
 
         Log::info('Successfully created GoCardless requisition (without agreement)', [
@@ -1109,21 +1207,21 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'request_data' => $requestData,
         ]);
 
-        if (!$response->successful()) {
-            throw new \RuntimeException('Failed to create agreement (Step 3): ' . $response->body());
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to create agreement (Step 3): ' . $response->body());
         }
 
         $data = $response->json();
-        
+
         // Check if the response has the expected structure
-        if (!isset($data['id'])) {
+        if (! isset($data['id'])) {
             Log::error('GoCardless new agreement response missing ID', [
                 'response_data' => $data,
                 'response_keys' => array_keys($data),
                 'response_type' => is_array($data) ? 'array' : gettype($data),
                 'response_length' => is_array($data) ? count($data) : 'N/A',
             ]);
-            throw new \RuntimeException('Invalid response from GoCardless API: missing agreement ID');
+            throw new RuntimeException('Invalid response from GoCardless API: missing agreement ID');
         }
 
         Log::info('Successfully created GoCardless agreement (Step 3)', [
@@ -1159,20 +1257,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'headers' => $response->headers(),
         ]);
 
-        if (!$response->successful()) {
-            throw new \RuntimeException('Failed to check existing requisitions: ' . $response->body());
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to check existing requisitions: ' . $response->body());
         }
 
         $data = $response->json();
-        
+
         // Look for an existing requisition for this institution and agreement
         if (isset($data['results']) && is_array($data['results'])) {
             foreach ($data['results'] as $requisition) {
-                if (isset($requisition['institution_id']) && 
+                if (isset($requisition['institution_id']) &&
                     $requisition['institution_id'] === $institutionId &&
-                    isset($requisition['agreement']) && 
+                    isset($requisition['agreement']) &&
                     $requisition['agreement'] === $agreementId) {
-                    
+
                     Log::info('Found existing GoCardless requisition for institution and agreement', [
                         'requisition_id' => $requisition['id'],
                         'institution_id' => $requisition['institution_id'],
@@ -1180,7 +1278,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'status' => $requisition['status'] ?? 'unknown',
                         'link' => $requisition['link'] ?? 'unknown',
                     ]);
-                    
+
                     // Return the existing requisition
                     return $requisition;
                 }
@@ -1217,12 +1315,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'content_type' => $response->header('Content-Type'),
         ]);
 
-        if (!$response->successful()) {
-            throw new \RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
         }
 
         $data = $response->json();
-        
+
         Log::info('GoCardless requisition response parsed JSON', [
             'parsed_data' => $data,
             'data_type' => is_array($data) ? 'array' : gettype($data),
@@ -1231,24 +1329,24 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Check if the response has the expected structure
-        if (!isset($data['id'])) {
+        if (! isset($data['id'])) {
             Log::error('GoCardless requisition response missing ID', [
                 'response_data' => $data,
                 'response_keys' => array_keys($data),
                 'response_type' => is_array($data) ? 'array' : gettype($data),
                 'response_length' => is_array($data) ? count($data) : 'N/A',
             ]);
-            throw new \RuntimeException('Invalid response from GoCardless API: missing requisition ID');
+            throw new RuntimeException('Invalid response from GoCardless API: missing requisition ID');
         }
 
-        if (!isset($data['link'])) {
+        if (! isset($data['link'])) {
             Log::error('GoCardless requisition response missing link', [
                 'response_data' => $data,
                 'response_keys' => array_keys($data),
                 'response_type' => is_array($data) ? 'array' : gettype($data),
                 'response_length' => is_array($data) ? count($data) : 'N/A',
             ]);
-            throw new \RuntimeException('Invalid response from GoCardless API: missing requisition link');
+            throw new RuntimeException('Invalid response from GoCardless API: missing requisition link');
         }
 
         Log::info('Successfully created GoCardless requisition (Step 4)', [
@@ -1260,8 +1358,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
         return $data;
     }
 
-
-
     /**
      * Get requisition details
      */
@@ -1271,7 +1367,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'requisition_id' => $requisitionId,
             'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
         ]);
-        
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/requisitions/' . $requisitionId . '/');
@@ -1283,18 +1379,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'response_headers' => $response->headers(),
         ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             Log::error('Failed to get requisition', [
                 'requisition_id' => $requisitionId,
                 'status' => $response->status(),
                 'response' => $response->body(),
                 'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
             ]);
-            throw new \RuntimeException('Failed to get requisition: ' . $response->body());
+            throw new RuntimeException('Failed to get requisition: ' . $response->body());
         }
 
         $data = $response->json();
-        
+
         Log::info('GoCardless getRequisition success', [
             'requisition_id' => $requisitionId,
             'requisition_data' => $data,
@@ -1314,10 +1410,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             $errorData = $response->json();
             $isRateLimited = $response->status() === 429;
-            
+
             if ($isRateLimited) {
                 Log::warning('GoCardless API rate limit exceeded for account details', [
                     'account_id' => $accountId,
@@ -1325,7 +1421,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'rate_limit_detail' => $errorData['detail'] ?? 'unknown',
                     'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
                 ]);
-                
+
                 // Return a fallback account structure when rate limited
                 return [
                     'id' => $accountId,
@@ -1343,6 +1439,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'response' => $response->body(),
                     'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
                 ]);
+
                 return null;
             }
         }
@@ -1350,7 +1447,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $responseData = $response->json();
         // The API returns {"account": {...}}, so extract the account data
         $accountData = $responseData['account'] ?? $responseData;
-        
+
         Log::info('GoCardless getAccount response', [
             'account_id' => $accountId,
             'account_data' => $accountData,
@@ -1368,7 +1465,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'account_id' => $accountId,
             'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/balances/',
         ]);
-        
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/accounts/' . $accountId . '/balances/');
@@ -1380,23 +1477,24 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'response_headers' => $response->headers(),
         ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             Log::error('Failed to get account balances', [
                 'account_id' => $accountId,
                 'status' => $response->status(),
                 'response' => $response->body(),
                 'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/balances/',
             ]);
+
             return [];
         }
 
         $data = $response->json();
-        
+
         // The API returns balances directly as an array
         $balances = $data;
-        
+
         // Ensure it's an array
-        if (!is_array($balances)) {
+        if (! is_array($balances)) {
             Log::warning('GoCardless getAccountBalances: unexpected response format', [
                 'account_id' => $accountId,
                 'response_type' => gettype($balances),
@@ -1404,7 +1502,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ]);
             $balances = [];
         }
-        
+
         Log::info('GoCardless getAccountBalances success', [
             'account_id' => $accountId,
             'balance_count' => count($balances),
@@ -1423,7 +1521,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'account_id' => $accountId,
             'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/transactions/',
         ]);
-        
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/accounts/' . $accountId . '/transactions/');
@@ -1435,25 +1533,26 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'response_headers' => $response->headers(),
         ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             Log::error('Failed to get account transactions', [
                 'account_id' => $accountId,
                 'status' => $response->status(),
                 'response' => $response->body(),
                 'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/transactions/',
             ]);
+
             return [];
         }
 
         $data = $response->json();
-        
+
         // The API returns a nested structure with 'booked' and 'pending' arrays
         $bookedTransactions = $data['transactions']['booked'] ?? [];
         $pendingTransactions = $data['transactions']['pending'] ?? [];
-        
+
         // Combine both types of transactions
         $transactions = array_merge($bookedTransactions, $pendingTransactions);
-        
+
         Log::info('GoCardless getAccountTransactions success', [
             'account_id' => $accountId,
             'booked_count' => count($bookedTransactions),
@@ -1495,15 +1594,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'headers' => $response->headers(),
         ]);
 
-        if (!$response->successful()) {
-            throw new \RuntimeException('Failed to get access token: ' . $response->body());
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to get access token: ' . $response->body());
         }
 
         $tokenData = $response->json();
         $this->accessToken = $tokenData['access'] ?? '';
 
         if (empty($this->accessToken)) {
-            throw new \RuntimeException('No access token in response');
+            throw new RuntimeException('No access token in response');
         }
 
         Log::info('GoCardless access token obtained', [
@@ -1512,89 +1611,4 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         return $this->accessToken;
     }
-
-    /**
-     * Get available institutions for a country
-     */
-    public function getInstitutions(string $country = null): array
-    {
-        $country = $country ?: $this->countryCode;
-        
-        try {
-            Log::info('Attempting to get GoCardless institutions', [
-                'country' => $country,
-                'api_base' => $this->apiBase,
-            ]);
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->get($this->apiBase . '/institutions/', [
-                'country' => $country,
-            ]);
-
-            Log::info('GoCardless institutions API response', [
-                'status' => $response->status(),
-                'headers' => $response->headers(),
-                'body' => $response->body(),
-                'country' => $country,
-            ]);
-
-            if (!$response->successful()) {
-                Log::warning('Failed to get institutions', [
-                    'country' => $country,
-                    'response' => $response->body(),
-                    'status' => $response->status(),
-                ]);
-                return [];
-            }
-
-            $data = $response->json();
-            Log::info('GoCardless institutions response data', [
-                'data_keys' => array_keys($data),
-                'data_structure' => $data,
-            ]);
-
-            // The API returns institutions directly as an array, not wrapped in 'institutions' key
-            $institutions = is_array($data) ? $data : [];
-            Log::info('Extracted institutions', [
-                'count' => count($institutions),
-                'first_few' => array_slice($institutions, 0, 3),
-            ]);
-
-            return $institutions;
-        } catch (\Throwable $e) {
-            Log::error('Failed to get institutions', [
-                'country' => $country,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return [];
-        }
-    }
-
-    /**
-     * Required method from IntegrationPlugin interface
-     */
-    public function convertData(array $externalData, Integration $integration): array
-    {
-        // This plugin processes data directly, no conversion needed
-        return $externalData;
-    }
-
-    /**
-     * Migration support methods
-     */
-    public function fetchWindowWithMeta(string $instanceType, ?string $lastDate = null): array
-    {
-        // Implementation for migration jobs
-        return [];
-    }
-
-    public function processGoCardlessMigrationItems(Integration $integration, array $items): void
-    {
-        // Implementation for migration processing
-    }
 }
-
-
-

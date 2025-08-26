@@ -16,6 +16,7 @@ class MonitorBatchAndStartProcessing implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected Integration $integration;
+
     protected string $targetBatchId;
 
     public function __construct(Integration $integration, string $batchId)

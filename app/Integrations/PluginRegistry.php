@@ -50,7 +50,7 @@ class PluginRegistry
             return $pluginClass::getServiceType() === 'apikey';
         });
     }
-    
+
     public static function getPluginInstance(string $identifier): ?IntegrationPlugin
     {
         $pluginClass = self::getPlugin($identifier);

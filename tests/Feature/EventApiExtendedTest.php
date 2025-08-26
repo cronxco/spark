@@ -15,6 +15,7 @@ class EventApiExtendedTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Integration $integration;
 
     protected function setUp(): void

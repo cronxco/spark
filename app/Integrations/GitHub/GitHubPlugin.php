@@ -21,10 +21,15 @@ use Throwable;
 class GitHubPlugin extends OAuthPlugin
 {
     protected string $baseUrl = 'https://api.github.com';
+
     protected string $authUrl = 'https://github.com/login/oauth';
+
     protected string $apiVersion = '2022-11-28';
+
     protected string $clientId;
+
     protected string $clientSecret;
+
     protected string $redirectUri;
 
     public function __construct()

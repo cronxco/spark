@@ -15,17 +15,23 @@ class HevyIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_hevy_plugin_has_correct_metadata_and_service_type(): void
+    /**
+     * @test
+     */
+    public function hevy_plugin_has_correct_metadata_and_service_type(): void
     {
         $this->assertEquals('hevy', HevyPlugin::getIdentifier());
         $this->assertEquals('Hevy', HevyPlugin::getDisplayName());
         $this->assertEquals('apikey', HevyPlugin::getServiceType());
     }
 
-    public function test_hevy_plugin_can_initialize_group_and_instance(): void
+    /**
+     * @test
+     */
+    public function hevy_plugin_can_initialize_group_and_instance(): void
     {
         $user = User::factory()->create();
-        $plugin = new HevyPlugin();
+        $plugin = new HevyPlugin;
 
         $group = $plugin->initializeGroup($user);
         $this->assertInstanceOf(IntegrationGroup::class, $group);
@@ -39,7 +45,10 @@ class HevyIntegrationTest extends TestCase
         $this->assertEquals('hevy', $instance->service);
     }
 
-    public function test_hevy_fetch_workouts_creates_event_and_set_blocks(): void
+    /**
+     * @test
+     */
+    public function hevy_fetch_workouts_creates_event_and_set_blocks(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -95,7 +104,7 @@ class HevyIntegrationTest extends TestCase
             ], 200),
         ]);
 
-        $plugin = new HevyPlugin();
+        $plugin = new HevyPlugin;
         $plugin->fetchData($integration);
 
         $event = Event::where('integration_id', $integration->id)->first();
@@ -116,5 +125,3 @@ class HevyIntegrationTest extends TestCase
         $this->assertNotNull($blocks->firstWhere('title', 'Bench Press - Total Volume'));
     }
 }
-
-

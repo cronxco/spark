@@ -22,9 +22,13 @@ class MonzoPlugin extends OAuthPlugin
     private static array $accountTypeCache = [];
 
     protected string $apiBase = 'https://api.monzo.com';
+
     protected string $authBase = 'https://auth.monzo.com';
+
     protected string $clientId;
+
     protected string $clientSecret;
+
     protected string $redirectUri;
 
     public function __construct()
@@ -244,7 +248,7 @@ class MonzoPlugin extends OAuthPlugin
         $counterpartyId = $tx['counterparty']['account_id'] ?? $tx['counterparty']['id'] ?? $tx['counterparty'] ?? null;
         $target = null;
         if ($counterpartyId) {
-            $target = EventObject::where('user_id', $master->user_id)
+            $target = EventObject::where('user_id', $integration->user_id)
                 ->where('concept', 'account')
                 ->where('type', 'monzo_pot')
                 ->whereJsonContains('metadata->pot_id', $counterpartyId)
@@ -256,12 +260,13 @@ class MonzoPlugin extends OAuthPlugin
             $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
             $target = EventObject::updateOrCreate(
                 [
-                    'user_id' => $master->user_id,
+                    'user_id' => $integration->user_id,
                     'concept' => 'counterparty',
                     'type' => 'monzo_counterparty',
                     'title' => $targetTitle,
                 ],
                 [
+                    'integration_id' => $master->id,
                     'time' => $tx['created'] ?? now(),
                     'content' => $tx['description'] ?? null,
                     'metadata' => [
@@ -310,12 +315,13 @@ class MonzoPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'user_id' => $master->user_id,
+                'user_id' => $integration->user_id,
                 'concept' => 'account',
                 'type' => 'monzo_pot',
                 'title' => $pot['name'] ?? 'Pot',
             ],
             [
+                'integration_id' => $master->id,
                 'time' => $pot['created'] ?? now(),
                 'content' => (string) ($pot['balance'] ?? 0),
                 'metadata' => [
@@ -340,12 +346,13 @@ class MonzoPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'user_id' => $master->user_id,
+                'user_id' => $integration->user_id,
                 'concept' => 'account',
                 'type' => 'monzo_account',
                 'title' => $title,
             ],
             [
+                'integration_id' => $master->id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [
@@ -458,6 +465,7 @@ class MonzoPlugin extends OAuthPlugin
                 'title' => $date,
             ],
             [
+                'integration_id' => $integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $date],
@@ -637,7 +645,6 @@ class MonzoPlugin extends OAuthPlugin
             }
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $event->integration_id,
                 'title' => 'Merchant',
                 'content' => implode(' • ', $parts),
                 'media_url' => $m['logo'] ?? null,
@@ -661,7 +668,6 @@ class MonzoPlugin extends OAuthPlugin
             }
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $event->integration_id,
                 'title' => 'FX',
                 'content' => $content,
                 'media_url' => null,
@@ -676,7 +682,6 @@ class MonzoPlugin extends OAuthPlugin
             $vc = (array) $tx['virtual_card'];
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $event->integration_id,
                 'title' => 'Virtual Card',
                 'content' => 'Virtual card used',
                 'media_url' => null,
@@ -704,7 +709,6 @@ class MonzoPlugin extends OAuthPlugin
             }
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $event->integration_id,
                 'title' => 'Pot Transfer',
                 'content' => trim(($direction . ' ' . ($potName ?? 'Pot'))),
                 'media_url' => null,
@@ -719,7 +723,6 @@ class MonzoPlugin extends OAuthPlugin
         if ($accountId !== '' && $this->isJointAccount($event->integration_id, $accountId)) {
             $event->blocks()->create([
                 'time' => $event->time,
-                'integration_id' => $event->integration_id,
                 'title' => 'Joint Account',
                 'content' => 'Transaction on a joint account',
                 'media_url' => null,

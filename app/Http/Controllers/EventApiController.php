@@ -87,7 +87,6 @@ class EventApiController extends Controller
                 foreach ($validated['blocks'] as $blockData) {
                     $block = Block::create(array_merge($blockData, [
                         'event_id' => $event->id,
-                        'integration_id' => $event->integration_id,
                     ]));
                     $blocks[] = $block;
                 }

@@ -24,11 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('objects', function (Blueprint $table) {
-            if (!Schema::hasColumn('objects', 'integration_id')) {
+            if (! Schema::hasColumn('objects', 'integration_id')) {
                 $table->uuid('integration_id')->nullable();
             }
         });
     }
 };
-
-

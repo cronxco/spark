@@ -22,9 +22,13 @@ use Throwable;
 class SpotifyPlugin extends OAuthPlugin
 {
     protected string $baseUrl = 'https://api.spotify.com/v1';
+
     protected string $authUrl = 'https://accounts.spotify.com';
+
     protected string $clientId;
+
     protected string $clientSecret;
+
     protected string $redirectUri;
 
     public function __construct()

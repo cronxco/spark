@@ -67,6 +67,12 @@ abstract class WebhookPlugin implements IntegrationPlugin
         $this->createEventsFromWebhook($convertedData, $integration);
     }
 
+    public function verifyWebhookSignature(Request $request, Integration $integration): bool
+    {
+        // Override in child classes if signature verification is needed
+        return true;
+    }
+
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         // Webhook plugins don't handle OAuth callbacks
@@ -77,12 +83,6 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         // Webhook plugins don't fetch data
         throw new Exception('Webhook plugins do not fetch data');
-    }
-
-    protected function verifyWebhookSignature(Request $request, Integration $integration): bool
-    {
-        // Override in child classes if signature verification is needed
-        return true;
     }
 
     protected function createEventsFromWebhook(array $convertedData, Integration $integration): void

@@ -72,7 +72,7 @@ return [
         'country' => env('GOCARDLESS_COUNTRY', 'GB'),
         'institution_id' => env('GOCARDLESS_INSTITUTION_ID'),
         // Redirect URI for requisition flow
-        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL').'/integrations/gocardless/callback'),
+        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL') . '/integrations/gocardless/callback'),
     ],
 
     'oura' => [

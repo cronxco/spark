@@ -2,19 +2,19 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if(session('success'))
+            @if (session('success'))
                 <div class="alert alert-success mb-6">
                     {{ session('success') }}
                 </div>
             @endif
 
-            @if(session('error'))
+            @if (session('error'))
                 <div class="alert alert-error mb-6">
                     {{ session('error') }}
                 </div>
             @endif
 
-            @if(isset($error))
+            @if (isset($error))
                 <div class="alert alert-error mb-6">
                     <strong>Error:</strong> {{ $error }}
                 </div>
@@ -28,7 +28,7 @@
                         These are the agreements that have been created with GoCardless for accessing bank data.
                     </p>
 
-                    @if(empty($agreements))
+                    @if (empty($agreements))
                         <div class="text-center py-8">
                             <p class="text-gray-500">No agreements found.</p>
                         </div>
@@ -46,12 +46,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($agreements as $agreement)
+                                    @foreach ($agreements as $agreement)
                                         <tr>
                                             <td class="font-mono text-xs">{{ $agreement['id'] }}</td>
                                             <td>
                                                 <div class="font-medium">{{ $agreement['institution_id'] }}</div>
-                                                @if(isset($agreement['max_historical_days']))
+                                                @if (isset($agreement['max_historical_days']))
                                                     <div class="text-sm text-gray-500">
                                                         Max: {{ $agreement['max_historical_days'] }} days
                                                     </div>
@@ -63,7 +63,7 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                @if(isset($agreement['accepted']))
+                                                @if (isset($agreement['accepted']))
                                                     <div class="text-sm">
                                                         {{ \Carbon\Carbon::parse($agreement['accepted'])->format('M j, Y g:i A') }}
                                                     </div>
@@ -72,14 +72,14 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @if(isset($agreement['accepted']))
+                                                @if (isset($agreement['accepted']))
                                                     <span class="badge badge-success">Active</span>
                                                 @else
                                                     <span class="badge badge-warning">Pending</span>
                                                 @endif
                                             </td>
                                             <td>
-                                                <form method="POST" action="{{ route('admin.gocardless.deleteAgreement', $agreement['id']) }}" 
+                                                <form method="POST" action="{{ route('admin.gocardless.deleteAgreement', $agreement['id']) }}"
                                                       class="inline" onsubmit="return confirm('Are you sure you want to delete this agreement?')">
                                                     @csrf
                                                     @method('DELETE')
@@ -105,7 +105,7 @@
                         These are the requisitions that have been created to access specific bank accounts.
                     </p>
 
-                    @if(empty($requisitions))
+                    @if (empty($requisitions))
                         <div class="text-center py-8">
                             <p class="text-gray-500">No requisitions found.</p>
                         </div>
@@ -123,12 +123,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($requisitions as $requisition)
+                                    @foreach ($requisitions as $requisition)
                                         <tr>
                                             <td class="font-mono text-xs">{{ $requisition['id'] }}</td>
                                             <td>
                                                 <div class="font-medium">{{ $requisition['institution_id'] }}</div>
-                                                @if(isset($requisition['agreement']))
+                                                @if (isset($requisition['agreement']))
                                                     <div class="text-sm text-gray-500">
                                                         Agreement: {{ Str::limit($requisition['agreement'], 20) }}
                                                     </div>
@@ -158,11 +158,11 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                @if(isset($requisition['accounts']) && is_array($requisition['accounts']))
+                                                @if (isset($requisition['accounts']) && is_array($requisition['accounts']))
                                                     <div class="text-sm">
                                                         {{ count($requisition['accounts']) }} account(s)
                                                     </div>
-                                                    @if(count($requisition['accounts']) > 0)
+                                                    @if (count($requisition['accounts']) > 0)
                                                         <div class="text-xs text-gray-500">
                                                             {{ Str::limit(implode(', ', $requisition['accounts']), 30) }}
                                                         </div>
@@ -172,7 +172,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <form method="POST" action="{{ route('admin.gocardless.deleteRequisition', $requisition['id']) }}" 
+                                                <form method="POST" action="{{ route('admin.gocardless.deleteRequisition', $requisition['id']) }}"
                                                       class="inline" onsubmit="return confirm('Are you sure you want to delete this requisition?')">
                                                     @csrf
                                                     @method('DELETE')
@@ -196,10 +196,10 @@
                     <h3 class="card-title">Help & Information</h3>
                     <div class="prose max-w-none">
                         <p class="mb-4">
-                            This admin interface allows you to manage GoCardless agreements and requisitions. 
+                            This admin interface allows you to manage GoCardless agreements and requisitions.
                             Use this to clean up any existing data that might be interfering with the OAuth flow.
                         </p>
-                        
+
                         <h4 class="text-lg font-semibold mt-6 mb-2">Status Meanings:</h4>
                         <ul class="list-disc pl-6 space-y-1">
                             <li><strong>CR (Created):</strong> Requisition has been created but not yet linked</li>
@@ -217,7 +217,7 @@
                         </ul>
 
                         <div class="alert alert-info mt-6">
-                            <strong>Note:</strong> Deleting agreements and requisitions is irreversible. 
+                            <strong>Note:</strong> Deleting agreements and requisitions is irreversible.
                             Only delete items you're sure are no longer needed.
                         </div>
                     </div>

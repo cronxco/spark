@@ -22,9 +22,13 @@ use Throwable;
 class OuraPlugin extends OAuthPlugin
 {
     protected string $baseUrl = 'https://api.ouraring.com/v2';
+
     protected string $authUrl = 'https://cloud.ouraring.com';
+
     protected string $clientId;
+
     protected string $clientSecret;
+
     protected string $redirectUri;
 
     public function __construct()
@@ -604,6 +608,7 @@ class OuraPlugin extends OAuthPlugin
                 'title' => $title,
             ],
             [
+                'integration_id' => $integration->id,
                 'time' => now(),
                 'content' => 'Oura account',
                 'metadata' => $profile,
@@ -939,6 +944,7 @@ class OuraPlugin extends OAuthPlugin
             [$encMin, $minMult] = $this->encodeNumericValue($min);
             $event->blocks()->create([
                 'time' => $event->time,
+                'integration_id' => $integration->id,
                 'title' => 'Min Heart Rate',
                 'content' => null,
                 'value' => $encMin,
@@ -949,6 +955,7 @@ class OuraPlugin extends OAuthPlugin
             [$encMax, $maxMult] = $this->encodeNumericValue($max);
             $event->blocks()->create([
                 'time' => $event->time,
+                'integration_id' => $integration->id,
                 'title' => 'Max Heart Rate',
                 'content' => null,
                 'value' => $encMax,
@@ -958,6 +965,7 @@ class OuraPlugin extends OAuthPlugin
 
             $event->blocks()->create([
                 'time' => $event->time,
+                'integration_id' => $integration->id,
                 'title' => 'Data Points',
                 'content' => 'Count of heart rate points collected for the day',
                 'value' => (int) $points->count(),

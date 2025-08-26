@@ -21,14 +21,14 @@ class IntegrationServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Register plugins
-        PluginRegistry::register(AppleHealthPlugin::class);
         PluginRegistry::register(GitHubPlugin::class);
-        PluginRegistry::register(GoCardlessBankPlugin::class);
-        PluginRegistry::register(HevyPlugin::class);
         PluginRegistry::register(SlackPlugin::class);
         PluginRegistry::register(SpotifyPlugin::class);
         PluginRegistry::register(OuraPlugin::class);
         PluginRegistry::register(MonzoPlugin::class);
+        PluginRegistry::register(HevyPlugin::class);
+        PluginRegistry::register(GoCardlessBankPlugin::class);
+        PluginRegistry::register(AppleHealthPlugin::class);
     }
 
     /**

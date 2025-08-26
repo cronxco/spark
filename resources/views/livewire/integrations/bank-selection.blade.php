@@ -9,13 +9,13 @@
                     </p>
                 </div>
 
-                @if(session('success'))
+                @if (session('success'))
                     <x-alert title="Success" icon="o-check-circle" class="alert-success">
                         {{ session('success') }}
                     </x-alert>
                 @endif
 
-                @if(session('error'))
+                @if (session('error'))
                     <x-alert title="Error" icon="o-exclamation-triangle" class="alert-error">
                         {{ session('error') }}
                     </x-alert>
@@ -23,24 +23,24 @@
 
                 <form method="POST" action="{{ route('integrations.gocardless.setInstitution', ['group' => $group->id]) }}" class="space-y-4">
                     @csrf
-                    
+
                     <div class="space-y-3">
                         <label for="institution_id" class="block text-sm font-medium">Select Your Bank</label>
-                        <select 
-                            name="institution_id" 
+                        <select
+                            name="institution_id"
                             id="institution_id"
-                            class="select select-bordered w-full" 
+                            class="select select-bordered w-full"
                             required
                         >
                             <option value="">Choose a bank...</option>
-                            @foreach(session('gocardless_institutions_'.$group->id, []) as $inst)
+                            @foreach (session('gocardless_institutions_'.$group->id, []) as $inst)
                                 <option value="{{ $inst['id'] }}" @selected(old('institution_id') == $inst['id'])>
                                     {{ $inst['name'] }}
                                 </option>
                             @endforeach
                         </select>
-                        
-                        @if(empty(session('gocardless_institutions_'.$group->id, [])))
+
+                        @if (empty(session('gocardless_institutions_'.$group->id, [])))
                             <div class="text-sm text-error">
                                 <x-icon name="o-exclamation-triangle" class="w-4 h-4 inline mr-1" />
                                 Unable to load banks from GoCardless API. This could be due to:
@@ -59,15 +59,15 @@
                     </div>
 
                     <div class="flex items-center justify-between pt-4">
-                        <x-button 
+                        <x-button
                             type="button"
                             label="Back to Integrations"
                             link="{{ route('integrations.index') }}"
                             class="btn-outline"
                         />
-                        
-                        <x-button 
-                            type="submit" 
+
+                        <x-button
+                            type="submit"
                             label="Continue to Bank Login"
                             class="btn-primary"
                             :disabled="empty(session('gocardless_institutions_'.$group->id, []))"
