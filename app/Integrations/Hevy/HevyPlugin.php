@@ -250,6 +250,7 @@ class HevyPlugin implements IntegrationPlugin
             'type' => 'hevy_workout',
             'title' => $title,
         ], [
+            'integration_id' => $integration->id,
             'time' => $startIso,
             'content' => Arr::get($workout, 'notes') ?? 'Hevy workout',
             'metadata' => $workout,
@@ -349,6 +350,7 @@ class HevyPlugin implements IntegrationPlugin
             'type' => 'hevy_user',
             'title' => $title,
         ], [
+            'integration_id' => $integration->id,
             'time' => now(),
             'content' => 'Hevy user account',
             'metadata' => is_array($profile) ? $profile : [],
