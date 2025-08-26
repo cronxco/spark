@@ -19,7 +19,7 @@ return new class extends Migration
         );
 
         Schema::table('objects', function (Blueprint $table) {
-            $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('user_id')->references('id')->on(Schema::getConnection()->getTablePrefix() . 'users');
         });
 
         // Ensure user_id is required going forward

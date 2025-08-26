@@ -28,10 +28,10 @@ return new class extends Migration
             $table->index('user_id');
             $table->index('integration_group_id');
             // Foreign keys
-            $table->foreign('user_id')->references('id')->on('users');
+            $table->foreign('user_id')->references('id')->on(Schema::getConnection()->getTablePrefix() . 'users');
             $table->foreign('integration_group_id')
                 ->references('id')
-                ->on('integration_groups')
+                ->on(Schema::getConnection()->getTablePrefix() . 'integration_groups')
                 ->onDelete('cascade');
         });
     }
