@@ -34,8 +34,9 @@ class CreateIntegrationGroupsTable extends Migration
                 ->onDelete('cascade');
         });
         // Partial unique index (user_id, service, account_id) where account_id IS NOT NULL
-        // Note: The table name in Schema::create() is automatically prefixed by Laravel
-        DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS integration_groups_user_service_account_unique ON integration_groups (user_id, service, account_id) WHERE account_id IS NOT NULL');
+        // Note: We need to manually handle the prefix for raw SQL statements
+        $tableName = Schema::getConnection()->getTablePrefix() . 'integration_groups';
+        DB::statement("CREATE UNIQUE INDEX IF NOT EXISTS integration_groups_user_service_account_unique ON {$tableName} (user_id, service, account_id) WHERE account_id IS NOT NULL");
     }
 
     public function down(): void
