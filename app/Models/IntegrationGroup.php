@@ -14,6 +14,7 @@ class IntegrationGroup extends Model
     public $incrementing = false;
 
     protected $table = 'integration_groups';
+
     protected $keyType = 'string';
 
     protected $fillable = [

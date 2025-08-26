@@ -9,14 +9,12 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Horizon\Horizon;
-use Sentry\Breadcrumb;
 use Sentry\EventHint;
 use Sentry\SentrySdk;
 use Sentry\Severity;
 use Sentry\Tracing\SpanContext;
-
-use function Sentry\addBreadcrumb;
-use function Sentry\captureMessage;
+use SocialiteProviders\Authelia\Provider as AutheliaProvider;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,8 +33,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register the Authelia socialite provider
         // This allows the use of Authelia for authentication via Socialite
-        Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
-            $event->extendSocialite('authelia', \SocialiteProviders\Authelia\Provider::class);
+        Event::listen(function (SocialiteWasCalled $event) {
+            $event->extendSocialite('authelia', AutheliaProvider::class);
         });
 
         // Sentry tracing for outgoing HTTP requests via Laravel Http client
@@ -61,10 +59,8 @@ class AppServiceProvider extends ServiceProvider
             });
         });
 
-        // Always apply beforeSending for breadcrumbs of responses
-        Http::beforeSending(function ($request, $options) {
-            addBreadcrumb(new Breadcrumb(Breadcrumb::LEVEL_INFO, Breadcrumb::TYPE_HTTP, 'http', sprintf('%s %s', $request->getMethod(), (string) $request->getUri())));
-        });
+        // Note: Sentry breadcrumb functionality requires proper method availability
+        // Consider using middleware or response events for HTTP logging
 
         Event::listen(ScheduledTaskFinished::class, function (ScheduledTaskFinished $event) {
             // Track success or failure of scheduled tasks
@@ -79,9 +75,9 @@ class AppServiceProvider extends ServiceProvider
             ];
 
             if ($event->task->exitCode === 0) {
-                captureMessage('Scheduled task completed', Severity::info(), EventHint::fromArray(['extra' => $context]));
+                \Sentry\captureMessage('Scheduled task completed', Severity::info(), EventHint::fromArray(['extra' => $context]));
             } else {
-                captureMessage('Scheduled task finished with non-zero exit code', Severity::warning(), EventHint::fromArray(['extra' => $context]));
+                \Sentry\captureMessage('Scheduled task finished with non-zero exit code', Severity::warning(), EventHint::fromArray(['extra' => $context]));
             }
         });
 

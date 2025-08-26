@@ -67,6 +67,26 @@ abstract class WebhookPlugin implements IntegrationPlugin
         $this->createEventsFromWebhook($convertedData, $integration);
     }
 
+    /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function verifyWebhookSignature(Request $request, Integration $integration): bool
+    {
+        // Get the secret from the route parameter
+        $routeSecret = $request->route('secret');
+
+        // Get the expected secret from the integration's account_id
+        $expectedSecret = $integration->account_id;
+
+        // Perform constant-time comparison to prevent timing attacks
+        // If either secret is missing, treat as invalid
+        if (empty($routeSecret) || empty($expectedSecret)) {
+            return false;
+        }
+
+        return hash_equals($expectedSecret, $routeSecret);
+    }
+
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         // Webhook plugins don't handle OAuth callbacks
@@ -77,12 +97,6 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         // Webhook plugins don't fetch data
         throw new Exception('Webhook plugins do not fetch data');
-    }
-
-    protected function verifyWebhookSignature(Request $request, Integration $integration): bool
-    {
-        // Override in child classes if signature verification is needed
-        return true;
     }
 
     protected function createEventsFromWebhook(array $convertedData, Integration $integration): void
@@ -117,7 +131,6 @@ abstract class WebhookPlugin implements IntegrationPlugin
             foreach ($eventData['blocks'] ?? [] as $blockData) {
                 $event->blocks()->create([
                     'time' => $blockData['time'] ?? now(),
-                    'integration_id' => $integration->id,
                     'title' => $blockData['title'],
                     'content' => $blockData['content'],
                     'url' => $blockData['url'] ?? null,
@@ -135,7 +148,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => $objectData['concept'],
                 'type' => $objectData['type'],
                 'title' => $objectData['title'],

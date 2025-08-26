@@ -86,7 +86,8 @@ class MonzoMigrationTest extends TestCase
         $this->assertEquals(100, $event->value_multiplier);
 
         // Stored under master 'accounts' integration
-        $target = EventObject::where('type', 'monzo_counterparty')
+        $target = EventObject::where('user_id', $integration->user_id)
+            ->where('type', 'monzo_counterparty')
             ->where('title', 'Test Store')
             ->first();
         $this->assertNotNull($target);
@@ -135,7 +136,7 @@ class MonzoMigrationTest extends TestCase
             ->first();
         $this->assertNotNull($master);
         $this->assertDatabaseHas('objects', [
-            'integration_id' => $master->id,
+            'user_id' => $integration->user_id,
             'type' => 'monzo_pot',
             'title' => 'Rainy Day',
         ]);

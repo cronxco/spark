@@ -112,21 +112,12 @@ class AppleHealthIntegrationTest extends TestCase
         $resp = $this->postJson(route('webhook.handle', ['service' => 'apple-health', 'secret' => $group->account_id]), $payload);
         $resp->assertStatus(200);
 
-        // Check that events were created with the correct service, domain, and action
-        // Since webhooks work at the group level, we don't check for specific integration IDs
         $this->assertDatabaseHas('events', [
+            'integration_id' => $metrics->id,
             'service' => 'apple-health',
             'domain' => 'health',
             'action' => 'measurement',
         ]);
-
-        // Verify that events were actually created
-        $events = Event::where('service', 'apple-health')
-            ->where('domain', 'health')
-            ->where('action', 'measurement')
-            ->get();
-
-        $this->assertGreaterThan(0, $events->count(), 'No metrics events were created');
     }
 
     private function createGroupWithInstances(User $user): array

@@ -17,6 +17,14 @@ class IntegrationController extends Controller
 {
     public function oauth(string $service)
     {
+        Log::info('OAuth method called', [
+            'service' => $service,
+            'user_id' => Auth::id(),
+            'session_id' => session()->getId(),
+            'request_url' => request()->url(),
+            'request_method' => request()->method(),
+        ]);
+
         $pluginClass = PluginRegistry::getPlugin($service);
         if (! $pluginClass) {
             abort(404);
@@ -26,13 +34,59 @@ class IntegrationController extends Controller
         $user = Auth::user();
 
         try {
-            // Create a new auth group and start OAuth
-            if ($plugin instanceof \App\Integrations\Contracts\OAuthIntegrationPlugin) {
-                $group = $plugin->initializeGroup($user);
-                $oauthUrl = $plugin->getOAuthUrl($group);
+            // For GoCardless, we need to find the existing group from the session
+            if ($service === 'gocardless') {
+                Log::info('GoCardless OAuth flow started', [
+                    'user_id' => $user->id,
+                    'session_id' => session()->getId(),
+                ]);
+
+                // Find the most recent GoCardless group for this user
+                $group = IntegrationGroup::where('user_id', $user->id)
+                    ->where('service', 'gocardless')
+                    ->latest()
+                    ->first();
+
+                Log::info('GoCardless group lookup result', [
+                    'group_found' => $group ? true : false,
+                    'group_id' => $group ? $group->id : null,
+                    'group_service' => $group ? $group->service : null,
+                ]);
+
+                if (! $group) {
+                    throw new Exception('No GoCardless integration group found. Please start from the beginning.');
+                }
+
+                // Check if we have an institution selected
+                $institutionId = session('gocardless_institution_id_' . $group->id);
+
+                Log::info('GoCardless institution ID from session', [
+                    'group_id' => $group->id,
+                    'institution_id' => $institutionId,
+                    'session_key' => 'gocardless_institution_id_' . $group->id,
+                    'session_id' => session()->getId(),
+                ]);
+
+                if (! $institutionId) {
+                    throw new Exception('No bank institution selected. Please select a bank first.');
+                }
+
+                Log::info('GoCardless OAuth flow using existing group', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'group_id' => $group->id,
+                    'institution_id' => $institutionId,
+                ]);
             } else {
-                throw new Exception('Plugin does not support OAuth');
+                // For other services, create a new auth group and start OAuth
+                if ($plugin instanceof \App\Integrations\Contracts\OAuthIntegrationPlugin) {
+                    $group = $plugin->initializeGroup($user);
+                } else {
+                    throw new Exception('Plugin does not support OAuth');
+                }
             }
+
+            $oauthUrl = $plugin->getOAuthUrl($group);
 
             Log::info('OAuth flow initiated', [
                 'service' => $service,
@@ -41,7 +95,7 @@ class IntegrationController extends Controller
                 'oauth_url' => $oauthUrl,
             ]);
 
-            // Ensure we're redirecting to an external URL (Spotify's OAuth)
+            // Ensure we're redirecting to an external URL (GoCardless's OAuth)
             if (! filter_var($oauthUrl, FILTER_VALIDATE_URL)) {
                 throw new Exception('Invalid OAuth URL generated');
             }
@@ -75,54 +129,138 @@ class IntegrationController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        // Extract group ID from state parameter
-        $state = $request->get('state');
-        if (! $state) {
-            Log::error('OAuth callback missing state parameter', [
-                'service' => $service,
-                'user_id' => $user->id,
-            ]);
+        // Handle GoCardless differently since it doesn't use state parameter
+        if ($service === 'gocardless') {
+            // For GoCardless, find the group by the reference from the callback
+            $ref = $request->get('ref');
+            if ($ref) {
+                // The ref parameter from GoCardless is actually the reference field, not the requisition ID
+                // We need to find the group that has this reference stored
+                $group = IntegrationGroup::query()
+                    ->where('user_id', $user->id)
+                    ->where('service', $service)
+                    ->where('auth_metadata->gocardless_reference', $ref)
+                    ->first();
 
-            return redirect()->route('integrations.index')
-                ->with('error', 'Invalid OAuth callback: missing state parameter');
-        }
+                if (! $group) {
+                    Log::error('GoCardless OAuth callback: no group found with reference', [
+                        'service' => $service,
+                        'user_id' => $user->id,
+                        'reference' => $ref,
+                    ]);
 
-        try {
-            $stateData = decrypt($state);
-            $groupId = $stateData['group_id'] ?? null;
+                    return redirect()->route('integrations.index')
+                        ->with('error', 'No GoCardless integration found with this reference. Please start over.');
+                }
+            } else {
+                // Use the dedicated session key to avoid "latest group" ambiguity
+                $oauthGroupId = session('gocardless_oauth_group_id');
+                if ($oauthGroupId) {
+                    $group = IntegrationGroup::query()
+                        ->where('id', $oauthGroupId)
+                        ->where('user_id', $user->id)
+                        ->where('service', $service)
+                        ->first();
 
-            if (! $groupId) {
-                Log::error('OAuth callback missing group_id in state', [
+                    if ($group) {
+                        Log::info('GoCardless OAuth callback: found group from session', [
+                            'service' => $service,
+                            'user_id' => $user->id,
+                            'group_id' => $group->id,
+                            'session_key' => 'gocardless_oauth_group_id',
+                        ]);
+                    }
+                }
+
+                // Fallback to most recent group only if session lookup failed
+                if (! $group) {
+                    Log::warning('GoCardless OAuth callback: session lookup failed, falling back to latest group', [
+                        'service' => $service,
+                        'user_id' => $user->id,
+                        'session_oauth_group_id' => $oauthGroupId,
+                    ]);
+
+                    $group = IntegrationGroup::query()
+                        ->where('user_id', $user->id)
+                        ->where('service', $service)
+                        ->latest()
+                        ->first();
+
+                    if (! $group) {
+                        Log::error('GoCardless OAuth callback: no group found for user', [
+                            'service' => $service,
+                            'user_id' => $user->id,
+                        ]);
+
+                        return redirect()->route('integrations.index')
+                            ->with('error', 'No GoCardless integration found. Please start over.');
+                    }
+                }
+            }
+        } else {
+            // Standard OAuth flow with state parameter
+            $state = $request->get('state');
+            if (! $state) {
+                Log::error('OAuth callback missing state parameter', [
                     'service' => $service,
                     'user_id' => $user->id,
-                    'state_data' => $stateData,
                 ]);
 
                 return redirect()->route('integrations.index')
-                    ->with('error', 'Invalid OAuth callback: missing group ID');
+                    ->with('error', 'Invalid OAuth callback: missing state parameter');
             }
 
-            // Get the specific group from the state
-            $group = IntegrationGroup::query()
-                ->where('id', $groupId)
-                ->where('user_id', $user->id)
-                ->where('service', $service)
-                ->firstOrFail();
+            try {
+                $stateData = decrypt($state);
+                $groupId = $stateData['group_id'] ?? null;
 
-        } catch (Exception $e) {
-            Log::error('OAuth callback state decryption failed', [
-                'service' => $service,
-                'user_id' => $user->id,
-                'exception' => $e->getMessage(),
-            ]);
+                if (! $groupId) {
+                    Log::error('OAuth callback missing group_id in state', [
+                        'service' => $service,
+                        'user_id' => $user->id,
+                        'state_data' => $stateData,
+                    ]);
 
-            return redirect()->route('integrations.index')
-                ->with('error', 'Invalid OAuth callback: state decryption failed');
+                    return redirect()->route('integrations.index')
+                        ->with('error', 'Invalid OAuth callback: missing group ID');
+                }
+
+                // Get the specific group from the state
+                $group = IntegrationGroup::query()
+                    ->where('id', $groupId)
+                    ->where('user_id', $user->id)
+                    ->where('service', $service)
+                    ->firstOrFail();
+
+            } catch (Exception $e) {
+                Log::error('OAuth callback state decryption failed', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'exception' => $e->getMessage(),
+                ]);
+
+                return redirect()->route('integrations.index')
+                    ->with('error', 'Invalid OAuth callback: state decryption failed');
+            }
         }
 
         try {
             if (method_exists($plugin, 'handleOAuthCallback')) {
                 $plugin->handleOAuthCallback($request, $group);
+            }
+
+            // Clean up GoCardless session data after successful OAuth
+            if ($service === 'gocardless') {
+                session()->forget([
+                    'gocardless_oauth_group_id',
+                    'gocardless_institution_id_' . $group->id,
+                ]);
+
+                Log::info('GoCardless OAuth callback: session data cleaned up', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'group_id' => $group->id,
+                ]);
             }
 
             // Redirect to onboarding to select instance types
@@ -168,6 +306,12 @@ class IntegrationController extends Controller
                 $integration->update(['integration_group_id' => $group->id]);
             }
 
+            // For GoCardless, redirect to bank selection first
+            if ($service === 'gocardless') {
+                return redirect()->route('integrations.gocardless.bankSelection', ['group' => $group->id])
+                    ->with('success', 'Integration initialized! Select your bank to continue.');
+            }
+
             return redirect()->route('integrations.onboarding', ['group' => $group->id])
                 ->with('success', 'Integration initialized! Configure instances next.');
         } catch (Exception $e) {
@@ -194,10 +338,20 @@ class IntegrationController extends Controller
         $pluginName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($group->service);
         $types = $pluginClass ? $pluginClass::getInstanceTypes() : [];
 
+        // Get available accounts for GoCardless onboarding
+        $availableAccounts = [];
+        if ($group->service === 'gocardless' && $pluginClass) {
+            $plugin = new $pluginClass;
+            if (method_exists($plugin, 'getAvailableAccountsForOnboarding')) {
+                $availableAccounts = $plugin->getAvailableAccountsForOnboarding($group);
+            }
+        }
+
         return view('livewire.integrations.onboarding', [
             'group' => $group,
             'pluginName' => $pluginName,
             'types' => $types,
+            'availableAccounts' => $availableAccounts,
         ]);
     }
 
@@ -279,31 +433,80 @@ class IntegrationController extends Controller
                     }
                 }
             }
-            if (method_exists($plugin, 'createInstance')) {
-                // Pull an optional custom name from initial config
-                $customName = $initial['name'] ?? null;
-                if (array_key_exists('name', $initial)) {
-                    unset($initial['name']);
-                }
-                $instance = $plugin->createInstance($group, $type, $initial);
-                if ($customName) {
-                    $instance->update(['name' => $customName]);
-                }
-                if ($frequency !== null) {
-                    $instance->update(['update_frequency_minutes' => (int) $frequency]);
-                }
 
-                // Optional historical migration trigger
-                if ($request->boolean('run_migration')) {
-                    $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
-                    StartIntegrationMigration::dispatch($instance, $timeboxUntil)
-                        ->onConnection('redis')
-                        ->onQueue('migration');
+            if (method_exists($plugin, 'createInstance')) {
+                // For GoCardless, create one instance per account for each type
+                if ($group->service === 'gocardless' && method_exists($plugin, 'getAvailableAccountsForOnboarding')) {
+                    $accounts = $plugin->getAvailableAccountsForOnboarding($group);
+
+                    foreach ($accounts as $account) {
+                        // Create instance-specific config with account details
+                        $instanceConfig = $initial;
+                        $instanceConfig['account_id'] = $account['id'];
+                        $instanceConfig['account_name'] = $account['name'] ?? 'Unknown Account';
+
+                        // Create a unique name for each account instance
+                        if (isset($account['details']) && ! empty($account['details'])) {
+                            $accountName = $account['details'];
+                        } elseif (isset($account['ownerName'])) {
+                            $accountName = $account['ownerName'] . "'s Account";
+                        } else {
+                            $accountName = 'Account ' . substr($account['resourceId'] ?? $account['id'], 0, 8);
+                        }
+
+                        $typeName = $initial['name'] ?? $typesMeta[$type]['label'] ?? ucfirst($type);
+                        $customName = "{$typeName} - {$accountName}";
+
+                        $instance = $plugin->createInstance($group, $type, $instanceConfig);
+                        $instance->update(['name' => $customName]);
+
+                        if ($frequency !== null) {
+                            $instance->update(['update_frequency_minutes' => (int) $frequency]);
+                        }
+
+                        // Optional historical migration trigger
+                        if ($request->boolean('run_migration')) {
+                            $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
+                            StartIntegrationMigration::dispatch($instance, $timeboxUntil)
+                                ->onConnection('redis')
+                                ->onQueue('migration');
+                        }
+                    }
+                } else {
+                    // Standard single instance creation for other services
+                    $customName = $initial['name'] ?? null;
+                    if (array_key_exists('name', $initial)) {
+                        unset($initial['name']);
+                    }
+                    $instance = $plugin->createInstance($group, $type, $initial);
+                    if ($customName) {
+                        $instance->update(['name' => $customName]);
+                    }
+                    if ($frequency !== null) {
+                        $instance->update(['update_frequency_minutes' => (int) $frequency]);
+                    }
+
+                    // Optional historical migration trigger
+                    if ($request->boolean('run_migration')) {
+                        $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
+                        StartIntegrationMigration::dispatch($instance, $timeboxUntil)
+                            ->onConnection('redis')
+                            ->onQueue('migration');
+                    }
                 }
+            }
+        }
+        // Customize success message for GoCardless multi-account scenarios
+        $successMessage = 'Instances created successfully.';
+        if ($group->service === 'gocardless' && method_exists($plugin, 'getAvailableAccountsForOnboarding')) {
+            $accounts = $plugin->getAvailableAccountsForOnboarding($group);
+            $accountCount = count($accounts);
+            if ($accountCount > 1) {
+                $successMessage = "Created {$accountCount} account instances successfully!";
             }
         }
 
         return redirect()->route('integrations.index')
-            ->with('success', 'Instances created successfully.');
+            ->with('success', $successMessage);
     }
 }

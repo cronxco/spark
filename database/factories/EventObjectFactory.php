@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\EventObject;
-use App\Models\Integration;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class EventObjectFactory extends Factory
@@ -15,7 +15,7 @@ class EventObjectFactory extends Factory
         return [
             'id' => $this->faker->uuid(),
             'time' => $this->faker->dateTime(),
-            'integration_id' => Integration::factory(),
+            'user_id' => User::factory(),
             'concept' => $this->faker->word(),
             'type' => $this->faker->word(),
             'title' => $this->faker->sentence(),

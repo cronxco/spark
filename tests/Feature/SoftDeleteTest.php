@@ -41,7 +41,7 @@ class SoftDeleteTest extends TestCase
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $object = EventObject::factory()->create(['integration_id' => $integration->id]);
+        $object = EventObject::factory()->create(['user_id' => $user->id]);
 
         $objectId = $object->id;
         $object->delete();
@@ -62,8 +62,8 @@ class SoftDeleteTest extends TestCase
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $actor = EventObject::factory()->create(['integration_id' => $integration->id]);
-        $target = EventObject::factory()->create(['integration_id' => $integration->id]);
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
 
         $event = Event::factory()->create([
             'integration_id' => $integration->id,
@@ -90,8 +90,8 @@ class SoftDeleteTest extends TestCase
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $actor = EventObject::factory()->create(['integration_id' => $integration->id]);
-        $target = EventObject::factory()->create(['integration_id' => $integration->id]);
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
         $event = Event::factory()->create([
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
@@ -100,7 +100,6 @@ class SoftDeleteTest extends TestCase
 
         $block = Block::factory()->create([
             'event_id' => $event->id,
-            'integration_id' => $integration->id,
         ]);
 
         $blockId = $block->id;
@@ -122,8 +121,8 @@ class SoftDeleteTest extends TestCase
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $actor = EventObject::factory()->create(['integration_id' => $integration->id]);
-        $target = EventObject::factory()->create(['integration_id' => $integration->id]);
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
 
         $event = Event::factory()->create([
             'integration_id' => $integration->id,

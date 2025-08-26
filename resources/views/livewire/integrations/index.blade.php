@@ -334,18 +334,29 @@ new class extends Component {
 
                         <div class="mt-4 pt-4 border-t border-base-300">
                             @if ($plugin['type'] === 'oauth')
-                                <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
-                                   class="btn btn-primary w-full">
-                                    <x-icon name="o-plus" class="w-4 h-4 mr-2" />
-                                    {{ __('Add Instance') }}
-                                </a>
+                                @if ($plugin['identifier'] === 'gocardless')
+                                    <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary w-full">
+                                            <x-icon name="o-plus" class="w-4 h-4 mr-2" />
+                                            {{ __('Add Instance') }}
+                                        </button>
+                                    </form>
+                                @else
+                                    <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
+                                       class="btn btn-primary w-full">
+                                        <x-icon name="o-plus" class="w-4 h-4 mr-2" />
+                                        {{ __('Add Instance') }}
+                                    </a>
+                                @endif
                             @else
-                                <x-button
-                                    label="{{ __('Add Instance') }}"
-                                    icon="o-plus"
-                                    wire:click="initializeIntegration('{{ $plugin['identifier'] }}')"
-                                    class="btn-success w-full"
-                                />
+                                <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
+                                    @csrf
+                                    <button type="submit" class="btn btn-success w-full">
+                                        <x-icon name="o-plus" class="w-4 h-4 mr-2" />
+                                        {{ __('Add Instance') }}
+                                    </button>
+                                </form>
                             @endif
                         </div>
                     </x-card>

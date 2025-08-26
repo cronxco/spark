@@ -14,12 +14,12 @@ class Block extends Model
     public $incrementing = false;
 
     protected $table = 'blocks';
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'event_id',
         'time',
-        'integration_id',
         'title',
         'content',
         'url',
