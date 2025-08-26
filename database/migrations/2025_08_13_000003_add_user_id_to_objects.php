@@ -14,8 +14,11 @@ return new class extends Migration
         });
 
         // Backfill user_id based on the owning integration's user_id
+        // Note: We need to manually handle the prefix for raw SQL statements
+        $objectsTable = Schema::getConnection()->getTablePrefix() . 'objects';
+        $integrationsTable = Schema::getConnection()->getTablePrefix() . 'integrations';
         DB::statement(
-            'UPDATE objects o SET user_id = i.user_id FROM integrations i WHERE o.integration_id = i.id'
+            "UPDATE {$objectsTable} o SET user_id = i.user_id FROM {$integrationsTable} i WHERE o.integration_id = i.id"
         );
 
         Schema::table('objects', function (Blueprint $table) {
@@ -23,7 +26,7 @@ return new class extends Migration
         });
 
         // Ensure user_id is required going forward
-        DB::statement('ALTER TABLE objects ALTER COLUMN user_id SET NOT NULL');
+        DB::statement("ALTER TABLE {$objectsTable} ALTER COLUMN user_id SET NOT NULL");
     }
 
     public function down(): void

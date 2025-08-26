@@ -12,8 +12,10 @@ return new class extends Migration
         // Guard against duplicate index creation (PostgreSQL-aware)
         $exists = false;
         try {
+            // Note: We need to manually handle the prefix for raw SQL statements
+            $tableName = Schema::getConnection()->getTablePrefix() . 'events';
             $rows = DB::select(
-                "select 1 from pg_indexes where tablename = 'events' and indexname = 'events_integration_source_unique' limit 1"
+                "select 1 from pg_indexes where tablename = '{$tableName}' and indexname = 'events_integration_source_unique' limit 1"
             );
             $exists = ! empty($rows);
         } catch (\Throwable $e) {
@@ -39,6 +41,8 @@ return new class extends Migration
     {
         // Safe drop for PostgreSQL (and no-op if missing)
         try {
+            // Note: We need to manually handle the prefix for raw SQL statements
+            $tableName = Schema::getConnection()->getTablePrefix() . 'events';
             DB::statement('DROP INDEX IF EXISTS events_integration_source_unique');
         } catch (\Throwable $e) {
             // Fallback: attempt Schema builder drop for other drivers
