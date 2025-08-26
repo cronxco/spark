@@ -66,6 +66,9 @@ jobs:
       - name: Add Wire Credentials Loaded From ENV
         run: composer config http-basic.wire-elements-pro.composer.sh ${{ secrets.WIRE_SECRET}}
 
+      - name: Update composer
+        run: composer update
+
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
