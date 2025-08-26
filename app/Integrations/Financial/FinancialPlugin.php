@@ -8,8 +8,8 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use Exception;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 
 class FinancialPlugin extends ManualPlugin
 {
