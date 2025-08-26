@@ -32,16 +32,16 @@ class EventApiTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user);
         $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $actorData = EventObject::factory()->make(['integration_id' => $integration->id])->toArray();
-        $targetData = EventObject::factory()->make(['integration_id' => $integration->id])->toArray();
+        $actorData = EventObject::factory()->make(['user_id' => $user->id])->toArray();
+        $targetData = EventObject::factory()->make(['user_id' => $user->id])->toArray();
         $eventData = Event::factory()->make([
             'integration_id' => $integration->id,
             // actor_id and target_id will be set by the controller
         ])->toArray();
         unset($eventData['actor_id'], $eventData['target_id']);
         $blocksData = [
-            Block::factory()->make(['integration_id' => $integration->id])->toArray(),
-            Block::factory()->make(['integration_id' => $integration->id])->toArray(),
+            Block::factory()->make()->toArray(),
+            Block::factory()->make()->toArray(),
         ];
         $payload = [
             'actor' => $actorData,
@@ -53,10 +53,10 @@ class EventApiTest extends TestCase
         $response->assertStatus(201);
         $response->assertJsonStructure([
             'event' => ['id', 'integration_id', 'actor_id', 'target_id', 'created_at', 'updated_at'],
-            'actor' => ['id', 'integration_id', 'created_at', 'updated_at'],
-            'target' => ['id', 'integration_id', 'created_at', 'updated_at'],
+            'actor' => ['id', 'user_id', 'created_at', 'updated_at'],
+            'target' => ['id', 'user_id', 'created_at', 'updated_at'],
             'blocks' => [
-                ['id', 'event_id', 'integration_id', 'created_at', 'updated_at'],
+                ['id', 'event_id', 'created_at', 'updated_at'],
             ],
         ]);
         $this->assertDatabaseHas('events', ['id' => $response['event']['id']]);

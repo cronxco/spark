@@ -15,6 +15,7 @@ class EventApiExtendedTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Integration $integration;
 
     protected function setUp(): void
@@ -231,7 +232,6 @@ class EventApiExtendedTest extends TestCase
         // Create some blocks for this event
         Block::factory()->create([
             'event_id' => $event->id,
-            'integration_id' => $this->integration->id,
         ]);
 
         $response = $this->deleteJson("/api/events/{$event->id}");

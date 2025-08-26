@@ -15,6 +15,7 @@ class Event extends Model
     public $incrementing = false;
 
     protected $table = 'events';
+
     protected $keyType = 'string';
 
     protected $fillable = [

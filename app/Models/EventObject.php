@@ -15,11 +15,11 @@ class EventObject extends Model
     public $incrementing = false;
 
     protected $table = 'objects';
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'time',
-        'integration_id',
         'user_id',
         'concept',
         'type',
@@ -47,23 +47,12 @@ class EventObject extends Model
                 $model->id = Str::uuid();
             }
 
-            // Automatically set user_id from integration if not provided
-            if (empty($model->user_id) && $model->integration_id) {
-                $integration = Integration::find($model->integration_id);
-                if ($integration) {
-                    $model->user_id = $integration->user_id;
-                }
-            }
+            // no-op: user_id must be provided by callers now
         });
-    }
-
-    public function integration()
-    {
-        return $this->belongsTo(Integration::class)->withTrashed();
     }
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 }

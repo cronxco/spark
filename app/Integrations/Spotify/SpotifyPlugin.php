@@ -22,9 +22,13 @@ use Throwable;
 class SpotifyPlugin extends OAuthPlugin
 {
     protected string $baseUrl = 'https://api.spotify.com/v1';
+
     protected string $authUrl = 'https://accounts.spotify.com';
+
     protected string $clientId;
+
     protected string $clientSecret;
+
     protected string $redirectUri;
 
     public function __construct()
@@ -499,7 +503,7 @@ class SpotifyPlugin extends OAuthPlugin
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'user',
                 'type' => 'spotify_user',
                 'title' => $integration->name,
@@ -528,7 +532,7 @@ class SpotifyPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'track',
                 'type' => 'spotify_track',
                 'title' => $track['name'],

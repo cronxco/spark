@@ -18,14 +18,12 @@ use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 use Throwable;
 
-use function Sentry\captureException;
-use function Sentry\captureMessage;
-
 class CheckIntegrationUpdates implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 60; // 1 minute
+
     public $tries = 1; // Don't retry this job
 
     /**
@@ -51,14 +49,26 @@ class CheckIntegrationUpdates implements ShouldQueue
         try {
             Log::info('Starting integration update check');
 
-            // Get integrations that need updating (OAuth instances with a valid group token)
+            // Get integrations that need updating
+            // - OAuth: require a valid group token
+            // - API key: no token requirement
+            $oauthServices = PluginRegistry::getOAuthPlugins()->keys();
+            $apiKeyServices = PluginRegistry::getApiKeyPlugins()->keys();
+
             $integrations = Integration::with(['user', 'group'])
                 ->whereHas('user')
-                ->whereHas('group', function ($q) {
-                    $q->whereNotNull('access_token');
+                ->where(function ($query) use ($oauthServices, $apiKeyServices) {
+                    $query->where(function ($q) use ($oauthServices) {
+                        // OAuth integrations with a token
+                        $q->whereIn('service', $oauthServices)
+                            ->whereHas('group', function ($groupQuery) {
+                                $groupQuery->whereNotNull('access_token');
+                            });
+                    })->orWhere(function ($q) use ($apiKeyServices) {
+                        // API key integrations (no token required)
+                        $q->whereIn('service', $apiKeyServices);
+                    });
                 })
-                // Only OAuth service integrations
-                ->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
                 ->needsUpdate()
                 ->get();
 
@@ -103,11 +113,11 @@ class CheckIntegrationUpdates implements ShouldQueue
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
                     ]);
-                    captureException($e);
+                    \Sentry\captureException($e);
                 }
             }
 
-            captureMessage('CheckIntegrationUpdates summary', Severity::info(), EventHint::fromArray(['extra' => [
+            \Sentry\captureMessage('CheckIntegrationUpdates summary', Severity::info(), EventHint::fromArray(['extra' => [
                 'scheduled' => $scheduledCount,
                 'skipped' => $skippedCount,
                 'total_due' => $integrations->count(),
@@ -121,7 +131,7 @@ class CheckIntegrationUpdates implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            captureException($e);
+            \Sentry\captureException($e);
             $transaction->setStatus(SpanStatus::internalError());
 
             throw $e;
@@ -140,6 +150,6 @@ class CheckIntegrationUpdates implements ShouldQueue
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
-        captureException($exception);
+        \Sentry\captureException($exception);
     }
 }

@@ -62,10 +62,27 @@ return [
         'salary_name' => env('MONZO_SALARY_NAME'),
     ],
 
+    'gocardless' => [
+        // GoCardless Bank Account Data API credentials
+        'secret_id' => env('GOCARDLESS_SECRET_ID'),
+        'secret_key' => env('GOCARDLESS_SECRET_KEY'),
+        // API base URL
+        'api_base' => env('GOCARDLESS_API_BASE', 'https://bankaccountdata.gocardless.com/api/v2'),
+        // Optional: limit to a country or pre-select an institution
+        'country' => env('GOCARDLESS_COUNTRY', 'GB'),
+        'institution_id' => env('GOCARDLESS_INSTITUTION_ID'),
+        // Redirect URI for requisition flow
+        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL') . '/integrations/gocardless/callback'),
+    ],
+
     'oura' => [
         'client_id' => env('OURA_CLIENT_ID'),
         'client_secret' => env('OURA_CLIENT_SECRET'),
         'redirect' => env('OURA_REDIRECT_URI'),
+    ],
+
+    'hevy' => [
+        'api_key' => env('HEVY_API_KEY'),
     ],
 
     'sentry' => [

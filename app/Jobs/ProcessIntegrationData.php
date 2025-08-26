@@ -17,14 +17,14 @@ use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 use Throwable;
 
-use function Sentry\captureException;
-
 class ProcessIntegrationData implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 300; // 5 minutes
+
     public $tries = 3;
+
     public $backoff = [60, 300, 600]; // Retry after 1, 5, 10 minutes
 
     protected Integration $integration;
@@ -77,7 +77,7 @@ class ProcessIntegrationData implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            captureException($e);
+            \Sentry\captureException($e);
 
             // Mark as failed so it can be retried
             $this->integration->markAsFailed();

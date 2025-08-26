@@ -16,6 +16,7 @@ class Integration extends Model
     public $incrementing = false;
 
     protected $table = 'integrations';
+
     protected $keyType = 'string';
 
     protected $fillable = [

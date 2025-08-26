@@ -8,7 +8,6 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Exception;
-use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +18,7 @@ use Throwable;
 class HevyPlugin implements IntegrationPlugin
 {
     protected string $baseUrl = 'https://api.hevyapp.com';
+
     protected ?string $apiKey;
 
     public function __construct()
@@ -142,7 +142,7 @@ class HevyPlugin implements IntegrationPlugin
         ]);
     }
 
-    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
+    public function handleOAuthCallback(\Illuminate\Http\Request $request, IntegrationGroup $group): void
     {
         throw new Exception('Hevy integration uses API key authentication and does not support OAuth');
     }
@@ -204,7 +204,7 @@ class HevyPlugin implements IntegrationPlugin
         return [];
     }
 
-    public function handleWebhook(Request $request, Integration $integration): void
+    public function handleWebhook(\Illuminate\Http\Request $request, Integration $integration): void
     {
         // Hevy integration is pull-based via API key; no webhooks
         throw new Exception('Hevy integration does not support webhooks');
@@ -249,8 +249,8 @@ class HevyPlugin implements IntegrationPlugin
             'concept' => 'workout',
             'type' => 'hevy_workout',
             'title' => $title,
+            'time' => $startIso, // Add time as discriminator to prevent collapsing identical titles
         ], [
-            'time' => $startIso,
             'content' => Arr::get($workout, 'notes') ?? 'Hevy workout',
             'metadata' => $workout,
             'url' => Arr::get($workout, 'url'),
@@ -305,7 +305,6 @@ class HevyPlugin implements IntegrationPlugin
 
                 $event->blocks()->create([
                     'time' => $startIso,
-                    'integration_id' => $integration->id,
                     'title' => $exerciseName . ' - Set ' . $setNum,
                     'content' => $content,
                     'url' => null,
@@ -320,7 +319,6 @@ class HevyPlugin implements IntegrationPlugin
                 [$encExVol, $exVolMult] = $this->encodeNumericValue($exerciseVolume);
                 $event->blocks()->create([
                     'time' => $startIso,
-                    'integration_id' => $integration->id,
                     'title' => $exerciseName . ' - Total Volume',
                     'content' => 'Total volume (weight x reps) for this exercise',
                     'value' => $encExVol,

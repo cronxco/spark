@@ -18,8 +18,11 @@ use Throwable;
 abstract class OAuthPlugin implements OAuthIntegrationPlugin
 {
     protected string $baseUrl;
+
     protected string $clientId;
+
     protected string $clientSecret;
+
     protected string $redirectUri;
 
     public static function getServiceType(): string
