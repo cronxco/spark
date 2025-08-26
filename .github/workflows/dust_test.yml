@@ -68,6 +68,10 @@ jobs:
 
       - name: Copy Environment File
         run: cp .env.example .env
+
+      - name: Update composer
+        run: composer update
+
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
