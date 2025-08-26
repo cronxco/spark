@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Collection;
 
 class FinancialPlugin extends ManualPlugin
 {
@@ -214,7 +215,7 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Get all financial accounts for a user
      */
-    public function getFinancialAccounts(User $user): \Illuminate\Database\Eloquent\Collection
+    public function getFinancialAccounts(User $user): Collection
     {
         // Get manual financial accounts
         $manualAccounts = EventObject::where('user_id', $user->id)
@@ -321,7 +322,7 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Get balance events for a specific account
      */
-    public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
+    public function getBalanceEvents(EventObject $accountObject): Collection
     {
         $service = $accountObject->metadata['service'] ?? 'financial';
 
@@ -349,13 +350,13 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Get Monzo accounts for a user
      */
-    protected function getMonzoAccounts(User $user): \Illuminate\Database\Eloquent\Collection
+    protected function getMonzoAccounts(User $user): Collection
     {
         $monzoIntegrations = Integration::where('user_id', $user->id)
             ->where('service', 'monzo')
             ->get();
 
-        $accounts = collect();
+        $accounts = new Collection;
 
         foreach ($monzoIntegrations as $integration) {
             try {
@@ -394,13 +395,13 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Get GoCardless accounts for a user
      */
-    protected function getGoCardlessAccounts(User $user): \Illuminate\Database\Eloquent\Collection
+    protected function getGoCardlessAccounts(User $user): Collection
     {
         $gocardlessIntegrations = Integration::where('user_id', $user->id)
             ->where('service', 'gocardless')
             ->get();
 
-        $accounts = collect();
+        $accounts = new Collection;
 
         foreach ($gocardlessIntegrations as $integration) {
             try {
