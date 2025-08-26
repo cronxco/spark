@@ -7,6 +7,7 @@ use App\Models\Integration;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class WebhookController extends Controller
 {
@@ -28,22 +29,54 @@ class WebhookController extends Controller
         // Create plugin instance once and reuse it
         $plugin = new $pluginClass;
 
-        try {
-            foreach ($integrations as $integration) {
-                // Verify webhook signature if plugin supports it per instance
-                if (method_exists($plugin, 'verifyWebhookSignature')) {
-                    if (! $plugin->verifyWebhookSignature($request, $integration)) {
-                        abort(401, 'Invalid signature');
-                    }
-                }
+        $results = [];
+        $hasFailures = false;
+
+        foreach ($integrations as $integration) {
+            try {
+                // Let the plugin handle signature verification internally
                 $plugin->handleWebhook($request, $integration);
+
+                $results[$integration->id] = [
+                    'status' => 'success',
+                    'message' => 'Webhook processed successfully',
+                ];
+            } catch (HttpExceptionInterface $e) {
+                // Re-throw HttpExceptions so they result in proper HTTP status codes
+                // This ensures abort(401) results in a 401 response, not 500
+                throw $e;
+            } catch (Exception $e) {
+                // Log and track other exceptions for per-integration handling
+                Log::error('Webhook processing failed for integration', [
+                    'integration_id' => $integration->id,
+                    'service' => $service,
+                    'exception' => $e->getMessage(),
+                ]);
+
+                $results[$integration->id] = [
+                    'status' => 'error',
+                    'message' => 'Webhook processing failed',
+                    'error' => $e->getMessage(),
+                ];
+                $hasFailures = true;
             }
-
-            return response()->json(['status' => 'success']);
-        } catch (Exception $e) {
-            Log::error('Webhook handling failed', ['exception' => $e]);
-
-            return response()->json(['error' => 'Webhook processing failed'], 500);
         }
+
+        // Return appropriate response based on results
+        if ($hasFailures) {
+            // Some integrations failed - return 207 Multi-Status
+            return response()->json([
+                'status' => 'partial_success',
+                'message' => 'Some webhooks processed successfully, others failed',
+                'results' => $results,
+            ], 207);
+        }
+
+        // All integrations succeeded
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All webhooks processed successfully',
+            'results' => $results,
+        ]);
     }
 }

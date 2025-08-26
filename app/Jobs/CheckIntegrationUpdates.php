@@ -57,16 +57,17 @@ class CheckIntegrationUpdates implements ShouldQueue
 
             $integrations = Integration::with(['user', 'group'])
                 ->whereHas('user')
-                ->where(function ($query) use ($oauthServices) {
-                    // OAuth integrations with a token
-                    $query->whereIn('service', $oauthServices)
-                        ->whereHas('group', function ($q) {
-                            $q->whereNotNull('access_token');
-                        });
-                })
-                ->orWhere(function ($query) use ($apiKeyServices) {
-                    // API key integrations (no token required)
-                    $query->whereIn('service', $apiKeyServices);
+                ->where(function ($query) use ($oauthServices, $apiKeyServices) {
+                    $query->where(function ($q) use ($oauthServices) {
+                        // OAuth integrations with a token
+                        $q->whereIn('service', $oauthServices)
+                            ->whereHas('group', function ($groupQuery) {
+                                $groupQuery->whereNotNull('access_token');
+                            });
+                    })->orWhere(function ($q) use ($apiKeyServices) {
+                        // API key integrations (no token required)
+                        $q->whereIn('service', $apiKeyServices);
+                    });
                 })
                 ->needsUpdate()
                 ->get();

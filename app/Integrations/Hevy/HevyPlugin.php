@@ -249,8 +249,8 @@ class HevyPlugin implements IntegrationPlugin
             'concept' => 'workout',
             'type' => 'hevy_workout',
             'title' => $title,
+            'time' => $startIso, // Add time as discriminator to prevent collapsing identical titles
         ], [
-            'time' => $startIso,
             'content' => Arr::get($workout, 'notes') ?? 'Hevy workout',
             'metadata' => $workout,
             'url' => Arr::get($workout, 'url'),

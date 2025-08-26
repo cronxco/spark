@@ -58,11 +58,17 @@ Route::middleware(['auth'])->group(function () {
                 $plugin = new GoCardlessBankPlugin;
                 $institutions = $plugin->getInstitutions();
 
-                Log::info('GoCardless institutions loaded', [
+                $logData = [
                     'count' => count($institutions),
                     'country' => config('services.gocardless.country', 'GB'),
-                    'first_few' => array_slice($institutions, 0, 3),
-                ]);
+                ];
+
+                // Only include institution details in local/debug environments
+                if (app()->isLocal() || config('app.debug')) {
+                    $logData['first_few'] = array_slice($institutions, 0, 3);
+                }
+
+                Log::info('GoCardless institutions loaded', $logData);
 
                 if (! empty($institutions)) {
                     session(['gocardless_institutions_' . $group->id => $institutions]);
@@ -75,11 +81,17 @@ Route::middleware(['auth'])->group(function () {
                     session(['gocardless_institutions_' . $group->id => []]);
                 }
             } catch (\Throwable $e) {
-                Log::error('GoCardless API call failed', [
+                $logData = [
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
                     'country' => config('services.gocardless.country', 'GB'),
-                ]);
+                ];
+
+                // Only include full trace in local/debug environments
+                if (app()->isLocal() || config('app.debug')) {
+                    $logData['trace'] = $e->getTraceAsString();
+                }
+
+                Log::error('GoCardless API call failed', $logData);
                 session(['gocardless_institutions_' . $group->id => []]);
             }
         }
@@ -95,38 +107,62 @@ Route::middleware(['auth'])->group(function () {
 
         $institutionId = request('institution_id');
 
-        Log::info('GoCardless setInstitution route called', [
+        // Validate required institution_id
+        if (empty($institutionId)) {
+            Log::warning('No institution ID provided in request', [
+                'group_id' => $group->id,
+                'user_id' => Auth::id(),
+            ]);
+
+            return redirect()->back()->withErrors(['institution_id' => 'Please select a bank to continue.']);
+        }
+
+        // Get the whitelisted institutions from session
+        $institutions = session('gocardless_institutions_' . $group->id, []);
+
+        // Validate institution_id exists in the whitelisted institutions
+        $validInstitution = collect($institutions)->firstWhere('id', $institutionId);
+        if (! $validInstitution) {
+            $logData = [
+                'group_id' => $group->id,
+                'user_id' => Auth::id(),
+                'institution_id' => $institutionId,
+            ];
+
+            // Only include available institutions list in local/debug environments
+            if (app()->isLocal() || config('app.debug')) {
+                $logData['available_institutions'] = array_column($institutions, 'id');
+            }
+
+            Log::warning('Invalid institution ID provided', $logData);
+
+            return redirect()->back()->withErrors(['institution_id' => 'Invalid bank selection. Please try again.']);
+        }
+
+        // Store the validated institution ID and OAuth group ID to avoid ambiguity
+        session([
+            'gocardless_institution_id_' . $group->id => (string) $institutionId,
+            'gocardless_oauth_group_id' => $group->id,
+        ]);
+
+        $logData = [
             'group_id' => $group->id,
             'user_id' => Auth::id(),
             'institution_id' => $institutionId,
-            'request_data' => request()->all(),
-            'session_id' => session()->getId(),
-            'session_data_before' => session()->all(),
-        ]);
+            'session_keys' => [
+                'institution_key' => 'gocardless_institution_id_' . $group->id,
+                'oauth_group_key' => 'gocardless_oauth_group_id',
+            ],
+        ];
 
-        if ($institutionId) {
-            session(['gocardless_institution_id_' . $group->id => (string) $institutionId]);
-
-            Log::info('GoCardless institution ID stored in session', [
-                'group_id' => $group->id,
-                'institution_id' => $institutionId,
-                'session_key' => 'gocardless_institution_id_' . $group->id,
-                'session_value' => session('gocardless_institution_id_' . $group->id),
-                'session_data_after' => session()->all(),
-            ]);
-        } else {
-            Log::warning('No institution ID provided in request');
+        // Only include institution name in local/debug environments
+        if (app()->isLocal() || config('app.debug')) {
+            $logData['institution_name'] = $validInstitution['name'] ?? 'Unknown';
         }
 
-        // Redirect to OAuth flow instead of onboarding
-        $oauthUrl = route('integrations.oauth', ['service' => 'gocardless']);
+        Log::info('GoCardless institution ID validated and stored in session', $logData);
 
-        Log::info('GoCardless redirecting to OAuth', [
-            'group_id' => $group->id,
-            'oauth_url' => $oauthUrl,
-            'session_data_final' => session()->all(),
-        ]);
-
+        // Redirect to OAuth flow
         return redirect()->route('integrations.oauth', ['service' => 'gocardless'])
             ->with('success', __('Bank selection saved.'));
     })->whereUuid('group')->name('integrations.gocardless.setInstitution');

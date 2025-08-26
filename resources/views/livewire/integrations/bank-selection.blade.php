@@ -29,7 +29,7 @@
                         <select
                             name="institution_id"
                             id="institution_id"
-                            class="select select-bordered w-full"
+                            class="select select-bordered w-full @error('institution_id') select-error @enderror"
                             required
                         >
                             <option value="">Choose a bank...</option>
@@ -39,6 +39,13 @@
                                 </option>
                             @endforeach
                         </select>
+
+                        @error('institution_id')
+                            <div class="text-sm text-error">
+                                <x-icon name="o-exclamation-triangle" class="w-4 h-4 inline mr-1" />
+                                {{ $message }}
+                            </div>
+                        @enderror
 
                         @if (empty(session('gocardless_institutions_'.$group->id, [])))
                             <div class="text-sm text-error">

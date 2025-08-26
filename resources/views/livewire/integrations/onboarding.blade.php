@@ -145,7 +145,7 @@ use Carbon\Carbon;
                                 <div>
                                     <div class="mb-1 text-sm font-medium">{{ __('Update frequency (minutes)') }}</div>
                                     <x-input type="number" min="{{ $group->service === 'gocardless' ? 1440 : 5 }}" step="1" name="config[{{ $typeKey }}][update_frequency_minutes]" value="{{ old('config.'.$typeKey.'.update_frequency_minutes', $group->service === 'gocardless' ? 1440 : 60) }}" />
-                                    @error('config[{{ $typeKey }}][update_frequency_minutes')
+                                    @error('config.'.$typeKey.'.update_frequency_minutes')
                                         <div class="text-xs text-error mt-1">{{ $message }}</div>
                                     @enderror
                                     <div class="text-xs text-base-content/70 mt-1">

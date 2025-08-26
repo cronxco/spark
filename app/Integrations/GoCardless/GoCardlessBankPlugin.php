@@ -869,7 +869,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $targetObject = $this->upsertCounterpartyObject($integration, $tx);
 
         // Create the event relationship
-        $event->objects()->sync([
+        $event->objects()->syncWithoutDetaching([
             $actorObject->id => ['role' => 'actor'],
             $targetObject->id => ['role' => 'target'],
         ]);
@@ -883,10 +883,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $category,
         ]);
 
-        // Create balance block if this affects account balance
-        if (isset($tx['transactionAmount']['amount'])) {
-            $this->createBalanceBlock($integration, $account, $tx);
-        }
     }
 
     /**
@@ -894,7 +890,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     protected function createBalanceEvent(Integration $integration, array $account, array $balance): void
     {
-        $sourceId = 'balance_' . $account['id'] . '_' . ($balance['referenceDate'] ?? now()->toDateString());
+        $balanceReferenceDate = $balance['referenceDate'] ?? now()->toDateString();
+        $sourceId = 'balance_' . $account['id'] . '_' . $balanceReferenceDate;
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'had_balance',
@@ -943,11 +940,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'user_id' => $integration->user_id,
                 'concept' => 'day',
                 'type' => 'day',
-                'title' => now()->toDateString(),
+                'title' => $balanceReferenceDate,
             ],
             [
                 'integration_id' => $integration->id,
-                'time' => now()->toDateString() . ' 00:00:00',
+                'time' => $balanceReferenceDate . ' 00:00:00',
                 'content' => null,
                 'url' => null,
                 'image_url' => null,
@@ -955,7 +952,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         );
 
         // Create the event relationship
-        $event->objects()->sync([
+        $event->objects()->syncWithoutDetaching([
             $actorObject->id => ['role' => 'actor'],
             $dayObject->id => ['role' => 'target'],
         ]);
@@ -969,18 +966,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Create balance block
-        $this->createBalanceBlock($integration, $account, $balance);
+        $this->createBalanceBlock($integration, $account, $balance, $balanceReferenceDate);
     }
 
     /**
      * Create balance block
      */
-    protected function createBalanceBlock(Integration $integration, array $account, array $data): void
+    protected function createBalanceBlock(Integration $integration, array $account, array $data, string $balanceReferenceDate): void
     {
         $block = Block::updateOrCreate(
             [
                 'integration_id' => $integration->id,
-                'source_id' => 'balance_' . $account['id'] . '_' . now()->toDateString(),
+                'source_id' => 'balance_' . $account['id'] . '_' . $balanceReferenceDate,
             ],
             [
                 'user_id' => $integration->user_id,

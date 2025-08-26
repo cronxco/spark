@@ -21,7 +21,6 @@ class IntegrationController extends Controller
             'service' => $service,
             'user_id' => Auth::id(),
             'session_id' => session()->getId(),
-            'session_data' => session()->all(),
             'request_url' => request()->url(),
             'request_method' => request()->method(),
         ]);
@@ -39,8 +38,7 @@ class IntegrationController extends Controller
             if ($service === 'gocardless') {
                 Log::info('GoCardless OAuth flow started', [
                     'user_id' => $user->id,
-                    'session_data' => session()->all(),
-                    'session_keys' => array_keys(session()->all()),
+                    'session_id' => session()->getId(),
                 ]);
 
                 // Find the most recent GoCardless group for this user
@@ -66,8 +64,7 @@ class IntegrationController extends Controller
                     'group_id' => $group->id,
                     'institution_id' => $institutionId,
                     'session_key' => 'gocardless_institution_id_' . $group->id,
-                    'all_session_keys' => array_keys(session()->all()),
-                    'session_data_full' => session()->all(),
+                    'session_id' => session()->getId(),
                 ]);
 
                 if (! $institutionId) {
@@ -156,21 +153,48 @@ class IntegrationController extends Controller
                         ->with('error', 'No GoCardless integration found with this reference. Please start over.');
                 }
             } else {
-                // Fallback to most recent group if no ref parameter
-                $group = IntegrationGroup::query()
-                    ->where('user_id', $user->id)
-                    ->where('service', $service)
-                    ->latest()
-                    ->first();
+                // Use the dedicated session key to avoid "latest group" ambiguity
+                $oauthGroupId = session('gocardless_oauth_group_id');
+                if ($oauthGroupId) {
+                    $group = IntegrationGroup::query()
+                        ->where('id', $oauthGroupId)
+                        ->where('user_id', $user->id)
+                        ->where('service', $service)
+                        ->first();
 
+                    if ($group) {
+                        Log::info('GoCardless OAuth callback: found group from session', [
+                            'service' => $service,
+                            'user_id' => $user->id,
+                            'group_id' => $group->id,
+                            'session_key' => 'gocardless_oauth_group_id',
+                        ]);
+                    }
+                }
+
+                // Fallback to most recent group only if session lookup failed
                 if (! $group) {
-                    Log::error('GoCardless OAuth callback: no group found for user', [
+                    Log::warning('GoCardless OAuth callback: session lookup failed, falling back to latest group', [
                         'service' => $service,
                         'user_id' => $user->id,
+                        'session_oauth_group_id' => $oauthGroupId,
                     ]);
 
-                    return redirect()->route('integrations.index')
-                        ->with('error', 'No GoCardless integration found. Please start over.');
+                    $group = IntegrationGroup::query()
+                        ->where('user_id', $user->id)
+                        ->where('service', $service)
+                        ->latest()
+                        ->first();
+
+                    if (! $group) {
+                        Log::error('GoCardless OAuth callback: no group found for user', [
+                            'service' => $service,
+                            'user_id' => $user->id,
+                        ]);
+
+                        return redirect()->route('integrations.index')
+                            ->with('error', 'No GoCardless integration found. Please start over.');
+                    }
                 }
             }
         } else {
@@ -223,6 +247,20 @@ class IntegrationController extends Controller
         try {
             if (method_exists($plugin, 'handleOAuthCallback')) {
                 $plugin->handleOAuthCallback($request, $group);
+            }
+
+            // Clean up GoCardless session data after successful OAuth
+            if ($service === 'gocardless') {
+                session()->forget([
+                    'gocardless_oauth_group_id',
+                    'gocardless_institution_id_' . $group->id,
+                ]);
+
+                Log::info('GoCardless OAuth callback: session data cleaned up', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'group_id' => $group->id,
+                ]);
             }
 
             // Redirect to onboarding to select instance types

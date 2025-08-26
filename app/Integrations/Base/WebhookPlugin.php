@@ -67,10 +67,24 @@ abstract class WebhookPlugin implements IntegrationPlugin
         $this->createEventsFromWebhook($convertedData, $integration);
     }
 
+    /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
     public function verifyWebhookSignature(Request $request, Integration $integration): bool
     {
-        // Override in child classes if signature verification is needed
-        return true;
+        // Get the secret from the route parameter
+        $routeSecret = $request->route('secret');
+
+        // Get the expected secret from the integration's account_id
+        $expectedSecret = $integration->account_id;
+
+        // Perform constant-time comparison to prevent timing attacks
+        // If either secret is missing, treat as invalid
+        if (empty($routeSecret) || empty($expectedSecret)) {
+            return false;
+        }
+
+        return hash_equals($expectedSecret, $routeSecret);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void

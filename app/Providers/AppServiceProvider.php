@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Horizon\Horizon;
-use Sentry\Breadcrumb;
 use Sentry\EventHint;
 use Sentry\SentrySdk;
 use Sentry\Severity;
@@ -60,10 +59,8 @@ class AppServiceProvider extends ServiceProvider
             });
         });
 
-        // Always apply beforeSending for breadcrumbs of responses
-        Http::beforeSending(function ($request, $options) {
-            \Sentry\addBreadcrumb(new Breadcrumb(Breadcrumb::LEVEL_INFO, Breadcrumb::TYPE_HTTP, 'http', sprintf('%s %s', $request->getMethod(), (string) $request->getUri())));
-        });
+        // Note: Sentry breadcrumb functionality requires proper method availability
+        // Consider using middleware or response events for HTTP logging
 
         Event::listen(ScheduledTaskFinished::class, function (ScheduledTaskFinished $event) {
             // Track success or failure of scheduled tasks

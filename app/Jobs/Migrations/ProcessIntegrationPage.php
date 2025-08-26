@@ -357,6 +357,18 @@ class ProcessIntegrationPage implements ShouldQueue
                 }
                 // Walk windows for each account and feed into plugin's item processor
                 try {
+                    // Check if NordigenClient class is available
+                    if (! class_exists('NordigenClient')) {
+                        Log::error('ProcessIntegrationPage: NordigenClient class not available; skipping GoCardless transaction replay', [
+                            'integration_id' => $this->integration->id,
+                            'service' => 'gocardless',
+                            'context' => $this->context,
+                            'missing_dependency' => 'NordigenClient',
+                        ]);
+
+                        return;
+                    }
+
                     $secretId = (string) (config('services.gocardless.secret_id'));
                     $secretKey = (string) (config('services.gocardless.secret_key'));
                     $group = $this->integration->group;

@@ -189,14 +189,21 @@ class GoCardlessIntegrationTest extends TestCase
     public function plugin_constructor_validates_credentials(): void
     {
         // Test that plugin constructor validates credentials in non-testing environment
-        $this->app['env'] = 'production';
-        config(['services.gocardless.secret_id' => '']);
-        config(['services.gocardless.secret_key' => '']);
+        $originalEnv = $this->app['env'];
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('GoCardless credentials are not configured');
+        try {
+            $this->app['env'] = 'production';
+            config(['services.gocardless.secret_id' => '']);
+            config(['services.gocardless.secret_key' => '']);
 
-        new GoCardlessBankPlugin;
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('GoCardless credentials are not configured');
+
+            new GoCardlessBankPlugin;
+        } finally {
+            // Restore original environment to prevent test pollution
+            $this->app['env'] = $originalEnv;
+        }
     }
 
     /**
