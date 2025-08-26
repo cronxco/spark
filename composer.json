@@ -23,6 +23,7 @@
         "sentry/sentry-laravel": "^4.9",
         "socialiteproviders/authelia": "^4.0",
         "spatie/laravel-tags": "^4.10",
+        "symfony/polyfill-php84": "1.33.0",
         "willscottuk/monzo-php": "dev-master"
     },
     "require-dev": {
