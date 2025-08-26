@@ -138,13 +138,12 @@ class FinancialPlugin extends ManualPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'account',
                 'type' => 'financial_account',
                 'title' => $title,
             ],
             [
-                'user_id' => $integration->user_id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [
@@ -173,13 +172,12 @@ class FinancialPlugin extends ManualPlugin
         // Create or update the target "day" object
         $dayObject = EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'day',
                 'type' => 'day',
                 'title' => $date,
             ],
             [
-                'user_id' => $integration->user_id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $date],
@@ -361,7 +359,7 @@ class FinancialPlugin extends ManualPlugin
         foreach ($monzoIntegrations as $integration) {
             try {
                 // Get existing Monzo account objects
-                $monzoAccountObjects = EventObject::where('integration_id', $integration->id)
+                $monzoAccountObjects = EventObject::where('user_id', $integration->user_id)
                     ->where('concept', 'account')
                     ->where('type', 'monzo_account')
                     ->get();
@@ -406,7 +404,7 @@ class FinancialPlugin extends ManualPlugin
         foreach ($gocardlessIntegrations as $integration) {
             try {
                 // Get existing GoCardless account objects
-                $gocardlessAccountObjects = EventObject::where('integration_id', $integration->id)
+                $gocardlessAccountObjects = EventObject::where('user_id', $integration->user_id)
                     ->where('concept', 'account')
                     ->where('type', 'gocardless_account')
                     ->get();

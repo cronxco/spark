@@ -45,7 +45,6 @@ class FinancialIntegrationEventTest extends TestCase
         $accountObject = $plugin->upsertAccountObject($integration, $accountData);
 
         $this->assertInstanceOf(EventObject::class, $accountObject);
-        $this->assertEquals($integration->id, $accountObject->integration_id);
         $this->assertEquals('account', $accountObject->concept);
         $this->assertEquals('financial_account', $accountObject->type);
         $this->assertEquals('Test Savings Account', $accountObject->title);
