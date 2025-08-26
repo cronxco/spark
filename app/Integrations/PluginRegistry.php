@@ -50,7 +50,7 @@ class PluginRegistry
             return $pluginClass::getServiceType() === 'manual';
         });
     }
-          
+
     public static function getApiKeyPlugins(): Collection
     {
         return self::getAllPlugins()->filter(function ($pluginClass) {

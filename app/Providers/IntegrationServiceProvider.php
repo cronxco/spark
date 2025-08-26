@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\AppleHealth\AppleHealthPlugin;
+use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\Hevy\HevyPlugin;
