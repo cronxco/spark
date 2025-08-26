@@ -83,7 +83,7 @@ class Event extends Model
             return $this->value;
         }
 
-        if ($this->value_multiplier === 1) {
+        if ($this->value_multiplier === 1 || $this->value_multiplier === 0) {
             return $this->value;
         }
 
