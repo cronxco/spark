@@ -13,7 +13,7 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Ensure session is properly initialized for tests
         $this->app['session']->start();
     }
