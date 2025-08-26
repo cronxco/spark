@@ -23,8 +23,8 @@ return new class extends Migration
         if (! $exists) {
             // Use IF NOT EXISTS to avoid race conditions; CONCURRENTLY requires no transaction
             try {
-                $tableName = Schema::getConnection()->getTablePrefix() . 'events';
-                DB::statement("CREATE UNIQUE INDEX IF NOT EXISTS events_integration_source_unique ON {$tableName} (integration_id, source_id)");
+                // Note: The table name is automatically prefixed by Laravel when using Schema::table()
+                DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS events_integration_source_unique ON events (integration_id, source_id)');
             } catch (\Throwable $e) {
                 // Fallback to Schema builder if statement not supported
                 Schema::table('events', function (Blueprint $table) {
