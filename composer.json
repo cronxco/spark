@@ -19,6 +19,7 @@
         "owenvoke/blade-fontawesome": "^2.9",
         "pgvector/pgvector": "^0.2.2",
         "pragmarx/version": "dev-master",
+        "predis/predis": "^3.2",
         "robsontenorio/mary": "^2.4",
         "sentry/sentry-laravel": "^4.9",
         "socialiteproviders/authelia": "^4.0",
