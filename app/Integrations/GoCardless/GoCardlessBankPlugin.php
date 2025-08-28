@@ -71,9 +71,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'type' => 'integer',
                 'label' => 'Update Frequency (minutes)',
                 'required' => true,
-                'min' => 1440, // 24 hours minimum due to GoCardless rate limits
+                'min' => 360, // 6 hours minimum due to GoCardless rate limits
                 'default' => 1440, // 24 hours default
-                'description' => 'GoCardless has strict rate limits (4 requests/day). Recommended: 24+ hours.',
+                'description' => 'GoCardless has strict rate limits (4 requests/day). Minimum: 6+ hours.',
             ],
         ];
     }
@@ -502,6 +502,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'account_id' => $accountId,
                         'account_data' => $accountDetails,
                     ]);
+                    $accountDetails['id'] = $accountId;
                     $accounts[] = $accountDetails;
                 } else {
                     Log::warning('GoCardless onboarding: failed to get account details', [
