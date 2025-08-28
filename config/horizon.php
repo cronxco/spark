@@ -56,6 +56,25 @@ return [
             ],
         ],
 
+        'staging' => [
+            'supervisor-pull' => [
+                'connection' => 'redis',
+                'queue' => ['pull'],
+                'balance' => 'simple',
+                'maxProcesses' => 5,
+                'memory' => 256,
+                'tries' => 3,
+            ],
+            'supervisor-migration' => [
+                'connection' => 'redis',
+                'queue' => ['migration'],
+                'balance' => 'simple',
+                'maxProcesses' => 1,
+                'memory' => 256,
+                'tries' => 1,
+            ],
+        ],
+
         'local' => [
             'supervisor-pull' => [
                 'connection' => 'redis',
