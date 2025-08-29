@@ -13,5 +13,4 @@ Artisan::command('inspire', function () {
 Schedule::job(new CheckIntegrationUpdates)
     ->everyMinute()
     ->withoutOverlapping()
-    ->onQueue('pull')
     ->onOneServer();
