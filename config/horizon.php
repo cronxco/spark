@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Str;
+
 return [
     'domain' => env('HORIZON_DOMAIN'),
 
@@ -7,7 +9,10 @@ return [
 
     'use' => 'default',
 
-    'prefix' => env('HORIZON_PREFIX'),
+    'prefix' => env(
+        'HORIZON_PREFIX',
+        Str::slug(env('APP_NAME', 'laravel'), '_') . '_horizon:'
+    ),
 
     'middleware' => ['web', 'auth', 'verified'],
 
@@ -38,18 +43,18 @@ return [
 
     'environments' => [
         'production' => [
-            'supervisor-pull' => [
+            'supervisor-1' => [
                 'connection' => 'redis',
                 'queue' => ['pull'],
-                'balance' => 'simple',
+                'balance' => 'auto',
                 'maxProcesses' => 5,
                 'memory' => 256,
                 'tries' => 3,
             ],
-            'supervisor-migration' => [
+            'supervisor-2' => [
                 'connection' => 'redis',
                 'queue' => ['migration'],
-                'balance' => 'simple',
+                'balance' => 'auto',
                 'maxProcesses' => 1,
                 'memory' => 256,
                 'tries' => 1,
@@ -57,18 +62,18 @@ return [
         ],
 
         'staging' => [
-            'supervisor-pull' => [
+            'supervisor-1' => [
                 'connection' => 'redis',
                 'queue' => ['pull'],
-                'balance' => 'simple',
+                'balance' => 'auto',
                 'maxProcesses' => 5,
                 'memory' => 256,
                 'tries' => 3,
             ],
-            'supervisor-migration' => [
+            'supervisor-2' => [
                 'connection' => 'redis',
                 'queue' => ['migration'],
-                'balance' => 'simple',
+                'balance' => 'auto',
                 'maxProcesses' => 1,
                 'memory' => 256,
                 'tries' => 1,
@@ -76,7 +81,7 @@ return [
         ],
 
         'local' => [
-            'supervisor-pull' => [
+            'supervisor-1' => [
                 'connection' => 'redis',
                 'queue' => ['pull'],
                 'balance' => 'simple',
@@ -84,10 +89,10 @@ return [
                 'memory' => 256,
                 'tries' => 3,
             ],
-            'supervisor-migration' => [
+            'supervisor-2' => [
                 'connection' => 'redis',
                 'queue' => ['migration'],
-                'balance' => 'simple',
+                'balance' => 'auto',
                 'maxProcesses' => 1,
                 'memory' => 256,
                 'tries' => 1,
