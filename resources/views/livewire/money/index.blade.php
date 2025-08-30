@@ -95,7 +95,7 @@
                             <tbody>
                                 @foreach ($accounts as $account)
                                     @php
-                                        $metadata = $account->metadata;
+                                        $metadata = $account->metadata ?? [];
                                         $accountType = $metadata['account_type'] ?? '';
                                         $provider = $metadata['provider'] ?? '';
                                         $accountNumber = $metadata['account_number'] ?? null;
@@ -133,7 +133,15 @@
                                     <tr>
                                         <td>
                                             <div>
-                                                <div class="font-medium">{{ $metadata['name'] ?? 'Unnamed Account' }}</div>
+                                                <div class="font-medium">
+                                                    @if (!empty($metadata['name']))
+                                                        {{ $metadata['name'] }}
+                                                    @elseif (!empty($account->title))
+                                                        {{ $account->title }}
+                                                    @else
+                                                        Unnamed Account
+                                                    @endif
+                                                </div>
                                                 @if ($accountNumber)
                                                     <div class="text-sm text-base-content/70">
                                                         {{ $accountNumber }}
@@ -145,11 +153,21 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <span class="badge badge-outline">
-                                                {{ $accountTypeLabel }}
-                                            </span>
+                                            @if (!empty($accountTypeLabel))
+                                                <span class="badge badge-outline">
+                                                    {{ $accountTypeLabel }}
+                                                </span>
+                                            @else
+                                                <span class="text-base-content/50">-</span>
+                                            @endif
                                         </td>
-                                        <td>{{ $provider }}</td>
+                                        <td>
+                                            @if (!empty($provider))
+                                                {{ $provider }}
+                                            @else
+                                                <span class="text-base-content/50">-</span>
+                                            @endif
+                                        </td>
                                         <td>
                                             @php
                                                 // Determine service based on account type
@@ -160,8 +178,16 @@
                                                     'bank_account' => 'GoCardless',
                                                     default => 'Unknown'
                                                 };
+                                                
+                                                // Get service color
+                                                $serviceColor = match ($account->type) {
+                                                    'manual_account' => 'badge-primary',
+                                                    'monzo_account', 'monzo_pot' => 'badge-secondary',
+                                                    'bank_account' => 'badge-accent',
+                                                    default => 'badge-neutral'
+                                                };
                                             @endphp
-                                            <span class="badge badge-{{ $service === 'Manual' ? 'primary' : 'secondary' }}">
+                                            <span class="badge {{ $serviceColor }}">
                                                 {{ $service }}
                                             </span>
                                         </td>

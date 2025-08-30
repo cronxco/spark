@@ -1006,12 +1006,25 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     protected function upsertAccountObject(Integration $integration, array $account): EventObject
     {
+        // Determine account type based on GoCardless data
+        $accountType = match ($account['cashAccountType'] ?? null) {
+            'CurrentAccount' => 'current_account',
+            'SavingsAccount' => 'savings_account',
+            'CreditCard' => 'credit_card',
+            'InvestmentAccount' => 'investment_account',
+            'LoanAccount' => 'loan',
+            default => 'other',
+        };
+
+        // Generate a proper account name
+        $accountName = $this->generateAccountName($account);
+
         return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
                 'concept' => 'account',
                 'type' => 'bank_account',
-                'title' => $account['name'] ?? $account['id'],
+                'title' => $accountName,
             ],
             [
                 'user_id' => $integration->user_id,
@@ -1019,6 +1032,14 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'url' => null,
                 'image_url' => null,
                 'time' => null,
+                'metadata' => [
+                    'name' => $accountName,
+                    'provider' => $account['institution_id'] ?? 'GoCardless',
+                    'account_type' => $accountType,
+                    'currency' => $account['currency'] ?? 'GBP',
+                    'account_number' => $account['resourceId'] ?? null,
+                    'raw' => $account,
+                ],
             ]
         );
     }
