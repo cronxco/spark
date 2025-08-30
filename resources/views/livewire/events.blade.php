@@ -76,13 +76,13 @@ $dateLabel = computed(function () {
 $formatAction = function ($action) {
     // Convert snake_case to title case
     $formatted = Str::headline($action);
-    
+
     // Keep certain words lowercase for natural language flow
     $wordsToLowercase = ['To', 'For', 'From', 'In', 'On', 'At', 'By', 'With', 'Of', 'The', 'A', 'An'];
     foreach ($wordsToLowercase as $word) {
         $formatted = str_replace(" $word ", " " . strtolower($word) . " ", $formatted);
     }
-    
+
     return $formatted;
 };
 
@@ -95,7 +95,7 @@ $getEventIcon = function ($action, $service) {
             return $actionTypes[$action]['icon'];
         }
     }
-    
+
     // Fallback to hardcoded icons if plugin doesn't have this action type
     $icons = [
         'create' => 'o-plus-circle',
@@ -288,7 +288,7 @@ $nextDay = function () {
                                 <div class="timeline-start">
                                 <div class="flex items-start gap-4">
                                         <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                            <x-icon name="{{ $this->getEventIcon($event->action, $event->service) }}" 
+                                            <x-icon name="{{ $this->getEventIcon($event->action, $event->service) }}"
                                                    class="w-5 h-5 {{ $this->getEventColor($event->action) }}" />
                                         </div>
                                         <div class="min-w-0 flex-1">
@@ -333,7 +333,7 @@ $nextDay = function () {
 
                                             <!-- View Event Button -->
                             <div>
-                                                <a href="{{ route('events.show', $event->id) }}" 
+                                                <a href="{{ route('events.show', $event->id) }}"
                                                    class="btn btn-sm btn-primary">
                                                     View Details
                                                     <x-icon name="o-chevron-right" class="w-3 h-3" />

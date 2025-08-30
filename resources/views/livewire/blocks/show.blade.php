@@ -7,7 +7,7 @@ use App\Integrations\PluginRegistry;
 
 new class extends Component {
     public Block $block;
-    
+
     public function mount(Block $block): void
     {
         $this->block = $block->load(['event']);
@@ -43,7 +43,7 @@ new class extends Component {
                 }
             }
         }
-        
+
         // Fallback to default icon if plugin doesn't have this block type
         return 'o-squares-2x2';
     }
@@ -73,7 +73,7 @@ new class extends Component {
                         <!-- Block Icon -->
                         <div class="flex-shrink-0 self-center sm:self-start">
                             <div class="w-12 h-12 rounded-full bg-info/10 flex items-center justify-center">
-                                <x-icon name="{{ $this->getBlockIcon($this->block->block_type, $this->block->event?->service) }}" 
+                                <x-icon name="{{ $this->getBlockIcon($this->block->block_type, $this->block->event?->service) }}"
                                        class="w-6 h-6 text-info" />
                             </div>
                         </div>
@@ -133,7 +133,7 @@ new class extends Component {
                         Related Event
                     </h3>
                     <div class="border border-base-300 rounded-lg p-4 hover:bg-base-50 transition-colors">
-                        <a href="{{ route('events.show', $this->block->event->id) }}" 
+                        <a href="{{ route('events.show', $this->block->event->id) }}"
                            class="block hover:text-primary transition-colors">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -177,7 +177,7 @@ new class extends Component {
                         @foreach ($this->getRelatedBlocks() as $relatedBlock)
                             <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
                                 <div class="flex items-start justify-between mb-2">
-                                    <a href="{{ route('blocks.show', $relatedBlock->id) }}" 
+                                    <a href="{{ route('blocks.show', $relatedBlock->id) }}"
                                        class="font-medium text-base-content hover:text-primary transition-colors text-sm">
                                         {{ $relatedBlock->title }}
                                     </a>

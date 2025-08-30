@@ -9,7 +9,7 @@ use App\Integrations\PluginRegistry;
 
 new class extends Component {
     public EventObject $object;
-    
+
     public function mount(EventObject $object): void
     {
         $this->object = $object->load(['tags']);
@@ -40,13 +40,13 @@ new class extends Component {
     {
         // Convert snake_case to title case
         $formatted = Str::headline($action);
-        
+
         // Keep certain words lowercase for natural language flow
         $wordsToLowercase = ['To', 'For', 'From', 'In', 'On', 'At', 'By', 'With', 'Of', 'The', 'A', 'An'];
         foreach ($wordsToLowercase as $word) {
             $formatted = str_replace(" $word ", " " . strtolower($word) . " ", $formatted);
         }
-        
+
         return $formatted;
     }
 
@@ -70,7 +70,7 @@ new class extends Component {
                 }
             }
         }
-        
+
         // Fallback to hardcoded icons if plugin doesn't have this object type
         $icons = [
             'user' => 'o-user',
@@ -690,7 +690,7 @@ new class extends Component {
                         <!-- Object Icon -->
                         <div class="flex-shrink-0 self-center sm:self-start">
                             <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center">
-                                <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept) }}" 
+                                <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept) }}"
                                        class="w-6 h-6 text-secondary" />
                             </div>
                         </div>
@@ -767,7 +767,7 @@ new class extends Component {
                     <div class="space-y-3">
                         @foreach ($this->getRelatedEvents() as $event)
                             <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                                <a href="{{ route('events.show', $event->id) }}" 
+                                <a href="{{ route('events.show', $event->id) }}"
                                    class="block hover:text-primary transition-colors">
                                     <div class="flex items-center gap-3">
                                         <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">

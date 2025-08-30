@@ -37,9 +37,9 @@
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h2 class="card-title">Action Types</h2>
-                @if(count($pluginClass::getActionTypes()) > 0)
+                @if (count($pluginClass::getActionTypes()) > 0)
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        @foreach($pluginClass::getActionTypes() as $key => $action)
+                        @foreach ($pluginClass::getActionTypes() as $key => $action)
                             @php
                                 $count = \App\Models\Event::where('service', $service)
                                     ->where('action', $key)
@@ -47,7 +47,7 @@
                                         $query->where('user_id', auth()->id());
                                     })
                                     ->count();
-                                
+
                                 $recent = \App\Models\Event::where('service', $service)
                                     ->where('action', $key)
                                     ->whereHas('integration', function($query) {
@@ -56,10 +56,10 @@
                                     ->orderBy('created_at', 'desc')
                                     ->limit(5)
                                     ->get();
-                                
+
                                 $newest = $recent->first();
                             @endphp
-                            
+
                             <div class="card bg-base-200 shadow-sm">
                                 <div class="card-body">
                                     <div class="flex items-center gap-3 mb-4">
@@ -71,27 +71,27 @@
                                             <p class="text-sm text-base-content/70">{{ $action['description'] }}</p>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="stats stats-horizontal shadow mb-4">
                                         <div class="stat">
                                             <div class="stat-title text-xs">Total</div>
                                             <div class="stat-value text-2xl">{{ $count }}</div>
                                         </div>
-                                        @if($newest)
+                                        @if ($newest)
                                             <div class="stat">
                                                 <div class="stat-title text-xs">Newest</div>
                                                 <div class="stat-value text-sm">{{ $newest->created_at->diffForHumans() }}</div>
                                             </div>
                                         @endif
                                     </div>
-                                    
-                                    @if($recent->count() > 0)
+
+                                    @if ($recent->count() > 0)
                                         <div class="space-y-2">
                                             <h4 class="font-medium text-sm text-base-content">Recent {{ $action['display_name'] }}:</h4>
                                             <div class="overflow-x-auto">
                                                 <table class="table table-xs">
                                                     <tbody>
-                                                        @foreach($recent as $event)
+                                                        @foreach ($recent as $event)
                                                             <tr>
                                                                 <td class="text-sm">{{ $event->title ?: $event->action }}</td>
                                                                 <td class="text-sm text-base-content/70">{{ $event->created_at->format('M j') }}</td>
@@ -106,11 +106,11 @@
                                             <p class="text-sm text-base-content/70">No {{ $action['display_name'] }} recorded yet</p>
                                         </div>
                                     @endif
-                                    
-                                    @if($action['value_unit'])
+
+                                    @if ($action['value_unit'])
                                         <div class="mt-4 flex gap-2">
                                             <span class="badge badge-outline">Unit: {{ $action['value_unit'] }}</span>
-                                            @if($action['display_with_object'])
+                                            @if ($action['display_with_object'])
                                                 <span class="badge badge-outline">With Object</span>
                                             @else
                                                 <span class="badge badge-outline">Value Only</span>
@@ -135,9 +135,9 @@
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h2 class="card-title">Object Types</h2>
-                @if(count($pluginClass::getObjectTypes()) > 0)
+                @if (count($pluginClass::getObjectTypes()) > 0)
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        @foreach($pluginClass::getObjectTypes() as $key => $object)
+                        @foreach ($pluginClass::getObjectTypes() as $key => $object)
                             @php
                                 $count = \App\Models\EventObject::where('concept', $key)
                                     ->where(function($query) use ($service) {
@@ -155,7 +155,7 @@
                                         });
                                     })
                                     ->count();
-                                
+
                                 $recent = \App\Models\EventObject::where('concept', $key)
                                     ->where(function($query) use ($service) {
                                         $query->whereHas('actorEvents', function($q) use ($service) {
@@ -175,10 +175,10 @@
                                     ->orderBy('created_at', 'desc')
                                     ->limit(5)
                                     ->get();
-                                
+
                                 $newest = $recent->first();
                             @endphp
-                            
+
                             <div class="card bg-base-200 shadow-sm">
                                 <div class="card-body">
                                     <div class="flex items-center gap-3 mb-4">
@@ -190,27 +190,27 @@
                                             <p class="text-sm text-base-content/70">{{ $object['description'] }}</p>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="stats stats-horizontal shadow mb-4">
                                         <div class="stat">
                                             <div class="stat-title text-xs">Total</div>
                                             <div class="stat-value text-2xl">{{ $count }}</div>
                                         </div>
-                                        @if($newest)
+                                        @if ($newest)
                                             <div class="stat">
                                                 <div class="stat-title text-xs">Newest</div>
                                                 <div class="stat-value text-sm">{{ $newest->created_at->diffForHumans() }}</div>
                                             </div>
                                         @endif
                                     </div>
-                                    
-                                    @if($recent->count() > 0)
+
+                                    @if ($recent->count() > 0)
                                         <div class="space-y-2">
                                             <h4 class="font-medium text-sm text-base-content">Recent {{ $object['display_name'] }}:</h4>
                                             <div class="overflow-x-auto">
                                                 <table class="table table-xs">
                                                     <tbody>
-                                                        @foreach($recent as $objectItem)
+                                                        @foreach ($recent as $objectItem)
                                                             <tr>
                                                                 <td class="text-sm">{{ $objectItem->title ?: $objectItem->concept }}</td>
                                                                 <td class="text-sm text-base-content/70">{{ $objectItem->created_at->format('M j') }}</td>
@@ -243,9 +243,9 @@
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h2 class="card-title">Block Types</h2>
-                @if(count($pluginClass::getBlockTypes()) > 0)
+                @if (count($pluginClass::getBlockTypes()) > 0)
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        @foreach($pluginClass::getBlockTypes() as $key => $block)
+                        @foreach ($pluginClass::getBlockTypes() as $key => $block)
                             @php
                                 $count = \App\Models\Block::where('block_type', $key)
                                     ->whereHas('event', function($query) use ($service) {
@@ -255,7 +255,7 @@
                                         $query->where('user_id', auth()->id());
                                     })
                                     ->count();
-                                
+
                                 $recent = \App\Models\Block::where('block_type', $key)
                                     ->whereHas('event', function($query) use ($service) {
                                         $query->where('service', $service);
@@ -267,10 +267,10 @@
                                     ->orderBy('created_at', 'desc')
                                     ->limit(5)
                                     ->get();
-                                
+
                                 $newest = $recent->first();
                             @endphp
-                            
+
                             <div class="card bg-base-200 shadow-sm">
                                 <div class="card-body">
                                     <div class="flex items-center gap-3 mb-4">
@@ -282,27 +282,27 @@
                                             <p class="text-sm text-base-content/70">{{ $block['description'] }}</p>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="stats stats-horizontal shadow mb-4">
                                         <div class="stat">
                                             <div class="stat-title text-xs">Total</div>
                                             <div class="stat-value text-2xl">{{ $count }}</div>
                                         </div>
-                                        @if($newest)
+                                        @if ($newest)
                                             <div class="stat">
                                                 <div class="stat-title text-xs">Newest</div>
                                                 <div class="stat-value text-sm">{{ $newest->created_at->diffForHumans() }}</div>
                                             </div>
                                         @endif
                                     </div>
-                                    
-                                    @if($recent->count() > 0)
+
+                                    @if ($recent->count() > 0)
                                         <div class="space-y-2">
                                             <h4 class="font-medium text-sm text-base-content">Recent {{ $block['display_name'] }}:</h4>
                                             <div class="overflow-x-auto">
                                                 <table class="table table-xs">
                                                     <tbody>
-                                                        @foreach($recent as $blockItem)
+                                                        @foreach ($recent as $blockItem)
                                                             <tr>
                                                                 <td class="text-sm">{{ $blockItem->title ?: $blockItem->block_type }}</td>
                                                                 <td class="text-sm text-base-content/70">{{ $blockItem->created_at->format('M j') }}</td>
@@ -317,11 +317,11 @@
                                             <p class="text-sm text-base-content/70">No {{ $block['display_name'] }} recorded yet</p>
                                         </div>
                                     @endif
-                                    
-                                    @if($block['value_unit'])
+
+                                    @if ($block['value_unit'])
                                         <div class="mt-4 flex gap-2">
                                             <span class="badge badge-outline">Unit: {{ $block['value_unit'] }}</span>
-                                            @if($block['display_with_object'])
+                                            @if ($block['display_with_object'])
                                                 <span class="badge badge-outline">With Object</span>
                                             @else
                                                 <span class="badge badge-outline">Value Only</span>

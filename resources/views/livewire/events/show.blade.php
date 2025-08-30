@@ -10,12 +10,12 @@ use App\Integrations\PluginRegistry;
 new class extends Component {
     public Event $event;
     public bool $showSidebar = false;
-    
+
     public function mount(Event $event): void
     {
         $this->event = $event->load([
             'actor',
-            'target', 
+            'target',
             'integration',
             'blocks',
             'tags',
@@ -54,29 +54,29 @@ new class extends Component {
     {
         // Convert snake_case to title case
         $formatted = Str::headline($action);
-        
+
         // Keep certain words lowercase for natural language flow
         $wordsToLowercase = ['To', 'For', 'From', 'In', 'On', 'At', 'By', 'With', 'Of', 'The', 'A', 'An'];
         foreach ($wordsToLowercase as $word) {
             $formatted = str_replace(" $word ", " " . strtolower($word) . " ", $formatted);
         }
-        
+
         return $formatted;
     }
 
     public function needsPreposition($action)
     {
         $actionLower = strtolower($action);
-        
+
         // Check if the action already contains a preposition
         $prepositions = ['_to', '_for', '_from', '_in', '_on', '_at', '_by', '_with', '_of'];
-        
+
         foreach ($prepositions as $preposition) {
             if (str_ends_with($actionLower, $preposition)) {
                 return false; // Action already has a preposition, don't add another
             }
         }
-        
+
         // If no preposition found, we need to add "to" for most actions
         return true;
     }
@@ -99,7 +99,7 @@ new class extends Component {
                 return $actionTypes[$action]['icon'];
             }
         }
-        
+
         // Fallback to hardcoded icons if plugin doesn't have this action type
         $icons = [
             'create' => 'o-plus-circle',
@@ -214,7 +214,7 @@ new class extends Component {
                         <!-- Event Icon & Action -->
                         <div class="flex-shrink-0 self-center sm:self-start">
                             <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                                <x-icon name="{{ $this->getEventIcon($this->event->action, $this->event->service) }}" 
+                                <x-icon name="{{ $this->getEventIcon($this->event->action, $this->event->service) }}"
                                        class="w-6 h-6 sm:w-8 sm:h-8 {{ $this->getEventColor($this->event->action) }}" />
                             </div>
                         </div>
@@ -234,7 +234,7 @@ new class extends Component {
                                         {{ $this->event->actor->title }}
                                     @endif
                                 </h2>
-                                
+
                                 @if ($this->event->value)
                                     <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary">
                                         {{ $this->event->formatted_value }}{{ $this->event->value_unit ? ' ' . $this->event->value_unit : '' }}
@@ -275,24 +275,24 @@ new class extends Component {
                                                 <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary/10 flex items-center justify-center">
                                                     <x-icon name="o-user" class="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
                                                 </div>
-                                                <a href="{{ route('objects.show', $this->event->actor->id) }}" 
+                                                <a href="{{ route('objects.show', $this->event->actor->id) }}"
                                                    class="font-medium text-secondary hover:underline text-sm sm:text-base">
                                                     {{ $this->event->actor->title }}
                                                 </a>
                                             </div>
                                         @endif
-                                        
+
                                         @if ($this->event->actor && $this->event->target)
                                             <x-icon name="o-arrow-down" class="w-5 h-5 sm:w-6 sm:h-6 text-base-content/40 sm:hidden" />
                                             <x-icon name="o-arrow-right" class="w-5 h-5 sm:w-6 sm:h-6 text-base-content/40 hidden sm:block" />
                                         @endif
-                                        
+
                                         @if ($this->event->target)
                                             <div class="flex items-center gap-2">
                                                 <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent/10 flex items-center justify-center">
                                                     <x-icon name="o-arrow-trending-up" class="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                                 </div>
-                                                <a href="{{ route('objects.show', $this->event->target->id) }}" 
+                                                <a href="{{ route('objects.show', $this->event->target->id) }}"
                                                    class="font-medium text-accent hover:underline text-sm sm:text-base">
                                                     {{ $this->event->target->title }}
                                                 </a>
@@ -327,7 +327,7 @@ new class extends Component {
                             @foreach ($this->event->blocks as $block)
                                 <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
                                     <div class="flex items-start justify-between mb-2">
-                                        <a href="{{ route('blocks.show', $block->id) }}" 
+                                        <a href="{{ route('blocks.show', $block->id) }}"
                                            class="font-medium text-base-content hover:text-primary transition-colors text-sm">
                                             {{ $block->title }}
                                         </a>
@@ -372,11 +372,11 @@ new class extends Component {
                         <div class="space-y-3">
                             @foreach ($this->getRelatedEvents() as $relatedEvent)
                                 <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                                    <a href="{{ route('events.show', $relatedEvent->id) }}" 
+                                    <a href="{{ route('events.show', $relatedEvent->id) }}"
                                        class="block hover:text-primary transition-colors">
                                         <div class="flex items-center gap-3">
                                             <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}" 
+                                                <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}"
                                                        class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
                                             </div>
                                             <div class="flex-1 min-w-0">
