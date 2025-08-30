@@ -152,6 +152,7 @@ class FinancialPlugin extends ManualPlugin
                     'currency' => $accountData['currency'] ?? 'GBP',
                     'interest_rate' => $accountData['interest_rate'] ?? null,
                     'start_date' => $accountData['start_date'] ?? null,
+                    'integration_id' => $integration->id,
                     'raw' => $accountData,
                 ],
             ]
@@ -187,10 +188,10 @@ class FinancialPlugin extends ManualPlugin
 
         return Event::create([
             'integration_id' => $integration->id,
-            'source_id' => 'financial_balance_' . $accountObject->id . '_' . $date,
+            'source_id' => 'manual_balance_' . $accountObject->id . '_' . $date,
             'time' => $date . ' 23:59:59',
             'actor_id' => $accountObject->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
             'domain' => 'money',
             'action' => 'had_balance',
             'value' => $wholeValue,
@@ -214,7 +215,24 @@ class FinancialPlugin extends ManualPlugin
     {
         return EventObject::where('user_id', $user->id)
             ->where('concept', 'account')
-            ->where('type', 'financial_account')
+            ->whereIn('type', [
+                'manual_account',      // Manual financial accounts
+                'monzo_account',          // Monzo bank accounts
+                'monzo_pot',              // Monzo pots
+                'bank_account',           // GoCardless bank accounts
+            ])
+            ->orderBy('title')
+            ->get();
+    }
+
+    /**
+     * Get only manual financial accounts for a user (for balance updates)
+     */
+    public function getManualFinancialAccounts(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        return EventObject::where('user_id', $user->id)
+            ->where('concept', 'account')
+            ->where('type', 'manual_account')
             ->orderBy('title')
             ->get();
     }
@@ -225,7 +243,7 @@ class FinancialPlugin extends ManualPlugin
     public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
     {
         return Event::where('actor_id', $accountObject->id)
-            ->where('service', 'financial')
+            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->orderBy('time', 'desc')
             ->get();
@@ -237,7 +255,7 @@ class FinancialPlugin extends ManualPlugin
     public function getLatestBalance(EventObject $accountObject): ?Event
     {
         return Event::where('actor_id', $accountObject->id)
-            ->where('service', 'financial')
+            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->latest('time')
             ->first();

@@ -11,10 +11,12 @@
                     <x-icon name="o-arrow-left" class="w-4 h-4" />
                     Back to Accounts
                 </a>
-                <a href="{{ route('balance-updates.create') }}" class="btn btn-primary">
-                    <x-icon name="o-currency-dollar" class="w-4 h-4" />
-                    Add Balance Update
-                </a>
+                @if ($account->type === 'manual_account')
+                    <a href="{{ route('balance-updates.create.for-account', $account->id) }}" class="btn btn-primary">
+                        <x-icon name="o-currency-dollar" class="w-4 h-4" />
+                        Add Balance Update
+                    </a>
+                @endif
             </div>
         </div>
 
@@ -148,10 +150,12 @@
                         <x-icon name="o-currency-dollar" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No balance history</h3>
                         <p class="text-base-content/70 mb-6">Add your first balance update to get started</p>
-                        <a href="{{ route('balance-updates.create') }}" class="btn btn-primary">
-                            <x-icon name="o-plus" class="w-4 h-4" />
-                            Add Balance Update
-                        </a>
+                        @if ($account->type === 'manual_account')
+                            <a href="{{ route('balance-updates.create.for-account', $account->id) }}" class="btn btn-primary">
+                                <x-icon name="o-plus" class="w-4 h-4" />
+                                Add Balance Update
+                            </a>
+                        @endif
                     </div>
                 @endif
             </div>

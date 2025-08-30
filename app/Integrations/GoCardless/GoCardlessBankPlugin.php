@@ -1009,7 +1009,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
-                'concept' => 'money_bank_account',
+                'concept' => 'account',
                 'type' => 'bank_account',
                 'title' => $account['name'] ?? $account['id'],
             ],

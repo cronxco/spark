@@ -85,6 +85,7 @@
                                     <th>Account</th>
                                     <th>Type</th>
                                     <th>Provider</th>
+                                    <th>Service</th>
                                     <th>Current Balance</th>
                                     <th>Currency</th>
                                     <th>Interest Rate</th>
@@ -149,6 +150,21 @@
                                             </span>
                                         </td>
                                         <td>{{ $provider }}</td>
+                                        <td>
+                                            @php
+                                                // Determine service based on account type
+                                                $service = match ($account->type) {
+                                                    'manual_account' => 'Manual',
+                                                    'monzo_account' => 'Monzo',
+                                                    'monzo_pot' => 'Monzo Pot',
+                                                    'bank_account' => 'GoCardless',
+                                                    default => 'Unknown'
+                                                };
+                                            @endphp
+                                            <span class="badge badge-{{ $service === 'Manual' ? 'primary' : 'secondary' }}">
+                                                {{ $service }}
+                                            </span>
+                                        </td>
                                         <td>
                                             @if ($currentBalance !== null)
                                                 <span class="font-mono font-medium">

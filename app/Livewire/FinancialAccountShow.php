@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[Title('Financial Account Details')]
+#[Title('Manual Account Details')]
 class FinancialAccountShow extends Component
 {
     public EventObject $account;

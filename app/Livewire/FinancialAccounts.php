@@ -55,7 +55,7 @@ class FinancialAccounts extends Component
 
         // Delete all related balance events first
         Event::where('actor_id', $account->id)
-            ->where('service', 'financial')
+            ->where('service', 'manual_account')
             ->delete();
 
         // Delete the account object
