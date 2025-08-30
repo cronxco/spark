@@ -124,7 +124,7 @@ class SpotifyPlugin extends OAuthPlugin
     public static function getActionTypes(): array
     {
         return [
-            'played_track' => [
+            'played' => [
                 'icon' => 'o-play',
                 'display_name' => 'Played Track',
                 'description' => 'A track that was played on Spotify',
@@ -190,6 +190,18 @@ class SpotifyPlugin extends OAuthPlugin
                 'icon' => 'o-tag',
                 'display_name' => 'Genre',
                 'description' => 'A musical genre category',
+                'hidden' => false,
+            ],
+            'spotify_user' => [
+                'icon' => 'o-user',
+                'display_name' => 'Spotify User',
+                'description' => 'A Spotify user account',
+                'hidden' => false,
+            ],
+            'spotify_track' => [
+                'icon' => 'o-musical-note',
+                'display_name' => 'Spotify Track',
+                'description' => 'A Spotify track',
                 'hidden' => false,
             ],
         ];

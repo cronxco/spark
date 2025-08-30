@@ -144,20 +144,20 @@ class FinancialPlugin extends ManualPlugin
     public static function getActionTypes(): array
     {
         return [
-            'balance_update' => [
+            'had_balance' => [
                 'icon' => 'o-currency-pound',
                 'display_name' => 'Balance Update',
-                'description' => 'Account balance has been updated',
-                'display_with_object' => false,
-                'value_unit' => null, // Varies by account currency
+                'description' => 'Account balance was updated',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
                 'hidden' => false,
             ],
             'transaction' => [
                 'icon' => 'o-arrow-right',
                 'display_name' => 'Transaction',
-                'description' => 'A financial transaction has occurred',
+                'description' => 'A financial transaction occurred',
                 'display_with_object' => true,
-                'value_unit' => null, // Varies by account currency
+                'value_unit' => 'GBP',
                 'hidden' => false,
             ],
         ];
@@ -212,6 +212,18 @@ class FinancialPlugin extends ManualPlugin
                 'icon' => 'o-user',
                 'display_name' => 'User',
                 'description' => 'The account holder',
+                'hidden' => false,
+            ],
+            'manual_account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Manual Account',
+                'description' => 'A manually entered financial account',
+                'hidden' => false,
+            ],
+            'day' => [
+                'icon' => 'o-calendar',
+                'display_name' => 'Day',
+                'description' => 'A calendar day',
                 'hidden' => false,
             ],
         ];

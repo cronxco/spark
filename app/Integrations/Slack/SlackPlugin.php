@@ -67,15 +67,15 @@ class SlackPlugin extends WebhookPlugin
     public static function getActionTypes(): array
     {
         return [
-            'message' => [
+            'sent' => [
                 'icon' => 'o-chat-bubble-left',
-                'display_name' => 'Message',
-                'description' => 'A message sent in a Slack channel',
+                'display_name' => 'Message Sent',
+                'description' => 'A message was sent in Slack',
                 'display_with_object' => true,
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'reaction_added' => [
+            'added' => [
                 'icon' => 'o-heart',
                 'display_name' => 'Reaction Added',
                 'description' => 'A reaction was added to a message',
@@ -83,10 +83,10 @@ class SlackPlugin extends WebhookPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'file_shared' => [
+            'shared' => [
                 'icon' => 'o-document',
                 'display_name' => 'File Shared',
-                'description' => 'A file was shared in a Slack channel',
+                'description' => 'A file was shared in Slack',
                 'display_with_object' => true,
                 'value_unit' => null,
                 'hidden' => false,

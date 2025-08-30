@@ -114,20 +114,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
     public static function getActionTypes(): array
     {
         return [
-            'transaction' => [
+            'made_transaction' => [
                 'icon' => 'o-arrow-right',
                 'display_name' => 'Transaction',
-                'description' => 'A bank transaction from GoCardless',
+                'description' => 'A bank transaction occurred',
                 'display_with_object' => true,
-                'value_unit' => null, // Varies by account currency
+                'value_unit' => 'GBP',
                 'hidden' => false,
             ],
-            'balance_update' => [
+            'had_balance' => [
                 'icon' => 'o-currency-pound',
                 'display_name' => 'Balance Update',
-                'description' => 'Account balance update from GoCardless',
-                'display_with_object' => false,
-                'value_unit' => null, // Varies by account currency
+                'description' => 'Account balance was updated',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
                 'hidden' => false,
             ],
         ];
@@ -196,6 +196,30 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'icon' => 'o-user',
                 'display_name' => 'User',
                 'description' => 'The account holder',
+                'hidden' => false,
+            ],
+            'day' => [
+                'icon' => 'o-calendar',
+                'display_name' => 'Day',
+                'description' => 'A calendar day',
+                'hidden' => false,
+            ],
+            'balance_snapshot' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Snapshot',
+                'description' => 'A snapshot of account balance',
+                'hidden' => false,
+            ],
+            'bank_account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Bank Account',
+                'description' => 'A bank account',
+                'hidden' => false,
+            ],
+            'transaction_counterparty' => [
+                'icon' => 'o-user',
+                'display_name' => 'Transaction Counterparty',
+                'description' => 'A transaction counterparty',
                 'hidden' => false,
             ],
         ];

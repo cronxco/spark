@@ -128,7 +128,7 @@ class HevyPlugin implements IntegrationPlugin
     {
         return [
             'exercise' => [
-                'icon' => 'o-muscle',
+                'icon' => 'o-bolt',
                 'display_name' => 'Exercise',
                 'description' => 'A specific exercise performed during a workout',
                 'display_with_object' => true,
@@ -164,7 +164,7 @@ class HevyPlugin implements IntegrationPlugin
                 'hidden' => false,
             ],
             'exercise' => [
-                'icon' => 'o-muscle',
+                'icon' => 'o-bolt',
                 'display_name' => 'Exercise',
                 'description' => 'A specific fitness exercise',
                 'hidden' => false,
@@ -173,6 +173,18 @@ class HevyPlugin implements IntegrationPlugin
                 'icon' => 'o-user',
                 'display_name' => 'User',
                 'description' => 'The person whose workout data is being tracked',
+                'hidden' => false,
+            ],
+            'hevy_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Hevy Workout',
+                'description' => 'A workout from Hevy app',
+                'hidden' => false,
+            ],
+            'hevy_user' => [
+                'icon' => 'o-user',
+                'display_name' => 'Hevy User',
+                'description' => 'A Hevy user account',
                 'hidden' => false,
             ],
         ];
