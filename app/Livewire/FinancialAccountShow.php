@@ -67,8 +67,9 @@ class FinancialAccountShow extends Component
                 // Monzo/GoCardless store balance in value field (integer cents)
                 $currentBalance = $latestBalance->formatted_value;
             }
-        } elseif ($this->account->type === 'monzo_pot' && ! empty($this->account->content)) {
-            // Monzo pots store balance in content field
+        } elseif (in_array($this->account->type, ['monzo_pot', 'monzo_archived_pot']) && ! empty($this->account->content)) {
+            // Monzo pots now create balance events, but fallback to content field if no events exist
+            // This ensures backward compatibility during the transition
             $currentBalance = (float) $this->account->content;
         } else {
             $currentBalance = null;

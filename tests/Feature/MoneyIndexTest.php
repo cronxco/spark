@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Integrations\Financial\FinancialPlugin;
 use App\Livewire\FinancialAccounts;
+use App\Livewire\FinancialAccountShow;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -218,5 +219,147 @@ class MoneyIndexTest extends TestCase
     {
         $response = $this->get('/money');
         $response->assertRedirect('/login');
+    }
+
+    /**
+     * @test
+     */
+    public function money_show_view_displays_account_details_correctly(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Create a mock Monzo account with title
+        $monzoAccount = new EventObject([
+            'user_id' => $user->id,
+            'time' => now(),
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => 'Current Account',
+            'metadata' => [
+                'name' => 'Monzo Account',
+                'provider' => 'Monzo',
+                'account_type' => 'current_account',
+                'currency' => 'GBP',
+            ],
+        ]);
+        $monzoAccount->save();
+
+        // Test that the show view uses the title field for Monzo accounts
+        // Test the Livewire component directly instead of the HTTP route
+        Livewire::test(FinancialAccountShow::class, ['account' => $monzoAccount])
+            ->assertSee('Current Account') // Should use title field
+            ->assertSee('Monzo') // Provider
+            ->assertSee('Current Account'); // Account type
+    }
+
+    /**
+     * @test
+     */
+    public function money_show_view_displays_monzo_pot_with_title(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Create a mock Monzo pot with title
+        $monzoPot = new EventObject([
+            'user_id' => $user->id,
+            'time' => now(),
+            'concept' => 'account',
+            'type' => 'monzo_pot',
+            'title' => 'Rainy Day Pot',
+            'content' => '500.00',
+            'metadata' => [
+                'name' => 'Pot',
+                'provider' => 'Monzo',
+                'account_type' => 'savings_account',
+                'currency' => 'GBP',
+            ],
+        ]);
+        $monzoPot->save();
+
+        // Test that the show view uses the title field for Monzo pots
+        // Test the Livewire component directly instead of the HTTP route
+        Livewire::test(FinancialAccountShow::class, ['account' => $monzoPot])
+            ->assertSee('Rainy Day Pot') // Should use title field
+            ->assertSee('Monzo') // Provider
+            ->assertSee('Savings Account'); // Account type
+    }
+
+    /**
+     * @test
+     */
+    public function money_show_view_displays_manual_account_with_metadata_name(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Create integration and manual account
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+        ]);
+
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'manual_account',
+            'name' => 'Test Account',
+        ]);
+
+        $plugin = new FinancialPlugin;
+        $manualAccount = $plugin->upsertAccountObject($integration, [
+            'name' => 'Manual Account',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+        ]);
+
+        // Test that the show view uses metadata name for manual accounts
+        // Test the Livewire component directly instead of the HTTP route
+        Livewire::test(FinancialAccountShow::class, ['account' => $manualAccount])
+            ->assertSee('Manual Account') // Should use metadata name
+            ->assertSee('Test Bank') // Provider
+            ->assertSee('Current Account'); // Account type
+    }
+
+    /**
+     * @test
+     */
+    public function money_show_view_requires_authentication(): void
+    {
+        // Create a mock account
+        $user = User::factory()->create();
+        $account = EventObject::factory()->create([
+            'user_id' => $user->id,
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => 'Test Account',
+        ]);
+
+        // Test that unauthenticated users are redirected
+        $response = $this->get("/money/{$account->id}");
+        $response->assertRedirect('/login');
+    }
+
+    /**
+     * @test
+     */
+    public function money_show_view_prevents_access_to_other_users_accounts(): void
+    {
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+
+        // Create an account owned by user2
+        $account = EventObject::factory()->create([
+            'user_id' => $user2->id,
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => 'Other User Account',
+        ]);
+
+        // Test that user1 cannot access user2's account
+        $this->actingAs($user1);
+        $response = $this->get("/money/{$account->id}");
+        $response->assertStatus(403); // Forbidden
     }
 }

@@ -3,7 +3,17 @@
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-base-content">{{ $metadata['name'] ?? 'Unnamed Account' }}</h1>
+                <h1 class="text-3xl font-bold text-base-content">
+                    @if (in_array($account->type, ['monzo_pot', 'monzo_archived_pot', 'monzo_account']) && !empty($account->title))
+                        {{ $account->title }}
+                    @elseif (!empty($metadata['name']))
+                        {{ $metadata['name'] }}
+                    @elseif (!empty($account->title))
+                        {{ $account->title }}
+                    @else
+                        Unnamed Account
+                    @endif
+                </h1>
                 <p class="text-base-content/70">{{ $provider }} - {{ $accountTypeLabel }}</p>
             </div>
             <div class="flex gap-2">

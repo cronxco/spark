@@ -457,8 +457,54 @@ class MonzoPlugin extends OAuthPlugin
             return;
         }
         $pots = $resp->json('pots') ?? [];
+        $date = now()->toDateString();
+
+        // Create or update the target "day" object for pot balance events
+        $dayObject = EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $date,
+            ],
+            [
+                'integration_id' => $integration->id,
+                'time' => $date . ' 00:00:00',
+                'content' => null,
+                'metadata' => ['date' => $date],
+            ]
+        );
+
         foreach ($pots as $pot) {
-            $this->upsertPotObject($integration, $pot);
+            // Upsert the pot object
+            $potObject = $this->upsertPotObject($integration, $pot);
+
+            // Create balance event for the pot
+            $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
+            $sourceId = 'monzo_pot_balance_' . $pot['id'] . '_' . $date;
+
+            Event::updateOrCreate(
+                [
+                    'integration_id' => $integration->id,
+                    'source_id' => $sourceId,
+                ],
+                [
+                    'time' => $date . ' 23:59:59',
+                    'actor_id' => $potObject->id,
+                    'service' => 'monzo',
+                    'domain' => 'money',
+                    'action' => 'had_balance',
+                    'value' => abs($balance), // integer pence
+                    'value_multiplier' => 100, // 100 pence = £1
+                    'value_unit' => 'GBP',
+                    'event_metadata' => [
+                        'pot_id' => $pot['id'] ?? null,
+                        'pot_name' => $pot['name'] ?? 'Pot',
+                        'snapshot_date' => $date,
+                    ],
+                    'target_id' => $dayObject->id,
+                ]
+            );
         }
     }
 
