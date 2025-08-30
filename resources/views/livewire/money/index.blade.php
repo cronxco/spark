@@ -128,7 +128,7 @@
                                         // Get current balance from latest event
                                         $plugin = new \App\Integrations\Financial\FinancialPlugin();
                                         $latestBalance = $plugin->getLatestBalance($account);
-                                        
+
                                         // Handle different balance storage formats
                                         if ($latestBalance) {
                                             if (isset($latestBalance->event_metadata['balance'])) {
