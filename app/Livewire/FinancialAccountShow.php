@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[Title('Financial Account Details')]
+#[Title('Manual Account Details')]
 class FinancialAccountShow extends Component
 {
     public EventObject $account;
@@ -62,7 +62,7 @@ class FinancialAccountShow extends Component
         // Get balance history
         $balanceEvents = $plugin->getBalanceEvents($this->account);
 
-        return view('livewire.financial-accounts.show', [
+        return view('livewire.money.show', [
             'metadata' => $metadata,
             'accountTypeLabel' => $accountTypeLabel,
             'provider' => $provider,

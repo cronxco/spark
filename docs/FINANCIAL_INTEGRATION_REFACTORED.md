@@ -5,17 +5,19 @@ The Financial Integration has been refactored to use the existing event-driven a
 ## Architecture Overview
 
 ### Event-Driven Design
-- **Financial Accounts** are stored as `EventObject` instances with `concept: 'account'` and `type: 'financial_account'`
-- **Balance Updates** are stored as `Event` instances with `service: 'financial'`, `domain: 'money'`, and `action: 'had_balance'`
+
+- **Financial Accounts** are stored as `EventObject` instances with `concept: 'account'` and `type: 'manual_account'`
+- **Balance Updates** are stored as `Event` instances with `service: manual_account'`, `domain: 'money'`, and `action: 'had_balance'`
 - **Day Objects** are created as targets for balance events, following the same pattern as Monzo integration
 
 ### Data Structure
 
 #### Financial Account Object
+
 ```php
 EventObject {
     concept: 'account',
-    type: 'financial_account',
+    type: 'manual_account',
     title: 'Account Name',
     metadata: {
         name: 'Main Current Account',
@@ -31,9 +33,10 @@ EventObject {
 ```
 
 #### Balance Event
+
 ```php
 Event {
-    service: 'financial',
+    service: manual_account',
     domain: 'money',
     action: 'had_balance',
     actor_id: 'account-object-id',
@@ -53,6 +56,7 @@ Event {
 ## Implementation Details
 
 ### FinancialPlugin Class
+
 The `FinancialPlugin` extends `ManualPlugin` and provides methods for:
 
 - `upsertAccountObject()` - Create or update financial account objects
@@ -62,6 +66,7 @@ The `FinancialPlugin` extends `ManualPlugin` and provides methods for:
 - `getLatestBalance()` - Get the most recent balance for an account
 
 ### Livewire Components
+
 All components have been refactored to work with the event system:
 
 - **FinancialAccounts** - Lists accounts using `EventObject` queries
@@ -69,6 +74,7 @@ All components have been refactored to work with the event system:
 - **AddBalanceUpdate** - Creates balance events via the plugin
 
 ### Data Access Patterns
+
 Instead of direct model relationships, data is accessed through:
 
 1. **Plugin Methods** - Use the plugin's helper methods for common operations
@@ -79,21 +85,25 @@ Instead of direct model relationships, data is accessed through:
 ## Benefits of the Refactored System
 
 ### Consistency
+
 - Follows the same pattern as all other integrations
 - Uses the existing `events` and `objects` tables
 - Integrates seamlessly with the dashboard and analytics
 
 ### Flexibility
+
 - Financial data appears alongside other integration data
 - Can use existing event querying and filtering tools
 - Supports the same tagging and categorization system
 
 ### Scalability
+
 - No additional database tables required
 - Leverages existing indexing and optimization
 - Can easily add new financial event types
 
 ### Integration
+
 - Works with existing event display components
 - Integrates with the updates and notifications system
 - Can be analyzed using existing event analytics tools
@@ -101,6 +111,7 @@ Instead of direct model relationships, data is accessed through:
 ## Usage Examples
 
 ### Creating an Account
+
 ```php
 $plugin = new FinancialPlugin();
 $accountData = [
@@ -115,6 +126,7 @@ $accountObject = $plugin->upsertAccountObject($integration, $accountData);
 ```
 
 ### Adding a Balance Update
+
 ```php
 $balanceData = [
     'balance' => 5000.00,
@@ -126,6 +138,7 @@ $balanceEvent = $plugin->createBalanceEvent($integration, $accountObject, $balan
 ```
 
 ### Retrieving Accounts
+
 ```php
 $accounts = $plugin->getFinancialAccounts($user);
 foreach ($accounts as $account) {
@@ -135,6 +148,7 @@ foreach ($accounts as $account) {
 ```
 
 ### Getting Balance History
+
 ```php
 $balanceEvents = $plugin->getBalanceEvents($accountObject);
 $latestBalance = $plugin->getLatestBalance($accountObject);
@@ -144,7 +158,7 @@ $latestBalance = $plugin->getLatestBalance($accountObject);
 
 The refactored system eliminates the need for:
 
-- `financial_accounts` table
+- `manual_accounts` table
 - `financial_balances` table
 - `FinancialAccount` model
 - `FinancialBalance` model

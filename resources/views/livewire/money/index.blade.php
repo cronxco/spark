@@ -4,7 +4,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-base-content">Money</h1>
-                <p class="text-base-content/70">Manage your financial accounts and track balances</p>
+                <p class="text-base-content/70">Manage your accounts and track balances</p>
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('money.create') }}" class="btn btn-primary">
@@ -85,6 +85,7 @@
                                     <th>Account</th>
                                     <th>Type</th>
                                     <th>Provider</th>
+                                    <th>Service</th>
                                     <th>Current Balance</th>
                                     <th>Currency</th>
                                     <th>Interest Rate</th>
@@ -149,6 +150,21 @@
                                             </span>
                                         </td>
                                         <td>{{ $provider }}</td>
+                                        <td>
+                                            @php
+                                                // Determine service based on account type
+                                                $service = match ($account->type) {
+                                                    'manual_account' => 'Manual',
+                                                    'monzo_account' => 'Monzo',
+                                                    'monzo_pot' => 'Monzo Pot',
+                                                    'bank_account' => 'GoCardless',
+                                                    default => 'Unknown'
+                                                };
+                                            @endphp
+                                            <span class="badge badge-{{ $service === 'Manual' ? 'primary' : 'secondary' }}">
+                                                {{ $service }}
+                                            </span>
+                                        </td>
                                         <td>
                                             @if ($currentBalance !== null)
                                                 <span class="font-mono font-medium">

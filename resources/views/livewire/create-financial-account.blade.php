@@ -168,7 +168,7 @@
                             <x-icon name="o-plus" class="w-4 h-4" />
                             Create Account
                         </button>
-                        <a href="{{ route('financial-accounts') }}" class="btn btn-outline">
+                        <a href="{{ route('money') }}" class="btn btn-outline">
                             Cancel
                         </a>
                     </div>

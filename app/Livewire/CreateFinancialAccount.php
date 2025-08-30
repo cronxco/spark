@@ -54,7 +54,7 @@ class CreateFinancialAccount extends Component
         $integration = Integration::create([
             'user_id' => Auth::id(),
             'integration_group_id' => $group->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
             'name' => $this->name,
             'instance_type' => 'accounts',
             'configuration' => [
@@ -85,7 +85,7 @@ class CreateFinancialAccount extends Component
 
         $this->dispatch('account-created');
         $this->reset();
-        $this->redirectRoute('financial-accounts');
+        $this->redirectRoute('money');
     }
 
     public function render(): View

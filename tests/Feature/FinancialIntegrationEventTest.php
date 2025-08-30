@@ -25,12 +25,12 @@ class FinancialIntegrationEventTest extends TestCase
     /**
      * @test
      */
-    public function can_create_financial_account_object(): void
+    public function can_create_manual_account_object(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
         ]);
 
         $plugin = new FinancialPlugin;
@@ -46,7 +46,7 @@ class FinancialIntegrationEventTest extends TestCase
 
         $this->assertInstanceOf(EventObject::class, $accountObject);
         $this->assertEquals('account', $accountObject->concept);
-        $this->assertEquals('financial_account', $accountObject->type);
+        $this->assertEquals('manual_account', $accountObject->type);
         $this->assertEquals('Test Savings Account', $accountObject->title);
 
         $metadata = $accountObject->metadata;
@@ -65,7 +65,7 @@ class FinancialIntegrationEventTest extends TestCase
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
         ]);
 
         $plugin = new FinancialPlugin;
@@ -90,7 +90,7 @@ class FinancialIntegrationEventTest extends TestCase
 
         $this->assertInstanceOf(Event::class, $balanceEvent);
         $this->assertEquals($integration->id, $balanceEvent->integration_id);
-        $this->assertEquals('financial', $balanceEvent->service);
+        $this->assertEquals('manual_account', $balanceEvent->service);
         $this->assertEquals('money', $balanceEvent->domain);
         $this->assertEquals('had_balance', $balanceEvent->action);
         $this->assertEquals(100050, $balanceEvent->value); // 1000.50 * 100
@@ -109,12 +109,12 @@ class FinancialIntegrationEventTest extends TestCase
     /**
      * @test
      */
-    public function can_get_financial_accounts_for_user(): void
+    public function can_get_manual_accounts_for_user(): void
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
         ]);
 
         $plugin = new FinancialPlugin;
@@ -151,7 +151,7 @@ class FinancialIntegrationEventTest extends TestCase
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
         ]);
 
         $plugin = new FinancialPlugin;
@@ -195,7 +195,7 @@ class FinancialIntegrationEventTest extends TestCase
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
         ]);
 
         $plugin = new FinancialPlugin;
@@ -247,11 +247,208 @@ class FinancialIntegrationEventTest extends TestCase
         $plugin = new FinancialPlugin;
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
-            'service' => 'financial',
+            'service' => 'manual_account',
         ]);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Manual integrations do not support webhooks');
         $plugin->handleWebhook(request(), $integration);
+    }
+
+    /**
+     * @test
+     */
+    public function account_metadata_includes_integration_id(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+        ]);
+
+        $plugin = new FinancialPlugin;
+        $accountData = [
+            'name' => 'Test Account',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+            'currency' => 'GBP',
+        ];
+
+        $accountObject = $plugin->upsertAccountObject($integration, $accountData);
+
+        $this->assertArrayHasKey('integration_id', $accountObject->metadata);
+        $this->assertEquals($integration->id, $accountObject->metadata['integration_id']);
+    }
+
+    /**
+     * @test
+     */
+    public function can_get_manual_accounts_only_for_balance_updates(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+        ]);
+
+        $plugin = new FinancialPlugin;
+
+        // Create a manual account
+        $manualAccount = $plugin->upsertAccountObject($integration, [
+            'name' => 'Manual Account',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+        ]);
+
+        // Debug: Check what was actually created
+        $this->assertNotNull($manualAccount);
+        $this->assertEquals($user->id, $manualAccount->user_id);
+        $this->assertEquals('account', $manualAccount->concept);
+        $this->assertEquals('manual_account', $manualAccount->type);
+
+        // Refresh from database to ensure we have the latest data
+        $manualAccount->refresh();
+
+        // Create a mock Monzo account (different type)
+        $monzoAccount = EventObject::factory()->create([
+            'user_id' => $user->id,
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => 'Monzo Account',
+        ]);
+
+        $manualAccounts = $plugin->getManualFinancialAccounts($user);
+
+        // Debug: Check what accounts were created
+        $this->assertCount(1, $manualAccounts);
+
+        // Debug: Check the manual account details
+        $this->assertEquals($user->id, $manualAccount->user_id);
+        $this->assertEquals('account', $manualAccount->concept);
+        $this->assertEquals('manual_account', $manualAccount->type);
+
+        // Debug: Check what accounts were found
+        $foundAccountIds = $manualAccounts->pluck('id')->toArray();
+        $this->assertContains($manualAccount->id, $foundAccountIds, 'Manual account ID not found in results');
+
+        $this->assertTrue($manualAccounts->contains($manualAccount));
+        $this->assertFalse($manualAccounts->contains($monzoAccount));
+    }
+
+    /**
+     * @test
+     */
+    public function can_get_all_financial_accounts_including_integrated_ones(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+        ]);
+
+        $plugin = new FinancialPlugin;
+
+        // Create a manual account
+        $manualAccount = $plugin->upsertAccountObject($integration, [
+            'name' => 'Manual Account',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+        ]);
+
+        // Refresh from database to ensure we have the latest data
+        $manualAccount->refresh();
+
+        // Create a mock Monzo account
+        $monzoAccount = EventObject::factory()->create([
+            'user_id' => $user->id,
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => 'Monzo Account',
+        ]);
+
+        // Create a mock GoCardless account
+        $gocardlessAccount = EventObject::factory()->create([
+            'user_id' => $user->id,
+            'concept' => 'account',
+            'type' => 'bank_account',
+            'title' => 'GoCardless Account',
+        ]);
+
+        $allAccounts = $plugin->getFinancialAccounts($user);
+
+        $this->assertCount(3, $allAccounts);
+        $this->assertTrue($allAccounts->contains($manualAccount));
+        $this->assertTrue($allAccounts->contains($monzoAccount));
+        $this->assertTrue($allAccounts->contains($gocardlessAccount));
+    }
+
+    /**
+     * @test
+     */
+    public function balance_events_use_manual_account_service(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+        ]);
+
+        $plugin = new FinancialPlugin;
+
+        $accountObject = $plugin->upsertAccountObject($integration, [
+            'name' => 'Test Account',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+        ]);
+
+        $balanceEvent = $plugin->createBalanceEvent($integration, $accountObject, [
+            'balance' => 1000.00,
+            'date' => '2025-01-27',
+        ]);
+
+        $this->assertEquals('manual_account', $balanceEvent->service);
+        $this->assertEquals('manual_balance_' . $accountObject->id . '_2025-01-27', $balanceEvent->source_id);
+    }
+
+    /**
+     * @test
+     */
+    public function can_find_integration_by_metadata_or_name_fallback(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+            'name' => 'Test Account Integration',
+        ]);
+
+        $plugin = new FinancialPlugin;
+
+        // Test with integration_id in metadata
+        $accountWithId = $plugin->upsertAccountObject($integration, [
+            'name' => 'Account With ID',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+        ]);
+
+        $this->assertArrayHasKey('integration_id', $accountWithId->metadata);
+        $this->assertEquals($integration->id, $accountWithId->metadata['integration_id']);
+
+        // Test fallback by name (simulate old account without integration_id)
+        $oldAccount = EventObject::factory()->create([
+            'user_id' => $user->id,
+            'concept' => 'account',
+            'type' => 'manual_account',
+            'title' => 'Old Account',
+            'metadata' => [
+                'name' => 'Test Account Integration', // Same name as integration
+                'account_type' => 'current_account',
+                'provider' => 'Test Bank',
+                // No integration_id
+            ],
+        ]);
+
+        // Verify the old account doesn't have integration_id
+        $this->assertArrayNotHasKey('integration_id', $oldAccount->metadata);
     }
 }

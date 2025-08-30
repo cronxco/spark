@@ -2,8 +2,20 @@
     <div class="max-w-2xl mx-auto">
         <!-- Header -->
         <div class="mb-6">
-            <h1 class="text-3xl font-bold text-base-content">Add Balance Update</h1>
-            <p class="text-base-content/70">Record a new balance for one of your financial accounts</p>
+            <h1 class="text-3xl font-bold text-base-content">
+                @if ($isAccountPreselected)
+                    Add Balance Update for {{ $accounts->firstWhere('id', $accountId)?->metadata['name'] ?? 'Account' }}
+                @else
+                    Add Balance Update
+                @endif
+            </h1>
+            <p class="text-base-content/70">
+                @if ($isAccountPreselected)
+                    Record a new balance for this account
+                @else
+                    Record a new balance for one of your accounts
+                @endif
+            </p>
         </div>
 
         <!-- Form -->
@@ -16,33 +28,87 @@
                             <label class="label">
                                 <span class="label-text">Account *</span>
                             </label>
-                            <select wire:model="accountId" class="select select-bordered w-full @error('accountId') select-error @enderror">
-                                <option value="">Select an account</option>
-                                @foreach ($accounts as $account)
-                                    @php
-                                        $metadata = $account->metadata;
-                                        $name = $metadata['name'] ?? 'Unnamed Account';
-                                        $provider = $metadata['provider'] ?? '';
-                                        $currency = $metadata['currency'] ?? 'GBP';
+                            @if ($isAccountPreselected)
+                                @php
+                                    $selectedAccount = $accounts->firstWhere('id', $accountId);
+                                    $metadata = $selectedAccount ? $selectedAccount->metadata : [];
 
-                                        // Get currency symbol
-                                        $currencySymbols = [
-                                            'GBP' => '£',
-                                            'USD' => '$',
-                                            'EUR' => '€',
-                                        ];
-                                        $currencySymbol = $currencySymbols[$currency] ?? $currency;
+                                    // Handle different account types
+                                    $name = $metadata['name'] ?? $selectedAccount->title ?? 'Unnamed Account';
+                                    $provider = $metadata['provider'] ?? '';
+                                    $currency = $metadata['currency'] ?? 'GBP';
 
-                                        // Get current balance from latest event
-                                        $plugin = new \App\Integrations\Financial\FinancialPlugin();
-                                        $latestBalance = $plugin->getLatestBalance($account);
-                                        $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? 0 : 0;
-                                    @endphp
-                                    <option value="{{ $account->id }}">
+                                    // For Monzo accounts, get provider from metadata
+                                    if ($selectedAccount && $selectedAccount->type === 'monzo_account') {
+                                        $provider = 'Monzo';
+                                    } elseif ($selectedAccount && $selectedAccount->type === 'monzo_pot') {
+                                        $provider = 'Monzo Pot';
+                                    } elseif ($selectedAccount && $selectedAccount->type === 'bank_account') {
+                                        $provider = $metadata['details'] ?? 'Bank Account';
+                                    }
+
+                                    // Get currency symbol
+                                    $currencySymbols = [
+                                        'GBP' => '£',
+                                        'USD' => '$',
+                                        'EUR' => '€',
+                                    ];
+                                    $currencySymbol = $currencySymbols[$currency] ?? $currency;
+
+                                    // Get current balance from latest event
+                                    $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                    $latestBalance = $selectedAccount ? $plugin->getLatestBalance($selectedAccount) : null;
+                                    $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? 0 : 0;
+                                @endphp
+                                <div class="flex gap-2">
+                                    <div class="input input-bordered w-full bg-base-200 flex-1">
                                         {{ $name }} - {{ $provider }} ({{ $currencySymbol }}{{ number_format($currentBalance, 2) }})
-                                    </option>
-                                @endforeach
-                            </select>
+                                    </div>
+                                    <button type="button" wire:click="$set('isAccountPreselected', false)" class="btn btn-outline btn-sm">
+                                        Change
+                                    </button>
+                                </div>
+                                <input type="hidden" wire:model="accountId" value="{{ $accountId }}" />
+                            @else
+                                <select wire:model="accountId" class="select select-bordered w-full @error('accountId') select-error @enderror">
+                                    <option value="">Select an account</option>
+                                    @foreach ($accounts as $account)
+                                        @php
+                                            $metadata = $account->metadata;
+
+                                            // Handle different account types
+                                            $name = $metadata['name'] ?? $account->title ?? 'Unnamed Account';
+                                            $provider = $metadata['provider'] ?? '';
+                                            $currency = $metadata['currency'] ?? 'GBP';
+
+                                            // For Monzo accounts, get provider from metadata
+                                            if ($account->type === 'monzo_account') {
+                                                $provider = 'Monzo';
+                                            } elseif ($account->type === 'monzo_pot') {
+                                                $provider = 'Monzo Pot';
+                                            } elseif ($account->type === 'bank_account') {
+                                                $provider = $metadata['details'] ?? 'Bank Account';
+                                            }
+
+                                            // Get currency symbol
+                                            $currencySymbols = [
+                                                'GBP' => '£',
+                                                'USD' => '$',
+                                                'EUR' => '€',
+                                            ];
+                                            $currencySymbol = $currencySymbols[$currency] ?? $currency;
+
+                                            // Get current balance from latest event
+                                            $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                            $latestBalance = $plugin->getLatestBalance($account);
+                                            $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? 0 : 0;
+                                        @endphp
+                                        <option value="{{ $account->id }}">
+                                            {{ $name }} - {{ $provider }} ({{ $currencySymbol }}{{ number_format($currentBalance, 2) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @endif
                             @error('accountId')
                                 <label class="label">
                                     <span class="label-text-alt text-error">{{ $message }}</span>
@@ -111,7 +177,7 @@
                             <x-icon name="o-currency-dollar" class="w-4 h-4" />
                             Add Balance Update
                         </button>
-                        <a href="{{ route('financial-accounts') }}" class="btn btn-outline">
+                        <a href="{{ route('money') }}" class="btn btn-outline">
                             Cancel
                         </a>
                     </div>
