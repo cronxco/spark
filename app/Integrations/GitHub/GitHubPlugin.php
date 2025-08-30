@@ -103,6 +103,70 @@ class GitHubPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-code-bracket';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'neutral';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'productivity';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'push' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Push',
+                'description' => 'Code was pushed to a repository',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'github_user' => [
+                'icon' => 'o-user',
+                'display_name' => 'GitHub User',
+                'description' => 'A GitHub user account',
+                'hidden' => false,
+            ],
+            'github_repo' => [
+                'icon' => 'o-code-bracket',
+                'display_name' => 'GitHub Repository',
+                'description' => 'A GitHub repository',
+                'hidden' => false,
+            ],
+            'github_pr' => [
+                'icon' => 'o-arrow-path',
+                'display_name' => 'GitHub Pull Request',
+                'description' => 'A GitHub pull request',
+                'hidden' => false,
+            ],
+            'github_issue' => [
+                'icon' => 'o-exclamation-triangle',
+                'display_name' => 'GitHub Issue',
+                'description' => 'A GitHub issue',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         // PKCE + CSRF setup
@@ -557,7 +621,7 @@ class GitHubPlugin extends OAuthPlugin
                 'time' => $data['created_at'],
                 'actor' => $actor,
                 'target' => $target,
-                'domain' => 'repository',
+                'domain' => self::getDomain(),
                 'action' => 'push',
                 'value' => count($commits),
                 'value_unit' => 'commits',
@@ -617,7 +681,7 @@ class GitHubPlugin extends OAuthPlugin
                 'time' => $data['created_at'],
                 'actor' => $actor,
                 'target' => $target,
-                'domain' => 'pull_request',
+                'domain' => self::getDomain(),
                 'action' => $data['payload']['action'],
                 'value' => 1,
                 'value_unit' => 'pull_request',
@@ -675,7 +739,7 @@ class GitHubPlugin extends OAuthPlugin
                 'time' => $data['created_at'],
                 'actor' => $actor,
                 'target' => $target,
-                'domain' => 'issue',
+                'domain' => self::getDomain(),
                 'action' => $data['payload']['action'],
                 'value' => 1,
                 'value_unit' => 'issue',

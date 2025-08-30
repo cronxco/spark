@@ -96,6 +96,78 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-building-library';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'info';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'financial';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'made_transaction' => [
+                'icon' => 'o-arrow-right',
+                'display_name' => 'Transaction',
+                'description' => 'A bank transaction occurred',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'had_balance' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance was updated',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'day' => [
+                'icon' => 'o-calendar',
+                'display_name' => 'Day',
+                'description' => 'A calendar day',
+                'hidden' => false,
+            ],
+            'balance_snapshot' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Snapshot',
+                'description' => 'A snapshot of account balance',
+                'hidden' => false,
+            ],
+            'bank_account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Bank Account',
+                'description' => 'A bank account',
+                'hidden' => false,
+            ],
+            'transaction_counterparty' => [
+                'icon' => 'o-user',
+                'display_name' => 'Transaction Counterparty',
+                'description' => 'A transaction counterparty',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     /**
      * Get OAuth URL for GoCardless Bank Account Data API
      */
@@ -823,7 +895,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'made_transaction',
-            'domain' => 'money',
+            'domain' => self::getDomain(),
             'service' => 'gocardless',
             'time' => $tx['bookingDate'] ?? now(),
             'value' => abs((float) ($tx['transactionAmount']['amount'] ?? 0)),
@@ -896,7 +968,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'had_balance',
-            'domain' => 'money',
+            'domain' => self::getDomain(),
             'service' => 'gocardless',
             'time' => $balance['referenceDate'] ?? now(),
             'value' => abs((float) ($balance['balanceAmount']['amount'] ?? 0)),

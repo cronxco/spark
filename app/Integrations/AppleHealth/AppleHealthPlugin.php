@@ -52,6 +52,71 @@ class AppleHealthPlugin extends WebhookPlugin
         ];
     }
 
+    public static function getServiceType(): string
+    {
+        return 'webhook';
+    }
+
+    public static function getIcon(): string
+    {
+        return 'o-heart';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'success';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'fitness';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'completed_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Completed Workout',
+                'description' => 'A workout session that has been completed',
+                'display_with_object' => true,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+            'measurement' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Health Measurement',
+                'description' => 'A health metric measurement from Apple Health',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'apple_health_user' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Apple Health User',
+                'description' => 'User profile in Apple Health',
+                'hidden' => true,
+            ],
+            'apple_metric' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Apple Metric',
+                'description' => 'Health metric from Apple Health',
+                'hidden' => true,
+            ],
+        ];
+    }
+
     public function initializeGroup(\App\Models\User $user): IntegrationGroup
     {
         // Use parent implementation to generate shared secret + webhook URL
@@ -156,6 +221,7 @@ class AppleHealthPlugin extends WebhookPlugin
         }
         if (! empty($summaryLines)) {
             $blocks[] = [
+                'block_type' => 'summary',
                 'time' => $start,
                 'title' => 'Summary',
                 'content' => implode("\n", $summaryLines),
@@ -165,6 +231,7 @@ class AppleHealthPlugin extends WebhookPlugin
         if ($distanceQty !== null && $distanceUnit) {
             [$encDistance, $distMult] = $this->encodeNumericValue($distanceQty);
             $blocks[] = [
+                'block_type' => 'distance',
                 'time' => $start,
                 'title' => 'Distance',
                 'content' => 'Distance covered in this workout',
@@ -176,6 +243,7 @@ class AppleHealthPlugin extends WebhookPlugin
         // Energy block
         if ($encEnergy !== null) {
             $blocks[] = [
+                'block_type' => 'energy',
                 'time' => $start,
                 'title' => 'Active Energy',
                 'content' => 'Active energy burned during workout',
@@ -188,6 +256,7 @@ class AppleHealthPlugin extends WebhookPlugin
         if ($intensityQty !== null && $intensityUnit) {
             [$encIntensity, $intMult] = $this->encodeNumericValue($intensityQty);
             $blocks[] = [
+                'block_type' => 'intensity',
                 'time' => $start,
                 'title' => 'Intensity',
                 'content' => 'Body weight–normalized intensity',
@@ -200,6 +269,7 @@ class AppleHealthPlugin extends WebhookPlugin
         if ($duration !== null) {
             [$encDur, $durMult] = $this->encodeNumericValue($duration);
             $blocks[] = [
+                'block_type' => 'duration',
                 'time' => $start,
                 'title' => 'Duration',
                 'content' => 'Workout duration in seconds',
@@ -214,7 +284,7 @@ class AppleHealthPlugin extends WebhookPlugin
             'time' => $start,
             'actor' => $actor,
             'target' => $target,
-            'domain' => 'fitness',
+            'domain' => self::getDomain(),
             'action' => 'completed_workout',
             'value' => $encEnergy,
             'value_multiplier' => $energyMult,
@@ -291,7 +361,7 @@ class AppleHealthPlugin extends WebhookPlugin
             'time' => $date,
             'actor' => $actor,
             'target' => $target,
-            'domain' => 'health',
+            'domain' => self::getDomain(),
             'action' => 'measurement',
             'value' => $enc,
             'value_multiplier' => $mult,

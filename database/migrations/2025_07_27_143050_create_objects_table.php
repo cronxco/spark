@@ -12,7 +12,7 @@ return new class extends Migration
         Schema::create('objects', function (Blueprint $table) {
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->timestampTz('time')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->uuid('integration_id');
+            $table->uuid('user_id');
             $table->text('concept');
             $table->text('type');
             $table->text('title');
@@ -24,7 +24,7 @@ return new class extends Migration
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
-            $table->foreign('integration_id')->references('id')->on('integrations');
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'objects_user_id_foreign')->references('id')->on('users');
         });
     }
 

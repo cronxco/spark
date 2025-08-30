@@ -55,4 +55,19 @@ class EventObject extends Model
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
+
+    public function actorEvents()
+    {
+        return $this->hasMany(Event::class, 'actor_id')->withTrashed();
+    }
+
+    public function targetEvents()
+    {
+        return $this->hasMany(Event::class, 'target_id')->withTrashed();
+    }
+
+    public function events()
+    {
+        return $this->actorEvents()->union($this->targetEvents());
+    }
 }

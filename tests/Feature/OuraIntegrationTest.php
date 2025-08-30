@@ -188,7 +188,7 @@ class OuraIntegrationTest extends TestCase
 
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
-        $this->assertEquals('sleep', $event->domain);
+        $this->assertEquals('health', $event->domain);
         $this->assertEquals('slept_for', $event->action);
         $this->assertEquals(8 * 3600, $event->value);
         $this->assertEquals('seconds', $event->value_unit);

@@ -49,6 +49,86 @@ class SlackPlugin extends WebhookPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-chat-bubble-left-right';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'communication';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'sent' => [
+                'icon' => 'o-chat-bubble-left',
+                'display_name' => 'Message Sent',
+                'description' => 'A message was sent in Slack',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'added' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Reaction Added',
+                'description' => 'A reaction was added to a message',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'shared' => [
+                'icon' => 'o-document',
+                'display_name' => 'File Shared',
+                'description' => 'A file was shared in Slack',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'slack_user' => [
+                'icon' => 'o-user',
+                'display_name' => 'Slack User',
+                'description' => 'A Slack user account',
+                'hidden' => false,
+            ],
+            'slack_message' => [
+                'icon' => 'o-chat-bubble-left',
+                'display_name' => 'Slack Message',
+                'description' => 'A Slack message',
+                'hidden' => false,
+            ],
+            'slack_reaction' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Slack Reaction',
+                'description' => 'A Slack reaction',
+                'hidden' => false,
+            ],
+            'slack_file' => [
+                'icon' => 'o-document',
+                'display_name' => 'Slack File',
+                'description' => 'A Slack file',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function handleWebhook(Request $request, Integration $integration): void
     {
         $payload = $request->all();
@@ -139,7 +219,7 @@ class SlackPlugin extends WebhookPlugin
                 'time' => date('Y-m-d H:i:s', $event['ts'] ?? time()),
                 'actor' => $actor,
                 'target' => $target,
-                'domain' => 'message',
+                'domain' => self::getDomain(),
                 'action' => 'sent',
                 'value' => 1,
                 'value_unit' => 'message',
@@ -185,7 +265,7 @@ class SlackPlugin extends WebhookPlugin
                 'time' => date('Y-m-d H:i:s', $event['event_ts'] ?? time()),
                 'actor' => $actor,
                 'target' => $target,
-                'domain' => 'reaction',
+                'domain' => self::getDomain(),
                 'action' => 'added',
                 'value' => 1,
                 'value_unit' => 'reaction',
@@ -231,7 +311,7 @@ class SlackPlugin extends WebhookPlugin
                 'time' => date('Y-m-d H:i:s', $file['timestamp'] ?? time()),
                 'actor' => $actor,
                 'target' => $target,
-                'domain' => 'file',
+                'domain' => self::getDomain(),
                 'action' => 'shared',
                 'value' => $file['size'] ?? 1,
                 'value_unit' => 'bytes',

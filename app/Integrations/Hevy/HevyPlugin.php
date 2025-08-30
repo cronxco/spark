@@ -95,6 +95,67 @@ class HevyPlugin implements IntegrationPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-fire';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'warning';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'fitness';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'completed_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Completed Workout',
+                'description' => 'A workout session that has been completed in Hevy',
+                'display_with_object' => true,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'exercise' => [
+                'icon' => 'o-bolt',
+                'display_name' => 'Exercise',
+                'description' => 'A specific exercise performed during a workout',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'hevy_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Hevy Workout',
+                'description' => 'A workout from Hevy app',
+                'hidden' => false,
+            ],
+            'hevy_user' => [
+                'icon' => 'o-user',
+                'display_name' => 'Hevy User',
+                'description' => 'A Hevy user account',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public static function getServiceType(): string
     {
         return 'apikey';
@@ -263,7 +324,7 @@ class HevyPlugin implements IntegrationPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'hevy',
-            'domain' => 'fitness',
+            'domain' => self::getDomain(),
             'action' => 'completed_workout',
             'value' => $encVolume,
             'value_multiplier' => $volMult,
@@ -303,7 +364,8 @@ class HevyPlugin implements IntegrationPlugin
                     $content .= "\n**Rest:** {$rest} s";
                 }
 
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'exercise',
+
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Set ' . $setNum,
                     'content' => $content,
@@ -317,7 +379,8 @@ class HevyPlugin implements IntegrationPlugin
 
             if ($includeExerciseSummary && $exerciseName !== '') {
                 [$encExVol, $exVolMult] = $this->encodeNumericValue($exerciseVolume);
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'exercise',
+
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Total Volume',
                     'content' => 'Total volume (weight x reps) for this exercise',

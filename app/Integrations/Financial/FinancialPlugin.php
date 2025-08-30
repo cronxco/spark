@@ -126,6 +126,58 @@ class FinancialPlugin extends ManualPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-currency-pound';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'success';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'financial';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'had_balance' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance was updated',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'manual_account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Manual Account',
+                'description' => 'A manually entered financial account',
+                'hidden' => false,
+            ],
+            'day' => [
+                'icon' => 'o-calendar',
+                'display_name' => 'Day',
+                'description' => 'A calendar day',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     /**
      * Create or update a financial account object
      */
@@ -192,7 +244,7 @@ class FinancialPlugin extends ManualPlugin
             'time' => $date . ' 23:59:59',
             'actor_id' => $accountObject->id,
             'service' => 'manual_account',
-            'domain' => 'money',
+            'domain' => self::getDomain(),
             'action' => 'had_balance',
             'value' => $wholeValue,
             'value_multiplier' => $multiplier,

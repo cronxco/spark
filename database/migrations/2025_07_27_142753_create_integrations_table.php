@@ -21,15 +21,17 @@ return new class extends Migration
             $table->integer('update_frequency_minutes')->default(15);
             $table->timestampTz('last_triggered_at')->nullable();
             $table->timestampTz('last_successful_update_at')->nullable();
+            $table->string('migration_batch_id', 36)->nullable();
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
             // Indexes for performance
             $table->index('user_id');
             $table->index('integration_group_id');
+            $table->index('migration_batch_id', Schema::getConnection()->getTablePrefix() . 'integrations_migration_batch_id_index');
             // Foreign keys
-            $table->foreign('user_id')->references('id')->on('users');
-            $table->foreign('integration_group_id')
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'integrations_user_id_foreign')->references('id')->on('users');
+            $table->foreign('integration_group_id', Schema::getConnection()->getTablePrefix() . 'integrations_integration_group_id_foreign')
                 ->references('id')
                 ->on('integration_groups')
                 ->onDelete('cascade');

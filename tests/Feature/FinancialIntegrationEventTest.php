@@ -91,7 +91,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertInstanceOf(Event::class, $balanceEvent);
         $this->assertEquals($integration->id, $balanceEvent->integration_id);
         $this->assertEquals('manual_account', $balanceEvent->service);
-        $this->assertEquals('money', $balanceEvent->domain);
+        $this->assertEquals('financial', $balanceEvent->domain);
         $this->assertEquals('had_balance', $balanceEvent->action);
         $this->assertEquals(100050, $balanceEvent->value); // 1000.50 * 100
         $this->assertEquals(100, $balanceEvent->value_multiplier);

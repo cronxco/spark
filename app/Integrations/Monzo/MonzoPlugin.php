@@ -93,6 +93,89 @@ class MonzoPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-credit-card';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'financial';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'had_balance' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance was updated',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'balance' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance',
+                'description' => 'Account balance information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'pot' => [
+                'icon' => 'o-banknotes',
+                'display_name' => 'Pot',
+                'description' => 'Monzo savings pot information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'transaction' => [
+                'icon' => 'o-arrow-path',
+                'display_name' => 'Transaction',
+                'description' => 'Transaction information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'monzo_counterparty' => [
+                'icon' => 'o-user',
+                'display_name' => 'Counterparty',
+                'description' => 'A Monzo transaction counterparty',
+                'hidden' => false,
+            ],
+            'monzo_account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Monzo Account',
+                'description' => 'A Monzo bank account',
+                'hidden' => false,
+            ],
+            'day' => [
+                'icon' => 'o-calendar',
+                'display_name' => 'Day',
+                'description' => 'A calendar day',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         $csrfToken = Str::random(32);
@@ -224,7 +307,8 @@ class MonzoPlugin extends OAuthPlugin
             $currentVal = (int) abs($balance);
             $delta = $currentVal - $prevVal; // cents
             if ($delta !== 0) {
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'balance',
+
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
                     'title' => 'Balance Change',
@@ -289,7 +373,7 @@ class MonzoPlugin extends OAuthPlugin
                 'time' => $tx['created'] ?? now(),
                 'actor_id' => $actor->id,
                 'service' => 'monzo',
-                'domain' => 'money',
+                'domain' => self::getDomain(),
                 'action' => $action,
                 'value' => abs((int) ($tx['amount'] ?? 0)), // integer cents
                 'value_multiplier' => 100,
@@ -492,7 +576,7 @@ class MonzoPlugin extends OAuthPlugin
                     'time' => $date . ' 23:59:59',
                     'actor_id' => $potObject->id,
                     'service' => 'monzo',
-                    'domain' => 'money',
+                    'domain' => self::getDomain(),
                     'action' => 'had_balance',
                     'value' => abs($balance), // integer pence
                     'value_multiplier' => 100, // 100 pence = £1
@@ -547,7 +631,7 @@ class MonzoPlugin extends OAuthPlugin
                 'time' => $date . ' 23:59:59',
                 'actor_id' => $this->upsertAccountObject($integration, $account)->id,
                 'service' => 'monzo',
-                'domain' => 'money',
+                'domain' => self::getDomain(),
                 'action' => 'had_balance',
                 'value' => abs($balance), // integer cents
                 'value_multiplier' => 100,
@@ -773,7 +857,8 @@ class MonzoPlugin extends OAuthPlugin
             } catch (Throwable $e) {
                 // ignore
             }
-            $event->blocks()->create([
+            $event->blocks()->create(['block_type' => 'pot',
+
                 'time' => $event->time,
                 'title' => 'Pot Transfer',
                 'content' => trim(($direction . ' ' . ($potName ?? 'Pot'))),
@@ -787,7 +872,8 @@ class MonzoPlugin extends OAuthPlugin
         // Joint Account Transactions (detect by account type)
         $accountId = (string) ($tx['account_id'] ?? $tx['account'] ?? '');
         if ($accountId !== '' && $this->isJointAccount($event->integration_id, $accountId)) {
-            $event->blocks()->create([
+            $event->blocks()->create(['block_type' => 'transaction',
+
                 'time' => $event->time,
                 'title' => 'Joint Account',
                 'content' => 'Transaction on a joint account',

@@ -114,7 +114,7 @@ class AddBalanceUpdateTest extends TestCase
             'integration_id' => $integration->id,
             'actor_id' => $account->id,
             'service' => 'manual_account',
-            'domain' => 'money',
+            'domain' => 'financial',
             'action' => 'had_balance',
             'value' => 150075, // 1500.75 * 100
             'value_multiplier' => 100,

@@ -106,6 +106,83 @@ class SpotifyPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-musical-note';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'success';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'entertainment';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'played' => [
+                'icon' => 'o-play',
+                'display_name' => 'Played Track',
+                'description' => 'A track that was played on Spotify',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'album_art' => [
+                'icon' => 'o-photo',
+                'display_name' => 'Album Artwork',
+                'description' => 'Album cover artwork for the track',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'track_details' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Track Details',
+                'description' => 'Detailed information about the track',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'artist' => [
+                'icon' => 'o-user',
+                'display_name' => 'Artist',
+                'description' => 'Musical artist who created the track',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'spotify_user' => [
+                'icon' => 'o-user',
+                'display_name' => 'Spotify User',
+                'description' => 'A Spotify user account',
+                'hidden' => false,
+            ],
+            'spotify_track' => [
+                'icon' => 'o-musical-note',
+                'display_name' => 'Spotify Track',
+                'description' => 'A Spotify track',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         // Generate PKCE code verifier and challenge
@@ -469,7 +546,7 @@ class SpotifyPlugin extends OAuthPlugin
                 'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
             ],
             'service' => 'spotify',
-            'domain' => 'music',
+            'domain' => self::getDomain(),
             'action' => 'played',
             'value' => $track['duration_ms'] ?? 0,
             'value_multiplier' => 1,
@@ -565,6 +642,7 @@ class SpotifyPlugin extends OAuthPlugin
         if (in_array('enabled', $includeAlbumArt) && ! empty($track['album']['images'])) {
             $albumImage = $track['album']['images'][0];
             $event->blocks()->create([
+                'block_type' => 'album_art',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Album Art',
@@ -582,6 +660,7 @@ class SpotifyPlugin extends OAuthPlugin
         $duration = gmdate('i:s', ($track['duration_ms'] ?? 0) / 1000);
 
         $event->blocks()->create([
+            'block_type' => 'track_details',
             'time' => $event->time,
             'integration_id' => $integration->id,
             'title' => 'Track Details',
@@ -597,6 +676,7 @@ class SpotifyPlugin extends OAuthPlugin
         if (! empty($track['artists'])) {
             $artist = $track['artists'][0];
             $event->blocks()->create([
+                'block_type' => 'artist',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Artist Info',
