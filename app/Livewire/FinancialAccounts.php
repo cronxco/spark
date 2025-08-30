@@ -19,8 +19,6 @@ class FinancialAccounts extends Component
     public ?string $search = null;
     public ?string $accountTypeFilter = null;
     public ?string $providerFilter = null;
-    public bool $showEditModal = false;
-    public ?EventObject $editingAccount = null;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -56,47 +54,14 @@ class FinancialAccounts extends Component
         }
 
         // Delete all related balance events first
-        $service = $account->metadata['service'] ?? 'financial';
         Event::where('actor_id', $account->id)
-            ->where('service', $service)
+            ->where('service', 'financial')
             ->delete();
 
         // Delete the account object
         $account->delete();
 
         $this->dispatch('account-deleted');
-    }
-
-    public function editAccountMetadata(EventObject $account, array $metadata): void
-    {
-        if ($account->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        $plugin = new FinancialPlugin;
-        $success = $plugin->updateAccountMetadata($account, $metadata);
-
-        if ($success) {
-            $this->dispatch('account-updated');
-        } else {
-            $this->dispatch('account-update-failed');
-        }
-    }
-
-    public function openEditModal(EventObject $account): void
-    {
-        if ($account->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        $this->editingAccount = $account;
-        $this->showEditModal = true;
-    }
-
-    public function closeEditModal(): void
-    {
-        $this->showEditModal = false;
-        $this->editingAccount = null;
     }
 
     public function nextPage(): void
