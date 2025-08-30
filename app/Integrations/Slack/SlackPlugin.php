@@ -49,6 +49,119 @@ class SlackPlugin extends WebhookPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-chat-bubble-left-right';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'communication';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'message' => [
+                'icon' => 'o-chat-bubble-left',
+                'display_name' => 'Message',
+                'description' => 'A message sent in a Slack channel',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'reaction_added' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Reaction Added',
+                'description' => 'A reaction was added to a message',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'file_shared' => [
+                'icon' => 'o-document',
+                'display_name' => 'File Shared',
+                'description' => 'A file was shared in a Slack channel',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'channel' => [
+                'icon' => 'o-hashtag',
+                'display_name' => 'Channel',
+                'description' => 'Slack channel information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'Slack user information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'file' => [
+                'icon' => 'o-document',
+                'display_name' => 'File',
+                'description' => 'Shared file information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'reaction' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Reaction',
+                'description' => 'Emoji reaction information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'channel' => [
+                'icon' => 'o-hashtag',
+                'display_name' => 'Channel',
+                'description' => 'A Slack communication channel',
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'A Slack user account',
+                'hidden' => false,
+            ],
+            'file' => [
+                'icon' => 'o-document',
+                'display_name' => 'File',
+                'description' => 'A file shared in Slack',
+                'hidden' => false,
+            ],
+            'message' => [
+                'icon' => 'o-chat-bubble-left',
+                'display_name' => 'Message',
+                'description' => 'A message in a Slack channel',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function handleWebhook(Request $request, Integration $integration): void
     {
         $payload = $request->all();

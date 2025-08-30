@@ -41,8 +41,60 @@ interface IntegrationPlugin
     public static function getInstanceTypes(): array;
 
     /**
-     * Initialize the integration for a user
+     * Get the integration icon (Heroicon name or custom icon identifier)
      */
+    public static function getIcon(): string;
+
+    /**
+     * Get the integration accent color (daisyUI color name)
+     */
+    public static function getAccentColor(): string;
+
+    /**
+     * Get the integration domain (e.g., 'fitness', 'health', 'financial', 'productivity')
+     */
+    public static function getDomain(): string;
+
+    /**
+     * Get the integration action types configuration
+     * 
+     * @return array<string, array{
+     *   icon: string,
+     *   display_name: string,
+     *   description: string,
+     *   display_with_object: bool,
+     *   value_unit: string|null,
+     *   hidden: bool
+     * }>
+     */
+    public static function getActionTypes(): array;
+
+    /**
+     * Get the integration block types configuration
+     * 
+     * @return array<string, array{
+     *   icon: string,
+     *   display_name: string,
+     *   description: string,
+     *   display_with_object: bool,
+     *   value_unit: string|null,
+     *   hidden: bool
+     * }>
+     */
+    public static function getBlockTypes(): array;
+
+    /**
+     * Get the integration object types configuration
+     * 
+     * @return array<string, array{
+     *   icon: string,
+     *   display_name: string,
+     *   description: string,
+     *   hidden: bool
+     * }>
+     */
+    public static function getObjectTypes(): array;
+
     /**
      * Initialize an auth group (for OAuth/webhook setup)
      */

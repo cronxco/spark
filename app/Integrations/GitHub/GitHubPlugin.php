@@ -103,6 +103,127 @@ class GitHubPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-code-bracket';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'neutral';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'productivity';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'push' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Push',
+                'description' => 'Code was pushed to a repository',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'pull_request' => [
+                'icon' => 'o-arrow-path',
+                'display_name' => 'Pull Request',
+                'description' => 'A pull request was created or updated',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'issue' => [
+                'icon' => 'o-exclamation-circle',
+                'display_name' => 'Issue',
+                'description' => 'An issue was created or updated',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'commit_comment' => [
+                'icon' => 'o-chat-bubble-left',
+                'display_name' => 'Commit Comment',
+                'description' => 'A comment was added to a commit',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'repository' => [
+                'icon' => 'o-folder',
+                'display_name' => 'Repository',
+                'description' => 'Git repository information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'branch' => [
+                'icon' => 'o-code-bracket',
+                'display_name' => 'Branch',
+                'description' => 'Git branch information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'commit' => [
+                'icon' => 'o-command-line',
+                'display_name' => 'Commit',
+                'description' => 'Git commit information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'GitHub user information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'repository' => [
+                'icon' => 'o-folder',
+                'display_name' => 'Repository',
+                'description' => 'A Git repository on GitHub',
+                'hidden' => false,
+            ],
+            'branch' => [
+                'icon' => 'o-code-bracket',
+                'display_name' => 'Branch',
+                'description' => 'A Git branch in a repository',
+                'hidden' => false,
+            ],
+            'commit' => [
+                'icon' => 'o-command-line',
+                'display_name' => 'Commit',
+                'description' => 'A Git commit in a repository',
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'A GitHub user account',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         // PKCE + CSRF setup

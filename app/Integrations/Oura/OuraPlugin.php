@@ -21,6 +21,37 @@ use Throwable;
 
 class OuraPlugin extends OAuthPlugin
 {
+
+    public static function getIcon(): string
+    {
+        return 'o-moon';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'health';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [];
+    }
+    
     protected string $baseUrl = 'https://api.ouraring.com/v2';
 
     protected string $authUrl = 'https://cloud.ouraring.com';

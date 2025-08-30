@@ -106,6 +106,104 @@ class SpotifyPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-musical-note';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'success';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'entertainment';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return array (
+  'played_track' => 
+  array (
+    'icon' => 'o-play',
+    'display_name' => 'Played Track',
+    'description' => 'A track that was played on Spotify',
+    'display_with_object' => true,
+    'value_unit' => NULL,
+    'hidden' => false,
+  ),
+);
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return array (
+  'album_art' => 
+  array (
+    'icon' => 'o-photo',
+    'display_name' => 'Album Artwork',
+    'description' => 'Album cover artwork for the track',
+    'display_with_object' => true,
+    'value_unit' => NULL,
+    'hidden' => false,
+  ),
+  'track_details' => 
+  array (
+    'icon' => 'o-information-circle',
+    'display_name' => 'Track Details',
+    'description' => 'Detailed information about the track',
+    'display_with_object' => true,
+    'value_unit' => NULL,
+    'hidden' => false,
+  ),
+  'artist' => 
+  array (
+    'icon' => 'o-user',
+    'display_name' => 'Artist',
+    'description' => 'Musical artist who created the track',
+    'display_with_object' => true,
+    'value_unit' => NULL,
+    'hidden' => false,
+  ),
+);
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return array (
+  'track' => 
+  array (
+    'icon' => 'o-musical-note',
+    'display_name' => 'Track',
+    'description' => 'A musical track or song',
+    'hidden' => false,
+  ),
+  'album' => 
+  array (
+    'icon' => 'o-rectangle-stack',
+    'display_name' => 'Album',
+    'description' => 'A collection of tracks',
+    'hidden' => false,
+  ),
+  'artist' => 
+  array (
+    'icon' => 'o-user',
+    'display_name' => 'Artist',
+    'description' => 'A musical artist or band',
+    'hidden' => false,
+  ),
+  'genre' => 
+  array (
+    'icon' => 'o-tag',
+    'display_name' => 'Genre',
+    'description' => 'A musical genre category',
+    'hidden' => false,
+  ),
+);
+    }
+    
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         // Generate PKCE code verifier and challenge
@@ -565,6 +663,7 @@ class SpotifyPlugin extends OAuthPlugin
         if (in_array('enabled', $includeAlbumArt) && ! empty($track['album']['images'])) {
             $albumImage = $track['album']['images'][0];
             $event->blocks()->create([
+                'block_type' => 'album_art',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Album Art',
@@ -582,6 +681,7 @@ class SpotifyPlugin extends OAuthPlugin
         $duration = gmdate('i:s', ($track['duration_ms'] ?? 0) / 1000);
 
         $event->blocks()->create([
+            'block_type' => 'track_details',
             'time' => $event->time,
             'integration_id' => $integration->id,
             'title' => 'Track Details',
@@ -597,6 +697,7 @@ class SpotifyPlugin extends OAuthPlugin
         if (! empty($track['artists'])) {
             $artist = $track['artists'][0];
             $event->blocks()->create([
+                'block_type' => 'artist',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Artist Info',

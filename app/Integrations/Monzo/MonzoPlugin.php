@@ -93,6 +93,119 @@ class MonzoPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-credit-card';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'financial';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'transaction' => [
+                'icon' => 'o-arrow-right',
+                'display_name' => 'Transaction',
+                'description' => 'A financial transaction from Monzo account',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'pot_transfer' => [
+                'icon' => 'o-arrow-path',
+                'display_name' => 'Pot Transfer',
+                'description' => 'A transfer between Monzo pots',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'balance_update' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance update from Monzo',
+                'display_with_object' => false,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'transaction_details' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Transaction Details',
+                'description' => 'Additional details about a transaction',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'merchant' => [
+                'icon' => 'o-building-storefront',
+                'display_name' => 'Merchant',
+                'description' => 'Business or merchant where transaction occurred',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'category' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Category',
+                'description' => 'Transaction category or classification',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'pot' => [
+                'icon' => 'o-banknotes',
+                'display_name' => 'Pot',
+                'description' => 'Monzo savings pot information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Account',
+                'description' => 'A Monzo bank account',
+                'hidden' => false,
+            ],
+            'pot' => [
+                'icon' => 'o-banknotes',
+                'display_name' => 'Pot',
+                'description' => 'A Monzo savings pot',
+                'hidden' => false,
+            ],
+            'merchant' => [
+                'icon' => 'o-building-storefront',
+                'display_name' => 'Merchant',
+                'description' => 'A business or merchant',
+                'hidden' => false,
+            ],
+            'category' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Category',
+                'description' => 'A transaction category',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         $csrfToken = Str::random(32);

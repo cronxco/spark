@@ -126,6 +126,97 @@ class FinancialPlugin extends ManualPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-currency-pound';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'success';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'financial';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'balance_update' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance has been updated',
+                'display_with_object' => false,
+                'value_unit' => null, // Varies by account currency
+                'hidden' => false,
+            ],
+            'transaction' => [
+                'icon' => 'o-arrow-right',
+                'display_name' => 'Transaction',
+                'description' => 'A financial transaction has occurred',
+                'display_with_object' => true,
+                'value_unit' => null, // Varies by account currency
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'account_details' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Account Details',
+                'description' => 'Detailed account information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'interest_rate' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Interest Rate',
+                'description' => 'Account interest rate information',
+                'display_with_object' => false,
+                'value_unit' => '%',
+                'hidden' => false,
+            ],
+            'provider' => [
+                'icon' => 'o-building-library',
+                'display_name' => 'Provider',
+                'description' => 'Financial institution information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Account',
+                'description' => 'A financial account',
+                'hidden' => false,
+            ],
+            'provider' => [
+                'icon' => 'o-building-library',
+                'display_name' => 'Provider',
+                'description' => 'A financial institution',
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'The account holder',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     /**
      * Create or update a financial account object
      */

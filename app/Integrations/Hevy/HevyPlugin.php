@@ -95,6 +95,89 @@ class HevyPlugin implements IntegrationPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-fire';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'warning';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'fitness';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'completed_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Completed Workout',
+                'description' => 'A workout session that has been completed in Hevy',
+                'display_with_object' => true,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'exercise' => [
+                'icon' => 'o-muscle',
+                'display_name' => 'Exercise',
+                'description' => 'A specific exercise performed during a workout',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'exercise_summary' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Exercise Summary',
+                'description' => 'Summary statistics for an exercise',
+                'display_with_object' => false,
+                'value_unit' => null, // Varies by exercise type
+                'hidden' => false,
+            ],
+            'set' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Set',
+                'description' => 'A set of repetitions for an exercise',
+                'display_with_object' => false,
+                'value_unit' => null, // Varies by exercise type
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout',
+                'description' => 'A fitness workout session',
+                'hidden' => false,
+            ],
+            'exercise' => [
+                'icon' => 'o-muscle',
+                'display_name' => 'Exercise',
+                'description' => 'A specific fitness exercise',
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'The person whose workout data is being tracked',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     public static function getServiceType(): string
     {
         return 'apikey';

@@ -67,4 +67,51 @@ class PluginRegistry
 
         return new $pluginClass;
     }
+
+    /**
+     * Get all plugins with their configuration metadata
+     */
+    public static function getPluginsWithConfig(): Collection
+    {
+        return self::getAllPlugins()->map(function ($pluginClass) {
+            return [
+                'identifier' => $pluginClass::getIdentifier(),
+                'display_name' => $pluginClass::getDisplayName(),
+                'description' => $pluginClass::getDescription(),
+                'service_type' => $pluginClass::getServiceType(),
+                'icon' => $pluginClass::getIcon(),
+                'accent_color' => $pluginClass::getAccentColor(),
+                'domain' => $pluginClass::getDomain(),
+                'action_types' => $pluginClass::getActionTypes(),
+                'block_types' => $pluginClass::getBlockTypes(),
+                'object_types' => $pluginClass::getObjectTypes(),
+                'instance_types' => $pluginClass::getInstanceTypes(),
+            ];
+        });
+    }
+
+    /**
+     * Get a specific plugin's configuration metadata
+     */
+    public static function getPluginConfig(string $identifier): ?array
+    {
+        $pluginClass = self::getPlugin($identifier);
+        if (! $pluginClass) {
+            return null;
+        }
+
+        return [
+            'identifier' => $pluginClass::getIdentifier(),
+            'display_name' => $pluginClass::getDisplayName(),
+            'description' => $pluginClass::getDescription(),
+            'service_type' => $pluginClass::getServiceType(),
+            'icon' => $pluginClass::getIcon(),
+            'accent_color' => $pluginClass::getAccentColor(),
+            'domain' => $pluginClass::getDomain(),
+            'action_types' => $pluginClass::getActionTypes(),
+            'block_types' => $pluginClass::getBlockTypes(),
+            'object_types' => $pluginClass::getObjectTypes(),
+            'instance_types' => $pluginClass::getInstanceTypes(),
+        ];
+    }
 }

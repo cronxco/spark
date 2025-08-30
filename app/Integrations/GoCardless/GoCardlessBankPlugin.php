@@ -96,6 +96,111 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ];
     }
 
+    public static function getIcon(): string
+    {
+        return 'o-building-library';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'info';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'financial';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'transaction' => [
+                'icon' => 'o-arrow-right',
+                'display_name' => 'Transaction',
+                'description' => 'A bank transaction from GoCardless',
+                'display_with_object' => true,
+                'value_unit' => null, // Varies by account currency
+                'hidden' => false,
+            ],
+            'balance_update' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance update from GoCardless',
+                'display_with_object' => false,
+                'value_unit' => null, // Varies by account currency
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Account',
+                'description' => 'Bank account information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'merchant' => [
+                'icon' => 'o-building-storefront',
+                'display_name' => 'Merchant',
+                'description' => 'Business or merchant information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'category' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Category',
+                'description' => 'Transaction category information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'transaction_details' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Transaction Details',
+                'description' => 'Additional transaction information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'account' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Account',
+                'description' => 'A bank account',
+                'hidden' => false,
+            ],
+            'merchant' => [
+                'icon' => 'o-building-storefront',
+                'display_name' => 'Merchant',
+                'description' => 'A business or merchant',
+                'hidden' => false,
+            ],
+            'category' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Category',
+                'description' => 'A transaction category',
+                'hidden' => false,
+            ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'The account holder',
+                'hidden' => false,
+            ],
+        ];
+    }
+
     /**
      * Get OAuth URL for GoCardless Bank Account Data API
      */

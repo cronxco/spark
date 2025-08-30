@@ -19,6 +19,7 @@ class Block extends Model
 
     protected $fillable = [
         'event_id',
+        'block_type',
         'time',
         'title',
         'content',
