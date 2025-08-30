@@ -325,8 +325,12 @@ class MonzoPlugin extends OAuthPlugin
                 'time' => $pot['created'] ?? now(),
                 'content' => (string) ($pot['balance'] ?? 0),
                 'metadata' => [
+                    'name' => $pot['name'] ?? 'Pot',
+                    'provider' => 'Monzo',
+                    'account_type' => 'savings_account',
                     'pot_id' => $pot['id'] ?? null,
                     'deleted' => (bool) ($pot['deleted'] ?? false),
+                    'currency' => 'GBP',
                 ],
                 'url' => null,
                 'media_url' => null,
@@ -342,6 +346,14 @@ class MonzoPlugin extends OAuthPlugin
             'uk_monzo_flex' => 'Monzo Flex',
             default => 'Monzo Account',
         };
+
+        $accountType = match ($account['type'] ?? null) {
+            'uk_retail' => 'current_account',
+            'uk_retail_joint' => 'current_account',
+            'uk_monzo_flex' => 'credit_card',
+            default => 'other',
+        };
+
         $master = $this->resolveMasterIntegration($integration);
 
         return EventObject::updateOrCreate(
@@ -356,7 +368,11 @@ class MonzoPlugin extends OAuthPlugin
                 'time' => now(),
                 'content' => null,
                 'metadata' => [
+                    'name' => $title,
+                    'provider' => 'Monzo',
+                    'account_type' => $accountType,
                     'account_id' => $account['id'] ?? null,
+                    'currency' => $account['currency'] ?? 'GBP',
                     'raw' => $account,
                 ],
             ]
