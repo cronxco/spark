@@ -135,69 +135,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     public static function getBlockTypes(): array
     {
-        return [
-            'account' => [
-                'icon' => 'o-credit-card',
-                'display_name' => 'Account',
-                'description' => 'Bank account information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'merchant' => [
-                'icon' => 'o-building-storefront',
-                'display_name' => 'Merchant',
-                'description' => 'Business or merchant information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'category' => [
-                'icon' => 'o-tag',
-                'display_name' => 'Category',
-                'description' => 'Transaction category information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'transaction_details' => [
-                'icon' => 'o-information-circle',
-                'display_name' => 'Transaction Details',
-                'description' => 'Additional transaction information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-        ];
+        return [];
     }
 
     public static function getObjectTypes(): array
     {
         return [
-            'account' => [
-                'icon' => 'o-credit-card',
-                'display_name' => 'Account',
-                'description' => 'A bank account',
-                'hidden' => false,
-            ],
-            'merchant' => [
-                'icon' => 'o-building-storefront',
-                'display_name' => 'Merchant',
-                'description' => 'A business or merchant',
-                'hidden' => false,
-            ],
-            'category' => [
-                'icon' => 'o-tag',
-                'display_name' => 'Category',
-                'description' => 'A transaction category',
-                'hidden' => false,
-            ],
-            'user' => [
-                'icon' => 'o-user',
-                'display_name' => 'User',
-                'description' => 'The account holder',
-                'hidden' => false,
-            ],
             'day' => [
                 'icon' => 'o-calendar',
                 'display_name' => 'Day',

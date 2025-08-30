@@ -96,67 +96,34 @@ class SlackPlugin extends WebhookPlugin
 
     public static function getBlockTypes(): array
     {
-        return [
-            'channel' => [
-                'icon' => 'o-hashtag',
-                'display_name' => 'Channel',
-                'description' => 'Slack channel information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'user' => [
-                'icon' => 'o-user',
-                'display_name' => 'User',
-                'description' => 'Slack user information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'file' => [
-                'icon' => 'o-document',
-                'display_name' => 'File',
-                'description' => 'Shared file information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'reaction' => [
-                'icon' => 'o-heart',
-                'display_name' => 'Reaction',
-                'description' => 'Emoji reaction information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-        ];
+        return [];
     }
 
     public static function getObjectTypes(): array
     {
         return [
-            'channel' => [
-                'icon' => 'o-hashtag',
-                'display_name' => 'Channel',
-                'description' => 'A Slack communication channel',
-                'hidden' => false,
-            ],
-            'user' => [
+            'slack_user' => [
                 'icon' => 'o-user',
-                'display_name' => 'User',
+                'display_name' => 'Slack User',
                 'description' => 'A Slack user account',
                 'hidden' => false,
             ],
-            'file' => [
-                'icon' => 'o-document',
-                'display_name' => 'File',
-                'description' => 'A file shared in Slack',
+            'slack_message' => [
+                'icon' => 'o-chat-bubble-left',
+                'display_name' => 'Slack Message',
+                'description' => 'A Slack message',
                 'hidden' => false,
             ],
-            'message' => [
-                'icon' => 'o-chat-bubble-left',
-                'display_name' => 'Message',
-                'description' => 'A message in a Slack channel',
+            'slack_reaction' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Slack Reaction',
+                'description' => 'A Slack reaction',
+                'hidden' => false,
+            ],
+            'slack_file' => [
+                'icon' => 'o-document',
+                'display_name' => 'Slack File',
+                'description' => 'A Slack file',
                 'hidden' => false,
             ],
         ];

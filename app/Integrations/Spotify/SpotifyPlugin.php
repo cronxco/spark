@@ -168,30 +168,6 @@ class SpotifyPlugin extends OAuthPlugin
     public static function getObjectTypes(): array
     {
         return [
-            'track' => [
-                'icon' => 'o-musical-note',
-                'display_name' => 'Track',
-                'description' => 'A musical track or song',
-                'hidden' => false,
-            ],
-            'album' => [
-                'icon' => 'o-rectangle-stack',
-                'display_name' => 'Album',
-                'description' => 'A collection of tracks',
-                'hidden' => false,
-            ],
-            'artist' => [
-                'icon' => 'o-user',
-                'display_name' => 'Artist',
-                'description' => 'A musical artist or band',
-                'hidden' => false,
-            ],
-            'genre' => [
-                'icon' => 'o-tag',
-                'display_name' => 'Genre',
-                'description' => 'A musical genre category',
-                'hidden' => false,
-            ],
             'spotify_user' => [
                 'icon' => 'o-user',
                 'display_name' => 'Spotify User',

@@ -135,46 +135,12 @@ class HevyPlugin implements IntegrationPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'exercise_summary' => [
-                'icon' => 'o-chart-bar',
-                'display_name' => 'Exercise Summary',
-                'description' => 'Summary statistics for an exercise',
-                'display_with_object' => false,
-                'value_unit' => null, // Varies by exercise type
-                'hidden' => false,
-            ],
-            'set' => [
-                'icon' => 'o-arrow-up',
-                'display_name' => 'Set',
-                'description' => 'A set of repetitions for an exercise',
-                'display_with_object' => false,
-                'value_unit' => null, // Varies by exercise type
-                'hidden' => false,
-            ],
         ];
     }
 
     public static function getObjectTypes(): array
     {
         return [
-            'workout' => [
-                'icon' => 'o-fire',
-                'display_name' => 'Workout',
-                'description' => 'A fitness workout session',
-                'hidden' => false,
-            ],
-            'exercise' => [
-                'icon' => 'o-bolt',
-                'display_name' => 'Exercise',
-                'description' => 'A specific fitness exercise',
-                'hidden' => false,
-            ],
-            'user' => [
-                'icon' => 'o-user',
-                'display_name' => 'User',
-                'description' => 'The person whose workout data is being tracked',
-                'hidden' => false,
-            ],
             'hevy_workout' => [
                 'icon' => 'o-fire',
                 'display_name' => 'Hevy Workout',

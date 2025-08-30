@@ -95,40 +95,25 @@ class PluginTypeValidationTest extends TestCase
         $usedBlockTypes = $this->extractUsedBlockTypes($fileContent);
         $usedObjectTypes = $this->extractUsedObjectTypes($fileContent);
 
-        // Get minimal exclusions for types that are actually used but missed by regex
-        $exclusions = $this->getMinimalTypeExclusions($identifier);
-
         // Check for unused action types
-        $unusedActionTypes = array_diff($configuredActionTypes, $usedActionTypes, $exclusions['action_types'] ?? []);
+        $unusedActionTypes = array_diff($configuredActionTypes, $usedActionTypes);
         if (! empty($unusedActionTypes)) {
             $errors['action_types'] = $unusedActionTypes;
         }
 
         // Check for unused block types
-        $unusedBlockTypes = array_diff($configuredBlockTypes, $usedBlockTypes, $exclusions['block_types'] ?? []);
+        $unusedBlockTypes = array_diff($configuredBlockTypes, $usedBlockTypes);
         if (! empty($unusedBlockTypes)) {
             $errors['block_types'] = $unusedBlockTypes;
         }
 
         // Check for unused object types
-        $unusedObjectTypes = array_diff($configuredObjectTypes, $usedObjectTypes, $exclusions['object_types'] ?? []);
+        $unusedObjectTypes = array_diff($configuredObjectTypes, $usedObjectTypes);
         if (! empty($unusedObjectTypes)) {
             $errors['object_types'] = $unusedObjectTypes;
         }
 
         return $errors;
-    }
-
-    private function getMinimalTypeExclusions(string $identifier): array
-    {
-        // Only exclude types that are actually used in code but missed by regex patterns
-        $exclusions = [
-            'spotify' => [
-                'object_types' => ['track', 'album', 'artist', 'genre'], // These are used in EventObject::updateOrCreate but missed by regex
-            ],
-        ];
-
-        return $exclusions[$identifier] ?? [];
     }
 
     private function validatePluginTypes(string $pluginClass, string $identifier): array
@@ -193,6 +178,26 @@ class PluginTypeValidationTest extends TestCase
             $actionTypes = array_merge($actionTypes, $matches[1]);
         }
 
+        // Look for any 'action' => '...' pattern anywhere (for cases where Event::create is multi-line)
+        // But exclude common PHP types and generic terms
+        preg_match_all("/'action'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
+        if (! empty($matches[1])) {
+            $filtered = array_filter($matches[1], function ($type) {
+                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea']);
+            });
+            $actionTypes = array_merge($actionTypes, $filtered);
+        }
+
+        // Look for "action" => "..." pattern anywhere (for cases where Event::create is multi-line)
+        // But exclude common PHP types and generic terms
+        preg_match_all('/"action"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
+        if (! empty($matches[1])) {
+            $filtered = array_filter($matches[1], function ($type) {
+                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea']);
+            });
+            $actionTypes = array_merge($actionTypes, $filtered);
+        }
+
         return array_unique(array_filter($actionTypes));
     }
 
@@ -212,6 +217,26 @@ class PluginTypeValidationTest extends TestCase
             $blockTypes = array_merge($blockTypes, $matches[1]);
         }
 
+        // Look for 'block_type' => '...' patterns anywhere (for cases where blocks are defined in arrays)
+        // But exclude common PHP types and generic terms
+        preg_match_all("/'block_type'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
+        if (! empty($matches[1])) {
+            $filtered = array_filter($matches[1], function ($type) {
+                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'summary', 'distance', 'energy', 'intensity', 'duration']);
+            });
+            $blockTypes = array_merge($blockTypes, $filtered);
+        }
+
+        // Look for "block_type" => "..." patterns anywhere (for cases where blocks are defined in arrays)
+        // But exclude common PHP types and generic terms
+        preg_match_all('/"block_type"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
+        if (! empty($matches[1])) {
+            $filtered = array_filter($matches[1], function ($type) {
+                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'summary', 'distance', 'energy', 'intensity', 'duration']);
+            });
+            $blockTypes = array_merge($blockTypes, $filtered);
+        }
+
         return array_unique(array_filter($blockTypes));
     }
 
@@ -229,6 +254,26 @@ class PluginTypeValidationTest extends TestCase
         preg_match_all('/EventObject::(?:create|updateOrCreate)\s*\(\s*\[[^\]]*"type"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
         if (! empty($matches[1])) {
             $objectTypes = array_merge($objectTypes, $matches[1]);
+        }
+
+        // Look for 'type' => '...' patterns anywhere (for cases where EventObject is used in different contexts)
+        // But exclude common PHP types and generic terms
+        preg_match_all("/'type'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
+        if (! empty($matches[1])) {
+            $filtered = array_filter($matches[1], function ($type) {
+                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
+            });
+            $objectTypes = array_merge($objectTypes, $filtered);
+        }
+
+        // Look for "type" => "..." patterns anywhere (for cases where EventObject is used in different contexts)
+        // But exclude common PHP types and generic terms
+        preg_match_all('/"type"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
+        if (! empty($matches[1])) {
+            $filtered = array_filter($matches[1], function ($type) {
+                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
+            });
+            $objectTypes = array_merge($objectTypes, $filtered);
         }
 
         return array_unique(array_filter($objectTypes));

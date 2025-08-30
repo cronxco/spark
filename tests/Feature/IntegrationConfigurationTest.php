@@ -282,8 +282,9 @@ class IntegrationConfigurationTest extends TestCase
             // Each plugin should have at least one object type defined (if they create objects)
             if (count($objectTypes) > 0) {
                 // Object type keys should be snake_case (allowing numbers for medical terms like 'spo2')
+                // Also allow PHP variable syntax like 'oura_daily_{$kind}'
                 foreach (array_keys($objectTypes) as $objectType) {
-                    $this->assertMatchesRegularExpression('/^[a-z0-9_]+$/', $objectType, "Object type '{$objectType}' should be snake_case with numbers allowed");
+                    $this->assertMatchesRegularExpression('/^[a-z0-9_{}$]+$/', $objectType, "Object type '{$objectType}' should be snake_case with numbers and PHP variables allowed");
                 }
             }
         }

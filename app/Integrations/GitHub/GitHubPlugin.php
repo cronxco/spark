@@ -129,96 +129,39 @@ class GitHubPlugin extends OAuthPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'pull_request' => [
-                'icon' => 'o-arrow-path',
-                'display_name' => 'Pull Request',
-                'description' => 'A pull request was created or updated',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'issue' => [
-                'icon' => 'o-exclamation-circle',
-                'display_name' => 'Issue',
-                'description' => 'An issue was created or updated',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'commit_comment' => [
-                'icon' => 'o-chat-bubble-left',
-                'display_name' => 'Commit Comment',
-                'description' => 'A comment was added to a commit',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
         ];
     }
 
     public static function getBlockTypes(): array
     {
-        return [
-            'repository' => [
-                'icon' => 'o-folder',
-                'display_name' => 'Repository',
-                'description' => 'Git repository information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'branch' => [
-                'icon' => 'o-code-bracket',
-                'display_name' => 'Branch',
-                'description' => 'Git branch information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'commit' => [
-                'icon' => 'o-command-line',
-                'display_name' => 'Commit',
-                'description' => 'Git commit information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'user' => [
-                'icon' => 'o-user',
-                'display_name' => 'User',
-                'description' => 'GitHub user information',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-        ];
+        return [];
     }
 
     public static function getObjectTypes(): array
     {
         return [
-            'repository' => [
-                'icon' => 'o-folder',
-                'display_name' => 'Repository',
-                'description' => 'A Git repository on GitHub',
-                'hidden' => false,
-            ],
-            'branch' => [
-                'icon' => 'o-code-bracket',
-                'display_name' => 'Branch',
-                'description' => 'A Git branch in a repository',
-                'hidden' => false,
-            ],
-            'commit' => [
-                'icon' => 'o-command-line',
-                'display_name' => 'Commit',
-                'description' => 'A Git commit in a repository',
-                'hidden' => false,
-            ],
-            'user' => [
+            'github_user' => [
                 'icon' => 'o-user',
-                'display_name' => 'User',
+                'display_name' => 'GitHub User',
                 'description' => 'A GitHub user account',
+                'hidden' => false,
+            ],
+            'github_repo' => [
+                'icon' => 'o-code-bracket',
+                'display_name' => 'GitHub Repository',
+                'description' => 'A GitHub repository',
+                'hidden' => false,
+            ],
+            'github_pr' => [
+                'icon' => 'o-arrow-path',
+                'display_name' => 'GitHub Pull Request',
+                'description' => 'A GitHub pull request',
+                'hidden' => false,
+            ],
+            'github_issue' => [
+                'icon' => 'o-exclamation-triangle',
+                'display_name' => 'GitHub Issue',
+                'description' => 'A GitHub issue',
                 'hidden' => false,
             ],
         ];
