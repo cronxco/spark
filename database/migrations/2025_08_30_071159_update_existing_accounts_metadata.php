@@ -62,6 +62,17 @@ return new class extends Migration
                         ->where('id', $account->id)
                         ->update(['title' => 'Monzo Pot']);
                 }
+
+                // Check if pot is deleted and convert to archived type
+                if (! empty($metadata['deleted']) && $metadata['deleted'] === true) {
+                    // Convert to archived pot type
+                    DB::table('objects')
+                        ->where('id', $account->id)
+                        ->update(['type' => 'monzo_archived_pot']);
+
+                    // Update the account type to reflect the change
+                    $account->type = 'monzo_archived_pot';
+                }
             }
 
             // Update GoCardless accounts

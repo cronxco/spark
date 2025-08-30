@@ -96,12 +96,22 @@
                             <div class="text-4xl font-bold text-primary mb-2">
                                 {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
                             </div>
-                            <p class="text-base-content/70">Last updated: {{ $latestBalance->time->format('F j, Y') }}</p>
+                            @if ($latestBalance)
+                                <p class="text-base-content/70">Last updated: {{ $latestBalance->time->format('F j, Y') }}</p>
+                            @elseif ($account->type === 'monzo_pot')
+                                <p class="text-base-content/70">Current pot balance</p>
+                            @endif
                         </div>
                     @else
                         <div class="text-center py-8">
                             <div class="text-2xl text-base-content/50 mb-2">No balance recorded</div>
-                            <p class="text-base-content/70">Add your first balance update to get started</p>
+                            <p class="text-base-content/70">
+                                @if ($account->type === 'manual_account')
+                                    Add your first balance update to get started
+                                @else
+                                    Balance will be updated automatically from your integration
+                                @endif
+                            </p>
                         </div>
                     @endif
                 </div>
@@ -125,8 +135,21 @@
                             <tbody>
                                 @foreach ($balanceEvents as $event)
                                     @php
-                                        $balance = $event->event_metadata['balance'] ?? null;
+                                        // Handle different balance storage formats
+                                        if (isset($event->event_metadata['balance'])) {
+                                            // Manual accounts store balance in event_metadata
+                                            $balance = $event->event_metadata['balance'];
+                                        } else {
+                                            // Monzo/GoCardless store balance in value field (integer cents)
+                                            $balance = $event->formatted_value;
+                                        }
+                                        
                                         $notes = $event->event_metadata['notes'] ?? null;
+                                        
+                                        // For Monzo accounts, show spend today info
+                                        if ($event->service === 'monzo' && isset($event->event_metadata['spend_today'])) {
+                                            $notes = 'Spend today: £' . number_format($event->event_metadata['spend_today'], 2);
+                                        }
                                     @endphp
                                     <tr>
                                         <td>{{ $event->time->format('F j, Y') }}</td>
@@ -149,7 +172,15 @@
                     <div class="text-center py-8">
                         <x-icon name="o-currency-dollar" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No balance history</h3>
-                        <p class="text-base-content/70 mb-6">Add your first balance update to get started</p>
+                        <p class="text-base-content/70 mb-6">
+                            @if ($account->type === 'manual_account')
+                                Add your first balance update to get started
+                            @elseif (in_array($account->type, ['monzo_account', 'monzo_pot', 'bank_account']))
+                                Balance history will appear here once your integration fetches data
+                            @else
+                                No balance history available
+                            @endif
+                        </p>
                         @if ($account->type === 'manual_account')
                             <a href="{{ route('balance-updates.create.for-account', $account->id) }}" class="btn btn-primary">
                                 <x-icon name="o-plus" class="w-4 h-4" />

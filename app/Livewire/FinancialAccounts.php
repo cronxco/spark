@@ -19,11 +19,13 @@ class FinancialAccounts extends Component
     public ?string $search = null;
     public ?string $accountTypeFilter = null;
     public ?string $providerFilter = null;
+    public bool $showArchivedPots = false;
 
     protected $queryString = [
         'search' => ['except' => ''],
         'accountTypeFilter' => ['except' => ''],
         'providerFilter' => ['except' => ''],
+        'showArchivedPots' => ['except' => false],
     ];
 
     public function updatedSearch(): void
@@ -43,7 +45,7 @@ class FinancialAccounts extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'accountTypeFilter', 'providerFilter']);
+        $this->reset(['search', 'accountTypeFilter', 'providerFilter', 'showArchivedPots']);
         $this->resetPage();
     }
 
@@ -80,11 +82,28 @@ class FinancialAccounts extends Component
     {
         $plugin = new FinancialPlugin;
 
-        $query = $plugin->getFinancialAccounts(Auth::user());
+        // Get accounts based on archived pots preference
+        if ($this->showArchivedPots) {
+            // Include archived pots when toggle is enabled
+            $accounts = EventObject::where('user_id', Auth::id())
+                ->where('concept', 'account')
+                ->whereIn('type', [
+                    'manual_account',
+                    'monzo_account',
+                    'monzo_pot',
+                    'monzo_archived_pot',
+                    'bank_account',
+                ])
+                ->orderBy('title')
+                ->get();
+        } else {
+            // Default: exclude archived pots
+            $accounts = $plugin->getFinancialAccounts(Auth::user());
+        }
 
         // Apply filters
         if ($this->search) {
-            $query = $query->filter(function ($account) {
+            $accounts = $accounts->filter(function ($account) {
                 $metadata = $account->metadata;
 
                 return str_contains(strtolower($metadata['name'] ?? ''), strtolower($this->search)) ||
@@ -94,19 +113,31 @@ class FinancialAccounts extends Component
         }
 
         if ($this->accountTypeFilter) {
-            $query = $query->filter(function ($account) {
+            $accounts = $accounts->filter(function ($account) {
                 return ($account->metadata['account_type'] ?? '') === $this->accountTypeFilter;
             });
         }
 
         if ($this->providerFilter) {
-            $query = $query->filter(function ($account) {
+            $accounts = $accounts->filter(function ($account) {
                 return ($account->metadata['provider'] ?? '') === $this->providerFilter;
             });
         }
 
         // Get unique account types and providers for filters
-        $allAccounts = $plugin->getFinancialAccounts(Auth::user());
+        // Use the same account set that's being displayed for consistent filtering
+        $allAccounts = $this->showArchivedPots
+            ? EventObject::where('user_id', Auth::id())
+                ->where('concept', 'account')
+                ->whereIn('type', [
+                    'manual_account',
+                    'monzo_account',
+                    'monzo_pot',
+                    'monzo_archived_pot',
+                    'bank_account',
+                ])
+                ->get()
+            : $plugin->getFinancialAccounts(Auth::user());
 
         $accountTypes = $allAccounts->pluck('metadata.account_type')
             ->filter()
@@ -121,13 +152,12 @@ class FinancialAccounts extends Component
             ->unique()
             ->sort();
 
-        // Convert to collection and implement manual pagination
-        $allAccounts = $query->values();
+        // Implement manual pagination
         $perPage = 10;
         $currentPage = $this->getPage();
-        $total = $allAccounts->count();
+        $total = $accounts->count();
         $offset = ($currentPage - 1) * $perPage;
-        $accounts = $allAccounts->slice($offset, $perPage);
+        $paginatedAccounts = $accounts->slice($offset, $perPage);
 
         // Create pagination data for the view
         $paginationData = [
@@ -141,7 +171,7 @@ class FinancialAccounts extends Component
         ];
 
         return view('livewire.money.index', [
-            'accounts' => $accounts,
+            'accounts' => $paginatedAccounts,
             'accountTypes' => $accountTypes,
             'providers' => $providers,
             'pagination' => $paginationData,

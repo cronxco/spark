@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[Title('Manual Account Details')]
+#[Title('Account Details')]
 class FinancialAccountShow extends Component
 {
     public EventObject $account;
@@ -57,7 +57,22 @@ class FinancialAccountShow extends Component
 
         // Get current balance from latest event
         $latestBalance = $plugin->getLatestBalance($this->account);
-        $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? null : null;
+
+        // Handle different balance storage formats
+        if ($latestBalance) {
+            if (isset($latestBalance->event_metadata['balance'])) {
+                // Manual accounts store balance in event_metadata
+                $currentBalance = $latestBalance->event_metadata['balance'];
+            } else {
+                // Monzo/GoCardless store balance in value field (integer cents)
+                $currentBalance = $latestBalance->formatted_value;
+            }
+        } elseif ($this->account->type === 'monzo_pot' && ! empty($this->account->content)) {
+            // Monzo pots store balance in content field
+            $currentBalance = (float) $this->account->content;
+        } else {
+            $currentBalance = null;
+        }
 
         // Get balance history
         $balanceEvents = $plugin->getBalanceEvents($this->account);

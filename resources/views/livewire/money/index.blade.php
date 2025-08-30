@@ -61,6 +61,18 @@
                         </select>
                     </div>
 
+                    <!-- Archived Pots Toggle -->
+                    <div class="form-control">
+                        <label class="label cursor-pointer">
+                            <span class="label-text">Show Archived Pots</span>
+                            <input
+                                type="checkbox"
+                                wire:model.live="showArchivedPots"
+                                class="toggle toggle-primary"
+                            />
+                        </label>
+                    </div>
+
                     <!-- Clear Filters -->
                     <div class="form-control">
                         <label class="label">
@@ -136,7 +148,7 @@
                                                 $currentBalance = $latestBalance->event_metadata['balance'];
                                             } else {
                                                 // Monzo/GoCardless store balance in value field (integer cents)
-                                                $currentBalance = $latestBalance->value / $latestBalance->value_multiplier;
+                                                $currentBalance = $latestBalance->formatted_value;
                                             }
                                         } elseif ($account->type === 'monzo_pot' && !empty($account->content)) {
                                             // Monzo pots store balance in content field
@@ -192,6 +204,7 @@
                                                     'manual_account' => 'Manual',
                                                     'monzo_account' => 'Monzo',
                                                     'monzo_pot' => 'Monzo Pot',
+                                                    'monzo_archived_pot' => 'Monzo Pot (Archived)',
                                                     'bank_account' => 'GoCardless',
                                                     default => 'Unknown'
                                                 };
@@ -200,6 +213,7 @@
                                                 $serviceColor = match ($account->type) {
                                                     'manual_account' => 'badge-primary',
                                                     'monzo_account', 'monzo_pot' => 'badge-secondary',
+                                                    'monzo_archived_pot' => 'badge-neutral',
                                                     'bank_account' => 'badge-accent',
                                                     default => 'badge-neutral'
                                                 };
