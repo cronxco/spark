@@ -128,13 +128,30 @@
                                         // Get current balance from latest event
                                         $plugin = new \App\Integrations\Financial\FinancialPlugin();
                                         $latestBalance = $plugin->getLatestBalance($account);
-                                        $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? null : null;
+                                        
+                                        // Handle different balance storage formats
+                                        if ($latestBalance) {
+                                            if (isset($latestBalance->event_metadata['balance'])) {
+                                                // Manual accounts store balance in event_metadata
+                                                $currentBalance = $latestBalance->event_metadata['balance'];
+                                            } else {
+                                                // Monzo/GoCardless store balance in value field (integer cents)
+                                                $currentBalance = $latestBalance->value / $latestBalance->value_multiplier;
+                                            }
+                                        } elseif ($account->type === 'monzo_pot' && !empty($account->content)) {
+                                            // Monzo pots store balance in content field
+                                            $currentBalance = (float) $account->content;
+                                        } else {
+                                            $currentBalance = null;
+                                        }
                                     @endphp
                                     <tr>
                                         <td>
                                             <div>
                                                 <div class="font-medium">
-                                                    @if (!empty($metadata['name']))
+                                                    @if ($account->type === 'monzo_pot' && !empty($account->title))
+                                                        {{ $account->title }}
+                                                    @elseif (!empty($metadata['name']))
                                                         {{ $metadata['name'] }}
                                                     @elseif (!empty($account->title))
                                                         {{ $account->title }}

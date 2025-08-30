@@ -55,6 +55,13 @@ return new class extends Migration
                     $metadata['currency'] = 'GBP';
                     $updated = true;
                 }
+                
+                // Ensure pot has a proper title if it's missing
+                if (empty($account->title) || $account->title === 'Pot') {
+                    DB::table('objects')
+                        ->where('id', $account->id)
+                        ->update(['title' => 'Monzo Pot']);
+                }
             }
 
             // Update GoCardless accounts
