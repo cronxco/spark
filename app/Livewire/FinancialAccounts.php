@@ -193,4 +193,29 @@ class FinancialAccounts extends Component
 
         return $labels[$type] ?? $type;
     }
+
+    /**
+     * Get the properly formatted balance for an account, handling value_multiplier correctly
+     */
+    private function getFormattedBalance(EventObject $account): ?float
+    {
+        $plugin = new FinancialPlugin;
+        $latestBalance = $plugin->getLatestBalance($account);
+
+        if ($latestBalance) {
+            if (isset($latestBalance->event_metadata['balance'])) {
+                // Manual accounts store balance in event_metadata
+                return $latestBalance->event_metadata['balance'];
+            } else {
+                // Monzo/GoCardless store balance in value field (integer cents)
+                // Use the formatted_value attribute which automatically handles value_multiplier
+                return $latestBalance->formatted_value;
+            }
+        } elseif (in_array($account->type, ['monzo_pot', 'monzo_archived_pot']) && ! empty($account->content)) {
+            // Monzo pots store balance in content field (already in correct format)
+            return (float) $account->content;
+        }
+
+        return null;
+    }
 }
