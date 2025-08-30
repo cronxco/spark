@@ -28,7 +28,7 @@ class CreateIntegrationGroupsTable extends Migration
             $table->index('service');
             $table->index('account_id');
             // If a user is deleted, remove their integration groups
-            $table->foreign('user_id')
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'integration_groups_user_id_foreign')
                 ->references('id')
                 ->on('users')
                 ->onDelete('cascade');

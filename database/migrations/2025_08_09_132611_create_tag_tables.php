@@ -20,7 +20,7 @@ return new class extends Migration
         });
 
         Schema::create('taggables', function (Blueprint $table) {
-            $table->foreignId('tag_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tag_id')->constrained('tags', 'id', Schema::getConnection()->getTablePrefix() . 'taggables_tag_id_foreign')->cascadeOnDelete();
 
             $table->uuid('taggable_id');
             $table->string('taggable_type');

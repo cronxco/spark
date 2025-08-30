@@ -66,8 +66,8 @@ class EventsPageTest extends TestCase
             ->get('/events');
 
         $response->assertStatus(200);
-        $response->assertSee('Test_action_today');
-        $response->assertDontSee('test_action_yesterday');
+        $response->assertSee('Test Action Today');
+        $response->assertDontSee('Test Action Yesterday');
     }
 
     /**

@@ -1,0 +1,557 @@
+<?php
+
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Block;
+use Illuminate\Support\Str;
+use Livewire\Volt\Component;
+
+new class extends Component {
+    public Event $event;
+    public bool $showSidebar = false;
+    
+    public function mount(Event $event): void
+    {
+        $this->event = $event->load([
+            'actor',
+            'target', 
+            'integration',
+            'blocks',
+            'tags',
+            'actor.tags',
+            'target.tags'
+        ]);
+    }
+
+    public function getRelatedEvents()
+    {
+        // Find events that share the same actor or target
+        return Event::with(['actor', 'target', 'integration', 'tags'])
+            ->whereHas('integration', function ($q) {
+                $userId = optional(auth()->guard('web')->user())->id;
+                if ($userId) {
+                    $q->where('user_id', $userId);
+                } else {
+                    $q->whereRaw('1 = 0');
+                }
+            })
+            ->where(function ($q) {
+                if ($this->event->actor_id) {
+                    $q->orWhere('actor_id', $this->event->actor_id);
+                }
+                if ($this->event->target_id) {
+                    $q->orWhere('target_id', $this->event->target_id);
+                }
+            })
+            ->where('id', '!=', $this->event->id)
+            ->orderBy('time', 'desc')
+            ->limit(5)
+            ->get();
+    }
+
+    public function formatAction($action)
+    {
+        // Convert snake_case to title case
+        $formatted = Str::headline($action);
+        
+        // Keep certain words lowercase for natural language flow
+        $wordsToLowercase = ['To', 'For', 'From', 'In', 'On', 'At', 'By', 'With', 'Of', 'The', 'A', 'An'];
+        foreach ($wordsToLowercase as $word) {
+            $formatted = str_replace(" $word ", " " . strtolower($word) . " ", $formatted);
+        }
+        
+        return $formatted;
+    }
+
+    public function needsPreposition($action)
+    {
+        $actionLower = strtolower($action);
+        
+        // Check if the action already contains a preposition
+        $prepositions = ['_to', '_for', '_from', '_in', '_on', '_at', '_by', '_with', '_of'];
+        
+        foreach ($prepositions as $preposition) {
+            if (str_ends_with($actionLower, $preposition)) {
+                return false; // Action already has a preposition, don't add another
+            }
+        }
+        
+        // If no preposition found, we need to add "to" for most actions
+        return true;
+    }
+
+    public function formatJson($data)
+    {
+        if (is_array($data) || is_object($data)) {
+            return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+        return $data;
+    }
+
+    public function getEventIcon($action)
+    {
+        $icons = [
+            'create' => 'o-plus-circle',
+            'update' => 'o-arrow-path',
+            'delete' => 'o-trash',
+            'move' => 'o-arrow-right',
+            'copy' => 'o-document-duplicate',
+            'share' => 'o-share',
+            'like' => 'o-heart',
+            'comment' => 'o-chat-bubble-left',
+            'follow' => 'o-user-plus',
+            'unfollow' => 'o-user-minus',
+            'join' => 'o-user-group',
+            'leave' => 'o-user-group',
+            'start' => 'o-play',
+            'stop' => 'o-stop',
+            'pause' => 'o-pause',
+            'resume' => 'o-play',
+            'complete' => 'o-check-circle',
+            'fail' => 'o-x-circle',
+            'cancel' => 'o-x-mark',
+            'approve' => 'o-check',
+            'reject' => 'o-x-mark',
+            'publish' => 'o-globe-alt',
+            'unpublish' => 'o-eye-slash',
+            'archive' => 'o-archive-box',
+            'restore' => 'o-arrow-path',
+            'login' => 'o-arrow-right-on-rectangle',
+            'logout' => 'o-arrow-left-on-rectangle',
+            'purchase' => 'o-shopping-cart',
+            'refund' => 'o-arrow-path',
+            'transfer' => 'o-arrow-right',
+            'withdraw' => 'o-arrow-down',
+            'deposit' => 'o-arrow-up',
+        ];
+
+        return $icons[strtolower($action)] ?? 'o-bolt';
+    }
+
+    public function getEventColor($action)
+    {
+        $colors = [
+            'create' => 'text-success',
+            'update' => 'text-info',
+            'delete' => 'text-error',
+            'move' => 'text-warning',
+            'copy' => 'text-info',
+            'share' => 'text-primary',
+            'like' => 'text-error',
+            'comment' => 'text-info',
+            'follow' => 'text-success',
+            'unfollow' => 'text-warning',
+            'join' => 'text-success',
+            'leave' => 'text-warning',
+            'start' => 'text-success',
+            'stop' => 'text-error',
+            'pause' => 'text-warning',
+            'resume' => 'text-success',
+            'complete' => 'text-success',
+            'fail' => 'text-error',
+            'cancel' => 'text-warning',
+            'approve' => 'text-success',
+            'reject' => 'text-error',
+            'publish' => 'text-success',
+            'unpublish' => 'text-warning',
+            'archive' => 'text-neutral',
+            'restore' => 'text-info',
+            'login' => 'text-success',
+            'logout' => 'text-warning',
+            'purchase' => 'text-success',
+            'refund' => 'text-info',
+            'transfer' => 'text-warning',
+            'withdraw' => 'text-error',
+            'deposit' => 'text-success',
+        ];
+
+        return $colors[strtolower($action)] ?? 'text-primary';
+    }
+
+    public function toggleSidebar()
+    {
+        $this->showSidebar = !$this->showSidebar;
+    }
+};
+?>
+
+<div>
+    @if ($this->event)
+        <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
+            <!-- Main Content Area -->
+            <div class="flex-1 space-y-4 lg:space-y-6">
+                <!-- Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center gap-3 lg:gap-4">
+                        <x-button href="{{ route('events.index') }}" class="btn-ghost btn-sm lg:btn-md">
+                            <x-icon name="o-arrow-left" class="w-4 h-4" />
+                            <span class="hidden sm:inline">Back to Events</span>
+                            <span class="sm:hidden">Back</span>
+                        </x-button>
+                        <h1 class="text-xl lg:text-2xl font-bold text-base-content">Event Details</h1>
+                    </div>
+                    <x-button wire:click="toggleSidebar" class="btn-outline btn-sm w-full sm:w-auto">
+                        <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                        <span class="hidden sm:inline">{{ $this->showSidebar ? 'Hide' : 'Show' }} Details</span>
+                        <span class="sm:hidden">{{ $this->showSidebar ? 'Hide' : 'Show' }}</span>
+                    </x-button>
+                </div>
+
+                <!-- Primary Event Information -->
+                <x-card>
+                    <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
+                        <!-- Event Icon & Action -->
+                        <div class="flex-shrink-0 self-center sm:self-start">
+                            <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                                <x-icon name="{{ $this->getEventIcon($this->event->action) }}" 
+                                       class="w-6 h-6 sm:w-8 sm:h-8 {{ $this->getEventColor($this->event->action) }}" />
+                            </div>
+                        </div>
+
+                        <!-- Event Details -->
+                        <div class="flex-1">
+                            <div class="mb-4 text-center sm:text-left">
+                                <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2 leading-tight">
+                                    {{ $this->formatAction($this->event->action) }}
+                                    @if ($this->event->target)
+                                        @if ($this->needsPreposition($this->event->action))
+                                            to {{ $this->event->target->title }}
+                                        @else
+                                            {{ $this->event->target->title }}
+                                        @endif
+                                    @elseif ($this->event->actor)
+                                        {{ $this->event->actor->title }}
+                                    @endif
+                                </h2>
+                                
+                                @if ($this->event->value)
+                                    <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary">
+                                        {{ $this->event->formatted_value }}{{ $this->event->value_unit ? ' ' . $this->event->value_unit : '' }}
+                                    </div>
+                                @endif
+                            </div>
+
+                            <!-- Key Metadata -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 text-sm">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                    <span class="text-base-content/70">{{ $this->event->time->format('M j, Y g:i A') }}</span>
+                                </div>
+                                @if ($this->event->integration)
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-link" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                        <span class="text-base-content/70 truncate">{{ $this->event->integration->name }}</span>
+                                    </div>
+                                @endif
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-bolt" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                    <span class="text-base-content/70 truncate">{{ $this->event->service }}</span>
+                                </div>
+                                @if ($this->event->domain)
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-globe-alt" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                        <span class="text-base-content/70 truncate">{{ $this->event->domain }}</span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <!-- Actor & Target Flow -->
+                            @if ($this->event->actor || $this->event->target)
+                                <div class="mt-4 lg:mt-6 p-3 lg:p-4 bg-base-100 rounded-lg border border-base-300">
+                                    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 lg:gap-4">
+                                        @if ($this->event->actor)
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                                                    <x-icon name="o-user" class="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
+                                                </div>
+                                                <a href="{{ route('objects.show', $this->event->actor->id) }}" 
+                                                   class="font-medium text-secondary hover:underline text-sm sm:text-base">
+                                                    {{ $this->event->actor->title }}
+                                                </a>
+                                            </div>
+                                        @endif
+                                        
+                                        @if ($this->event->actor && $this->event->target)
+                                            <x-icon name="o-arrow-down" class="w-5 h-5 sm:w-6 sm:h-6 text-base-content/40 sm:hidden" />
+                                            <x-icon name="o-arrow-right" class="w-5 h-5 sm:w-6 sm:h-6 text-base-content/40 hidden sm:block" />
+                                        @endif
+                                        
+                                        @if ($this->event->target)
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                                                    <x-icon name="o-arrow-trending-up" class="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
+                                                </div>
+                                                <a href="{{ route('objects.show', $this->event->target->id) }}" 
+                                                   class="font-medium text-accent hover:underline text-sm sm:text-base">
+                                                    {{ $this->event->target->title }}
+                                                </a>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            <!-- Tags -->
+                            @if ($this->event->tags->isNotEmpty())
+                                <div class="mt-4">
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ($this->event->tags as $tag)
+                                            <x-badge :value="$tag->name" class="badge-sm" />
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </x-card>
+
+                <!-- Blocks - Compact Grid View -->
+                @if ($this->event->blocks->isNotEmpty())
+                    <x-card>
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                            Related Blocks ({{ $this->event->blocks->count() }})
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->event->blocks as $block)
+                                <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <a href="{{ route('blocks.show', $block->id) }}" 
+                                           class="font-medium text-base-content hover:text-primary transition-colors text-sm">
+                                            {{ $block->title }}
+                                        </a>
+                                        @if ($block->value)
+                                            <x-badge :value="$block->formatted_value . ($block->value_unit ? ' ' . $block->value_unit : '')" class="badge-xs" />
+                                        @endif
+                                    </div>
+
+                                    @if ($block->content)
+                                        <p class="text-xs text-base-content/70 mb-2 line-clamp-2">{{ $block->content }}</p>
+                                    @endif
+
+                                    <div class="flex items-center gap-2 text-xs text-base-content/60">
+                                        @if ($block->time)
+                                            <div class="flex items-center gap-1">
+                                                <x-icon name="o-clock" class="w-3 h-3" />
+                                                {{ $block->time->format('g:i A') }}
+                                            </div>
+                                        @endif
+                                        @if ($block->url)
+                                            <div class="flex items-center gap-1">
+                                                <x-icon name="o-link" class="w-3 h-3" />
+                                                <a href="{{ $block->url }}" target="_blank" class="text-primary hover:underline">
+                                                    View
+                                                </a>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </x-card>
+                @endif
+
+                <!-- Related Events -->
+                @if ($this->getRelatedEvents()->isNotEmpty())
+                    <x-card>
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-arrow-path" class="w-5 h-5 text-warning" />
+                            Related Events
+                        </h3>
+                        <div class="space-y-3">
+                            @foreach ($this->getRelatedEvents() as $relatedEvent)
+                                <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                    <a href="{{ route('events.show', $relatedEvent->id) }}" 
+                                       class="block hover:text-primary transition-colors">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                <x-icon name="{{ $this->getEventIcon($relatedEvent->action) }}" 
+                                                       class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="mb-1">
+                                                    <span class="font-medium">
+                                                        {{ $this->formatAction($relatedEvent->action) }}
+                                                        @if ($relatedEvent->target)
+                                                            to {{ $relatedEvent->target->title }}
+                                                        @elseif ($relatedEvent->actor)
+                                                            {{ $relatedEvent->actor->title }}
+                                                        @endif
+                                                        @if ($relatedEvent->value)
+                                                            <span class="text-primary">
+                                                                ({{ $relatedEvent->formatted_value }}{{ $relatedEvent->value_unit ? ' ' . $relatedEvent->value_unit : '' }})
+                                                            </span>
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                                <div class="text-sm text-base-content/70">
+                                                    {{ $relatedEvent->time->format('M j, Y g:i A') }}
+                                                </div>
+                                            </div>
+                                            <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40" />
+                                        </div>
+                                    </a>
+                                </div>
+                            @endforeach
+                        </div>
+                    </x-card>
+                @endif
+            </div>
+
+            <!-- Collapsible Sidebar for Technical Details -->
+            @if ($this->showSidebar)
+                <div class="w-full lg:w-80 space-y-4 lg:space-y-6 border-t lg:border-t-0 lg:border-l border-base-300 pt-4 lg:pt-0 lg:pl-4">
+                    <!-- Actor Details -->
+                    @if ($this->event->actor)
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-user" class="w-5 h-5 text-secondary" />
+                                Actor Details
+                            </h3>
+                            <div class="space-y-3 text-sm">
+                                <div>
+                                    <span class="text-base-content/70">Title:</span>
+                                    <div class="font-medium">{{ $this->event->actor->title }}</div>
+                                </div>
+                                @if ($this->event->actor->content)
+                                    <div>
+                                        <span class="text-base-content/70">Content:</span>
+                                        <div class="font-medium">{{ $this->event->actor->content }}</div>
+                                    </div>
+                                @endif
+                                @if ($this->event->actor->type)
+                                    <div>
+                                        <span class="text-base-content/70">Type:</span>
+                                        <x-badge :value="$this->event->actor->type" class="badge-sm" />
+                                    </div>
+                                @endif
+                                @if ($this->event->actor->concept)
+                                    <div>
+                                        <span class="text-base-content/70">Concept:</span>
+                                        <x-badge :value="$this->event->actor->concept" class="badge-sm badge-outline" />
+                                    </div>
+                                @endif
+                                @if ($this->event->actor->url)
+                                    <div>
+                                        <span class="text-base-content/70">URL:</span>
+                                        <a href="{{ $this->event->actor->url }}" target="_blank" class="text-primary hover:underline block">
+                                            View
+                                        </a>
+                                    </div>
+                                @endif
+                                @if ($this->event->actor->tags->isNotEmpty())
+                                    <div>
+                                        <span class="text-base-content/70">Tags:</span>
+                                        <div class="flex flex-wrap gap-1 mt-1">
+                                            @foreach ($this->event->actor->tags as $tag)
+                                                <x-badge :value="$tag->name" class="badge-xs" />
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </x-card>
+                    @endif
+
+                    <!-- Target Details -->
+                    @if ($this->event->target)
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-arrow-trending-up" class="w-5 h-5 text-accent" />
+                                Target Details
+                            </h3>
+                            <div class="space-y-3 text-sm">
+                                <div>
+                                    <span class="text-base-content/70">Title:</span>
+                                    <div class="font-medium">{{ $this->event->target->title }}</div>
+                                </div>
+                                @if ($this->event->target->content)
+                                    <div>
+                                        <span class="text-base-content/70">Content:</span>
+                                        <div class="font-medium">{{ $this->event->target->content }}</div>
+                                    </div>
+                                @endif
+                                @if ($this->event->target->type)
+                                    <div>
+                                        <span class="text-base-content/70">Type:</span>
+                                        <x-badge :value="$this->event->target->type" class="badge-sm" />
+                                    </div>
+                                @endif
+                                @if ($this->event->target->concept)
+                                    <div>
+                                        <span class="text-base-content/70">Concept:</span>
+                                        <x-badge :value="$this->event->target->concept" class="badge-sm badge-outline" />
+                                    </div>
+                                @endif
+                                @if ($this->event->target->url)
+                                    <div>
+                                        <span class="text-base-content/70">URL:</span>
+                                        <a href="{{ $this->event->target->url }}" target="_blank" class="text-primary hover:underline block">
+                                            View
+                                        </a>
+                                    </div>
+                                @endif
+                                @if ($this->event->target->tags->isNotEmpty())
+                                    <div>
+                                        <span class="text-base-content/70">Tags:</span>
+                                        <div class="flex flex-wrap gap-1 mt-1">
+                                            @foreach ($this->event->target->tags as $tag)
+                                                <x-badge :value="$tag->name" class="badge-xs" />
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </x-card>
+                    @endif
+
+                    <!-- Technical Metadata -->
+                    @if ($this->event->event_metadata && count($this->event->event_metadata) > 0)
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
+                                Event Metadata
+                            </h3>
+                            <div class="bg-base-200 rounded-lg p-3">
+                                <pre class="text-xs text-base-content/80 whitespace-pre-wrap overflow-x-auto">{{ $this->formatJson($this->event->event_metadata) }}</pre>
+                            </div>
+                        </x-card>
+                    @endif
+
+                    @if ($this->event->actor && $this->event->actor->metadata && count($this->event->actor->metadata) > 0)
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-secondary" />
+                                Actor Metadata
+                            </h3>
+                            <div class="bg-base-200 rounded-lg p-3">
+                                <pre class="text-xs text-base-content/80 whitespace-pre-wrap overflow-x-auto">{{ $this->formatJson($this->event->actor->metadata) }}</pre>
+                            </div>
+                        </x-card>
+                    @endif
+
+                    @if ($this->event->target && $this->event->target->metadata && count($this->event->target->metadata) > 0)
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-accent" />
+                                Target Metadata
+                            </h3>
+                            <div class="bg-base-200 rounded-lg p-3">
+                                <pre class="text-xs text-base-content/80 whitespace-pre-wrap overflow-x-auto">{{ $this->formatJson($this->event->target->metadata) }}</pre>
+                            </div>
+                        </x-card>
+                    @endif
+                </div>
+            @endif
+        </div>
+    @else
+        <div class="text-center py-8">
+            <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
+            <h3 class="text-lg font-semibold text-base-content mb-2">Event Not Found</h3>
+            <p class="text-base-content/70">The requested event could not be found.</p>
+            <x-button href="{{ route('events.index') }}" class="mt-4">
+                Back to Events
+            </x-button>
+        </div>
+    @endif
+</div>
