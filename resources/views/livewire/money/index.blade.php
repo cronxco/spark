@@ -178,7 +178,7 @@
                                                     'bank_account' => 'GoCardless',
                                                     default => 'Unknown'
                                                 };
-                                                
+
                                                 // Get service color
                                                 $serviceColor = match ($account->type) {
                                                     'manual_account' => 'badge-primary',
