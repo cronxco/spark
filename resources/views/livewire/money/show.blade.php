@@ -143,9 +143,9 @@
                                             // Monzo/GoCardless store balance in value field (integer cents)
                                             $balance = $event->formatted_value;
                                         }
-                                        
+
                                         $notes = $event->event_metadata['notes'] ?? null;
-                                        
+
                                         // For Monzo accounts, show spend today info
                                         if ($event->service === 'monzo' && isset($event->event_metadata['spend_today'])) {
                                             $notes = 'Spend today: £' . number_format($event->event_metadata['spend_today'], 2);
