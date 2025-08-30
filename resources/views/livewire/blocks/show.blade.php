@@ -3,6 +3,7 @@
 use App\Models\Block;
 use App\Models\Event;
 use Livewire\Volt\Component;
+use App\Integrations\PluginRegistry;
 
 new class extends Component {
     public Block $block;
@@ -28,6 +29,23 @@ new class extends Component {
             return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }
         return $data;
+    }
+
+    public function getBlockIcon($blockType, $service = null)
+    {
+        // Try to get icon from plugin configuration first if service is available
+        if ($service) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+            if ($pluginClass) {
+                $blockTypes = $pluginClass::getBlockTypes();
+                if (isset($blockTypes[$blockType]) && isset($blockTypes[$blockType]['icon'])) {
+                    return $blockTypes[$blockType]['icon'];
+                }
+            }
+        }
+        
+        // Fallback to default icon if plugin doesn't have this block type
+        return 'o-squares-2x2';
     }
 };
 
@@ -55,7 +73,8 @@ new class extends Component {
                         <!-- Block Icon -->
                         <div class="flex-shrink-0 self-center sm:self-start">
                             <div class="w-12 h-12 rounded-full bg-info/10 flex items-center justify-center">
-                                <x-icon name="o-squares-2x2" class="w-6 h-6 text-info" />
+                                <x-icon name="{{ $this->getBlockIcon($this->block->block_type, $this->block->event?->service) }}" 
+                                       class="w-6 h-6 text-info" />
                             </div>
                         </div>
 

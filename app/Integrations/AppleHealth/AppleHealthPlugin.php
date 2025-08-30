@@ -74,156 +74,139 @@ class AppleHealthPlugin extends WebhookPlugin
 
     public static function getActionTypes(): array
     {
-        return array (
-  'completed_workout' => 
-  array (
-    'icon' => 'o-fire',
-    'display_name' => 'Completed Workout',
-    'description' => 'A workout session that has been completed',
-    'display_with_object' => true,
-    'value_unit' => 'kcal',
-    'hidden' => false,
-  ),
-  'measurement' => 
-  array (
-    'icon' => 'o-chart-bar',
-    'display_name' => 'Health Measurement',
-    'description' => 'A health metric measurement from Apple Health',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-);
+        return [
+            'completed_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Completed Workout',
+                'description' => 'A workout session that has been completed',
+                'display_with_object' => true,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+            'measurement' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Health Measurement',
+                'description' => 'A health metric measurement from Apple Health',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getBlockTypes(): array
     {
-        return array (
-  'summary' => 
-  array (
-    'icon' => 'o-information-circle',
-    'display_name' => 'Summary',
-    'description' => 'Summary of workout details',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'duration' => 
-  array (
-    'icon' => 'o-clock',
-    'display_name' => 'Duration',
-    'description' => 'Time duration of an activity',
-    'display_with_object' => false,
-    'value_unit' => 's',
-    'hidden' => false,
-  ),
-  'distance' => 
-  array (
-    'icon' => 'o-map-pin',
-    'display_name' => 'Distance',
-    'description' => 'Distance covered during an activity',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'energy' => 
-  array (
-    'icon' => 'o-fire',
-    'display_name' => 'Energy',
-    'description' => 'Energy burned during activity',
-    'display_with_object' => false,
-    'value_unit' => 'kcal',
-    'hidden' => false,
-  ),
-  'intensity' => 
-  array (
-    'icon' => 'o-bolt',
-    'display_name' => 'Intensity',
-    'description' => 'Intensity level of an activity',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'min' => 
-  array (
-    'icon' => 'o-arrow-down',
-    'display_name' => 'Minimum Value',
-    'description' => 'Minimum value in a range of measurements',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'avg' => 
-  array (
-    'icon' => 'o-minus',
-    'display_name' => 'Average Value',
-    'description' => 'Average value in a range of measurements',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'max' => 
-  array (
-    'icon' => 'o-arrow-up',
-    'display_name' => 'Maximum Value',
-    'description' => 'Maximum value in a range of measurements',
-    'display_with_object' => false,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'source' => 
-  array (
-    'icon' => 'o-information-circle',
-    'display_name' => 'Data Source',
-    'description' => 'Source of the health data',
-    'display_with_object' => true,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-);
+        return [
+            'summary' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Summary',
+                'description' => 'Summary of workout details',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'duration' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Duration',
+                'description' => 'Time duration of an activity',
+                'display_with_object' => false,
+                'value_unit' => 's',
+                'hidden' => false,
+            ],
+            'distance' => [
+                'icon' => 'o-map-pin',
+                'display_name' => 'Distance',
+                'description' => 'Distance covered during an activity',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'energy' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Energy',
+                'description' => 'Energy burned during activity',
+                'display_with_object' => false,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+            'intensity' => [
+                'icon' => 'o-bolt',
+                'display_name' => 'Intensity',
+                'description' => 'Intensity level of an activity',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'min' => [
+                'icon' => 'o-arrow-down',
+                'display_name' => 'Minimum Value',
+                'description' => 'Minimum value in a range of measurements',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'avg' => [
+                'icon' => 'o-minus',
+                'display_name' => 'Average Value',
+                'description' => 'Average value in a range of measurements',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'max' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Maximum Value',
+                'description' => 'Maximum value in a range of measurements',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'source' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Data Source',
+                'description' => 'Source of the health data',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getObjectTypes(): array
     {
-        return array (
-  'user' => 
-  array (
-    'icon' => 'o-user',
-    'display_name' => 'User',
-    'description' => 'The person whose health data is being tracked',
-    'hidden' => false,
-  ),
-  'workout' => 
-  array (
-    'icon' => 'o-fire',
-    'display_name' => 'Workout',
-    'description' => 'A physical exercise session',
-    'hidden' => false,
-  ),
-  'metric' => 
-  array (
-    'icon' => 'o-chart-bar',
-    'display_name' => 'Health Metric',
-    'description' => 'A measurable health indicator',
-    'hidden' => false,
-  ),
-  'apple_health_user' => 
-  array (
-    'icon' => 'o-heart',
-    'display_name' => 'Apple Health User',
-    'description' => 'User profile in Apple Health',
-    'hidden' => true,
-  ),
-  'apple_metric' => 
-  array (
-    'icon' => 'o-chart-bar',
-    'display_name' => 'Apple Metric',
-    'description' => 'Health metric from Apple Health',
-    'hidden' => true,
-  ),
-);
+        return [
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'The person whose health data is being tracked',
+                'hidden' => false,
+            ],
+            'workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout',
+                'description' => 'A physical exercise session',
+                'hidden' => false,
+            ],
+            'metric' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Health Metric',
+                'description' => 'A measurable health indicator',
+                'hidden' => false,
+            ],
+            'apple_health_user' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Apple Health User',
+                'description' => 'User profile in Apple Health',
+                'hidden' => true,
+            ],
+            'apple_metric' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Apple Metric',
+                'description' => 'Health metric from Apple Health',
+                'hidden' => true,
+            ],
+        ];
     }
-    
 
     public function initializeGroup(\App\Models\User $user): IntegrationGroup
     {
@@ -392,7 +375,7 @@ class AppleHealthPlugin extends WebhookPlugin
             'time' => $start,
             'actor' => $actor,
             'target' => $target,
-            'domain' => 'fitness',
+            'domain' => self::getDomain(),
             'action' => 'completed_workout',
             'value' => $encEnergy,
             'value_multiplier' => $energyMult,
@@ -469,7 +452,7 @@ class AppleHealthPlugin extends WebhookPlugin
             'time' => $date,
             'actor' => $actor,
             'target' => $target,
-            'domain' => 'health',
+            'domain' => self::getDomain(),
             'action' => 'measurement',
             'value' => $enc,
             'value_multiplier' => $mult,

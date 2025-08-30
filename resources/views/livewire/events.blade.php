@@ -4,6 +4,7 @@ use function Livewire\Volt\{state, computed, on};
 use App\Models\Event;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use App\Integrations\PluginRegistry;
 
 state([
     'view' => 'index',
@@ -85,7 +86,17 @@ $formatAction = function ($action) {
     return $formatted;
 };
 
-$getEventIcon = function ($action) {
+$getEventIcon = function ($action, $service) {
+    // Try to get icon from plugin configuration first
+    $pluginClass = PluginRegistry::getPlugin($service);
+    if ($pluginClass) {
+        $actionTypes = $pluginClass::getActionTypes();
+        if (isset($actionTypes[$action]) && isset($actionTypes[$action]['icon'])) {
+            return $actionTypes[$action]['icon'];
+        }
+    }
+    
+    // Fallback to hardcoded icons if plugin doesn't have this action type
     $icons = [
         'create' => 'o-plus-circle',
         'update' => 'o-arrow-path',
@@ -277,7 +288,7 @@ $nextDay = function () {
                                 <div class="timeline-start">
                                 <div class="flex items-start gap-4">
                                         <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                            <x-icon name="{{ $this->getEventIcon($event->action) }}" 
+                                            <x-icon name="{{ $this->getEventIcon($event->action, $event->service) }}" 
                                                    class="w-5 h-5 {{ $this->getEventColor($event->action) }}" />
                                         </div>
                                         <div class="min-w-0 flex-1">

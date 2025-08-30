@@ -346,7 +346,7 @@ class HevyPlugin implements IntegrationPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'hevy',
-            'domain' => 'fitness',
+            'domain' => self::getDomain(),
             'action' => 'completed_workout',
             'value' => $encVolume,
             'value_multiplier' => $volMult,
@@ -386,7 +386,8 @@ class HevyPlugin implements IntegrationPlugin
                     $content .= "\n**Rest:** {$rest} s";
                 }
 
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'exercise',
+
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Set ' . $setNum,
                     'content' => $content,
@@ -400,7 +401,8 @@ class HevyPlugin implements IntegrationPlugin
 
             if ($includeExerciseSummary && $exerciseName !== '') {
                 [$encExVol, $exVolMult] = $this->encodeNumericValue($exerciseVolume);
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'exercise',
+
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Total Volume',
                     'content' => 'Total volume (weight x reps) for this exercise',

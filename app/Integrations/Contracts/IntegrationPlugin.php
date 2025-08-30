@@ -57,7 +57,7 @@ interface IntegrationPlugin
 
     /**
      * Get the integration action types configuration
-     * 
+     *
      * @return array<string, array{
      *   icon: string,
      *   display_name: string,
@@ -71,7 +71,7 @@ interface IntegrationPlugin
 
     /**
      * Get the integration block types configuration
-     * 
+     *
      * @return array<string, array{
      *   icon: string,
      *   display_name: string,
@@ -85,7 +85,7 @@ interface IntegrationPlugin
 
     /**
      * Get the integration object types configuration
-     * 
+     *
      * @return array<string, array{
      *   icon: string,
      *   display_name: string,

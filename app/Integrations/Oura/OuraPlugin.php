@@ -21,37 +21,6 @@ use Throwable;
 
 class OuraPlugin extends OAuthPlugin
 {
-
-    public static function getIcon(): string
-    {
-        return 'o-moon';
-    }
-
-    public static function getAccentColor(): string
-    {
-        return 'primary';
-    }
-
-    public static function getDomain(): string
-    {
-        return 'health';
-    }
-
-    public static function getActionTypes(): array
-    {
-        return [];
-    }
-
-    public static function getBlockTypes(): array
-    {
-        return [];
-    }
-
-    public static function getObjectTypes(): array
-    {
-        return [];
-    }
-    
     protected string $baseUrl = 'https://api.ouraring.com/v2';
 
     protected string $authUrl = 'https://cloud.ouraring.com';
@@ -71,6 +40,227 @@ class OuraPlugin extends OAuthPlugin
         if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
             throw new InvalidArgumentException('Oura OAuth credentials are not configured');
         }
+    }
+
+    public static function getIcon(): string
+    {
+        return 'o-moon';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'health';
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'daily_activity' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Daily Activity',
+                'description' => 'Daily activity metrics from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'steps',
+                'hidden' => false,
+            ],
+            'daily_sleep' => [
+                'icon' => 'o-moon',
+                'display_name' => 'Daily Sleep',
+                'description' => 'Daily sleep metrics from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'hours',
+                'hidden' => false,
+            ],
+            'daily_readiness' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Daily Readiness',
+                'description' => 'Daily readiness score from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'score',
+                'hidden' => false,
+            ],
+            'daily_resilience' => [
+                'icon' => 'o-shield-check',
+                'display_name' => 'Daily Resilience',
+                'description' => 'Daily resilience metrics from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'score',
+                'hidden' => false,
+            ],
+            'daily_stress' => [
+                'icon' => 'o-exclamation-triangle',
+                'display_name' => 'Daily Stress',
+                'description' => 'Daily stress level from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'level',
+                'hidden' => false,
+            ],
+            'daily_spo2' => [
+                'icon' => 'o-droplet',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily blood oxygen level from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => '%',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'sleep_stages' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Sleep Stages',
+                'description' => 'Sleep stage duration information',
+                'display_with_object' => true,
+                'value_unit' => 'minutes',
+                'hidden' => false,
+            ],
+            'heart_rate' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Heart Rate',
+                'description' => 'Heart rate data from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'bpm',
+                'hidden' => false,
+            ],
+            'activity' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Activity',
+                'description' => 'Activity metrics from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'steps',
+                'hidden' => false,
+            ],
+            'readiness' => [
+                'icon' => 'o-star',
+                'display_name' => 'Readiness',
+                'description' => 'Readiness score from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'score',
+                'hidden' => false,
+            ],
+            'resilience' => [
+                'icon' => 'o-shield-check',
+                'display_name' => 'Resilience',
+                'description' => 'Resilience metrics from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'score',
+                'hidden' => false,
+            ],
+            'stress' => [
+                'icon' => 'o-exclamation-triangle',
+                'display_name' => 'Stress',
+                'description' => 'Stress level from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'level',
+                'hidden' => false,
+            ],
+            'spo2' => [
+                'icon' => 'o-droplet',
+                'display_name' => 'SpO2',
+                'description' => 'Blood oxygen level from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => '%',
+                'hidden' => false,
+            ],
+            'workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout',
+                'description' => 'Workout details from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'calories',
+                'hidden' => false,
+            ],
+            'session' => [
+                'icon' => 'o-play',
+                'display_name' => 'Session',
+                'description' => 'Session information from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => 'minutes',
+                'hidden' => false,
+            ],
+            'tag' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Tag',
+                'description' => 'Tag information from Oura Ring',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'activity' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Activity',
+                'description' => 'Daily activity data from Oura Ring',
+                'hidden' => false,
+            ],
+            'sleep' => [
+                'icon' => 'o-moon',
+                'display_name' => 'Sleep',
+                'description' => 'Sleep data from Oura Ring',
+                'hidden' => false,
+            ],
+            'readiness' => [
+                'icon' => 'o-star',
+                'display_name' => 'Readiness',
+                'description' => 'Readiness data from Oura Ring',
+                'hidden' => false,
+            ],
+            'resilience' => [
+                'icon' => 'o-shield-check',
+                'display_name' => 'Resilience',
+                'description' => 'Resilience data from Oura Ring',
+                'hidden' => false,
+            ],
+            'stress' => [
+                'icon' => 'o-exclamation-triangle',
+                'display_name' => 'Stress',
+                'description' => 'Stress data from Oura Ring',
+                'hidden' => false,
+            ],
+            'spo2' => [
+                'icon' => 'o-droplet',
+                'display_name' => 'SpO2',
+                'description' => 'Blood oxygen data from Oura Ring',
+                'hidden' => false,
+            ],
+            'workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout',
+                'description' => 'Workout data from Oura Ring',
+                'hidden' => false,
+            ],
+            'session' => [
+                'icon' => 'o-play',
+                'display_name' => 'Session',
+                'description' => 'Session data from Oura Ring',
+                'hidden' => false,
+            ],
+            'tag' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Tag',
+                'description' => 'Tag data from Oura Ring',
+                'hidden' => false,
+            ],
+            'heartrate' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Heart Rate',
+                'description' => 'Heart rate data from Oura Ring',
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getIdentifier(): string
@@ -724,7 +914,7 @@ class OuraPlugin extends OAuthPlugin
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'service' => 'oura',
-                'domain' => 'sleep',
+                'domain' => self::getDomain(),
                 'action' => 'slept_for',
                 'value' => $duration,
                 'value_multiplier' => 1,
@@ -748,7 +938,8 @@ class OuraPlugin extends OAuthPlugin
                 if ($seconds === null) {
                     continue;
                 }
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'tag',
+
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
@@ -762,7 +953,8 @@ class OuraPlugin extends OAuthPlugin
             $hrAvg = Arr::get($item, 'average_heart_rate');
             if ($hrAvg !== null) {
                 [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
-                $event->blocks()->create([
+                $event->blocks()->create(['block_type' => 'sleep_stages',
+
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => 'Average Heart Rate',
@@ -957,7 +1149,7 @@ class OuraPlugin extends OAuthPlugin
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'service' => 'oura',
-                'domain' => 'health',
+                'domain' => self::getDomain(),
                 'action' => 'had_heart_rate',
                 'value' => $encodedAvg,
                 'value_multiplier' => $avgMultiplier,
@@ -994,7 +1186,8 @@ class OuraPlugin extends OAuthPlugin
                 'value_unit' => 'bpm',
             ]);
 
-            $event->blocks()->create([
+            $event->blocks()->create(['block_type' => 'heart_rate',
+
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Data Points',
@@ -1056,7 +1249,7 @@ class OuraPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
-            'domain' => 'health',
+            'domain' => self::getDomain(),
             'action' => $action,
             'value' => $encodedScore,
             'value_multiplier' => $scoreMultiplier,
@@ -1143,7 +1336,7 @@ class OuraPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
-            'domain' => 'fitness',
+            'domain' => self::getDomain(),
             'action' => 'did_workout',
             'value' => $durationSec,
             'value_multiplier' => 1,
@@ -1156,7 +1349,8 @@ class OuraPlugin extends OAuthPlugin
         ]);
 
         [$encodedCalories, $calMultiplier] = $this->encodeNumericValue($calories);
-        $event->blocks()->create([
+        $event->blocks()->create(['block_type' => 'workout',
+
             'time' => $event->time,
             'integration_id' => $integration->id,
             'title' => 'Calories',
@@ -1169,7 +1363,8 @@ class OuraPlugin extends OAuthPlugin
         $avgHr = Arr::get($item, 'average_heart_rate');
         if ($avgHr !== null) {
             [$encodedAvgHr, $avgHrMultiplier] = $this->encodeNumericValue($avgHr);
-            $event->blocks()->create([
+            $event->blocks()->create(['block_type' => 'workout',
+
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Average Heart Rate',
@@ -1210,7 +1405,7 @@ class OuraPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
-            'domain' => 'health',
+            'domain' => self::getDomain(),
             'action' => 'had_mindfulness_session',
             'value' => $durationSec,
             'value_multiplier' => 1,
@@ -1262,7 +1457,7 @@ class OuraPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
-            'domain' => 'health',
+            'domain' => self::getDomain(),
             'action' => 'had_oura_tag',
             'value' => null,
             'value_multiplier' => 1,
@@ -1274,7 +1469,8 @@ class OuraPlugin extends OAuthPlugin
             'target_id' => $tagTarget->id,
         ]);
 
-        $event->blocks()->create([
+        $event->blocks()->create(['block_type' => 'tag',
+
             'time' => $event->time,
             'integration_id' => $integration->id,
             'title' => 'Tag',
@@ -1341,7 +1537,7 @@ class OuraPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
-            'domain' => 'sleep',
+            'domain' => self::getDomain(),
             'action' => 'slept_for',
             'value' => $duration,
             'value_multiplier' => 1,
@@ -1365,7 +1561,8 @@ class OuraPlugin extends OAuthPlugin
             if ($seconds === null) {
                 continue;
             }
-            $event->blocks()->create([
+            $event->blocks()->create(['block_type' => 'tag',
+
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
@@ -1379,7 +1576,8 @@ class OuraPlugin extends OAuthPlugin
         $hrAvg = Arr::get($item, 'average_heart_rate');
         if ($hrAvg !== null) {
             [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
-            $event->blocks()->create([
+            $event->blocks()->create(['block_type' => 'sleep_stages',
+
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Average Heart Rate',

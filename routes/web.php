@@ -3,6 +3,7 @@
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
+use App\Integrations\PluginRegistry;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +49,24 @@ Route::middleware(['auth'])->group(function () {
         ->whereUuid('group')
         ->name('integrations.storeInstances');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
+
+    // Plugin and integration instance detail routes
+    Route::get('plugins/{service}', function (string $service) {
+        $pluginClass = PluginRegistry::getPlugin($service);
+        if (! $pluginClass) {
+            abort(404);
+        }
+
+        return view('plugins.show', ['service' => $service, 'pluginClass' => $pluginClass]);
+    })->name('plugins.show');
+
+    Route::get('integrations/{integration}/details', function (\App\Models\Integration $integration) {
+        if ((string) $integration->user_id !== (string) Auth::id()) {
+            abort(403);
+        }
+
+        return view('integrations.details', ['integration' => $integration]);
+    })->whereUuid('integration')->name('integrations.details');
 
     // Money routes
     Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');

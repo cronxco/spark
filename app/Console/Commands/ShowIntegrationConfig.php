@@ -45,8 +45,9 @@ class ShowIntegrationConfig extends Command
     {
         $config = PluginRegistry::getPluginConfig($pluginIdentifier);
 
-        if (!$config) {
+        if (! $config) {
             $this->error("Plugin '{$pluginIdentifier}' not found.");
+
             return;
         }
 
@@ -58,44 +59,44 @@ class ShowIntegrationConfig extends Command
         $this->line("Description: {$config['description']}\n");
 
         // Action Types
-        $this->info("Action Types:");
+        $this->info('Action Types:');
         foreach ($config['action_types'] as $key => $action) {
             $objectText = $action['display_with_object'] ? 'with object' : 'without object';
             $unitText = $action['value_unit'] ? $action['value_unit'] : 'no unit';
             $hiddenText = $action['hidden'] ? ' (hidden)' : '';
-            
+
             $this->line("  • {$action['display_name']} ({$action['icon']}) - {$objectText}, {$unitText}{$hiddenText}");
             $this->line("    {$action['description']}");
         }
 
-        $this->line("");
+        $this->line('');
 
         // Block Types
-        $this->info("Block Types:");
+        $this->info('Block Types:');
         foreach ($config['block_types'] as $key => $block) {
             $objectText = $block['display_with_object'] ? 'with object' : 'without object';
             $unitText = $block['value_unit'] ? $block['value_unit'] : 'no unit';
             $hiddenText = $block['hidden'] ? ' (hidden)' : '';
-            
+
             $this->line("  • {$block['display_name']} ({$block['icon']}) - {$objectText}, {$unitText}{$hiddenText}");
             $this->line("    {$block['description']}");
         }
 
-        $this->line("");
+        $this->line('');
 
         // Object Types
-        $this->info("Object Types:");
+        $this->info('Object Types:');
         foreach ($config['object_types'] as $key => $object) {
             $hiddenText = $object['hidden'] ? ' (hidden)' : '';
-            
+
             $this->line("  • {$object['display_name']} ({$object['icon']}){$hiddenText}");
             $this->line("    {$object['description']}");
         }
 
-        $this->line("");
+        $this->line('');
 
         // Instance Types
-        $this->info("Instance Types:");
+        $this->info('Instance Types:');
         foreach ($config['instance_types'] as $key => $instance) {
             $this->line("  • {$key}: {$instance['label']}");
         }

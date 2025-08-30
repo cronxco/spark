@@ -115,7 +115,7 @@ class AppleHealthIntegrationTest extends TestCase
         $this->assertDatabaseHas('events', [
             'integration_id' => $metrics->id,
             'service' => 'apple-health',
-            'domain' => 'health',
+            'domain' => 'fitness',
             'action' => 'measurement',
         ]);
     }

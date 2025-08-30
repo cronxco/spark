@@ -5,6 +5,7 @@ use App\Models\EventObject;
 use App\Models\Block;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
+use App\Integrations\PluginRegistry;
 
 new class extends Component {
     public Event $event;
@@ -88,8 +89,18 @@ new class extends Component {
         return $data;
     }
 
-    public function getEventIcon($action)
+    public function getEventIcon($action, $service)
     {
+        // Try to get icon from plugin configuration first
+        $pluginClass = PluginRegistry::getPlugin($service);
+        if ($pluginClass) {
+            $actionTypes = $pluginClass::getActionTypes();
+            if (isset($actionTypes[$action]) && isset($actionTypes[$action]['icon'])) {
+                return $actionTypes[$action]['icon'];
+            }
+        }
+        
+        // Fallback to hardcoded icons if plugin doesn't have this action type
         $icons = [
             'create' => 'o-plus-circle',
             'update' => 'o-arrow-path',
@@ -203,7 +214,7 @@ new class extends Component {
                         <!-- Event Icon & Action -->
                         <div class="flex-shrink-0 self-center sm:self-start">
                             <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                                <x-icon name="{{ $this->getEventIcon($this->event->action) }}" 
+                                <x-icon name="{{ $this->getEventIcon($this->event->action, $this->event->service) }}" 
                                        class="w-6 h-6 sm:w-8 sm:h-8 {{ $this->getEventColor($this->event->action) }}" />
                             </div>
                         </div>
@@ -365,7 +376,7 @@ new class extends Component {
                                        class="block hover:text-primary transition-colors">
                                         <div class="flex items-center gap-3">
                                             <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <x-icon name="{{ $this->getEventIcon($relatedEvent->action) }}" 
+                                                <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}" 
                                                        class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
                                             </div>
                                             <div class="flex-1 min-w-0">

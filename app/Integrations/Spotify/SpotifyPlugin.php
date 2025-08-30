@@ -123,86 +123,77 @@ class SpotifyPlugin extends OAuthPlugin
 
     public static function getActionTypes(): array
     {
-        return array (
-  'played_track' => 
-  array (
-    'icon' => 'o-play',
-    'display_name' => 'Played Track',
-    'description' => 'A track that was played on Spotify',
-    'display_with_object' => true,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-);
+        return [
+            'played_track' => [
+                'icon' => 'o-play',
+                'display_name' => 'Played Track',
+                'description' => 'A track that was played on Spotify',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getBlockTypes(): array
     {
-        return array (
-  'album_art' => 
-  array (
-    'icon' => 'o-photo',
-    'display_name' => 'Album Artwork',
-    'description' => 'Album cover artwork for the track',
-    'display_with_object' => true,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'track_details' => 
-  array (
-    'icon' => 'o-information-circle',
-    'display_name' => 'Track Details',
-    'description' => 'Detailed information about the track',
-    'display_with_object' => true,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-  'artist' => 
-  array (
-    'icon' => 'o-user',
-    'display_name' => 'Artist',
-    'description' => 'Musical artist who created the track',
-    'display_with_object' => true,
-    'value_unit' => NULL,
-    'hidden' => false,
-  ),
-);
+        return [
+            'album_art' => [
+                'icon' => 'o-photo',
+                'display_name' => 'Album Artwork',
+                'description' => 'Album cover artwork for the track',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'track_details' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Track Details',
+                'description' => 'Detailed information about the track',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'artist' => [
+                'icon' => 'o-user',
+                'display_name' => 'Artist',
+                'description' => 'Musical artist who created the track',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getObjectTypes(): array
     {
-        return array (
-  'track' => 
-  array (
-    'icon' => 'o-musical-note',
-    'display_name' => 'Track',
-    'description' => 'A musical track or song',
-    'hidden' => false,
-  ),
-  'album' => 
-  array (
-    'icon' => 'o-rectangle-stack',
-    'display_name' => 'Album',
-    'description' => 'A collection of tracks',
-    'hidden' => false,
-  ),
-  'artist' => 
-  array (
-    'icon' => 'o-user',
-    'display_name' => 'Artist',
-    'description' => 'A musical artist or band',
-    'hidden' => false,
-  ),
-  'genre' => 
-  array (
-    'icon' => 'o-tag',
-    'display_name' => 'Genre',
-    'description' => 'A musical genre category',
-    'hidden' => false,
-  ),
-);
+        return [
+            'track' => [
+                'icon' => 'o-musical-note',
+                'display_name' => 'Track',
+                'description' => 'A musical track or song',
+                'hidden' => false,
+            ],
+            'album' => [
+                'icon' => 'o-rectangle-stack',
+                'display_name' => 'Album',
+                'description' => 'A collection of tracks',
+                'hidden' => false,
+            ],
+            'artist' => [
+                'icon' => 'o-user',
+                'display_name' => 'Artist',
+                'description' => 'A musical artist or band',
+                'hidden' => false,
+            ],
+            'genre' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Genre',
+                'description' => 'A musical genre category',
+                'hidden' => false,
+            ],
+        ];
     }
-    
 
     public function getOAuthUrl(IntegrationGroup $group): string
     {
@@ -567,7 +558,7 @@ class SpotifyPlugin extends OAuthPlugin
                 'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
             ],
             'service' => 'spotify',
-            'domain' => 'music',
+            'domain' => self::getDomain(),
             'action' => 'played',
             'value' => $track['duration_ms'] ?? 0,
             'value_multiplier' => 1,

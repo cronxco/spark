@@ -928,7 +928,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'made_transaction',
-            'domain' => 'money',
+            'domain' => self::getDomain(),
             'service' => 'gocardless',
             'time' => $tx['bookingDate'] ?? now(),
             'value' => abs((float) ($tx['transactionAmount']['amount'] ?? 0)),
@@ -1001,7 +1001,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'had_balance',
-            'domain' => 'money',
+            'domain' => self::getDomain(),
             'service' => 'gocardless',
             'time' => $balance['referenceDate'] ?? now(),
             'value' => abs((float) ($balance['balanceAmount']['amount'] ?? 0)),

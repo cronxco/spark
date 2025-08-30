@@ -283,7 +283,7 @@ class FinancialPlugin extends ManualPlugin
             'time' => $date . ' 23:59:59',
             'actor_id' => $accountObject->id,
             'service' => 'manual_account',
-            'domain' => 'money',
+            'domain' => self::getDomain(),
             'action' => 'had_balance',
             'value' => $wholeValue,
             'value_multiplier' => $multiplier,
