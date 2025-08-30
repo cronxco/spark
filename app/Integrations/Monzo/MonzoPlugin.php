@@ -313,11 +313,15 @@ class MonzoPlugin extends OAuthPlugin
     {
         $master = $this->resolveMasterIntegration($integration);
 
+        // Determine account type based on deletion status
+        $isDeleted = (bool) ($pot['deleted'] ?? false);
+        $accountType = $isDeleted ? 'monzo_archived_pot' : 'monzo_pot';
+
         return EventObject::updateOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'account',
-                'type' => 'monzo_pot',
+                'type' => $accountType,
                 'title' => $pot['name'] ?? 'Pot',
             ],
             [
@@ -329,7 +333,7 @@ class MonzoPlugin extends OAuthPlugin
                     'provider' => 'Monzo',
                     'account_type' => 'savings_account',
                     'pot_id' => $pot['id'] ?? null,
-                    'deleted' => (bool) ($pot['deleted'] ?? false),
+                    'deleted' => $isDeleted,
                     'currency' => 'GBP',
                 ],
                 'url' => null,

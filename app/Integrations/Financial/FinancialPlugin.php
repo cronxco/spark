@@ -238,6 +238,18 @@ class FinancialPlugin extends ManualPlugin
     }
 
     /**
+     * Get archived Monzo pots for a user
+     */
+    public function getArchivedMonzoPots(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        return EventObject::where('user_id', $user->id)
+            ->where('concept', 'account')
+            ->where('type', 'monzo_archived_pot')
+            ->orderBy('title')
+            ->get();
+    }
+
+    /**
      * Get balance events for a specific account
      */
     public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
