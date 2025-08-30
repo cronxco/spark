@@ -3,7 +3,7 @@
         <!-- Header -->
         <div class="mb-6">
             <h1 class="text-3xl font-bold text-base-content">Add Balance Update</h1>
-            <p class="text-base-content/70">Record a new balance for one of your financial accounts</p>
+            <p class="text-base-content/70">Record a new balance for one of your accounts</p>
         </div>
 
         <!-- Form -->
@@ -111,7 +111,7 @@
                             <x-icon name="o-currency-dollar" class="w-4 h-4" />
                             Add Balance Update
                         </button>
-                        <a href="{{ route('financial-accounts') }}" class="btn btn-outline">
+                        <a href="{{ route('money') }}" class="btn btn-outline">
                             Cancel
                         </a>
                     </div>

@@ -17,7 +17,7 @@ class FinancialPlugin extends ManualPlugin
 
     public static function getDisplayName(): string
     {
-        return 'Financial Accounts';
+        return 'Manual Accounts';
     }
 
     public static function getDescription(): string
@@ -96,7 +96,7 @@ class FinancialPlugin extends ManualPlugin
     {
         return [
             'accounts' => [
-                'label' => 'Financial Accounts',
+                'label' => 'Accounts',
                 'schema' => self::getConfigurationSchema(),
             ],
             'balances' => [
@@ -131,13 +131,13 @@ class FinancialPlugin extends ManualPlugin
      */
     public function upsertAccountObject(Integration $integration, array $accountData): EventObject
     {
-        $title = $accountData['name'] ?? 'Financial Account';
+        $title = $accountData['name'] ?? 'Manual Account';
 
         return EventObject::updateOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'account',
-                'type' => 'financial_account',
+                'type' => 'manual_account',
                 'title' => $title,
             ],
             [
@@ -234,7 +234,7 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Get the latest balance for an account
      */
-        public function getLatestBalance(EventObject $accountObject): ?Event
+    public function getLatestBalance(EventObject $accountObject): ?Event
     {
         return Event::where('actor_id', $accountObject->id)
             ->where('service', 'financial')

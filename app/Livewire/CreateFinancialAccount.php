@@ -85,7 +85,7 @@ class CreateFinancialAccount extends Component
 
         $this->dispatch('account-created');
         $this->reset();
-        $this->redirectRoute('financial-accounts');
+        $this->redirectRoute('money');
     }
 
     public function render(): View

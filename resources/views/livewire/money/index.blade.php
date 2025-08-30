@@ -4,7 +4,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-base-content">Money</h1>
-                <p class="text-base-content/70">Manage your financial accounts and track balances</p>
+                <p class="text-base-content/70">Manage your accounts and track balances</p>
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('money.create') }}" class="btn btn-primary">

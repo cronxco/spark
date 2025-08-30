@@ -62,7 +62,7 @@ class FinancialAccountShow extends Component
         // Get balance history
         $balanceEvents = $plugin->getBalanceEvents($this->account);
 
-        return view('livewire.financial-accounts.show', [
+        return view('livewire.money.show', [
             'metadata' => $metadata,
             'accountTypeLabel' => $accountTypeLabel,
             'provider' => $provider,

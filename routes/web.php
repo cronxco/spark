@@ -46,10 +46,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('integrations.storeInstances');
     Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
 
-    // Financial accounts routes
-    Route::get('financial-accounts', \App\Livewire\FinancialAccounts::class)->name('financial-accounts');
-    Volt::route('/financial-accounts/create', 'create-financial-account')->name('financial-accounts.create');
-    Route::get('financial-accounts/{account}', \App\Livewire\FinancialAccountShow::class)->name('financial-accounts.show');
+    // Money routes
+    Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');
+    Volt::route('/money/create', 'create-financial-account')->name('money.create');
+    Route::get('money/{account}', \App\Livewire\FinancialAccountShow::class)->name('money.show');
     Volt::route('/balance-updates/create', 'add-balance-update')->name('balance-updates.create');
     // GoCardless bank selection page
     Route::get('integrations/groups/{group}/gocardless/bank-selection', function (IntegrationGroup $group) {

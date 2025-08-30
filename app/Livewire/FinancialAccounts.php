@@ -11,7 +11,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Title('Financial Accounts')]
+#[Title('Money')]
 class FinancialAccounts extends Component
 {
     use WithPagination;
@@ -140,7 +140,7 @@ class FinancialAccounts extends Component
             'hasPages' => $total > $perPage,
         ];
 
-        return view('livewire.financial-accounts', [
+        return view('livewire.money.index', [
             'accounts' => $accounts,
             'accountTypes' => $accountTypes,
             'providers' => $providers,
