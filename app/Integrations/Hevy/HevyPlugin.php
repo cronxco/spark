@@ -107,7 +107,7 @@ class HevyPlugin implements IntegrationPlugin
 
     public static function getDomain(): string
     {
-        return 'fitness';
+        return 'health';
     }
 
     public static function getActionTypes(): array

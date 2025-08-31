@@ -55,7 +55,8 @@ class CheckIntegrationUpdates implements ShouldQueue
             $oauthServices = PluginRegistry::getOAuthPlugins()->keys();
             $apiKeyServices = PluginRegistry::getApiKeyPlugins()->keys();
 
-            $integrations = Integration::with(['user', 'group'])
+            // Get all integrations that could potentially need updating
+            $allIntegrations = Integration::with(['user', 'group'])
                 ->whereHas('user')
                 ->where(function ($query) use ($oauthServices, $apiKeyServices) {
                     $query->where(function ($q) use ($oauthServices) {
@@ -69,8 +70,12 @@ class CheckIntegrationUpdates implements ShouldQueue
                         $q->whereIn('service', $apiKeyServices);
                     });
                 })
-                ->needsUpdate()
                 ->get();
+
+            // Filter to only those that actually need updating using the individual method
+            $integrations = $allIntegrations->filter(function ($integration) {
+                return $integration->needsUpdate();
+            });
 
             if ($integrations->isEmpty()) {
                 Log::info('No integrations found that need updating');
@@ -95,7 +100,7 @@ class CheckIntegrationUpdates implements ShouldQueue
 
                     // Check if it's time to fetch data based on update frequency
                     if ($integration->last_triggered_at &&
-                        $integration->last_triggered_at->addMinutes($integration->update_frequency_minutes)->isFuture()) {
+                $integration->last_triggered_at->addMinutes($integration->getUpdateFrequencyMinutes())->isFuture()) {
                         Log::info("Skipping integration {$integration->id} ({$integration->service}) - too soon since last update");
                         $skippedCount++;
 

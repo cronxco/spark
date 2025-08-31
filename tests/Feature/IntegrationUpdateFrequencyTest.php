@@ -29,7 +29,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => null,
         ]);
 
@@ -45,7 +45,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
         ]);
 
@@ -61,7 +61,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
@@ -78,7 +78,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => $lastUpdate,
         ]);
 
@@ -97,7 +97,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => null,
         ]);
 
@@ -170,7 +170,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         // Not processing initially
@@ -207,7 +207,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration2 = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
         ]);
 
@@ -215,15 +215,21 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration3 = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
+        // Test the scope (which uses approximate filtering)
         $needsUpdate = Integration::query()->needsUpdate()->get();
 
         $this->assertTrue($needsUpdate->contains($integration1));
         $this->assertTrue($needsUpdate->contains($integration2));
         $this->assertFalse($needsUpdate->contains($integration3));
+
+        // Test the individual method (which uses exact filtering)
+        $this->assertTrue($integration1->needsUpdate());
+        $this->assertTrue($integration2->needsUpdate());
+        $this->assertFalse($integration3->needsUpdate());
     }
 
     /**
@@ -262,7 +268,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         Livewire::actingAs($user)
@@ -275,7 +281,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
             ->call('updateConfiguration');
 
         $integration->refresh();
-        $this->assertEquals(30, $integration->update_frequency_minutes);
+        $this->assertEquals(30, $integration->getUpdateFrequencyMinutes());
         $this->assertEquals(['owner/repo1'], $integration->configuration['repositories']);
         $this->assertEquals(['push'], $integration->configuration['events']);
     }
@@ -316,7 +322,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 30,
+            'configuration' => ['update_frequency_minutes' => 30],
             'last_successful_update_at' => Carbon::now()->subMinutes(45),
         ]);
 
@@ -339,7 +345,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 30,
+            'configuration' => ['update_frequency_minutes' => 30],
             'last_successful_update_at' => Carbon::now()->subMinutes(15),
         ]);
 

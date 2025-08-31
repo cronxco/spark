@@ -31,7 +31,7 @@ class FetchCommandTest extends TestCase
         $integration1 = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => null,
         ]);
 
@@ -39,7 +39,7 @@ class FetchCommandTest extends TestCase
         $integration2 = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
@@ -66,7 +66,7 @@ class FetchCommandTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
@@ -90,7 +90,7 @@ class FetchCommandTest extends TestCase
         Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 

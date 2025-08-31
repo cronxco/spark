@@ -39,22 +39,30 @@ class FetchIntegrationData extends Command
             $query = Integration::where('service', $service)
                 ->whereIn('service', $services);
 
-            if (! $force) {
-                $query->needsUpdate();
-            }
+            $allIntegrations = $query->get();
 
-            $integrations = $query->get();
+            if (! $force) {
+                $integrations = $allIntegrations->filter(function ($integration) {
+                    return $integration->needsUpdate();
+                });
+            } else {
+                $integrations = $allIntegrations;
+            }
         } else {
             $this->info('Fetching data from integrations that need updating...');
             $services = PluginRegistry::getOAuthPlugins()->keys()->merge(PluginRegistry::getApiKeyPlugins()->keys());
             $query = Integration::whereHas('user')
                 ->whereIn('service', $services);
 
-            if (! $force) {
-                $query->needsUpdate();
-            }
+            $allIntegrations = $query->get();
 
-            $integrations = $query->get();
+            if (! $force) {
+                $integrations = $allIntegrations->filter(function ($integration) {
+                    return $integration->needsUpdate();
+                });
+            } else {
+                $integrations = $allIntegrations;
+            }
         }
 
         if ($integrations->isEmpty()) {
@@ -100,7 +108,7 @@ class FetchIntegrationData extends Command
 
                 // Check if it's time to fetch data based on update frequency
                 if ($integration->last_triggered_at &&
-                    $integration->last_triggered_at->addMinutes($integration->update_frequency_minutes)->isFuture()) {
+                $integration->last_triggered_at->addMinutes($integration->getUpdateFrequencyMinutes())->isFuture()) {
                     $this->line("Skipping integration {$integration->id} ({$integration->service}) - too soon since last update");
 
                     continue;

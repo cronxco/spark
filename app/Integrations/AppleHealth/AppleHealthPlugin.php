@@ -11,7 +11,7 @@ class AppleHealthPlugin extends WebhookPlugin
 {
     public static function getIdentifier(): string
     {
-        return 'apple-health';
+        return 'apple_health';
     }
 
     public static function getDisplayName(): string
@@ -44,10 +44,12 @@ class AppleHealthPlugin extends WebhookPlugin
             'workouts' => [
                 'label' => 'Workouts',
                 'schema' => self::getConfigurationSchema(),
+                'mandatory' => false,
             ],
             'metrics' => [
                 'label' => 'Metrics',
                 'schema' => self::getConfigurationSchema(),
+                'mandatory' => false,
             ],
         ];
     }
@@ -69,7 +71,7 @@ class AppleHealthPlugin extends WebhookPlugin
 
     public static function getDomain(): string
     {
-        return 'fitness';
+        return 'health';
     }
 
     public static function getActionTypes(): array

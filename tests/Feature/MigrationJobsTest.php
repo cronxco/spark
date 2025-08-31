@@ -72,8 +72,7 @@ class MigrationJobsTest extends TestCase
             'service' => 'spotify',
             'name' => 'Listening',
             'instance_type' => 'listening',
-            'configuration' => [],
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         $context = [
@@ -110,8 +109,7 @@ class MigrationJobsTest extends TestCase
             'service' => 'spotify',
             'name' => 'Listening',
             'instance_type' => 'listening',
-            'configuration' => [],
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         $context = [
@@ -155,8 +153,8 @@ class MigrationJobsTest extends TestCase
             'configuration' => [
                 'repositories' => ['org/repo'],
                 'events' => ['push'],
+                'update_frequency_minutes' => 15,
             ],
-            'update_frequency_minutes' => 15,
         ]);
 
         $context = [

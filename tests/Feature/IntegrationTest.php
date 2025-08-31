@@ -181,7 +181,7 @@ class IntegrationTest extends TestCase
 
         $this->assertEquals(['owner/repo1', 'owner/repo2'], $integration->configuration['repositories']);
         $this->assertEquals(['push', 'pull_request'], $integration->configuration['events']);
-        $this->assertEquals(15, $integration->update_frequency_minutes);
+        $this->assertEquals(15, $integration->getUpdateFrequencyMinutes());
     }
 
     /**

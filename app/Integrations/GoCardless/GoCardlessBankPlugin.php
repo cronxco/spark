@@ -71,9 +71,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'type' => 'integer',
                 'label' => 'Update Frequency (minutes)',
                 'required' => true,
-                'min' => 360, // 6 hours minimum due to GoCardless rate limits
+                'min' => 1440, // 24 hours minimum due to GoCardless rate limits (4 requests/day)
                 'default' => 1440, // 24 hours default
-                'description' => 'GoCardless has strict rate limits (4 requests/day). Minimum: 6+ hours.',
+                'description' => 'GoCardless has strict rate limits (4 requests/day). Minimum: 24 hours.',
             ],
         ];
     }
@@ -84,14 +84,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'transactions' => [
                 'label' => 'Transactions',
                 'schema' => self::getConfigurationSchema(),
+                'mandatory' => false,
             ],
             'balances' => [
                 'label' => 'Balances',
                 'schema' => self::getConfigurationSchema(),
+                'mandatory' => false,
             ],
             'accounts' => [
                 'label' => 'Accounts (master)',
                 'schema' => [],
+                'mandatory' => true,
             ],
         ];
     }
@@ -108,7 +111,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     public static function getDomain(): string
     {
-        return 'financial';
+        return 'media';
     }
 
     public static function getActionTypes(): array

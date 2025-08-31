@@ -110,7 +110,7 @@ class HevyIntegrationTest extends TestCase
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('hevy', $event->service);
-        $this->assertEquals('fitness', $event->domain);
+        $this->assertEquals('health', $event->domain);
         $this->assertEquals('completed_workout', $event->action);
         $this->assertEquals('kg', $event->value_unit);
 

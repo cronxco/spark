@@ -61,7 +61,7 @@ class SlackPlugin extends WebhookPlugin
 
     public static function getDomain(): string
     {
-        return 'communication';
+        return 'online';
     }
 
     public static function getActionTypes(): array

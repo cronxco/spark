@@ -19,7 +19,7 @@ class PluginAndIntegrationViewsTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('GitHub');
-        $response->assertSee('productivity');
+        $response->assertSee('online');
     }
 
     /** @test */

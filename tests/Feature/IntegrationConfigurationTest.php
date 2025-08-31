@@ -59,7 +59,7 @@ class IntegrationConfigurationTest extends TestCase
     public function all_plugins_return_valid_domain(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
-        $validDomains = ['fitness', 'health', 'financial', 'productivity', 'social', 'development', 'music', 'communication', 'entertainment'];
+        $validDomains = ['health', 'money', 'media', 'knowledge', 'online'];
 
         foreach ($plugins as $pluginClass) {
             $domain = $pluginClass::getDomain();

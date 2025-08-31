@@ -27,9 +27,9 @@
                         <div class="flex items-center gap-4">
                             <span class="badge badge-primary">{{ $integration->instance_type }}</span>
                             <span class="badge badge-outline">{{ $integration->account_id }}</span>
-                            @if ($integration->update_frequency_minutes)
-                                <span class="badge badge-secondary">Updates every {{ $integration->update_frequency_minutes }} minutes</span>
-                            @endif
+                            @if ($integration->getUpdateFrequencyMinutes())
+    <span class="badge badge-secondary">Updates every {{ $integration->getUpdateFrequencyMinutes() }} minutes</span>
+@endif
                         </div>
                     </div>
                 </div>

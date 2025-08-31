@@ -21,8 +21,9 @@ class IntegrationFactory extends Factory
             'name' => $this->faker->word(),
             'instance_type' => null,
             'account_id' => $this->faker->uuid(),
-            'configuration' => [],
-            'update_frequency_minutes' => 15,
+            'configuration' => [
+                'update_frequency_minutes' => 15,
+            ],
             'last_triggered_at' => null,
             'last_successful_update_at' => null,
             'migration_batch_id' => null,

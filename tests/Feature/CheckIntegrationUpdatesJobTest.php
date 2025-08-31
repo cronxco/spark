@@ -48,7 +48,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'user_id' => $user->id,
             'service' => 'spotify',
             'integration_group_id' => $group2->id,
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
         ]);
 
@@ -62,7 +62,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'user_id' => $user->id,
             'service' => 'slack',
             'integration_group_id' => $group3->id,
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
@@ -138,7 +138,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'user_id' => $user->id,
             'service' => 'github',
             'integration_group_id' => $group->id,
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
             'last_triggered_at' => Carbon::now()->subMinutes(5), // Recently triggered
         ]);

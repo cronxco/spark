@@ -147,7 +147,7 @@ class SpotifyIntegrationTest extends TestCase
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('spotify', $event->service);
-        $this->assertEquals('entertainment', $event->domain);
+        $this->assertEquals('media', $event->domain);
         $this->assertEquals('played', $event->action);
         $this->assertEquals(180000, $event->value);
         $this->assertEquals('milliseconds', $event->value_unit);

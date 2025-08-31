@@ -105,7 +105,7 @@ class MonzoPlugin extends OAuthPlugin
 
     public static function getDomain(): string
     {
-        return 'financial';
+        return 'money';
     }
 
     public static function getActionTypes(): array
