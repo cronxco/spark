@@ -700,8 +700,9 @@ new class extends Component {
                             @endif
                         </div>
 
-                        @if ($this->object->content)
-                            <p class="text-base-content/70 mb-4">{{ $this->object->content }}</p>
+                        @php $text = is_array($this->object->metadata ?? null) ? ($this->object->metadata['text'] ?? null) : null; @endphp
+                        @if ($text)
+                            <p class="text-base-content/70 mb-4">{{ $text }}</p>
                         @endif
 
                         <!-- Object Metadata -->

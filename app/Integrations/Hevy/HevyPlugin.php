@@ -368,7 +368,7 @@ class HevyPlugin implements IntegrationPlugin
 
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Set ' . $setNum,
-                    'content' => $content,
+                    'metadata' => ['text' => $content],
                     'url' => null,
                     'media_url' => null,
                     'value' => $encWeight,
@@ -383,7 +383,7 @@ class HevyPlugin implements IntegrationPlugin
 
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Total Volume',
-                    'content' => 'Total volume (weight x reps) for this exercise',
+                    'metadata' => ['text' => 'Total volume (weight x reps) for this exercise'],
                     'value' => $encExVol,
                     'value_multiplier' => $exVolMult,
                     'value_unit' => $this->inferWeightUnit($integration, Arr::get($exercise, 'weight_unit')),

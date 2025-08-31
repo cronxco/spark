@@ -306,8 +306,11 @@ new class extends Component {
                                         @endif
                                     </div>
 
-                                    @if ($block->content)
-                                        <p class="text-xs text-base-content/70 mb-2 line-clamp-2">{{ $block->content }}</p>
+                                    @php $meta = is_array($block->metadata ?? null) ? $block->metadata : []; @endphp
+                                    @if (!empty($meta))
+                                        <div class="mb-2">
+                                            <x-metadata-list :data="$meta" />
+                                        </div>
                                     @endif
 
                                     <div class="flex items-center gap-2 text-xs text-base-content/60">
@@ -394,10 +397,11 @@ new class extends Component {
                                     <span class="text-base-content/70">Title:</span>
                                     <div class="font-medium">{{ $this->event->actor->title }}</div>
                                 </div>
-                                @if ($this->event->actor->content)
+                                @php $actorText = is_array($this->event->actor->metadata ?? null) ? ($this->event->actor->metadata['text'] ?? null) : null; @endphp
+                                @if ($actorText)
                                     <div>
                                         <span class="text-base-content/70">Content:</span>
-                                        <div class="font-medium">{{ $this->event->actor->content }}</div>
+                                        <div class="font-medium">{{ $actorText }}</div>
                                     </div>
                                 @endif
                                 @if ($this->event->actor->type)
@@ -446,10 +450,11 @@ new class extends Component {
                                     <span class="text-base-content/70">Title:</span>
                                     <div class="font-medium">{{ $this->event->target->title }}</div>
                                 </div>
-                                @if ($this->event->target->content)
+                                @php $targetText = is_array($this->event->target->metadata ?? null) ? ($this->event->target->metadata['text'] ?? null) : null; @endphp
+                                @if ($targetText)
                                     <div>
                                         <span class="text-base-content/70">Content:</span>
-                                        <div class="font-medium">{{ $this->event->target->content }}</div>
+                                        <div class="font-medium">{{ $targetText }}</div>
                                     </div>
                                 @endif
                                 @if ($this->event->target->type)

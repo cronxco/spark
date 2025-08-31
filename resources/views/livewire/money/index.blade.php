@@ -150,10 +150,10 @@
                                                 // Monzo/GoCardless store balance in value field (integer cents)
                                                 $currentBalance = $latestBalance->formatted_value;
                                             }
-                                        } elseif (in_array($account->type, ['monzo_pot', 'monzo_archived_pot']) && !empty($account->content)) {
+                                        } elseif (in_array($account->type, ['monzo_pot', 'monzo_archived_pot']) && !empty(($account->metadata['balance'] ?? null))) {
                                             // Monzo pots now create balance events, but fallback to content field if no events exist
                                             // This ensures backward compatibility during the transition
-                                            $currentBalance = (float) $account->content;
+                                            $currentBalance = (float) ($account->metadata['balance'] ?? 0);
                                         } else {
                                             $currentBalance = null;
                                         }

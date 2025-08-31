@@ -14,7 +14,7 @@ return new class extends Migration
             $table->uuid('event_id')->nullable();
             $table->timestampTz('time')->nullable();
             $table->text('title')->nullable();
-            $table->text('content')->nullable();
+            $table->json('metadata')->nullable();
             $table->text('url')->nullable();
             $table->text('media_url')->nullable();
             $table->bigInteger('value')->nullable();
