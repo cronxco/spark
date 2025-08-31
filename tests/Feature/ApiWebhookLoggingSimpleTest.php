@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ApiWebhookLoggingSimpleTest extends TestCase
@@ -26,10 +25,11 @@ class ApiWebhookLoggingSimpleTest extends TestCase
 
         // Assert - File should be created automatically
         $expectedFileName = 'api_debug_test_auto_instance_auto_integration_123-' . now()->format('Y-m-d') . '.log';
-        $this->assertTrue(Storage::disk('local')->exists('logs/' . $expectedFileName));
+        $logPath = storage_path('logs/' . $expectedFileName);
+        $this->assertTrue(file_exists($logPath));
 
         // Verify log content structure
-        $logContent = Storage::disk('local')->get('logs/' . $expectedFileName);
+        $logContent = file_get_contents($logPath);
         $this->assertStringContainsString('API Request', $logContent);
         $this->assertStringContainsString('test_auto_instance', $logContent);
         $this->assertStringContainsString('auto_integration_123', $logContent);
@@ -52,10 +52,11 @@ class ApiWebhookLoggingSimpleTest extends TestCase
 
         // Assert - File should be created automatically
         $expectedFileName = 'api_debug_test_auto_service-' . now()->format('Y-m-d') . '.log';
-        $this->assertTrue(Storage::disk('local')->exists('logs/' . $expectedFileName));
+        $logPath = storage_path('logs/' . $expectedFileName);
+        $this->assertTrue(file_exists($logPath));
 
         // Verify log content structure
-        $logContent = Storage::disk('local')->get('logs/' . $expectedFileName);
+        $logContent = file_get_contents($logPath);
         $this->assertStringContainsString('API Request', $logContent);
         $this->assertStringContainsString('test_auto_service', $logContent);
     }
@@ -76,7 +77,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
 
         // Assert - Should create per-service file
         $expectedFileName = 'api_debug_test_fallback-' . now()->format('Y-m-d') . '.log';
-        $this->assertTrue(Storage::disk('local')->exists('logs/' . $expectedFileName));
+        $logPath = storage_path('logs/' . $expectedFileName);
+        $this->assertTrue(file_exists($logPath));
     }
 
     /** @test */
@@ -100,9 +102,10 @@ class ApiWebhookLoggingSimpleTest extends TestCase
 
         // Assert - File created and content sanitized
         $expectedFileName = 'api_debug_test_sanitize_sanitize_integration_999-' . now()->format('Y-m-d') . '.log';
-        $this->assertTrue(Storage::disk('local')->exists('logs/' . $expectedFileName));
+        $logPath = storage_path('logs/' . $expectedFileName);
+        $this->assertTrue(file_exists($logPath));
 
-        $logContent = Storage::disk('local')->get('logs/' . $expectedFileName);
+        $logContent = file_get_contents($logPath);
 
         // Sensitive headers should be redacted
         $this->assertStringContainsString('"Authorization":["[REDACTED]"]', $logContent);
@@ -129,9 +132,10 @@ class ApiWebhookLoggingSimpleTest extends TestCase
 
         // Assert - All log entries in the same file
         $expectedFileName = 'api_debug_multi_test_' . $integrationId . '-' . now()->format('Y-m-d') . '.log';
-        $this->assertTrue(Storage::disk('local')->exists('logs/' . $expectedFileName));
+        $logPath = storage_path('logs/' . $expectedFileName);
+        $this->assertTrue(file_exists($logPath));
 
-        $logContent = Storage::disk('local')->get('logs/' . $expectedFileName);
+        $logContent = file_get_contents($logPath);
 
         // Should contain all three message types
         $this->assertStringContainsString('API Request', $logContent);
@@ -163,16 +167,16 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $date = now()->format('Y-m-d');
 
         // Assert - Should create separate files
-        $this->assertTrue(Storage::disk('local')->exists("logs/api_debug_service_a_integration_111-{$date}.log"));
-        $this->assertTrue(Storage::disk('local')->exists("logs/api_debug_service_a_integration_222-{$date}.log"));
-        $this->assertTrue(Storage::disk('local')->exists("logs/api_debug_service_b_integration_333-{$date}.log"));
-        $this->assertTrue(Storage::disk('local')->exists("logs/api_debug_service_b-{$date}.log"));
+        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_a_integration_111-{$date}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_a_integration_222-{$date}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_b_integration_333-{$date}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_b-{$date}.log")));
 
         // Verify different content in each file
-        $content111 = Storage::disk('local')->get("logs/api_debug_service_a_integration_111-{$date}.log");
-        $content222 = Storage::disk('local')->get("logs/api_debug_service_a_integration_222-{$date}.log");
-        $content333 = Storage::disk('local')->get("logs/api_debug_service_b_integration_333-{$date}.log");
-        $contentService = Storage::disk('local')->get("logs/api_debug_service_b-{$date}.log");
+        $content111 = file_get_contents(storage_path("logs/api_debug_service_a_integration_111-{$date}.log"));
+        $content222 = file_get_contents(storage_path("logs/api_debug_service_a_integration_222-{$date}.log"));
+        $content333 = file_get_contents(storage_path("logs/api_debug_service_b_integration_333-{$date}.log"));
+        $contentService = file_get_contents(storage_path("logs/api_debug_service_b-{$date}.log"));
 
         $this->assertStringContainsString('integration_111', $content111);
         $this->assertStringContainsString('integration_222', $content222);
