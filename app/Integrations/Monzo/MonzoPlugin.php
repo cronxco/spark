@@ -117,7 +117,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
-                'hidden' => false,
+                'hidden' => true,
             ],
         ];
     }
@@ -221,6 +221,15 @@ class MonzoPlugin extends OAuthPlugin
             throw new Exception('Invalid CSRF token');
         }
 
+        // Log the API request
+        $this->logApiRequest('POST', '/oauth2/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->redirectUri,
+        ]);
+
         $response = Http::asForm()->post($this->apiBase . '/oauth2/token', [
             'grant_type' => 'authorization_code',
             'client_id' => $this->clientId,
@@ -228,6 +237,9 @@ class MonzoPlugin extends OAuthPlugin
             'redirect_uri' => $this->redirectUri,
             'code' => $code,
         ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/oauth2/token', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Monzo token exchange failed', [
@@ -505,8 +517,17 @@ class MonzoPlugin extends OAuthPlugin
 
     protected function getPrimaryAccount(IntegrationGroup $group): ?array
     {
+        // Log the API request
+        $this->logApiRequest('GET', '/accounts', [
+            'Authorization' => '[REDACTED]',
+        ], [], $group->id);
+
         $resp = Http::withToken((string) $group->access_token)
             ->get($this->apiBase . '/accounts');
+
+        // Log the API response
+        $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
+
         if (! $resp->successful()) {
             return null;
         }
@@ -522,8 +543,17 @@ class MonzoPlugin extends OAuthPlugin
 
     protected function listAccounts(Integration $integration): array
     {
+        // Log the API request
+        $this->logApiRequest('GET', '/accounts', [
+            'Authorization' => '[REDACTED]',
+        ], [], $integration->id);
+
         $resp = Http::withHeaders($this->authHeaders($integration))
             ->get($this->apiBase . '/accounts');
+
+        // Log the API response
+        $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
         if (! $resp->successful()) {
             return [];
         }
@@ -533,10 +563,21 @@ class MonzoPlugin extends OAuthPlugin
 
     protected function processPotsSnapshot(Integration $integration, array $account): void
     {
+        // Log the API request
+        $this->logApiRequest('GET', '/pots', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            'current_account_id' => $account['id'],
+        ], $integration->id);
+
         $resp = Http::withHeaders($this->authHeaders($integration))
             ->get($this->apiBase . '/pots', [
                 'current_account_id' => $account['id'],
             ]);
+
+        // Log the API response
+        $this->logApiResponse('GET', '/pots', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
         if (! $resp->successful()) {
             return;
         }
@@ -922,7 +963,16 @@ class MonzoPlugin extends OAuthPlugin
             return false;
         }
         try {
+            // Log the API request
+            $this->logApiRequest('GET', '/accounts', [
+                'Authorization' => '[REDACTED]',
+            ], [], $integrationId);
+
             $resp = Http::withHeaders($this->authHeaders($integration))->get($this->apiBase . '/accounts');
+
+            // Log the API response
+            $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $integrationId);
+
             if ($resp->successful()) {
                 $accounts = $resp->json('accounts') ?? [];
                 foreach ($accounts as $acc) {

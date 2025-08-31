@@ -7,6 +7,14 @@ use Tests\TestCase;
 
 class IntegrationConfigurationTest extends TestCase
 {
+    private array $validDomains;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->validDomains = PluginRegistry::getValidDomains();
+    }
+
     /**
      * @test
      */
@@ -59,13 +67,12 @@ class IntegrationConfigurationTest extends TestCase
     public function all_plugins_return_valid_domain(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
-        $validDomains = ['health', 'money', 'media', 'knowledge', 'online'];
 
         foreach ($plugins as $pluginClass) {
             $domain = $pluginClass::getDomain();
             $this->assertIsString($domain, "Plugin {$pluginClass} getDomain must return a string");
             $this->assertNotEmpty($domain, "Plugin {$pluginClass} getDomain must not be empty");
-            $this->assertContains($domain, $validDomains, "Plugin {$pluginClass} getDomain must be a valid domain");
+            $this->assertContains($domain, $this->validDomains, "Plugin {$pluginClass} getDomain must be a valid domain");
         }
     }
 

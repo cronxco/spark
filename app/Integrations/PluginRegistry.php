@@ -10,6 +10,14 @@ class PluginRegistry
 {
     private static array $plugins = [];
 
+    /**
+     * Get the list of valid domains that plugins can use
+     */
+    public static function getValidDomains(): array
+    {
+        return ['health', 'money', 'media', 'knowledge', 'online'];
+    }
+
     public static function register(string $pluginClass): void
     {
         if (! is_subclass_of($pluginClass, IntegrationPlugin::class)) {

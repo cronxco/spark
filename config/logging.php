@@ -135,6 +135,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'api_debug' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/api_debug.log'),
+            'level' => 'debug',
+            'days' => 2,
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
