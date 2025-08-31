@@ -33,25 +33,25 @@ use Carbon\Carbon;
                                     $isChecked = in_array($key, old('types', array_keys($types ?? [])));
                                 @endphp
                                 <label class="flex items-center gap-3 p-3 rounded-lg bg-base-100 {{ $isMandatory ? 'border-2 border-primary' : '' }}">
-                                    <input 
-                                        type="checkbox" 
-                                        name="types[]" 
-                                        value="{{ $key }}" 
-                                        class="checkbox" 
+                                    <input
+                                        type="checkbox"
+                                        name="types[]"
+                                        value="{{ $key }}"
+                                        class="checkbox"
                                         @checked($isChecked)
-                                        @if($isMandatory) disabled @endif
+                                        @if ($isMandatory) disabled @endif
                                     >
                                     <div>
                                         <div class="font-medium flex items-center gap-2">
                                             {{ $meta['label'] ?? ucfirst($key) }}
-                                            @if($isMandatory)
+                                            @if ($isMandatory)
                                                 <span class="badge badge-primary badge-xs">Required</span>
                                             @endif
                                         </div>
                                         @if (!empty($meta['description']))
                                             <div class="text-xs text-base-content/70">{{ $meta['description'] }}</div>
                                         @endif
-                                        @if($isMandatory)
+                                        @if ($isMandatory)
                                             <div class="text-xs text-primary mt-1">This instance type is required and cannot be disabled</div>
                                         @endif
                                     </div>

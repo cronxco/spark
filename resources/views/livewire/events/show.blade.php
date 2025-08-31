@@ -198,7 +198,7 @@ new class extends Component {
                             <div class="mb-4 text-center sm:text-left">
                                 <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2 leading-tight">
                                     {{ $this->formatAction($this->event->action) }}
-                                    @if ($this->event->target)          
+                                    @if ($this->event->target)
                                             {{ $this->event->target->title }}
                                     @elseif ($this->event->actor)
                                         {{ $this->event->actor->title }}

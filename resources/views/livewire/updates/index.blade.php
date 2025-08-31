@@ -264,7 +264,7 @@ new class extends Component {
                                     </div>
 
 
-                                    
+
 
                                     @php
                                         $showUpdateFrequency = !$isWebhook && !$isManual;
