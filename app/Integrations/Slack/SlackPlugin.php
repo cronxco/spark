@@ -5,6 +5,7 @@ namespace App\Integrations\Slack;
 use App\Integrations\Base\WebhookPlugin;
 use App\Models\Integration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class SlackPlugin extends WebhookPlugin
 {
@@ -61,7 +62,7 @@ class SlackPlugin extends WebhookPlugin
 
     public static function getDomain(): string
     {
-        return 'communication';
+        return 'online';
     }
 
     public static function getActionTypes(): array
@@ -131,7 +132,10 @@ class SlackPlugin extends WebhookPlugin
 
     public function handleWebhook(Request $request, Integration $integration): void
     {
+        // Log the webhook payload
         $payload = $request->all();
+        $headers = $request->headers->all();
+        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $payload, $headers);
 
         // Verify Slack signature
         if (! $this->verifySlackSignature($request, $integration)) {

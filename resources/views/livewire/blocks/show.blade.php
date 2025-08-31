@@ -141,7 +141,7 @@ new class extends Component {
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 mb-1">
-                                        <span class="font-medium">{{ ucfirst($this->block->event->action) }}</span>
+                                        <span class="font-medium">{{ format_action_title($this->block->event->action) }}</span>
                                         <x-badge :value="$this->block->event->service" class="badge-xs" />
                                         @if ($this->block->event->domain)
                                             <x-badge :value="$this->block->event->domain" class="badge-xs badge-outline" />

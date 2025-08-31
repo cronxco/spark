@@ -6,15 +6,14 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class EventsPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_page_loads_for_authenticated_user(): void
     {
         /** @var User $user */
@@ -27,9 +26,7 @@ class EventsPageTest extends TestCase
         $response->assertSee('Events — Today');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_page_requires_authentication(): void
     {
         $response = $this->get('/events');
@@ -37,9 +34,7 @@ class EventsPageTest extends TestCase
         $response->assertRedirect('/login');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_page_shows_events_from_today(): void
     {
         /** @var User $user */
@@ -70,9 +65,7 @@ class EventsPageTest extends TestCase
         $response->assertDontSee('Test Action Yesterday');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_page_shows_no_events_message_when_empty(): void
     {
         /** @var User $user */

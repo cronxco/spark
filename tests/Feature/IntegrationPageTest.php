@@ -4,13 +4,12 @@ namespace Tests\Feature;
 
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\PluginRegistry;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class IntegrationPageTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function integrations_page_requires_authentication()
     {
         $response = $this->get('/integrations');
@@ -18,9 +17,7 @@ class IntegrationPageTest extends TestCase
         $response->assertRedirect('/login');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_has_github_plugin()
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -29,9 +26,7 @@ class IntegrationPageTest extends TestCase
         $this->assertEquals('GitHub', $plugins->get('github')::getDisplayName());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_has_slack_plugin()
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -40,9 +35,7 @@ class IntegrationPageTest extends TestCase
         $this->assertEquals('Slack', $plugins->get('slack')::getDisplayName());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function initialize_route_exists()
     {
         // Test that the route exists by making a request
@@ -52,9 +45,7 @@ class IntegrationPageTest extends TestCase
         $response->assertStatus(302);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_supports_multiple_instances()
     {
         $plugins = PluginRegistry::getAllPlugins();

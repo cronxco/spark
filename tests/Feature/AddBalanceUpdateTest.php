@@ -11,6 +11,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AddBalanceUpdateTest extends TestCase
@@ -22,9 +23,7 @@ class AddBalanceUpdateTest extends TestCase
         parent::setUp();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_mount_component_without_account_parameter(): void
     {
         $user = User::factory()->create();
@@ -37,9 +36,7 @@ class AddBalanceUpdateTest extends TestCase
             ->assertSee('Add Balance Update');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_mount_component_with_account_parameter(): void
     {
         $user = User::factory()->create();
@@ -71,9 +68,7 @@ class AddBalanceUpdateTest extends TestCase
             ->assertSee('Add Balance Update for Test Account');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_add_balance_update_for_manual_account(): void
     {
         $user = User::factory()->create();
@@ -114,7 +109,7 @@ class AddBalanceUpdateTest extends TestCase
             'integration_id' => $integration->id,
             'actor_id' => $account->id,
             'service' => 'manual_account',
-            'domain' => 'financial',
+            'domain' => 'money',
             'action' => 'had_balance',
             'value' => 150075, // 1500.75 * 100
             'value_multiplier' => 100,
@@ -128,9 +123,7 @@ class AddBalanceUpdateTest extends TestCase
         $this->assertEquals('Test Account', $event->event_metadata['account_name']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function cannot_add_balance_update_for_non_manual_account(): void
     {
         $user = User::factory()->create();
@@ -153,9 +146,7 @@ class AddBalanceUpdateTest extends TestCase
             ->call('save');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function cannot_add_balance_update_for_other_users_account(): void
     {
         $user1 = User::factory()->create();
@@ -191,9 +182,7 @@ class AddBalanceUpdateTest extends TestCase
             ->call('save');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function validation_requires_all_required_fields(): void
     {
         $user = User::factory()->create();
@@ -207,9 +196,7 @@ class AddBalanceUpdateTest extends TestCase
             ->assertHasErrors(['accountId', 'balance', 'date']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_change_preselected_account(): void
     {
         $user = User::factory()->create();
@@ -241,9 +228,7 @@ class AddBalanceUpdateTest extends TestCase
             ->assertSet('isAccountPreselected', false);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function only_manual_accounts_are_available_in_dropdown(): void
     {
         $user = User::factory()->create();

@@ -300,7 +300,7 @@
                             @if ($search || $accountTypeFilter || $providerFilter)
                                 Try adjusting your filters or search terms.
                             @else
-                                Get started by adding your first financial account.
+                                Get started by adding your first account.
                             @endif
                         </p>
                         @if (!$search && !$accountTypeFilter && !$providerFilter)

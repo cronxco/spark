@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -22,9 +23,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->mockSpotifyApi();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_plugin_can_be_initialized()
     {
         // Note: when SpotifyPlugin migrates fully to IntegrationGroup, update this test
@@ -39,9 +38,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertEquals($user->id, $integration->user_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_plugin_has_correct_metadata()
     {
         $this->assertEquals('spotify', SpotifyPlugin::getIdentifier());
@@ -53,9 +50,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertStringContainsString('listening', $description);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_plugin_has_configuration_schema()
     {
         $schema = SpotifyPlugin::getConfigurationSchema();
@@ -66,9 +61,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertArrayHasKey('include_album_art', $schema);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_plugin_requires_correct_scopes()
     {
         $plugin = new SpotifyPlugin;
@@ -83,9 +76,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertStringContainsString('user-read-private', $scopes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_plugin_can_process_track_play()
     {
         $user = User::factory()->create();
@@ -147,7 +138,7 @@ class SpotifyIntegrationTest extends TestCase
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('spotify', $event->service);
-        $this->assertEquals('entertainment', $event->domain);
+        $this->assertEquals('media', $event->domain);
         $this->assertEquals('played', $event->action);
         $this->assertEquals(180000, $event->value);
         $this->assertEquals('milliseconds', $event->value_unit);
@@ -201,9 +192,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertNotNull($popularityTag);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_plugin_prevents_duplicate_events()
     {
         $user = User::factory()->create();

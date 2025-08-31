@@ -10,15 +10,14 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CheckIntegrationUpdatesJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_dispatches_processing_jobs_for_integrations_that_need_updating()
     {
         Queue::fake();
@@ -48,7 +47,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'user_id' => $user->id,
             'service' => 'spotify',
             'integration_group_id' => $group2->id,
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
         ]);
 
@@ -62,7 +61,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'user_id' => $user->id,
             'service' => 'slack',
             'integration_group_id' => $group3->id,
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
@@ -89,9 +88,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         // The job dispatching logic is tested in the integration tests
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_skips_integrations_that_are_currently_processing()
     {
         Queue::fake();
@@ -119,9 +116,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertNotPushed(ProcessIntegrationData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_skips_integrations_that_were_recently_triggered()
     {
         Queue::fake();
@@ -138,7 +133,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'user_id' => $user->id,
             'service' => 'github',
             'integration_group_id' => $group->id,
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
             'last_triggered_at' => Carbon::now()->subMinutes(5), // Recently triggered
         ]);
@@ -150,9 +145,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertNotPushed(ProcessIntegrationData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integrations_without_access_token()
     {
         Queue::fake();
@@ -179,9 +172,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertNotPushed(ProcessIntegrationData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_empty_result_set()
     {
         Queue::fake();

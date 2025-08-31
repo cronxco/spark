@@ -18,7 +18,6 @@ return new class extends Migration
             $table->text('account_id')->nullable();
             $table->text('instance_type')->nullable();
             $table->jsonb('configuration')->nullable();
-            $table->integer('update_frequency_minutes')->default(15);
             $table->timestampTz('last_triggered_at')->nullable();
             $table->timestampTz('last_successful_update_at')->nullable();
             $table->string('migration_batch_id', 36)->nullable();

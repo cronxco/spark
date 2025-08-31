@@ -10,13 +10,12 @@ use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MigrationJobsTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function onboarding_can_trigger_migration_with_optional_timebox(): void
     {
         $this->withoutExceptionHandling();
@@ -53,9 +52,7 @@ class MigrationJobsTest extends TestCase
         Queue::assertPushedOn('migration', StartIntegrationMigration::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_integration_page_respects_timebox_and_stops(): void
     {
         Bus::fake();
@@ -72,8 +69,7 @@ class MigrationJobsTest extends TestCase
             'service' => 'spotify',
             'name' => 'Listening',
             'instance_type' => 'listening',
-            'configuration' => [],
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         $context = [
@@ -88,9 +84,7 @@ class MigrationJobsTest extends TestCase
         Bus::assertNothingDispatched();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function spotify_fetch_handles_429_and_redispatches(): void
     {
         Queue::fake();
@@ -110,8 +104,7 @@ class MigrationJobsTest extends TestCase
             'service' => 'spotify',
             'name' => 'Listening',
             'instance_type' => 'listening',
-            'configuration' => [],
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         $context = [
@@ -125,9 +118,7 @@ class MigrationJobsTest extends TestCase
         Queue::assertPushedOn('migration', FetchIntegrationPage::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function github_fetch_paginates_and_chains_processing(): void
     {
         Bus::fake();
@@ -155,8 +146,8 @@ class MigrationJobsTest extends TestCase
             'configuration' => [
                 'repositories' => ['org/repo'],
                 'events' => ['push'],
+                'update_frequency_minutes' => 15,
             ],
-            'update_frequency_minutes' => 15,
         ]);
 
         $context = [
@@ -173,9 +164,7 @@ class MigrationJobsTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_handles_429_and_empty_window(): void
     {
         // First call 429, then empty window -> final stop

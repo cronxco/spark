@@ -7,6 +7,7 @@ use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 //
 use Tests\TestCase;
 
@@ -21,9 +22,7 @@ class AppleHealthIntegrationTest extends TestCase
         PluginRegistry::register(AppleHealthPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_ingests_workouts_creating_event_and_blocks(): void
     {
         $user = User::factory()->create();
@@ -58,24 +57,22 @@ class AppleHealthIntegrationTest extends TestCase
             ],
         ];
 
-        $resp = $this->postJson(route('webhook.handle', ['service' => 'apple-health', 'secret' => $group->account_id]), $payload);
+        $resp = $this->postJson(route('webhook.handle', ['service' => 'apple_health', 'secret' => $group->account_id]), $payload);
         $resp->assertStatus(200);
 
         $this->assertDatabaseHas('events', [
             'integration_id' => $workouts->id,
-            'service' => 'apple-health',
-            'domain' => 'fitness',
+            'service' => 'apple_health',
+            'domain' => 'health',
             'action' => 'completed_workout',
         ]);
 
-        $event = Event::where('integration_id', $workouts->id)->where('domain', 'fitness')->first();
+        $event = Event::where('integration_id', $workouts->id)->where('domain', 'health')->first();
         $this->assertNotNull($event);
         $this->assertTrue($event->blocks()->count() >= 1);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_ingests_metrics_creating_events(): void
     {
         $user = User::factory()->create();
@@ -109,13 +106,13 @@ class AppleHealthIntegrationTest extends TestCase
             ],
         ];
 
-        $resp = $this->postJson(route('webhook.handle', ['service' => 'apple-health', 'secret' => $group->account_id]), $payload);
+        $resp = $this->postJson(route('webhook.handle', ['service' => 'apple_health', 'secret' => $group->account_id]), $payload);
         $resp->assertStatus(200);
 
         $this->assertDatabaseHas('events', [
             'integration_id' => $metrics->id,
-            'service' => 'apple-health',
-            'domain' => 'fitness',
+            'service' => 'apple_health',
+            'domain' => 'health',
             'action' => 'measurement',
         ]);
     }

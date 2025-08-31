@@ -99,6 +99,7 @@ class GitHubPlugin extends OAuthPlugin
             'activity' => [
                 'label' => 'Activity',
                 'schema' => self::getConfigurationSchema(),
+                'mandatory' => true,
             ],
         ];
     }
@@ -115,7 +116,7 @@ class GitHubPlugin extends OAuthPlugin
 
     public static function getDomain(): string
     {
-        return 'productivity';
+        return 'online';
     }
 
     public static function getActionTypes(): array
@@ -287,7 +288,10 @@ class GitHubPlugin extends OAuthPlugin
 
     public function handleWebhook(Request $request, Integration $integration): void
     {
+        // Log the webhook payload
         $payload = $request->all();
+        $headers = $request->headers->all();
+        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $payload, $headers);
 
         // Verify GitHub webhook signature
         if (! $this->verifyGitHubSignature($request, $integration)) {

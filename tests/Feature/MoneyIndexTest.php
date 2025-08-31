@@ -11,6 +11,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MoneyIndexTest extends TestCase
@@ -22,9 +23,7 @@ class MoneyIndexTest extends TestCase
         parent::setUp();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_index_displays_service_column(): void
     {
         $user = User::factory()->create();
@@ -57,9 +56,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('Provider');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_index_shows_manual_accounts_with_correct_service(): void
     {
         $user = User::factory()->create();
@@ -92,9 +89,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('current_account');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_index_shows_monzo_accounts_with_correct_service(): void
     {
         $user = User::factory()->create();
@@ -120,9 +115,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('current_account');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_index_shows_gocardless_accounts_with_correct_service(): void
     {
         $user = User::factory()->create();
@@ -148,9 +141,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('current_account');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_index_shows_all_account_types(): void
     {
         $user = User::factory()->create();
@@ -212,18 +203,14 @@ class MoneyIndexTest extends TestCase
             ->assertSee('GoCardless');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_index_requires_authentication(): void
     {
         $response = $this->get('/money');
         $response->assertRedirect('/login');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_show_view_displays_account_details_correctly(): void
     {
         $user = User::factory()->create();
@@ -253,9 +240,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('Current Account'); // Account type
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_show_view_displays_monzo_pot_with_title(): void
     {
         $user = User::factory()->create();
@@ -286,9 +271,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('Savings Account'); // Account type
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_show_view_displays_manual_account_with_metadata_name(): void
     {
         $user = User::factory()->create();
@@ -322,9 +305,7 @@ class MoneyIndexTest extends TestCase
             ->assertSee('Current Account'); // Account type
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_show_view_requires_authentication(): void
     {
         // Create a mock account
@@ -341,9 +322,7 @@ class MoneyIndexTest extends TestCase
         $response->assertRedirect('/login');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function money_show_view_prevents_access_to_other_users_accounts(): void
     {
         $user1 = User::factory()->create();

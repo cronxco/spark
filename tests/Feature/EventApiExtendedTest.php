@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class EventApiExtendedTest extends TestCase
@@ -28,9 +29,7 @@ class EventApiExtendedTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_list_events()
     {
         Sanctum::actingAs($this->user);
@@ -73,9 +72,7 @@ class EventApiExtendedTest extends TestCase
         $this->assertCount(2, $response->json('data'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_events_by_service()
     {
         Sanctum::actingAs($this->user);
@@ -97,9 +94,7 @@ class EventApiExtendedTest extends TestCase
         $this->assertEquals('test-service', $response->json('data.0.service'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_events_by_domain()
     {
         Sanctum::actingAs($this->user);
@@ -121,9 +116,7 @@ class EventApiExtendedTest extends TestCase
         $this->assertEquals('test-domain', $response->json('data.0.domain'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_get_specific_event()
     {
         Sanctum::actingAs($this->user);
@@ -141,9 +134,7 @@ class EventApiExtendedTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_access_other_users_event()
     {
         Sanctum::actingAs($this->user);
@@ -162,9 +153,7 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_update_event()
     {
         Sanctum::actingAs($this->user);
@@ -195,9 +184,7 @@ class EventApiExtendedTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_update_other_users_event()
     {
         Sanctum::actingAs($this->user);
@@ -218,9 +205,7 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_delete_event()
     {
         Sanctum::actingAs($this->user);
@@ -251,9 +236,7 @@ class EventApiExtendedTest extends TestCase
         $this->assertNotNull($deletedBlock->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_delete_other_users_event()
     {
         Sanctum::actingAs($this->user);
@@ -272,9 +255,7 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unauthenticated_user_cannot_access_events()
     {
         $response = $this->getJson('/api/events');
@@ -292,9 +273,7 @@ class EventApiExtendedTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_are_paginated()
     {
         Sanctum::actingAs($this->user);
@@ -319,9 +298,7 @@ class EventApiExtendedTest extends TestCase
         $this->assertEquals(20, $response->json('total'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_specify_per_page()
     {
         Sanctum::actingAs($this->user);

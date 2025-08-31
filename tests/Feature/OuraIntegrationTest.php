@@ -9,6 +9,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -16,9 +17,7 @@ class OuraIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_plugin_has_correct_metadata_and_scopes(): void
     {
         $this->assertEquals('oura', OuraPlugin::getIdentifier());
@@ -41,9 +40,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertStringContainsString('spo2', $scopes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_plugin_can_initialize_group_and_instance(): void
     {
         $user = User::factory()->create();
@@ -61,9 +58,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertEquals('oura', $instance->service);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_daily_activity_creates_event_and_blocks(): void
     {
         $user = User::factory()->create();
@@ -143,9 +138,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($blocks->where('title', 'Cal Total')->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_sleep_records_creates_event_with_stages_and_avg_hr(): void
     {
         $user = User::factory()->create();
@@ -201,9 +194,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($blocks->where('title', 'Average Heart Rate')->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_heartrate_series_creates_daily_event_with_min_max_blocks(): void
     {
         $user = User::factory()->create();
@@ -243,9 +234,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($event->blocks->where('title', 'Max Heart Rate')->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_workouts_creates_event_seconds_and_blocks(): void
     {
         $user = User::factory()->create();
@@ -288,9 +277,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($event->blocks->where('title', 'Average Heart Rate')->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_sessions_creates_event_seconds_and_mindfulness_concept(): void
     {
         $user = User::factory()->create();
@@ -330,9 +317,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertEquals('seconds', $event->value_unit);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_fetch_tags_creates_event_and_tag_block(): void
     {
         $user = User::factory()->create();
@@ -370,9 +355,7 @@ class OuraIntegrationTest extends TestCase
         $this->assertNotNull($event->blocks->where('title', 'Tag')->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oura_daily_readiness_resilience_stress_spo2_actions(): void
     {
         $user = User::factory()->create();

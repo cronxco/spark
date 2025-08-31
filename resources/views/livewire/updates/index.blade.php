@@ -68,7 +68,7 @@ new class extends Component {
                 'name' => $integration->name ?: $integration->service,
                 'service' => $integration->service,
                 'account_id' => $integration->account_id,
-                'update_frequency_minutes' => $integration->update_frequency_minutes,
+                'update_frequency_minutes' => $integration->getUpdateFrequencyMinutes(),
                 'last_triggered_at' => $integration->last_triggered_at ? $integration->last_triggered_at->toISOString() : null,
                 'last_successful_update_at' => $integration->last_successful_update_at ? $integration->last_successful_update_at->toISOString() : null,
                 'needs_update' => $integration->needsUpdate(),
@@ -188,9 +188,31 @@ new class extends Component {
                                                         {{ $integration['name'] }}
                                                     </a>
                                                 </h4>
-                                                <p class="text-sm text-base-content/70">{{ ucfirst($integration['service']) }}</p>
+                                                <span class="text-sm text-base-content/70">
+                                                    {{ \Illuminate\Support\Str::of($integration['service'])->replace('_', ' ')->title() }}
+                                                </span>
+                                                @if ($integration['service'] === 'monzo'
+                                                && !is_null($integration['migration_progress'])
+                                                && $integration['migration_progress'] < 100
+                                                && $integration['migration_fetched_back_to'])
+                                                    <span class="text-xs text-base-content/70">
+                                                        {{ __('Fetched to') }}: {{ $integration['migration_fetched_back_to'] }}
+                                                    </span>
+                                                @endif
+                                                @if ($integration['account_id'])
+                                                    <span class="text-xs text-base-content/70 mb-3">
+                                                        {{ __('Account') }}: {{ $integration['account_id'] }}
+                                                    </span>
+                                                @endif
                                             </div>
                                         </div>
+
+                                        @php
+                                            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration['service']);
+                                            $isWebhook = $pluginClass && $pluginClass::getServiceType() === 'webhook';
+                                            $isManual = $pluginClass && $pluginClass::getServiceType() === 'manual';
+                                            $showScheduledUpdates = !$isWebhook && !$isManual;
+                                        @endphp
 
                                         <div class="flex items-center space-x-3">
                                             @if ($integration['is_processing'])
@@ -198,12 +220,18 @@ new class extends Component {
                                                     <x-loading class="loading-spinner loading-sm" />
                                                     <x-badge value="{{ __('Processing') }}" class="badge-outline badge-info badge-sm" />
                                                 </div>
-                                            @else
+                                            @elseif ($showScheduledUpdates)
                                                 <x-badge
                                                     :value="$integration['status'] === 'needs_update' ? __('Needs Update') : __('Up to Date')"
                                                     :class="$integration['status'] === 'needs_update' ? 'badge-outline badge-warning' : 'badge-outline badge-success'"
                                                     class="badge-sm"
                                                 />
+                                            @else
+                                                @if ($isWebhook)
+                                                    <x-badge value="{{ __('Push') }}" class="badge-outline badge-info badge-sm" />
+                                                @elseif ($isManual)
+                                                    <x-badge value="{{ __('Manual') }}" class="badge-outline badge-success badge-sm" />
+                                                @endif
                                             @endif
 
                                             @if (!is_null($integration['migration_progress']))
@@ -223,7 +251,7 @@ new class extends Component {
                                                 @endif
                                             @endif
 
-                                            @if (!$integration['is_processing'] && $integration['status'] === 'needs_update')
+                                            @if ($showScheduledUpdates && !$integration['is_processing'] && $integration['status'] === 'needs_update')
                                                 <x-button
                                                     label="{{ __('Update') }}"
                                                     icon="o-arrow-path"
@@ -235,23 +263,16 @@ new class extends Component {
                                         </div>
                                     </div>
 
-                                    @if ($integration['service'] === 'monzo'
-                                        && !is_null($integration['migration_progress'])
-                                        && $integration['migration_progress'] < 100
-                                        && $integration['migration_fetched_back_to'])
-                                        <div class="mt-1 text-xs text-base-content/60 flex flex-wrap items-center gap-x-2">
-                                            <span>{{ __('Fetched to') }}: {{ $integration['migration_fetched_back_to'] }}</span>
-                                        </div>
-                                    @endif
 
-                                    @if ($integration['account_id'])
-                                        <div class="text-sm text-base-content/70 mb-3">
-                                            <x-icon name="fas.user" class="w-3 h-3 inline mr-1" />
-                                            {{ __('Account') }}: {{ $integration['account_id'] }}
-                                        </div>
-                                    @endif
 
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+
+                                    @php
+                                        $showUpdateFrequency = !$isWebhook && !$isManual;
+                                    @endphp
+
+                                    @if ($showScheduledUpdates)
+                                    <div class="grid grid-cols-1 {{ $showUpdateFrequency ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-4 text-sm">
+                                        @if ($showUpdateFrequency)
                                         <div class="bg-base-300 rounded-lg p-3">
                                             <div class="font-medium mb-1">{{ __('Update Frequency') }}</div>
                                             <div class="text-base-content/70">
@@ -269,6 +290,7 @@ new class extends Component {
                                                 @endphp
                                             </div>
                                         </div>
+                                        @endif
 
                                         <div class="bg-base-300 rounded-lg p-3">
                                             <div class="font-medium mb-1">{{ __('Last Update') }}</div>
@@ -292,6 +314,46 @@ new class extends Component {
                                             </div>
                                         </div>
                                     </div>
+                                    @else
+                                    <!-- Event-driven/Manual integrations section -->
+                                    <div class="bg-base-200 rounded-lg">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-2">
+                                            <div class="bg-base-300 rounded-lg p-3">
+                                                <div class="font-medium mb-1">
+                                                    @if ($isWebhook)
+                                                        {{ __('Last Data Received') }}
+                                                    @elseif ($isManual)
+                                                        {{ __('Last Entry') }}
+                                                    @endif
+                                                </div>
+                                                <div class="text-base-content/70">
+                                                    @if ($integration['last_successful_update_at'])
+                                                        {{ \Carbon\Carbon::parse($integration['last_successful_update_at'])->diffForHumans() }}
+                                                    @else
+                                                        <span class="text-warning">
+                                                            @if ($isWebhook)
+                                                                {{ __('No data received yet') }}
+                                                            @elseif ($isManual)
+                                                                {{ __('No entries yet') }}
+                                                            @endif
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-base-300 rounded-lg p-3">
+                                                <div class="font-medium mb-1">{{ __('Status') }}</div>
+                                                <div class="text-base-content/70">
+                                                    @if ($isWebhook)
+                                                        <span class="text-info">{{ __('Waiting for webhook events') }}</span>
+                                                    @elseif ($isManual)
+                                                        <span class="text-success">{{ __('Ready for manual entries') }}</span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @endif
 
                                     @if ($integration['last_triggered_at'] && $integration['last_triggered_at'] !== $integration['last_successful_update_at'])
                                         <div class="mt-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">

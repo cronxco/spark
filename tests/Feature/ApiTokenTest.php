@@ -5,15 +5,14 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ApiTokenTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_create_api_token()
     {
         $user = User::factory()->create();
@@ -34,9 +33,7 @@ class ApiTokenTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_list_their_tokens()
     {
         $user = User::factory()->create();
@@ -67,9 +64,7 @@ class ApiTokenTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_revoke_token()
     {
         $user = User::factory()->create();
@@ -91,9 +86,7 @@ class ApiTokenTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_revoke_nonexistent_token()
     {
         $user = User::factory()->create();
@@ -107,9 +100,7 @@ class ApiTokenTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unauthenticated_user_cannot_access_token_endpoints()
     {
         $response = $this->postJson('/api/tokens/create');

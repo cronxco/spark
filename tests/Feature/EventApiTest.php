@@ -9,24 +9,21 @@ use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class EventApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unauthenticated_users_cannot_create_events()
     {
         $response = $this->postJson('/api/events', []);
         $response->assertStatus(401);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function authenticated_user_can_create_event_with_objects_and_blocks()
     {
         $user = User::factory()->create();

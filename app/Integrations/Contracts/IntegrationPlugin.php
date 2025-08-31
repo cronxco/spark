@@ -51,7 +51,7 @@ interface IntegrationPlugin
     public static function getAccentColor(): string;
 
     /**
-     * Get the integration domain (e.g., 'fitness', 'health', 'financial', 'productivity')
+     * Get the integration domain (e.g., 'media', 'health', 'money', 'online')
      */
     public static function getDomain(): string;
 

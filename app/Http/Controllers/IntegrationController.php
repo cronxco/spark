@@ -377,6 +377,14 @@ class IntegrationController extends Controller
             'migration_timebox_minutes' => ['nullable', 'integer', 'min:1'],
         ];
 
+        // Ensure mandatory types are included
+        $mandatoryTypes = [];
+        foreach ($typesMeta as $typeKey => $typeMeta) {
+            if (($typeMeta['mandatory'] ?? false) === true) {
+                $mandatoryTypes[] = $typeKey;
+            }
+        }
+
         // Add per-field rules based on schema for each allowed type
         foreach ($allowedTypes as $typeKey) {
             $schema = $typesMeta[$typeKey]['schema'] ?? [];
@@ -406,19 +414,25 @@ class IntegrationController extends Controller
         }
 
         $data = $request->validate($rules);
+
+        // Ensure mandatory types are included
+        $selectedTypes = $data['types'];
+        foreach ($mandatoryTypes as $mandatoryType) {
+            if (! in_array($mandatoryType, $selectedTypes)) {
+                $selectedTypes[] = $mandatoryType;
+            }
+        }
+        $data['types'] = $selectedTypes;
+
         // Read optional migration timebox from validated data
         $timeboxMinutes = $data['migration_timebox_minutes'] ?? null;
 
         // Only keep config entries for selected types
-        $selectedTypes = $data['types'];
         $data['config'] = Arr::only(($data['config'] ?? []), $selectedTypes);
         foreach ($data['types'] as $type) {
             $initial = $data['config'][$type] ?? [];
-            // Extract frequency to instance column if present
-            $frequency = $initial['update_frequency_minutes'] ?? null;
-            if (array_key_exists('update_frequency_minutes', $initial)) {
-                unset($initial['update_frequency_minutes']);
-            }
+            // Keep update_frequency_minutes in configuration
+            // The database column is now optional and will be read from configuration
             // Normalize schema-declared array fields that may arrive as strings
             $schemaForType = $typesMeta[$type]['schema'] ?? [];
             foreach ($schemaForType as $field => $fieldConfig) {
@@ -460,10 +474,6 @@ class IntegrationController extends Controller
                         $instance = $plugin->createInstance($group, $type, $instanceConfig);
                         $instance->update(['name' => $customName]);
 
-                        if ($frequency !== null) {
-                            $instance->update(['update_frequency_minutes' => (int) $frequency]);
-                        }
-
                         // Optional historical migration trigger
                         if ($request->boolean('run_migration')) {
                             $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
@@ -481,9 +491,6 @@ class IntegrationController extends Controller
                     $instance = $plugin->createInstance($group, $type, $initial);
                     if ($customName) {
                         $instance->update(['name' => $customName]);
-                    }
-                    if ($frequency !== null) {
-                        $instance->update(['update_frequency_minutes' => (int) $frequency]);
                     }
 
                     // Optional historical migration trigger

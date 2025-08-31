@@ -52,33 +52,7 @@ new class extends Component {
 
     public function formatAction($action)
     {
-        // Convert snake_case to title case
-        $formatted = Str::headline($action);
-
-        // Keep certain words lowercase for natural language flow
-        $wordsToLowercase = ['To', 'For', 'From', 'In', 'On', 'At', 'By', 'With', 'Of', 'The', 'A', 'An'];
-        foreach ($wordsToLowercase as $word) {
-            $formatted = str_replace(" $word ", " " . strtolower($word) . " ", $formatted);
-        }
-
-        return $formatted;
-    }
-
-    public function needsPreposition($action)
-    {
-        $actionLower = strtolower($action);
-
-        // Check if the action already contains a preposition
-        $prepositions = ['_to', '_for', '_from', '_in', '_on', '_at', '_by', '_with', '_of'];
-
-        foreach ($prepositions as $preposition) {
-            if (str_ends_with($actionLower, $preposition)) {
-                return false; // Action already has a preposition, don't add another
-            }
-        }
-
-        // If no preposition found, we need to add "to" for most actions
-        return true;
+        return format_action_title($action);
     }
 
     public function formatJson($data)
@@ -225,11 +199,7 @@ new class extends Component {
                                 <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2 leading-tight">
                                     {{ $this->formatAction($this->event->action) }}
                                     @if ($this->event->target)
-                                        @if ($this->needsPreposition($this->event->action))
-                                            to {{ $this->event->target->title }}
-                                        @else
                                             {{ $this->event->target->title }}
-                                        @endif
                                     @elseif ($this->event->actor)
                                         {{ $this->event->actor->title }}
                                     @endif
@@ -384,7 +354,7 @@ new class extends Component {
                                                     <span class="font-medium">
                                                         {{ $this->formatAction($relatedEvent->action) }}
                                                         @if ($relatedEvent->target)
-                                                            to {{ $relatedEvent->target->title }}
+                                                            {{ $relatedEvent->target->title }}
                                                         @elseif ($relatedEvent->actor)
                                                             {{ $relatedEvent->actor->title }}
                                                         @endif

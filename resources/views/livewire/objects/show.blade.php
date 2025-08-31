@@ -38,16 +38,7 @@ new class extends Component {
 
     public function formatAction($action)
     {
-        // Convert snake_case to title case
-        $formatted = Str::headline($action);
-
-        // Keep certain words lowercase for natural language flow
-        $wordsToLowercase = ['To', 'For', 'From', 'In', 'On', 'At', 'By', 'With', 'Of', 'The', 'A', 'An'];
-        foreach ($wordsToLowercase as $word) {
-            $formatted = str_replace(" $word ", " " . strtolower($word) . " ", $formatted);
-        }
-
-        return $formatted;
+        return format_action_title($action);
     }
 
     public function formatJson($data)

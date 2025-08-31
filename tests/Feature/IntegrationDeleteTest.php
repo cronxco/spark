@@ -7,15 +7,14 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class IntegrationDeleteTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_delete_their_integration(): void
     {
         $user = User::factory()->create();
@@ -37,9 +36,7 @@ class IntegrationDeleteTest extends TestCase
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_delete_other_users_integration(): void
     {
         $user = User::factory()->create();
@@ -60,9 +57,7 @@ class IntegrationDeleteTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_delete_nonexistent_integration(): void
     {
         $user = User::factory()->create();
@@ -76,9 +71,7 @@ class IntegrationDeleteTest extends TestCase
         $this->assertTrue(true, 'Component should handle nonexistent integration gracefully');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function delete_integration_shows_success_message(): void
     {
         $user = User::factory()->create();
@@ -101,9 +94,7 @@ class IntegrationDeleteTest extends TestCase
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function delete_integration_refreshes_data(): void
     {
         $user = User::factory()->create();
@@ -129,9 +120,7 @@ class IntegrationDeleteTest extends TestCase
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deleting_last_integration_soft_deletes_group(): void
     {
         $user = User::factory()->create();
@@ -156,9 +145,7 @@ class IntegrationDeleteTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deleting_non_last_integration_does_not_delete_group(): void
     {
         $user = User::factory()->create();

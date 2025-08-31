@@ -12,7 +12,7 @@ class FinancialPlugin extends ManualPlugin
 {
     public static function getIdentifier(): string
     {
-        return 'financial';
+        return 'manual_account';
     }
 
     public static function getDisplayName(): string
@@ -22,7 +22,7 @@ class FinancialPlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Manually track your financial accounts including mortgages, savings, investments, and current accounts.';
+        return 'Manually track your accounts including mortgages, savings, investments, and current accounts.';
     }
 
     public static function getConfigurationSchema(): array
@@ -31,7 +31,7 @@ class FinancialPlugin extends ManualPlugin
             'account_type' => [
                 'type' => 'select',
                 'label' => 'Account Type',
-                'description' => 'The type of financial account',
+                'description' => 'The type of account',
                 'options' => [
                     'current_account' => 'Current Account',
                     'savings_account' => 'Savings Account',
@@ -138,7 +138,7 @@ class FinancialPlugin extends ManualPlugin
 
     public static function getDomain(): string
     {
-        return 'financial';
+        return 'money';
     }
 
     public static function getActionTypes(): array

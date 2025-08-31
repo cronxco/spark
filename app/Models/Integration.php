@@ -27,7 +27,6 @@ class Integration extends Model
         'instance_type',
         'account_id',
         'configuration',
-        'update_frequency_minutes',
         'last_triggered_at',
         'last_successful_update_at',
         'migration_batch_id',
@@ -45,12 +44,14 @@ class Integration extends Model
 
     /**
      * Get integrations that need updating
+     * Note: This scope is approximate since update_frequency_minutes is now in configurationa
+     * For exact filtering, use the needsUpdate() method on individual models
      */
     public static function scopeNeedsUpdate($query)
     {
         return $query->where(function ($q) {
             $q->whereNull('last_successful_update_at')
-                ->orWhereRaw('last_successful_update_at + INTERVAL \'1 minute\' * update_frequency_minutes < NOW()');
+                ->orWhereRaw('last_successful_update_at + INTERVAL \'1 minute\' * 15 < NOW()');
         });
     }
 
@@ -108,6 +109,16 @@ class Integration extends Model
         });
     }
 
+    /**
+     * Get the update frequency in minutes from configuration
+     */
+    public function getUpdateFrequencyMinutes(): int
+    {
+        $config = $this->configuration ?? [];
+
+        return $config['update_frequency_minutes'] ?? 15;
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -129,7 +140,7 @@ class Integration extends Model
         }
 
         // Check if enough time has passed since last successful update
-        $nextUpdateTime = $this->last_successful_update_at->addMinutes($this->update_frequency_minutes);
+        $nextUpdateTime = $this->last_successful_update_at->addMinutes($this->getUpdateFrequencyMinutes());
 
         return now()->isAfter($nextUpdateTime);
     }
@@ -143,7 +154,7 @@ class Integration extends Model
             return null;
         }
 
-        return $this->last_successful_update_at->addMinutes($this->update_frequency_minutes);
+        return $this->last_successful_update_at->addMinutes($this->getUpdateFrequencyMinutes());
     }
 
     /**
@@ -186,7 +197,7 @@ class Integration extends Model
 
         // Bound the "processing" window to avoid indefinite lockout if a job fails/crashes.
         // Use update_frequency_minutes where available, clamped to [5, 30] minutes.
-        $windowMinutes = (int) ($this->update_frequency_minutes ?? 15);
+        $windowMinutes = (int) $this->getUpdateFrequencyMinutes();
         $windowMinutes = max(5, min(30, $windowMinutes));
 
         $triggerIsRecent = $this->last_triggered_at->gt(now()->subMinutes($windowMinutes));

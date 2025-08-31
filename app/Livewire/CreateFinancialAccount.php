@@ -42,7 +42,7 @@ class CreateFinancialAccount extends Component
 
         // Get or create the financial integration group
         $group = IntegrationGroup::where('user_id', Auth::id())
-            ->where('service', 'financial')
+            ->where('service', 'manual_account')
             ->first();
 
         if (! $group) {

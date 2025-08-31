@@ -3,13 +3,20 @@
 namespace Tests\Feature;
 
 use App\Integrations\PluginRegistry;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class IntegrationConfigurationTest extends TestCase
 {
-    /**
-     * @test
-     */
+    private array $validDomains;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->validDomains = PluginRegistry::getValidDomains();
+    }
+
+    #[Test]
     public function all_plugins_have_required_configuration_methods(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -24,9 +31,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugins_return_valid_icon_strings(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -38,9 +43,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugins_return_valid_accent_colors(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -53,25 +56,20 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugins_return_valid_domain(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
-        $validDomains = ['fitness', 'health', 'financial', 'productivity', 'social', 'development', 'music', 'communication', 'entertainment'];
 
         foreach ($plugins as $pluginClass) {
             $domain = $pluginClass::getDomain();
             $this->assertIsString($domain, "Plugin {$pluginClass} getDomain must return a string");
             $this->assertNotEmpty($domain, "Plugin {$pluginClass} getDomain must not be empty");
-            $this->assertContains($domain, $validDomains, "Plugin {$pluginClass} getDomain must be a valid domain");
+            $this->assertContains($domain, $this->validDomains, "Plugin {$pluginClass} getDomain must be a valid domain");
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugins_return_valid_action_types(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -110,9 +108,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugins_return_valid_block_types(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -151,9 +147,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugins_return_valid_object_types(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -185,9 +179,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_get_plugins_with_config(): void
     {
         $pluginsWithConfig = PluginRegistry::getPluginsWithConfig();
@@ -208,9 +200,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_get_plugin_config(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -229,9 +219,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function block_types_are_consistent_across_plugins(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -249,9 +237,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function action_types_are_consistent_across_plugins(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -269,9 +255,7 @@ class IntegrationConfigurationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function object_types_are_consistent_across_plugins(): void
     {
         $plugins = PluginRegistry::getAllPlugins();

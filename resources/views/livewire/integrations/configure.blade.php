@@ -35,7 +35,7 @@ new class extends Component {
 
         // Ensure update_frequency_minutes is in configuration if it exists in schema
         if (isset($this->schema['update_frequency_minutes'])) {
-            $this->configuration['update_frequency_minutes'] = $integration->update_frequency_minutes ?? 15;
+            $this->configuration['update_frequency_minutes'] = $integration->getUpdateFrequencyMinutes();
         }
 
         // Ensure array fields are properly initialized as arrays
@@ -85,15 +85,11 @@ new class extends Component {
 
             // Process the current configuration state
             foreach ($this->configuration as $field => $value) {
-                if ($field === 'update_frequency_minutes') {
-                    $updateData['update_frequency_minutes'] = $value;
+                // Handle array fields that might come as strings
+                if (isset($this->schema[$field]) && $this->schema[$field]['type'] === 'array' && is_string($value)) {
+                    $updateData['configuration'][$field] = array_filter(array_map('trim', explode(',', $value)));
                 } else {
-                    // Handle array fields that might come as strings
-                    if (isset($this->schema[$field]) && $this->schema[$field]['type'] === 'array' && is_string($value)) {
-                        $updateData['configuration'][$field] = array_filter(array_map('trim', explode(',', $value)));
-                    } else {
-                        $updateData['configuration'][$field] = $value;
-                    }
+                    $updateData['configuration'][$field] = $value;
                 }
             }
 
@@ -179,6 +175,12 @@ new class extends Component {
                 <!-- Configuration Form -->
                 <form wire:submit="updateConfiguration" class="space-y-6">
                     @foreach ($schema as $field => $config)
+                        @php
+                            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration->service);
+                            $isWebhook = $pluginClass && $pluginClass::getServiceType() === 'webhook';
+                            $shouldHideField = $isWebhook && $field === 'update_frequency_minutes';
+                        @endphp
+                        @if (!$shouldHideField)
                         <div class="p-4 bg-base-200 rounded-lg">
                             <div class="mb-4">
                                 <h4 class="text-lg font-medium">{{ $config['label'] }}</h4>
@@ -234,6 +236,7 @@ new class extends Component {
                                 @enderror
                             </div>
                         </div>
+                        @endif
                     @endforeach
 
                     <div class="flex justify-end space-x-3 pt-6 border-t border-base-300">

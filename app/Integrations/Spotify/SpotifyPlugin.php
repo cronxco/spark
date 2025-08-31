@@ -118,7 +118,7 @@ class SpotifyPlugin extends OAuthPlugin
 
     public static function getDomain(): string
     {
-        return 'entertainment';
+        return 'media';
     }
 
     public static function getActionTypes(): array

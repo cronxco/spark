@@ -9,15 +9,14 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class HevyIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function hevy_plugin_has_correct_metadata_and_service_type(): void
     {
         $this->assertEquals('hevy', HevyPlugin::getIdentifier());
@@ -25,9 +24,7 @@ class HevyIntegrationTest extends TestCase
         $this->assertEquals('apikey', HevyPlugin::getServiceType());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function hevy_plugin_can_initialize_group_and_instance(): void
     {
         $user = User::factory()->create();
@@ -45,9 +42,7 @@ class HevyIntegrationTest extends TestCase
         $this->assertEquals('hevy', $instance->service);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function hevy_fetch_workouts_creates_event_and_set_blocks(): void
     {
         $user = User::factory()->create();
@@ -110,7 +105,7 @@ class HevyIntegrationTest extends TestCase
         $event = Event::where('integration_id', $integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('hevy', $event->service);
-        $this->assertEquals('fitness', $event->domain);
+        $this->assertEquals('health', $event->domain);
         $this->assertEquals('completed_workout', $event->action);
         $this->assertEquals('kg', $event->value_unit);
 

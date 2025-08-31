@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 abstract class WebhookPlugin implements IntegrationPlugin
@@ -54,13 +55,17 @@ abstract class WebhookPlugin implements IntegrationPlugin
 
     public function handleWebhook(Request $request, Integration $integration): void
     {
+        // Log the webhook payload
+        $payload = $request->all();
+        $headers = $request->headers->all();
+        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $payload, $headers);
+
         // Verify webhook signature if required
         if (! $this->verifyWebhookSignature($request, $integration)) {
             abort(401, 'Invalid webhook signature');
         }
 
         // Process the webhook payload
-        $payload = $request->all();
         $convertedData = $this->convertData($payload, $integration);
 
         // Create events, objects, and blocks
@@ -97,6 +102,64 @@ abstract class WebhookPlugin implements IntegrationPlugin
     {
         // Webhook plugins don't fetch data
         throw new Exception('Webhook plugins do not fetch data');
+    }
+
+    /**
+     * Log webhook payload for debugging
+     */
+    protected function logWebhookPayload(string $service, string $integrationId, array $payload, array $headers = []): void
+    {
+        log_integration_webhook(
+            $service,
+            $integrationId,
+            $this->sanitizeData($payload),
+            $this->sanitizeHeaders($headers),
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Sanitize headers for logging (remove sensitive data)
+     */
+    protected function sanitizeHeaders(array $headers): array
+    {
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token', 'x-signature', 'x-hub-signature'];
+        $sanitized = [];
+
+        foreach ($headers as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveHeaders)) {
+                $sanitized[$key] = ['[REDACTED]'];
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $value; // Headers are already arrays from Laravel
+            } else {
+                $sanitized[$key] = [$value];
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize data for logging (remove sensitive data)
+     */
+    protected function sanitizeData(array $data): array
+    {
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'signature'];
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveKeys)) {
+                $sanitized[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $this->sanitizeData($value);
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
     }
 
     protected function createEventsFromWebhook(array $convertedData, Integration $integration): void

@@ -6,15 +6,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AutheliaAuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_authenticate_via_authelia_and_is_created_if_new()
     {
         $socialiteUser = new SocialiteUser;
@@ -37,9 +36,7 @@ class AutheliaAuthTest extends TestCase
         $this->assertEquals('authelia@example.com', Auth::user()->email);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_authentication_fails_without_email()
     {
         $socialiteUser = new SocialiteUser;

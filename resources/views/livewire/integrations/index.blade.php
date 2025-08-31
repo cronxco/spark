@@ -51,7 +51,7 @@ new class extends Component {
                         'id' => (string) $integration->id,
                         'name' => $integration->name ?: $integration->service,
                         'instance_type' => $integration->instance_type,
-                        'update_frequency_minutes' => $integration->update_frequency_minutes,
+                        'update_frequency_minutes' => $integration->getUpdateFrequencyMinutes(),
                         'last_successful_update_at' => $integration->last_successful_update_at ? $integration->last_successful_update_at->toISOString() : null,
                         'needs_update' => $integration->needsUpdate(),
                         'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,

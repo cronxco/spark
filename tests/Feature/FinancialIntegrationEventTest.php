@@ -10,6 +10,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FinancialIntegrationEventTest extends TestCase
@@ -22,9 +23,7 @@ class FinancialIntegrationEventTest extends TestCase
         PluginRegistry::register(FinancialPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_create_manual_account_object(): void
     {
         $user = User::factory()->create();
@@ -57,9 +56,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals(2.5, $metadata['interest_rate']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_create_balance_event(): void
     {
         $user = User::factory()->create();
@@ -91,7 +88,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertInstanceOf(Event::class, $balanceEvent);
         $this->assertEquals($integration->id, $balanceEvent->integration_id);
         $this->assertEquals('manual_account', $balanceEvent->service);
-        $this->assertEquals('financial', $balanceEvent->domain);
+        $this->assertEquals('money', $balanceEvent->domain);
         $this->assertEquals('had_balance', $balanceEvent->action);
         $this->assertEquals(100050, $balanceEvent->value); // 1000.50 * 100
         $this->assertEquals(100, $balanceEvent->value_multiplier);
@@ -106,9 +103,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals('Test Bank', $eventMetadata['provider']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_manual_accounts_for_user(): void
     {
         $user = User::factory()->create();
@@ -143,9 +138,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertTrue($accounts->contains($account2));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_balance_events_for_account(): void
     {
         $user = User::factory()->create();
@@ -187,9 +180,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals((string) $event1->id, (string) $balanceEvents->last()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_latest_balance_for_account(): void
     {
         $user = User::factory()->create();
@@ -224,9 +215,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals(1100.00, $latestBalance->event_metadata['balance']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function manual_plugin_does_not_support_oauth(): void
     {
         $user = User::factory()->create();
@@ -238,9 +227,7 @@ class FinancialIntegrationEventTest extends TestCase
         $plugin->handleOAuthCallback(request(), $group);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function manual_plugin_does_not_support_webhooks(): void
     {
         $user = User::factory()->create();
@@ -255,9 +242,7 @@ class FinancialIntegrationEventTest extends TestCase
         $plugin->handleWebhook(request(), $integration);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function account_metadata_includes_integration_id(): void
     {
         $user = User::factory()->create();
@@ -280,9 +265,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals($integration->id, $accountObject->metadata['integration_id']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_manual_accounts_only_for_balance_updates(): void
     {
         $user = User::factory()->create();
@@ -335,9 +318,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertFalse($manualAccounts->contains($monzoAccount));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_all_financial_accounts_including_integrated_ones(): void
     {
         $user = User::factory()->create();
@@ -382,9 +363,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertTrue($allAccounts->contains($gocardlessAccount));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function balance_events_use_manual_account_service(): void
     {
         $user = User::factory()->create();
@@ -410,9 +389,7 @@ class FinancialIntegrationEventTest extends TestCase
         $this->assertEquals('manual_balance_' . $accountObject->id . '_2025-01-27', $balanceEvent->source_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_find_integration_by_metadata_or_name_fallback(): void
     {
         $user = User::factory()->create();

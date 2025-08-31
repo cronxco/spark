@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Carbon\Carbon;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class IntegrationUpdateFrequencyTest extends TestCase
@@ -20,57 +21,49 @@ class IntegrationUpdateFrequencyTest extends TestCase
         PluginRegistry::register(GitHubPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integration_needs_update_when_never_updated()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => null,
         ]);
 
         $this->assertTrue($integration->needsUpdate());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integration_needs_update_when_frequency_elapsed()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
         ]);
 
         $this->assertTrue($integration->needsUpdate());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integration_does_not_need_update_when_frequency_not_elapsed()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
         $this->assertFalse($integration->needsUpdate());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_next_update_time_returns_correct_time()
     {
         $user = User::factory()->create();
@@ -78,7 +71,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => $lastUpdate,
         ]);
 
@@ -88,25 +81,21 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertEquals($expectedTime->format('Y-m-d H:i:s'), $nextUpdate->format('Y-m-d H:i:s'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_next_update_time_returns_null_when_never_updated()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => null,
         ]);
 
         $this->assertNull($integration->getNextUpdateTime());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function mark_as_triggered_updates_last_triggered_at()
     {
         $user = User::factory()->create();
@@ -121,9 +110,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($integration->fresh()->last_triggered_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function mark_as_successfully_updated_updates_both_timestamps()
     {
         $user = User::factory()->create();
@@ -141,9 +128,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($fresh->last_successful_update_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function mark_as_failed_clears_triggered_state()
     {
         $user = User::factory()->create();
@@ -161,16 +146,14 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertNotNull($fresh->last_successful_update_at); // Should remain unchanged
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function is_processing_with_time_window()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         // Not processing initially
@@ -189,9 +172,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertTrue($integration->isProcessing());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function scope_needs_update_returns_correct_integrations()
     {
         $user = User::factory()->create();
@@ -207,7 +188,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration2 = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(20),
         ]);
 
@@ -215,20 +196,24 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $integration3 = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
             'last_successful_update_at' => Carbon::now()->subMinutes(10),
         ]);
 
+        // Test the scope (which uses approximate filtering)
         $needsUpdate = Integration::query()->needsUpdate()->get();
 
         $this->assertTrue($needsUpdate->contains($integration1));
         $this->assertTrue($needsUpdate->contains($integration2));
         $this->assertFalse($needsUpdate->contains($integration3));
+
+        // Test the individual method (which uses exact filtering)
+        $this->assertTrue($integration1->needsUpdate());
+        $this->assertTrue($integration2->needsUpdate());
+        $this->assertFalse($integration3->needsUpdate());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function scope_oauth_needs_update_returns_only_oauth_integrations()
     {
         $user = User::factory()->create();
@@ -253,16 +238,14 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertFalse($oauthNeedsUpdate->contains($webhookIntegration));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_configure_update_frequency()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 15,
+            'configuration' => ['update_frequency_minutes' => 15],
         ]);
 
         Livewire::actingAs($user)
@@ -275,14 +258,12 @@ class IntegrationUpdateFrequencyTest extends TestCase
             ->call('updateConfiguration');
 
         $integration->refresh();
-        $this->assertEquals(30, $integration->update_frequency_minutes);
+        $this->assertEquals(30, $integration->getUpdateFrequencyMinutes());
         $this->assertEquals(['owner/repo1'], $integration->configuration['repositories']);
         $this->assertEquals(['push'], $integration->configuration['events']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function update_frequency_validation_requires_minimum_one_minute()
     {
         $user = User::factory()->create();
@@ -307,16 +288,14 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertTrue(true, 'Component handles zero update frequency without crashing');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integration_index_shows_update_frequency_info()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 30,
+            'configuration' => ['update_frequency_minutes' => 30],
             'last_successful_update_at' => Carbon::now()->subMinutes(45),
         ]);
 
@@ -330,16 +309,14 @@ class IntegrationUpdateFrequencyTest extends TestCase
         $this->assertTrue(true, 'Integration index page loads successfully');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integration_index_shows_up_to_date_status()
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
-            'update_frequency_minutes' => 30,
+            'configuration' => ['update_frequency_minutes' => 30],
             'last_successful_update_at' => Carbon::now()->subMinutes(15),
         ]);
 
