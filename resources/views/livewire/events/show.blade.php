@@ -306,9 +306,11 @@ new class extends Component {
                                         @endif
                                     </div>
 
-                                    @php $text = is_array($block->metadata ?? null) ? ($block->metadata['text'] ?? null) : null; @endphp
-                                    @if ($text)
-                                        <p class="text-xs text-base-content/70 mb-2 line-clamp-2">{{ $text }}</p>
+                                    @php $meta = is_array($block->metadata ?? null) ? $block->metadata : []; @endphp
+                                    @if (!empty($meta))
+                                        <div class="mb-2">
+                                            <x-metadata-list :data="$meta" />
+                                        </div>
                                     @endif
 
                                     <div class="flex items-center gap-2 text-xs text-base-content/60">
