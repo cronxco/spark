@@ -169,8 +169,9 @@ class SpotifyIntegrationTest extends TestCase
 
         $trackDetailsBlock = $blocks->where('title', 'Track Details')->first();
         $this->assertNotNull($trackDetailsBlock);
-        $this->assertStringContainsString('Test Track', $trackDetailsBlock->content);
-        $this->assertStringContainsString('Test Artist', $trackDetailsBlock->content);
+        $this->assertIsArray($trackDetailsBlock->metadata);
+        $this->assertEquals('Test Track', $trackDetailsBlock->metadata['track'] ?? null);
+        $this->assertStringContainsString('Test Artist', $trackDetailsBlock->metadata['artists'] ?? '');
 
         // Verify tags were attached
         $tags = $event->tags;

@@ -205,28 +205,28 @@ class AppleHealthPlugin extends WebhookPlugin
 
         $blocks = [];
         // Summary block
-        $summaryLines = [];
+        $summaryMetadata = [];
         if ($distanceQty !== null && $distanceUnit) {
-            $summaryLines[] = "Distance: {$distanceQty} {$distanceUnit}";
+            $summaryMetadata['distance'] = "{$distanceQty} {$distanceUnit}";
         }
         if ($duration !== null) {
-            $summaryLines[] = "Duration: {$duration} s";
+            $summaryMetadata['duration'] = "{$duration} s";
         }
         if ($energyQty !== null && $energyUnit) {
-            $summaryLines[] = "Active energy: {$energyQty} {$energyUnit}";
+            $summaryMetadata['active_energy'] = "{$energyQty} {$energyUnit}";
         }
         if ($intensityQty !== null && $intensityUnit) {
-            $summaryLines[] = "Intensity: {$intensityQty} {$intensityUnit}";
+            $summaryMetadata['intensity'] = "{$intensityQty} {$intensityUnit}";
         }
         if ($location) {
-            $summaryLines[] = "Location: {$location}";
+            $summaryMetadata['location'] = "{$location}";
         }
-        if (! empty($summaryLines)) {
+        if (! empty($summaryMetadata)) {
             $blocks[] = [
                 'block_type' => 'summary',
                 'time' => $start,
                 'title' => 'Summary',
-                'content' => implode("\n", $summaryLines),
+                'metadata' => [$summaryMetadata],
             ];
         }
         // Distance block
@@ -236,7 +236,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'block_type' => 'distance',
                 'time' => $start,
                 'title' => 'Distance',
-                'content' => 'Distance covered in this workout',
+                'metadata' => [],
                 'value' => $encDistance,
                 'value_multiplier' => $distMult,
                 'value_unit' => $distanceUnit,
@@ -248,7 +248,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'block_type' => 'energy',
                 'time' => $start,
                 'title' => 'Active Energy',
-                'content' => 'Active energy burned during workout',
+                'metadata' => [],
                 'value' => $encEnergy,
                 'value_multiplier' => $energyMult,
                 'value_unit' => $energyUnit,
@@ -261,7 +261,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'block_type' => 'intensity',
                 'time' => $start,
                 'title' => 'Intensity',
-                'content' => 'Body weight–normalized intensity',
+                'metadata' => [],
                 'value' => $encIntensity,
                 'value_multiplier' => $intMult,
                 'value_unit' => $intensityUnit,
@@ -274,7 +274,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'block_type' => 'duration',
                 'time' => $start,
                 'title' => 'Duration',
-                'content' => 'Workout duration in seconds',
+                'metadata' => [],
                 'value' => $encDur,
                 'value_multiplier' => $durMult,
                 'value_unit' => 's',
@@ -343,7 +343,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 $blocks[] = [
                     'time' => $date,
                     'title' => $label,
-                    'content' => $label . ' value for ' . $name,
+                    'metadata' => ['text' => $label . ' value for ' . $name],
                     'value' => $bVal,
                     'value_multiplier' => $bMult,
                     'value_unit' => $unit,
@@ -354,7 +354,7 @@ class AppleHealthPlugin extends WebhookPlugin
             $blocks[] = [
                 'time' => $date,
                 'title' => 'Source',
-                'content' => (string) $point['source'],
+                'metadata' => ['text' => (string) $point['source']],
             ];
         }
 

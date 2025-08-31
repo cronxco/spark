@@ -89,8 +89,9 @@ new class extends Component {
                             @endif
                         </div>
 
-                        @if ($this->block->content)
-                            <p class="text-base-content/70 mb-4">{{ $this->block->content }}</p>
+                        @php $text = is_array($this->block->metadata ?? null) ? ($this->block->metadata['text'] ?? null) : null; @endphp
+                        @if ($text)
+                            <p class="text-base-content/70 mb-4">{{ $text }}</p>
                         @endif
 
                         <!-- Block Metadata -->
@@ -185,8 +186,9 @@ new class extends Component {
                                         <x-badge :value="$relatedBlock->formatted_value . ($relatedBlock->value_unit ? ' ' . $relatedBlock->value_unit : '')" class="badge-xs" />
                                     @endif
                                 </div>
-                                @if ($relatedBlock->content)
-                                    <p class="text-xs text-base-content/70 mb-2 line-clamp-2">{{ Str::limit($relatedBlock->content, 80) }}</p>
+                                @php $relText = is_array($relatedBlock->metadata ?? null) ? ($relatedBlock->metadata['text'] ?? null) : null; @endphp
+                                @if ($relText)
+                                    <p class="text-xs text-base-content/70 mb-2 line-clamp-2">{{ Str::limit($relText, 80) }}</p>
                                 @endif
                                 <div class="flex items-center gap-2 text-xs text-base-content/60">
                                     @if ($relatedBlock->time)

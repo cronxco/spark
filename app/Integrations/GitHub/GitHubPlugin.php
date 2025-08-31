@@ -612,7 +612,9 @@ class GitHubPlugin extends OAuthPlugin
         foreach ($commits as $commit) {
             $blocks[] = [
                 'title' => 'Commit: ' . substr($commit['sha'], 0, 7),
-                'content' => $commit['message'],
+                'metadata' => [
+                    'message' => $commit['message'],
+                ],
                 'url' => $commit['url'],
                 'value' => 1,
                 'value_unit' => 'commit',
@@ -804,7 +806,7 @@ class GitHubPlugin extends OAuthPlugin
                     'time' => $blockData['time'] ?? now(),
                     'integration_id' => $integration->id,
                     'title' => $blockData['title'],
-                    'content' => $blockData['content'],
+                    'metadata' => $blockData['metadata'] ?? (isset($blockData['content']) ? ['text' => (string) $blockData['content']] : []),
                     'url' => $blockData['url'] ?? null,
                     'media_url' => $blockData['media_url'] ?? null,
                     'value' => $blockData['value'] ?? null,

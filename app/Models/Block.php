@@ -22,7 +22,7 @@ class Block extends Model
         'block_type',
         'time',
         'title',
-        'content',
+        'metadata',
         'url',
         'media_url',
         'value',
@@ -33,6 +33,7 @@ class Block extends Model
 
     protected $casts = [
         'time' => 'datetime',
+        'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',

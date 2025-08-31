@@ -16,7 +16,9 @@ class BlockFactory extends Factory
             'event_id' => $this->faker->uuid(),
             'time' => $this->faker->dateTime(),
             'title' => $this->faker->sentence(),
-            'content' => $this->faker->paragraph(),
+            'metadata' => [
+                'text' => $this->faker->paragraph(),
+            ],
             'url' => $this->faker->url(),
             'media_url' => $this->faker->imageUrl(),
             'value' => $this->faker->randomNumber(),

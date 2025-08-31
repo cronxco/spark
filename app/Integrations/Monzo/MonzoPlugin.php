@@ -54,21 +54,40 @@ class MonzoPlugin extends OAuthPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect your Monzo bank account to ingest transactions, pots, and balances.';
+        return 'Connect your Monzo bank account to pull transactions, pots, and balances.';
     }
 
-    public static function getConfigurationSchema(): array
+    public static function getConfigurationSchema($instanceType = null): array
     {
-        return [
-            'include_pot_transfers' => [
-                'type' => 'array',
-                'label' => 'Include Pot Transfers',
-                'description' => 'Process pot transfer transactions',
-                'options' => [
-                    'enabled' => 'Enabled',
+        if ($instanceType === 'transactions') {
+            return [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 5,
+                    'default' => 30, // 30 minutes default
                 ],
-            ],
-        ];
+                'include_pot_transfers' => [
+                    'type' => 'array',
+                    'label' => 'Include Pot Transfers',
+                    'description' => 'Process pot transfer transactions',
+                    'options' => [
+                        'enabled' => 'Enabled',
+                    ],
+                ],
+            ];
+        } else {
+            return [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 5,
+                    'default' => 30, // 30 minutes default
+                ],
+            ];
+        }
     }
 
     public static function getInstanceTypes(): array
@@ -76,19 +95,19 @@ class MonzoPlugin extends OAuthPlugin
         return [
             'accounts' => [
                 'label' => 'Accounts (Master)',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'transactions' => [
                 'label' => 'Transactions',
-                'schema' => self::getConfigurationSchema(),
+                'schema' => self::getConfigurationSchema('transactions'),
             ],
             'pots' => [
                 'label' => 'Pots',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'balances' => [
                 'label' => 'Balances',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
         ];
     }
@@ -119,6 +138,166 @@ class MonzoPlugin extends OAuthPlugin
                 'value_unit' => 'GBP',
                 'hidden' => true,
             ],
+            'salary_received_from' => [
+                'icon' => 'o-banknotes',
+                'display_name' => 'Salary Received',
+                'description' => 'Salary payment received from employer',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'declined_payment_to' => [
+                'icon' => 'o-x-circle',
+                'display_name' => 'Declined Payment',
+                'description' => 'Card payment was declined',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'card_payment_to' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Card Payment',
+                'description' => 'Payment made with Monzo card',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'card_refund_from' => [
+                'icon' => 'o-arrow-left',
+                'display_name' => 'Card Refund',
+                'description' => 'Refund received on Monzo card',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'pot_transfer_to' => [
+                'icon' => 'o-arrow-down',
+                'display_name' => 'Pot Transfer',
+                'description' => 'Money transferred to a Monzo pot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'pot_withdrawal_from' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Pot Withdrawal',
+                'description' => 'Money withdrawn from a Monzo pot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'interest_repaid' => [
+                'icon' => 'o-arrow-trending-down',
+                'display_name' => 'Interest Repaid',
+                'description' => 'Interest payment made',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'interest_earned' => [
+                'icon' => 'o-arrow-trending-up',
+                'display_name' => 'Interest Earned',
+                'description' => 'Interest received',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'monzo_flex_payment' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Monzo Flex Payment',
+                'description' => 'Payment made for Monzo Flex',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'monzo_flex_loan' => [
+                'icon' => 'o-plus-circle',
+                'display_name' => 'Monzo Flex Loan',
+                'description' => 'Money borrowed via Monzo Flex',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'direct_debit_to' => [
+                'icon' => 'o-arrow-down',
+                'display_name' => 'Direct Debit',
+                'description' => 'Direct debit payment',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'direct_credit_from' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Direct Credit',
+                'description' => 'Direct credit received',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'monzo_me_to' => [
+                'icon' => 'o-user-minus',
+                'display_name' => 'Monzo Me Sent',
+                'description' => 'Money sent via Monzo Me',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'monzo_me_from' => [
+                'icon' => 'o-user-plus',
+                'display_name' => 'Monzo Me Received',
+                'description' => 'Money received via Monzo Me',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'bank_transfer_to' => [
+                'icon' => 'o-building-library',
+                'display_name' => 'Bank Transfer Sent',
+                'description' => 'Money sent via bank transfer',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'bank_transfer_from' => [
+                'icon' => 'o-building-library',
+                'display_name' => 'Bank Transfer Received',
+                'description' => 'Money received via bank transfer',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'fee_paid_for' => [
+                'icon' => 'o-minus-circle',
+                'display_name' => 'Fee Paid',
+                'description' => 'Fee charged by Monzo',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'fee_refunded_for' => [
+                'icon' => 'o-plus-circle',
+                'display_name' => 'Fee Refunded',
+                'description' => 'Fee refunded by Monzo',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'other_debit_to' => [
+                'icon' => 'o-minus',
+                'display_name' => 'Other Debit',
+                'description' => 'Other outgoing transaction',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'other_credit_from' => [
+                'icon' => 'o-plus',
+                'display_name' => 'Other Credit',
+                'description' => 'Other incoming transaction',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -133,12 +312,52 @@ class MonzoPlugin extends OAuthPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'spend_today' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Spend Today',
+                'description' => 'Amount spent today for this account',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'balance_change' => [
+                'icon' => 'o-arrow-path',
+                'display_name' => 'Balance Change',
+                'description' => 'Change in balance since previous day',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
             'pot' => [
                 'icon' => 'o-banknotes',
                 'display_name' => 'Pot',
                 'description' => 'Monzo savings pot information',
                 'display_with_object' => true,
                 'value_unit' => null,
+                'hidden' => false,
+            ],
+            'foreign_exchange' => [
+                'icon' => 'o-globe-europe-africa',
+                'display_name' => 'Foreign Exchange',
+                'description' => 'Local vs transaction currency breakdown',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'virtual_card' => [
+                'icon' => 'o-credit-card',
+                'display_name' => 'Virtual Card',
+                'description' => 'Virtual card details used for this payment',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'bank_transfer' => [
+                'icon' => 'o-building-library',
+                'display_name' => 'Bank Transfer',
+                'description' => 'External bank transfer details',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
                 'hidden' => false,
             ],
             'transaction' => [
@@ -296,9 +515,10 @@ class MonzoPlugin extends OAuthPlugin
         // Spend Today block
         $event->blocks()->create([
             'time' => $event->time,
+            'block_type' => 'spend_today',
             'integration_id' => $event->integration_id,
             'title' => 'Spend Today',
-            'content' => null,
+            'metadata' => [],
             'media_url' => null,
             'value' => abs($spendToday),
             'value_multiplier' => 100,
@@ -322,9 +542,10 @@ class MonzoPlugin extends OAuthPlugin
                 $event->blocks()->create(['block_type' => 'balance',
 
                     'time' => $event->time,
+                    'block_type' => 'balance_change',
                     'integration_id' => $event->integration_id,
                     'title' => 'Balance Change',
-                    'content' => $delta > 0 ? 'Up' : 'Down',
+                    'metadata' => ['text' => $delta > 0 ? 'Up' : 'Down'],
                     'media_url' => null,
                     'value' => abs($delta),
                     'value_multiplier' => 100,
@@ -374,7 +595,7 @@ class MonzoPlugin extends OAuthPlugin
             );
         }
 
-        $action = $this->deriveAction($tx);
+        $action = $this->setAction($tx);
 
         $event = Event::updateOrCreate(
             [
@@ -444,6 +665,8 @@ class MonzoPlugin extends OAuthPlugin
             'uk_retail' => 'Current Account',
             'uk_retail_joint' => 'Joint Account',
             'uk_monzo_flex' => 'Monzo Flex',
+            'uk_prepaid' => 'Monzo OG',
+            'uk_reward_account' => 'Monzo Rewards',
             default => 'Monzo Account',
         };
 
@@ -451,6 +674,8 @@ class MonzoPlugin extends OAuthPlugin
             'uk_retail' => 'current_account',
             'uk_retail_joint' => 'current_account',
             'uk_monzo_flex' => 'credit_card',
+            'uk_prepaid' => 'current_account',
+            'uk_reward_account' => 'savings_account',
             default => 'other',
         };
 
@@ -725,7 +950,7 @@ class MonzoPlugin extends OAuthPlugin
         return $master;
     }
 
-    private function deriveAction(array $tx): string
+    private function setAction(array $tx): string
     {
         $amount = (int) ($tx['amount'] ?? 0);
         $scheme = $tx['scheme'] ?? null;
@@ -837,7 +1062,7 @@ class MonzoPlugin extends OAuthPlugin
             $event->blocks()->create([
                 'time' => $event->time,
                 'title' => 'Merchant',
-                'content' => implode(' • ', $parts),
+                'metadata' => ['text' => implode(' • ', $parts)],
                 'media_url' => $m['logo'] ?? null,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -859,8 +1084,9 @@ class MonzoPlugin extends OAuthPlugin
             }
             $event->blocks()->create([
                 'time' => $event->time,
+                'block_type' => 'foreign_exchange',
                 'title' => 'FX',
-                'content' => $content,
+                'metadata' => ['text' => $content],
                 'media_url' => null,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -873,8 +1099,9 @@ class MonzoPlugin extends OAuthPlugin
             $vc = (array) $tx['virtual_card'];
             $event->blocks()->create([
                 'time' => $event->time,
+                'block_type' => 'virtual_card',
                 'title' => 'Virtual Card',
-                'content' => 'Virtual card used',
+                'metadata' => $vc,
                 'media_url' => null,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -902,26 +1129,11 @@ class MonzoPlugin extends OAuthPlugin
 
                 'time' => $event->time,
                 'title' => 'Pot Transfer',
-                'content' => trim(($direction . ' ' . ($potName ?? 'Pot'))),
+                'metadata' => ['text' => trim(($direction . ' ' . ($potName ?? 'Pot')))],
                 'media_url' => null,
                 'value' => abs($amount),
                 'value_multiplier' => 100,
                 'value_unit' => 'GBP',
-            ]);
-        }
-
-        // Joint Account Transactions (detect by account type)
-        $accountId = (string) ($tx['account_id'] ?? $tx['account'] ?? '');
-        if ($accountId !== '' && $this->isJointAccount($event->integration_id, $accountId)) {
-            $event->blocks()->create(['block_type' => 'transaction',
-
-                'time' => $event->time,
-                'title' => 'Joint Account',
-                'content' => 'Transaction on a joint account',
-                'media_url' => null,
-                'value' => null,
-                'value_multiplier' => 1,
-                'value_unit' => null,
             ]);
         }
 
@@ -937,56 +1149,16 @@ class MonzoPlugin extends OAuthPlugin
             }
             $content = ! empty($details) ? implode(' • ', $details) : 'External transfer';
             $event->blocks()->create([
+                'block_type' => 'bank_transfer',
                 'time' => $event->time,
                 'integration_id' => $event->integration_id,
                 'title' => 'Bank Transfer',
-                'content' => $content,
+                'metadata' => ['text' => $content],
                 'media_url' => null,
                 'value' => abs($amount),
                 'value_multiplier' => 100,
                 'value_unit' => 'GBP',
             ]);
         }
-    }
-
-    private function isJointAccount(string $integrationId, string $accountId): bool
-    {
-        $cacheKey = $integrationId . ':' . $accountId;
-        if (array_key_exists($cacheKey, self::$accountTypeCache)) {
-            return self::$accountTypeCache[$cacheKey] === 'uk_retail_joint';
-        }
-        // Find integration by id and call accounts API once per account id
-        $integration = Integration::find($integrationId);
-        if (! $integration) {
-            self::$accountTypeCache[$cacheKey] = '';
-
-            return false;
-        }
-        try {
-            // Log the API request
-            $this->logApiRequest('GET', '/accounts', [
-                'Authorization' => '[REDACTED]',
-            ], [], $integrationId);
-
-            $resp = Http::withHeaders($this->authHeaders($integration))->get($this->apiBase . '/accounts');
-
-            // Log the API response
-            $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $integrationId);
-
-            if ($resp->successful()) {
-                $accounts = $resp->json('accounts') ?? [];
-                foreach ($accounts as $acc) {
-                    $type = (string) ($acc['type'] ?? '');
-                    $id = (string) ($acc['id'] ?? '');
-                    if ($id !== '') {
-                        self::$accountTypeCache[$integrationId . ':' . $id] = $type;
-                    }
-                }
-            }
-        } catch (Throwable $e) {
-            // ignore
-        }
-
-        return (self::$accountTypeCache[$cacheKey] ?? '') === 'uk_retail_joint';
     }
 }

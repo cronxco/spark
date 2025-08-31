@@ -195,7 +195,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
                 $event->blocks()->create([
                     'time' => $blockData['time'] ?? now(),
                     'title' => $blockData['title'],
-                    'content' => $blockData['content'],
+                    'metadata' => $blockData['metadata'] ?? (isset($blockData['content']) ? ['text' => (string) $blockData['content']] : []),
                     'url' => $blockData['url'] ?? null,
                     'media_url' => $blockData['media_url'] ?? null,
                     'value' => $blockData['value'] ?? null,

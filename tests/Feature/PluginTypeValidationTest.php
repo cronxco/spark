@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
+use Throwable;
 
 class PluginTypeValidationTest extends TestCase
 {
@@ -92,6 +93,16 @@ class PluginTypeValidationTest extends TestCase
         $usedBlockTypes = $this->extractUsedBlockTypes($fileContent);
         $usedObjectTypes = $this->extractUsedObjectTypes($fileContent);
 
+        // Also include configured types from the plugin itself
+        // This ensures we catch types that are defined in get*Types() methods but not used in code
+        $configuredActionTypesFromPlugin = $this->extractConfiguredActionTypes($pluginClass);
+        $configuredBlockTypesFromPlugin = $this->extractConfiguredBlockTypes($pluginClass);
+        $configuredObjectTypesFromPlugin = $this->extractConfiguredObjectTypes($pluginClass);
+
+        $usedActionTypes = array_merge($usedActionTypes, $configuredActionTypesFromPlugin);
+        $usedBlockTypes = array_merge($usedBlockTypes, $configuredBlockTypesFromPlugin);
+        $usedObjectTypes = array_merge($usedObjectTypes, $configuredObjectTypesFromPlugin);
+
         // Check for unused action types
         $unusedActionTypes = array_diff($configuredActionTypes, $usedActionTypes);
         if (! empty($unusedActionTypes)) {
@@ -138,6 +149,16 @@ class PluginTypeValidationTest extends TestCase
         $usedBlockTypes = $this->extractUsedBlockTypes($fileContent);
         $usedObjectTypes = $this->extractUsedObjectTypes($fileContent);
 
+        // Also include configured types from the plugin itself
+        // This ensures we catch types that are defined in get*Types() methods but not used in code
+        $configuredActionTypesFromPlugin = $this->extractConfiguredActionTypes($pluginClass);
+        $configuredBlockTypesFromPlugin = $this->extractConfiguredBlockTypes($pluginClass);
+        $configuredObjectTypesFromPlugin = $this->extractConfiguredObjectTypes($pluginClass);
+
+        $usedActionTypes = array_merge($usedActionTypes, $configuredActionTypesFromPlugin);
+        $usedBlockTypes = array_merge($usedBlockTypes, $configuredBlockTypesFromPlugin);
+        $usedObjectTypes = array_merge($usedObjectTypes, $configuredObjectTypesFromPlugin);
+
         // Check for undefined action types
         $undefinedActionTypes = array_diff($usedActionTypes, $configuredActionTypes);
         if (! empty($undefinedActionTypes)) {
@@ -163,39 +184,104 @@ class PluginTypeValidationTest extends TestCase
     {
         $actionTypes = [];
 
-        // Look for 'action' => '...' patterns in Event::create context (more flexible)
-        preg_match_all("/Event::create\s*\(\s*\[[^\]]*'action'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
+        // Look for specific patterns that are likely to be action types in Event creation
+        // Pattern 1: Event::create/updateOrCreate with action field
+        preg_match_all("/Event::(?:create|updateOrCreate)\s*\(\s*\[[^\]]*'action'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
         if (! empty($matches[1])) {
             $actionTypes = array_merge($actionTypes, $matches[1]);
         }
 
-        // Look for "action" => "..." patterns in Event::create context (more flexible)
-        preg_match_all('/Event::create\s*\(\s*\[[^\]]*"action"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
+        // Pattern 2: Event::create/updateOrCreate with action field (double quotes)
+        preg_match_all('/Event::(?:create|updateOrCreate)\s*\(\s*\[[^\]]*"action"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
         if (! empty($matches[1])) {
             $actionTypes = array_merge($actionTypes, $matches[1]);
         }
 
-        // Look for any 'action' => '...' pattern anywhere (for cases where Event::create is multi-line)
-        // But exclude common PHP types and generic terms
-        preg_match_all("/'action'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
+        // Pattern 3: Return statements in setAction methods (more specific)
+        preg_match_all("/setAction.*?return\s+['\"]([^'\"]+)['\"]\s*;/s", $fileContent, $matches);
         if (! empty($matches[1])) {
-            $filtered = array_filter($matches[1], function ($type) {
-                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea']);
-            });
-            $actionTypes = array_merge($actionTypes, $filtered);
+            $actionTypes = array_merge($actionTypes, $matches[1]);
         }
 
-        // Look for "action" => "..." pattern anywhere (for cases where Event::create is multi-line)
-        // But exclude common PHP types and generic terms
-        preg_match_all('/"action"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
+        // Pattern 4: Action assignments in variable arrays
+        preg_match_all("/\\\$[a-zA-Z_][a-zA-Z0-9_]*\\s*\[\\s*['\"]action['\"]\\s*\]\\s*=\\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
         if (! empty($matches[1])) {
-            $filtered = array_filter($matches[1], function ($type) {
-                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea']);
-            });
-            $actionTypes = array_merge($actionTypes, $filtered);
+            $actionTypes = array_merge($actionTypes, $matches[1]);
         }
 
         return array_unique(array_filter($actionTypes));
+    }
+
+    private function extractConfiguredActionTypes(string $pluginClass): array
+    {
+        try {
+            $reflection = new ReflectionClass($pluginClass);
+            if (! $reflection->hasMethod('getActionTypes')) {
+                return [];
+            }
+
+            $method = $reflection->getMethod('getActionTypes');
+            if (! $method->isStatic()) {
+                return [];
+            }
+
+            // Call the static method to get configured action types
+            $actionTypes = $pluginClass::getActionTypes();
+
+            // Return just the keys (action type names)
+            return array_keys($actionTypes);
+        } catch (Throwable $e) {
+            // If reflection fails, return empty array
+            return [];
+        }
+    }
+
+    private function extractConfiguredBlockTypes(string $pluginClass): array
+    {
+        try {
+            $reflection = new ReflectionClass($pluginClass);
+            if (! $reflection->hasMethod('getBlockTypes')) {
+                return [];
+            }
+
+            $method = $reflection->getMethod('getBlockTypes');
+            if (! $method->isStatic()) {
+                return [];
+            }
+
+            // Call the static method to get configured block types
+            $blockTypes = $pluginClass::getBlockTypes();
+
+            // Return just the keys (block type names)
+            return array_keys($blockTypes);
+        } catch (Throwable $e) {
+            // If reflection fails, return empty array
+            return [];
+        }
+    }
+
+    private function extractConfiguredObjectTypes(string $pluginClass): array
+    {
+        try {
+            $reflection = new ReflectionClass($pluginClass);
+            if (! $reflection->hasMethod('getObjectTypes')) {
+                return [];
+            }
+
+            $method = $reflection->getMethod('getObjectTypes');
+            if (! $method->isStatic()) {
+                return [];
+            }
+
+            // Call the static method to get configured object types
+            $objectTypes = $pluginClass::getObjectTypes();
+
+            // Return just the keys (object type names)
+            return array_keys($objectTypes);
+        } catch (Throwable $e) {
+            // If reflection fails, return empty array
+            return [];
+        }
     }
 
     private function extractUsedBlockTypes(string $fileContent): array

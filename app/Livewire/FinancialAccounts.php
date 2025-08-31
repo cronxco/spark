@@ -211,9 +211,9 @@ class FinancialAccounts extends Component
                 // Use the formatted_value attribute which automatically handles value_multiplier
                 return $latestBalance->formatted_value;
             }
-        } elseif (in_array($account->type, ['monzo_pot', 'monzo_archived_pot']) && ! empty($account->content)) {
-            // Monzo pots store balance in content field (already in correct format)
-            return (float) $account->content;
+        } elseif (in_array($account->type, ['monzo_pot', 'monzo_archived_pot']) && ! empty(($account->metadata['balance'] ?? null))) {
+            // Monzo pots store balance in metadata now
+            return (float) ($account->metadata['balance'] ?? 0);
         }
 
         return null;
