@@ -55,6 +55,7 @@
 
                                     $recent = \App\Models\Event::where('integration_id', $integration->id)
                                         ->where('action', $key)
+                                        ->with('target')
                                         ->orderBy('created_at', 'desc')
                                         ->limit(5)
                                         ->get();
@@ -95,8 +96,12 @@
                                                         <tbody>
                                                             @foreach ($recent as $event)
                                                                 <tr>
-                                                                    <td class="text-sm">{{ $event->title ?: $event->action }}</td>
-                                                                    <td class="text-sm text-base-content/70">{{ $event->created_at->format('M j') }}</td>
+                                                                    <td class="text-sm">{{ $event->target?->title ?: $event->action }}</td>
+                                                                    <td class="text-sm text-base-content/70">
+                                                                        <a href="{{ route('events.show', $event->id) }}" class="link link-hover">
+                                                                            {{ $event->created_at->diffForHumans() }}
+                                                                        </a>
+                                                                    </td>
                                                                 </tr>
                                                             @endforeach
                                                         </tbody>
@@ -141,7 +146,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             @foreach ($pluginClass::getObjectTypes() as $key => $object)
                                 @php
-                                    $count = \App\Models\EventObject::where('concept', $key)
+                                    $count = \App\Models\EventObject::where('type', $key)
                                         ->where(function($query) use ($integration) {
                                             $query->whereHas('actorEvents', function($q) use ($integration) {
                                                 $q->where('integration_id', $integration->id);
@@ -151,7 +156,7 @@
                                         })
                                         ->count();
 
-                                    $recent = \App\Models\EventObject::where('concept', $key)
+                                    $recent = \App\Models\EventObject::where('type', $key)
                                         ->where(function($query) use ($integration) {
                                             $query->whereHas('actorEvents', function($q) use ($integration) {
                                                 $q->where('integration_id', $integration->id);
@@ -201,7 +206,11 @@
                                                             @foreach ($recent as $objectItem)
                                                                 <tr>
                                                                     <td class="text-sm">{{ $objectItem->title ?: $objectItem->concept }}</td>
-                                                                    <td class="text-sm text-base-content/70">{{ $objectItem->created_at->format('M j') }}</td>
+                                                                    <td class="text-sm text-base-content/70">
+                                                                        <a href="{{ route('objects.show', $objectItem->id) }}" class="link link-hover">
+                                                                            {{ $objectItem->created_at->diffForHumans() }}
+                                                                        </a>
+                                                                    </td>
                                                                 </tr>
                                                             @endforeach
                                                         </tbody>
@@ -235,13 +244,19 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             @foreach ($pluginClass::getBlockTypes() as $key => $block)
                                 @php
-                                    $count = \App\Models\Block::where('block_type', $key)
+                                    $count = \App\Models\Block::where(function($query) use ($key) {
+                                        $query->where('block_type', $key)
+                                              ->orWhereNull('block_type');
+                                    })
                                         ->whereHas('event', function($query) use ($integration) {
                                             $query->where('integration_id', $integration->id);
                                         })
                                         ->count();
 
-                                    $recent = \App\Models\Block::where('block_type', $key)
+                                    $recent = \App\Models\Block::where(function($query) use ($key) {
+                                        $query->where('block_type', $key)
+                                              ->orWhereNull('block_type');
+                                    })
                                         ->whereHas('event', function($query) use ($integration) {
                                             $query->where('integration_id', $integration->id);
                                         })
@@ -286,8 +301,12 @@
                                                         <tbody>
                                                             @foreach ($recent as $blockItem)
                                                                 <tr>
-                                                                    <td class="text-sm">{{ $blockItem->title ?: $blockItem->block_type }}</td>
-                                                                    <td class="text-sm text-base-content/70">{{ $blockItem->created_at->format('M j') }}</td>
+                                                                    <td class="text-sm">{{ $blockItem->title ?: ($blockItem->block_type ?: 'Block') }}</td>
+                                                                    <td class="text-sm text-base-content/70">
+                                                                        <a href="{{ route('blocks.show', $blockItem->id) }}" class="link link-hover">
+                                                                            {{ $blockItem->created_at->diffForHumans() }}
+                                                                        </a>
+                                                                    </td>
                                                                 </tr>
                                                             @endforeach
                                                         </tbody>
