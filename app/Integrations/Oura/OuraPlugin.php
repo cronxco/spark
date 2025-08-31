@@ -653,7 +653,9 @@ class OuraPlugin extends OAuthPlugin
             'workout',
             'tag',
             'session',
-            'spo2',
+            'spo2Daily',
+            'stress',
+            'resilience',
         ]);
     }
 
