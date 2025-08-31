@@ -10,15 +10,14 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MonzoMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_processes_transactions_window_creates_events(): void
     {
         $integration = $this->makeMonzoIntegration('transactions');
@@ -101,9 +100,7 @@ class MonzoMigrationTest extends TestCase
         }));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_pots_snapshot_creates_pot_objects(): void
     {
         $integration = $this->makeMonzoIntegration('pots');
@@ -142,9 +139,7 @@ class MonzoMigrationTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_balance_snapshot_creates_daily_event(): void
     {
         $integration = $this->makeMonzoIntegration('balances');

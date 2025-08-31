@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FetchCommandTest extends TestCase
@@ -20,9 +21,7 @@ class FetchCommandTest extends TestCase
         PluginRegistry::register(GitHubPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_command_only_updates_integrations_that_need_updating()
     {
         $user = User::factory()->create();
@@ -55,9 +54,7 @@ class FetchCommandTest extends TestCase
         $this->assertNull($integration2->last_triggered_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_command_with_force_updates_all_integrations()
     {
         $user = User::factory()->create();
@@ -79,9 +76,7 @@ class FetchCommandTest extends TestCase
         $this->assertNotNull($integration->last_triggered_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_command_returns_no_integrations_message_when_none_need_updating()
     {
         $user = User::factory()->create();

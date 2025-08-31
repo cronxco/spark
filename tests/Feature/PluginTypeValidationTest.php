@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Integrations\PluginRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -12,9 +13,7 @@ class PluginTypeValidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_plugin_types_are_properly_configured(): void
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -41,9 +40,7 @@ class PluginTypeValidationTest extends TestCase
         $this->assertTrue(true, 'All plugin types are properly configured');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_configured_types_are_actually_used(): void
     {
         $plugins = PluginRegistry::getAllPlugins();

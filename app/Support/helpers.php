@@ -41,6 +41,54 @@ if (! function_exists('format_action_title')) {
     }
 }
 
+/**
+ * Sanitize headers for logging (remove sensitive data)
+ */
+if (! function_exists('sanitizeHeaders')) {
+    function sanitizeHeaders(array $headers): array
+    {
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token', 'x-signature', 'x-hub-signature'];
+        $sanitized = [];
+
+        foreach ($headers as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveHeaders)) {
+                $sanitized[$key] = ['[REDACTED]'];
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $value; // Headers are already arrays from Laravel
+            } else {
+                $sanitized[$key] = [$value];
+            }
+        }
+
+        return $sanitized;
+    }
+}
+
+/**
+ * Sanitize data for logging (remove sensitive data)
+ */
+if (! function_exists('sanitizeData')) {
+    function sanitizeData(array $data): array
+    {
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key', 'access_token', 'refresh_token', 'authorization', 'webhook_secret'];
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveKeys)) {
+                $sanitized[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = sanitizeData($value);
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+}
+
 if (! function_exists('get_integration_log_channel')) {
     /**
      * Get or create a dynamic log channel for a specific integration instance
@@ -121,8 +169,8 @@ if (! function_exists('log_integration_api_request')) {
             'endpoint' => $endpoint,
             'headers' => array_map(function ($header) {
                 return is_array($header) ? $header : [$header];
-            }, $headers),
-            'data' => $data,
+            }, sanitizeHeaders($headers)),
+            'data' => sanitizeData($data),
             'timestamp' => now()->toISOString(),
         ]);
     }
@@ -166,7 +214,7 @@ if (! function_exists('log_integration_api_response')) {
             'status_code' => $statusCode,
             'headers' => array_map(function ($header) {
                 return is_array($header) ? $header : [$header];
-            }, $headers),
+            }, sanitizeHeaders($headers)),
             'response_body' => strlen($body) > 10000
                 ? substr($body, 0, 10000) . '... [TRUNCATED]'
                 : $body,
@@ -207,8 +255,8 @@ if (! function_exists('log_integration_webhook')) {
             'integration_id' => $integrationId,
             'headers' => array_map(function ($header) {
                 return is_array($header) ? $header : [$header];
-            }, $headers),
-            'payload' => $payload,
+            }, sanitizeHeaders($headers)),
+            'payload' => sanitizeData($payload),
             'timestamp' => now()->toISOString(),
         ]);
     }

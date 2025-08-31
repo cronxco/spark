@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\PluginRegistry;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -17,9 +18,7 @@ class IntegrationPluginTest extends TestCase
         PluginRegistry::register(GitHubPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_can_register_and_retrieve_plugins()
     {
         $plugins = PluginRegistry::getAllPlugins();
@@ -28,9 +27,7 @@ class IntegrationPluginTest extends TestCase
         $this->assertEquals(GitHubPlugin::class, $plugins->get('github'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_can_filter_by_service_type()
     {
         $oauthPlugins = PluginRegistry::getOAuthPlugins();
@@ -40,9 +37,7 @@ class IntegrationPluginTest extends TestCase
         $this->assertFalse($webhookPlugins->has('github'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_can_get_plugin_instance()
     {
         $plugin = PluginRegistry::getPluginInstance('github');
@@ -50,9 +45,7 @@ class IntegrationPluginTest extends TestCase
         $this->assertInstanceOf(GitHubPlugin::class, $plugin);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_registry_returns_null_for_invalid_plugin()
     {
         $plugin = PluginRegistry::getPluginInstance('invalid');
@@ -60,9 +53,7 @@ class IntegrationPluginTest extends TestCase
         $this->assertNull($plugin);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function github_plugin_has_correct_metadata()
     {
         $this->assertEquals('github', GitHubPlugin::getIdentifier());
@@ -71,9 +62,7 @@ class IntegrationPluginTest extends TestCase
         $this->assertEquals('oauth', GitHubPlugin::getServiceType());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function github_plugin_has_configuration_schema()
     {
         $schema = GitHubPlugin::getConfigurationSchema();
@@ -84,9 +73,7 @@ class IntegrationPluginTest extends TestCase
         $this->assertEquals('array', $schema['events']['type']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function github_plugin_has_required_scopes()
     {
         $plugin = new GitHubPlugin;

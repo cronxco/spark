@@ -10,15 +10,14 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CheckIntegrationUpdatesJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_dispatches_processing_jobs_for_integrations_that_need_updating()
     {
         Queue::fake();
@@ -89,9 +88,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         // The job dispatching logic is tested in the integration tests
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_skips_integrations_that_are_currently_processing()
     {
         Queue::fake();
@@ -119,9 +116,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertNotPushed(ProcessIntegrationData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_skips_integrations_that_were_recently_triggered()
     {
         Queue::fake();
@@ -150,9 +145,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertNotPushed(ProcessIntegrationData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integrations_without_access_token()
     {
         Queue::fake();
@@ -179,9 +172,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertNotPushed(ProcessIntegrationData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_empty_result_set()
     {
         Queue::fake();

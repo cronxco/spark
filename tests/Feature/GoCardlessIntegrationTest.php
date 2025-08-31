@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Session;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Throwable;
 
@@ -15,9 +16,7 @@ class GoCardlessIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_metadata_and_service_type(): void
     {
         $plugin = new GoCardlessBankPlugin;
@@ -35,9 +34,7 @@ class GoCardlessIntegrationTest extends TestCase
         $this->assertArrayHasKey('accounts', $instanceTypes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function onboarding_institution_selection_route_exists_and_sets_session(): void
     {
         /** @var User $user */
@@ -65,9 +62,7 @@ class GoCardlessIntegrationTest extends TestCase
         $this->assertEquals('test_bank_1', session('gocardless_institution_id_' . $group->id));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function bank_selection_page_loads(): void
     {
         /** @var User $user */
@@ -95,9 +90,7 @@ class GoCardlessIntegrationTest extends TestCase
         $resp->assertSee('Test Bank 2');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function bank_selection_page_shows_error_when_no_banks_available(): void
     {
         /** @var User $user */
@@ -123,9 +116,7 @@ class GoCardlessIntegrationTest extends TestCase
         $this->assertEmpty(session('gocardless_institutions_' . $group->id));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oauth_flow_uses_selected_institution_and_redirects(): void
     {
         /** @var User $user */
@@ -155,9 +146,7 @@ class GoCardlessIntegrationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function initialization_redirects_to_bank_selection(): void
     {
         /** @var User $user */
@@ -183,9 +172,7 @@ class GoCardlessIntegrationTest extends TestCase
         $this->assertEquals($user->id, $group->user_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_constructor_validates_credentials(): void
     {
         // Test that plugin constructor validates credentials in non-testing environment
@@ -206,9 +193,7 @@ class GoCardlessIntegrationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_constructor_allows_empty_credentials_in_testing(): void
     {
         // In testing environment, empty credentials should be allowed

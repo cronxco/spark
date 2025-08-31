@@ -8,15 +8,14 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SoftDeleteTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integration_soft_delete()
     {
         $user = User::factory()->create();
@@ -34,9 +33,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNotNull($deletedIntegration->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_object_soft_delete()
     {
         $user = User::factory()->create();
@@ -55,9 +52,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNotNull($deletedObject->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_soft_delete()
     {
         $user = User::factory()->create();
@@ -83,9 +78,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNotNull($deletedEvent->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function block_soft_delete()
     {
         $user = User::factory()->create();
@@ -114,9 +107,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNotNull($deletedBlock->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function relationships_with_soft_deleted_models()
     {
         $user = User::factory()->create();
@@ -139,9 +130,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNotNull($event->integration->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function restore_functionality()
     {
         $user = User::factory()->create();
@@ -163,9 +152,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNull($restoredIntegration->deleted_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function force_delete_functionality()
     {
         $user = User::factory()->create();
@@ -185,9 +172,7 @@ class SoftDeleteTest extends TestCase
         $this->assertNull(Integration::withTrashed()->find($integrationId));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function only_trashed_scope()
     {
         $user = User::factory()->create();
@@ -215,9 +200,7 @@ class SoftDeleteTest extends TestCase
         $this->assertTrue($activeIntegrations->contains($activeIntegration2));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function with_trashed_scope()
     {
         $user = User::factory()->create();
@@ -236,9 +219,7 @@ class SoftDeleteTest extends TestCase
         $this->assertTrue($allIntegrations->contains($deletedIntegration));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function trashed_helper_method()
     {
         $user = User::factory()->create();

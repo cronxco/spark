@@ -22,6 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'sentry.api.logging' => SentryApiLogging::class,
         ]);
+
+        // Exclude webhook routes from CSRF protection
+        $middleware->validateCsrfTokens(except: [
+            'webhook/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         SentryIntegration::handles($exceptions);

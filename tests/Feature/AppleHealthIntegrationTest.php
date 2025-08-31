@@ -7,6 +7,7 @@ use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 //
 use Tests\TestCase;
 
@@ -21,9 +22,7 @@ class AppleHealthIntegrationTest extends TestCase
         PluginRegistry::register(AppleHealthPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_ingests_workouts_creating_event_and_blocks(): void
     {
         $user = User::factory()->create();
@@ -73,9 +72,7 @@ class AppleHealthIntegrationTest extends TestCase
         $this->assertTrue($event->blocks()->count() >= 1);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_ingests_metrics_creating_events(): void
     {
         $user = User::factory()->create();

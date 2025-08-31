@@ -5,11 +5,12 @@ namespace Tests\Feature;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PluginAndIntegrationViewsTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function plugin_show_page_loads_for_valid_service(): void
     {
         $user = User::factory()->create();
@@ -22,7 +23,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertSee('online');
     }
 
-    /** @test */
+    #[Test]
     public function plugin_show_page_returns_404_for_invalid_service(): void
     {
         $user = User::factory()->create();
@@ -33,7 +34,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function integration_details_page_loads_for_owned_integration(): void
     {
         $user = User::factory()->create();
@@ -58,7 +59,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertSee('github');
     }
 
-    /** @test */
+    #[Test]
     public function integration_details_page_returns_403_for_other_users_integration(): void
     {
         $user = User::factory()->create();
@@ -81,7 +82,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function plugin_show_page_displays_action_types(): void
     {
         $user = User::factory()->create();
@@ -95,7 +96,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertSee('Pull Request');
     }
 
-    /** @test */
+    #[Test]
     public function plugin_show_page_displays_object_types(): void
     {
         $user = User::factory()->create();
@@ -109,7 +110,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertSee('User');
     }
 
-    /** @test */
+    #[Test]
     public function plugin_show_page_displays_block_types(): void
     {
         $user = User::factory()->create();
@@ -122,7 +123,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         // GitHub plugin has no block types, so we just verify the section exists
     }
 
-    /** @test */
+    #[Test]
     public function integration_details_page_displays_action_types(): void
     {
         $user = User::factory()->create();
@@ -147,7 +148,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertSee('Pull Request');
     }
 
-    /** @test */
+    #[Test]
     public function integration_details_page_displays_object_types(): void
     {
         $user = User::factory()->create();
@@ -172,7 +173,7 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertSee('User');
     }
 
-    /** @test */
+    #[Test]
     public function integration_details_page_displays_block_types(): void
     {
         $user = User::factory()->create();

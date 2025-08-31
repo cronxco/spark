@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class IconValidationTest extends TestCase
@@ -19,11 +20,7 @@ class IconValidationTest extends TestCase
         $this->loadValidFontAwesomeIcons();
     }
 
-    /**
-     * Test that all icon references in the codebase are valid
-     *
-     * @test
-     */
+    #[Test]
     public function all_icon_references_are_valid(): void
     {
         $this->scanDirectory('app');
@@ -57,33 +54,21 @@ class IconValidationTest extends TestCase
         $this->assertTrue(true, 'All icon references are valid');
     }
 
-    /**
-     * Test that we can actually load the Heroicons package
-     *
-     * @test
-     */
+    #[Test]
     public function heroicons_package_is_available(): void
     {
         $this->assertNotEmpty($this->validHeroIcons, 'Heroicons package should provide icons');
         $this->assertGreaterThan(100, count($this->validHeroIcons), 'Should have many icons available');
     }
 
-    /**
-     * Test that we can actually load the FontAwesome package
-     *
-     * @test
-     */
+    #[Test]
     public function fontawesome_package_is_available(): void
     {
         $this->assertNotEmpty($this->validFontAwesomeIcons, 'FontAwesome package should provide icons');
         $this->assertGreaterThan(100, count($this->validFontAwesomeIcons), 'Should have many icons available');
     }
 
-    /**
-     * Test that common icon patterns are found
-     *
-     * @test
-     */
+    #[Test]
     public function common_icon_patterns_are_detected(): void
     {
         // Create a temporary test file with various icon patterns
@@ -119,11 +104,7 @@ class IconValidationTest extends TestCase
         $this->assertContains('far.user', $this->foundIcons);
     }
 
-    /**
-     * Test that invalid icon patterns are not detected
-     *
-     * @test
-     */
+    #[Test]
     public function invalid_icon_patterns_are_not_detected(): void
     {
         // Clear any previously found icons
@@ -157,11 +138,7 @@ class IconValidationTest extends TestCase
         $this->assertNotContains('fab.not-real', $this->validFontAwesomeIcons);
     }
 
-    /**
-     * Test that we can find icons in actual plugin files
-     *
-     * @test
-     */
+    #[Test]
     public function can_find_icons_in_plugin_files(): void
     {
         $this->scanDirectory('app/Integrations');
@@ -284,6 +261,7 @@ class IconValidationTest extends TestCase
             '/[\'"`]icon[\'"`]\s*=>\s*[\'"`]([^"\']+)[\'"`]/i',
 
             // Icon in strings: "o-heart" or "fas.home" (but not CSS-like classes)
+            // Exclude patterns that look like CSS classes (e.g., items-baseline, flex-col, etc.)
             '/[\'"`]([mso]-[a-zA-Z0-9-]{2,})[\'"`]/i',
 
             // FontAwesome icons in strings: "fas.home", "fab.github", etc.
@@ -301,8 +279,9 @@ class IconValidationTest extends TestCase
                     if (preg_match('/^[mso]-[a-zA-Z0-9-]+$/', $match) &&
                         strlen($match) > 3 && // Must be longer than just "o-b" or "s-1"
                         ! preg_match('/^[mso]-[a-z]$/', $match) && // Exclude single letters
-                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500)$/', $match) && // Exclude CSS-like classes
-                        ! preg_match('/^[mso]-[a-z]+-[0-9]+$/', $match)) { // Exclude color classes like m-neutral-950, m-purple-500
+                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible)$/', $match) && // Exclude CSS-like classes
+                        ! preg_match('/^[mso]-[a-z]+-[0-9]+$/', $match) && // Exclude color classes like m-neutral-950, m-purple-500
+                        ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match)) { // Exclude common CSS class patterns
                         $this->foundIcons[] = $match;
                     }
 

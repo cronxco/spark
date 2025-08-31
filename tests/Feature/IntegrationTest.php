@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class IntegrationTest extends TestCase
@@ -20,9 +21,7 @@ class IntegrationTest extends TestCase
         PluginRegistry::register(GitHubPlugin::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_can_initialize_group_and_instance()
     {
         $user = User::factory()->create();
@@ -39,9 +38,7 @@ class IntegrationTest extends TestCase
         $this->assertEquals('activity', $instance->instance_type);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function integrations_index_page_loads()
     {
         $user = User::factory()->create();
@@ -54,9 +51,7 @@ class IntegrationTest extends TestCase
         $response->assertSee('GitHub');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oauth_flow_redirects_to_provider()
     {
         $user = User::factory()->create();
@@ -68,9 +63,7 @@ class IntegrationTest extends TestCase
         $this->assertStringContainsString('github.com', $response->headers->get('Location'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oauth_callback_handles_success()
     {
         $user = User::factory()->create();
@@ -93,9 +86,7 @@ class IntegrationTest extends TestCase
         $response->assertStatus(302);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function oauth_callback_handles_invalid_state()
     {
         $user = User::factory()->create();
@@ -110,9 +101,7 @@ class IntegrationTest extends TestCase
         $response->assertStatus(302);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configure_page_loads()
     {
         $user = User::factory()->create();
@@ -128,9 +117,7 @@ class IntegrationTest extends TestCase
         $response->assertSee('Configure Integration');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configure_page_requires_ownership()
     {
         $user1 = User::factory()->create();
@@ -146,9 +133,7 @@ class IntegrationTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_update_integration_configuration()
     {
         $user = User::factory()->create();
@@ -184,9 +169,7 @@ class IntegrationTest extends TestCase
         $this->assertEquals(15, $integration->getUpdateFrequencyMinutes());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_handles_valid_request()
     {
         $user = User::factory()->create();
@@ -204,9 +187,7 @@ class IntegrationTest extends TestCase
         $response->assertJson(['status' => 'success']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_handles_invalid_service()
     {
         $response = $this->post('/webhook/invalid/test_secret', [
@@ -216,9 +197,7 @@ class IntegrationTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function webhook_handles_invalid_secret()
     {
         $user = User::factory()->create();

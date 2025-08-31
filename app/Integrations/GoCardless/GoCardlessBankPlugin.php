@@ -44,7 +44,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ?? route('integrations.oauth.callback', ['service' => self::getIdentifier()]));
         $this->countryCode = (string) (config('services.gocardless.country', 'GB'));
 
-        if (! app()->environment('testing') && (empty($this->secretId) || empty($this->secretKey))) {
+        if (! app()->environment('testing') && ! app()->runningUnitTests() && (empty($this->secretId) || empty($this->secretKey))) {
             throw new InvalidArgumentException('GoCardless credentials are not configured');
         }
     }
