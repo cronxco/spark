@@ -429,6 +429,12 @@ class IntegrationController extends Controller
 
         // Only keep config entries for selected types
         $data['config'] = Arr::only(($data['config'] ?? []), $selectedTypes);
+
+        // Preserve instance names from request (not validated, so not in $data)
+        $instanceNames = [];
+        foreach ($selectedTypes as $type) {
+            $instanceNames[$type] = $request->input("config.{$type}.name");
+        }
         foreach ($data['types'] as $type) {
             $initial = $data['config'][$type] ?? [];
             // Keep update_frequency_minutes in configuration
@@ -468,7 +474,7 @@ class IntegrationController extends Controller
                             $accountName = 'Account ' . substr($account['resourceId'] ?? $account['id'], 0, 8);
                         }
 
-                        $typeName = $initial['name'] ?? $typesMeta[$type]['label'] ?? ucfirst($type);
+                        $typeName = $instanceNames[$type] ?? $typesMeta[$type]['label'] ?? ucfirst($type);
                         $customName = "{$typeName} - {$accountName}";
 
                         $instance = $plugin->createInstance($group, $type, $instanceConfig);
@@ -484,10 +490,7 @@ class IntegrationController extends Controller
                     }
                 } else {
                     // Standard single instance creation for other services
-                    $customName = $initial['name'] ?? null;
-                    if (array_key_exists('name', $initial)) {
-                        unset($initial['name']);
-                    }
+                    $customName = $instanceNames[$type] ?? null;
                     $instance = $plugin->createInstance($group, $type, $initial);
                     if ($customName) {
                         $instance->update(['name' => $customName]);
