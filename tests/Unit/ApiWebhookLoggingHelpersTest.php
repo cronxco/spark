@@ -18,7 +18,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         $channelName = get_integration_log_channel('monzo', 'test_integration_123', true);
 
         // Assert
-        $this->assertEquals('api_debug_monzo_test_integration_123', $channelName);
+        $this->assertEquals('api_monzo_test_integration_123', $channelName);
     }
 
     #[Test]
@@ -28,7 +28,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         $channelName = get_integration_log_channel('github', '', false);
 
         // Assert
-        $this->assertEquals('api_debug_github', $channelName);
+        $this->assertEquals('api_github', $channelName);
     }
 
     #[Test]
@@ -38,7 +38,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         $channelName = get_integration_log_channel('slack', '', true);
 
         // Assert
-        $this->assertEquals('api_debug_slack', $channelName);
+        $this->assertEquals('api_slack', $channelName);
     }
 
     #[Test]
@@ -56,7 +56,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_debug_test_service_test_integration_123-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_service_test_integration_123-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -73,7 +73,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
     {
         // Arrange
         $jsonResponse = '{"accounts": [{"id": "123", "balance": 100}], "token": "secret_token"}';
-        $expectedFileName = 'api_debug_test_service_test_integration_456-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_service_test_integration_456-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
 
         // Clear any existing log file to ensure clean test
@@ -123,7 +123,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_debug_test_webhook_service_webhook_integration_789-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_webhook_service_webhook_integration_789-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -142,7 +142,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         log_integration_webhook('service', '', [], [], false);
 
         // Should create per-service log files
-        $expectedFileName = 'api_debug_service-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_service-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
     }
@@ -175,7 +175,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_debug_test_sensitive_sensitive_test-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_sensitive_sensitive_test-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -205,7 +205,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Should create log file despite invalid parameters
-        $expectedFileName = 'api_debug_test_edge_edge_case-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_edge_edge_case-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
     }
@@ -225,7 +225,7 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_debug_test_timestamp_timestamp_test-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_timestamp_timestamp_test-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -244,15 +244,17 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         log_integration_api_request('multi', 'GET', '/test3', [], [], '', false); // Per-service
 
         // Assert - Should create separate files
-        $date = now()->format('Y-m-d');
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_multi_integration_a-{$date}.log")));
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_multi_integration_b-{$date}.log")));
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_multi-{$date}.log")));
+        $dateSuffix = now()->format('Y-m-d');
+        $uuidBlockA = explode('-', 'integration_a')[0] ?? 'integration_a';
+        $uuidBlockB = explode('-', 'integration_b')[0] ?? 'integration_b';
+        $this->assertTrue(file_exists(storage_path("logs/api_multi_{$uuidBlockA}-{$dateSuffix}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_multi_{$uuidBlockB}-{$dateSuffix}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_multi-{$dateSuffix}.log")));
 
         // Verify different content in each file
-        $contentA = file_get_contents(storage_path("logs/api_debug_multi_integration_a-{$date}.log"));
-        $contentB = file_get_contents(storage_path("logs/api_debug_multi_integration_b-{$date}.log"));
-        $contentService = file_get_contents(storage_path("logs/api_debug_multi-{$date}.log"));
+        $contentA = file_get_contents(storage_path("logs/api_multi_{$uuidBlockA}-{$dateSuffix}.log"));
+        $contentB = file_get_contents(storage_path("logs/api_multi_{$uuidBlockB}-{$dateSuffix}.log"));
+        $contentService = file_get_contents(storage_path("logs/api_multi-{$dateSuffix}.log"));
 
         $this->assertStringContainsString('integration_a', $contentA);
         $this->assertStringContainsString('integration_b', $contentB);

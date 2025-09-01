@@ -24,7 +24,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - File should be created automatically
-        $expectedFileName = 'api_debug_test_auto_instance_auto_integration_123-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_auto_instance_auto_integration_123-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -51,7 +51,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - File should be created automatically
-        $expectedFileName = 'api_debug_test_auto_service-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_auto_service-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -76,7 +76,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - Should create per-service file
-        $expectedFileName = 'api_debug_test_fallback-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_fallback-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
     }
@@ -101,7 +101,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - File created and content sanitized
-        $expectedFileName = 'api_debug_test_sanitize_sanitize_integration_999-' . now()->format('Y-m-d') . '.log';
+        $expectedFileName = 'api_test_sanitize_sanitize_integration_999-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -131,7 +131,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         log_integration_webhook('multi_test', $integrationId, ['type' => 'test'], [], true);
 
         // Assert - All log entries in the same file
-        $expectedFileName = 'api_debug_multi_test_' . $integrationId . '-' . now()->format('Y-m-d') . '.log';
+        $uuidBlock = explode('-', $integrationId)[0] ?? $integrationId;
+        $expectedFileName = 'api_multi_test_' . $uuidBlock . '-' . now()->format('Y-m-d') . '.log';
         $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
@@ -164,19 +165,21 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         log_integration_api_request('service_b', 'GET', '/test3', [], [], 'integration_333', true);
         log_integration_api_request('service_b', 'GET', '/test4', [], [], '', false); // Per-service
 
-        $date = now()->format('Y-m-d');
-
         // Assert - Should create separate files
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_a_integration_111-{$date}.log")));
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_a_integration_222-{$date}.log")));
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_b_integration_333-{$date}.log")));
-        $this->assertTrue(file_exists(storage_path("logs/api_debug_service_b-{$date}.log")));
+        $dateSuffix = now()->format('Y-m-d');
+        $uuidBlock111 = explode('-', 'integration_111')[0] ?? 'integration_111';
+        $uuidBlock222 = explode('-', 'integration_222')[0] ?? 'integration_222';
+        $uuidBlock333 = explode('-', 'integration_333')[0] ?? 'integration_333';
+        $this->assertTrue(file_exists(storage_path("logs/api_service_a_{$uuidBlock111}-{$dateSuffix}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_service_a_{$uuidBlock222}-{$dateSuffix}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_service_b_{$uuidBlock333}-{$dateSuffix}.log")));
+        $this->assertTrue(file_exists(storage_path("logs/api_service_b-{$dateSuffix}.log")));
 
         // Verify different content in each file
-        $content111 = file_get_contents(storage_path("logs/api_debug_service_a_integration_111-{$date}.log"));
-        $content222 = file_get_contents(storage_path("logs/api_debug_service_a_integration_222-{$date}.log"));
-        $content333 = file_get_contents(storage_path("logs/api_debug_service_b_integration_333-{$date}.log"));
-        $contentService = file_get_contents(storage_path("logs/api_debug_service_b-{$date}.log"));
+        $content111 = file_get_contents(storage_path("logs/api_service_a_{$uuidBlock111}-{$dateSuffix}.log"));
+        $content222 = file_get_contents(storage_path("logs/api_service_a_{$uuidBlock222}-{$dateSuffix}.log"));
+        $content333 = file_get_contents(storage_path("logs/api_service_b_{$uuidBlock333}-{$dateSuffix}.log"));
+        $contentService = file_get_contents(storage_path("logs/api_service_b-{$dateSuffix}.log"));
 
         $this->assertStringContainsString('integration_111', $content111);
         $this->assertStringContainsString('integration_222', $content222);

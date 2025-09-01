@@ -44,7 +44,7 @@ class OuraPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'o-moon';
+        return 'o-heart';
     }
 
     public static function getAccentColor(): string
@@ -217,47 +217,47 @@ class OuraPlugin extends OAuthPlugin
         return [
             'activity' => [
                 'label' => 'Daily Activity',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'sleep' => [
                 'label' => 'Daily Sleep',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'sleep_records' => [
                 'label' => 'Sleep Records',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'readiness' => [
                 'label' => 'Daily Readiness',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'resilience' => [
                 'label' => 'Daily Resilience',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'stress' => [
                 'label' => 'Daily Stress',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'workouts' => [
                 'label' => 'Workouts',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'sessions' => [
                 'label' => 'Sessions',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'tags' => [
                 'label' => 'Tags',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'heartrate' => [
                 'label' => 'Heart Rate (time series)',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
             'spo2' => [
                 'label' => 'Daily SpO2',
-                'schema' => [],
+                'schema' => self::getConfigurationSchema(),
             ],
         ];
     }
@@ -343,6 +343,16 @@ class OuraPlugin extends OAuthPlugin
             throw new Exception('Missing code verifier');
         }
 
+        // Log the API request
+        $this->logApiRequest('POST', '/oauth/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->redirectUri,
+            'code_verifier' => '[REDACTED]', // PKCE code verifier
+        ]);
+
         // Exchange code for tokens with PKCE against api.ouraring.com
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
@@ -356,6 +366,9 @@ class OuraPlugin extends OAuthPlugin
             'code_verifier' => $codeVerifier,
         ]);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('POST', '/oauth/token', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Oura token exchange failed', [
@@ -612,12 +625,20 @@ class OuraPlugin extends OAuthPlugin
             ];
         }
 
+        // Log the API request
+        $this->logApiRequest('GET', $endpoint, [
+            'Authorization' => '[REDACTED]',
+        ], $query, $integration->id);
+
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
         $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
 
         $ok = $response->successful();
         $status = $response->status();
@@ -643,8 +664,6 @@ class OuraPlugin extends OAuthPlugin
 
     protected function getRequiredScopes(): string
     {
-        // Scopes per Oura docs (treating search results as authoritative)
-        // Request broad scopes to support all instance types; callers can scope down later if needed
         return implode(' ', [
             'email',
             'personal',
@@ -661,6 +680,14 @@ class OuraPlugin extends OAuthPlugin
 
     protected function refreshToken(IntegrationGroup $group): void
     {
+        // Log the API request
+        $this->logApiRequest('POST', '/oauth/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'refresh_token',
+        ]);
+
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST https://api.ouraring.com/oauth/token'));
@@ -671,6 +698,9 @@ class OuraPlugin extends OAuthPlugin
             'grant_type' => 'refresh_token',
         ]);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('POST', '/oauth/token', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new Exception('Failed to refresh token');
@@ -713,12 +743,20 @@ class OuraPlugin extends OAuthPlugin
             throw new Exception('Missing access token for authenticated request');
         }
 
+        // Log the API request
+        $this->logApiRequest('GET', $endpoint, [
+            'Authorization' => '[REDACTED]',
+        ], $query, $integration->id);
+
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
         $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
 
         if (! $response->successful()) {
             Log::warning('Oura API request failed', [
@@ -1392,6 +1430,127 @@ class OuraPlugin extends OAuthPlugin
             'title' => 'Tag',
             'content' => (string) $label,
         ]);
+    }
+
+    /**
+     * Get the appropriate log channel for this plugin
+     */
+    protected function getLogChannel(): string
+    {
+        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
+
+        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
+    }
+
+    /**
+     * Log API request details for debugging
+     */
+    protected function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
+    {
+        log_integration_api_request(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $this->sanitizeHeaders($headers),
+            $this->sanitizeData($data),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log API response details for debugging
+     */
+    protected function logApiResponse(string $method, string $endpoint, int $statusCode, string $body, array $headers = [], ?string $integrationId = null): void
+    {
+        log_integration_api_response(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $statusCode,
+            $this->sanitizeResponseBody($body),
+            $this->sanitizeHeaders($headers),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log webhook payload for debugging
+     */
+    protected function logWebhookPayload(string $service, string $integrationId, array $payload, array $headers = []): void
+    {
+        log_integration_webhook(
+            $service,
+            $integrationId,
+            $this->sanitizeData($payload),
+            $this->sanitizeHeaders($headers),
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Sanitize headers for logging (remove sensitive data)
+     */
+    protected function sanitizeHeaders(array $headers): array
+    {
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token'];
+        $sanitized = [];
+
+        foreach ($headers as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveHeaders)) {
+                $sanitized[$key] = '[REDACTED]';
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize data for logging (remove sensitive data)
+     */
+    protected function sanitizeData(array $data): array
+    {
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth'];
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveKeys)) {
+                $sanitized[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $this->sanitizeData($value);
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize response body for logging (limit size and remove sensitive data)
+     */
+    protected function sanitizeResponseBody(string $body): string
+    {
+        // Limit response body size to prevent huge logs
+        $maxLength = 10000;
+        if (strlen($body) > $maxLength) {
+            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
+        }
+
+        // Try to parse as JSON and sanitize sensitive fields
+        $parsed = json_decode($body, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+            $sanitized = $this->sanitizeData($parsed);
+
+            return json_encode($sanitized, JSON_PRETTY_PRINT);
+        }
+
+        return $body;
     }
 
     /**

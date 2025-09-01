@@ -617,18 +617,21 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'api_base' => $this->apiBase,
             ]);
 
+            // Log the API request
+            $this->logApiRequest('GET', '/api/v2/institutions/', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'country' => $country,
+            ]);
+
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->getAccessToken(),
             ])->get($this->apiBase . '/institutions/', [
                 'country' => $country,
             ]);
 
-            Log::info('GoCardless institutions API response', [
-                'status' => $response->status(),
-                'headers' => $response->headers(),
-                'body' => $response->body(),
-                'country' => $country,
-            ]);
+            // Log the API response
+            $this->logApiResponse('GET', '/api/v2/institutions/', $response->status(), $response->body(), $response->headers());
 
             if (! $response->successful()) {
                 Log::warning('Failed to get institutions', [
@@ -1158,17 +1161,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'api_endpoint' => $this->apiBase . '/requisitions/',
         ]);
 
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/requisitions/', [
+            'Authorization' => '[REDACTED]',
+            'Content-Type' => 'application/json',
+        ]);
+
         // First, check if there are existing requisitions we can reuse
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Content-Type' => 'application/json',
         ])->get($this->apiBase . '/requisitions/');
 
-        Log::info('GoCardless existing requisitions API response (Step 4)', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-            'headers' => $response->headers(),
-        ]);
+        // Log the API response
+        $this->logApiResponse('GET', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if ($response->successful()) {
             $data = $response->json();
@@ -1224,14 +1230,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'access_token_length' => strlen($this->getAccessToken()),
         ]);
 
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/requisitions/', $requestHeaders, $requestData);
+
         $response = Http::withHeaders($requestHeaders)->post($requestUrl, $requestData);
 
-        Log::info('GoCardless new requisition API response (Step 4)', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-            'headers' => $response->headers(),
-            'request_data' => $requestData,
-        ]);
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
@@ -1289,17 +1294,19 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'request_data' => $requestData,
         ]);
 
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/agreements/enduser/', [
+            'Authorization' => '[REDACTED]',
+            'Content-Type' => 'application/json',
+        ], $requestData);
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Content-Type' => 'application/json',
         ])->post($this->apiBase . '/agreements/enduser/', $requestData);
 
-        Log::info('GoCardless new agreement API response (Step 3)', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-            'headers' => $response->headers(),
-            'request_data' => $requestData,
-        ]);
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/agreements/enduser/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new RuntimeException('Failed to create agreement (Step 3): ' . $response->body());
@@ -1339,17 +1346,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'redirect_uri' => $this->redirectUri,
         ]);
 
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/requisitions/', [
+            'Authorization' => '[REDACTED]',
+            'Content-Type' => 'application/json',
+        ]);
+
         // First, try to get existing requisitions to see if we can reuse one
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Content-Type' => 'application/json',
         ])->get($this->apiBase . '/requisitions/');
 
-        Log::info('GoCardless existing requisitions API response (Step 4)', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-            'headers' => $response->headers(),
-        ]);
+        // Log the API response
+        $this->logApiResponse('GET', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new RuntimeException('Failed to check existing requisitions: ' . $response->body());
@@ -1397,17 +1407,19 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'access_token_length' => strlen($this->getAccessToken()),
         ]);
 
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/requisitions/', [
+            'Authorization' => '[REDACTED]',
+            'Content-Type' => 'application/json',
+        ], $requestData);
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Content-Type' => 'application/json',
         ])->post($this->apiBase . '/requisitions/', $requestData);
 
-        Log::info('GoCardless requisition API response (Step 4)', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-            'headers' => $response->headers(),
-            'content_type' => $response->header('Content-Type'),
-        ]);
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
@@ -1462,16 +1474,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
         ]);
 
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/requisitions/' . $requisitionId . '/', [
+            'Authorization' => '[REDACTED]',
+        ]);
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/requisitions/' . $requisitionId . '/');
 
-        Log::info('GoCardless getRequisition response', [
-            'requisition_id' => $requisitionId,
-            'status' => $response->status(),
-            'response_body' => $response->body(),
-            'response_headers' => $response->headers(),
-        ]);
+        // Log the API response
+        $this->logApiResponse('GET', '/api/v2/requisitions/' . $requisitionId . '/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Failed to get requisition', [
@@ -1500,9 +1513,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     protected function getAccount(string $accountId): ?array
     {
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/details/', [
+            'Authorization' => '[REDACTED]',
+        ]);
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
+
+        // Log the API response
+        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/details/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             $errorData = $response->json();
@@ -1560,16 +1581,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/balances/',
         ]);
 
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/balances/', [
+            'Authorization' => '[REDACTED]',
+        ]);
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/accounts/' . $accountId . '/balances/');
 
-        Log::info('GoCardless getAccountBalances response', [
-            'account_id' => $accountId,
-            'status' => $response->status(),
-            'response_body' => $response->body(),
-            'response_headers' => $response->headers(),
-        ]);
+        // Log the API response
+        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/balances/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Failed to get account balances', [
@@ -1616,16 +1638,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/transactions/',
         ]);
 
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/transactions/', [
+            'Authorization' => '[REDACTED]',
+        ]);
+
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ])->get($this->apiBase . '/accounts/' . $accountId . '/transactions/');
 
-        Log::info('GoCardless getAccountTransactions response', [
-            'account_id' => $accountId,
-            'status' => $response->status(),
-            'response_body' => $response->body(),
-            'response_headers' => $response->headers(),
-        ]);
+        // Log the API response
+        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/transactions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Failed to get account transactions', [
@@ -1673,6 +1696,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'secret_key_length' => strlen($this->secretKey),
         ]);
 
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/token/new/', [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ], [
+            'secret_id' => '[REDACTED]',
+            'secret_key' => '[REDACTED]',
+        ]);
+
         // Send credentials in POST body as JSON
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
@@ -1682,11 +1714,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'secret_key' => $this->secretKey,
         ]);
 
-        Log::info('GoCardless token response', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-            'headers' => $response->headers(),
-        ]);
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new RuntimeException('Failed to get access token: ' . $response->body());
@@ -1704,5 +1733,126 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         return $this->accessToken;
+    }
+
+    /**
+     * Get the appropriate log channel for this plugin
+     */
+    protected function getLogChannel(): string
+    {
+        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
+
+        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
+    }
+
+    /**
+     * Log API request details for debugging
+     */
+    protected function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
+    {
+        log_integration_api_request(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $this->sanitizeHeaders($headers),
+            $this->sanitizeData($data),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log API response details for debugging
+     */
+    protected function logApiResponse(string $method, string $endpoint, int $statusCode, string $body, array $headers = [], ?string $integrationId = null): void
+    {
+        log_integration_api_response(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $statusCode,
+            $this->sanitizeResponseBody($body),
+            $this->sanitizeHeaders($headers),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log webhook payload for debugging
+     */
+    protected function logWebhookPayload(string $service, string $integrationId, array $payload, array $headers = []): void
+    {
+        log_integration_webhook(
+            $service,
+            $integrationId,
+            $this->sanitizeData($payload),
+            $this->sanitizeHeaders($headers),
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Sanitize headers for logging (remove sensitive data)
+     */
+    protected function sanitizeHeaders(array $headers): array
+    {
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token'];
+        $sanitized = [];
+
+        foreach ($headers as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveHeaders)) {
+                $sanitized[$key] = '[REDACTED]';
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize data for logging (remove sensitive data)
+     */
+    protected function sanitizeData(array $data): array
+    {
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'secret_id', 'secret_key'];
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveKeys)) {
+                $sanitized[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $this->sanitizeData($value);
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize response body for logging (limit size and remove sensitive data)
+     */
+    protected function sanitizeResponseBody(string $body): string
+    {
+        // Limit response body size to prevent huge logs
+        $maxLength = 10000;
+        if (strlen($body) > $maxLength) {
+            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
+        }
+
+        // Try to parse as JSON and sanitize sensitive fields
+        $parsed = json_decode($body, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+            $sanitized = $this->sanitizeData($parsed);
+
+            return json_encode($sanitized, JSON_PRETTY_PRINT);
+        }
+
+        return $body;
     }
 }
