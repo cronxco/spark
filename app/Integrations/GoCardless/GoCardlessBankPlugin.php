@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -131,6 +132,22 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'icon' => 'o-arrow-right',
                 'display_name' => 'Transaction',
                 'description' => 'A bank transaction occurred',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'payment_to' => [
+                'icon' => 'o-arrow-up-right',
+                'display_name' => 'Payment Out',
+                'description' => 'Money was sent from the account',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'payment_from' => [
+                'icon' => 'o-arrow-down-left',
+                'display_name' => 'Payment In',
+                'description' => 'Money was received into the account',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
                 'hidden' => false,
@@ -1068,28 +1085,42 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'account_name' => $account['details'] ?? $account['ownerName'] ?? 'Unknown',
             ]);
 
-            $transactions = $this->getAccountTransactions($account['id']);
+            $transactionData = $this->getAccountTransactions($account['id']);
+            $bookedTransactions = $transactionData['booked'] ?? [];
+            $pendingTransactions = $transactionData['pending'] ?? [];
 
             Log::info('GoCardless processRecentTransactions: got transactions', [
                 'integration_id' => $integration->id,
                 'account_id' => $account['id'],
-                'transaction_count' => count($transactions),
+                'booked_count' => count($bookedTransactions),
+                'pending_count' => count($pendingTransactions),
+                'total_count' => count($bookedTransactions) + count($pendingTransactions),
             ]);
 
-            foreach ($transactions as $transaction) {
-                Log::info('GoCardless processRecentTransactions: processing transaction', [
+            // Process pending transactions first
+            foreach ($pendingTransactions as $transaction) {
+                Log::info('GoCardless processRecentTransactions: processing pending transaction', [
                     'integration_id' => $integration->id,
                     'account_id' => $account['id'],
                     'transaction_id' => $transaction['transactionId'] ?? $transaction['internalTransactionId'] ?? 'unknown',
                     'amount' => $transaction['transactionAmount']['amount'] ?? 'unknown',
-                    'currency' => $transaction['transactionAmount']['currency'] ?? 'unknown',
                     'description' => $transaction['remittanceInformationUnstructured'] ?? 'unknown',
-                    'booking_date' => $transaction['bookingDate'] ?? 'unknown',
-                    'debtor_name' => $transaction['debtorName'] ?? 'unknown',
-                    'creditor_name' => $transaction['creditorName'] ?? 'unknown',
                 ]);
 
-                $this->processTransactionItem($integration, $account, $transaction);
+                $this->processTransactionItem($integration, $account, $transaction, 'pending');
+            }
+
+            // Process booked transactions (these may update existing pending transactions)
+            foreach ($bookedTransactions as $transaction) {
+                Log::info('GoCardless processRecentTransactions: processing booked transaction', [
+                    'integration_id' => $integration->id,
+                    'account_id' => $account['id'],
+                    'transaction_id' => $transaction['transactionId'] ?? $transaction['internalTransactionId'] ?? 'unknown',
+                    'amount' => $transaction['transactionAmount']['amount'] ?? 'unknown',
+                    'description' => $transaction['remittanceInformationUnstructured'] ?? 'unknown',
+                ]);
+
+                $this->processTransactionItem($integration, $account, $transaction, 'booked');
             }
         }
 
@@ -1101,7 +1132,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Process a single transaction item
      */
-    protected function processTransactionItem(Integration $integration, array $account, array $tx): void
+    protected function processTransactionItem(Integration $integration, array $account, array $tx, string $status = 'booked'): void
     {
         Log::info('GoCardless processTransactionItem: processing transaction', [
             'integration_id' => $integration->id,
@@ -1128,15 +1159,32 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
         ]);
 
-        // Create or update the event
-        $sourceId = (string) ($tx['transactionId'] ?? $tx['internalTransactionId'] ?? Str::uuid());
+        // Create consistent source ID based on transaction content
+        // This ensures pending and booked versions of the same transaction have the same ID
+        $sourceId = $this->generateConsistentTransactionId($tx);
+
+        // Check if this transaction already exists (for status transitions)
+        $existingEvent = Event::where('integration_id', $integration->id)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        // Determine if this is a status change
+        $isStatusChange = $existingEvent && $existingEvent->event_metadata['transaction_status'] !== $status;
+
+        // Determine action based on transaction amount and direction
+        $amount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+        $action = $this->determineTransactionAction($amount, $status);
+
+        // Preserve the best available timestamp
+        $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
+
         $eventData = [
             'user_id' => $integration->user_id,
-            'action' => 'made_transaction',
+            'action' => $action,
             'domain' => self::getDomain(),
             'service' => 'gocardless',
-            'time' => $tx['bookingDate'] ?? now(),
-            'value' => abs((float) ($tx['transactionAmount']['amount'] ?? 0)),
+            'time' => $timestamp,
+            'value' => abs($amount),
             'value_unit' => $tx['transactionAmount']['currency'] ?? 'EUR',
             'event_metadata' => [
                 'category' => $category,
@@ -1150,13 +1198,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'mandate_id' => $tx['mandateId'] ?? null,
                 'creditor_account' => $tx['creditorAccount'] ?? null,
                 'debtor_account' => $tx['debtorAccount'] ?? null,
+                'transaction_status' => $status, // Track pending vs booked
+                'status_changed' => $isStatusChange, // Track if this is a status transition
+                'previous_status' => $existingEvent?->event_metadata['transaction_status'] ?? null,
+                'timestamp_preserved' => $isStatusChange && $existingEvent && $existingEvent->time === $timestamp,
+                'timestamp_reason' => $this->getTimestampReason($tx, $existingEvent, $status, $isStatusChange, $timestamp),
             ],
         ];
 
-        Log::info('GoCardless processTransactionItem: creating event', [
+        Log::info('GoCardless processTransactionItem: processing event', [
             'integration_id' => $integration->id,
             'source_id' => $sourceId,
-            'event_data' => $eventData,
+            'status' => $status,
+            'existing_event' => $existingEvent?->id,
+            'is_status_change' => $isStatusChange,
         ]);
 
         $event = Event::updateOrCreate(
@@ -1167,10 +1222,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $eventData
         );
 
-        Log::info('GoCardless processTransactionItem: event created/updated', [
+        Log::info('GoCardless processTransactionItem: event processed', [
             'integration_id' => $integration->id,
             'event_id' => $event->id,
             'source_id' => $sourceId,
+            'status' => $status,
+            'created' => $event->wasRecentlyCreated,
+            'updated' => $isStatusChange,
         ]);
 
         // Create or update actor (bank account)
@@ -1185,14 +1243,43 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $targetObject->id => ['role' => 'target'],
         ]);
 
-        // Add relevant tags
-        $event->syncTags([
+        // Add relevant tags based on transaction status
+        $tags = [
             'money',
             'transaction',
             'bank',
             'gocardless',
             $category,
-        ]);
+        ];
+
+        // Add status-specific tags
+        if ($status === 'pending') {
+            $tags[] = 'pending';
+        } elseif ($status === 'booked') {
+            $tags[] = 'settled';
+            // Remove pending tag if it exists (status transition)
+            if ($isStatusChange && $existingEvent) {
+                $event->detachTag('pending');
+                Log::info('GoCardless: Transitioned transaction from pending to settled', [
+                    'event_id' => $event->id,
+                    'source_id' => $sourceId,
+                    'previous_status' => $existingEvent->event_metadata['transaction_status'],
+                    'new_status' => $status,
+                ]);
+            }
+        }
+
+        // Add direction-based tags for booked transactions
+        if ($status === 'booked') {
+            $txAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+            if ($txAmount < 0) {
+                $tags[] = 'debit';
+            } else {
+                $tags[] = 'credit';
+            }
+        }
+
+        $event->syncTags($tags);
 
     }
 
@@ -1309,6 +1396,176 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'bank',
             'gocardless',
         ]);
+    }
+
+    /**
+     * Generate consistent transaction ID based on transaction content
+     * This ensures pending and booked versions of the same transaction have identical IDs
+     */
+    protected function generateConsistentTransactionId(array $transaction): string
+    {
+        // Get transaction date
+        $date = $transaction['bookingDate'] ?? $transaction['valueDate'] ?? now()->toDateString();
+
+        // Get counterparty name
+        $counterparty = $transaction['creditorName'] ??
+                       $transaction['debtorName'] ??
+                       $transaction['remittanceInformationUnstructured'] ??
+                       'unknown';
+
+        // Get transaction amount (absolute value for consistency)
+        $amount = abs((float) ($transaction['transactionAmount']['amount'] ?? 0));
+
+        // Create content-based hash that's consistent between pending and booked states
+        $contentString = $date . '_' .
+                        Str::headline(Str::lower($counterparty)) . '_' .
+                        $amount . '_' .
+                        ($transaction['transactionAmount']['currency'] ?? 'EUR');
+
+        return 'gc_' . md5($contentString);
+    }
+
+    /**
+     * Determine the appropriate transaction action based on amount direction
+     */
+    protected function determineTransactionAction(float $amount, string $status): string
+    {
+        // Use directional actions for both pending and booked transactions
+        if ($amount < 0) {
+            return 'payment_to'; // Money going out
+        } else {
+            return 'payment_from'; // Money coming in
+        }
+    }
+
+    /**
+     * Determine the best timestamp to use, preserving precision from pending transactions
+     */
+    protected function determineBestTimestamp(array $currentTx, ?Event $existingEvent, string $status, bool $isStatusChange): string
+    {
+        $currentTimestamp = $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
+
+        // If no existing event, use current timestamp
+        if (! $existingEvent) {
+            return $currentTimestamp;
+        }
+
+        $existingTimestamp = $existingEvent->time;
+
+        // If this is NOT a status change, keep existing timestamp to avoid unnecessary updates
+        if (! $isStatusChange) {
+            return $existingTimestamp;
+        }
+
+        // This is a status change (pending → booked), choose the most precise timestamp
+        return $this->chooseBetterTimestamp($existingTimestamp, $currentTimestamp, $existingEvent, $status);
+    }
+
+    /**
+     * Choose the better timestamp based on precision and context
+     */
+    protected function chooseBetterTimestamp(string $existingTime, string $newTime, Event $existingEvent, string $newStatus): string
+    {
+        $existingDateTime = Carbon::parse($existingTime);
+        $newDateTime = Carbon::parse($newTime);
+
+        // If existing transaction was pending and new is booked
+        if ($existingEvent->event_metadata['transaction_status'] === 'pending' && $newStatus === 'booked') {
+
+            // Check if the new timestamp looks like a generic batch processing time
+            // Common patterns: 3:00 AM, 4:00 AM, midnight, etc.
+            $newHour = $newDateTime->hour;
+            $newMinute = $newDateTime->minute;
+
+            $isGenericTime = (
+                ($newHour >= 2 && $newHour <= 5 && $newMinute === 0) || // 2-5 AM with :00 minutes
+                ($newHour === 0 && $newMinute === 0) || // Midnight
+                ($newHour === 23 && $newMinute >= 55)   // Near midnight (end of day processing)
+            );
+
+            // If new time looks generic and existing time is more specific, keep existing
+            if ($isGenericTime && ! $this->isGenericTime($existingDateTime)) {
+                Log::info('GoCardless: Preserving precise pending timestamp over generic booked timestamp', [
+                    'existing_time' => $existingTime,
+                    'new_time' => $newTime,
+                    'existing_hour' => $existingDateTime->hour,
+                    'new_hour' => $newHour,
+                    'reason' => 'new_time_looks_generic',
+                ]);
+
+                return $existingTime;
+            }
+
+            // If new time is more precise (has seconds/minutes that look real), use it
+            if ($newMinute !== 0 || $newDateTime->second !== 0) {
+                Log::info('GoCardless: Using more precise booked timestamp', [
+                    'existing_time' => $existingTime,
+                    'new_time' => $newTime,
+                    'reason' => 'new_time_more_precise',
+                ]);
+
+                return $newTime;
+            }
+
+            // Default: keep the existing (pending) timestamp as it's likely more accurate
+            Log::info('GoCardless: Keeping existing pending timestamp as default', [
+                'existing_time' => $existingTime,
+                'new_time' => $newTime,
+                'reason' => 'keeping_pending_as_default',
+            ]);
+
+            return $existingTime;
+        }
+
+        // For other cases, use the newer timestamp
+        return $newTime;
+    }
+
+    /**
+     * Check if a timestamp looks like a generic/batch processing time
+     */
+    protected function isGenericTime(Carbon $dateTime): bool
+    {
+        $hour = $dateTime->hour;
+        $minute = $dateTime->minute;
+
+        return
+            ($hour >= 2 && $hour <= 5 && $minute === 0) || // 2-5 AM with :00 minutes
+            ($hour === 0 && $minute === 0) || // Midnight
+            ($hour === 23 && $minute >= 55);   // Near midnight
+    }
+
+    /**
+     * Get a human-readable explanation for timestamp choice
+     */
+    protected function getTimestampReason(array $currentTx, ?Event $existingEvent, string $status, bool $isStatusChange, string $chosenTimestamp): string
+    {
+        if (! $existingEvent) {
+            return 'new_transaction';
+        }
+
+        if (! $isStatusChange) {
+            return 'same_status_update';
+        }
+
+        $existingTime = $existingEvent->time;
+        $currentTime = $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
+
+        if ($existingTime === $chosenTimestamp) {
+            $newDateTime = Carbon::parse($currentTime);
+            if ($this->isGenericTime($newDateTime)) {
+                return 'preserved_pending_over_generic_booked';
+            }
+
+            return 'preserved_existing_timestamp';
+        } else {
+            $existingDateTime = Carbon::parse($existingTime);
+            if ($this->isGenericTime($existingDateTime)) {
+                return 'used_more_precise_booked_timestamp';
+            }
+
+            return 'used_new_timestamp';
+        }
     }
 
     /**
@@ -2030,18 +2287,19 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $bookedTransactions = $data['transactions']['booked'] ?? [];
         $pendingTransactions = $data['transactions']['pending'] ?? [];
 
-        // Combine both types of transactions
-        $transactions = array_merge($bookedTransactions, $pendingTransactions);
-
         Log::info('GoCardless getAccountTransactions success', [
             'account_id' => $accountId,
             'booked_count' => count($bookedTransactions),
             'pending_count' => count($pendingTransactions),
-            'total_count' => count($transactions),
+            'total_count' => count($bookedTransactions) + count($pendingTransactions),
             'response_structure' => array_keys($data),
         ]);
 
-        return $transactions;
+        // Return structured data to enable separate processing
+        return [
+            'booked' => $bookedTransactions,
+            'pending' => $pendingTransactions,
+        ];
     }
 
     /**
