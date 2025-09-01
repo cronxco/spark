@@ -860,10 +860,21 @@ class MonzoPlugin extends OAuthPlugin
 
     protected function processBalanceSnapshot(Integration $integration, array $account): void
     {
+        // Log the API request
+        $this->logApiRequest('GET', '/balance', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            'account_id' => $account['id'],
+        ], $integration->id);
+
         $resp = Http::withHeaders($this->authHeaders($integration))
             ->get($this->apiBase . '/balance', [
                 'account_id' => $account['id'],
             ]);
+
+        // Log the API response
+        $this->logApiResponse('GET', '/balance', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
         if (! $resp->successful()) {
             return;
         }
@@ -920,6 +931,16 @@ class MonzoPlugin extends OAuthPlugin
     protected function processRecentTransactions(Integration $integration, array $account): void
     {
         $sinceIso = now()->subDays(7)->toIso8601String();
+        // Log the API request
+        $this->logApiRequest('GET', '/transactions', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            'account_id' => $account['id'],
+            'expand[]' => 'merchant',
+            'since' => $sinceIso,
+            'limit' => 100,
+        ], $integration->id);
+
         $resp = Http::withHeaders($this->authHeaders($integration))
             ->get($this->apiBase . '/transactions', [
                 'account_id' => $account['id'],
@@ -927,6 +948,10 @@ class MonzoPlugin extends OAuthPlugin
                 'since' => $sinceIso,
                 'limit' => 100,
             ]);
+
+        // Log the API response
+        $this->logApiResponse('GET', '/transactions', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
         if (! $resp->successful()) {
             return;
         }
@@ -1042,10 +1067,10 @@ class MonzoPlugin extends OAuthPlugin
             $m = (array) $tx['merchant'];
             $parts = [];
             if (! empty($m['name'])) {
-                $parts[] = (string) $m['name'];
+                $parts['merchant'] = (string) $m['name'];
             }
             if (! empty($m['category'])) {
-                $parts[] = (string) $m['category'];
+                $parts['category'] = (string) $m['category'];
             }
             if (! empty($m['address'])) {
                 $addr = (array) $m['address'];
@@ -1056,13 +1081,13 @@ class MonzoPlugin extends OAuthPlugin
                     $addr['country'] ?? null,
                 ])));
                 if ($addrLine !== '') {
-                    $parts[] = $addrLine;
+                    $parts['address'] = $addrLine;
                 }
             }
             $event->blocks()->create([
                 'time' => $event->time,
                 'title' => 'Merchant',
-                'metadata' => ['text' => implode(' • ', $parts)],
+                'metadata' => $parts,
                 'media_url' => $m['logo'] ?? null,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -1078,15 +1103,18 @@ class MonzoPlugin extends OAuthPlugin
             $gbp = abs(((int) ($tx['amount'] ?? 0)) / 100);
             $loc = abs(((int) $localAmount) / 100);
             $rate = $loc > 0 ? round($gbp / $loc, 6) : null;
-            $content = 'Local: ' . $loc . ' ' . strtoupper((string) $localCurrency) . ' → ' . $gbp . ' ' . strtoupper((string) $txCurrency);
+            $metadata = [
+                strtoupper((string) $localCurrency) => $loc,
+                strtoupper((string) $txCurrency) => $gbp,
+            ];
             if ($rate !== null) {
-                $content .= ' (rate ' . $rate . ')';
+                $metadata['rate'] = $rate;
             }
             $event->blocks()->create([
                 'time' => $event->time,
                 'block_type' => 'foreign_exchange',
                 'title' => 'FX',
-                'metadata' => ['text' => $content],
+                'metadata' => $metadata,
                 'media_url' => null,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -1129,7 +1157,7 @@ class MonzoPlugin extends OAuthPlugin
 
                 'time' => $event->time,
                 'title' => 'Pot Transfer',
-                'metadata' => ['text' => trim(($direction . ' ' . ($potName ?? 'Pot')))],
+                'metadata' => ['direction' => $direction, 'pot_name' => $potName ?? 'Pot'],
                 'media_url' => null,
                 'value' => abs($amount),
                 'value_multiplier' => 100,
@@ -1142,18 +1170,18 @@ class MonzoPlugin extends OAuthPlugin
             $cp = (array) ($tx['counterparty'] ?? []);
             $details = [];
             if (! empty($cp['name'])) {
-                $details[] = (string) $cp['name'];
+                $details['counterparty'] = (string) $cp['name'];
             }
             if (! empty($cp['sort_code']) && ! empty($cp['account_number'])) {
-                $details[] = $cp['sort_code'] . '-' . $cp['account_number'];
+                $details['sort_code'] = $cp['sort_code'];
+                $details['account_number'] = $cp['account_number'];
             }
-            $content = ! empty($details) ? implode(' • ', $details) : 'External transfer';
             $event->blocks()->create([
                 'block_type' => 'bank_transfer',
                 'time' => $event->time,
                 'integration_id' => $event->integration_id,
                 'title' => 'Bank Transfer',
-                'metadata' => ['text' => $content],
+                'metadata' => $details,
                 'media_url' => null,
                 'value' => abs($amount),
                 'value_multiplier' => 100,

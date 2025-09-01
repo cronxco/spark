@@ -89,6 +89,25 @@ if (! function_exists('sanitizeData')) {
     }
 }
 
+/**
+ * Generate API log filename with new format: api_{service}_{first_block_of_uuid}.log
+ */
+if (! function_exists('generate_api_log_filename')) {
+    function generate_api_log_filename(string $service, string $integrationId = '', bool $perInstance = false): string
+    {
+        $serviceSlug = str_replace([' ', '-', '_'], '_', $service);
+
+        if ($perInstance && ! empty($integrationId)) {
+            // Extract first block of UUID (first 8 characters before first hyphen)
+            $uuidBlock = explode('-', $integrationId)[0] ?? $integrationId;
+
+            return "api_{$serviceSlug}_{$uuidBlock}.log";
+        }
+
+        return "api_{$serviceSlug}.log";
+    }
+}
+
 if (! function_exists('get_integration_log_channel')) {
     /**
      * Get or create a dynamic log channel for a specific integration instance
@@ -107,22 +126,10 @@ if (! function_exists('get_integration_log_channel')) {
             'replace_placeholders' => true,
         ];
 
-        if ($perInstance && ! empty($integrationId)) {
-            // Per-instance logging: api_debug_{service}_{integration_id}
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service) . '_' . $integrationId;
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
 
-            // Create the channel dynamically if it doesn't exist
-            if (! config('logging.channels.' . $channelName)) {
-                Log::build($baseConfig);
-            }
-
-            return $channelName;
-        }
-
-        // Per-service logging: api_debug_{service}
-        $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service);
-        $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
+        $baseConfig['path'] = storage_path('logs/' . $filename);
 
         // Create the channel dynamically if it doesn't exist
         if (! config('logging.channels.' . $channelName)) {
@@ -153,13 +160,9 @@ if (! function_exists('log_integration_api_request')) {
             'replace_placeholders' => true,
         ];
 
-        if ($perInstance && ! empty($integrationId)) {
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service) . '_' . $integrationId;
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
-        } else {
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service);
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
-        }
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+        $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
         $logger->debug('API Request', [
@@ -197,13 +200,9 @@ if (! function_exists('log_integration_api_response')) {
             'replace_placeholders' => true,
         ];
 
-        if ($perInstance && ! empty($integrationId)) {
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service) . '_' . $integrationId;
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
-        } else {
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service);
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
-        }
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+        $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
         $logger->debug('API Response', [
@@ -241,13 +240,9 @@ if (! function_exists('log_integration_webhook')) {
             'replace_placeholders' => true,
         ];
 
-        if ($perInstance && ! empty($integrationId)) {
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service) . '_' . $integrationId;
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
-        } else {
-            $channelName = 'api_debug_' . str_replace([' ', '-', '_'], '_', $service);
-            $baseConfig['path'] = storage_path('logs/' . $channelName . '.log');
-        }
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+        $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
         $logger->debug('Webhook Payload', [

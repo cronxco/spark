@@ -251,6 +251,17 @@ class GitHubPlugin extends OAuthPlugin
             throw new Exception('Missing code verifier');
         }
 
+        // Log the API request
+        $this->logApiRequest('POST', '/access_token', [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->redirectUri,
+            'code_verifier' => '[REDACTED]', // PKCE code verifier
+        ]);
+
         // Exchange code for token on github.com/login/oauth/access_token
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
@@ -266,6 +277,9 @@ class GitHubPlugin extends OAuthPlugin
                 'code_verifier' => $codeVerifier,
             ]);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('POST', '/access_token', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('GitHub token exchange failed', [
@@ -430,6 +444,14 @@ class GitHubPlugin extends OAuthPlugin
             $token = $group->access_token;
         }
 
+        // Log the API request
+        $this->logApiRequest('GET', $endpoint, [
+            'Accept' => 'application/vnd.github+json',
+            'X-GitHub-Api-Version' => $this->apiVersion,
+            'User-Agent' => config('app.name', 'SparkApp'),
+            'Authorization' => '[REDACTED]',
+        ], [], $integration->id);
+
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . $endpoint));
@@ -441,6 +463,9 @@ class GitHubPlugin extends OAuthPlugin
             ])
             ->get($this->baseUrl . $endpoint);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
 
         if (! $response->successful()) {
             throw new Exception('API request failed: ' . $response->body());
@@ -836,5 +861,126 @@ class GitHubPlugin extends OAuthPlugin
                 'embeddings' => $objectData['embeddings'] ?? null,
             ]
         );
+    }
+
+    /**
+     * Get the appropriate log channel for this plugin
+     */
+    protected function getLogChannel(): string
+    {
+        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
+
+        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
+    }
+
+    /**
+     * Log API request details for debugging
+     */
+    protected function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
+    {
+        log_integration_api_request(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $this->sanitizeHeaders($headers),
+            $this->sanitizeData($data),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log API response details for debugging
+     */
+    protected function logApiResponse(string $method, string $endpoint, int $statusCode, string $body, array $headers = [], ?string $integrationId = null): void
+    {
+        log_integration_api_response(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $statusCode,
+            $this->sanitizeResponseBody($body),
+            $this->sanitizeHeaders($headers),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log webhook payload for debugging
+     */
+    protected function logWebhookPayload(string $service, string $integrationId, array $payload, array $headers = []): void
+    {
+        log_integration_webhook(
+            $service,
+            $integrationId,
+            $this->sanitizeData($payload),
+            $this->sanitizeHeaders($headers),
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Sanitize headers for logging (remove sensitive data)
+     */
+    protected function sanitizeHeaders(array $headers): array
+    {
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token'];
+        $sanitized = [];
+
+        foreach ($headers as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveHeaders)) {
+                $sanitized[$key] = '[REDACTED]';
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize data for logging (remove sensitive data)
+     */
+    protected function sanitizeData(array $data): array
+    {
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth'];
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveKeys)) {
+                $sanitized[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $this->sanitizeData($value);
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize response body for logging (limit size and remove sensitive data)
+     */
+    protected function sanitizeResponseBody(string $body): string
+    {
+        // Limit response body size to prevent huge logs
+        $maxLength = 10000;
+        if (strlen($body) > $maxLength) {
+            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
+        }
+
+        // Try to parse as JSON and sanitize sensitive fields
+        $parsed = json_decode($body, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+            $sanitized = $this->sanitizeData($parsed);
+
+            return json_encode($sanitized, JSON_PRETTY_PRINT);
+        }
+
+        return $body;
     }
 }

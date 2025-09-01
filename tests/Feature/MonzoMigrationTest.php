@@ -93,14 +93,14 @@ class MonzoMigrationTest extends TestCase
 
         // Blocks: Merchant and FX
         $this->assertTrue($event->blocks->contains(function ($b) {
-            $text = is_array($b->metadata ?? null) ? ($b->metadata['text'] ?? '') : '';
+            $metadata = is_array($b->metadata ?? null) ? $b->metadata : [];
 
-            return $b->title === 'Merchant' && str_contains($text, 'Test Store');
+            return $b->title === 'Merchant' && isset($metadata['merchant']) && str_contains($metadata['merchant'], 'Test Store');
         }));
         $this->assertTrue($event->blocks->contains(function ($b) {
-            $text = is_array($b->metadata ?? null) ? ($b->metadata['text'] ?? '') : '';
+            $metadata = is_array($b->metadata ?? null) ? $b->metadata : [];
 
-            return $b->title === 'FX' && str_contains($text, 'EUR') && str_contains($text, 'GBP');
+            return $b->title === 'FX' && isset($metadata['EUR']) && isset($metadata['GBP']);
         }));
     }
 
