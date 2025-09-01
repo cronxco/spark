@@ -82,7 +82,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'type' => 'integer',
                 'label' => 'Update Frequency (minutes)',
                 'required' => true,
-                'min' => 1440, // 24 hours minimum due to GoCardless rate limits (4 requests/day)
+                'min' => 360,  // 6 hours minimum due to GoCardless rate limits (4 requests/day)
                 'default' => 1440, // 24 hours default
                 'description' => 'GoCardless has strict rate limits (4 requests/day). Minimum: 24 hours.',
             ],
@@ -678,6 +678,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'account_id' => $accountId,
                         'account_name' => $accountDetails['details'] ?? $accountDetails['ownerName'] ?? 'Unknown',
                     ]);
+
+                    // Create account object immediately for availability
+                    $this->createAccountObjectForOnboarding($group, $accountDetails);
+
                     $accountDetails['id'] = $accountId;
                     $accounts[] = $accountDetails;
                 } else {
@@ -903,6 +907,68 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         Cache::forget(self::API_CALLS_CACHE_KEY);
         Log::info('GoCardless API monitoring data cleared');
+    }
+
+    /**
+     * Clean up orphaned onboarding account objects
+     * Call this periodically to remove account objects that were created during onboarding
+     * but never associated with real integrations
+     */
+    public function cleanupOrphanedOnboardingObjects(): int
+    {
+        // Find onboarding account objects that are older than 24 hours
+        $cutoffDate = now()->subHours(24);
+
+        $orphanedObjects = EventObject::where('integration_id', 'like', 'onboarding_%')
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->where('created_at', '<', $cutoffDate)
+            ->get();
+
+        $count = 0;
+        foreach ($orphanedObjects as $object) {
+            // Check if there's a real integration that should own this account
+            $integrationId = str_replace('onboarding_', '', $object->integration_id);
+            if (strpos($integrationId, '_') !== false) {
+                [$groupId, $accountId] = explode('_', $integrationId, 2);
+
+                // Look for real integrations that might claim this account
+                $realIntegrations = Integration::where('integration_group_id', $groupId)
+                    ->where('service', 'gocardless')
+                    ->get();
+
+                $found = false;
+                foreach ($realIntegrations as $integration) {
+                    // Check if this integration should own this account
+                    try {
+                        $accounts = $this->listAccounts($integration);
+                        foreach ($accounts as $account) {
+                            if (($account['id'] ?? null) === $accountId) {
+                                $found = true;
+                                break 2;
+                            }
+                        }
+                    } catch (Throwable $e) {
+                        // Skip if there's an error accessing the integration
+                        continue;
+                    }
+                }
+
+                if (! $found) {
+                    // No real integration claims this account, safe to delete
+                    $object->delete();
+                    $count++;
+                }
+            }
+        }
+
+        if ($count > 0) {
+            Log::info('GoCardless: Cleaned up orphaned onboarding account objects', [
+                'count' => $count,
+            ]);
+        }
+
+        return $count;
     }
 
     protected function getRequiredScopes(): string
@@ -1569,7 +1635,60 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
-     * Upsert account object
+     * Create account object during onboarding for immediate availability
+     */
+    protected function createAccountObjectForOnboarding(IntegrationGroup $group, array $account): EventObject
+    {
+        // Determine account type based on GoCardless data
+        $accountType = match ($account['cashAccountType'] ?? null) {
+            'CurrentAccount' => 'current_account',
+            'SavingsAccount' => 'savings_account',
+            'CreditCard' => 'credit_card',
+            'InvestmentAccount' => 'investment_account',
+            'LoanAccount' => 'loan',
+            default => 'other',
+        };
+
+        // Generate a proper account name
+        $accountName = $this->generateAccountName($account);
+
+        Log::info('GoCardless onboarding: creating account object', [
+            'group_id' => $group->id,
+            'account_id' => $account['id'] ?? 'unknown',
+            'account_name' => $accountName,
+        ]);
+
+        // Use onboarding-specific integration ID to avoid conflicts
+        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . ($account['id'] ?? 'unknown');
+
+        return EventObject::updateOrCreate(
+            [
+                'integration_id' => $onboardingIntegrationId,
+                'concept' => 'account',
+                'type' => 'bank_account',
+                'title' => $accountName,
+            ],
+            [
+                'user_id' => $group->user_id,
+                'content' => json_encode($account),
+                'url' => null,
+                'image_url' => null,
+                'time' => null,
+                'metadata' => [
+                    'name' => $accountName,
+                    'provider' => $account['institution_id'] ?? 'GoCardless',
+                    'account_type' => $accountType,
+                    'currency' => $account['currency'] ?? 'GBP',
+                    'account_number' => $account['resourceId'] ?? null,
+                    'raw' => $account,
+                    'onboarding_created' => true, // Flag to indicate this was created during onboarding
+                ],
+            ]
+        );
+    }
+
+    /**
+     * Upsert account object - handles both onboarding-created and transaction-created objects
      */
     protected function upsertAccountObject(Integration $integration, array $account): EventObject
     {
@@ -1586,6 +1705,33 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Generate a proper account name
         $accountName = $this->generateAccountName($account);
 
+        // First, try to find an existing onboarding-created account object
+        $accountId = $account['id'] ?? 'unknown';
+        $onboardingIntegrationId = 'onboarding_' . $integration->group_id . '_' . $accountId;
+
+        $existingObject = EventObject::where('integration_id', $onboardingIntegrationId)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->where('title', $accountName)
+            ->first();
+
+        if ($existingObject) {
+            Log::info('GoCardless: Found existing onboarding account object, updating with integration ID', [
+                'account_id' => $accountId,
+                'existing_integration_id' => $existingObject->integration_id,
+                'new_integration_id' => $integration->id,
+            ]);
+
+            // Update the integration ID to point to the real integration
+            $existingObject->update([
+                'integration_id' => $integration->id,
+                'metadata->onboarding_created' => false, // Remove onboarding flag
+            ]);
+
+            return $existingObject;
+        }
+
+        // No existing onboarding object found, create new one
         return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
