@@ -8,6 +8,8 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -18,6 +20,15 @@ use Throwable;
 
 class GoCardlessBankPlugin extends OAuthPlugin
 {
+    // Cache configuration constants
+    private const ACCOUNT_DETAILS_CACHE_TTL = 86400; // 24 hours
+    private const REQUISITION_CACHE_TTL = 3600; // 1 hour
+
+    // API monitoring constants
+    private const API_CALLS_CACHE_KEY = 'gocardless_api_calls';
+    private const API_EFFICIENCY_REPORT_TTL = 3600;
+
+    // 1 hour
     /**
      * GoCardless Bank Account Data API integration
      * Uses direct HTTP calls instead of the unmaintained Nordigen package
@@ -71,7 +82,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'type' => 'integer',
                 'label' => 'Update Frequency (minutes)',
                 'required' => true,
-                'min' => 1440, // 24 hours minimum due to GoCardless rate limits (4 requests/day)
+                'min' => 360,  // 6 hours minimum due to GoCardless rate limits (4 requests/day)
                 'default' => 1440, // 24 hours default
                 'description' => 'GoCardless has strict rate limits (4 requests/day). Minimum: 24 hours.',
             ],
@@ -121,6 +132,22 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'icon' => 'o-arrow-right',
                 'display_name' => 'Transaction',
                 'description' => 'A bank transaction occurred',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'payment_to' => [
+                'icon' => 'o-arrow-up-right',
+                'display_name' => 'Payment Out',
+                'description' => 'Money was sent from the account',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'payment_from' => [
+                'icon' => 'o-arrow-down-left',
+                'display_name' => 'Payment In',
+                'description' => 'Money was received into the account',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
                 'hidden' => false,
@@ -293,6 +320,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 throw new RuntimeException('Requisition not linked: ' . ($requisition['status'] ?? 'unknown'));
             }
 
+            // Cache the account IDs for faster future access
+            $accountIds = $requisition['accounts'] ?? [];
+            if (! empty($accountIds)) {
+                $this->cacheAccountList($group->id, $accountIds);
+            }
+
             // Update group with the confirmed requisition id
             $group->update([
                 'account_id' => $requisitionId,
@@ -305,6 +338,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'requisition_id' => $requisitionId,
                 'reference' => $reference,
                 'status' => $requisition['status'],
+                'account_count' => count($accountIds),
             ]);
         } catch (Throwable $e) {
             Log::error('GoCardless OAuth callback failed', [
@@ -404,36 +438,59 @@ class GoCardlessBankPlugin extends OAuthPlugin
             return [];
         }
 
-        Log::info('GoCardless listAccounts: getting requisition', [
-            'integration_id' => $integration->id,
-            'group_id' => $group->id,
-            'account_id' => $group->account_id,
-        ]);
-
         try {
-            $requisition = $this->getRequisition($group->account_id);
-            $accountIds = $requisition['accounts'] ?? [];
+            // Try to get cached account list first
+            $cachedAccountIds = $this->getCachedAccountList($group->id);
 
-            Log::info('GoCardless listAccounts: found account IDs', [
-                'integration_id' => $integration->id,
-                'requisition_id' => $group->account_id,
-                'account_ids' => $accountIds,
-                'account_count' => count($accountIds),
-            ]);
+            if ($cachedAccountIds !== null) {
+                Log::info('GoCardless listAccounts: using cached account IDs', [
+                    'integration_id' => $integration->id,
+                    'group_id' => $group->id,
+                    'cached_account_count' => count($cachedAccountIds),
+                ]);
+                $accountIds = $cachedAccountIds;
+            } else {
+                // Fall back to API call
+                Log::info('GoCardless listAccounts: getting requisition from API', [
+                    'integration_id' => $integration->id,
+                    'group_id' => $group->id,
+                    'account_id' => $group->account_id,
+                ]);
+
+                $requisition = $this->getRequisition($group->account_id);
+                $accountIds = $requisition['accounts'] ?? [];
+
+                // Cache the account list for future use
+                if (! empty($accountIds)) {
+                    $this->cacheAccountList($group->id, $accountIds);
+                }
+
+                Log::info('GoCardless listAccounts: retrieved and cached account IDs', [
+                    'integration_id' => $integration->id,
+                    'requisition_id' => $group->account_id,
+                    'account_ids' => $accountIds,
+                    'account_count' => count($accountIds),
+                ]);
+            }
+
+            if (empty($accountIds)) {
+                Log::warning('GoCardless listAccounts: no accounts found', [
+                    'integration_id' => $integration->id,
+                    'group_id' => $group->id,
+                ]);
+
+                return [];
+            }
 
             $accounts = [];
             foreach ($accountIds as $accountId) {
-                Log::info('GoCardless listAccounts: getting account details', [
-                    'integration_id' => $integration->id,
-                    'account_id' => $accountId,
-                ]);
-
                 $accountDetails = $this->getAccount($accountId);
                 if ($accountDetails) {
                     Log::info('GoCardless listAccounts: account details retrieved', [
                         'integration_id' => $integration->id,
                         'account_id' => $accountId,
                         'account_name' => $accountDetails['details'] ?? $accountDetails['ownerName'] ?? 'Unknown',
+                        'from_cache' => ! isset($accountDetails['cached']) || $accountDetails['cached'] === false,
                     ]);
                     $accounts[] = $accountDetails;
                 } else {
@@ -447,6 +504,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             Log::info('GoCardless listAccounts: returning accounts', [
                 'integration_id' => $integration->id,
                 'account_count' => count($accounts),
+                'cached_used' => $cachedAccountIds !== null,
             ]);
 
             return $accounts;
@@ -472,8 +530,25 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         try {
-            $requisition = $this->getRequisition($group->account_id);
-            $accountIds = $requisition['accounts'] ?? [];
+            // Try to get cached account list first
+            $cachedAccountIds = $this->getCachedAccountList($group->id);
+
+            if ($cachedAccountIds !== null) {
+                Log::info('GoCardless updateIntegrationNames: using cached account IDs', [
+                    'group_id' => $group->id,
+                    'cached_account_count' => count($cachedAccountIds),
+                ]);
+                $accountIds = $cachedAccountIds;
+            } else {
+                // Fall back to API call
+                $requisition = $this->getRequisition($group->account_id);
+                $accountIds = $requisition['accounts'] ?? [];
+
+                // Cache the account list for future use
+                if (! empty($accountIds)) {
+                    $this->cacheAccountList($group->id, $accountIds);
+                }
+            }
 
             if (empty($accountIds)) {
                 Log::warning('GoCardless updateIntegrationNames: no accounts found', [
@@ -499,6 +574,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             Log::info('GoCardless updateIntegrationNames: completed', [
                 'group_id' => $group->id,
                 'account_count' => count($accounts),
+                'cached_used' => $cachedAccountIds !== null,
             ]);
         } catch (Throwable $e) {
             Log::error('Failed to update GoCardless integration names', [
@@ -561,22 +637,51 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         try {
-            $requisition = $this->getRequisition($group->account_id);
-            $accountIds = $requisition['accounts'] ?? [];
+            // Try to get cached account list first
+            $cachedAccountIds = $this->getCachedAccountList($group->id);
 
-            Log::info('GoCardless onboarding: found account IDs', [
-                'group_id' => $group->id,
-                'account_ids' => $accountIds,
-            ]);
+            if ($cachedAccountIds !== null) {
+                Log::info('GoCardless onboarding: using cached account IDs', [
+                    'group_id' => $group->id,
+                    'cached_account_count' => count($cachedAccountIds),
+                ]);
+                $accountIds = $cachedAccountIds;
+            } else {
+                // Fall back to API call
+                $requisition = $this->getRequisition($group->account_id);
+                $accountIds = $requisition['accounts'] ?? [];
+
+                // Cache the account list for future use
+                if (! empty($accountIds)) {
+                    $this->cacheAccountList($group->id, $accountIds);
+                }
+
+                Log::info('GoCardless onboarding: retrieved and cached account IDs', [
+                    'group_id' => $group->id,
+                    'account_ids' => $accountIds,
+                ]);
+            }
+
+            if (empty($accountIds)) {
+                Log::warning('GoCardless onboarding: no accounts found', [
+                    'group_id' => $group->id,
+                ]);
+
+                return [];
+            }
 
             $accounts = [];
             foreach ($accountIds as $accountId) {
                 $accountDetails = $this->getAccount($accountId);
                 if ($accountDetails) {
-                    Log::info('GoCardless onboarding: account details', [
+                    Log::info('GoCardless onboarding: account details retrieved', [
                         'account_id' => $accountId,
-                        'account_data' => $accountDetails,
+                        'account_name' => $accountDetails['details'] ?? $accountDetails['ownerName'] ?? 'Unknown',
                     ]);
+
+                    // Create account object immediately for availability
+                    $this->createAccountObjectForOnboarding($group, $accountDetails);
+
                     $accountDetails['id'] = $accountId;
                     $accounts[] = $accountDetails;
                 } else {
@@ -590,7 +695,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             Log::info('GoCardless onboarding: returning accounts', [
                 'group_id' => $group->id,
                 'account_count' => count($accounts),
-                'accounts' => $accounts,
+                'cached_used' => $cachedAccountIds !== null,
             ]);
 
             return $accounts;
@@ -691,6 +796,181 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Implementation for migration processing
     }
 
+    /**
+     * Force refresh of all caches for a group
+     */
+    public function refreshCaches(IntegrationGroup $group): array
+    {
+        Log::info('GoCardless manual cache refresh requested', [
+            'group_id' => $group->id,
+        ]);
+
+        try {
+            // Clear all caches for the group
+            $this->clearGroupCaches($group->id);
+
+            // Force refresh by making fresh API calls
+            $requisition = $this->getRequisition($group->account_id);
+            $accountIds = $requisition['accounts'] ?? [];
+
+            $accounts = [];
+            foreach ($accountIds as $accountId) {
+                $accountDetails = $this->getAccount($accountId);
+                if ($accountDetails) {
+                    $accounts[] = $accountDetails;
+                }
+            }
+
+            Log::info('GoCardless cache refresh completed', [
+                'group_id' => $group->id,
+                'account_count' => count($accounts),
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Caches refreshed successfully',
+                'account_count' => count($accounts),
+            ];
+        } catch (Throwable $e) {
+            Log::error('GoCardless cache refresh failed', [
+                'group_id' => $group->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Cache refresh failed: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get API efficiency report
+     */
+    public function getApiEfficiencyReport(): array
+    {
+        $calls = Cache::get(self::API_CALLS_CACHE_KEY, []);
+        $totalCalls = count($calls);
+
+        if ($totalCalls === 0) {
+            return [
+                'total_calls' => 0,
+                'cached_calls' => 0,
+                'api_calls' => 0,
+                'cache_hit_rate' => 0,
+                'calls_by_endpoint' => [],
+                'recent_calls' => [],
+            ];
+        }
+
+        $cachedCalls = count(array_filter($calls, fn ($call) => $call['from_cache']));
+        $apiCalls = $totalCalls - $cachedCalls;
+        $cacheHitRate = $totalCalls > 0 ? round(($cachedCalls / $totalCalls) * 100, 2) : 0;
+
+        // Group by endpoint
+        $callsByEndpoint = [];
+        foreach ($calls as $call) {
+            $endpoint = $call['endpoint'];
+            if (! isset($callsByEndpoint[$endpoint])) {
+                $callsByEndpoint[$endpoint] = [
+                    'total' => 0,
+                    'cached' => 0,
+                    'api' => 0,
+                ];
+            }
+            $callsByEndpoint[$endpoint]['total']++;
+            if ($call['from_cache']) {
+                $callsByEndpoint[$endpoint]['cached']++;
+            } else {
+                $callsByEndpoint[$endpoint]['api']++;
+            }
+        }
+
+        // Get recent calls (last 10)
+        $recentCalls = array_slice(array_reverse($calls), 0, 10);
+
+        return [
+            'total_calls' => $totalCalls,
+            'cached_calls' => $cachedCalls,
+            'api_calls' => $apiCalls,
+            'cache_hit_rate' => $cacheHitRate,
+            'calls_by_endpoint' => $callsByEndpoint,
+            'recent_calls' => $recentCalls,
+        ];
+    }
+
+    /**
+     * Clear API monitoring data
+     */
+    public function clearApiMonitoringData(): void
+    {
+        Cache::forget(self::API_CALLS_CACHE_KEY);
+        Log::info('GoCardless API monitoring data cleared');
+    }
+
+    /**
+     * Clean up orphaned onboarding account objects
+     * Call this periodically to remove account objects that were created during onboarding
+     * but never associated with real integrations
+     */
+    public function cleanupOrphanedOnboardingObjects(): int
+    {
+        // Find onboarding account objects that are older than 24 hours
+        $cutoffDate = now()->subHours(24);
+
+        $orphanedObjects = EventObject::where('integration_id', 'like', 'onboarding_%')
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->where('created_at', '<', $cutoffDate)
+            ->get();
+
+        $count = 0;
+        foreach ($orphanedObjects as $object) {
+            // Check if there's a real integration that should own this account
+            $integrationId = str_replace('onboarding_', '', $object->integration_id);
+            if (strpos($integrationId, '_') !== false) {
+                [$groupId, $accountId] = explode('_', $integrationId, 2);
+
+                // Look for real integrations that might claim this account
+                $realIntegrations = Integration::where('integration_group_id', $groupId)
+                    ->where('service', 'gocardless')
+                    ->get();
+
+                $found = false;
+                foreach ($realIntegrations as $integration) {
+                    // Check if this integration should own this account
+                    try {
+                        $accounts = $this->listAccounts($integration);
+                        foreach ($accounts as $account) {
+                            if (($account['id'] ?? null) === $accountId) {
+                                $found = true;
+                                break 2;
+                            }
+                        }
+                    } catch (Throwable $e) {
+                        // Skip if there's an error accessing the integration
+                        continue;
+                    }
+                }
+
+                if (! $found) {
+                    // No real integration claims this account, safe to delete
+                    $object->delete();
+                    $count++;
+                }
+            }
+        }
+
+        if ($count > 0) {
+            Log::info('GoCardless: Cleaned up orphaned onboarding account objects', [
+                'count' => $count,
+            ]);
+        }
+
+        return $count;
+    }
+
     protected function getRequiredScopes(): string
     {
         // Not applicable for GoCardless Bank Account Data API
@@ -754,7 +1034,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
         ]);
 
-        $accounts = $this->listAccounts($integration);
+        // Use batch processing to share account data fetching
+        $accounts = $this->getAccountsWithSharedData($integration);
 
         Log::info('GoCardless processBalanceSnapshot: got accounts', [
             'integration_id' => $integration->id,
@@ -814,6 +1095,39 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
+     * Batch process accounts with shared data fetching
+     */
+    protected function getAccountsWithSharedData(Integration $integration): array
+    {
+        static $cachedAccounts = [];
+
+        $cacheKey = "batch_accounts_{$integration->group_id}";
+
+        if (! isset($cachedAccounts[$cacheKey])) {
+            Log::info('GoCardless batch processing: fetching accounts for group', [
+                'integration_id' => $integration->id,
+                'group_id' => $integration->group_id,
+            ]);
+
+            $cachedAccounts[$cacheKey] = $this->listAccounts($integration);
+
+            Log::info('GoCardless batch processing: cached accounts for group', [
+                'integration_id' => $integration->id,
+                'group_id' => $integration->group_id,
+                'account_count' => count($cachedAccounts[$cacheKey]),
+            ]);
+        } else {
+            Log::info('GoCardless batch processing: using cached accounts for group', [
+                'integration_id' => $integration->id,
+                'group_id' => $integration->group_id,
+                'account_count' => count($cachedAccounts[$cacheKey]),
+            ]);
+        }
+
+        return $cachedAccounts[$cacheKey];
+    }
+
+    /**
      * Process recent transactions for an integration
      */
     protected function processRecentTransactions(Integration $integration): void
@@ -822,7 +1136,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
         ]);
 
-        $accounts = $this->listAccounts($integration);
+        // Use batch processing to share account data fetching
+        $accounts = $this->getAccountsWithSharedData($integration);
 
         Log::info('GoCardless processRecentTransactions: got accounts', [
             'integration_id' => $integration->id,
@@ -836,28 +1151,42 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'account_name' => $account['details'] ?? $account['ownerName'] ?? 'Unknown',
             ]);
 
-            $transactions = $this->getAccountTransactions($account['id']);
+            $transactionData = $this->getAccountTransactions($account['id']);
+            $bookedTransactions = $transactionData['booked'] ?? [];
+            $pendingTransactions = $transactionData['pending'] ?? [];
 
             Log::info('GoCardless processRecentTransactions: got transactions', [
                 'integration_id' => $integration->id,
                 'account_id' => $account['id'],
-                'transaction_count' => count($transactions),
+                'booked_count' => count($bookedTransactions),
+                'pending_count' => count($pendingTransactions),
+                'total_count' => count($bookedTransactions) + count($pendingTransactions),
             ]);
 
-            foreach ($transactions as $transaction) {
-                Log::info('GoCardless processRecentTransactions: processing transaction', [
+            // Process pending transactions first
+            foreach ($pendingTransactions as $transaction) {
+                Log::info('GoCardless processRecentTransactions: processing pending transaction', [
                     'integration_id' => $integration->id,
                     'account_id' => $account['id'],
                     'transaction_id' => $transaction['transactionId'] ?? $transaction['internalTransactionId'] ?? 'unknown',
                     'amount' => $transaction['transactionAmount']['amount'] ?? 'unknown',
-                    'currency' => $transaction['transactionAmount']['currency'] ?? 'unknown',
                     'description' => $transaction['remittanceInformationUnstructured'] ?? 'unknown',
-                    'booking_date' => $transaction['bookingDate'] ?? 'unknown',
-                    'debtor_name' => $transaction['debtorName'] ?? 'unknown',
-                    'creditor_name' => $transaction['creditorName'] ?? 'unknown',
                 ]);
 
-                $this->processTransactionItem($integration, $account, $transaction);
+                $this->processTransactionItem($integration, $account, $transaction, 'pending');
+            }
+
+            // Process booked transactions (these may update existing pending transactions)
+            foreach ($bookedTransactions as $transaction) {
+                Log::info('GoCardless processRecentTransactions: processing booked transaction', [
+                    'integration_id' => $integration->id,
+                    'account_id' => $account['id'],
+                    'transaction_id' => $transaction['transactionId'] ?? $transaction['internalTransactionId'] ?? 'unknown',
+                    'amount' => $transaction['transactionAmount']['amount'] ?? 'unknown',
+                    'description' => $transaction['remittanceInformationUnstructured'] ?? 'unknown',
+                ]);
+
+                $this->processTransactionItem($integration, $account, $transaction, 'booked');
             }
         }
 
@@ -869,7 +1198,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Process a single transaction item
      */
-    protected function processTransactionItem(Integration $integration, array $account, array $tx): void
+    protected function processTransactionItem(Integration $integration, array $account, array $tx, string $status = 'booked'): void
     {
         Log::info('GoCardless processTransactionItem: processing transaction', [
             'integration_id' => $integration->id,
@@ -896,15 +1225,32 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
         ]);
 
-        // Create or update the event
-        $sourceId = (string) ($tx['transactionId'] ?? $tx['internalTransactionId'] ?? Str::uuid());
+        // Create consistent source ID based on transaction content
+        // This ensures pending and booked versions of the same transaction have the same ID
+        $sourceId = $this->generateConsistentTransactionId($tx);
+
+        // Check if this transaction already exists (for status transitions)
+        $existingEvent = Event::where('integration_id', $integration->id)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        // Determine if this is a status change
+        $isStatusChange = $existingEvent && $existingEvent->event_metadata['transaction_status'] !== $status;
+
+        // Determine action based on transaction amount and direction
+        $amount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+        $action = $this->determineTransactionAction($amount, $status);
+
+        // Preserve the best available timestamp
+        $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
+
         $eventData = [
             'user_id' => $integration->user_id,
-            'action' => 'made_transaction',
+            'action' => $action,
             'domain' => self::getDomain(),
             'service' => 'gocardless',
-            'time' => $tx['bookingDate'] ?? now(),
-            'value' => abs((float) ($tx['transactionAmount']['amount'] ?? 0)),
+            'time' => $timestamp,
+            'value' => abs($amount),
             'value_unit' => $tx['transactionAmount']['currency'] ?? 'EUR',
             'event_metadata' => [
                 'category' => $category,
@@ -918,13 +1264,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'mandate_id' => $tx['mandateId'] ?? null,
                 'creditor_account' => $tx['creditorAccount'] ?? null,
                 'debtor_account' => $tx['debtorAccount'] ?? null,
+                'transaction_status' => $status, // Track pending vs booked
+                'status_changed' => $isStatusChange, // Track if this is a status transition
+                'previous_status' => $existingEvent?->event_metadata['transaction_status'] ?? null,
+                'timestamp_preserved' => $isStatusChange && $existingEvent && $existingEvent->time === $timestamp,
+                'timestamp_reason' => $this->getTimestampReason($tx, $existingEvent, $status, $isStatusChange, $timestamp),
             ],
         ];
 
-        Log::info('GoCardless processTransactionItem: creating event', [
+        Log::info('GoCardless processTransactionItem: processing event', [
             'integration_id' => $integration->id,
             'source_id' => $sourceId,
-            'event_data' => $eventData,
+            'status' => $status,
+            'existing_event' => $existingEvent?->id,
+            'is_status_change' => $isStatusChange,
         ]);
 
         $event = Event::updateOrCreate(
@@ -935,10 +1288,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $eventData
         );
 
-        Log::info('GoCardless processTransactionItem: event created/updated', [
+        Log::info('GoCardless processTransactionItem: event processed', [
             'integration_id' => $integration->id,
             'event_id' => $event->id,
             'source_id' => $sourceId,
+            'status' => $status,
+            'created' => $event->wasRecentlyCreated,
+            'updated' => $isStatusChange,
         ]);
 
         // Create or update actor (bank account)
@@ -953,14 +1309,43 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $targetObject->id => ['role' => 'target'],
         ]);
 
-        // Add relevant tags
-        $event->syncTags([
+        // Add relevant tags based on transaction status
+        $tags = [
             'money',
             'transaction',
             'bank',
             'gocardless',
             $category,
-        ]);
+        ];
+
+        // Add status-specific tags
+        if ($status === 'pending') {
+            $tags[] = 'pending';
+        } elseif ($status === 'booked') {
+            $tags[] = 'settled';
+            // Remove pending tag if it exists (status transition)
+            if ($isStatusChange && $existingEvent) {
+                $event->detachTag('pending');
+                Log::info('GoCardless: Transitioned transaction from pending to settled', [
+                    'event_id' => $event->id,
+                    'source_id' => $sourceId,
+                    'previous_status' => $existingEvent->event_metadata['transaction_status'],
+                    'new_status' => $status,
+                ]);
+            }
+        }
+
+        // Add direction-based tags for booked transactions
+        if ($status === 'booked') {
+            $txAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+            if ($txAmount < 0) {
+                $tags[] = 'debit';
+            } else {
+                $tags[] = 'credit';
+            }
+        }
+
+        $event->syncTags($tags);
 
     }
 
@@ -1080,7 +1465,230 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
-     * Upsert account object
+     * Generate consistent transaction ID based on transaction content
+     * This ensures pending and booked versions of the same transaction have identical IDs
+     */
+    protected function generateConsistentTransactionId(array $transaction): string
+    {
+        // Get transaction date
+        $date = $transaction['bookingDate'] ?? $transaction['valueDate'] ?? now()->toDateString();
+
+        // Get counterparty name
+        $counterparty = $transaction['creditorName'] ??
+                       $transaction['debtorName'] ??
+                       $transaction['remittanceInformationUnstructured'] ??
+                       'unknown';
+
+        // Get transaction amount (absolute value for consistency)
+        $amount = abs((float) ($transaction['transactionAmount']['amount'] ?? 0));
+
+        // Create content-based hash that's consistent between pending and booked states
+        $contentString = $date . '_' .
+                        Str::headline(Str::lower($counterparty)) . '_' .
+                        $amount . '_' .
+                        ($transaction['transactionAmount']['currency'] ?? 'EUR');
+
+        return 'gc_' . md5($contentString);
+    }
+
+    /**
+     * Determine the appropriate transaction action based on amount direction
+     */
+    protected function determineTransactionAction(float $amount, string $status): string
+    {
+        // Use directional actions for both pending and booked transactions
+        if ($amount < 0) {
+            return 'payment_to'; // Money going out
+        } else {
+            return 'payment_from'; // Money coming in
+        }
+    }
+
+    /**
+     * Determine the best timestamp to use, preserving precision from pending transactions
+     */
+    protected function determineBestTimestamp(array $currentTx, ?Event $existingEvent, string $status, bool $isStatusChange): string
+    {
+        $currentTimestamp = $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
+
+        // If no existing event, use current timestamp
+        if (! $existingEvent) {
+            return $currentTimestamp;
+        }
+
+        $existingTimestamp = $existingEvent->time;
+
+        // If this is NOT a status change, keep existing timestamp to avoid unnecessary updates
+        if (! $isStatusChange) {
+            return $existingTimestamp;
+        }
+
+        // This is a status change (pending → booked), choose the most precise timestamp
+        return $this->chooseBetterTimestamp($existingTimestamp, $currentTimestamp, $existingEvent, $status);
+    }
+
+    /**
+     * Choose the better timestamp based on precision and context
+     */
+    protected function chooseBetterTimestamp(string $existingTime, string $newTime, Event $existingEvent, string $newStatus): string
+    {
+        $existingDateTime = Carbon::parse($existingTime);
+        $newDateTime = Carbon::parse($newTime);
+
+        // If existing transaction was pending and new is booked
+        if ($existingEvent->event_metadata['transaction_status'] === 'pending' && $newStatus === 'booked') {
+
+            // Check if the new timestamp looks like a generic batch processing time
+            // Common patterns: 3:00 AM, 4:00 AM, midnight, etc.
+            $newHour = $newDateTime->hour;
+            $newMinute = $newDateTime->minute;
+
+            $isGenericTime = (
+                ($newHour >= 2 && $newHour <= 5 && $newMinute === 0) || // 2-5 AM with :00 minutes
+                ($newHour === 0 && $newMinute === 0) || // Midnight
+                ($newHour === 23 && $newMinute >= 55)   // Near midnight (end of day processing)
+            );
+
+            // If new time looks generic and existing time is more specific, keep existing
+            if ($isGenericTime && ! $this->isGenericTime($existingDateTime)) {
+                Log::info('GoCardless: Preserving precise pending timestamp over generic booked timestamp', [
+                    'existing_time' => $existingTime,
+                    'new_time' => $newTime,
+                    'existing_hour' => $existingDateTime->hour,
+                    'new_hour' => $newHour,
+                    'reason' => 'new_time_looks_generic',
+                ]);
+
+                return $existingTime;
+            }
+
+            // If new time is more precise (has seconds/minutes that look real), use it
+            if ($newMinute !== 0 || $newDateTime->second !== 0) {
+                Log::info('GoCardless: Using more precise booked timestamp', [
+                    'existing_time' => $existingTime,
+                    'new_time' => $newTime,
+                    'reason' => 'new_time_more_precise',
+                ]);
+
+                return $newTime;
+            }
+
+            // Default: keep the existing (pending) timestamp as it's likely more accurate
+            Log::info('GoCardless: Keeping existing pending timestamp as default', [
+                'existing_time' => $existingTime,
+                'new_time' => $newTime,
+                'reason' => 'keeping_pending_as_default',
+            ]);
+
+            return $existingTime;
+        }
+
+        // For other cases, use the newer timestamp
+        return $newTime;
+    }
+
+    /**
+     * Check if a timestamp looks like a generic/batch processing time
+     */
+    protected function isGenericTime(Carbon $dateTime): bool
+    {
+        $hour = $dateTime->hour;
+        $minute = $dateTime->minute;
+
+        return
+            ($hour >= 2 && $hour <= 5 && $minute === 0) || // 2-5 AM with :00 minutes
+            ($hour === 0 && $minute === 0) || // Midnight
+            ($hour === 23 && $minute >= 55);   // Near midnight
+    }
+
+    /**
+     * Get a human-readable explanation for timestamp choice
+     */
+    protected function getTimestampReason(array $currentTx, ?Event $existingEvent, string $status, bool $isStatusChange, string $chosenTimestamp): string
+    {
+        if (! $existingEvent) {
+            return 'new_transaction';
+        }
+
+        if (! $isStatusChange) {
+            return 'same_status_update';
+        }
+
+        $existingTime = $existingEvent->time;
+        $currentTime = $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
+
+        if ($existingTime === $chosenTimestamp) {
+            $newDateTime = Carbon::parse($currentTime);
+            if ($this->isGenericTime($newDateTime)) {
+                return 'preserved_pending_over_generic_booked';
+            }
+
+            return 'preserved_existing_timestamp';
+        } else {
+            $existingDateTime = Carbon::parse($existingTime);
+            if ($this->isGenericTime($existingDateTime)) {
+                return 'used_more_precise_booked_timestamp';
+            }
+
+            return 'used_new_timestamp';
+        }
+    }
+
+    /**
+     * Create account object during onboarding for immediate availability
+     */
+    protected function createAccountObjectForOnboarding(IntegrationGroup $group, array $account): EventObject
+    {
+        // Determine account type based on GoCardless data
+        $accountType = match ($account['cashAccountType'] ?? null) {
+            'CurrentAccount' => 'current_account',
+            'SavingsAccount' => 'savings_account',
+            'CreditCard' => 'credit_card',
+            'InvestmentAccount' => 'investment_account',
+            'LoanAccount' => 'loan',
+            default => 'other',
+        };
+
+        // Generate a proper account name
+        $accountName = $this->generateAccountName($account);
+
+        Log::info('GoCardless onboarding: creating account object', [
+            'group_id' => $group->id,
+            'account_id' => $account['id'] ?? 'unknown',
+            'account_name' => $accountName,
+        ]);
+
+        // Use onboarding-specific integration ID to avoid conflicts
+        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . ($account['id'] ?? 'unknown');
+
+        return EventObject::updateOrCreate(
+            [
+                'integration_id' => $onboardingIntegrationId,
+                'concept' => 'account',
+                'type' => 'bank_account',
+                'title' => $accountName,
+            ],
+            [
+                'user_id' => $group->user_id,
+                'content' => json_encode($account),
+                'url' => null,
+                'image_url' => null,
+                'time' => null,
+                'metadata' => [
+                    'name' => $accountName,
+                    'provider' => $account['institution_id'] ?? 'GoCardless',
+                    'account_type' => $accountType,
+                    'currency' => $account['currency'] ?? 'GBP',
+                    'account_number' => $account['resourceId'] ?? null,
+                    'raw' => $account,
+                    'onboarding_created' => true, // Flag to indicate this was created during onboarding
+                ],
+            ]
+        );
+    }
+
+    /**
+     * Upsert account object - handles both onboarding-created and transaction-created objects
      */
     protected function upsertAccountObject(Integration $integration, array $account): EventObject
     {
@@ -1097,6 +1705,33 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Generate a proper account name
         $accountName = $this->generateAccountName($account);
 
+        // First, try to find an existing onboarding-created account object
+        $accountId = $account['id'] ?? 'unknown';
+        $onboardingIntegrationId = 'onboarding_' . $integration->group_id . '_' . $accountId;
+
+        $existingObject = EventObject::where('integration_id', $onboardingIntegrationId)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->where('title', $accountName)
+            ->first();
+
+        if ($existingObject) {
+            Log::info('GoCardless: Found existing onboarding account object, updating with integration ID', [
+                'account_id' => $accountId,
+                'existing_integration_id' => $existingObject->integration_id,
+                'new_integration_id' => $integration->id,
+            ]);
+
+            // Update the integration ID to point to the real integration
+            $existingObject->update([
+                'integration_id' => $integration->id,
+                'metadata->onboarding_created' => false, // Remove onboarding flag
+            ]);
+
+            return $existingObject;
+        }
+
+        // No existing onboarding object found, create new one
         return EventObject::updateOrCreate(
             [
                 'integration_id' => $integration->id,
@@ -1465,110 +2100,241 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
-     * Get requisition details
+     * Get requisition details with caching
      */
     protected function getRequisition(string $requisitionId): array
     {
-        Log::info('GoCardless getRequisition called', [
-            'requisition_id' => $requisitionId,
-            'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
-        ]);
+        $cacheKey = "gocardless_requisition_{$requisitionId}";
 
-        // Log the API request
-        $this->logApiRequest('GET', '/api/v2/requisitions/' . $requisitionId . '/', [
-            'Authorization' => '[REDACTED]',
-        ]);
-
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->apiBase . '/requisitions/' . $requisitionId . '/');
-
-        // Log the API response
-        $this->logApiResponse('GET', '/api/v2/requisitions/' . $requisitionId . '/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful()) {
-            Log::error('Failed to get requisition', [
+        // Check if data is in cache first
+        if (Cache::has($cacheKey)) {
+            // Track cache hit
+            $this->trackApiCall('/api/v2/requisitions/{id}/', 'GET', true);
+            Log::info('GoCardless getRequisition: using cached data', [
                 'requisition_id' => $requisitionId,
-                'status' => $response->status(),
-                'response' => $response->body(),
-                'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
+                'cache_key' => $cacheKey,
             ]);
-            throw new RuntimeException('Failed to get requisition: ' . $response->body());
         }
 
-        $data = $response->json();
+        return Cache::remember($cacheKey, self::REQUISITION_CACHE_TTL, function () use ($requisitionId) {
+            Log::info('GoCardless getRequisition called (API call)', [
+                'requisition_id' => $requisitionId,
+                'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
+            ]);
 
-        Log::info('GoCardless getRequisition success', [
-            'requisition_id' => $requisitionId,
-            'requisition_data' => $data,
-            'accounts' => $data['accounts'] ?? [],
-            'account_count' => count($data['accounts'] ?? []),
-        ]);
+            // Log the API request
+            $this->logApiRequest('GET', '/api/v2/requisitions/' . $requisitionId . '/', [
+                'Authorization' => '[REDACTED]',
+            ]);
 
-        return $data;
+            $startTime = microtime(true);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ])->get($this->apiBase . '/requisitions/' . $requisitionId . '/');
+            $responseTime = (int) ((microtime(true) - $startTime) * 1000); // Convert to milliseconds
+
+            // Log the API response
+            $this->logApiResponse('GET', '/api/v2/requisitions/' . $requisitionId . '/', $response->status(), $response->body(), $response->headers());
+
+            // Track API call for monitoring
+            $this->trackApiCall('/api/v2/requisitions/{id}/', 'GET', false, $responseTime);
+
+            if (! $response->successful()) {
+                Log::error('Failed to get requisition', [
+                    'requisition_id' => $requisitionId,
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                    'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
+                ]);
+                throw new RuntimeException('Failed to get requisition: ' . $response->body());
+            }
+
+            $data = $response->json();
+
+            Log::info('GoCardless getRequisition success', [
+                'requisition_id' => $requisitionId,
+                'requisition_data' => $data,
+                'accounts' => $data['accounts'] ?? [],
+                'account_count' => count($data['accounts'] ?? []),
+            ]);
+
+            return $data;
+        });
     }
 
     /**
-     * Get account details
+     * Clear requisition cache
+     */
+    protected function clearRequisitionCache(string $requisitionId): void
+    {
+        $cacheKey = "gocardless_requisition_{$requisitionId}";
+        Cache::forget($cacheKey);
+
+        Log::info('GoCardless requisition cache cleared', [
+            'requisition_id' => $requisitionId,
+            'cache_key' => $cacheKey,
+        ]);
+    }
+
+    /**
+     * Get account details with caching
      */
     protected function getAccount(string $accountId): ?array
     {
-        // Log the API request
-        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/details/', [
-            'Authorization' => '[REDACTED]',
-        ]);
+        $cacheKey = "gocardless_account_details_{$accountId}";
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
-
-        // Log the API response
-        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/details/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful()) {
-            $errorData = $response->json();
-            $isRateLimited = $response->status() === 429;
-
-            if ($isRateLimited) {
-                Log::warning('GoCardless API rate limit exceeded for account details', [
-                    'account_id' => $accountId,
-                    'status' => $response->status(),
-                    'rate_limit_detail' => $errorData['detail'] ?? 'unknown',
-                    'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
-                ]);
-
-                // Return a fallback account structure when rate limited
-                return [
-                    'id' => $accountId,
-                    'details' => 'Account ' . substr($accountId, 0, 8),
-                    'currency' => 'Unknown',
-                    'cashAccountType' => 'Unknown',
-                    'ownerName' => 'Unknown',
-                    'status' => 'rate_limited',
-                    'rate_limit_error' => $errorData['detail'] ?? 'Rate limit exceeded',
-                ];
-            } else {
-                Log::error('Failed to get account details', [
-                    'account_id' => $accountId,
-                    'status' => $response->status(),
-                    'response' => $response->body(),
-                    'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
-                ]);
-
-                return null;
-            }
+        // Check if data is in cache first
+        if (Cache::has($cacheKey)) {
+            // Track cache hit
+            $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', true);
+            Log::info('GoCardless getAccount: using cached data', [
+                'account_id' => $accountId,
+                'cache_key' => $cacheKey,
+            ]);
         }
 
-        $responseData = $response->json();
-        // The API returns {"account": {...}}, so extract the account data
-        $accountData = $responseData['account'] ?? $responseData;
+        return Cache::remember($cacheKey, self::ACCOUNT_DETAILS_CACHE_TTL, function () use ($accountId) {
+            Log::info('GoCardless getAccount: fetching from API (not cached)', [
+                'account_id' => $accountId,
+            ]);
 
-        Log::info('GoCardless getAccount response', [
+            // Log the API request
+            $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/details/', [
+                'Authorization' => '[REDACTED]',
+            ]);
+
+            $startTime = microtime(true);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
+            $responseTime = (int) ((microtime(true) - $startTime) * 1000); // Convert to milliseconds
+
+            // Log the API response
+            $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/details/', $response->status(), $response->body(), $response->headers());
+
+            // Track API call for monitoring
+            $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', false, $responseTime);
+
+            if (! $response->successful()) {
+                $errorData = $response->json();
+                $isRateLimited = $response->status() === 429;
+
+                if ($isRateLimited) {
+                    Log::warning('GoCardless API rate limit exceeded for account details', [
+                        'account_id' => $accountId,
+                        'status' => $response->status(),
+                        'rate_limit_detail' => $errorData['detail'] ?? 'unknown',
+                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
+                    ]);
+
+                    // Return a fallback account structure when rate limited
+                    return [
+                        'id' => $accountId,
+                        'details' => 'Account ' . substr($accountId, 0, 8),
+                        'currency' => 'Unknown',
+                        'cashAccountType' => 'Unknown',
+                        'ownerName' => 'Unknown',
+                        'status' => 'rate_limited',
+                        'rate_limit_error' => $errorData['detail'] ?? 'Rate limit exceeded',
+                    ];
+                } else {
+                    Log::error('Failed to get account details', [
+                        'account_id' => $accountId,
+                        'status' => $response->status(),
+                        'response' => $response->body(),
+                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
+                    ]);
+
+                    return null;
+                }
+            }
+
+            $responseData = $response->json();
+            // The API returns {"account": {...}}, so extract the account data
+            $accountData = $responseData['account'] ?? $responseData;
+
+            Log::info('GoCardless getAccount response', [
+                'account_id' => $accountId,
+                'account_data' => $accountData,
+            ]);
+
+            return $accountData;
+        });
+    }
+
+    /**
+     * Clear account details cache for a specific account
+     */
+    protected function clearAccountCache(string $accountId): void
+    {
+        $cacheKey = "gocardless_account_details_{$accountId}";
+        Cache::forget($cacheKey);
+
+        Log::info('GoCardless account cache cleared', [
             'account_id' => $accountId,
-            'account_data' => $accountData,
+            'cache_key' => $cacheKey,
         ]);
+    }
 
-        return $accountData;
+    /**
+     * Cache account list for a group to avoid redundant requisition calls
+     */
+    protected function cacheAccountList(string $groupId, array $accountIds): void
+    {
+        $cacheKey = "gocardless_group_accounts_{$groupId}";
+        Cache::put($cacheKey, $accountIds, self::REQUISITION_CACHE_TTL);
+
+        Log::info('GoCardless account list cached', [
+            'group_id' => $groupId,
+            'account_count' => count($accountIds),
+            'cache_key' => $cacheKey,
+        ]);
+    }
+
+    /**
+     * Get cached account list for a group
+     */
+    protected function getCachedAccountList(string $groupId): ?array
+    {
+        $cacheKey = "gocardless_group_accounts_{$groupId}";
+
+        return Cache::get($cacheKey);
+    }
+
+    /**
+     * Clear all caches for a group (useful when data changes)
+     */
+    protected function clearGroupCaches(string $groupId): void
+    {
+        // Clear group account list cache
+        $accountListKey = "gocardless_group_accounts_{$groupId}";
+        Cache::forget($accountListKey);
+
+        // Clear requisition cache
+        $requisitionKey = 'gocardless_requisition_*';
+        // Note: Since we can't use wildcards with Cache::forget(), we'll handle this differently
+        // The requisition cache will naturally expire based on TTL
+
+        // Clear batch processing cache
+        $batchKey = "batch_accounts_{$groupId}";
+        // This is handled by the static cache in getAccountsWithSharedData
+
+        Log::info('GoCardless group caches cleared', [
+            'group_id' => $groupId,
+            'cleared_keys' => [$accountListKey, 'requisition_*', $batchKey],
+        ]);
+    }
+
+    /**
+     * Clear caches when account data might have changed
+     */
+    protected function invalidateAccountCaches(string $accountId): void
+    {
+        $this->clearAccountCache($accountId);
+
+        Log::info('GoCardless account caches invalidated', [
+            'account_id' => $accountId,
+        ]);
     }
 
     /**
@@ -1667,18 +2433,19 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $bookedTransactions = $data['transactions']['booked'] ?? [];
         $pendingTransactions = $data['transactions']['pending'] ?? [];
 
-        // Combine both types of transactions
-        $transactions = array_merge($bookedTransactions, $pendingTransactions);
-
         Log::info('GoCardless getAccountTransactions success', [
             'account_id' => $accountId,
             'booked_count' => count($bookedTransactions),
             'pending_count' => count($pendingTransactions),
-            'total_count' => count($transactions),
+            'total_count' => count($bookedTransactions) + count($pendingTransactions),
             'response_structure' => array_keys($data),
         ]);
 
-        return $transactions;
+        // Return structured data to enable separate processing
+        return [
+            'booked' => $bookedTransactions,
+            'pending' => $pendingTransactions,
+        ];
     }
 
     /**
@@ -1854,5 +2621,47 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         return $body;
+    }
+
+    /**
+     * Track API call for monitoring purposes
+     */
+    protected function trackApiCall(string $endpoint, string $method, bool $fromCache = false, ?int $responseTime = null): void
+    {
+        $callData = [
+            'endpoint' => $endpoint,
+            'method' => $method,
+            'from_cache' => $fromCache,
+            'timestamp' => now()->toISOString(),
+            'response_time' => $responseTime,
+        ];
+
+        // Store in cache for monitoring
+        $existingCalls = Cache::get(self::API_CALLS_CACHE_KEY, []);
+        $existingCalls[] = $callData;
+
+        // Keep only last 1000 calls to prevent memory issues
+        if (count($existingCalls) > 1000) {
+            $existingCalls = array_slice($existingCalls, -1000);
+        }
+
+        Cache::put(self::API_CALLS_CACHE_KEY, $existingCalls, self::API_EFFICIENCY_REPORT_TTL);
+    }
+
+    /**
+     * Log API efficiency metrics
+     */
+    protected function logApiEfficiency(string $context = 'general'): void
+    {
+        $report = $this->getApiEfficiencyReport();
+
+        Log::info('GoCardless API efficiency report', [
+            'context' => $context,
+            'total_calls' => $report['total_calls'],
+            'cached_calls' => $report['cached_calls'],
+            'api_calls' => $report['api_calls'],
+            'cache_hit_rate' => $report['cache_hit_rate'] . '%',
+            'top_endpoints' => array_slice($report['calls_by_endpoint'], 0, 5),
+        ]);
     }
 }

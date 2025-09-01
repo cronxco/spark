@@ -60,13 +60,9 @@ Route::middleware(['auth'])->group(function () {
         return view('plugins.show', ['service' => $service, 'pluginClass' => $pluginClass]);
     })->name('plugins.show');
 
-    Route::get('integrations/{integration}/details', function (\App\Models\Integration $integration) {
-        if ((string) $integration->user_id !== (string) Auth::id()) {
-            abort(403);
-        }
-
-        return view('integrations.details', ['integration' => $integration]);
-    })->whereUuid('integration')->name('integrations.details');
+    Route::get('integrations/{integration}/details', \App\Livewire\IntegrationDetails::class)
+        ->whereUuid('integration')
+        ->name('integrations.details');
 
     // Money routes
     Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');
