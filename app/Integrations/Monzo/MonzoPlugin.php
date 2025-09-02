@@ -709,6 +709,26 @@ class MonzoPlugin extends OAuthPlugin
         return [];
     }
 
+    public function listAccounts(Integration $integration): array
+    {
+        // Log the API request
+        $this->logApiRequest('GET', '/accounts', [
+            'Authorization' => '[REDACTED]',
+        ], [], $integration->id);
+
+        $resp = Http::withHeaders($this->authHeaders($integration))
+            ->get($this->apiBase . '/accounts');
+
+        // Log the API response
+        $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
+        if (! $resp->successful()) {
+            return [];
+        }
+
+        return $resp->json('accounts') ?? [];
+    }
+
     protected function getRequiredScopes(): string
     {
         // Monzo OAuth scopes needed for read-only ingestion
@@ -764,26 +784,6 @@ class MonzoPlugin extends OAuthPlugin
         }
 
         return $accounts[0] ?? null;
-    }
-
-    protected function listAccounts(Integration $integration): array
-    {
-        // Log the API request
-        $this->logApiRequest('GET', '/accounts', [
-            'Authorization' => '[REDACTED]',
-        ], [], $integration->id);
-
-        $resp = Http::withHeaders($this->authHeaders($integration))
-            ->get($this->apiBase . '/accounts');
-
-        // Log the API response
-        $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
-
-        if (! $resp->successful()) {
-            return [];
-        }
-
-        return $resp->json('accounts') ?? [];
     }
 
     protected function processPotsSnapshot(Integration $integration, array $account): void

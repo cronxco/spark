@@ -369,6 +369,14 @@ class SpotifyPlugin extends OAuthPlugin
     }
 
     /**
+     * Make an authenticated request to the Spotify API
+     */
+    public function makeAuthenticatedApiRequest(string $endpoint, Integration $integration, array $query = []): array
+    {
+        return $this->makeAuthenticatedRequest($endpoint, $integration, $query);
+    }
+
+    /**
      * Log API request details for debugging
      */
     public function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
