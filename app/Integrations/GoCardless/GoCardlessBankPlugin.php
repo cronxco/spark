@@ -971,6 +971,39 @@ class GoCardlessBankPlugin extends OAuthPlugin
         return $count;
     }
 
+    /**
+     * Log API request details for debugging
+     */
+    public function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
+    {
+        log_integration_api_request(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $this->sanitizeHeaders($headers),
+            $this->sanitizeData($data),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
+    /**
+     * Log API response details for debugging
+     */
+    public function logApiResponse(string $method, string $endpoint, int $statusCode, string $body, array $headers = [], ?string $integrationId = null): void
+    {
+        log_integration_api_response(
+            static::getIdentifier(),
+            $method,
+            $endpoint,
+            $statusCode,
+            $this->sanitizeResponseBody($body),
+            $this->sanitizeHeaders($headers),
+            $integrationId ?: '',
+            true // Use per-instance logging
+        );
+    }
+
     protected function getRequiredScopes(): string
     {
         // Not applicable for GoCardless Bank Account Data API
@@ -2511,39 +2544,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
 
         return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
-    }
-
-    /**
-     * Log API request details for debugging
-     */
-    protected function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
-    {
-        log_integration_api_request(
-            static::getIdentifier(),
-            $method,
-            $endpoint,
-            $this->sanitizeHeaders($headers),
-            $this->sanitizeData($data),
-            $integrationId ?: '',
-            true // Use per-instance logging
-        );
-    }
-
-    /**
-     * Log API response details for debugging
-     */
-    protected function logApiResponse(string $method, string $endpoint, int $statusCode, string $body, array $headers = [], ?string $integrationId = null): void
-    {
-        log_integration_api_response(
-            static::getIdentifier(),
-            $method,
-            $endpoint,
-            $statusCode,
-            $this->sanitizeResponseBody($body),
-            $this->sanitizeHeaders($headers),
-            $integrationId ?: '',
-            true // Use per-instance logging
-        );
     }
 
     /**
