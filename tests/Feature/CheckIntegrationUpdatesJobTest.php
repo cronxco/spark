@@ -3,7 +3,8 @@
 namespace Tests\Feature;
 
 use App\Jobs\CheckIntegrationUpdates;
-use App\Jobs\ProcessIntegrationData;
+use App\Jobs\OAuth\GitHub\GitHubActivityPull;
+use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
@@ -81,11 +82,17 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         $job = new CheckIntegrationUpdates;
         $job->handle();
 
-        // Should dispatch ProcessIntegrationData jobs for integrations 1 and 2
-        Queue::assertPushed(ProcessIntegrationData::class, 2);
+        // Should dispatch service-specific jobs for integrations 1 and 2
+        Queue::assertPushed(GitHubActivityPull::class, 1);
+        Queue::assertPushed(SpotifyListeningPull::class, 1);
 
-        // We can't access the protected integration property directly, so we'll just verify the count
-        // The job dispatching logic is tested in the integration tests
+        // Verify that the jobs were dispatched with the correct integrations
+        Queue::assertPushed(GitHubActivityPull::class, function ($job) use ($integration1) {
+            return $job->getIntegration()->id === $integration1->id;
+        });
+        Queue::assertPushed(SpotifyListeningPull::class, function ($job) use ($integration2) {
+            return $job->getIntegration()->id === $integration2->id;
+        });
     }
 
     #[Test]

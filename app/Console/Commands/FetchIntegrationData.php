@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Integrations\PluginRegistry;
-use App\Jobs\ProcessIntegrationData;
+use App\Jobs\CheckIntegrationUpdates;
 use App\Models\Integration;
 use Exception;
 use Illuminate\Console\Command;
@@ -114,16 +114,20 @@ class FetchIntegrationData extends Command
                     continue;
                 }
 
-                // Dispatch the job instead of processing directly
-                ProcessIntegrationData::dispatch($integration);
-
-                $this->line("Scheduled job for user: {$integration->user->name} (ID: {$integration->user_id}) - Service: {$integration->service}");
+                // Mark this integration as needing update (don't dispatch yet)
+                $this->line("Integration {$integration->id} ({$integration->service}) needs updating");
                 $successCount++;
 
             } catch (Exception $e) {
                 $this->error("Failed to schedule job for integration {$integration->id} ({$integration->service}): " . $e->getMessage());
                 $errorCount++;
             }
+        }
+
+        // Dispatch the integration update check job if any integrations need updating
+        if ($successCount > 0) {
+            CheckIntegrationUpdates::dispatch();
+            $this->info("Dispatched CheckIntegrationUpdates job to process {$successCount} integrations");
         }
 
         $this->info("Completed: {$successCount} successful, {$errorCount} failed");
