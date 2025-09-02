@@ -3,6 +3,27 @@
 namespace App\Jobs;
 
 use App\Integrations\PluginRegistry;
+use App\Jobs\OAuth\GitHub\GitHubActivityPull;
+use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
+use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
+use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
+use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
+use App\Jobs\OAuth\Monzo\MonzoAccountPull;
+use App\Jobs\OAuth\Monzo\MonzoBalancePull;
+use App\Jobs\OAuth\Monzo\MonzoPotPull;
+use App\Jobs\OAuth\Monzo\MonzoTransactionPull;
+use App\Jobs\OAuth\Oura\OuraActivityPull;
+use App\Jobs\OAuth\Oura\OuraHeartratePull;
+use App\Jobs\OAuth\Oura\OuraReadinessPull;
+use App\Jobs\OAuth\Oura\OuraResiliencePull;
+use App\Jobs\OAuth\Oura\OuraSessionsPull;
+use App\Jobs\OAuth\Oura\OuraSleepPull;
+use App\Jobs\OAuth\Oura\OuraSleepRecordsPull;
+use App\Jobs\OAuth\Oura\OuraSpo2Pull;
+use App\Jobs\OAuth\Oura\OuraStressPull;
+use App\Jobs\OAuth\Oura\OuraTagsPull;
+use App\Jobs\OAuth\Oura\OuraWorkoutsPull;
+use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
 use App\Models\Integration;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -107,10 +128,13 @@ class CheckIntegrationUpdates implements ShouldQueue
                         continue;
                     }
 
-                    // Dispatch the processing job
-                    ProcessIntegrationData::dispatch($integration);
+                    // Dispatch appropriate fetch jobs based on integration service and instance type
+                    $fetchJobs = $this->getFetchJobsForIntegration($integration);
+                    foreach ($fetchJobs as $jobClass) {
+                        $jobClass::dispatch($integration);
+                    }
 
-                    Log::info("Scheduled processing job for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
+                    Log::info("Scheduled fetch jobs for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
                     $scheduledCount++;
 
                 } catch (Exception $e) {
@@ -156,5 +180,103 @@ class CheckIntegrationUpdates implements ShouldQueue
             'trace' => $exception->getTraceAsString(),
         ]);
         \Sentry\captureException($exception);
+    }
+
+    /**
+     * Get the appropriate fetch jobs for an integration based on its service and instance type.
+     */
+    private function getFetchJobsForIntegration(Integration $integration): array
+    {
+        return match ($integration->service) {
+            'monzo' => $this->getMonzoFetchJobs($integration),
+            'gocardless' => $this->getGoCardlessFetchJobs($integration),
+            'github' => $this->getGitHubFetchJobs($integration),
+            'spotify' => $this->getSpotifyFetchJobs($integration),
+            'oura' => $this->getOuraFetchJobs($integration),
+            'hevy' => $this->getHevyFetchJobs($integration),
+            // Add other services here as they are implemented
+            default => [],
+        };
+    }
+
+    /**
+     * Get Monzo-specific fetch jobs based on instance type.
+     */
+    private function getMonzoFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'transactions';
+
+        return match ($instanceType) {
+            'accounts' => [MonzoAccountPull::class],
+            'transactions' => [MonzoTransactionPull::class],
+            'pots' => [MonzoPotPull::class],
+            'balances' => [MonzoBalancePull::class],
+            default => [],
+        };
+    }
+
+    /**
+     * Get Oura-specific fetch jobs based on instance type.
+     */
+    private function getGoCardlessFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'transactions';
+
+        return match ($instanceType) {
+            'accounts' => [GoCardlessAccountPull::class],
+            'transactions' => [GoCardlessTransactionPull::class],
+            'balances' => [GoCardlessBalancePull::class],
+            default => [],
+        };
+    }
+
+    private function getGitHubFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'activity';
+
+        return match ($instanceType) {
+            'activity' => [GitHubActivityPull::class],
+            default => [],
+        };
+    }
+
+    private function getSpotifyFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'listening';
+
+        return match ($instanceType) {
+            'listening' => [SpotifyListeningPull::class],
+            default => [],
+        };
+    }
+
+    private function getOuraFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'activity';
+
+        return match ($instanceType) {
+            'activity' => [OuraActivityPull::class],
+            'sleep' => [OuraSleepPull::class],
+            'sleep_records' => [OuraSleepRecordsPull::class],
+            'readiness' => [OuraReadinessPull::class],
+            'resilience' => [OuraResiliencePull::class],
+            'stress' => [OuraStressPull::class],
+            'workouts' => [OuraWorkoutsPull::class],
+            'sessions' => [OuraSessionsPull::class],
+            'tags' => [OuraTagsPull::class],
+            'heartrate' => [OuraHeartratePull::class],
+            'spo2' => [OuraSpo2Pull::class],
+            default => [],
+        };
+    }
+
+    private function getHevyFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'workouts';
+
+        return match ($instanceType) {
+            'workouts' => [HevyWorkoutPull::class],
+            default => [],
+        };
     }
 }

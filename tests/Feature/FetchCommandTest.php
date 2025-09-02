@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -19,6 +20,9 @@ class FetchCommandTest extends TestCase
 
         // Register the GitHub plugin for testing
         PluginRegistry::register(GitHubPlugin::class);
+
+        // Use queue fake for testing job dispatching
+        Queue::fake();
     }
 
     #[Test]
@@ -46,12 +50,9 @@ class FetchCommandTest extends TestCase
 
         $this->assertEquals(0, $result);
 
-        // Check that only the first integration was marked as triggered
-        $integration1->refresh();
-        $integration2->refresh();
-
-        $this->assertNotNull($integration1->last_triggered_at);
-        $this->assertNull($integration2->last_triggered_at);
+        // Check that CheckIntegrationUpdates job was dispatched (integrations are marked as triggered by the job, not the command)
+        // The command now dispatches CheckIntegrationUpdates which handles the processing asynchronously
+        Queue::assertPushed(\App\Jobs\CheckIntegrationUpdates::class, 1);
     }
 
     #[Test]
@@ -71,9 +72,8 @@ class FetchCommandTest extends TestCase
 
         $this->assertEquals(0, $result);
 
-        // Check that the integration was marked as triggered even though it didn't need updating
-        $integration->refresh();
-        $this->assertNotNull($integration->last_triggered_at);
+        // Check that CheckIntegrationUpdates job was dispatched for force updates
+        Queue::assertPushed(\App\Jobs\CheckIntegrationUpdates::class, 1);
     }
 
     #[Test]

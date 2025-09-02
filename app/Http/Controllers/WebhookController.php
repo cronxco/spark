@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Integrations\PluginRegistry;
+use App\Jobs\Webhook\AppleHealth\AppleHealthWebhookHook;
+use App\Jobs\Webhook\Slack\SlackEventsHook;
 use App\Models\Integration;
 use Exception;
 use Illuminate\Http\Request;
@@ -34,12 +36,12 @@ class WebhookController extends Controller
 
         foreach ($integrations as $integration) {
             try {
-                // Let the plugin handle signature verification internally
-                $plugin->handleWebhook($request, $integration);
+                // Dispatch the appropriate webhook job instead of processing inline
+                $this->dispatchWebhookJob($service, $request, $integration);
 
                 $results[$integration->id] = [
                     'status' => 'success',
-                    'message' => 'Webhook processed successfully',
+                    'message' => 'Webhook job dispatched successfully',
                 ];
             } catch (HttpExceptionInterface $e) {
                 // Re-throw HttpExceptions so they result in proper HTTP status codes
@@ -47,7 +49,7 @@ class WebhookController extends Controller
                 throw $e;
             } catch (Exception $e) {
                 // Log and track other exceptions for per-integration handling
-                Log::error('Webhook processing failed for integration', [
+                Log::error('Webhook job dispatch failed for integration', [
                     'integration_id' => $integration->id,
                     'service' => $service,
                     'exception' => $e->getMessage(),
@@ -55,7 +57,7 @@ class WebhookController extends Controller
 
                 $results[$integration->id] = [
                     'status' => 'error',
-                    'message' => 'Webhook processing failed',
+                    'message' => 'Webhook job dispatch failed',
                     'error' => $e->getMessage(),
                 ];
                 $hasFailures = true;
@@ -78,5 +80,40 @@ class WebhookController extends Controller
             'message' => 'All webhooks processed successfully',
             'results' => $results,
         ]);
+    }
+
+    /**
+     * Dispatch the appropriate webhook job for the given service
+     */
+    private function dispatchWebhookJob(string $service, Request $request, Integration $integration): void
+    {
+        $payload = $request->all();
+        $headers = $request->headers->all();
+
+        switch ($service) {
+            case 'slack':
+                SlackEventsHook::dispatch($payload, $headers, $integration);
+                break;
+
+            case 'apple_health':
+                AppleHealthWebhookHook::dispatch($payload, $headers, $integration);
+                break;
+
+            default:
+                // For services without specific webhook jobs, fall back to inline processing
+                Log::warning("No webhook job found for service {$service}, falling back to inline processing", [
+                    'integration_id' => $integration->id,
+                    'service' => $service,
+                ]);
+
+                $pluginClass = PluginRegistry::getPlugin($service);
+                if ($pluginClass) {
+                    $plugin = new $pluginClass;
+                    $plugin->handleWebhook($request, $integration);
+                } else {
+                    throw new Exception("Unknown service: {$service}");
+                }
+                break;
+        }
     }
 }
