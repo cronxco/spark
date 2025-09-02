@@ -320,7 +320,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
             ],
             [
                 'content' => json_encode($account),
-                'time' => null,
                 'metadata' => [
                     'integration_id' => $this->integration->id,
                     'name' => $accountName,
@@ -355,7 +354,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
                     'creditor_account' => $tx['creditorAccount'] ?? null,
                     'debtor_account' => $tx['debtorAccount'] ?? null,
                 ]),
-                'time' => null,
                 'metadata' => [
                     'integration_id' => $this->integration->id,
                 ],

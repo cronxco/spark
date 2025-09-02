@@ -1672,7 +1672,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'content' => json_encode($account),
                 'url' => null,
                 'image_url' => null,
-                'time' => null,
                 'metadata' => [
                     'integration_id' => $onboardingIntegrationId, // Store integration_id in metadata
                     'name' => $accountName,
@@ -1745,7 +1744,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'content' => json_encode($account),
                 'url' => null,
                 'image_url' => null,
-                'time' => null,
                 'metadata' => [
                     'integration_id' => $integration->id,
                     'name' => $accountName,
@@ -1768,13 +1766,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'money_counterparty',
                 'type' => 'transaction_counterparty',
                 'title' => $counterpartyName,
             ],
             [
-                'user_id' => $integration->user_id,
                 'content' => json_encode([
                     'creditor_name' => $tx['creditorName'] ?? null,
                     'debtor_name' => $tx['debtorName'] ?? null,
@@ -1783,7 +1780,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 ]),
                 'url' => null,
                 'image_url' => null,
-                'time' => null,
+                'metadata' => [
+                    'integration_id' => $integration->id,
+                ],
             ]
         );
     }

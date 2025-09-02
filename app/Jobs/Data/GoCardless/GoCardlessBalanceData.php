@@ -235,7 +235,6 @@ class GoCardlessBalanceData extends BaseProcessingJob
             ],
             [
                 'content' => json_encode(['account_id' => $accountId]),
-                'time' => null,
                 'metadata' => [
                     'integration_id' => $this->integration->id,
                     'name' => $accountName,
