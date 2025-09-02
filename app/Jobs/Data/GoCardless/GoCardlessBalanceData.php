@@ -209,16 +209,17 @@ class GoCardlessBalanceData extends BaseProcessingJob
         // First, try to find an existing onboarding-created account object
         $onboardingIntegrationId = 'onboarding_' . $this->integration->group_id . '_' . $accountId;
 
-        $existingObject = EventObject::where('integration_id', $onboardingIntegrationId)
+        $existingObject = EventObject::where('user_id', $this->integration->user_id)
             ->where('concept', 'account')
             ->where('type', 'bank_account')
             ->where('title', $accountName)
+            ->whereJsonContains('metadata->integration_id', $onboardingIntegrationId)
             ->first();
 
         if ($existingObject) {
             // Update the integration ID to point to the real integration
             $existingObject->update([
-                'integration_id' => $this->integration->id,
+                'metadata->integration_id' => $this->integration->id,
             ]);
 
             return $existingObject;
@@ -227,16 +228,16 @@ class GoCardlessBalanceData extends BaseProcessingJob
         // Create new account object
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $this->integration->id,
+                'user_id' => $this->integration->user_id,
                 'concept' => 'account',
                 'type' => 'bank_account',
                 'title' => $accountName,
             ],
             [
-                'user_id' => $this->integration->user_id,
                 'content' => json_encode(['account_id' => $accountId]),
                 'time' => null,
                 'metadata' => [
+                    'integration_id' => $this->integration->id,
                     'name' => $accountName,
                     'provider' => 'GoCardless',
                     'account_type' => 'current_account',

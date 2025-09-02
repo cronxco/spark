@@ -919,7 +919,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Find onboarding account objects that are older than 24 hours
         $cutoffDate = now()->subHours(24);
 
-        $orphanedObjects = EventObject::where('integration_id', 'like', 'onboarding_%')
+        $orphanedObjects = EventObject::whereJsonContains('metadata->integration_id', 'onboarding_%')
             ->where('concept', 'account')
             ->where('type', 'bank_account')
             ->where('created_at', '<', $cutoffDate)
@@ -928,7 +928,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $count = 0;
         foreach ($orphanedObjects as $object) {
             // Check if there's a real integration that should own this account
-            $integrationId = str_replace('onboarding_', '', $object->integration_id);
+            $integrationId = str_replace('onboarding_', '', $object->metadata['integration_id'] ?? '');
             if (strpos($integrationId, '_') !== false) {
                 [$groupId, $accountId] = explode('_', $integrationId, 2);
 
@@ -1663,18 +1663,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $onboardingIntegrationId,
+                'user_id' => $group->user_id,
                 'concept' => 'account',
                 'type' => 'bank_account',
                 'title' => $accountName,
             ],
             [
-                'user_id' => $group->user_id,
                 'content' => json_encode($account),
                 'url' => null,
                 'image_url' => null,
                 'time' => null,
                 'metadata' => [
+                    'integration_id' => $onboardingIntegrationId, // Store integration_id in metadata
                     'name' => $accountName,
                     'provider' => $account['institution_id'] ?? 'GoCardless',
                     'account_type' => $accountType,
@@ -1709,22 +1709,23 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $accountId = $account['id'] ?? 'unknown';
         $onboardingIntegrationId = 'onboarding_' . $integration->group_id . '_' . $accountId;
 
-        $existingObject = EventObject::where('integration_id', $onboardingIntegrationId)
+        $existingObject = EventObject::where('user_id', $integration->user_id)
             ->where('concept', 'account')
             ->where('type', 'bank_account')
             ->where('title', $accountName)
+            ->whereJsonContains('metadata->integration_id', $onboardingIntegrationId)
             ->first();
 
         if ($existingObject) {
             Log::info('GoCardless: Found existing onboarding account object, updating with integration ID', [
                 'account_id' => $accountId,
-                'existing_integration_id' => $existingObject->integration_id,
+                'existing_integration_id' => $existingObject->metadata['integration_id'] ?? null,
                 'new_integration_id' => $integration->id,
             ]);
 
             // Update the integration ID to point to the real integration
             $existingObject->update([
-                'integration_id' => $integration->id,
+                'metadata->integration_id' => $integration->id,
                 'metadata->onboarding_created' => false, // Remove onboarding flag
             ]);
 
@@ -1734,7 +1735,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // No existing onboarding object found, create new one
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'user_id' => $integration->user_id,
                 'concept' => 'account',
                 'type' => 'bank_account',
                 'title' => $accountName,
@@ -1746,6 +1747,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'image_url' => null,
                 'time' => null,
                 'metadata' => [
+                    'integration_id' => $integration->id,
                     'name' => $accountName,
                     'provider' => $account['institution_id'] ?? 'GoCardless',
                     'account_type' => $accountType,

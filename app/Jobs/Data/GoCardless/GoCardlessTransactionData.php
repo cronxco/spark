@@ -291,16 +291,17 @@ class GoCardlessTransactionData extends BaseProcessingJob
         $accountId = $account['id'] ?? 'unknown';
         $onboardingIntegrationId = 'onboarding_' . $this->integration->group_id . '_' . $accountId;
 
-        $existingObject = EventObject::where('integration_id', $onboardingIntegrationId)
+        $existingObject = EventObject::where('user_id', $this->integration->user_id)
             ->where('concept', 'account')
             ->where('type', 'bank_account')
             ->where('title', $accountName)
+            ->whereJsonContains('metadata->integration_id', $onboardingIntegrationId)
             ->first();
 
         if ($existingObject) {
             // Update the integration ID to point to the real integration
             $existingObject->update([
-                'integration_id' => $this->integration->id,
+                'metadata->integration_id' => $this->integration->id,
             ]);
 
             return $existingObject;
@@ -312,16 +313,16 @@ class GoCardlessTransactionData extends BaseProcessingJob
         // Create new account object
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $this->integration->id,
+                'user_id' => $this->integration->user_id,
                 'concept' => 'account',
                 'type' => 'bank_account',
                 'title' => $accountName,
             ],
             [
-                'user_id' => $this->integration->user_id,
                 'content' => json_encode($account),
                 'time' => null,
                 'metadata' => [
+                    'integration_id' => $this->integration->id,
                     'name' => $accountName,
                     'provider' => $account['institution_id'] ?? 'GoCardless',
                     'account_type' => $accountType,
@@ -342,13 +343,12 @@ class GoCardlessTransactionData extends BaseProcessingJob
 
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $this->integration->id,
+                'user_id' => $this->integration->user_id,
                 'concept' => 'money_counterparty',
                 'type' => 'transaction_counterparty',
                 'title' => $counterpartyName,
             ],
             [
-                'user_id' => $this->integration->user_id,
                 'content' => json_encode([
                     'creditor_name' => $tx['creditorName'] ?? null,
                     'debtor_name' => $tx['debtorName'] ?? null,
@@ -356,6 +356,9 @@ class GoCardlessTransactionData extends BaseProcessingJob
                     'debtor_account' => $tx['debtorAccount'] ?? null,
                 ]),
                 'time' => null,
+                'metadata' => [
+                    'integration_id' => $this->integration->id,
+                ],
             ]
         );
     }
@@ -438,81 +441,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
     }
 
     /**
-     * Add transaction blocks for additional metadata
-     */
-    protected function addTransactionBlocks(Event $event, array $tx): void
-    {
-        // Add merchant information if available
-        if (! empty($tx['merchant'])) {
-            $merchant = $tx['merchant'];
-            $event->blocks()->create([
-                'time' => $event->time,
-                'block_type' => 'merchant_info',
-                'title' => 'Merchant Information',
-                'metadata' => [
-                    'merchant_name' => $merchant['name'] ?? null,
-                    'merchant_category' => $merchant['category'] ?? null,
-                    'merchant_location' => $merchant['location'] ?? null,
-                ],
-                'value' => null,
-                'value_multiplier' => 1,
-                'value_unit' => null,
-            ]);
-        }
-
-        // Add foreign exchange information if applicable
-        if (! empty($tx['currencyExchange'])) {
-            $fx = $tx['currencyExchange'];
-            $event->blocks()->create([
-                'time' => $event->time,
-                'block_type' => 'foreign_exchange',
-                'title' => 'Currency Exchange',
-                'metadata' => [
-                    'source_currency' => $fx['sourceCurrency']['currency'] ?? null,
-                    'source_amount' => $fx['sourceCurrency']['amount'] ?? null,
-                    'target_currency' => $fx['targetCurrency']['currency'] ?? null,
-                    'target_amount' => $fx['targetCurrency']['amount'] ?? null,
-                    'exchange_rate' => $fx['exchangeRate'] ?? null,
-                ],
-                'value' => null,
-                'value_multiplier' => 1,
-                'value_unit' => null,
-            ]);
-        }
-
-        // Add check information if available
-        if (! empty($tx['checkId'])) {
-            $event->blocks()->create([
-                'time' => $event->time,
-                'block_type' => 'check_info',
-                'title' => 'Check Information',
-                'metadata' => [
-                    'check_id' => $tx['checkId'],
-                ],
-                'value' => null,
-                'value_multiplier' => 1,
-                'value_unit' => null,
-            ]);
-        }
-
-        // Add mandate information if available
-        if (! empty($tx['mandateId'])) {
-            $event->blocks()->create([
-                'time' => $event->time,
-                'block_type' => 'mandate_info',
-                'title' => 'Mandate Information',
-                'metadata' => [
-                    'mandate_id' => $tx['mandateId'],
-                    'creditor_id' => $tx['creditorId'] ?? null,
-                ],
-                'value' => null,
-                'value_multiplier' => 1,
-                'value_unit' => null,
-            ]);
-        }
-    }
-
-    /**
      * Add additional metadata blocks
      */
     protected function addAdditionalBlocks(Event $event, array $tx, string $status): void
@@ -563,7 +491,7 @@ class GoCardlessTransactionData extends BaseProcessingJob
         return EventObject::where('user_id', $this->integration->user_id)
             ->where('concept', 'account')
             ->where('type', 'gocardless_account')
-            ->where('integration_id', $this->integration->id)
+            ->whereJsonContains('metadata->integration_id', $this->integration->id)
             ->first()
             ?? throw new Exception('Account object not found');
     }
@@ -581,10 +509,10 @@ class GoCardlessTransactionData extends BaseProcessingJob
                 'title' => $counterpartyName,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => $this->parseTransactionDate($transaction),
                 'content' => $transaction['remittanceInformationUnstructured'] ?? '',
                 'metadata' => array_merge($counterpartyDetails, [
+                    'integration_id' => $this->integration->id,
                     'transaction_details' => $transaction,
                 ]),
             ]
