@@ -99,7 +99,7 @@ class SpotifyListeningPull extends BaseFetchJob
         $endpoint = '/me/player/currently-playing';
 
         try {
-            $response = $plugin->makeAuthenticatedRequest($endpoint, $this->integration);
+            $response = $plugin->makeAuthenticatedApiRequest($endpoint, $this->integration);
 
             if (empty($response) || ! isset($response['item'])) {
                 return null; // No track currently playing
@@ -118,7 +118,7 @@ class SpotifyListeningPull extends BaseFetchJob
     private function getRecentlyPlayed(SpotifyPlugin $plugin): array
     {
         $endpoint = '/me/player/recently-played?limit=50';
-        $response = $plugin->makeAuthenticatedRequest($endpoint, $this->integration);
+        $response = $plugin->makeAuthenticatedApiRequest($endpoint, $this->integration);
 
         return $response['items'] ?? [];
     }

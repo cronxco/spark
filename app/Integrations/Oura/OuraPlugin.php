@@ -695,6 +695,30 @@ class OuraPlugin extends OAuthPlugin
         );
     }
 
+    /**
+     * HTTP helper that attaches Bearer token from the group and refreshes when needed.
+     */
+    /**
+     * Get authentication headers for HTTP requests
+     */
+    public function authHeaders(Integration $integration): array
+    {
+        $group = $integration->group;
+        $token = $group?->access_token;
+        if ($group && $group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+            $token = $group->access_token;
+        }
+
+        if (empty($token)) {
+            throw new Exception('Missing access token for authenticated request');
+        }
+
+        return [
+            'Authorization' => 'Bearer ' . $token,
+        ];
+    }
+
     protected function getRequiredScopes(): string
     {
         return implode(' ', [
@@ -760,9 +784,6 @@ class OuraPlugin extends OAuthPlugin
         ]);
     }
 
-    /**
-     * HTTP helper that attaches Bearer token from the group and refreshes when needed.
-     */
     protected function getJson(string $endpoint, Integration $integration, array $query = []): array
     {
         $group = $integration->group;
