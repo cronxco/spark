@@ -135,9 +135,12 @@ class AppleHealthPlugin extends WebhookPlugin
         $instanceType = (string) ($integration->instance_type ?? 'workouts');
         $events = [];
 
+        // Extract data from the nested payload structure
+        $payloadData = $externalData['payload']['data'] ?? $externalData;
+
         // Accept either a top-level {workouts:[...]} or {metrics:[...]} payload
         if ($instanceType === 'workouts') {
-            $workouts = is_array($externalData['workouts'] ?? null) ? $externalData['workouts'] : [];
+            $workouts = is_array($payloadData['workouts'] ?? null) ? $payloadData['workouts'] : [];
             foreach ($workouts as $workout) {
                 if (! is_array($workout)) {
                     continue;
@@ -147,7 +150,7 @@ class AppleHealthPlugin extends WebhookPlugin
         }
 
         if ($instanceType === 'metrics') {
-            $metrics = is_array($externalData['metrics'] ?? null) ? $externalData['metrics'] : [];
+            $metrics = is_array($payloadData['metrics'] ?? null) ? $payloadData['metrics'] : [];
             foreach ($metrics as $metricEntry) {
                 if (! is_array($metricEntry)) {
                     continue;
