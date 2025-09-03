@@ -56,20 +56,20 @@ class OuraStressData extends BaseProcessingJob
             return null;
         }
 
-        $actor = $this->createOrUpdateObject([
+        $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
             'time' => $day . ' 00:00:00',
-        ]);
+        ];
 
-        $target = $this->createOrUpdateObject([
+        $target = [
             'concept' => 'metric',
             'type' => 'oura_daily_stress',
             'title' => $options['title'] ?? 'Stress',
             'time' => $day . ' 00:00:00',
             'metadata' => $item,
-        ]);
+        ];
 
         $scoreField = $options['score_field'] ?? 'score';
         $score = Arr::get($item, $scoreField);

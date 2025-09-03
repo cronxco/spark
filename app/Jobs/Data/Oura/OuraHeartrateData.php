@@ -50,14 +50,14 @@ class OuraHeartrateData extends BaseProcessingJob
             return null;
         }
 
-        $actor = $this->createOrUpdateObject([
+        $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
             'time' => now(),
-        ]);
+        ];
 
-        $target = $this->createOrUpdateObject([
+        $target = [
             'concept' => 'metric',
             'type' => 'heartrate_series',
             'title' => 'Heart Rate',
@@ -65,7 +65,7 @@ class OuraHeartrateData extends BaseProcessingJob
             'metadata' => [
                 'interval' => 'irregular',
             ],
-        ]);
+        ];
 
         $min = (int) $points->min('bpm');
         $max = (int) $points->max('bpm');

@@ -214,12 +214,11 @@ abstract class BaseProcessingJob implements ShouldQueue
                 'title' => $objectData['title'],
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => $objectData['time'] ?? now(),
                 'content' => $objectData['content'] ?? null,
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
-                'image_url' => $objectData['image_url'] ?? null,
+                'media_url' => $objectData['image_url'] ?? null,
                 'embeddings' => $objectData['embeddings'] ?? null,
             ]
         );
