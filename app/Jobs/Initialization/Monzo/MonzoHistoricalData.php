@@ -63,7 +63,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->apiBase . '/transactions', [
+            ->get($plugin->getBaseUrl() . '/transactions', [
                 'account_id' => $account['id'],
                 'expand[]' => 'merchant',
                 'since' => $sinceIso,
@@ -93,7 +93,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->apiBase . '/balance', [
+            ->get($plugin->getBaseUrl() . '/balance', [
                 'account_id' => $account['id'],
             ]);
 
@@ -120,7 +120,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->apiBase . '/pots', [
+            ->get($plugin->getBaseUrl() . '/pots', [
                 'current_account_id' => $account['id'],
             ]);
 

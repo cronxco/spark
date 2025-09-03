@@ -60,6 +60,9 @@ abstract class BaseFetchJob implements ShouldQueue
             // Dispatch processing jobs with the fetched data
             $this->dispatchProcessingJobs($rawData);
 
+            // Mark the integration as successfully updated
+            $this->integration->markAsSuccessfullyUpdated();
+
             Log::info("Completed {$this->getJobType()} fetch for integration {$this->integration->id} ({$this->serviceName})");
             $transaction->setStatus(SpanStatus::ok());
 

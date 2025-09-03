@@ -198,6 +198,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ];
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->apiBase;
+    }
+
     /**
      * Get OAuth URL for GoCardless Bank Account Data API
      */

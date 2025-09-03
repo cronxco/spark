@@ -39,8 +39,8 @@ class MonzoPotPull extends BaseFetchJob
                 'current_account_id' => $account['id'],
             ], $this->integration->id);
 
-            $response = Http::withHeaders($plugin->getAuthHeaders($this->integration))
-                ->get($plugin->apiBase . '/pots', [
+            $response = Http::withHeaders($plugin->authHeaders($this->integration))
+                ->get($plugin->getBaseUrl() . '/pots', [
                     'current_account_id' => $account['id'],
                 ]);
 

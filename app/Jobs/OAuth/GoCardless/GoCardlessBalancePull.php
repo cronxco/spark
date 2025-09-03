@@ -58,7 +58,7 @@ class GoCardlessBalancePull extends BaseFetchJob
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $plugin->getAccessToken(),
         ])
-            ->get($plugin->apiBase . "/accounts/{$accountId}/balances/");
+            ->get($plugin->getBaseUrl() . "/accounts/{$accountId}/balances/");
 
         $plugin->logApiResponse('GET', "/accounts/{$accountId}/balances/", $response->status(), $response->body(), $response->headers(), $this->integration->id);
 

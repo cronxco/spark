@@ -69,7 +69,7 @@ class GoCardlessTransactionPull extends BaseFetchJob
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $plugin->getAccessToken(),
         ])
-            ->get($plugin->apiBase . "/accounts/{$accountId}/transactions/", [
+            ->get($plugin->getBaseUrl() . "/accounts/{$accountId}/transactions/", [
                 'date_from' => $startDate,
                 'date_to' => $endDate,
             ]);

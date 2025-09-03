@@ -60,7 +60,7 @@ class MonzoAccountPull extends BaseFetchJob
         ], [], $this->integration->id);
 
         $response = Http::withHeaders($plugin->getAuthHeaders($this->integration))
-            ->get($plugin->apiBase . $endpoint);
+            ->get($plugin->getBaseUrl() . $endpoint);
 
         // Log the API response (using reflection to access protected method for testing compatibility)
         $logResponseMethod = $reflection->getMethod('logApiResponse');
