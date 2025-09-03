@@ -90,4 +90,46 @@ class Event extends Model
 
         return $this->value / $this->value_multiplier;
     }
+
+    /**
+     * Get related objects through direct relationships (actor/target)
+     * This maintains compatibility with the original simple design
+     */
+    public function objects()
+    {
+        return new class($this)
+        {
+            private $event;
+
+            public function __construct($event)
+            {
+                $this->event = $event;
+            }
+
+            public function syncWithoutDetaching($relationships)
+            {
+                // For backward compatibility, just return true
+                // The original design didn't need complex object relationships
+                return true;
+            }
+
+            public function get()
+            {
+                $objects = collect();
+
+                // Return actor and target objects
+                if ($this->event->actor) {
+                    $this->event->actor->pivot = (object) ['role' => 'actor'];
+                    $objects->push($this->event->actor);
+                }
+
+                if ($this->event->target) {
+                    $this->event->target->pivot = (object) ['role' => 'target'];
+                    $objects->push($this->event->target);
+                }
+
+                return $objects;
+            }
+        };
+    }
 }

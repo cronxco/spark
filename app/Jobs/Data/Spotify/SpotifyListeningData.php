@@ -129,24 +129,14 @@ class SpotifyListeningData extends BaseProcessingJob
             'target_id' => $trackObject->id,
         ]);
 
-        // Create event-object relationships
-        $event->objects()->syncWithoutDetaching([
-            $trackObject->id => ['role' => 'target'],
-        ]);
-
-        // Add artist relationships
-        foreach ($artistObjects as $artistObject) {
-            $event->objects()->syncWithoutDetaching([
-                $artistObject->id => ['role' => 'artist'],
-            ]);
-        }
-
-        // Add album relationship if available
+        // Store additional track information in metadata (original simple design)
+        $metadata = $event->event_metadata ?? [];
+        $metadata['artists'] = $artistObjects->pluck('id')->toArray();
         if ($albumObject) {
-            $event->objects()->syncWithoutDetaching([
-                $albumObject->id => ['role' => 'album'],
-            ]);
+            $metadata['album'] = $albumObject->id;
         }
+        $event->event_metadata = $metadata;
+        $event->save();
 
         // Add tags based on configuration and track data
         $this->addTrackTags($event, $track, $this->integration->configuration ?? []);
