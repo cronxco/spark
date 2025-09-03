@@ -41,7 +41,6 @@ class MonzoPotData extends BaseProcessingJob
                 'title' => $date,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $date],
@@ -97,7 +96,6 @@ class MonzoPotData extends BaseProcessingJob
                 'title' => $pot['name'] ?? 'Pot',
             ],
             [
-                'integration_id' => $master->id,
                 'time' => $pot['created'] ?? now(),
                 'content' => (string) ($pot['balance'] ?? 0),
                 'metadata' => [

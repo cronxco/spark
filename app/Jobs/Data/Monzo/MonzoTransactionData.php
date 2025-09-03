@@ -79,7 +79,6 @@ class MonzoTransactionData extends BaseProcessingJob
                     'title' => $targetTitle,
                 ],
                 [
-                    'integration_id' => $master->id,
                     'time' => $tx['created'] ?? now(),
                     'content' => $tx['description'] ?? null,
                     'metadata' => [
@@ -150,7 +149,6 @@ class MonzoTransactionData extends BaseProcessingJob
                 'title' => $title,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [

@@ -54,7 +54,6 @@ class GoCardlessAccountData extends BaseProcessingJob
                 'title' => $ownerName,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => now(),
                 'content' => "IBAN: {$iban}",
                 'metadata' => [
@@ -83,7 +82,6 @@ class GoCardlessAccountData extends BaseProcessingJob
                 'title' => $accountData['details'] ?? 'Rate Limited Account',
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => now(),
                 'content' => 'Account details temporarily unavailable due to rate limiting',
                 'metadata' => [

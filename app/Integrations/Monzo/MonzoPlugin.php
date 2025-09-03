@@ -729,6 +729,11 @@ class MonzoPlugin extends OAuthPlugin
         return $resp->json('accounts') ?? [];
     }
 
+    public function getAuthHeaders(Integration $integration): array
+    {
+        return $this->authHeaders($integration);
+    }
+
     protected function getRequiredScopes(): string
     {
         // Monzo OAuth scopes needed for read-only ingestion

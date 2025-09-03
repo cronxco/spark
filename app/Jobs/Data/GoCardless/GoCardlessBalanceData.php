@@ -100,7 +100,6 @@ class GoCardlessBalanceData extends BaseProcessingJob
                 'title' => $balanceReferenceDate,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => $balanceReferenceDate . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $balanceReferenceDate],
