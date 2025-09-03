@@ -36,7 +36,7 @@ class OuraStressPull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/daily_stress', [
+            ->get($plugin->getBaseUrl() . '/usercollection/daily_stress', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

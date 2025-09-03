@@ -36,7 +36,7 @@ class OuraTagsPull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/tag', [
+            ->get($plugin->getBaseUrl() . '/usercollection/tag', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

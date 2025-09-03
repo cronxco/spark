@@ -303,7 +303,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
             throw new Exception('API request failed: ' . $response->body());
         }
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     abstract protected function getRequiredScopes(): string;

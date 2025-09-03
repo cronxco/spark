@@ -36,7 +36,7 @@ class OuraWorkoutsPull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/workout', [
+            ->get($plugin->getBaseUrl() . '/usercollection/workout', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

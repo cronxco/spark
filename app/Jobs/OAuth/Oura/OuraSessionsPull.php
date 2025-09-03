@@ -36,7 +36,7 @@ class OuraSessionsPull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/session', [
+            ->get($plugin->getBaseUrl() . '/usercollection/session', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

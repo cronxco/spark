@@ -36,7 +36,7 @@ class OuraReadinessPull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/daily_readiness', [
+            ->get($plugin->getBaseUrl() . '/usercollection/daily_readiness', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

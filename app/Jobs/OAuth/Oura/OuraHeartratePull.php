@@ -36,7 +36,7 @@ class OuraHeartratePull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/heartrate', [
+            ->get($plugin->getBaseUrl() . '/usercollection/heartrate', [
                 'start_datetime' => $startDatetime,
                 'end_datetime' => $endDatetime,
             ]);

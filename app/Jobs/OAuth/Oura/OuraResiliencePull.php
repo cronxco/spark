@@ -36,7 +36,7 @@ class OuraResiliencePull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/daily_resilience', [
+            ->get($plugin->getBaseUrl() . '/usercollection/daily_resilience', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);
