@@ -39,8 +39,8 @@ class MonzoBalancePull extends BaseFetchJob
                 'account_id' => $account['id'],
             ], $this->integration->id);
 
-            $response = Http::withHeaders($plugin->getAuthHeaders($this->integration))
-                ->get($plugin->apiBase . '/balance', [
+            $response = Http::withHeaders($plugin->authHeaders($this->integration))
+                ->get($plugin->getBaseUrl() . '/balance', [
                     'account_id' => $account['id'],
                 ]);
 

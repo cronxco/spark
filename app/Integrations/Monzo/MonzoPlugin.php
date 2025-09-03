@@ -395,6 +395,11 @@ class MonzoPlugin extends OAuthPlugin
         ];
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->apiBase;
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         $csrfToken = Str::random(32);
@@ -734,6 +739,16 @@ class MonzoPlugin extends OAuthPlugin
         return $this->authHeaders($integration);
     }
 
+    public function authHeaders(Integration $integration): array
+    {
+        $group = $integration->group;
+        $token = $group?->access_token ?? $integration->access_token;
+
+        return [
+            'Authorization' => 'Bearer ' . $token,
+        ];
+    }
+
     protected function getRequiredScopes(): string
     {
         // Monzo OAuth scopes needed for read-only ingestion
@@ -753,16 +768,6 @@ class MonzoPlugin extends OAuthPlugin
                 'account_id' => $account['id'],
             ]);
         }
-    }
-
-    protected function authHeaders(Integration $integration): array
-    {
-        $group = $integration->group;
-        $token = $group?->access_token ?? $integration->access_token;
-
-        return [
-            'Authorization' => 'Bearer ' . $token,
-        ];
     }
 
     protected function getPrimaryAccount(IntegrationGroup $group): ?array

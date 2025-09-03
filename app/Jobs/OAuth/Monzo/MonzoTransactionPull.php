@@ -44,8 +44,8 @@ class MonzoTransactionPull extends BaseFetchJob
                 'limit' => 100,
             ], $this->integration->id);
 
-            $response = Http::withHeaders($plugin->getAuthHeaders($this->integration))
-                ->get($plugin->apiBase . '/transactions', [
+            $response = Http::withHeaders($plugin->authHeaders($this->integration))
+                ->get($plugin->getBaseUrl() . '/transactions', [
                     'account_id' => $account['id'],
                     'expand[]' => 'merchant',
                     'since' => $sinceIso,

@@ -134,6 +134,9 @@ class CheckIntegrationUpdates implements ShouldQueue
                         $jobClass::dispatch($integration);
                     }
 
+                    // Mark the integration as triggered to prevent immediate re-triggering
+                    $integration->markAsTriggered();
+
                     Log::info("Scheduled fetch jobs for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
                     $scheduledCount++;
 

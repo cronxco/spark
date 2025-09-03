@@ -231,6 +231,7 @@ abstract class BaseProcessingJob implements ShouldQueue
     {
         return Event::where('integration_id', $this->integration->id)
             ->where('source_id', $sourceId)
+            ->whereNull('deleted_at')
             ->exists();
     }
 }
