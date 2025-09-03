@@ -17,7 +17,9 @@ class OuraActivityPullTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected IntegrationGroup $group;
+
     protected Integration $integration;
 
     protected function setUp(): void
@@ -155,6 +157,7 @@ class OuraActivityPullTest extends TestCase
                     {
                         return ['Authorization' => 'Bearer test-token'];
                     }
+
                     public $apiBase = 'https://api.ouraring.com/v2';
 
                     public function logApiRequest(...$args) {}

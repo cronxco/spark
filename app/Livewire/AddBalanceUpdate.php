@@ -13,9 +13,13 @@ use Livewire\Component;
 class AddBalanceUpdate extends Component
 {
     public string $accountId = '';
+
     public ?float $balance = null;
+
     public ?string $date = null;
+
     public ?string $notes = null;
+
     public bool $isAccountPreselected = false;
 
     protected $rules = [

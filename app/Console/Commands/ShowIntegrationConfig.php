@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class ShowIntegrationConfig extends Command
 {
     protected $signature = 'integrations:config {plugin_identifier?}';
+
     protected $description = 'Show integration plugin configuration details';
 
     public function handle(): void

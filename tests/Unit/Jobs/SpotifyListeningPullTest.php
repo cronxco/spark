@@ -14,7 +14,9 @@ class SpotifyListeningPullTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected IntegrationGroup $group;
+
     protected Integration $integration;
 
     protected function setUp(): void

@@ -13,6 +13,7 @@ class GoCardlessBalancePull extends BaseFetchJob
 {
     // Rate limit cache keys
     private const BALANCE_CALLS_CACHE_KEY = 'gocardless_balance_calls';
+
     private const MAX_DAILY_BALANCE_CALLS = 10; // GoCardless limit
 
     protected function getServiceName(): string
