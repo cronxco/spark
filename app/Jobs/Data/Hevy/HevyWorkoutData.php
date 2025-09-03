@@ -210,7 +210,6 @@ class HevyWorkoutData extends BaseProcessingJob
             'type' => 'hevy_user',
             'title' => $title,
         ], [
-            'integration_id' => $this->integration->id,
             'time' => now(),
             'content' => 'Hevy user account',
             'metadata' => is_array($profile) ? $profile : [],

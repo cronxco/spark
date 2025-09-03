@@ -49,20 +49,20 @@ class OuraTagsData extends BaseProcessingJob
             return null;
         }
 
-        $actor = $this->createOrUpdateObject([
+        $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
             'time' => $timestamp,
-        ]);
+        ];
 
-        $target = $this->createOrUpdateObject([
+        $target = [
             'concept' => 'tag',
             'type' => 'oura_tag',
             'title' => 'Oura Tag',
             'time' => $timestamp,
             'metadata' => $item,
-        ]);
+        ];
 
         $label = Arr::get($item, 'tag') ?? Arr::get($item, 'label', 'Tag');
 

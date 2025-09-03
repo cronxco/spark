@@ -49,20 +49,20 @@ class OuraSessionsData extends BaseProcessingJob
             return null;
         }
 
-        $actor = $this->createOrUpdateObject([
+        $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
             'time' => $start ?? ($day . ' 00:00:00'),
-        ]);
+        ];
 
-        $target = $this->createOrUpdateObject([
+        $target = [
             'concept' => 'mindfulness_session',
             'type' => Arr::get($item, 'type', 'session'),
             'title' => Str::title((string) Arr::get($item, 'type', 'Session')),
             'time' => $start ?? ($day . ' 00:00:00'),
             'metadata' => $item,
-        ]);
+        ];
 
         $durationSec = (int) Arr::get($item, 'duration', 0);
 
