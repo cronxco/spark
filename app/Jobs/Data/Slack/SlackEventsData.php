@@ -90,12 +90,6 @@ class SlackEventsData extends BaseProcessingJob
             'target_id' => $target->id,
         ]);
 
-        // Create event-object relationships
-        $event->objects()->syncWithoutDetaching([
-            $actor->id => ['role' => 'actor'],
-            $target->id => ['role' => 'target'],
-        ]);
-
         // Add blocks if any
         if (! empty($eventData['blocks'])) {
             foreach ($eventData['blocks'] as $blockData) {

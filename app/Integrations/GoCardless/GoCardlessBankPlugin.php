@@ -1282,6 +1282,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Preserve the best available timestamp
         $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
 
+        // Create or update actor (bank account)
+        $actorObject = $this->upsertAccountObject($integration, $account);
+
+        // Create or update target (counterparty)
+        $targetObject = $this->upsertCounterpartyObject($integration, $tx);
+
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => $action,
@@ -1290,6 +1296,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'time' => $timestamp,
             'value' => abs($amount),
             'value_unit' => $tx['transactionAmount']['currency'] ?? 'EUR',
+            'actor_id' => $actorObject->id, // Set directly (original simple design)
+            'target_id' => $targetObject->id, // Set directly (original simple design)
             'event_metadata' => [
                 'category' => $category,
                 'description' => $tx['remittanceInformationUnstructured'] ?? '',
@@ -1333,18 +1341,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'status' => $status,
             'created' => $event->wasRecentlyCreated,
             'updated' => $isStatusChange,
-        ]);
-
-        // Create or update actor (bank account)
-        $actorObject = $this->upsertAccountObject($integration, $account);
-
-        // Create or update target (counterparty)
-        $targetObject = $this->upsertCounterpartyObject($integration, $tx);
-
-        // Create the event relationship
-        $event->objects()->syncWithoutDetaching([
-            $actorObject->id => ['role' => 'actor'],
-            $targetObject->id => ['role' => 'target'],
         ]);
 
         // Add relevant tags based on transaction status
@@ -1394,6 +1390,26 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         $balanceReferenceDate = $balance['referenceDate'] ?? now()->toDateString();
         $sourceId = 'balance_' . $account['id'] . '_' . $balanceReferenceDate;
+        // Create or update actor (bank account)
+        $actorObject = $this->upsertAccountObject($integration, $account);
+
+        // Create day target
+        $dayObject = EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $balanceReferenceDate,
+            ],
+            [
+                'integration_id' => $integration->id,
+                'time' => $balanceReferenceDate . ' 00:00:00',
+                'content' => null,
+                'url' => null,
+                'image_url' => null,
+            ]
+        );
+
         $eventData = [
             'user_id' => $integration->user_id,
             'action' => 'had_balance',
@@ -1402,6 +1418,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'time' => $balance['referenceDate'] ?? now(),
             'value' => abs((float) ($balance['balanceAmount']['amount'] ?? 0)),
             'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
+            'actor_id' => $actorObject->id, // Set directly (original simple design)
+            'target_id' => $dayObject->id, // Set directly (original simple design)
             'event_metadata' => [
                 'balance_type' => $balance['balanceType'] ?? null,
                 'reference_date' => $balance['referenceDate'] ?? null,
@@ -1431,32 +1449,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'integration_id' => $integration->id,
             'event_id' => $event->id,
             'source_id' => $sourceId,
-        ]);
-
-        // Create or update actor (bank account)
-        $actorObject = $this->upsertAccountObject($integration, $account);
-
-        // Create day target
-        $dayObject = EventObject::updateOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'day',
-                'type' => 'day',
-                'title' => $balanceReferenceDate,
-            ],
-            [
-                'integration_id' => $integration->id,
-                'time' => $balanceReferenceDate . ' 00:00:00',
-                'content' => null,
-                'url' => null,
-                'image_url' => null,
-            ]
-        );
-
-        // Create the event relationship
-        $event->objects()->syncWithoutDetaching([
-            $actorObject->id => ['role' => 'actor'],
-            $dayObject->id => ['role' => 'target'],
         ]);
 
         // Add relevant tags

@@ -45,6 +45,24 @@ class GoCardlessBalanceData extends BaseProcessingJob
 
         $sourceId = 'balance_' . $accountId . '_' . $balanceReferenceDate;
 
+        // Create or update actor (bank account)
+        $accountObject = $this->upsertAccountObject($balance);
+
+        // Create day target
+        $dayObject = EventObject::updateOrCreate(
+            [
+                'user_id' => $this->integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $balanceReferenceDate,
+            ],
+            [
+                'time' => $balanceReferenceDate . ' 00:00:00',
+                'content' => null,
+                'metadata' => ['date' => $balanceReferenceDate],
+            ]
+        );
+
         $eventData = [
             'user_id' => $this->integration->user_id,
             'action' => 'had_balance',
@@ -54,6 +72,8 @@ class GoCardlessBalanceData extends BaseProcessingJob
             'value' => abs((float) ($balance['balanceAmount']['amount'] ?? 0)),
             'value_multiplier' => 100,
             'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
+            'actor_id' => $accountObject->id, // Set directly (original simple design)
+            'target_id' => $dayObject->id, // Set directly (original simple design)
             'event_metadata' => [
                 'balance_type' => $balanceType,
                 'reference_date' => $balanceReferenceDate,
@@ -105,12 +125,6 @@ class GoCardlessBalanceData extends BaseProcessingJob
                 'metadata' => ['date' => $balanceReferenceDate],
             ]
         );
-
-        // Create the event relationship
-        $event->objects()->syncWithoutDetaching([
-            $accountObject->id => ['role' => 'actor'],
-            $dayObject->id => ['role' => 'target'],
-        ]);
 
         // Add tags
         $event->syncTags([

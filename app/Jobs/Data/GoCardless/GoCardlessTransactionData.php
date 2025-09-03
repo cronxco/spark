@@ -71,6 +71,12 @@ class GoCardlessTransactionData extends BaseProcessingJob
         // Preserve the best available timestamp
         $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
 
+        // Create or update actor (bank account)
+        $accountObject = $this->upsertAccountObject($tx);
+
+        // Create or update target (counterparty)
+        $counterpartyObject = $this->upsertCounterpartyObject($tx);
+
         $eventData = [
             'user_id' => $this->integration->user_id,
             'action' => $action,
@@ -80,6 +86,8 @@ class GoCardlessTransactionData extends BaseProcessingJob
             'value' => abs($amount),
             'value_multiplier' => 100,
             'value_unit' => $tx['transactionAmount']['currency'] ?? 'GBP',
+            'actor_id' => $accountObject->id, // Set directly (original simple design)
+            'target_id' => $counterpartyObject->id, // Set directly (original simple design)
             'event_metadata' => [
                 'category' => $category,
                 'description' => $tx['remittanceInformationUnstructured'] ?? '',
@@ -107,18 +115,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
             ],
             $eventData
         );
-
-        // Create or update actor (bank account)
-        $accountObject = $this->upsertAccountObject($tx);
-
-        // Create or update target (counterparty)
-        $counterpartyObject = $this->upsertCounterpartyObject($tx);
-
-        // Create the event relationship
-        $event->objects()->syncWithoutDetaching([
-            $accountObject->id => ['role' => 'actor'],
-            $counterpartyObject->id => ['role' => 'target'],
-        ]);
 
         // Add relevant tags based on transaction status
         $this->addTransactionTags($event, $tx, $status, $category, $isStatusChange, $existingEvent);
