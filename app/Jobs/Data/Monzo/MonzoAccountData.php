@@ -65,7 +65,6 @@ class MonzoAccountData extends BaseProcessingJob
                 'title' => $title,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [
@@ -92,7 +91,6 @@ class MonzoAccountData extends BaseProcessingJob
                 'title' => $date,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => ['date' => $date],

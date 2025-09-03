@@ -50,20 +50,20 @@ class OuraWorkoutsData extends BaseProcessingJob
             return null;
         }
 
-        $actor = $this->createOrUpdateObject([
+        $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
             'time' => $start ?? ($day . ' 00:00:00'),
-        ]);
+        ];
 
-        $target = $this->createOrUpdateObject([
+        $target = [
             'concept' => 'workout',
             'type' => Arr::get($item, 'activity', 'workout'),
             'title' => Str::title((string) Arr::get($item, 'activity', 'Workout')),
             'time' => $start ?? ($day . ' 00:00:00'),
             'metadata' => $item,
-        ]);
+        ];
 
         $durationSec = (int) Arr::get($item, 'duration', 0);
         $calories = (float) Arr::get($item, 'calories', Arr::get($item, 'total_calories', 0));

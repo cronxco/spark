@@ -50,7 +50,9 @@ class GoCardlessAccountPull extends BaseFetchJob
             'Authorization' => '[REDACTED]',
         ], [], $this->integration->id);
 
-        $response = Http::withHeaders($plugin->authHeaders($this->integration))
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $plugin->getAccessToken(),
+        ])
             ->get($plugin->apiBase . "/accounts/{$accountId}/details/");
 
         $plugin->logApiResponse('GET', "/accounts/{$accountId}/details/", $response->status(), $response->body(), $response->headers(), $this->integration->id);

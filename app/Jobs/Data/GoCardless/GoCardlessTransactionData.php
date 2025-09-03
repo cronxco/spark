@@ -321,7 +321,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
             [
                 'content' => json_encode($account),
                 'metadata' => [
-                    'integration_id' => $this->integration->id,
                     'name' => $accountName,
                     'provider' => $account['institution_id'] ?? 'GoCardless',
                     'account_type' => $accountType,
@@ -355,7 +354,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
                     'debtor_account' => $tx['debtorAccount'] ?? null,
                 ]),
                 'metadata' => [
-                    'integration_id' => $this->integration->id,
                 ],
             ]
         );
@@ -510,7 +508,6 @@ class GoCardlessTransactionData extends BaseProcessingJob
                 'time' => $this->parseTransactionDate($transaction),
                 'content' => $transaction['remittanceInformationUnstructured'] ?? '',
                 'metadata' => array_merge($counterpartyDetails, [
-                    'integration_id' => $this->integration->id,
                     'transaction_details' => $transaction,
                 ]),
             ]

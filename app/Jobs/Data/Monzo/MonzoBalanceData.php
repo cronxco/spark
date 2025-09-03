@@ -105,7 +105,6 @@ class MonzoBalanceData extends BaseProcessingJob
                 'title' => $title,
             ],
             [
-                'integration_id' => $this->integration->id,
                 'time' => now(),
                 'content' => null,
                 'metadata' => [
