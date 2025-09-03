@@ -36,7 +36,7 @@ class OuraSpo2Pull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/daily_spo2', [
+            ->get($plugin->getBaseUrl() . '/usercollection/daily_spo2', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

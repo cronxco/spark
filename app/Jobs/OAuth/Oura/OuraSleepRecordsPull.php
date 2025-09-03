@@ -36,7 +36,7 @@ class OuraSleepRecordsPull extends BaseFetchJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . '/usercollection/sleep', [
+            ->get($plugin->getBaseUrl() . '/usercollection/sleep', [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ]);

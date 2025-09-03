@@ -65,7 +65,7 @@ class OuraActivityPull extends BaseFetchJob
         ], $queryParams, $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->baseUrl . $endpoint, $queryParams);
+            ->get($plugin->getBaseUrl() . $endpoint, $queryParams);
 
         // Log the API response (using reflection to access protected method for testing compatibility)
         $logResponseMethod = $reflection->getMethod('logApiResponse');

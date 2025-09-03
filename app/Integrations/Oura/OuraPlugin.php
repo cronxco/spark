@@ -262,6 +262,11 @@ class OuraPlugin extends OAuthPlugin
         ];
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
+    }
+
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         // Use cloud.ouraring.com for authorization endpoint
