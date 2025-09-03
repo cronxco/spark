@@ -51,20 +51,20 @@ class OuraSleepRecordsData extends BaseProcessingJob
             return null;
         }
 
-        $actor = $this->createOrUpdateObject([
+        $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
             'time' => $start ?? ($day . ' 00:00:00'),
-        ]);
+        ];
 
-        $target = $this->createOrUpdateObject([
+        $target = [
             'concept' => 'sleep',
             'type' => 'oura_sleep_record',
             'title' => 'Sleep Record',
             'time' => $start ?? ($day . ' 00:00:00'),
             'metadata' => $item,
-        ]);
+        ];
 
         $duration = (int) Arr::get($item, 'duration', 0);
         $efficiency = Arr::get($item, 'efficiency');

@@ -7,6 +7,7 @@ use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\Oura\OuraSpo2Data;
 use Exception;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class OuraSpo2Pull extends BaseFetchJob
 {
@@ -45,6 +46,16 @@ class OuraSpo2Pull extends BaseFetchJob
         $plugin->logApiResponse('GET', '/usercollection/daily_spo2', $response->status(), $response->body(), $response->headers(), $this->integration->id);
 
         if (! $response->successful()) {
+            // Handle authorization errors gracefully
+            if ($response->status() === 403) {
+                Log::warning('Oura SpO2 access not authorized for integration', [
+                    'integration_id' => $this->integration->id,
+                    'response_body' => $response->body(),
+                ]);
+
+                return []; // Return empty array to skip processing
+            }
+
             throw new Exception('Failed to fetch daily SpO2 from Oura API: ' . $response->body());
         }
 
