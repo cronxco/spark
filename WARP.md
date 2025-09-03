@@ -31,6 +31,7 @@ composer dev
 - [Database & Queue Setup](#database--queue-setup)
 - [Frontend Stack](#frontend-stack)
 - [Development Patterns](#development-patterns)
+    - [Git Conventions](#git-conventions)
 
 ## Architecture Overview
 
@@ -431,6 +432,39 @@ resources/
 - **Laravel Pint** enforces PSR-12 with Laravel-specific rules
 - **Prettier** handles JavaScript/CSS/JSON formatting
 - **EditorConfig** maintains consistent editor settings
+
+### Git Conventions
+
+- **Gitmoji**: Use semantic emojis in commit messages following [gitmoji.dev](https://gitmoji.dev/) conventions
+- **Commit Format**: `{emoji} {descriptive message}`
+
+#### Common Gitmoji Examples for Spark
+
+```bash
+# New features and improvements
+git commit -m "✨ Add new Spotify playlist integration"
+git commit -m "⚡️ Optimize job queue processing performance"
+git commit -m "🎨 Refactor plugin registration system"
+
+# Bug fixes and maintenance
+git commit -m "🐛 Fix OAuth token refresh in Monzo plugin"
+git commit -m "🚑️ Critical hotfix for job timeout handling"
+git commit -m "🔒️ Fix security issue in webhook validation"
+
+# Tests and documentation
+git commit -m "✅ Add unit tests for integration jobs"
+git commit -m "📝 Update WARP.md with plugin development guide"
+
+# Dependencies and configuration
+git commit -m "⬆️ Upgrade Laravel to v12"
+git commit -m "🔧 Update queue configuration for Horizon"
+git commit -m "➕ Add pgvector extension support"
+
+# Code quality and refactoring
+git commit -m "♻️ Refactor BaseFetchJob error handling"
+git commit -m "🚨 Fix PHPStan warnings in plugin registry"
+git commit -m "💄 Improve dashboard UI components"
+```
 
 ### Key Patterns
 

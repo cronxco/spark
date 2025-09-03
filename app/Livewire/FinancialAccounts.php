@@ -17,8 +17,11 @@ class FinancialAccounts extends Component
     use WithPagination;
 
     public ?string $search = null;
+
     public ?string $accountTypeFilter = null;
+
     public ?string $providerFilter = null;
+
     public bool $showArchivedPots = false;
 
     protected $queryString = [

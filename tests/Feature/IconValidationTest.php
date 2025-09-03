@@ -9,8 +9,11 @@ use Tests\TestCase;
 class IconValidationTest extends TestCase
 {
     private array $validHeroIcons = [];
+
     private array $validFontAwesomeIcons = [];
+
     private array $foundIcons = [];
+
     private array $invalidIcons = [];
 
     protected function setUp(): void

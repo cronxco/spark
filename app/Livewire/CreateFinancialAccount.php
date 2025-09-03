@@ -12,12 +12,19 @@ use Livewire\Component;
 class CreateFinancialAccount extends Component
 {
     public string $name = '';
+
     public string $accountType = '';
+
     public string $provider = '';
+
     public ?string $accountNumber = null;
+
     public ?string $sortCode = null;
+
     public string $currency = 'GBP';
+
     public ?float $interestRate = null;
+
     public ?string $startDate = null;
 
     protected $rules = [

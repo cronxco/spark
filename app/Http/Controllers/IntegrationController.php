@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\PluginRegistry;
 use App\Jobs\Migrations\StartIntegrationMigration;
 use App\Models\IntegrationGroup;
@@ -463,17 +464,10 @@ class IntegrationController extends Controller
                         // Create instance-specific config with account details
                         $instanceConfig = $initial;
                         $instanceConfig['account_id'] = $account['id'];
-                        $instanceConfig['account_name'] = $account['name'] ?? 'Unknown Account';
+                        $instanceConfig['account_name'] = GoCardlessBankPlugin::generateAccountName($account);
 
                         // Create a unique name for each account instance
-                        if (isset($account['details']) && ! empty($account['details'])) {
-                            $accountName = $account['details'];
-                        } elseif (isset($account['ownerName'])) {
-                            $accountName = $account['ownerName'] . "'s Account";
-                        } else {
-                            $accountName = 'Account ' . substr($account['resourceId'] ?? $account['id'], 0, 8);
-                        }
-
+                        $accountName = GoCardlessBankPlugin::generateAccountName($account);
                         $typeName = $instanceNames[$type] ?? $typesMeta[$type]['label'] ?? ucfirst($type);
                         $customName = "{$typeName} - {$accountName}";
 

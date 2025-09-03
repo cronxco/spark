@@ -22,10 +22,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
 {
     // Cache configuration constants
     private const ACCOUNT_DETAILS_CACHE_TTL = 86400; // 24 hours
+
     private const REQUISITION_CACHE_TTL = 3600; // 1 hour
 
     // API monitoring constants
     private const API_CALLS_CACHE_KEY = 'gocardless_api_calls';
+
     private const API_EFFICIENCY_REPORT_TTL = 3600;
 
     // 1 hour
@@ -196,6 +198,22 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
         ];
+    }
+
+    /**
+     * Generate a descriptive name for an account
+     */
+    public static function generateAccountName(array $account): string
+    {
+        if (isset($account['details']) && ! empty(trim($account['details']))) {
+            return trim($account['details']);
+        } elseif (isset($account['ownerName']) && ! empty(trim($account['ownerName']))) {
+            return trim($account['ownerName']) . "'s Account";
+        } else {
+            $fallback = $account['resourceId'] ?? $account['id'] ?? 'Unknown';
+
+            return 'Account ' . substr($fallback, 0, 8);
+        }
     }
 
     public function getBaseUrl(): string
@@ -1009,6 +1027,60 @@ class GoCardlessBankPlugin extends OAuthPlugin
         );
     }
 
+    /**
+     * Get access token for API calls
+     */
+    public function getAccessToken(): string
+    {
+        if ($this->accessToken) {
+            return $this->accessToken;
+        }
+
+        Log::info('Getting GoCardless access token', [
+            'endpoint' => $this->tokenEndpoint,
+            'secret_id_length' => strlen($this->secretId),
+            'secret_key_length' => strlen($this->secretKey),
+        ]);
+
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/token/new/', [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ], [
+            'secret_id' => '[REDACTED]',
+            'secret_key' => '[REDACTED]',
+        ]);
+
+        // Send credentials in POST body as JSON
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->post($this->tokenEndpoint, [
+            'secret_id' => $this->secretId,
+            'secret_key' => $this->secretKey,
+        ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to get access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        $this->accessToken = $tokenData['access'] ?? '';
+
+        if (empty($this->accessToken)) {
+            throw new RuntimeException('No access token in response');
+        }
+
+        Log::info('GoCardless access token obtained', [
+            'token_length' => strlen($this->accessToken),
+        ]);
+
+        return $this->accessToken;
+    }
+
     protected function getRequiredScopes(): string
     {
         // Not applicable for GoCardless Bank Account Data API
@@ -1034,7 +1106,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         foreach ($integrations as $integration) {
             $currentName = $integration->name;
-            $newName = $this->generateAccountName($account);
+            $newName = static::generateAccountName($account);
 
             if ($currentName !== $newName) {
                 Log::info('GoCardless updateIntegrationNamesForAccount: updating name', [
@@ -1046,20 +1118,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
                 $integration->update(['name' => $newName]);
             }
-        }
-    }
-
-    /**
-     * Generate a descriptive name for an account
-     */
-    protected function generateAccountName(array $account): string
-    {
-        if (isset($account['details']) && ! empty($account['details'])) {
-            return $account['details'];
-        } elseif (isset($account['ownerName'])) {
-            return $account['ownerName'] . "'s Account";
-        } else {
-            return 'Account ' . substr($account['resourceId'] ?? $account['id'] ?? 'Unknown', 0, 8);
         }
     }
 
@@ -2477,60 +2535,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'booked' => $bookedTransactions,
             'pending' => $pendingTransactions,
         ];
-    }
-
-    /**
-     * Get access token for API calls
-     */
-    protected function getAccessToken(): string
-    {
-        if ($this->accessToken) {
-            return $this->accessToken;
-        }
-
-        Log::info('Getting GoCardless access token', [
-            'endpoint' => $this->tokenEndpoint,
-            'secret_id_length' => strlen($this->secretId),
-            'secret_key_length' => strlen($this->secretKey),
-        ]);
-
-        // Log the API request
-        $this->logApiRequest('POST', '/api/v2/token/new/', [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ], [
-            'secret_id' => '[REDACTED]',
-            'secret_key' => '[REDACTED]',
-        ]);
-
-        // Send credentials in POST body as JSON
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ])->post($this->tokenEndpoint, [
-            'secret_id' => $this->secretId,
-            'secret_key' => $this->secretKey,
-        ]);
-
-        // Log the API response
-        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Failed to get access token: ' . $response->body());
-        }
-
-        $tokenData = $response->json();
-        $this->accessToken = $tokenData['access'] ?? '';
-
-        if (empty($this->accessToken)) {
-            throw new RuntimeException('No access token in response');
-        }
-
-        Log::info('GoCardless access token obtained', [
-            'token_length' => strlen($this->accessToken),
-        ]);
-
-        return $this->accessToken;
     }
 
     /**

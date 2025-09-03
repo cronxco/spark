@@ -17,7 +17,9 @@ class MonzoAccountPullTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected IntegrationGroup $group;
+
     protected Integration $integration;
 
     protected function setUp(): void
@@ -149,6 +151,7 @@ class MonzoAccountPullTest extends TestCase
                     {
                         return ['Authorization' => 'Bearer test-token'];
                     }
+
                     public $apiBase = 'https://api.monzo.com';
 
                     public function logApiRequest(...$args) {}

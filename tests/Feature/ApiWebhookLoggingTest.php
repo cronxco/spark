@@ -20,7 +20,9 @@ class ApiWebhookLoggingTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private IntegrationGroup $group;
+
     private Integration $integration;
 
     protected function setUp(): void
