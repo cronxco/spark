@@ -166,7 +166,7 @@ class SpotifyListeningData extends BaseProcessingJob
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $this->integration->id,
+                'user_id' => $this->integration->user_id,
                 'concept' => 'track',
                 'type' => 'spotify_track',
                 'title' => $track['name'],
@@ -195,7 +195,7 @@ class SpotifyListeningData extends BaseProcessingJob
         foreach ($artists as $artist) {
             $artistObject = EventObject::updateOrCreate(
                 [
-                    'integration_id' => $this->integration->id,
+                    'user_id' => $this->integration->user_id,
                     'concept' => 'artist',
                     'type' => 'spotify_artist',
                     'title' => $artist['name'],
@@ -222,7 +222,7 @@ class SpotifyListeningData extends BaseProcessingJob
     {
         return EventObject::updateOrCreate(
             [
-                'integration_id' => $this->integration->id,
+                'user_id' => $this->integration->user_id,
                 'concept' => 'album',
                 'type' => 'spotify_album',
                 'title' => $album['name'],
@@ -255,7 +255,6 @@ class SpotifyListeningData extends BaseProcessingJob
                 'title' => 'Spotify User',
             ],
             [
-                'integration_id' => $this->integration->id,
                 'content' => 'Spotify User',
                 'metadata' => [
                     'account_id' => $this->integration->group?->account_id ?? $this->integration->account_id,
