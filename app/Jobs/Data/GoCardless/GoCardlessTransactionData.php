@@ -77,14 +77,16 @@ class GoCardlessTransactionData extends BaseProcessingJob
         // Create or update target (counterparty)
         $counterpartyObject = $this->upsertCounterpartyObject($tx);
 
+        [$encodedValue, $valueMultiplier] = $this->encodeCurrencyValue(abs($amount));
+
         $eventData = [
             'user_id' => $this->integration->user_id,
             'action' => $action,
             'domain' => 'money',
             'service' => 'gocardless',
             'time' => $timestamp,
-            'value' => abs($amount),
-            'value_multiplier' => 100,
+            'value' => $encodedValue,
+            'value_multiplier' => $valueMultiplier,
             'value_unit' => $tx['transactionAmount']['currency'] ?? 'GBP',
             'actor_id' => $accountObject->id, // Set directly (original simple design)
             'target_id' => $counterpartyObject->id, // Set directly (original simple design)
@@ -482,7 +484,7 @@ class GoCardlessTransactionData extends BaseProcessingJob
         // This method is replaced by upsertAccountObject
         return EventObject::where('user_id', $this->integration->user_id)
             ->where('concept', 'account')
-            ->where('type', 'gocardless_account')
+            ->where('type', 'bank_account')
             ->whereJsonContains('metadata->integration_id', $this->integration->id)
             ->first()
             ?? throw new Exception('Account object not found');
@@ -716,5 +718,21 @@ class GoCardlessTransactionData extends BaseProcessingJob
         // Add credit/debit tag based on amount
         $amount = (float) ($transaction['transactionAmount']['amount'] ?? 0);
         $event->attachTag($amount < 0 ? 'debit' : 'credit');
+    }
+
+    /**
+     * Encode currency values for storage in bigint column
+     * Uses multiplier of 100 for 2 decimal place precision
+     */
+    private function encodeCurrencyValue(float $amount): array
+    {
+        if ($amount === 0.0) {
+            return [0, 100];
+        }
+
+        // Currency values: multiply by 100 for 2 decimal precision
+        $encodedValue = (int) round($amount * 100);
+
+        return [$encodedValue, 100];
     }
 }

@@ -63,14 +63,17 @@ class GoCardlessBalanceData extends BaseProcessingJob
             ]
         );
 
+        $balanceAmount = abs((float) ($balance['balanceAmount']['amount'] ?? 0));
+        [$encodedValue, $valueMultiplier] = $this->encodeCurrencyValue($balanceAmount);
+
         $eventData = [
             'user_id' => $this->integration->user_id,
             'action' => 'had_balance',
             'domain' => 'money',
             'service' => 'gocardless',
             'time' => $balance['referenceDate'] ?? now(),
-            'value' => abs((float) ($balance['balanceAmount']['amount'] ?? 0)),
-            'value_multiplier' => 100,
+            'value' => $encodedValue,
+            'value_multiplier' => $valueMultiplier,
             'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
             'actor_id' => $accountObject->id, // Set directly (original simple design)
             'target_id' => $dayObject->id, // Set directly (original simple design)
@@ -271,5 +274,21 @@ class GoCardlessBalanceData extends BaseProcessingJob
 
             $this->createBalanceEvent($balance);
         }
+    }
+
+    /**
+     * Encode currency values for storage in bigint column
+     * Uses multiplier of 100 for 2 decimal place precision
+     */
+    private function encodeCurrencyValue(float $amount): array
+    {
+        if ($amount === 0.0) {
+            return [0, 100];
+        }
+
+        // Currency values: multiply by 100 for 2 decimal precision
+        $encodedValue = (int) round($amount * 100);
+
+        return [$encodedValue, 100];
     }
 }

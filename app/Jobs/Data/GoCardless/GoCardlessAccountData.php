@@ -50,7 +50,7 @@ class GoCardlessAccountData extends BaseProcessingJob
             [
                 'user_id' => $this->integration->user_id,
                 'concept' => 'account',
-                'type' => 'gocardless_account',
+                'type' => 'bank_account',
                 'title' => $ownerName,
             ],
             [
@@ -78,7 +78,7 @@ class GoCardlessAccountData extends BaseProcessingJob
             [
                 'user_id' => $this->integration->user_id,
                 'concept' => 'account',
-                'type' => 'gocardless_account',
+                'type' => 'bank_account',
                 'title' => $accountData['details'] ?? 'Rate Limited Account',
             ],
             [
@@ -107,8 +107,8 @@ class GoCardlessAccountData extends BaseProcessingJob
         foreach ($integrations as $integration) {
             $accountObject = EventObject::where('user_id', $integration->user_id)
                 ->where('concept', 'account')
-                ->where('type', 'gocardless_account')
-                ->where('integration_id', $integration->id)
+                ->where('type', 'bank_account')
+                ->whereJsonContains('metadata->integration_id', $integration->id)
                 ->first();
 
             if ($accountObject && $integration->name !== $accountObject->title) {
@@ -125,5 +125,21 @@ class GoCardlessAccountData extends BaseProcessingJob
             'credit' => 'credit_card',
             default => 'checking_account',
         };
+    }
+
+    /**
+     * Encode currency values for storage in bigint column
+     * Uses multiplier of 100 for 2 decimal place precision
+     */
+    private function encodeCurrencyValue(float $amount): array
+    {
+        if ($amount === 0.0) {
+            return [0, 100];
+        }
+
+        // Currency values: multiply by 100 for 2 decimal precision
+        $encodedValue = (int) round($amount * 100);
+
+        return [$encodedValue, 100];
     }
 }
