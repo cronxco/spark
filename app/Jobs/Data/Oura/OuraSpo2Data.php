@@ -51,9 +51,6 @@ class OuraSpo2Data extends BaseProcessingJob
         }
 
         $sourceId = "oura_spo2_{$this->integration->id}_{$day}";
-        if ($this->eventExists($sourceId)) {
-            return null;
-        }
 
         $actor = [
             'concept' => 'user',
