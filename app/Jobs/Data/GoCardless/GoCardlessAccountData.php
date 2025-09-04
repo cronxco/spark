@@ -107,7 +107,7 @@ class GoCardlessAccountData extends BaseProcessingJob
         foreach ($integrations as $integration) {
             $accountObject = EventObject::where('user_id', $integration->user_id)
                 ->where('concept', 'account')
-                ->where('type', 'gocardless_account')
+                ->where('type', 'bank_account')
                 ->whereJsonContains('metadata->integration_id', $integration->id)
                 ->first();
 
