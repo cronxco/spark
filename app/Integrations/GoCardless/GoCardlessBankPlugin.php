@@ -392,27 +392,26 @@ class GoCardlessBankPlugin extends OAuthPlugin
             return;
         }
 
-        $group = $integration->group;
-        if (! $group || empty($group->account_id)) {
-            Log::warning('GoCardless fetchData: missing group or account_id', [
+        if (empty($integration->configuration['account_id'])) {
+            Log::warning('GoCardless fetchData: missing account_id in integration configuration', [
                 'integration_id' => $integration->id,
-                'group_id' => $group?->id,
-                'account_id' => $group?->account_id,
+                'configuration' => $integration->configuration,
             ]);
 
             return;
         }
 
+        $accountId = $integration->configuration['account_id'];
+
         Log::info('GoCardless fetchData: processing data', [
             'integration_id' => $integration->id,
             'instance_type' => $instanceType,
-            'group_id' => $group->id,
-            'account_id' => $group->account_id,
+            'account_id' => $accountId,
         ]);
 
         try {
             // First, try to update integration names if account details are now available
-            $this->updateIntegrationNames($group);
+            $this->updateIntegrationNames($integration->group, $accountId);
 
             if ($instanceType === 'balances') {
                 Log::info('GoCardless fetchData: processing balance snapshot', [
@@ -435,7 +434,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'integration_id' => $integration->id,
                 'instance_type' => $instanceType,
                 'group_id' => $group->id,
-                'account_id' => $group->account_id,
+                'account_id' => $accountId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -450,16 +449,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'group_id' => $integration->group_id,
         ]);
 
-        $group = $integration->group;
-        if (! $group || empty($group->account_id)) {
-            Log::warning('GoCardless listAccounts: missing group or account_id', [
+        if (empty($integration->configuration['account_id'])) {
+            Log::warning('GoCardless listAccounts: missing account_id in integration configuration', [
                 'integration_id' => $integration->id,
-                'group_id' => $group?->id,
-                'account_id' => $group?->account_id,
+                'configuration' => $integration->configuration,
             ]);
 
             return [];
         }
+
+        $accountId = $integration->configuration['account_id'];
+        $group = $integration->group;
 
         try {
             // Try to get cached account list first
@@ -477,10 +477,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 Log::info('GoCardless listAccounts: getting requisition from API', [
                     'integration_id' => $integration->id,
                     'group_id' => $group->id,
-                    'account_id' => $group->account_id,
+                    'account_id' => $accountId,
                 ]);
 
-                $requisition = $this->getRequisition($group->account_id);
+                $requisition = $this->getRequisition($accountId);
                 $accountIds = $requisition['accounts'] ?? [];
 
                 // Cache the account list for future use
@@ -490,7 +490,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
                 Log::info('GoCardless listAccounts: retrieved and cached account IDs', [
                     'integration_id' => $integration->id,
-                    'requisition_id' => $group->account_id,
+                    'requisition_id' => $accountId,
                     'account_ids' => $accountIds,
                     'account_count' => count($accountIds),
                 ]);
@@ -535,7 +535,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             Log::error('Failed to list GoCardless accounts', [
                 'integration_id' => $integration->id,
                 'group_id' => $group->id,
-                'account_id' => $group->account_id,
+                'account_id' => $accountId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -546,7 +546,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Update integration names when account details become available
      */
-    public function updateIntegrationNames(IntegrationGroup $group): void
+    public function updateIntegrationNames(IntegrationGroup $group, string $accountId): void
     {
         Log::info('GoCardless updateIntegrationNames: starting', [
             'group_id' => $group->id,
@@ -564,7 +564,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 $accountIds = $cachedAccountIds;
             } else {
                 // Fall back to API call
-                $requisition = $this->getRequisition($group->account_id);
+                $requisition = $this->getRequisition($accountId);
                 $accountIds = $requisition['accounts'] ?? [];
 
                 // Cache the account list for future use
@@ -619,7 +619,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         try {
-            $this->updateIntegrationNames($group);
+            // Get account_id from the first integration in the group
+            $firstIntegration = $group->integrations()->first();
+            $accountId = $firstIntegration?->configuration['account_id'] ?? $group->account_id;
+
+            $this->updateIntegrationNames($group, $accountId);
 
             // Return summary of what was updated
             $integrations = $group->integrations()->get();

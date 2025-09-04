@@ -30,13 +30,12 @@ class GoCardlessBalancePull extends BaseFetchJob
     protected function fetchData(): array
     {
         $plugin = new GoCardlessBankPlugin;
-        $group = $this->integration->group;
 
-        if (! $group || empty($group->account_id)) {
-            throw new Exception('Missing GoCardless group or account_id');
+        if (empty($this->integration->configuration['account_id'])) {
+            throw new Exception('Missing GoCardless account_id in integration configuration');
         }
 
-        $accountId = $group->account_id;
+        $accountId = $this->integration->configuration['account_id'];
 
         // Validate account exists before making API calls
         if (! $this->validateAccountExists($accountId, $plugin)) {

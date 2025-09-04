@@ -371,8 +371,8 @@ class ProcessIntegrationPage implements ShouldQueue
 
                     $secretId = (string) (config('services.gocardless.secret_id'));
                     $secretKey = (string) (config('services.gocardless.secret_key'));
-                    $group = $this->integration->group;
-                    if (! $group) {
+
+                    if (empty($this->integration->configuration['account_id'])) {
                         return;
                     }
                     $client = new NordigenClient($secretId, $secretKey);
@@ -380,7 +380,7 @@ class ProcessIntegrationPage implements ShouldQueue
                     $all = $client->requisition->getRequisitions();
                     $accountIds = [];
                     foreach ((array) ($all['results'] ?? []) as $req) {
-                        if (($req['id'] ?? null) === (string) $group->account_id) {
+                        if (($req['id'] ?? null) === (string) $this->integration->configuration['account_id']) {
                             $accountIds = (array) ($req['accounts'] ?? []);
                             break;
                         }

@@ -411,8 +411,8 @@ class FetchIntegrationPage implements ShouldQueue
     protected function fetchGoCardless(): void
     {
         $type = $this->context['instance_type'] ?? 'transactions';
-        $group = $this->integration->group;
-        if (! $group || empty($group->account_id)) {
+
+        if (empty($this->integration->configuration['account_id'])) {
             return;
         }
 
@@ -443,7 +443,7 @@ class FetchIntegrationPage implements ShouldQueue
             $all = $client->requisition->getRequisitions();
             $accountIds = [];
             foreach ((array) ($all['results'] ?? []) as $req) {
-                if (($req['id'] ?? null) === (string) $group->account_id) {
+                if (($req['id'] ?? null) === (string) $this->integration->configuration['account_id']) {
                     $accountIds = (array) ($req['accounts'] ?? []);
                     break;
                 }
