@@ -24,6 +24,9 @@ class SpotifyListeningData extends BaseProcessingJob
     {
         $listeningData = $this->rawData;
 
+        // Check for potential duplicate processing
+        $this->checkForDuplicateProcessing($listeningData);
+
         // Process currently playing track
         if (! empty($listeningData['currently_playing'])) {
             try {
@@ -38,9 +41,17 @@ class SpotifyListeningData extends BaseProcessingJob
 
         // Process recently played tracks
         if (! empty($listeningData['recently_played'])) {
+            $processedCount = 0;
+            $skippedCount = 0;
+
             foreach ($listeningData['recently_played'] as $playedItem) {
                 try {
-                    $this->processTrackPlay($playedItem, 'recently_played');
+                    $result = $this->processTrackPlay($playedItem, 'recently_played');
+                    if ($result === 'skipped') {
+                        $skippedCount++;
+                    } else {
+                        $processedCount++;
+                    }
                 } catch (Exception $e) {
                     Log::error('Spotify: Failed to process recently played track', [
                         'integration_id' => $this->integration->id,
@@ -49,10 +60,17 @@ class SpotifyListeningData extends BaseProcessingJob
                     ]);
                 }
             }
+
+            Log::info('Spotify: Completed processing recently played tracks', [
+                'integration_id' => $this->integration->id,
+                'total_tracks' => count($listeningData['recently_played']),
+                'processed_count' => $processedCount,
+                'skipped_count' => $skippedCount,
+            ]);
         }
     }
 
-    private function processTrackPlay(array $trackData, string $source): void
+    private function processTrackPlay(array $trackData, string $source): ?string
     {
         // Extract track information based on source
         if ($source === 'currently_playing') {
@@ -70,86 +88,174 @@ class SpotifyListeningData extends BaseProcessingJob
         // Generate consistent source ID to prevent duplicates
         $sourceId = $this->generateTrackPlaySourceId($trackId, $playedAt);
 
-        // Check if this track play already exists
-        $existingEvent = Event::where('integration_id', $this->integration->id)
-            ->where('source_id', $sourceId)
-            ->first();
+        // Check if this track play already exists (with retry logic for race conditions)
+        $maxRetries = 3;
+        $retryCount = 0;
 
-        if ($existingEvent) {
-            Log::debug('Spotify: Track play already exists, skipping', [
-                'integration_id' => $this->integration->id,
-                'source_id' => $sourceId,
-                'track_name' => $track['name'] ?? 'Unknown',
-            ]);
+        while ($retryCount < $maxRetries) {
+            $existingEvent = Event::where('integration_id', $this->integration->id)
+                ->where('source_id', $sourceId)
+                ->first();
 
-            return;
+            if ($existingEvent) {
+                Log::debug('Spotify: Track play already exists, skipping', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $sourceId,
+                    'track_name' => $track['name'] ?? 'Unknown',
+                    'retry_count' => $retryCount,
+                ]);
+
+                return 'skipped';
+            }
+
+            try {
+                Log::info('Spotify: Processing track play', [
+                    'integration_id' => $this->integration->id,
+                    'track_name' => $track['name'] ?? 'Unknown',
+                    'artist_name' => $track['artists'][0]['name'] ?? 'Unknown',
+                    'source' => $source,
+                ]);
+
+                // Create or update track object
+                $trackObject = $this->upsertTrackObject($track);
+
+                // Create or update artist objects
+                $artistObjects = $this->upsertArtistObjects($track['artists'] ?? []);
+
+                // Create or update album object
+                $albumObject = null;
+                if (! empty($track['album'])) {
+                    $albumObject = $this->upsertAlbumObject($track['album']);
+                }
+
+                // Create the track play event with upsert to handle race conditions
+                $event = Event::updateOrCreate(
+                    [
+                        'integration_id' => $this->integration->id,
+                        'source_id' => $sourceId,
+                    ],
+                    [
+                        'time' => $playedAt,
+                        'actor_id' => $this->getUserObject()->id,
+                        'service' => 'spotify',
+                        'domain' => 'media',
+                        'action' => 'played',
+                        'value' => 1,
+                        'value_multiplier' => 1,
+                        'value_unit' => 'play',
+                        'event_metadata' => [
+                            'source' => $source,
+                            'track_id' => $trackId,
+                            'track_name' => $track['name'] ?? null,
+                            'artist_names' => array_column($track['artists'] ?? [], 'name'),
+                            'album_name' => $track['album']['name'] ?? null,
+                            'duration_ms' => $track['duration_ms'] ?? null,
+                            'popularity' => $track['popularity'] ?? null,
+                            'external_urls' => $track['external_urls'] ?? null,
+                        ],
+                        'target_id' => $trackObject->id,
+                    ]
+                );
+
+                // Store additional track information in metadata (original simple design)
+                $metadata = $event->event_metadata ?? [];
+                $metadata['artists'] = $artistObjects->pluck('id')->toArray();
+                if ($albumObject) {
+                    $metadata['album'] = $albumObject->id;
+                }
+                $event->event_metadata = $metadata;
+                $event->save();
+
+                // Add tags based on configuration and track data
+                $this->addTrackTags($event, $track, $this->integration->configuration ?? []);
+
+                // Add blocks for additional information
+                $this->addTrackBlocks($event, $track, $source);
+
+                // Successfully created/updated event, break out of retry loop
+                return 'processed';
+
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                $retryCount++;
+
+                if ($retryCount >= $maxRetries) {
+                    Log::error('Spotify: Failed to create track play event after retries due to unique constraint violation', [
+                        'integration_id' => $this->integration->id,
+                        'source_id' => $sourceId,
+                        'track_name' => $track['name'] ?? 'Unknown',
+                        'retry_count' => $retryCount,
+                        'error' => $e->getMessage(),
+                    ]);
+                    throw $e;
+                }
+
+                Log::warning('Spotify: Race condition detected during track play creation, retrying', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $sourceId,
+                    'track_name' => $track['name'] ?? 'Unknown',
+                    'retry_count' => $retryCount,
+                ]);
+
+                // Small delay before retry to reduce race condition likelihood
+                usleep(100000); // 100ms
+            }
         }
-
-        Log::info('Spotify: Processing track play', [
-            'integration_id' => $this->integration->id,
-            'track_name' => $track['name'] ?? 'Unknown',
-            'artist_name' => $track['artists'][0]['name'] ?? 'Unknown',
-            'source' => $source,
-        ]);
-
-        // Create or update track object
-        $trackObject = $this->upsertTrackObject($track);
-
-        // Create or update artist objects
-        $artistObjects = $this->upsertArtistObjects($track['artists'] ?? []);
-
-        // Create or update album object
-        $albumObject = null;
-        if (! empty($track['album'])) {
-            $albumObject = $this->upsertAlbumObject($track['album']);
-        }
-
-        // Create the track play event
-        $event = Event::create([
-            'source_id' => $sourceId,
-            'time' => $playedAt,
-            'integration_id' => $this->integration->id,
-            'actor_id' => $this->getUserObject()->id,
-            'service' => 'spotify',
-            'domain' => 'media',
-            'action' => 'played',
-            'value' => 1,
-            'value_multiplier' => 1,
-            'value_unit' => 'play',
-            'event_metadata' => [
-                'source' => $source,
-                'track_id' => $trackId,
-                'track_name' => $track['name'] ?? null,
-                'artist_names' => array_column($track['artists'] ?? [], 'name'),
-                'album_name' => $track['album']['name'] ?? null,
-                'duration_ms' => $track['duration_ms'] ?? null,
-                'popularity' => $track['popularity'] ?? null,
-                'external_urls' => $track['external_urls'] ?? null,
-            ],
-            'target_id' => $trackObject->id,
-        ]);
-
-        // Store additional track information in metadata (original simple design)
-        $metadata = $event->event_metadata ?? [];
-        $metadata['artists'] = $artistObjects->pluck('id')->toArray();
-        if ($albumObject) {
-            $metadata['album'] = $albumObject->id;
-        }
-        $event->event_metadata = $metadata;
-        $event->save();
-
-        // Add tags based on configuration and track data
-        $this->addTrackTags($event, $track, $this->integration->configuration ?? []);
-
-        // Add blocks for additional information
-        $this->addTrackBlocks($event, $track, $source);
     }
 
     private function generateTrackPlaySourceId(string $trackId, $playedAt): string
     {
         $timestamp = is_string($playedAt) ? $playedAt : $playedAt->toISOString();
 
-        return 'spotify_play_' . $trackId . '_' . md5($timestamp);
+        // Use a more robust approach to avoid collisions
+        // Include milliseconds for better uniqueness
+        $microtime = microtime(true);
+        $uniqueId = hash('sha256', $trackId . '_' . $timestamp . '_' . $microtime . '_' . $this->integration->id);
+
+        return 'spotify_play_' . substr($uniqueId, 0, 32); // Keep it reasonable length
+    }
+
+    private function checkForDuplicateProcessing(array $listeningData): void
+    {
+        $recentlyPlayed = $listeningData['recently_played'] ?? [];
+        $duplicateCount = 0;
+
+        foreach ($recentlyPlayed as $playedItem) {
+            if (! isset($playedItem['track']['id'])) {
+                continue;
+            }
+
+            $trackId = $playedItem['track']['id'];
+            $playedAt = $playedItem['played_at'];
+
+            // Check if this exact track play was processed very recently (within last 5 minutes)
+            $recentEvent = Event::where('integration_id', $this->integration->id)
+                ->where('service', 'spotify')
+                ->where('action', 'played')
+                ->where('event_metadata->track_id', $trackId)
+                ->where('time', '>=', now()->subMinutes(5))
+                ->first();
+
+            if ($recentEvent) {
+                $duplicateCount++;
+                Log::warning('Spotify: Potential duplicate processing detected', [
+                    'integration_id' => $this->integration->id,
+                    'track_id' => $trackId,
+                    'track_name' => $playedItem['track']['name'] ?? 'Unknown',
+                    'played_at' => $playedAt,
+                    'recent_event_time' => $recentEvent->time->toISOString(),
+                    'time_difference_minutes' => now()->diffInMinutes($recentEvent->time),
+                ]);
+            }
+        }
+
+        if ($duplicateCount > 0) {
+            Log::warning('Spotify: Multiple potential duplicate tracks detected in this batch', [
+                'integration_id' => $this->integration->id,
+                'total_tracks' => count($recentlyPlayed),
+                'potential_duplicates' => $duplicateCount,
+                'percentage' => round(($duplicateCount / count($recentlyPlayed)) * 100, 1) . '%',
+            ]);
+        }
     }
 
     private function upsertTrackObject(array $track): EventObject

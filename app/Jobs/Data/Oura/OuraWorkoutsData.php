@@ -3,7 +3,9 @@
 namespace App\Jobs\Data\Oura;
 
 use App\Jobs\Base\BaseProcessingJob;
+use App\Models\Event;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OuraWorkoutsData extends BaseProcessingJob
@@ -35,7 +37,7 @@ class OuraWorkoutsData extends BaseProcessingJob
         }
 
         if (! empty($events)) {
-            $this->createEvents($events);
+            $this->createEventsSafely($events);
         }
     }
 
@@ -45,10 +47,6 @@ class OuraWorkoutsData extends BaseProcessingJob
         $end = Arr::get($item, 'end_datetime');
         $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
         $sourceId = "oura_workout_{$this->integration->id}_" . (Arr::get($item, 'id') ?? ($day . '_' . md5(json_encode($item))));
-
-        if ($this->eventExists($sourceId)) {
-            return null;
-        }
 
         $actor = [
             'concept' => 'user',
@@ -107,6 +105,7 @@ class OuraWorkoutsData extends BaseProcessingJob
                 'calories' => $calories,
             ],
             'blocks' => $blocks,
+            'integration_id' => $this->integration->id,
         ];
     }
 
@@ -127,5 +126,57 @@ class OuraWorkoutsData extends BaseProcessingJob
         }
 
         return [(int) $float, $defaultMultiplier];
+    }
+
+    /**
+     * Create events safely with race condition protection
+     */
+    private function createEventsSafely(array $eventData): void
+    {
+        foreach ($eventData as $data) {
+            // Use updateOrCreate to prevent race conditions
+            $event = Event::updateOrCreate(
+                [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $data['source_id'],
+                ],
+                [
+                    'time' => $data['time'],
+                    'actor_id' => $this->createOrUpdateObject($data['actor'])->id,
+                    'service' => $this->serviceName,
+                    'domain' => $data['domain'],
+                    'action' => $data['action'],
+                    'value' => $data['value'] ?? null,
+                    'value_multiplier' => $data['value_multiplier'] ?? 1,
+                    'value_unit' => $data['value_unit'] ?? null,
+                    'event_metadata' => $data['event_metadata'] ?? [],
+                    'target_id' => $this->createOrUpdateObject($data['target'])->id,
+                ]
+            );
+
+            // Create blocks if any
+            if (isset($data['blocks'])) {
+                foreach ($data['blocks'] as $blockData) {
+                    $event->blocks()->create([
+                        'time' => $blockData['time'] ?? $event->time,
+                        'block_type' => $blockData['block_type'] ?? '',
+                        'title' => $blockData['title'],
+                        'metadata' => $blockData['metadata'] ?? [],
+                        'url' => $blockData['url'] ?? null,
+                        'media_url' => $blockData['media_url'] ?? null,
+                        'value' => $blockData['value'] ?? null,
+                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
+                        'value_unit' => $blockData['value_unit'] ?? null,
+                        'embeddings' => $blockData['embeddings'] ?? null,
+                    ]);
+                }
+            }
+
+            Log::info('Oura: Created workout event safely', [
+                'integration_id' => $this->integration->id,
+                'source_id' => $data['source_id'],
+                'action' => $data['action'],
+            ]);
+        }
     }
 }

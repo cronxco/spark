@@ -28,13 +28,17 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->group = IntegrationGroup::factory()->create([
             'user_id' => $this->user->id,
             'service' => 'gocardless',
-            'account_id' => 'test_account_123',
         ]);
         $this->integration = Integration::factory()->create([
             'user_id' => $this->user->id,
             'integration_group_id' => $this->group->id,
             'service' => 'gocardless',
             'instance_type' => 'transactions',
+            'configuration' => [
+                'account_id' => 'test_account_123',
+                'account_name' => 'Test Account',
+                'update_frequency_minutes' => 360,
+            ],
         ]);
 
         // Clear any cached rate limit data
@@ -69,19 +73,18 @@ class GoCardlessTransactionPullTest extends TestCase
     /**
      * @test
      */
-    public function missing_account_id_integration()
+    public function missing_account_id_in_configuration()
     {
-        $groupWithoutAccountId = IntegrationGroup::factory()->create([
-            'user_id' => $this->user->id,
-            'service' => 'gocardless',
-            'account_id' => null,
-        ]);
-
         $integrationWithoutAccountId = Integration::factory()->create([
             'user_id' => $this->user->id,
-            'integration_group_id' => $groupWithoutAccountId->id,
+            'integration_group_id' => $this->group->id,
             'service' => 'gocardless',
             'instance_type' => 'transactions',
+            'configuration' => [
+                'account_name' => 'Test Account',
+                'update_frequency_minutes' => 360,
+                // Missing account_id
+            ],
         ]);
 
         $job = new GoCardlessTransactionPull($integrationWithoutAccountId);
@@ -99,10 +102,10 @@ class GoCardlessTransactionPullTest extends TestCase
         $cacheKey = 'gocardless_transaction_calls';
         $today = now()->toDateString();
 
-        // Simulate some API calls
+        // Simulate some API calls using the account_id from integration configuration
         $calls = [
             [
-                'account_id' => 'test_account_123',
+                'account_id' => $this->integration->configuration['account_id'],
                 'date' => $today,
                 'timestamp' => now()->toISOString(),
             ],
@@ -112,7 +115,7 @@ class GoCardlessTransactionPullTest extends TestCase
 
         $cachedCalls = Cache::get($cacheKey);
         $this->assertCount(1, $cachedCalls);
-        $this->assertEquals('test_account_123', $cachedCalls[0]['account_id']);
+        $this->assertEquals($this->integration->configuration['account_id'], $cachedCalls[0]['account_id']);
         $this->assertEquals($today, $cachedCalls[0]['date']);
     }
 
@@ -144,24 +147,54 @@ class GoCardlessTransactionPullTest extends TestCase
      */
     public function configuration_inheritance()
     {
-        // Test that configuration from the integration is accessible via public methods
+        // Test that configuration from the integration is accessible and includes account_id
         $integrationWithConfig = Integration::factory()->create([
             'user_id' => $this->user->id,
             'integration_group_id' => $this->group->id,
             'service' => 'gocardless',
             'instance_type' => 'transactions',
             'configuration' => [
+                'account_id' => 'configured_account_456',
+                'account_name' => 'Configured Test Account',
                 'days_back' => 14,
-                'custom_setting' => 'test_value',
+                'update_frequency_minutes' => 360,
             ],
         ]);
 
         // Test that the integration was created with the correct configuration
+        $this->assertEquals('configured_account_456', $integrationWithConfig->configuration['account_id']);
+        $this->assertEquals('Configured Test Account', $integrationWithConfig->configuration['account_name']);
         $this->assertEquals(14, $integrationWithConfig->configuration['days_back']);
-        $this->assertEquals('test_value', $integrationWithConfig->configuration['custom_setting']);
+        $this->assertEquals(360, $integrationWithConfig->configuration['update_frequency_minutes']);
 
         // Test that the job can be created with this integration
         $job = new GoCardlessTransactionPull($integrationWithConfig);
+        $this->assertInstanceOf(GoCardlessTransactionPull::class, $job);
+    }
+
+    /**
+     * @test
+     */
+    public function uses_account_id_from_integration_configuration()
+    {
+        // Create an integration with a specific account_id in configuration
+        $integrationWithSpecificAccountId = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $this->group->id,
+            'service' => 'gocardless',
+            'instance_type' => 'transactions',
+            'configuration' => [
+                'account_id' => 'specific_config_account_789',
+                'account_name' => 'Specific Config Account',
+                'update_frequency_minutes' => 360,
+            ],
+        ]);
+
+        // Verify the account_id is correctly set in configuration
+        $this->assertEquals('specific_config_account_789', $integrationWithSpecificAccountId->configuration['account_id']);
+
+        // Create job with this integration
+        $job = new GoCardlessTransactionPull($integrationWithSpecificAccountId);
         $this->assertInstanceOf(GoCardlessTransactionPull::class, $job);
     }
 }

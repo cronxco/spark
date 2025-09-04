@@ -41,7 +41,7 @@ class GoCardlessBalanceData extends BaseProcessingJob
     {
         $balanceReferenceDate = $balance['referenceDate'] ?? now()->toDateString();
         $balanceType = $balance['balanceType'] ?? 'unknown';
-        $accountId = $this->integration->group->account_id ?? 'unknown';
+        $accountId = $this->integration->configuration['account_id'] ?? 'unknown';
 
         $sourceId = 'balance_' . $accountId . '_' . $balanceReferenceDate;
 
@@ -216,7 +216,7 @@ class GoCardlessBalanceData extends BaseProcessingJob
     protected function upsertAccountObject(array $balance): EventObject
     {
         // This is a simplified version - in practice we'd have account data from the balance API
-        $accountId = $this->integration->group->account_id ?? 'unknown';
+        $accountId = $this->integration->configuration['account_id'] ?? 'unknown';
         $accountName = 'Bank Account'; // Would be derived from account data in real implementation
 
         // First, try to find an existing onboarding-created account object

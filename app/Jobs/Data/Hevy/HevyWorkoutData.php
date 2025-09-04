@@ -112,23 +112,27 @@ class HevyWorkoutData extends BaseProcessingJob
         ]);
 
         [$encVolume, $volMult] = $this->encodeNumericValue($volume);
-        $event = Event::create([
-            'source_id' => $sourceId,
-            'time' => $startIso,
-            'integration_id' => $this->integration->id,
-            'actor_id' => $actor->id,
-            'service' => 'hevy',
-            'domain' => 'health',
-            'action' => 'completed_workout',
-            'value' => $encVolume,
-            'value_multiplier' => $volMult,
-            'value_unit' => $this->inferWeightUnit(Arr::get($workout, 'weight_unit')),
-            'event_metadata' => [
-                'end' => $endIso,
-                'duration_seconds' => $durationSec,
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $this->integration->id,
+                'source_id' => $sourceId,
             ],
-            'target_id' => $target->id,
-        ]);
+            [
+                'time' => $startIso,
+                'actor_id' => $actor->id,
+                'service' => 'hevy',
+                'domain' => 'health',
+                'action' => 'completed_workout',
+                'value' => $encVolume,
+                'value_multiplier' => $volMult,
+                'value_unit' => $this->inferWeightUnit(Arr::get($workout, 'weight_unit')),
+                'event_metadata' => [
+                    'end' => $endIso,
+                    'duration_seconds' => $durationSec,
+                ],
+                'target_id' => $target->id,
+            ]
+        );
 
         // Create blocks per exercise set
         $exercises = Arr::get($workout, 'exercises', []);
