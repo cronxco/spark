@@ -152,50 +152,86 @@ abstract class BaseProcessingJob implements ShouldQueue
         $events = collect();
 
         foreach ($eventData as $data) {
+            // Skip if event already exists to prevent duplicate key violations
+            if ($this->eventExists($data['source_id'])) {
+                Log::info('Skipping duplicate event creation', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $data['source_id'],
+                    'service' => $this->serviceName,
+                    'job_type' => $this->getJobType(),
+                    'action' => 'duplicate_event_skipped',
+                ]);
+
+                continue;
+            }
+
             // Create actor object
             $actor = $this->createOrUpdateObject($data['actor']);
 
             // Create target object
             $target = $this->createOrUpdateObject($data['target']);
 
-            // Create event
-            $event = Event::create([
-                'source_id' => $data['source_id'],
-                'time' => $data['time'],
-                'integration_id' => $this->integration->id,
-                'actor_id' => $actor->id,
-                'actor_metadata' => $data['actor_metadata'] ?? [],
-                'service' => $this->serviceName,
-                'domain' => $data['domain'],
-                'action' => $data['action'],
-                'value' => $data['value'] ?? null,
-                'value_multiplier' => $data['value_multiplier'] ?? 1,
-                'value_unit' => $data['value_unit'] ?? null,
-                'event_metadata' => $data['event_metadata'] ?? [],
-                'target_id' => $target->id,
-                'target_metadata' => $data['target_metadata'] ?? [],
-                'embeddings' => $data['embeddings'] ?? null,
-            ]);
+            try {
+                // Create event with duplicate handling
+                $event = Event::create([
+                    'source_id' => $data['source_id'],
+                    'time' => $data['time'],
+                    'integration_id' => $this->integration->id,
+                    'actor_id' => $actor->id,
+                    'actor_metadata' => $data['actor_metadata'] ?? [],
+                    'service' => $this->serviceName,
+                    'domain' => $data['domain'],
+                    'action' => $data['action'],
+                    'value' => $data['value'] ?? null,
+                    'value_multiplier' => $data['value_multiplier'] ?? 1,
+                    'value_unit' => $data['value_unit'] ?? null,
+                    'event_metadata' => $data['event_metadata'] ?? [],
+                    'target_id' => $target->id,
+                    'target_metadata' => $data['target_metadata'] ?? [],
+                    'embeddings' => $data['embeddings'] ?? null,
+                ]);
 
-            // Create blocks if any
-            if (isset($data['blocks'])) {
-                foreach ($data['blocks'] as $blockData) {
-                    $event->blocks()->create([
-                        'time' => $blockData['time'] ?? $event->time,
-                        'block_type' => $blockData['block_type'] ?? '',
-                        'title' => $blockData['title'],
-                        'metadata' => $blockData['metadata'] ?? [],
-                        'url' => $blockData['url'] ?? null,
-                        'media_url' => $blockData['media_url'] ?? null,
-                        'value' => $blockData['value'] ?? null,
-                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
-                        'value_unit' => $blockData['value_unit'] ?? null,
-                        'embeddings' => $blockData['embeddings'] ?? null,
-                    ]);
+                // Create blocks if any
+                if (isset($data['blocks'])) {
+                    foreach ($data['blocks'] as $blockData) {
+                        $event->blocks()->create([
+                            'time' => $blockData['time'] ?? $event->time,
+                            'block_type' => $blockData['block_type'] ?? '',
+                            'title' => $blockData['title'],
+                            'metadata' => $blockData['metadata'] ?? [],
+                            'url' => $blockData['url'] ?? null,
+                            'media_url' => $blockData['media_url'] ?? null,
+                            'value' => $blockData['value'] ?? null,
+                            'value_multiplier' => $blockData['value_multiplier'] ?? 1,
+                            'value_unit' => $blockData['value_unit'] ?? null,
+                            'embeddings' => $blockData['embeddings'] ?? null,
+                        ]);
+                    }
+                }
+
+                $events->push($event);
+
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                // Handle race condition where event was created between our check and create
+                Log::warning('Race condition detected - event already exists', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $data['source_id'],
+                    'service' => $this->serviceName,
+                    'job_type' => $this->getJobType(),
+                    'error' => $e->getMessage(),
+                    'action' => 'race_condition_handled',
+                ]);
+
+                // Try to find the existing event
+                $existingEvent = Event::where('integration_id', $this->integration->id)
+                    ->where('source_id', $data['source_id'])
+                    ->whereNull('deleted_at')
+                    ->first();
+
+                if ($existingEvent) {
+                    $events->push($existingEvent);
                 }
             }
-
-            $events->push($event);
         }
 
         return $events;

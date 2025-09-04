@@ -8,6 +8,7 @@ use App\Jobs\Data\GoCardless\GoCardlessTransactionData;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GoCardlessTransactionPull extends BaseFetchJob
 {
@@ -36,6 +37,24 @@ class GoCardlessTransactionPull extends BaseFetchJob
         }
 
         $accountId = $group->account_id;
+
+        // Validate account exists before making API calls
+        if (! $this->validateAccountExists($accountId, $plugin)) {
+            // Log the problematic integration for monitoring
+            Log::warning('GoCardless integration failed due to invalid account ID - account not found in GoCardless API', [
+                'integration_id' => $this->integration->id,
+                'integration_name' => $this->integration->name,
+                'account_id' => $accountId,
+                'user_id' => $this->integration->user_id,
+                'error_type' => 'invalid_account_id',
+                'service' => 'gocardless',
+                'job_type' => 'transactions',
+                'action' => 'account_validation_failed',
+                'recommendation' => 'Check if the account has been disconnected or if the account ID is correct',
+            ]);
+
+            throw new Exception('Account ID not found in GoCardless API. The configured account may have been disconnected or the account ID may be incorrect.');
+        }
 
         // Check if we've exceeded daily transaction API call limits
         if (! $this->canMakeTransactionApiCall($accountId)) {
@@ -140,5 +159,68 @@ class GoCardlessTransactionPull extends BaseFetchJob
         });
 
         Cache::put(self::TRANSACTION_CALLS_CACHE_KEY, array_values($calls), 604800); // 7 days
+    }
+
+    /**
+     * Validate that the account exists in GoCardless before making API calls
+     */
+    private function validateAccountExists(string $accountId, GoCardlessBankPlugin $plugin): bool
+    {
+        try {
+            // Check if we have a cached validation result
+            $validationCacheKey = "gocardless_account_validation_{$accountId}";
+            $cachedValidation = Cache::get($validationCacheKey);
+
+            if ($cachedValidation === true) {
+                return true;
+            }
+
+            if ($cachedValidation === false) {
+                return false;
+            }
+
+            // Make a lightweight API call to check if account exists
+            $plugin->logApiRequest('GET', "/accounts/{$accountId}/", [
+                'Authorization' => '[REDACTED]',
+            ], [], $this->integration->id);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $plugin->getAccessToken(),
+            ])
+                ->get($plugin->getBaseUrl() . "/accounts/{$accountId}/");
+
+            $plugin->logApiResponse('GET', "/accounts/{$accountId}/", $response->status(), $response->body(), $response->headers(), $this->integration->id);
+
+            if ($response->status() === 404) {
+                // Account doesn't exist, cache this result for 24 hours
+                Cache::put($validationCacheKey, false, 86400);
+
+                // Log the invalid account ID detection
+                Log::info('GoCardless account validation failed - account not found', [
+                    'integration_id' => $this->integration->id,
+                    'account_id' => $accountId,
+                    'job_type' => 'transactions',
+                    'api_response_status' => 404,
+                    'api_response_body' => $response->body(),
+                    'action' => 'account_validation_failed',
+                ]);
+
+                return false;
+            }
+
+            if ($response->successful()) {
+                // Account exists, cache this result for 24 hours
+                Cache::put($validationCacheKey, true, 86400);
+
+                return true;
+            }
+
+            // For other errors (rate limits, server errors), assume account exists to avoid false negatives
+            return true;
+
+        } catch (Exception $e) {
+            // If validation fails due to network issues, assume account exists
+            return true;
+        }
     }
 }
