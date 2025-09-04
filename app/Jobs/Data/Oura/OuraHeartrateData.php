@@ -3,7 +3,9 @@
 namespace App\Jobs\Data\Oura;
 
 use App\Jobs\Base\BaseProcessingJob;
+use App\Models\Event;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OuraHeartrateData extends BaseProcessingJob
@@ -38,17 +40,13 @@ class OuraHeartrateData extends BaseProcessingJob
         }
 
         if (! empty($events)) {
-            $this->createEvents($events);
+            $this->createEventsSafely($events);
         }
     }
 
     private function createHeartrateEvent(string $day, Collection $points): ?array
     {
         $sourceId = "oura_heartrate_{$this->integration->id}_{$day}";
-
-        if ($this->eventExists($sourceId)) {
-            return null;
-        }
 
         $actor = [
             'concept' => 'user',
@@ -120,6 +118,7 @@ class OuraHeartrateData extends BaseProcessingJob
                 'avg_bpm' => $avg,
             ],
             'blocks' => $blocks,
+            'integration_id' => $this->integration->id,
         ];
     }
 
@@ -140,5 +139,57 @@ class OuraHeartrateData extends BaseProcessingJob
         }
 
         return [(int) $float, $defaultMultiplier];
+    }
+
+    /**
+     * Create events safely with race condition protection
+     */
+    private function createEventsSafely(array $eventData): void
+    {
+        foreach ($eventData as $data) {
+            // Use updateOrCreate to prevent race conditions
+            $event = Event::updateOrCreate(
+                [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $data['source_id'],
+                ],
+                [
+                    'time' => $data['time'],
+                    'actor_id' => $this->createOrUpdateObject($data['actor'])->id,
+                    'service' => $this->serviceName,
+                    'domain' => $data['domain'],
+                    'action' => $data['action'],
+                    'value' => $data['value'] ?? null,
+                    'value_multiplier' => $data['value_multiplier'] ?? 1,
+                    'value_unit' => $data['value_unit'] ?? null,
+                    'event_metadata' => $data['event_metadata'] ?? [],
+                    'target_id' => $this->createOrUpdateObject($data['target'])->id,
+                ]
+            );
+
+            // Create blocks if any
+            if (isset($data['blocks'])) {
+                foreach ($data['blocks'] as $blockData) {
+                    $event->blocks()->create([
+                        'time' => $blockData['time'] ?? $event->time,
+                        'block_type' => $blockData['block_type'] ?? '',
+                        'title' => $blockData['title'],
+                        'metadata' => $blockData['metadata'] ?? [],
+                        'url' => $blockData['url'] ?? null,
+                        'media_url' => $blockData['media_url'] ?? null,
+                        'value' => $blockData['value'] ?? null,
+                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
+                        'value_unit' => $blockData['value_unit'] ?? null,
+                        'embeddings' => $blockData['embeddings'] ?? null,
+                    ]);
+                }
+            }
+
+            Log::info('Oura: Created heartrate event safely', [
+                'integration_id' => $this->integration->id,
+                'source_id' => $data['source_id'],
+                'action' => $data['action'],
+            ]);
+        }
     }
 }

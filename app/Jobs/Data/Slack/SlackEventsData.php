@@ -74,21 +74,25 @@ class SlackEventsData extends BaseProcessingJob
         // Create or update target object
         $target = $this->createOrUpdateObject($eventData['target']);
 
-        // Create the event
-        $event = Event::create([
-            'source_id' => $sourceId,
-            'time' => $eventData['time'],
-            'integration_id' => $this->integration->id,
-            'actor_id' => $actor->id,
-            'service' => $eventData['service'],
-            'domain' => $eventData['domain'],
-            'action' => $eventData['action'],
-            'value' => $eventData['value'] ?? null,
-            'value_multiplier' => $eventData['value_multiplier'] ?? 1,
-            'value_unit' => $eventData['value_unit'] ?? null,
-            'event_metadata' => $eventData['event_metadata'] ?? [],
-            'target_id' => $target->id,
-        ]);
+        // Create the event safely with race condition protection
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $this->integration->id,
+                'source_id' => $sourceId,
+            ],
+            [
+                'time' => $eventData['time'],
+                'actor_id' => $actor->id,
+                'service' => $eventData['service'],
+                'domain' => $eventData['domain'],
+                'action' => $eventData['action'],
+                'value' => $eventData['value'] ?? null,
+                'value_multiplier' => $eventData['value_multiplier'] ?? 1,
+                'value_unit' => $eventData['value_unit'] ?? null,
+                'event_metadata' => $eventData['event_metadata'] ?? [],
+                'target_id' => $target->id,
+            ]
+        );
 
         // Add blocks if any
         if (! empty($eventData['blocks'])) {
