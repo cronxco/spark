@@ -23,6 +23,7 @@ use App\Jobs\OAuth\Oura\OuraSpo2Pull;
 use App\Jobs\OAuth\Oura\OuraStressPull;
 use App\Jobs\OAuth\Oura\OuraTagsPull;
 use App\Jobs\OAuth\Oura\OuraWorkoutsPull;
+use App\Jobs\OAuth\Reddit\RedditSavedPull;
 use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
 use App\Models\Integration;
 use Exception;
@@ -195,6 +196,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             'gocardless' => $this->getGoCardlessFetchJobs($integration),
             'github' => $this->getGitHubFetchJobs($integration),
             'spotify' => $this->getSpotifyFetchJobs($integration),
+            'reddit' => $this->getRedditFetchJobs($integration),
             'oura' => $this->getOuraFetchJobs($integration),
             'hevy' => $this->getHevyFetchJobs($integration),
             // Add other services here as they are implemented
@@ -249,6 +251,16 @@ class CheckIntegrationUpdates implements ShouldQueue
 
         return match ($instanceType) {
             'listening' => [SpotifyListeningPull::class],
+            default => [],
+        };
+    }
+
+    private function getRedditFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'saved';
+
+        return match ($instanceType) {
+            'saved' => [RedditSavedPull::class],
             default => [],
         };
     }
