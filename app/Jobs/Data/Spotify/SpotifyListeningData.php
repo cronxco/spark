@@ -159,7 +159,7 @@ class SpotifyListeningData extends BaseProcessingJob
 
                 // Store additional track information in metadata (original simple design)
                 $metadata = $event->event_metadata ?? [];
-                $metadata['artists'] = $artistObjects->pluck('id')->toArray();
+                $metadata['artists'] = array_column($artistObjects, 'id');
                 if ($albumObject) {
                     $metadata['album'] = $albumObject->id;
                 }
@@ -206,10 +206,9 @@ class SpotifyListeningData extends BaseProcessingJob
     {
         $timestamp = is_string($playedAt) ? $playedAt : $playedAt->toISOString();
 
-        // Use a more robust approach to avoid collisions
-        // Include milliseconds for better uniqueness
-        $microtime = microtime(true);
-        $uniqueId = hash('sha256', $trackId . '_' . $timestamp . '_' . $microtime . '_' . $this->integration->id);
+        // Use deterministic ID based on track and timestamp only
+        // This ensures the same track play always generates the same source_id for proper deduplication
+        $uniqueId = hash('sha256', $trackId . '_' . $timestamp . '_' . $this->integration->id);
 
         return 'spotify_play_' . substr($uniqueId, 0, 32); // Keep it reasonable length
     }
