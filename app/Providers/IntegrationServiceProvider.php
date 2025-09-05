@@ -10,6 +10,7 @@ use App\Integrations\Hevy\HevyPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\PluginRegistry;
+use App\Integrations\Reddit\RedditPlugin;
 use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
 use Illuminate\Support\ServiceProvider;
@@ -31,6 +32,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(HevyPlugin::class);
         PluginRegistry::register(GoCardlessBankPlugin::class);
         PluginRegistry::register(AppleHealthPlugin::class);
+        PluginRegistry::register(RedditPlugin::class);
     }
 
     /**

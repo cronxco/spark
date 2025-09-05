@@ -55,6 +55,13 @@ return [
         'redirect' => env('SPOTIFY_REDIRECT_URI'),
     ],
 
+    'reddit' => [
+        'client_id' => env('REDDIT_CLIENT_ID'),
+        'client_secret' => env('REDDIT_CLIENT_SECRET'),
+        'redirect' => env('REDDIT_REDIRECT_URI', env('APP_URL') . '/integrations/oauth/callback/reddit'),
+        'useragent' => env('REDDIT_USERAGENT', 'SparkApp/1.0 by u/example'),
+    ],
+
     'monzo' => [
         'client_id' => env('MONZO_CLIENT_ID'),
         'client_secret' => env('MONZO_CLIENT_SECRET'),
