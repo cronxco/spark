@@ -2613,10 +2613,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
     protected function sanitizeResponseBody(string $body): string
     {
         // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
+        // $maxLength = 10000;
+        // if (strlen($body) > $maxLength) {
+        //     return substr($body, 0, $maxLength) . '... [TRUNCATED]';
+        // }
 
         // Try to parse as JSON and sanitize sensitive fields
         $parsed = json_decode($body, true);
