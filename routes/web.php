@@ -35,9 +35,6 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     // Removed settings/appearance route
     Volt::route('settings/api-tokens', 'settings.api-tokens')->name('settings.api-tokens');
-});
-
-Route::middleware(['auth'])->group(function () {
     Volt::route('settings/integrations', 'integrations.index')->name('integrations.index');
     Volt::route('/updates', 'updates.index')->name('updates.index');
     Volt::route('/events/{event}', 'events.show')->name('events.show');
@@ -173,6 +170,16 @@ Route::middleware(['auth'])->group(function () {
             'gocardless_oauth_group_id' => $group->id,
         ]);
 
+        // Persist institution id and human-readable name on the group for later provider derivation
+        $authMeta = $group->auth_metadata ?? [];
+        $authMeta['gocardless_institution_id'] = (string) $institutionId;
+        if (! empty($validInstitution['name'])) {
+            $authMeta['gocardless_institution_name'] = (string) $validInstitution['name'];
+        }
+        $group->update([
+            'auth_metadata' => $authMeta,
+        ]);
+
         $logData = [
             'group_id' => $group->id,
             'user_id' => Auth::id(),
@@ -194,74 +201,6 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('integrations.oauth', ['service' => 'gocardless'])
             ->with('success', __('Bank selection saved.'));
     })->whereUuid('group')->name('integrations.gocardless.setInstitution');
-
-    // Debug route for testing Nordigen API (remove in production)
-    Route::get('debug/gocardless-test', function () {
-        if (! app()->environment('local')) {
-            abort(404);
-        }
-
-        $secretId = config('services.gocardless.secret_id');
-        $secretKey = config('services.gocardless.secret_key');
-        $country = config('services.gocardless.country', 'GB');
-
-        $result = [
-            'credentials_loaded' => ! empty($secretId) && ! empty($secretKey),
-            'secret_id_length' => strlen($secretId),
-            'secret_key_length' => strlen($secretKey),
-            'country' => $country,
-        ];
-
-        try {
-            $plugin = new \App\Integrations\GoCardless\GoCardlessBankPlugin;
-            $result['plugin_created'] = true;
-
-            $institutions = $plugin->getInstitutions($country);
-            $result['institutions_loaded'] = true;
-            $result['institution_count'] = count($institutions);
-            $result['first_institution'] = $institutions[0] ?? null;
-
-        } catch (\Throwable $e) {
-            $result['error'] = $e->getMessage();
-            $result['error_class'] = get_class($e);
-            $result['trace'] = $e->getTraceAsString();
-        }
-
-        return response()->json($result);
-    })->name('debug.gocardless');
-
-    // Debug route for refreshing GoCardless integration names
-    Route::get('debug/gocardless-refresh-names/{groupId}', function (string $groupId) {
-        if (! app()->environment('local')) {
-            abort(404);
-        }
-
-        $group = IntegrationGroup::find($groupId);
-        if (! $group || $group->service !== 'gocardless') {
-            return response()->json(['error' => 'Invalid group ID or not GoCardless'], 400);
-        }
-
-        $plugin = new \App\Integrations\GoCardless\GoCardlessBankPlugin;
-        $result = $plugin->refreshIntegrationNames($group);
-
-        return response()->json($result);
-    })->name('debug.gocardless-refresh-names');
-
-    // Test route for OAuth redirect
-    Route::get('debug/oauth-test', function () {
-        if (! app()->environment('local')) {
-            abort(404);
-        }
-
-        // Test the OAuth route directly
-        $oauthUrl = route('integrations.oauth', ['service' => 'gocardless']);
-
-        return response()->json([
-            'oauth_route_exists' => true,
-            'oauth_url' => $oauthUrl,
-            'current_user' => Auth::check() ? Auth::id() : null,
-        ]);
-    })->name('debug.oauth-test');
 
 });
 

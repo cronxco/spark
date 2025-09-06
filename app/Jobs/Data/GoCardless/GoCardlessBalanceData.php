@@ -254,13 +254,34 @@ class GoCardlessBalanceData extends BaseProcessingJob
                 'metadata' => [
                     'integration_id' => $this->integration->id,
                     'name' => $accountName,
-                    'provider' => 'GoCardless',
+                    'provider' => $this->deriveProviderName(),
                     'account_type' => 'current_account',
                     'currency' => $balance['balanceAmount']['currency'] ?? 'EUR',
                     'account_number' => $accountId,
                 ],
             ]
         );
+    }
+
+    /**
+     * Prefer the human-readable institution name stored on the integration group
+     */
+    protected function deriveProviderName(): string
+    {
+        $group = $this->integration->group;
+        if ($group && is_array($group->auth_metadata)) {
+            $name = $group->auth_metadata['gocardless_institution_name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+
+            $alt = $group->auth_metadata['institution_name'] ?? null;
+            if (is_string($alt) && $alt !== '') {
+                return $alt;
+            }
+        }
+
+        return 'GoCardless';
     }
 
     private function processBalances(array $balances): void
