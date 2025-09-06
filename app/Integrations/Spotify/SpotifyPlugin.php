@@ -333,13 +333,6 @@ class SpotifyPlugin extends OAuthPlugin
         $accountId = $integration->group?->account_id ?? $integration->account_id;
         Log::info("Fetching Spotify data for user {$accountId}");
 
-        // Get currently playing track
-        $currentlyPlaying = $this->getCurrentlyPlaying($integration);
-
-        if ($currentlyPlaying) {
-            $this->processTrackPlay($integration, $currentlyPlaying, 'currently_playing');
-        }
-
         // Get recently played tracks (last 50)
         $recentlyPlayed = $this->getRecentlyPlayed($integration);
 

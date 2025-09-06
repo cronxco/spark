@@ -27,17 +27,7 @@ class SpotifyListeningData extends BaseProcessingJob
         // Check for potential duplicate processing
         $this->checkForDuplicateProcessing($listeningData);
 
-        // Process currently playing track
-        if (! empty($listeningData['currently_playing'])) {
-            try {
-                $this->processTrackPlay($listeningData['currently_playing'], 'currently_playing');
-            } catch (Exception $e) {
-                Log::error('Spotify: Failed to process currently playing track', [
-                    'integration_id' => $this->integration->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        // Skip processing currently playing to avoid duplicates
 
         // Process recently played tracks
         if (! empty($listeningData['recently_played'])) {
@@ -73,11 +63,7 @@ class SpotifyListeningData extends BaseProcessingJob
     private function processTrackPlay(array $trackData, string $source): ?string
     {
         // Extract track information based on source
-        if ($source === 'currently_playing') {
-            $track = $trackData['item'];
-            $playedAt = now(); // Currently playing doesn't have a played_at timestamp
-            $trackId = $track['id'];
-        } elseif ($source === 'recently_played') {
+        if ($source === 'recently_played') {
             $track = $trackData['track'];
             $playedAt = $trackData['played_at'];
             $trackId = $track['id'];
@@ -200,6 +186,8 @@ class SpotifyListeningData extends BaseProcessingJob
                 usleep(100000); // 100ms
             }
         }
+
+        return null;
     }
 
     private function generateTrackPlaySourceId(string $trackId, $playedAt): string
