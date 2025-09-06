@@ -170,7 +170,7 @@ new class extends Component {
                     </div>
                 </x-card>
             @endif
-            
+
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Block Details" separator with-close-button class="w-11/12 lg:w-1/3">
                 <div class="space-y-4 lg:space-y-6">
