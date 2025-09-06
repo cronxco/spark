@@ -4,7 +4,6 @@
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use Illuminate\Support\Facades\Auth;
-use DateTimeZone;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -110,7 +109,7 @@ new class extends Component {
 
             // Validate timezone if provided/required
             if (!empty($this->configuration['schedule_timezone'])) {
-                $validTz = in_array($this->configuration['schedule_timezone'], DateTimeZone::listIdentifiers(), true);
+                $validTz = in_array($this->configuration['schedule_timezone'], \DateTimeZone::listIdentifiers(), true);
                 if (! $validTz) {
                     $this->addError('configuration.schedule_timezone', 'Invalid timezone.');
                     return;
@@ -195,7 +194,6 @@ new class extends Component {
             $rules["configuration.{$field}"] = $fieldRules;
         }
 
-        // Generic scheduling + task validations (not in schema)
         $useSchedule = (bool) ($this->configuration['use_schedule'] ?? false);
         $rules['configuration.use_schedule'] = ['nullable'];
         $rules['configuration.paused'] = ['nullable'];
