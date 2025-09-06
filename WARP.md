@@ -31,7 +31,7 @@ composer dev
 - [Database & Queue Setup](#database--queue-setup)
 - [Frontend Stack](#frontend-stack)
 - [Development Patterns](#development-patterns)
-    - [Git Conventions](#git-conventions)
+- [Git Conventions](#git-conventions)
 
 ## Architecture Overview
 
