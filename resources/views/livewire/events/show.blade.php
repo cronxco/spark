@@ -424,7 +424,7 @@ new class extends Component {
                         </x-slot:heading>
                         <x-slot:content>
                             @php $activities = $this->getActivities(); @endphp
-                            @if($activities->isEmpty())
+                            @if ($activities->isEmpty())
                                 <div class="text-sm text-base-content/70">No activity yet.</div>
                             @else
                                 @php
@@ -444,7 +444,7 @@ new class extends Component {
                                     // ensure newest first
                                     $timeline = $timeline->sortByDesc(fn($a) => $a->created_at)->values();
                                 @endphp
-                                @foreach($timeline as $activity)
+                                @foreach ($timeline as $activity)
                                     @php
                                         $modelLabel = 'Event';
                                         $event = strtolower((string) ($activity->event ?? ($activity->description ?? '')));
