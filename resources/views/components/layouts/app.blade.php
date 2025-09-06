@@ -88,7 +88,7 @@
                 <x-menu title="">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')"/>
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')"/>
-                    
+
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')"/>
                 </x-menu>
                 <form method="POST" action="{{ route('logout') }}" x-data>
@@ -122,7 +122,7 @@
                 <x-menu-item title="Today" icon="fas.calendar-day" link="{{ route('today.main') }}" :active="request()->routeIs('today.*')"/>
                 <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')"/>
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')"/>
-                
+
                 <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')"/>
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')"/>
 
@@ -130,7 +130,7 @@
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')"/>
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')"/>
                     <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')"/>
-                    
+
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')"/>
                 </x-menu-sub>
             </x-menu>
