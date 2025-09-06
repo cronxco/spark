@@ -1733,14 +1733,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     protected function createAccountObjectForOnboarding(IntegrationGroup $group, array $account): EventObject
     {
         // Determine account type based on GoCardless data
-        $accountType = match ($account['cashAccountType'] ?? null) {
-            'CurrentAccount' => 'current_account',
-            'SavingsAccount' => 'savings_account',
-            'CreditCard' => 'credit_card',
-            'InvestmentAccount' => 'investment_account',
-            'LoanAccount' => 'loan',
-            default => 'other',
-        };
+        $accountType = $this->mapCashAccountType($account['cashAccountType'] ?? null);
 
         // Generate a proper account name
         $accountName = $this->generateAccountName($account);
@@ -1768,10 +1761,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'metadata' => [
                     'integration_id' => $onboardingIntegrationId, // Store integration_id in metadata
                     'name' => $accountName,
-                    'provider' => $account['institution_id'] ?? 'GoCardless',
+                    'provider' => $this->deriveProviderName($group, $account),
                     'account_type' => $accountType,
                     'currency' => $account['currency'] ?? 'GBP',
-                    'account_number' => $account['resourceId'] ?? null,
+                    'account_number' => $this->deriveAccountNumber($account),
                     'raw' => $account,
                     'onboarding_created' => true, // Flag to indicate this was created during onboarding
                 ],
@@ -1785,14 +1778,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     protected function upsertAccountObject(Integration $integration, array $account): EventObject
     {
         // Determine account type based on GoCardless data
-        $accountType = match ($account['cashAccountType'] ?? null) {
-            'CurrentAccount' => 'current_account',
-            'SavingsAccount' => 'savings_account',
-            'CreditCard' => 'credit_card',
-            'InvestmentAccount' => 'investment_account',
-            'LoanAccount' => 'loan',
-            default => 'other',
-        };
+        $accountType = $this->mapCashAccountType($account['cashAccountType'] ?? null);
 
         // Generate a proper account name
         $accountName = $this->generateAccountName($account);
@@ -1840,14 +1826,131 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'metadata' => [
                     'integration_id' => $integration->id,
                     'name' => $accountName,
-                    'provider' => $account['institution_id'] ?? 'GoCardless',
+                    'provider' => $this->deriveProviderName($integration->group, $account),
                     'account_type' => $accountType,
                     'currency' => $account['currency'] ?? 'GBP',
-                    'account_number' => $account['resourceId'] ?? null,
+                    'account_number' => $this->deriveAccountNumber($account),
                     'raw' => $account,
                 ],
             ]
         );
+    }
+
+    /**
+     * Map ISO 20022 ExternalCashAccountType1Code and common strings to internal types
+     */
+    protected function mapCashAccountType(?string $cashAccountType): string
+    {
+        if ($cashAccountType === null) {
+            return 'other';
+        }
+
+        $code = strtoupper($cashAccountType);
+
+        // ISO 20022 codes (reference: https://dz-privatbank-xs2a.pass-consulting.com/apidocs/json_ExternalCashAccountType1Code.html)
+        $isoMapping = [
+            'CACC' => 'current_account', // Current account
+            'TRAN' => 'current_account', // Transacting account
+            'SVGS' => 'savings_account', // Savings
+            'LLSV' => 'savings_account', // Limited liquidity savings
+            'ONDP' => 'savings_account', // Overnight deposit
+            'CHAR' => 'credit_card', // Charge Card
+            'LOAN' => 'loan',            // Loan
+            'ODFT' => 'loan',            // Overdraft treated as loan category internally
+            'MOMA' => 'investment_account', // Money market
+            'MGLD' => 'investment_account', // Marginal lending
+            'TRAS' => 'investment_account', // Cash trading
+        ];
+
+        if (isset($isoMapping[$code])) {
+            return $isoMapping[$code];
+        }
+
+        // Fallback for common descriptive values occasionally returned
+        return match ($cashAccountType) {
+            'CurrentAccount' => 'current_account',
+            'SavingsAccount' => 'savings_account',
+            'CreditCard' => 'credit_card',
+            'InvestmentAccount' => 'investment_account',
+            'LoanAccount' => 'loan',
+            default => 'other',
+        };
+    }
+
+    /**
+     * Derive a user-friendly account number with fallbacks:
+     * - IBAN (last 8 chars, spaces removed)
+     * - maskedPan (as-is)
+     * - BBAN (as-is)
+     * - resourceId (last 8 chars)
+     */
+    protected function deriveAccountNumber(array $data): ?string
+    {
+        // IBAN may appear at top-level or nested under account fields
+        $iban = $data['iban']
+            ?? ($data['debtorAccount']['iban'] ?? null)
+            ?? ($data['creditorAccount']['iban'] ?? null);
+        if ($iban) {
+            $clean = str_replace(' ', '', $iban);
+
+            return substr($clean, -8);
+        }
+
+        // maskedPan may be present for card accounts
+        $maskedPan = $data['maskedPan']
+            ?? ($data['debtorAccount']['maskedPan'] ?? null)
+            ?? ($data['creditorAccount']['maskedPan'] ?? null);
+        if ($maskedPan) {
+            return $maskedPan;
+        }
+
+        // BBAN may be present
+        $bban = $data['bban']
+            ?? ($data['debtorAccount']['bban'] ?? null)
+            ?? ($data['creditorAccount']['bban'] ?? null);
+        if ($bban) {
+            return $bban;
+        }
+
+        // Fallback to resourceId (truncate to last 8 chars)
+        $resourceId = $data['resourceId'] ?? ($data['id'] ?? null);
+        if ($resourceId) {
+            return substr((string) $resourceId, -8);
+        }
+
+        return null;
+    }
+
+    /**
+     * Prefer human-readable institution name from group metadata,
+     * then payload institution_id, else fallback to "GoCardless".
+     */
+    protected function deriveProviderName(?IntegrationGroup $group, array $payload): string
+    {
+        if ($group && is_array($group->auth_metadata)) {
+            $name = $group->auth_metadata['gocardless_institution_name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+
+            // As a secondary option, some UIs might store institution display name under a generic key
+            $alt = $group->auth_metadata['institution_name'] ?? null;
+            if (is_string($alt) && $alt !== '') {
+                return $alt;
+            }
+        }
+
+        // If payload carries an institution name, use it
+        if (! empty($payload['institution_name']) && is_string($payload['institution_name'])) {
+            return (string) $payload['institution_name'];
+        }
+
+        // If we only have an id, return it for now (still better than generic)
+        if (! empty($payload['institution_id']) && is_string($payload['institution_id'])) {
+            return (string) $payload['institution_id'];
+        }
+
+        return 'GoCardless';
     }
 
     /**

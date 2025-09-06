@@ -321,10 +321,10 @@ class GoCardlessTransactionData extends BaseProcessingJob
                 'content' => json_encode($account),
                 'metadata' => [
                     'name' => $accountName,
-                    'provider' => $account['institution_id'] ?? 'GoCardless',
+                    'provider' => $this->deriveProviderName(),
                     'account_type' => $accountType,
                     'currency' => $account['currency'] ?? 'GBP',
-                    'account_number' => $account['resourceId'] ?? null,
+                    'account_number' => $this->deriveAccountNumber($account),
                     'raw' => $account,
                 ],
             ]
@@ -388,6 +388,32 @@ class GoCardlessTransactionData extends BaseProcessingJob
      */
     protected function mapAccountType(?string $cashAccountType): string
     {
+        if ($cashAccountType === null) {
+            return 'other';
+        }
+
+        $code = strtoupper($cashAccountType);
+
+        // ISO 20022 mapping (ExternalCashAccountType1Code)
+        // Reference: https://dz-privatbank-xs2a.pass-consulting.com/apidocs/json_ExternalCashAccountType1Code.html
+        $isoMapping = [
+            'CACC' => 'current_account',
+            'TRAN' => 'current_account',
+            'SVGS' => 'savings_account',
+            'LLSV' => 'savings_account',
+            'ONDP' => 'savings_account',
+            'LOAN' => 'loan',
+            'ODFT' => 'loan',
+            'MOMA' => 'investment_account',
+            'MGLD' => 'investment_account',
+            'TRAS' => 'investment_account',
+        ];
+
+        if (isset($isoMapping[$code])) {
+            return $isoMapping[$code];
+        }
+
+        // Fallback for descriptive strings
         return match ($cashAccountType) {
             'CurrentAccount' => 'current_account',
             'SavingsAccount' => 'savings_account',
@@ -396,6 +422,63 @@ class GoCardlessTransactionData extends BaseProcessingJob
             'LoanAccount' => 'loan',
             default => 'other',
         };
+    }
+
+    /**
+     * Derive account_number from IBAN, maskedPan, BBAN, then resourceId (last 8 chars)
+     */
+    protected function deriveAccountNumber(array $data): ?string
+    {
+        $iban = $data['iban']
+            ?? ($data['debtorAccount']['iban'] ?? null)
+            ?? ($data['creditorAccount']['iban'] ?? null);
+        if ($iban) {
+            $clean = str_replace(' ', '', $iban);
+
+            return substr($clean, -8);
+        }
+
+        $maskedPan = $data['maskedPan']
+            ?? ($data['debtorAccount']['maskedPan'] ?? null)
+            ?? ($data['creditorAccount']['maskedPan'] ?? null);
+        if ($maskedPan) {
+            return $maskedPan;
+        }
+
+        $bban = $data['bban']
+            ?? ($data['debtorAccount']['bban'] ?? null)
+            ?? ($data['creditorAccount']['bban'] ?? null);
+        if ($bban) {
+            return $bban;
+        }
+
+        $resourceId = $data['resourceId'] ?? ($data['id'] ?? null);
+        if ($resourceId) {
+            return substr((string) $resourceId, -8);
+        }
+
+        return null;
+    }
+
+    /**
+     * Prefer the human-readable institution name stored on the integration group
+     */
+    protected function deriveProviderName(): string
+    {
+        $group = $this->integration->group;
+        if ($group && is_array($group->auth_metadata)) {
+            $name = $group->auth_metadata['gocardless_institution_name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+
+            $alt = $group->auth_metadata['institution_name'] ?? null;
+            if (is_string($alt) && $alt !== '') {
+                return $alt;
+            }
+        }
+
+        return 'GoCardless';
     }
 
     /**

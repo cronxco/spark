@@ -85,7 +85,7 @@
                     <!-- Archived Pots Toggle -->
                     <div class="form-control">
                         <label class="label cursor-pointer">
-                            <span class="label-text">Show Archived Pots</span>
+                            <span class="label-text">Show Archived</span>
                             <input
                                 type="checkbox"
                                 wire:model.live="showArchivedPots"
@@ -107,7 +107,7 @@
             </div>
         </div>
         <div class="lg:hidden">
-            <x-collapse separator class="bg-base-200">
+            <x-collapse separator class="bg-base-200 mb-4">
                 <x-slot:heading>Filters</x-slot:heading>
                 <x-slot:content>
                     <div class="flex flex-col gap-4">
@@ -208,11 +208,11 @@
 
                                         // Get account type label
                                         $accountTypeLabels = [
-                                            'current_account' => 'Current Account',
-                                            'savings_account' => 'Savings Account',
+                                            'current_account' => 'Current',
+                                            'savings_account' => 'Savings',
                                             'mortgage' => 'Mortgage',
-                                            'investment_account' => 'Investment Account',
-                                            'credit_card' => 'Credit Card',
+                                            'investment_account' => 'Investment',
+                                            'credit_card' => 'Credit',
                                             'loan' => 'Loan',
                                             'pension' => 'Pension',
                                             'other' => 'Other',
