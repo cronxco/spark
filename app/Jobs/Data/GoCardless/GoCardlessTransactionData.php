@@ -107,6 +107,7 @@ class GoCardlessTransactionData extends BaseProcessingJob
                 'previous_status' => $existingEvent?->event_metadata['transaction_status'] ?? null,
                 'timestamp_preserved' => $isStatusChange && $existingEvent && $existingEvent->time === $timestamp,
                 'timestamp_reason' => $this->getTimestampReason($tx, $existingEvent, $status, $isStatusChange, $timestamp),
+                'raw' => $tx,
             ],
         ];
 
