@@ -168,10 +168,13 @@ new class extends Component {
                 <!-- Header -->
                 <x-header title="Event Details" separator>
                     <x-slot:actions>
-                        <x-button wire:click="toggleSidebar" class="btn-ghost btn-sm">
-                            <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
-                            <span class="hidden sm:inline">{{ $this->showSidebar ? 'Hide' : 'Show' }} Details</span>
-                            <span class="sm:hidden">{{ $this->showSidebar ? 'Hide' : 'Show' }}</span>
+                        <x-button
+                            wire:click="toggleSidebar"
+                            class="btn-ghost btn-sm"
+                            title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                            aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        >
+                            <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
                         </x-button>
                     </x-slot:actions>
                 </x-header>

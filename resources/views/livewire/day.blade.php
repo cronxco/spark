@@ -1,6 +1,6 @@
 <?php
 
-use function Livewire\Volt\{state, computed, on};
+use function Livewire\Volt\{state, computed, on, layout};
 use App\Models\Event;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
@@ -10,13 +10,60 @@ state([
     'view' => 'index',
     'eventId' => null,
     'search' => '',
-    // Selected date in Y-m-d format for native date input
-    'date' => Carbon::today()->format('Y-m-d'),
+    // Selected date in Y-m-d format for native date input (driven by route)
+    'date' => (function () {
+        try {
+            if (request()->routeIs('today.*')) {
+                return Carbon::today()->format('Y-m-d');
+            }
+            if (request()->routeIs('day.yesterday')) {
+                return Carbon::yesterday()->format('Y-m-d');
+            }
+            if (request()->routeIs('tomorrow')) {
+                return Carbon::tomorrow()->format('Y-m-d');
+            }
+            $param = request()->route('date');
+            if ($param) {
+                return Carbon::parse($param)->format('Y-m-d');
+            }
+        } catch (\Throwable $e) {
+            // Fallback to today if parsing fails
+        }
+        return Carbon::today()->format('Y-m-d');
+    })(),
     // Group collapse state keyed by group key
     'collapsedGroups' => [],
     // Polling mode: 'keep' (keep-alive) or 'visible'
     'pollMode' => 'visible',
 ]);
+
+layout('components.layouts.app');
+
+$navigateToDate = function (): void {
+    try {
+        $selected = Carbon::parse((string) $this->date)->startOfDay();
+        $today = Carbon::today();
+
+        if ($selected->equalTo($today)) {
+            $this->redirect(route('today.main'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->subDay())) {
+            $this->redirect(route('day.yesterday'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->addDay())) {
+            $this->redirect(route('tomorrow'), navigate: true);
+            return;
+        }
+
+        $this->redirect(route('day.show', ['date' => $selected->format('Y-m-d')]), navigate: true);
+    } catch (\Throwable $e) {
+        // Ignore
+    }
+};
 
 $events = computed(function () {
     try {
@@ -82,6 +129,32 @@ $events = computed(function () {
 
     return $filtered->values();
 });
+
+$updatedDate = function ($value): void {
+    try {
+        $selected = Carbon::parse((string) $value)->startOfDay();
+        $today = Carbon::today();
+
+        if ($selected->equalTo($today)) {
+            $this->redirect(route('today.main'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->subDay())) {
+            $this->redirect(route('day.yesterday'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->addDay())) {
+            $this->redirect(route('tomorrow'), navigate: true);
+            return;
+        }
+
+        $this->redirect(route('day.show', ['date' => $selected->format('Y-m-d')]), navigate: true);
+    } catch (\Throwable $e) {
+        // Ignore parse errors; keep current date
+    }
+};
 
 $dateLabel = computed(function () {
     try {
@@ -369,6 +442,29 @@ $previousDay = function () {
         $current = Carbon::today();
     }
     $this->date = $current->copy()->subDay()->format('Y-m-d');
+    try {
+        $selected = Carbon::parse((string) $this->date)->startOfDay();
+        $today = Carbon::today();
+
+        if ($selected->equalTo($today)) {
+            $this->redirect(route('today.main'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->subDay())) {
+            $this->redirect(route('day.yesterday'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->addDay())) {
+            $this->redirect(route('tomorrow'), navigate: true);
+            return;
+        }
+
+        $this->redirect(route('day.show', ['date' => $selected->format('Y-m-d')]), navigate: true);
+    } catch (\Throwable $e) {
+        // Ignore
+    }
 };
 
 $nextDay = function () {
@@ -378,6 +474,29 @@ $nextDay = function () {
         $current = Carbon::today();
     }
     $this->date = $current->copy()->addDay()->format('Y-m-d');
+    try {
+        $selected = Carbon::parse((string) $this->date)->startOfDay();
+        $today = Carbon::today();
+
+        if ($selected->equalTo($today)) {
+            $this->redirect(route('today.main'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->subDay())) {
+            $this->redirect(route('day.yesterday'), navigate: true);
+            return;
+        }
+
+        if ($selected->equalTo($today->copy()->addDay())) {
+            $this->redirect(route('tomorrow'), navigate: true);
+            return;
+        }
+
+        $this->redirect(route('day.show', ['date' => $selected->format('Y-m-d')]), navigate: true);
+    } catch (\Throwable $e) {
+        // Ignore
+    }
 };
 
 $toggleGroup = function (string $groupKey): void {
@@ -497,9 +616,9 @@ $areAllGroupsExpanded = computed(function () {
 ?>
 
 <div>
-        <!-- Events Index -->
+        <!-- Day Index -->
         <div>
-            <x-header :title="'Events — ' . $this->dateLabel" separator>
+            <x-header :title="'Day — ' . $this->dateLabel" separator>
                 <x-slot:actions>
                     <div class="flex items-center gap-2 sm:gap-3 w-full">
                         <div class="join">
@@ -510,7 +629,8 @@ $areAllGroupsExpanded = computed(function () {
                                 <input
                                     type="date"
                                     class="input input-sm"
-                                    wire:model.debounce.0ms="date"
+                                    wire:model.live.debounce.0ms="date"
+                                    @change="$wire.call('navigateToDate')"
                                 />
                             </label>
                             <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">

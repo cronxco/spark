@@ -44,7 +44,7 @@ class IntegrationTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)
-            ->get('/integrations');
+            ->get('/settings/integrations');
 
         $response->assertStatus(200);
         $response->assertSee('Available Integrations');

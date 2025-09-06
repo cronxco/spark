@@ -20,16 +20,16 @@ class EventsPageTest extends TestCase
         $user = User::factory()->createOne();
 
         $response = $this->actingAs($user)
-            ->get('/events');
+            ->get('/today');
 
         $response->assertStatus(200);
-        $response->assertSee('Events — Today');
+        $response->assertSee('Day — Today');
     }
 
     #[Test]
     public function events_page_requires_authentication(): void
     {
-        $response = $this->get('/events');
+        $response = $this->get('/today');
 
         $response->assertRedirect('/login');
     }
@@ -58,7 +58,7 @@ class EventsPageTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->get('/events');
+            ->get('/today');
 
         $response->assertStatus(200);
         $response->assertSee('Test Action Today');
@@ -75,7 +75,7 @@ class EventsPageTest extends TestCase
         Event::whereDate('time', now())->delete();
 
         $response = $this->actingAs($user)
-            ->get('/events');
+            ->get('/today');
 
         $response->assertStatus(200);
         $response->assertSee('No events for this date');

@@ -3,7 +3,10 @@
 use App\Models\Block;
 use App\Models\Event;
 use Livewire\Volt\Component;
+use function Livewire\Volt\layout;
 use App\Integrations\PluginRegistry;
+
+layout('components.layouts.app');
 
 new class extends Component {
     public Block $block;
@@ -63,10 +66,13 @@ new class extends Component {
             <!-- Header -->
             <x-header title="Block Details" separator>
                 <x-slot:actions>
-                    <x-button wire:click="toggleSidebar" class="btn-ghost btn-sm">
-                        <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
-                        <span class="hidden sm:inline">{{ $this->showSidebar ? 'Hide' : 'Show' }} Details</span>
-                        <span class="sm:hidden">{{ $this->showSidebar ? 'Hide' : 'Show' }}</span>
+                    <x-button
+                            wire:click="toggleSidebar"
+                            class="btn-ghost btn-sm"
+                            title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                            aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        >
+                            <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
                     </x-button>
                 </x-slot:actions>
             </x-header>
@@ -172,7 +178,7 @@ new class extends Component {
             @endif
 
             <!-- Drawer for Technical Details -->
-            <x-drawer wire:model="showSidebar" right title="Block Details" separator with-close-button class="w-11/12 lg:w-1/3">
+            <x-drawer wire:model="showSidebar" right title="Block Details" with-close-button separator class="w-11/12 lg:w-1/3">
                 <div class="space-y-4 lg:space-y-6">
                     @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
                     @if (!empty($meta))
