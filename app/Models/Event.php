@@ -6,11 +6,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Tags\HasTags;
 
 class Event extends Model
 {
-    use HasFactory, HasTags, SoftDeletes;
+    use HasFactory, HasTags, LogsActivity, SoftDeletes;
+
+    /**
+     * Only record update events via LogsActivity trait
+     * to avoid duplicating data on create/delete.
+     *
+     * @var array<int, string>
+     */
+    protected static $recordEvents = ['updated'];
 
     public $incrementing = false;
 
@@ -53,6 +63,30 @@ class Event extends Model
                 $model->id = Str::uuid();
             }
         });
+
+        static::deleted(function ($model): void {
+            activity('changelog')
+                ->performedOn($model)
+                ->event('deleted')
+                ->log('deleted');
+        });
+
+        static::restored(function ($model): void {
+            activity('changelog')
+                ->performedOn($model)
+                ->event('restored')
+                ->log('restored');
+        });
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('changelog')
+            ->logFillable()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
 
     public function integration()

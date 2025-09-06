@@ -23,6 +23,7 @@
         "robsontenorio/mary": "^2.4",
         "sentry/sentry-laravel": "^4.9",
         "socialiteproviders/authelia": "^4.0",
+        "spatie/laravel-activitylog": "^4",
         "spatie/laravel-tags": "^4.10",
         "willscottuk/monzo-php": "dev-master"
     },
