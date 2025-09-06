@@ -300,7 +300,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->get('/integrations');
+            ->get('/settings/integrations');
 
         $response->assertStatus(200);
 
@@ -321,7 +321,7 @@ class IntegrationUpdateFrequencyTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->get('/integrations');
+            ->get('/settings/integrations');
 
         $response->assertStatus(200);
 

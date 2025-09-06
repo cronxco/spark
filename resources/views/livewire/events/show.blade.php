@@ -166,21 +166,18 @@ new class extends Component {
             <!-- Main Content Area -->
             <div class="flex-1 space-y-4 lg:space-y-6">
                 <!-- Header -->
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="flex items-center gap-3 lg:gap-4">
-                        <x-button href="{{ route('events.index') }}" class="btn-ghost btn-sm lg:btn-md">
-                            <x-icon name="o-arrow-left" class="w-4 h-4" />
-                            <span class="hidden sm:inline">Back to Events</span>
-                            <span class="sm:hidden">Back</span>
+                <x-header title="Event Details" separator>
+                    <x-slot:actions>
+                        <x-button
+                            wire:click="toggleSidebar"
+                            class="btn-ghost btn-sm"
+                            title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                            aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        >
+                            <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
                         </x-button>
-                        <h1 class="text-xl lg:text-2xl font-bold text-base-content">Event Details</h1>
-                    </div>
-                    <x-button wire:click="toggleSidebar" class="btn-outline btn-sm w-full sm:w-auto">
-                        <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
-                        <span class="hidden sm:inline">{{ $this->showSidebar ? 'Hide' : 'Show' }} Details</span>
-                        <span class="sm:hidden">{{ $this->showSidebar ? 'Hide' : 'Show' }}</span>
-                    </x-button>
-                </div>
+                    </x-slot:actions>
+                </x-header>
 
                 <!-- Primary Event Information -->
                 <x-card>
@@ -382,9 +379,9 @@ new class extends Component {
                 @endif
             </div>
 
-            <!-- Collapsible Sidebar for Technical Details -->
-            @if ($this->showSidebar)
-                <div class="w-full lg:w-80 space-y-4 lg:space-y-6 border-t lg:border-t-0 lg:border-l border-base-300 pt-4 lg:pt-0 lg:pl-4">
+            <!-- Drawer for Technical Details -->
+            <x-drawer wire:model="showSidebar" right title="Event Details" separator with-close-button class="w-11/12 lg:w-1/3">
+                <div class="space-y-4 lg:space-y-6">
                     <!-- Actor Details -->
                     @if ($this->event->actor)
                         <x-card>
@@ -528,16 +525,16 @@ new class extends Component {
                         </x-card>
                     @endif
                 </div>
-            @endif
+                <div class="pt-2">
+                    <x-button label="Close" class="btn-ghost btn-block" @click="$wire.showSidebar = false" />
+                </div>
+            </x-drawer>
         </div>
     @else
         <div class="text-center py-8">
             <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
             <h3 class="text-lg font-semibold text-base-content mb-2">Event Not Found</h3>
             <p class="text-base-content/70">The requested event could not be found.</p>
-            <x-button href="{{ route('events.index') }}" class="mt-4">
-                Back to Events
-            </x-button>
         </div>
     @endif
 </div>

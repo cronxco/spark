@@ -15,7 +15,7 @@ use Laravel\Socialite\Facades\Socialite;
 use Livewire\Volt\Volt;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('today.main');
 })->name('home');
 
 Route::view('dashboard', 'dashboard')
@@ -23,19 +23,23 @@ Route::view('dashboard', 'dashboard')
     ->name('dashboard');
 
 Route::middleware(['auth'])->group(function () {
+    // Day-based timeline routes
+    Volt::route('day/today', 'day')->name('today.day');
+    Volt::route('today', 'day')->name('today.main');
+    Volt::route('day/tomorrow', 'day')->name('tomorrow');
+    Volt::route('day/yesterday', 'day')->name('day.yesterday');
+    Volt::route('day/{date}', 'day')->name('day.show');
     Route::redirect('settings', 'settings/profile');
 
     Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
     Volt::route('settings/password', 'settings.password')->name('settings.password');
-    Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
+    // Removed settings/appearance route
     Volt::route('settings/api-tokens', 'settings.api-tokens')->name('settings.api-tokens');
 });
 
-// Integration routes
 Route::middleware(['auth'])->group(function () {
-    Volt::route('/integrations', 'integrations.index')->name('integrations.index');
+    Volt::route('settings/integrations', 'integrations.index')->name('integrations.index');
     Volt::route('/updates', 'updates.index')->name('updates.index');
-    Volt::route('/events', 'events')->name('events.index');
     Volt::route('/events/{event}', 'events.show')->name('events.show');
     Volt::route('/objects/{object}', 'objects.show')->name('objects.show');
     Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
@@ -286,7 +290,7 @@ Route::get('auth/authelia/callback', function () {
     );
     Auth::login($authUser);
 
-    return redirect('/dashboard');
+    return redirect('/today');
 });
 
 // Admin routes

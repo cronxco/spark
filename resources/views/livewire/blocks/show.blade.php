@@ -3,14 +3,23 @@
 use App\Models\Block;
 use App\Models\Event;
 use Livewire\Volt\Component;
+use function Livewire\Volt\layout;
 use App\Integrations\PluginRegistry;
+
+layout('components.layouts.app');
 
 new class extends Component {
     public Block $block;
+    public bool $showSidebar = false;
 
     public function mount(Block $block): void
     {
         $this->block = $block->load(['event']);
+    }
+
+    public function toggleSidebar(): void
+    {
+        $this->showSidebar = ! $this->showSidebar;
     }
 
     public function getRelatedBlocks()
@@ -55,17 +64,18 @@ new class extends Component {
     @if ($this->block)
         <div class="space-y-6">
             <!-- Header -->
-            <div class="flex items-center gap-4">
-                <x-button href="{{ route('events.index') }}" class="btn-ghost">
-                    <x-icon name="o-arrow-left" class="w-4 h-4" />
-                    Back to Events
-                </x-button>
-                <div class="flex-1">
-                    <h1 class="text-2xl font-bold text-base-content">
-                        Block Details
-                    </h1>
-                </div>
-            </div>
+            <x-header title="Block Details" separator>
+                <x-slot:actions>
+                    <x-button
+                            wire:click="toggleSidebar"
+                            class="btn-ghost btn-sm"
+                            title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                            aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        >
+                            <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
+                    </x-button>
+                </x-slot:actions>
+            </x-header>
 
                             <!-- Block Overview Card -->
                 <x-card>
@@ -166,6 +176,24 @@ new class extends Component {
                     </div>
                 </x-card>
             @endif
+
+            <!-- Drawer for Technical Details -->
+            <x-drawer wire:model="showSidebar" right title="Block Details" with-close-button separator class="w-11/12 lg:w-1/3">
+                <div class="space-y-4 lg:space-y-6">
+                    @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
+                    @if (!empty($meta))
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-info" />
+                                Block Metadata
+                            </h3>
+                            <div class="bg-base-200 rounded-lg p-3">
+                                <pre class="text-xs text-base-content/80 whitespace-pre-wrap overflow-x-auto">{{ $this->formatJson($meta) }}</pre>
+                            </div>
+                        </x-card>
+                    @endif
+                </div>
+            </x-drawer>
 
             <!-- Related Blocks -->
                                     @if ($this->getRelatedBlocks()->isNotEmpty())

@@ -12,7 +12,7 @@ class IntegrationPageTest extends TestCase
     #[Test]
     public function integrations_page_requires_authentication()
     {
-        $response = $this->get('/integrations');
+        $response = $this->get('/settings/integrations');
 
         $response->assertRedirect('/login');
     }

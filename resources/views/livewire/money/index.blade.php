@@ -1,27 +1,48 @@
 <div>
-    <div class="flex flex-col gap-6">
+    <div class="flex flex-col">
         <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-base-content">Money</h1>
-                <p class="text-base-content/70">Manage your accounts and track balances</p>
-            </div>
-            <div class="flex gap-2">
-                <a href="{{ route('money.create') }}" class="btn btn-primary">
-                    <x-icon name="o-plus" class="w-4 h-4" />
-                    Add Account
-                </a>
-                <a href="{{ route('balance-updates.create') }}" class="btn btn-secondary">
-                    <x-icon name="o-currency-dollar" class="w-4 h-4" />
-                    Add Balance Update
-                </a>
-            </div>
-        </div>
+        <x-header title="Money" subtitle="Manage your accounts and track balances" separator>
+                    <x-slot:actions>
+                        <!-- Mobile actions dropdown -->
+                        <div class="sm:hidden">
+                            <x-dropdown position="dropdown-end">
+                                <x-slot:trigger>
+                                    <button type="button" class="btn btn-ghost btn-sm" aria-label="Actions" title="Actions">
+                                        <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                                    </button>
+                                </x-slot:trigger>
+                                <x-menu-item title="Add Account" icon="o-plus" link="{{ route('money.create') }}" />
+                                <x-menu-item title="Add Balance Update" icon="o-banknotes" link="{{ route('balance-updates.create') }}" />
+                            </x-dropdown>
+                        </div>
+
+                        <!-- Desktop buttons -->
+                        <div class="hidden sm:flex gap-2">
+                            <button
+                                onclick="window.location='{{ route('money.create') }}'"
+                                type="button"
+                                class="btn btn-primary btn-sm sm:btn-md flex items-center gap-2"
+                            >
+                                <x-icon name="o-plus" class="w-4 h-4" />
+                                <span class="hidden sm:inline">Add Account</span>
+                            </button>
+                            <button
+                                onclick="window.location='{{ route('balance-updates.create') }}'"
+                                type="button"
+                                class="btn btn-secondary btn-sm sm:btn-md flex items-center gap-2"
+                            >
+                                <x-icon name="o-banknotes" class="w-4 h-4" />
+                                <span class="hidden sm:inline">Add Balance Update</span>
+                            </button>
+                        </div>
+                    </x-slot:actions>
+                </x-header>
+
 
         <!-- Filters -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="hidden lg:flex card bg-base-100 shadow-sm mb-6">
             <div class="card-body">
-                <div class="flex flex-col lg:flex-row gap-4">
+                <div class="hidden lg:flex lg:flex-row gap-4">
                     <!-- Search -->
                     <div class="form-control flex-1">
                         <label class="label">
@@ -84,6 +105,75 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="lg:hidden">
+            <x-collapse separator class="bg-base-200">
+                <x-slot:heading>Filters</x-slot:heading>
+                <x-slot:content>
+                    <div class="flex flex-col gap-4">
+                        <!-- Search -->
+                        <div class="form-control flex-1">
+                            <label class="label">
+                                <span class="label-text">Search</span>
+                            </label>
+                            <input
+                                type="text"
+                                wire:model.live.debounce.300ms="search"
+                                placeholder="Search accounts, providers, or account numbers..."
+                                class="input input-bordered w-full"
+                            />
+                        </div>
+
+                        <!-- Account Type Filter -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Account Type</span>
+                            </label>
+                            <select wire:model.live="accountTypeFilter" class="select select-bordered">
+                                <option value="">All Types</option>
+                                @foreach ($accountTypes as $type => $label)
+                                    <option value="{{ $type }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Provider Filter -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Provider</span>
+                            </label>
+                            <select wire:model.live="providerFilter" class="select select-bordered">
+                                <option value="">All Providers</option>
+                                @foreach ($providers as $provider)
+                                    <option value="{{ $provider }}">{{ $provider }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Archived Pots Toggle -->
+                        <div class="form-control">
+                            <label class="label cursor-pointer">
+                                <span class="label-text">Show Archived Pots</span>
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="showArchivedPots"
+                                    class="toggle toggle-primary"
+                                />
+                            </label>
+                        </div>
+
+                        <!-- Clear Filters -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">&nbsp;</span>
+                            </label>
+                            <button wire:click="clearFilters" class="btn btn-outline">
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </x-slot:content>
+            </x-collapse>
         </div>
 
         <!-- Accounts List -->
@@ -294,7 +384,7 @@
                     @endif
                 @else
                     <div class="text-center py-12">
-                        <x-icon name="o-currency-dollar" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No accounts found</h3>
                         <p class="text-base-content/70 mb-6">
                             @if ($search || $accountTypeFilter || $providerFilter)

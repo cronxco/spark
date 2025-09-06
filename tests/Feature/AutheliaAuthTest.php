@@ -27,7 +27,7 @@ class AutheliaAuthTest extends TestCase
             ->andReturn($socialiteUser);
 
         $response = $this->get('/auth/authelia/callback');
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect('/today');
         $this->assertDatabaseHas('users', [
             'email' => 'authelia@example.com',
             'name' => 'Authelia User',
