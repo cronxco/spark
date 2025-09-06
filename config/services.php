@@ -58,7 +58,7 @@ return [
     'reddit' => [
         'client_id' => env('REDDIT_CLIENT_ID'),
         'client_secret' => env('REDDIT_CLIENT_SECRET'),
-        'redirect' => env('REDDIT_REDIRECT_URI', env('APP_URL') . '/integrations/oauth/callback/reddit'),
+        'redirect' => env('REDDIT_REDIRECT_URI'),
         'useragent' => env('REDDIT_USERAGENT', 'SparkApp/1.0 by u/example'),
     ],
 
