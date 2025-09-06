@@ -9,10 +9,16 @@ use App\Integrations\PluginRegistry;
 
 new class extends Component {
     public EventObject $object;
+    public bool $showSidebar = false;
 
     public function mount(EventObject $object): void
     {
         $this->object = $object->load(['tags']);
+    }
+
+    public function toggleSidebar(): void
+    {
+        $this->showSidebar = ! $this->showSidebar;
     }
 
     public function getRelatedEvents()
@@ -664,16 +670,15 @@ new class extends Component {
             <!-- Main Content Area -->
             <div class="flex-1 space-y-4 lg:space-y-6">
                 <!-- Header -->
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="flex items-center gap-3 lg:gap-4">
-                        <x-button href="{{ route('events.index') }}" class="btn-ghost btn-sm lg:btn-md">
-                            <x-icon name="o-arrow-left" class="w-4 h-4" />
-                            <span class="hidden sm:inline">Back to Events</span>
-                            <span class="sm:hidden">Back</span>
+                <x-header title="Object Details" separator>
+                    <x-slot:actions>
+                        <x-button wire:click="toggleSidebar" class="btn-ghost btn-sm">
+                            <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                            <span class="hidden sm:inline">{{ $this->showSidebar ? 'Hide' : 'Show' }} Details</span>
+                            <span class="sm:hidden">{{ $this->showSidebar ? 'Hide' : 'Show' }}</span>
                         </x-button>
-                        <h1 class="text-xl lg:text-2xl font-bold text-base-content">Object Details</h1>
-                    </div>
-                </div>
+                    </x-slot:actions>
+                </x-header>
 
                             <!-- Object Overview Card -->
                 <x-card>
@@ -794,27 +799,28 @@ new class extends Component {
                 </x-card>
             @endif
 
-            <!-- Object Metadata -->
-            @if ($this->object->metadata && count($this->object->metadata) > 0)
-                <x-card>
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
-                        Object Metadata
-                    </h3>
-                    <div class="bg-base-200 rounded-lg p-4">
-                        <pre class="text-sm text-base-content/80 whitespace-pre-wrap">{{ $this->formatJson($this->object->metadata) }}</pre>
-                    </div>
-                </x-card>
-            @endif
+            <!-- Drawer for Technical Details -->
+            <x-drawer wire:model="showSidebar" right title="Object Details" separator with-close-button class="w-11/12 lg:w-1/3">
+                <div class="space-y-4 lg:space-y-6">
+                    @if ($this->object->metadata && count($this->object->metadata) > 0)
+                        <x-card>
+                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
+                                Object Metadata
+                            </h3>
+                            <div class="bg-base-200 rounded-lg p-3">
+                                <pre class="text-xs text-base-content/80 whitespace-pre-wrap overflow-x-auto">{{ $this->formatJson($this->object->metadata) }}</pre>
+                            </div>
+                        </x-card>
+                    @endif
+                </div>
+            </x-drawer>
         </div>
     @else
         <div class="text-center py-8">
             <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
             <h3 class="text-lg font-semibold text-base-content mb-2">Object Not Found</h3>
             <p class="text-base-content/70">The requested object could not be found.</p>
-            <x-button href="{{ route('events.index') }}" class="mt-4">
-                Back to Events
-            </x-button>
         </div>
     @endif
 </div>
