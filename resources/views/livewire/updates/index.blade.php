@@ -1,5 +1,6 @@
 <?php
 use App\Jobs\ProcessIntegrationData;
+use App\Jobs\RunIntegrationTask;
 use App\Models\Integration;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +14,13 @@ new class extends Component {
 
     public array $integrations = [];
     public bool $isRefreshing = false;
+    public string $filter = 'all'; // all|integrations|tasks
+
+    public function setFilter(string $filter): void
+    {
+        $this->filter = in_array($filter, ['all', 'integrations', 'tasks']) ? $filter : 'all';
+        $this->loadData();
+    }
 
     public function mount(): void
     {
@@ -23,11 +31,23 @@ new class extends Component {
     {
         /** @var User $user */
         $user = Auth::user();
-        $userIntegrations = $user->integrations()
+        $query = $user->integrations()
             ->with('user')
             ->orderBy('last_successful_update_at', 'asc')
             ->orderBy('created_at', 'asc')
-            ->get();
+            ;
+
+        if ($this->filter === 'integrations') {
+            $query->where(function ($q) {
+                $q->whereNull('instance_type')->orWhere('instance_type', '!=', 'task');
+            })->where('service', '!=', 'task');
+        } elseif ($this->filter === 'tasks') {
+            $query->where(function ($q) {
+                $q->where('instance_type', 'task')->orWhere('service', 'task');
+            });
+        }
+
+        $userIntegrations = $query->get();
 
         $this->integrations = $userIntegrations->map(function ($integration) {
             $batchName = null;
@@ -67,6 +87,7 @@ new class extends Component {
                 'id' => $integration->id,
                 'name' => $integration->name ?: $integration->service,
                 'service' => $integration->service,
+                'instance_type' => $integration->instance_type,
                 'account_id' => $integration->account_id,
                 'update_frequency_minutes' => $integration->getUpdateFrequencyMinutes(),
                 'last_triggered_at' => $integration->last_triggered_at ? $integration->last_triggered_at->toISOString() : null,
@@ -75,6 +96,8 @@ new class extends Component {
                 'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,
                 'is_processing' => $integration->isProcessing(),
                 'status' => $this->getIntegrationStatus($integration),
+                'is_paused' => $integration->isPaused(),
+                'schedule_summary' => $integration->getScheduleSummary(),
                 'migration_progress' => $batchProgress,
                 'migration_batch_id' => $integration->migration_batch_id,
                 'migration_batch_name' => $batchName,
@@ -113,8 +136,13 @@ new class extends Component {
         }
 
         try {
-            // Dispatch the job
-            ProcessIntegrationData::dispatch($integration);
+            // Dispatch the job based on instance type
+            if ($integration->instance_type === 'task' || $integration->service === 'task') {
+                RunIntegrationTask::dispatch($integration)
+                    ->onQueue($integration->configuration['task_queue'] ?? 'pull');
+            } else {
+                ProcessIntegrationData::dispatch($integration);
+            }
 
             $this->success('Update triggered successfully!');
             $this->loadData();
@@ -122,6 +150,21 @@ new class extends Component {
         } catch (\Exception $e) {
             $this->error('Failed to trigger update. Please try again.');
         }
+    }
+
+    public function togglePause(string $integrationId): void
+    {
+        $integration = Integration::find($integrationId);
+        if (!$integration || (string) $integration->user_id !== (string) Auth::id()) {
+            $this->error('Integration not found.');
+            return;
+        }
+
+        $config = $integration->configuration ?? [];
+        $config['paused'] = !((bool) ($config['paused'] ?? false));
+        $integration->update(['configuration' => $config]);
+        $this->success($config['paused'] ? 'Paused.' : 'Resumed.');
+        $this->loadData();
     }
 
     public function refreshData(): void
@@ -144,6 +187,13 @@ new class extends Component {
             <div>
                 <h1 class="text-3xl font-bold text-base-content">Updates</h1>
                 <p class="text-base-content/70">Monitor and manage your integration data updates</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="join">
+                    <button class="btn btn-sm join-item {{ $filter === 'all' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('all')">All</button>
+                    <button class="btn btn-sm join-item {{ $filter === 'integrations' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('integrations')">Integrations</button>
+                    <button class="btn btn-sm join-item {{ $filter === 'tasks' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('tasks')">Tasks</button>
+                </div>
             </div>
             @if ($isRefreshing)
                 <div class="flex items-center space-x-2">
@@ -211,7 +261,8 @@ new class extends Component {
                                             $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration['service']);
                                             $isWebhook = $pluginClass && $pluginClass::getServiceType() === 'webhook';
                                             $isManual = $pluginClass && $pluginClass::getServiceType() === 'manual';
-                                            $showScheduledUpdates = !$isWebhook && !$isManual;
+                                            $isTask = ($integration['instance_type'] === 'task') || ($integration['service'] === 'task');
+                                            $showScheduledUpdates = (!$isWebhook && !$isManual) || $isTask;
                                         @endphp
 
                                         <div class="flex items-center space-x-3">
@@ -226,6 +277,9 @@ new class extends Component {
                                                     :class="$integration['status'] === 'needs_update' ? 'badge-outline badge-warning' : 'badge-outline badge-success'"
                                                     class="badge-sm"
                                                 />
+                                                @if ($integration['is_paused'])
+                                                    <x-badge value="Paused" class="badge-outline badge-neutral badge-sm" />
+                                                @endif
                                             @else
                                                 @if ($isWebhook)
                                                     <x-badge value="{{ __('Push') }}" class="badge-outline badge-info badge-sm" />
@@ -251,7 +305,7 @@ new class extends Component {
                                                 @endif
                                             @endif
 
-                                            @if ($showScheduledUpdates && !$integration['is_processing'] && $integration['status'] === 'needs_update')
+                                            @if ($showScheduledUpdates && !$integration['is_processing'] && !$integration['is_paused'] && $integration['status'] === 'needs_update')
                                                 <x-button
                                                     label="{{ __('Update') }}"
                                                     icon="o-arrow-path"
@@ -260,6 +314,12 @@ new class extends Component {
                                                     class="btn btn-xs hover:btn-success"
                                                 />
                                             @endif
+                                            <x-button
+                                                label="{{ $integration['is_paused'] ? __('Resume') : __('Pause') }}"
+                                                icon="o-pause"
+                                                wire:click="togglePause('{{ $integration['id'] }}')"
+                                                class="btn btn-xs btn-ghost"
+                                            />
                                         </div>
                                     </div>
 
@@ -313,6 +373,14 @@ new class extends Component {
                                                 @endif
                                             </div>
                                         </div>
+                                        @if ($integration['schedule_summary'])
+                                        <div class="bg-base-300 rounded-lg p-3 md:col-span-3">
+                                            <div class="font-medium mb-1">{{ __('Schedule') }}</div>
+                                            <div class="text-base-content/70">
+                                                {{ $integration['schedule_summary'] }}
+                                            </div>
+                                        </div>
+                                        @endif
                                     </div>
                                     @else
                                     <!-- Event-driven/Manual integrations section -->

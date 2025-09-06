@@ -1,6 +1,6 @@
 # Scheduled Integration Updates
 
-This document explains how the scheduled integration updates work in the Spark application.
+This document explains how scheduled and frequency-based integration updates work in Spark.
 
 ## Overview
 
@@ -10,12 +10,14 @@ The application automatically checks for integrations that are due for updates e
 
 ### 1. Scheduled Job
 
-The `CheckIntegrationUpdates` job runs every minute via Laravel's task scheduler. This job:
+The `CheckIntegrationUpdates` job runs periodically via Laravel's scheduler. It:
 
-- Checks for integrations that need updating based on their `update_frequency_minutes` setting
-- Skips integrations that are currently being processed
-- Skips integrations that were recently triggered (within their frequency window)
-- Dispatches `ProcessIntegrationData` jobs for integrations that need updating
+- Determines due instances via `Integration::isDue()` (schedule overrides frequency)
+- Skips paused instances (`configuration.paused=true`)
+- Skips instances currently processing and throttled recent triggers
+- Dispatches:
+    - `ProcessIntegrationData` (normal integrations)
+    - `RunIntegrationTask` (task instances)
 
 ### 2. Background Processing
 
@@ -27,13 +29,16 @@ Each integration update is processed as a background job using Laravel's queue s
 - Each `ProcessIntegrationData` job has a 5-minute timeout
 - Failed `ProcessIntegrationData` jobs are retried up to 3 times with increasing delays (1, 5, 10 minutes)
 
-### 3. Integration Frequency
+### 3. Frequency vs Schedule
 
-Each integration has an `update_frequency_minutes` field that determines how often it should be updated:
+Each integration can be configured either by frequency or schedule (per-instance override):
 
-- If `last_successful_update_at` is null, the integration needs updating
-- Otherwise, the next update time is calculated as `last_successful_update_at + update_frequency_minutes`
-- The system only updates integrations that are past their next scheduled update time
+- Frequency: `configuration.update_frequency_minutes` (default 15)
+- Schedule override: `configuration.use_schedule=true` with:
+    - `configuration.schedule_times`: array of HH:mm strings (e.g., ["04:10","10:10","16:10","22:10"]) in `configuration.schedule_timezone`
+    - `configuration.schedule_timezone`: IANA timezone (defaults to app timezone)
+- Pause: `configuration.paused=true` prevents runs
+  UI shows a human summary like "4× daily at 04:10, 10:10, 16:10, 22:10 (Europe/London)".
 
 ## Setup
 
@@ -122,6 +127,7 @@ The `CheckIntegrationUpdates` job:
 5. Logs the results
 
 **Job Configuration:**
+
 - **Timeout**: 1 minute
 - **Retries**: 1 attempt (no retry)
 - **Queue**: `default`
@@ -137,12 +143,14 @@ The `ProcessIntegrationData` job:
 5. Handles errors and retries with proper state management
 
 **Job Configuration:**
+
 - **Timeout**: 5 minutes
 - **Retries**: 3 attempts
 - **Backoff**: 60, 300, 600 seconds (1, 5, 10 minutes)
 - **Queue**: `default`
 
 **Error Handling:**
+
 - If an exception occurs during processing, the integration is marked as failed
 - Failed integrations have their `last_triggered_at` cleared, allowing them to be retried
 - The `failed()` callback ensures permanent failures are also properly marked
@@ -177,12 +185,14 @@ sail artisan queue:flush
 ### Processing State
 
 An integration is considered "processing" if:
+
 - `last_triggered_at` is more recent than `last_successful_update_at`
 - This prevents duplicate jobs from being dispatched
 
 ### Failed State
 
 An integration is marked as failed when:
+
 - An exception occurs during processing (in the catch block)
 - The job fails permanently after all retries (in the failed callback)
 - The `last_triggered_at` field is cleared, allowing the integration to be retried
@@ -190,6 +200,7 @@ An integration is marked as failed when:
 ### Update Frequency
 
 The system respects each integration's `update_frequency_minutes` setting:
+
 - Minimum interval between updates
 - Prevents excessive API calls
 - Configurable per integration

@@ -123,4 +123,9 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    // Whitelist of allowed artisan task commands for Task plugin execution (comma-separated in env)
+    'allowed_task_commands' => env('ALLOWED_TASK_COMMANDS') ? explode(',', env('ALLOWED_TASK_COMMANDS')) : null,
+    // Whitelist of allowed job classes for Task plugin execution (comma-separated FQCNs)
+    'allowed_task_jobs' => env('ALLOWED_TASK_JOBS') ? explode(',', env('ALLOWED_TASK_JOBS')) : null,
+
 ];

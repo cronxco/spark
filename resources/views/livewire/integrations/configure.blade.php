@@ -81,6 +81,41 @@ new class extends Component {
     public function updateConfiguration(): void
     {
         try {
+            // Pre-normalize schedule times input for validation
+            if (isset($this->configuration['schedule_times']) && is_string($this->configuration['schedule_times'])) {
+                $parts = preg_split('/[\s,]+/', $this->configuration['schedule_times']) ?: [];
+                $this->configuration['schedule_times'] = array_values(array_filter(array_map('trim', $parts)));
+            }
+
+            // Pre-validate task_payload JSON if provided as string
+            if (isset($this->configuration['task_payload']) && is_string($this->configuration['task_payload']) && $this->configuration['task_payload'] !== '') {
+                $decoded = json_decode($this->configuration['task_payload'], true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    $this->addError('configuration.task_payload', 'Payload must be valid JSON object.');
+                    return;
+                }
+            }
+
+            // Pre-normalize any schema-declared array fields that may be comma/space separated strings
+            foreach ($this->schema as $field => $config) {
+                if (($config['type'] ?? null) === 'array' && isset($this->configuration[$field]) && is_string($this->configuration[$field])) {
+                    $parts = preg_split('/[\s,]+/', (string) $this->configuration[$field]) ?: [];
+                    $this->configuration[$field] = array_values(array_filter(array_map('trim', $parts)));
+                }
+            }
+
+            // Validate according to rules (includes conditional requirements)
+            $this->validate();
+
+            // Validate timezone if provided/required
+            if (!empty($this->configuration['schedule_timezone'])) {
+                $validTz = in_array($this->configuration['schedule_timezone'], \DateTimeZone::listIdentifiers(), true);
+                if (! $validTz) {
+                    $this->addError('configuration.schedule_timezone', 'Invalid timezone.');
+                    return;
+                }
+            }
+
             $updateData = ['configuration' => []];
 
             // Process the current configuration state
@@ -90,6 +125,32 @@ new class extends Component {
                     $updateData['configuration'][$field] = array_filter(array_map('trim', explode(',', $value)));
                 } else {
                     $updateData['configuration'][$field] = $value;
+                }
+            }
+
+            // Ensure schema-free arrays like repositories/events (GitHub) are normalized when set as comma-separated
+            foreach (['repositories', 'events'] as $arrayField) {
+                if (isset($updateData['configuration'][$arrayField]) && is_string($updateData['configuration'][$arrayField])) {
+                    $parts = preg_split('/[\s,]+/', (string) $updateData['configuration'][$arrayField]) ?: [];
+                    $updateData['configuration'][$arrayField] = array_values(array_filter(array_map('trim', $parts)));
+                }
+            }
+
+            // Normalize scheduling booleans
+            $updateData['configuration']['use_schedule'] = (bool) ($updateData['configuration']['use_schedule'] ?? ($this->configuration['use_schedule'] ?? false));
+            $updateData['configuration']['paused'] = (bool) ($updateData['configuration']['paused'] ?? ($this->configuration['paused'] ?? false));
+
+            // Normalize schedule times input: accept comma or newline separated strings
+            if (!empty($updateData['configuration']['schedule_times']) && is_string($updateData['configuration']['schedule_times'])) {
+                $parts = preg_split('/[\s,]+/', $updateData['configuration']['schedule_times']) ?: [];
+                $updateData['configuration']['schedule_times'] = array_values(array_filter(array_map('trim', $parts)));
+            }
+
+            // Parse task_payload if provided as JSON string
+            if (isset($updateData['configuration']['task_payload']) && is_string($updateData['configuration']['task_payload'])) {
+                $decoded = json_decode($updateData['configuration']['task_payload'], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $updateData['configuration']['task_payload'] = $decoded;
                 }
             }
 
@@ -133,6 +194,20 @@ new class extends Component {
             $rules["configuration.{$field}"] = $fieldRules;
         }
 
+        // Generic scheduling + task validations (not in schema)
+        $useSchedule = (bool) ($this->configuration['use_schedule'] ?? false);
+        $rules['configuration.use_schedule'] = ['nullable'];
+        $rules['configuration.paused'] = ['nullable'];
+        $rules['configuration.schedule_timezone'] = [$useSchedule ? 'required' : 'nullable', 'string'];
+        $rules['configuration.schedule_times'] = [$useSchedule ? 'required' : 'nullable', 'array', 'min:1'];
+        $rules['configuration.schedule_times.*'] = ['regex:/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/'];
+        $taskMode = (string) ($this->configuration['task_mode'] ?? '');
+        $rules['configuration.task_mode'] = ['nullable', 'string', 'in:artisan,job'];
+        $rules['configuration.task_command'] = [$taskMode === 'artisan' ? 'required' : 'nullable', 'string'];
+        $rules['configuration.task_job_class'] = [$taskMode === 'job' ? 'required' : 'nullable', 'string'];
+        $rules['configuration.task_queue'] = ['nullable', 'string'];
+        $rules['configuration.task_payload'] = ['nullable'];
+
         return $rules;
     }
 
@@ -174,6 +249,55 @@ new class extends Component {
 
                 <!-- Configuration Form -->
                 <form wire:submit="updateConfiguration" class="space-y-6">
+                    <!-- Scheduling & Pause -->
+                    <div class="p-4 bg-base-200 rounded-lg">
+                        <div class="mb-4">
+                            <h4 class="text-lg font-medium">{{ __('Scheduling') }}</h4>
+                            <p class="text-sm text-base-content/70">{{ __('Enable a fixed daily schedule or use frequency-based updates.') }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <x-toggle
+                                    label="{{ __('Use schedule instead of frequency') }}"
+                                    wire:model="configuration.use_schedule"
+                                />
+                            </div>
+                            <div>
+                                <x-toggle
+                                    label="{{ __('Paused') }}"
+                                    wire:model="configuration.paused"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4" x-data>
+                            <div>
+                                <x-input
+                                    label="{{ __('Schedule Times (HH:mm, comma or space separated)') }}"
+                                    placeholder="04:10 10:10 16:10 22:10"
+                                    wire:model="configuration.schedule_times"
+                                />
+                            </div>
+                            <div>
+                                <x-input
+                                    label="{{ __('Schedule Timezone') }}"
+                                    placeholder="UTC"
+                                    wire:model="configuration.schedule_timezone"
+                                />
+                            </div>
+                            <div>
+                                <x-input
+                                    type="number"
+                                    label="{{ __('Fallback Frequency (minutes)') }}"
+                                    placeholder="60"
+                                    wire:model="configuration.update_frequency_minutes"
+                                    min="1"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     @foreach ($schema as $field => $config)
                         @php
                             $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration->service);

@@ -94,9 +94,9 @@ class CheckIntegrationUpdates implements ShouldQueue
                 })
                 ->get();
 
-            // Filter to only those that actually need updating using the individual method
+            // Filter to only those that actually need updating using the individual/schedule-aware method
             $integrations = $allIntegrations->filter(function ($integration) {
-                return $integration->needsUpdate();
+                return $integration->isDue();
             });
 
             if ($integrations->isEmpty()) {
@@ -112,6 +112,14 @@ class CheckIntegrationUpdates implements ShouldQueue
 
             foreach ($integrations as $integration) {
                 try {
+                    // Skip if paused or currently processing
+                    if ($integration->isPaused()) {
+                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - paused");
+                        $skippedCount++;
+
+                        continue;
+                    }
+
                     // Skip if currently processing
                     if ($integration->isProcessing()) {
                         Log::info("Skipping integration {$integration->id} ({$integration->service}) - currently processing");
@@ -120,19 +128,24 @@ class CheckIntegrationUpdates implements ShouldQueue
                         continue;
                     }
 
-                    // Check if it's time to fetch data based on update frequency
-                    if ($integration->last_triggered_at &&
-                $integration->last_triggered_at->addMinutes($integration->getUpdateFrequencyMinutes())->isFuture()) {
-                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - too soon since last update");
+                    // Throttle immediate re-runs
+                    if ($integration->shouldThrottle()) {
+                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - throttled");
                         $skippedCount++;
 
                         continue;
                     }
 
-                    // Dispatch appropriate fetch jobs based on integration service and instance type
-                    $fetchJobs = $this->getFetchJobsForIntegration($integration);
-                    foreach ($fetchJobs as $jobClass) {
-                        $jobClass::dispatch($integration);
+                    if ($integration->isTaskInstance()) {
+                        // Dispatch task job
+                        RunIntegrationTask::dispatch($integration)
+                            ->onQueue($integration->configuration['task_queue'] ?? 'pull');
+                    } else {
+                        // Dispatch appropriate fetch jobs based on integration service and instance type
+                        $fetchJobs = $this->getFetchJobsForIntegration($integration);
+                        foreach ($fetchJobs as $jobClass) {
+                            $jobClass::dispatch($integration);
+                        }
                     }
 
                     // Mark the integration as triggered to prevent immediate re-triggering
