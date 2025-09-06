@@ -109,7 +109,7 @@ new class extends Component {
 
             // Validate timezone if provided/required
             if (!empty($this->configuration['schedule_timezone'])) {
-                $validTz = in_array($this->configuration['schedule_timezone'], \DateTimeZone::listIdentifiers(), true);
+                $validTz = in_array($this->configuration['schedule_timezone'], DateTimeZone::listIdentifiers(), true);
                 if (! $validTz) {
                     $this->addError('configuration.schedule_timezone', 'Invalid timezone.');
                     return;
