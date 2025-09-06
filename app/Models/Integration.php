@@ -119,6 +119,68 @@ class Integration extends Model
         return $config['update_frequency_minutes'] ?? 15;
     }
 
+    /**
+     * Whether this instance is a task instance
+     */
+    public function isTaskInstance(): bool
+    {
+        return ($this->instance_type === 'task') || ($this->service === 'task');
+    }
+
+    /**
+     * Whether this instance is paused
+     */
+    public function isPaused(): bool
+    {
+        $config = $this->configuration ?? [];
+
+        return (bool) ($config['paused'] ?? false);
+    }
+
+    /**
+     * Whether this instance should use schedule times instead of frequency
+     */
+    public function useSchedule(): bool
+    {
+        $config = $this->configuration ?? [];
+
+        return (bool) ($config['use_schedule'] ?? false);
+    }
+
+    /**
+     * Get configured schedule times as HH:mm strings
+     *
+     * @return array<int, string>
+     */
+    public function getScheduleTimes(): array
+    {
+        $config = $this->configuration ?? [];
+        $times = $config['schedule_times'] ?? [];
+        if (! is_array($times)) {
+            return [];
+        }
+
+        // Filter to valid HH:mm entries
+        return array_values(array_filter($times, static function ($t) {
+            if (! is_string($t)) {
+                return false;
+            }
+
+            return (bool) preg_match('/^\d{2}:\d{2}$/', $t);
+        }));
+    }
+
+    /**
+     * Get schedule timezone (IANA), default to UTC
+     */
+    public function getScheduleTimezone(): string
+    {
+        $config = $this->configuration ?? [];
+        $tz = $config['schedule_timezone'] ?? config('app.timezone', 'UTC');
+
+        return is_string($tz) && $tz !== '' ? $tz : (config('app.timezone', 'UTC'));
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -130,19 +192,11 @@ class Integration extends Model
     }
 
     /**
-     * Check if this integration needs to be updated based on its frequency
+     * Check if this integration needs to be updated (schedule overrides frequency)
      */
     public function needsUpdate(): bool
     {
-        // If never updated, it needs updating
-        if (! $this->last_successful_update_at) {
-            return true;
-        }
-
-        // Check if enough time has passed since last successful update
-        $nextUpdateTime = $this->last_successful_update_at->addMinutes($this->getUpdateFrequencyMinutes());
-
-        return now()->isAfter($nextUpdateTime);
+        return $this->isDue();
     }
 
     /**
@@ -150,11 +204,169 @@ class Integration extends Model
      */
     public function getNextUpdateTime(): ?Carbon
     {
+        if ($this->isPaused()) {
+            return null;
+        }
+
+        if ($this->useSchedule()) {
+            return $this->getNextScheduledRun();
+        }
+
         if (! $this->last_successful_update_at) {
             return null;
         }
 
-        return $this->last_successful_update_at->addMinutes($this->getUpdateFrequencyMinutes());
+        return $this->last_successful_update_at->copy()->addMinutes($this->getUpdateFrequencyMinutes());
+    }
+
+    /**
+     * Compute the next scheduled run time in UTC if using schedule
+     */
+    public function getNextScheduledRun(?Carbon $now = null): ?Carbon
+    {
+        if (! $this->useSchedule()) {
+            return null;
+        }
+
+        $times = $this->getScheduleTimes();
+        if (empty($times)) {
+            return null;
+        }
+
+        $tz = $this->getScheduleTimezone();
+        $nowTz = $now ? (clone $now)->setTimezone($tz) : Carbon::now($tz);
+
+        // Build times for today in tz
+        $candidates = [];
+        foreach ($times as $t) {
+            [$h, $m] = [substr($t, 0, 2), substr($t, 3, 2)];
+            $candidates[] = Carbon::createFromTime((int) $h, (int) $m, 0, $tz)
+                ->setDate($nowTz->year, $nowTz->month, $nowTz->day);
+        }
+
+        usort($candidates, static function (Carbon $a, Carbon $b) {
+            return $a->getTimestamp() <=> $b->getTimestamp();
+        });
+
+        foreach ($candidates as $candidate) {
+            if ($candidate->greaterThan($nowTz)) {
+                return $candidate->clone()->setTimezone('UTC');
+            }
+        }
+
+        // Otherwise, first time tomorrow
+        $first = $candidates[0]->clone()->addDay();
+
+        return $first->setTimezone('UTC');
+    }
+
+    /**
+     * Compute the first scheduled run that occurs strictly after the given moment
+     */
+    public function getNextScheduledRunAfter(Carbon $after): ?Carbon
+    {
+        if (! $this->useSchedule()) {
+            return null;
+        }
+
+        $times = $this->getScheduleTimes();
+        if (empty($times)) {
+            return null;
+        }
+
+        $tz = $this->getScheduleTimezone();
+        $cursorTz = $after->copy()->setTimezone($tz);
+
+        // Build candidates for today and tomorrow relative to the "after" timestamp
+        $candidates = [];
+        foreach ($times as $t) {
+            [$h, $m] = [substr($t, 0, 2), substr($t, 3, 2)];
+            $today = Carbon::createFromTime((int) $h, (int) $m, 0, $tz)
+                ->setDate($cursorTz->year, $cursorTz->month, $cursorTz->day);
+            $tomorrow = $today->copy()->addDay();
+            $candidates[] = $today;
+            $candidates[] = $tomorrow;
+        }
+
+        usort($candidates, static function (Carbon $a, Carbon $b) {
+            return $a->getTimestamp() <=> $b->getTimestamp();
+        });
+
+        foreach ($candidates as $candidate) {
+            if ($candidate->greaterThan($cursorTz)) {
+                return $candidate->clone()->setTimezone('UTC');
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Human-friendly schedule summary (e.g., "4× daily at 04:10, 10:10, 16:10, 22:10 (Europe/London)")
+     */
+    public function getScheduleSummary(): ?string
+    {
+        if (! $this->useSchedule()) {
+            return null;
+        }
+
+        $times = $this->getScheduleTimes();
+        if (empty($times)) {
+            return null;
+        }
+
+        $tz = $this->getScheduleTimezone();
+        $count = count($times);
+        $timesList = implode(', ', $times);
+
+        return $count . '× daily at ' . $timesList . ' (' . $tz . ')';
+    }
+
+    /**
+     * Whether the integration is due to run now
+     */
+    public function isDue(?Carbon $now = null): bool
+    {
+        if ($this->isPaused()) {
+            return false;
+        }
+
+        $nowUtc = $now ? (clone $now)->setTimezone('UTC') : Carbon::now('UTC');
+
+        if ($this->useSchedule()) {
+            if (! $this->last_successful_update_at) {
+                return true;
+            }
+
+            // Determine the next run strictly after last success, and compare to now
+            $nextAfterSuccess = $this->getNextScheduledRunAfter($this->last_successful_update_at->copy());
+
+            return $nextAfterSuccess !== null && $nowUtc->greaterThanOrEqualTo($nextAfterSuccess);
+        }
+
+        // Frequency-based fallback
+        if (! $this->last_successful_update_at) {
+            return true;
+        }
+
+        $nextUpdateTime = $this->last_successful_update_at->copy()->addMinutes($this->getUpdateFrequencyMinutes());
+
+        return $nowUtc->greaterThanOrEqualTo($nextUpdateTime);
+    }
+
+    /**
+     * Simple throttle guard to avoid immediate re-triggering
+     */
+    public function shouldThrottle(): bool
+    {
+        if (! $this->last_triggered_at) {
+            return false;
+        }
+
+        $windowMinutes = (int) $this->getUpdateFrequencyMinutes();
+        $windowMinutes = max(5, min(30, $windowMinutes));
+
+        return $this->last_triggered_at->addMinutes($windowMinutes)->isFuture();
     }
 
     /**

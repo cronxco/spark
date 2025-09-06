@@ -13,6 +13,7 @@ use App\Integrations\PluginRegistry;
 use App\Integrations\Reddit\RedditPlugin;
 use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
+use App\Integrations\Task\TaskPlugin;
 use Illuminate\Support\ServiceProvider;
 
 class IntegrationServiceProvider extends ServiceProvider
@@ -33,6 +34,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(GoCardlessBankPlugin::class);
         PluginRegistry::register(AppleHealthPlugin::class);
         PluginRegistry::register(RedditPlugin::class);
+        PluginRegistry::register(TaskPlugin::class);
     }
 
     /**

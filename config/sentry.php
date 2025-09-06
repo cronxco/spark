@@ -5,7 +5,7 @@ return [
 
     'environment' => env('APP_ENV', 'production'),
 
-    'release' => env('SENTRY_RELEASE'),
+    'release' => file_exists(base_path('VERSION')) ? file_get_contents(base_path('VERSION')) : null,
 
     'traces_sample_rate' => (float) env('SENTRY_TRACES_SAMPLE_RATE', 0.2),
 
