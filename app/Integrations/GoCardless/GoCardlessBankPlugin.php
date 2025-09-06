@@ -433,7 +433,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             Log::error('Failed to fetch GoCardless data', [
                 'integration_id' => $integration->id,
                 'instance_type' => $instanceType,
-                'group_id' => $group->id,
+                'group_id' => $integration->group_id,
                 'account_id' => $accountId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -1377,6 +1377,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'previous_status' => $existingEvent?->event_metadata['transaction_status'] ?? null,
                 'timestamp_preserved' => $isStatusChange && $existingEvent && $existingEvent->time === $timestamp,
                 'timestamp_reason' => $this->getTimestampReason($tx, $existingEvent, $status, $isStatusChange, $timestamp),
+                'raw' => $tx,
             ],
         ];
 

@@ -622,6 +622,7 @@ class MonzoPlugin extends OAuthPlugin
                     'notes' => $tx['notes'] ?? null,
                     'local_amount' => $tx['local_amount'] ?? null,
                     'local_currency' => $tx['local_currency'] ?? null,
+                    'raw' => $tx,
                 ],
                 'target_id' => $target->id,
             ]
