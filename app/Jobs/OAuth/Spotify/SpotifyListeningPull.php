@@ -36,29 +36,11 @@ class SpotifyListeningPull extends BaseFetchJob
 
         $listeningData = [
             'account_id' => $accountId,
-            'currently_playing' => null,
             'recently_played' => [],
             'fetched_at' => now()->toISOString(),
         ];
 
-        try {
-            // Get currently playing track
-            $currentlyPlaying = $this->getCurrentlyPlaying($plugin);
-            if ($currentlyPlaying) {
-                $listeningData['currently_playing'] = $currentlyPlaying;
-                Log::info('Spotify: Found currently playing track', [
-                    'integration_id' => $this->integration->id,
-                    'track_name' => $currentlyPlaying['item']['name'] ?? 'Unknown',
-                    'artist_name' => $currentlyPlaying['item']['artists'][0]['name'] ?? 'Unknown',
-                ]);
-            }
-        } catch (Exception $e) {
-            Log::warning('Spotify: Failed to get currently playing track', [
-                'integration_id' => $this->integration->id,
-                'error' => $e->getMessage(),
-            ]);
-            // Continue without currently playing data
-        }
+        // Skip fetching currently playing to avoid duplicates
 
         try {
             // Get recently played tracks (last 50)
@@ -82,7 +64,7 @@ class SpotifyListeningPull extends BaseFetchJob
 
     protected function dispatchProcessingJobs(array $rawData): void
     {
-        if (empty($rawData['currently_playing']) && empty($rawData['recently_played'])) {
+        if (empty($rawData['recently_played'])) {
             Log::info('Spotify: No listening data to process', [
                 'integration_id' => $this->integration->id,
             ]);
@@ -94,26 +76,7 @@ class SpotifyListeningPull extends BaseFetchJob
         SpotifyListeningData::dispatch($this->integration, $rawData);
     }
 
-    private function getCurrentlyPlaying(SpotifyPlugin $plugin): ?array
-    {
-        $endpoint = '/me/player/currently-playing';
-
-        try {
-            $response = $plugin->makeAuthenticatedApiRequest($endpoint, $this->integration);
-
-            if (empty($response) || ! isset($response['item'])) {
-                return null; // No track currently playing
-            }
-
-            return $response;
-        } catch (Exception $e) {
-            // If it's a 204 (no content) or other expected error, return null
-            if (str_contains($e->getMessage(), '204') || str_contains($e->getMessage(), 'No Content')) {
-                return null;
-            }
-            throw $e;
-        }
-    }
+    // Removed currently playing fetch to disable feature
 
     private function getRecentlyPlayed(SpotifyPlugin $plugin): array
     {
