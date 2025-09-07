@@ -125,12 +125,10 @@ class SpotifyListeningData extends BaseProcessingJob
                         'actor_id' => $this->getUserObject()->id,
                         'service' => 'spotify',
                         'domain' => 'media',
-                        'action' => 'played',
-                        'value' => 1,
-                        'value_multiplier' => 1,
-                        'value_unit' => 'play',
+                        'action' => 'listened_to',
                         'event_metadata' => [
                             'source' => $source,
+                            'context_type' => $trackData['context']['type'] ?? null,
                             'track_id' => $trackId,
                             'track_name' => $track['name'] ?? null,
                             'artist_names' => array_column($track['artists'] ?? [], 'name'),
@@ -152,8 +150,8 @@ class SpotifyListeningData extends BaseProcessingJob
                 $event->event_metadata = $metadata;
                 $event->save();
 
-                // Add tags based on configuration and track data
-                $this->addTrackTags($event, $track, $this->integration->configuration ?? []);
+                // Simplified typed tags
+                $this->addTrackTags($event, $track, $source, $trackData['context'] ?? []);
 
                 // Add blocks for additional information
                 $this->addTrackBlocks($event, $track, $source);
@@ -217,7 +215,7 @@ class SpotifyListeningData extends BaseProcessingJob
             // Check if this exact track play was processed very recently (within last 5 minutes)
             $recentEvent = Event::where('integration_id', $this->integration->id)
                 ->where('service', 'spotify')
-                ->where('action', 'played')
+                ->where('action', 'listened_to')
                 ->where('event_metadata->track_id', $trackId)
                 ->where('time', '>=', now()->subMinutes(5))
                 ->first();
@@ -247,6 +245,9 @@ class SpotifyListeningData extends BaseProcessingJob
 
     private function upsertTrackObject(array $track): EventObject
     {
+        // Remove heavy arrays we don't need
+        unset($track['available_markets']);
+
         return EventObject::updateOrCreate(
             [
                 'user_id' => $this->integration->user_id,
@@ -276,6 +277,7 @@ class SpotifyListeningData extends BaseProcessingJob
         $artistObjects = [];
 
         foreach ($artists as $artist) {
+            unset($artist['available_markets']);
             $artistObject = EventObject::updateOrCreate(
                 [
                     'user_id' => $this->integration->user_id,
@@ -303,6 +305,8 @@ class SpotifyListeningData extends BaseProcessingJob
 
     private function upsertAlbumObject(array $album): EventObject
     {
+        unset($album['available_markets']);
+
         return EventObject::updateOrCreate(
             [
                 'user_id' => $this->integration->user_id,
@@ -346,34 +350,25 @@ class SpotifyListeningData extends BaseProcessingJob
         );
     }
 
-    private function addTrackTags(Event $event, array $track, array $config): void
+    private function addTrackTags(Event $event, array $track, string $source, array $context = []): void
     {
-        $tags = [
-            'spotify',
-            'media',
-            'music',
-            'played',
-        ];
-
-        // Add genre tags if enabled in configuration
-        if (! empty($config['auto_tag_genres'])) {
-            // Note: Spotify API doesn't provide genre info in track responses
-            // This would require additional API calls to get artist genres
-        }
-
-        // Add artist name tags if enabled in configuration
-        if (! empty($config['auto_tag_artists'])) {
-            foreach ($track['artists'] ?? [] as $artist) {
-                $tags[] = 'artist_' . str_replace(' ', '_', strtolower($artist['name']));
+        // Artists
+        foreach ($track['artists'] ?? [] as $artist) {
+            if (! empty($artist['name'])) {
+                $event->attachTag($artist['name'], 'music_artist');
             }
         }
 
-        // Add album name tag
+        // Album
         if (! empty($track['album']['name'])) {
-            $tags[] = 'album_' . str_replace(' ', '_', strtolower($track['album']['name']));
+            $event->attachTag($track['album']['name'], 'music_album');
         }
 
-        $event->syncTags($tags);
+        // Context type (e.g., album, playlist)
+        $contextType = $context['type'] ?? null;
+        if (! empty($contextType)) {
+            $event->attachTag($contextType, 'spotify_context');
+        }
     }
 
     private function addTrackBlocks(Event $event, array $track, string $source): void

@@ -124,10 +124,10 @@ class SpotifyPlugin extends OAuthPlugin
     public static function getActionTypes(): array
     {
         return [
-            'played' => [
+            'listened_to' => [
                 'icon' => 'o-play',
-                'display_name' => 'Played Track',
-                'description' => 'A track that was played on Spotify',
+                'display_name' => 'Listened to Track',
+                'description' => 'A track that was listened to on Spotify',
                 'display_with_object' => true,
                 'value_unit' => null,
                 'hidden' => false,
@@ -623,14 +623,12 @@ class SpotifyPlugin extends OAuthPlugin
             ],
             'service' => 'spotify',
             'domain' => self::getDomain(),
-            'action' => 'played',
-            'value' => $track['duration_ms'] ?? 0,
-            'value_multiplier' => 1,
-            'value_unit' => 'milliseconds',
+            'action' => 'listened_to',
             'event_metadata' => [
                 'source' => $source,
                 'progress_ms' => $progressMs,
                 'is_playing' => $source === 'currently_playing',
+                'context_type' => $playData['context']['type'] ?? null,
                 'track_id' => $track['id'],
                 'album_id' => $track['album']['id'] ?? null,
                 'artist_ids' => collect($track['artists'])->pluck('id')->toArray(),
@@ -647,7 +645,7 @@ class SpotifyPlugin extends OAuthPlugin
         $this->createTrackBlocks($event, $track, $integration);
 
         // Auto-tag the event
-        $this->autoTagEvent($event, $track, $integration);
+        $this->autoTagEvent($event, $track, $integration, $playData);
 
         Log::info("Created event for track: {$track['name']} by " . collect($track['artists'])->pluck('name')->implode(', '));
     }
@@ -777,52 +775,26 @@ class SpotifyPlugin extends OAuthPlugin
         }
     }
 
-    protected function autoTagEvent(Event $event, array $track, Integration $integration): void
+    protected function autoTagEvent(Event $event, array $track, Integration $integration, array $playData = []): void
     {
-        $configuration = $integration->configuration ?? [];
-
-        // Tag by artist (check if enabled in configuration)
-        $autoTagArtists = $configuration['auto_tag_artists'] ?? ['enabled'];
-        if (in_array('enabled', $autoTagArtists)) {
-            foreach ($track['artists'] as $artist) {
-                $event->attachTag($artist['name']);
+        // Simplified, typed tags only
+        // Artists
+        foreach ($track['artists'] ?? [] as $artist) {
+            if (! empty($artist['name'])) {
+                $event->attachTag($artist['name'], 'music_artist');
             }
         }
 
-        // Tag by album (always enabled)
+        // Album
         if (! empty($track['album']['name'])) {
-            $event->attachTag($track['album']['name']);
+            $event->attachTag($track['album']['name'], 'music_album');
         }
 
-        // Tag by year (from album release date)
-        if (! empty($track['album']['release_date'])) {
-            $year = date('Y', strtotime($track['album']['release_date']));
-            $event->attachTag($year);
-
-            // Tag by decade
-            $decade = floor($year / 10) * 10;
-            $event->attachTag("{$decade}s");
+        // Listening context (e.g. album, playlist)
+        $contextType = $playData['context']['type'] ?? null;
+        if (! empty($contextType)) {
+            $event->attachTag($contextType, 'spotify_context');
         }
-
-        // Tag by explicit content
-        if ($track['explicit'] ?? false) {
-            $event->attachTag('explicit');
-        }
-
-        // Tag by popularity level
-        $popularity = $track['popularity'] ?? 0;
-        if ($popularity >= 80) {
-            $event->attachTag('very-popular');
-        } elseif ($popularity >= 60) {
-            $event->attachTag('popular');
-        } elseif ($popularity >= 40) {
-            $event->attachTag('moderate');
-        } else {
-            $event->attachTag('niche');
-        }
-
-        // Note: Genre tagging would require additional API calls to get track/artist genres
-        // This could be implemented as a separate job to avoid rate limiting
     }
 
     /**
