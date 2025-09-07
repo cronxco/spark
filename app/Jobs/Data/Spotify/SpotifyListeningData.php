@@ -247,6 +247,7 @@ class SpotifyListeningData extends BaseProcessingJob
     {
         // Remove heavy arrays we don't need
         unset($track['available_markets']);
+
         return EventObject::updateOrCreate(
             [
                 'user_id' => $this->integration->user_id,
@@ -305,6 +306,7 @@ class SpotifyListeningData extends BaseProcessingJob
     private function upsertAlbumObject(array $album): EventObject
     {
         unset($album['available_markets']);
+
         return EventObject::updateOrCreate(
             [
                 'user_id' => $this->integration->user_id,
