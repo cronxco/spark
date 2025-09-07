@@ -536,7 +536,7 @@ new class extends Component {
                                             @endif
                                         </x-slot:description>
                                     </x-timeline-item>
-                                    
+
                                 @endforeach
 
                         </x-slot:content>
