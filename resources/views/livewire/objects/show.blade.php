@@ -8,6 +8,7 @@ use Livewire\Volt\Component;
 use function Livewire\Volt\layout;
 use App\Integrations\PluginRegistry;
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Tags\Tag;
 
 layout('components.layouts.app');
 
@@ -691,6 +692,37 @@ new class extends Component {
 
         return 'o-cube'; // Default icon
     }
+
+    public function addTag(string $value): void
+    {
+        $name = trim((string) $value);
+        if ($name === '') {
+            return;
+        }
+
+        if (str_starts_with($name, 'tag-whitelist-') || str_starts_with($name, 'tag-initial-')) {
+            return;
+        }
+
+        $tag = Tag::findOrCreate($name);
+        $this->object->attachTag($tag);
+        $this->object->refresh()->loadMissing('tags');
+    }
+
+    public function removeTag(string $value): void
+    {
+        $name = trim((string) $value);
+        if ($name === '') {
+            return;
+        }
+
+        if (str_starts_with($name, 'tag-whitelist-') || str_starts_with($name, 'tag-initial-')) {
+            return;
+        }
+
+        $this->object->detachTag($name);
+        $this->object->refresh()->loadMissing('tags');
+    }
 };
 
 ?>
@@ -908,6 +940,19 @@ new class extends Component {
                                 <x-button type="submit" class="btn-primary btn-sm" label="Post" />
                             </div>
                         </x-form>
+                    </x-card>
+
+                    <!-- Tags Manager -->
+                    <x-card>
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-tag" class="w-5 h-5 text-primary" />
+                            Tags
+                        </h3>
+                        <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
+                            <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
+                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">{!! json_encode(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all()) !!}</script>
+                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">{!! json_encode($this->object->tags->pluck('name')->values()->all()) !!}</script>
+                        </div>
                     </x-card>
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
                         <x-collapse wire:model="objectMetaOpen">

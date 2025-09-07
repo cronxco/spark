@@ -7,6 +7,8 @@ use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use App\Integrations\PluginRegistry;
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Tags\Tag;
+use Illuminate\Support\Facades\Log;
 
 new class extends Component {
     public Event $event;
@@ -188,6 +190,39 @@ new class extends Component {
     public function toggleSidebar()
     {
         $this->showSidebar = !$this->showSidebar;
+    }
+
+    public function addTag(string $value): void
+    {
+        $name = trim((string) $value);
+        if ($name === '') {
+            return;
+        }
+
+        if (str_starts_with($name, 'tag-whitelist-') || str_starts_with($name, 'tag-initial-')) {
+            return;
+        }
+
+        $tag = Tag::findOrCreate($name);
+        $this->event->attachTag($tag);
+        $this->event->refresh()->loadMissing('tags');
+        Log::info('Tag added to event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
+    }
+
+    public function removeTag(string $value): void
+    {
+        $name = trim((string) $value);
+        if ($name === '') {
+            return;
+        }
+
+        if (str_starts_with($name, 'tag-whitelist-') || str_starts_with($name, 'tag-initial-')) {
+            return;
+        }
+
+        $this->event->detachTag($name);
+        $this->event->refresh()->loadMissing('tags');
+        Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
     }
 };
 ?>
@@ -414,6 +449,31 @@ new class extends Component {
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Event Details" separator with-close-button class="w-11/12 lg:w-1/3">
                 <div class="space-y-4 lg:space-y-6">
+                    <!-- Tags Manager -->
+                    <x-card class="mb-0 !p-2">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-tag" class="w-5 h-5 text-primary" />
+                            Tags
+                        </h3>
+                        <div class="space-y-2" wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
+                            <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
+                            <script type="application/json" id="tag-initial-{{ $this->event->id }}">{!! json_encode($this->event->tags->pluck('name')->values()->all()) !!}</script>
+                            <script type="application/json" id="tag-suggestions-{{ $this->event->id }}">{!! json_encode(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all()) !!}</script>
+                        </div>
+                    </x-card>
+                    <!-- Add Comment -->
+                    <x-card class="!p-2">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-chat-bubble-left" class="w-5 h-5 text-primary" />
+                            Comment
+                        </h3>
+                        <x-form wire:submit="addComment">
+                            <x-textarea wire:model="comment" rows="3" placeholder="Add a comment..." />
+                            <div class="mt-3 flex justify-end">
+                                <x-button type="submit" class="btn-primary btn-sm" label="Post" />
+                            </div>
+                        </x-form>
+                    </x-card>
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
@@ -424,9 +484,6 @@ new class extends Component {
                         </x-slot:heading>
                         <x-slot:content>
                             @php $activities = $this->getActivities(); @endphp
-                            @if ($activities->isEmpty())
-                                <div class="text-sm text-base-content/70">No activity yet.</div>
-                            @else
                                 @php
                                     $activities = $this->getActivities();
                                     // newest first, synth created first as well
@@ -472,23 +529,9 @@ new class extends Component {
                                     @endphp
                                     <x-timeline-item title="{{ $title }}" subtitle="{{ $subtitle }}" description="{{ $desc }}" />
                                 @endforeach
-                            @endif
+
                         </x-slot:content>
                     </x-collapse>
-
-                    <!-- Add Comment -->
-                    <x-card>
-                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-5 h-5 text-primary" />
-                            Comment
-                        </h3>
-                        <x-form wire:submit="addComment">
-                            <x-textarea wire:model="comment" rows="3" placeholder="Add a comment..." />
-                            <div class="mt-3 flex justify-end">
-                                <x-button type="submit" class="btn-primary btn-sm" label="Post" />
-                            </div>
-                        </x-form>
-                    </x-card>
                     <!-- Actor Details -->
                     @if ($this->event->actor)
                         <x-collapse wire:model="actorOpen">
@@ -657,7 +700,8 @@ new class extends Component {
                 </div>
             </x-drawer>
         </div>
-    @else
+    @endif
+    @if (! $this->event)
         <div class="text-center py-8">
             <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
             <h3 class="text-lg font-semibold text-base-content mb-2">Event Not Found</h3>
