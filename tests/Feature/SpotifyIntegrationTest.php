@@ -139,9 +139,7 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertNotNull($event);
         $this->assertEquals('spotify', $event->service);
         $this->assertEquals('media', $event->domain);
-        $this->assertEquals('played', $event->action);
-        $this->assertEquals(180000, $event->value);
-        $this->assertEquals('milliseconds', $event->value_unit);
+        $this->assertEquals('listened_to', $event->action);
 
         // Verify actor (user) was created
         $actor = $event->actor;
@@ -173,24 +171,17 @@ class SpotifyIntegrationTest extends TestCase
         $this->assertEquals('Test Track', $trackDetailsBlock->metadata['track'] ?? null);
         $this->assertStringContainsString('Test Artist', $trackDetailsBlock->metadata['artists'] ?? '');
 
-        // Verify tags were attached
+        // Verify tags were attached (typed)
         $tags = $event->tags;
         $this->assertGreaterThan(0, $tags->count());
 
         $artistTag = $tags->where('name', 'Test Artist')->first();
         $this->assertNotNull($artistTag);
+        $this->assertEquals('music_artist', $artistTag->type);
 
         $albumTag = $tags->where('name', 'Test Album')->first();
         $this->assertNotNull($albumTag);
-
-        $yearTag = $tags->where('name', '2023')->first();
-        $this->assertNotNull($yearTag);
-
-        $decadeTag = $tags->where('name', '2020s')->first();
-        $this->assertNotNull($decadeTag);
-
-        $popularityTag = $tags->where('name', 'very-popular')->first();
-        $this->assertNotNull($popularityTag);
+        $this->assertEquals('music_album', $albumTag->type);
     }
 
     #[Test]

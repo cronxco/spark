@@ -5,25 +5,26 @@ The Spotify integration allows users to connect their Spotify accounts and autom
 ## Features
 
 ### 🎵 **Real-time Track Monitoring**
+
 - Polls Spotify API every 30 seconds for currently playing tracks
 - Tracks recently played songs (last 50 tracks)
-- Creates events for each unique track play
-- Prevents duplicate events for the same track play
+- Creates events for each unique track listening
+- Prevents duplicate events for the same listen
 
 ### 🏷️ **Automatic Tagging**
-- **Artist tags**: Automatically tags events with artist names
-- **Album tags**: Tags events with album names
-- **Year tags**: Tags events with release year
-- **Decade tags**: Tags events with decade (e.g., "2020s", "1990s")
-- **Popularity tags**: Tags based on track popularity (very-popular, popular, moderate, niche)
-- **Content tags**: Tags explicit content appropriately
+
+- **Artist tags** (type `music_artist`): Performing artist names
+- **Album tag** (type `music_album`): Album name
+- **Listening context** (type `spotify_context`): Source context such as `album`, `playlist`, etc.
 
 ### 📦 **Rich Content Blocks**
+
 - **Album Art**: High-quality album artwork with metadata
 - **Track Details**: Comprehensive track information including duration, popularity
 - **Artist Info**: Artist details and Spotify links
 
 ### ⚙️ **Configurable Settings**
+
 - **Polling Interval**: Adjustable from 30 seconds to 5 minutes
 - **Auto-tagging**: Enable/disable automatic tagging features
 - **Album Art**: Toggle album artwork inclusion
@@ -39,21 +40,24 @@ The Spotify integration uses the same OAuth callback URL pattern as other integr
 - **GitHub URL**: `/integrations/github/callback`
 
 This ensures:
+
 - **Consistent routing** across all OAuth providers
 - **Simplified configuration** in external service dashboards
 - **Easier maintenance** and debugging
 - **Unified authentication flow** for all integrations
 
 ### Event Structure
-Each track play creates a structured event with:
+
+Each track listen creates a structured event with:
 
 - **Actor**: Spotify User (the listener)
-- **Target**: Track being played
-- **Event**: Track play with duration and timestamp
+- **Target**: Track being listened to
+- **Event**: Listening event with timestamp
 - **Blocks**: Rich content blocks (album art, track details, artist info)
-- **Tags**: Automatic categorization tags
+- **Tags**: Simplified typed tags (artist, album, context)
 
 ### Data Flow
+
 1. **OAuth Authentication**: User connects Spotify account
 2. **Background Polling**: System polls Spotify API every 30 seconds
 3. **Event Creation**: New track plays create events with rich metadata
@@ -84,6 +88,7 @@ SPOTIFY_REDIRECT_URI=https://yourdomain.com/integrations/spotify/callback
 ### 3. Database Migration
 
 The integration uses existing database tables:
+
 - `integrations` - Stores OAuth tokens and configuration
 - `events` - Stores track play events
 - `objects` - Stores user and track objects
@@ -129,7 +134,7 @@ protected function schedule(Schedule $schedule): void
 {
     // Run every 30 seconds for real-time updates
     $schedule->command('spotify:schedule')->everyThirtySeconds();
-    
+
     // Or use the general integration command
     $schedule->command('integrations:fetch --service=spotify')->everyMinute();
 }
@@ -165,70 +170,72 @@ GET /api/events?tags[]=artist_name&tags[]=album_name
 
 ```json
 {
-  "id": "event-uuid",
-  "source_id": "spotify_track_123_2023-12-01T10:30:00Z",
-  "time": "2023-12-01T10:30:00Z",
-  "service": "spotify",
-  "domain": "music",
-  "action": "played",
-  "value": 180000,
-  "value_unit": "milliseconds",
-  "event_metadata": {
-    "source": "currently_playing",
-    "progress_ms": 90000,
-    "is_playing": true,
-    "track_id": "track_123",
-    "album_id": "album_123",
-    "artist_ids": ["artist_123"]
-  },
-  "actor": {
-    "id": "user-uuid",
-    "concept": "user",
-    "type": "spotify_user",
-    "title": "John Doe",
-    "content": "Spotify user account"
-  },
-  "target": {
-    "id": "track-uuid",
-    "concept": "track",
-    "type": "spotify_track",
-    "title": "Bohemian Rhapsody",
-    "content": "Track: Bohemian Rhapsody\nArtist: Queen\nAlbum: A Night at the Opera"
-  },
-  "blocks": [
-    {
-      "title": "Album Art",
-      "content": "Album artwork for A Night at the Opera",
-      "media_url": "https://i.scdn.co/image/ab67616d0000b273...",
-      "value": 300,
-      "value_unit": "pixels"
+    "id": "event-uuid",
+    "source_id": "spotify_track_123_2023-12-01T10:30:00Z",
+    "time": "2023-12-01T10:30:00Z",
+    "service": "spotify",
+    "domain": "music",
+    "action": "listened_to",
+    "event_metadata": {
+        "source": "currently_playing",
+        "progress_ms": 90000,
+        "is_playing": true,
+        "track_id": "track_123",
+        "album_id": "album_123",
+        "artist_ids": ["artist_123"]
     },
-    {
-      "title": "Track Details",
-      "content": "**Track:** Bohemian Rhapsody\n**Artist:** Queen\n**Album:** A Night at the Opera\n**Duration:** 05:55\n**Popularity:** 95/100",
-      "value": 95,
-      "value_unit": "popularity"
-    }
-  ],
-  "tags": [
-    {"name": "Queen", "slug": "queen"},
-    {"name": "A Night at the Opera", "slug": "a-night-at-the-opera"},
-    {"name": "1975", "slug": "1975"},
-    {"name": "1970s", "slug": "1970s"},
-    {"name": "very-popular", "slug": "very-popular"}
-  ]
+    "actor": {
+        "id": "user-uuid",
+        "concept": "user",
+        "type": "spotify_user",
+        "title": "John Doe",
+        "content": "Spotify user account"
+    },
+    "target": {
+        "id": "track-uuid",
+        "concept": "track",
+        "type": "spotify_track",
+        "title": "Bohemian Rhapsody",
+        "content": "Track: Bohemian Rhapsody\nArtist: Queen\nAlbum: A Night at the Opera"
+    },
+    "blocks": [
+        {
+            "title": "Album Art",
+            "content": "Album artwork for A Night at the Opera",
+            "media_url": "https://i.scdn.co/image/ab67616d0000b273...",
+            "value": 300,
+            "value_unit": "pixels"
+        },
+        {
+            "title": "Track Details",
+            "content": "**Track:** Bohemian Rhapsody\n**Artist:** Queen\n**Album:** A Night at the Opera\n**Duration:** 05:55\n**Popularity:** 95/100",
+            "value": 95,
+            "value_unit": "popularity"
+        }
+    ],
+    "tags": [
+        { "name": "Queen", "slug": "queen", "type": "music_artist" },
+        {
+            "name": "A Night at the Opera",
+            "slug": "a-night-at-the-opera",
+            "type": "music_album"
+        },
+        { "name": "playlist", "slug": "playlist", "type": "spotify_context" }
+    ]
 }
 ```
 
 ## Configuration Options
 
 ### Update Frequency
+
 - **1 minute**: Real-time updates (default, minimum)
 - **5 minutes**: Balanced performance
 - **15 minutes**: Conservative rate limiting
 - **30 minutes**: Minimal API usage
 
 ### Auto-tagging Features
+
 - **Artist tags**: Tag events with artist names (configurable)
 - **Album tags**: Tag events with album names (always enabled)
 - **Year/Decade tags**: Tag events with release year and decade
@@ -236,12 +243,15 @@ GET /api/events?tags[]=artist_name&tags[]=album_name
 - **Explicit content**: Tag explicit tracks
 
 ### Content Options
+
 - **Include Album Art**: Create blocks with album artwork (configurable)
 - **Track Details**: Include comprehensive track information (always included)
 - **Artist Info**: Include artist details and links (always included)
 
 ### Configuration Interface
+
 The integration provides a user-friendly configuration interface where you can:
+
 - Set the update frequency in minutes
 - Enable/disable artist tagging
 - Enable/disable album art inclusion
@@ -250,6 +260,7 @@ The integration provides a user-friendly configuration interface where you can:
 ## Rate Limiting
 
 Spotify API has rate limits:
+
 - **Currently Playing**: 450 requests per 15 minutes
 - **Recently Played**: 450 requests per 15 minutes
 - **User Profile**: 450 requests per 15 minutes
@@ -259,16 +270,19 @@ The integration respects these limits and includes exponential backoff for retri
 ## Error Handling
 
 ### Token Refresh
+
 - Automatically refreshes expired access tokens
 - Handles refresh token rotation
 - Logs authentication failures
 
 ### API Failures
+
 - Graceful handling of API errors
 - Retry logic with exponential backoff
 - Comprehensive error logging
 
 ### Duplicate Prevention
+
 - Unique source IDs prevent duplicate events
 - Checks existing events before creation
 - Handles edge cases in timing
@@ -276,14 +290,18 @@ The integration respects these limits and includes exponential backoff for retri
 ## Monitoring
 
 ### Logs
+
 The integration logs all activities:
+
 - Authentication events
 - API requests and responses
 - Event creation
 - Error conditions
 
 ### Metrics
+
 Track integration health:
+
 - Events created per day
 - API request success rate
 - Token refresh frequency
@@ -294,20 +312,20 @@ Track integration health:
 ### Common Issues
 
 1. **OAuth Errors**
-   - Verify redirect URI matches exactly: `https://yourdomain.com/integrations/spotify/callback`
-   - Check client ID and secret
-   - Ensure scopes are properly configured
-   - Confirm the callback URL follows the consistent pattern: `/integrations/spotify/callback`
+    - Verify redirect URI matches exactly: `https://yourdomain.com/integrations/spotify/callback`
+    - Check client ID and secret
+    - Ensure scopes are properly configured
+    - Confirm the callback URL follows the consistent pattern: `/integrations/spotify/callback`
 
 2. **No Events Created**
-   - Check if user has played tracks recently
-   - Verify access token is valid
-   - Check polling schedule is running
+    - Check if user has played tracks recently
+    - Verify access token is valid
+    - Check polling schedule is running
 
 3. **Rate Limiting**
-   - Reduce polling frequency
-   - Check API usage in Spotify dashboard
-   - Monitor error logs
+    - Reduce polling frequency
+    - Check API usage in Spotify dashboard
+    - Monitor error logs
 
 ### Debug Commands
 
@@ -327,6 +345,7 @@ php artisan tinker
 ## Future Enhancements
 
 ### Planned Features
+
 - **Genre Analysis**: Fetch and tag by track genres
 - **Playlist Integration**: Track playlist additions
 - **Listening Analytics**: Generate listening insights
@@ -334,6 +353,7 @@ php artisan tinker
 - **Recommendations**: Suggest similar tracks
 
 ### API Improvements
+
 - **Webhook Support**: Real-time notifications (if Spotify adds support)
 - **Batch Processing**: Process multiple tracks efficiently
 - **Caching**: Cache track metadata to reduce API calls
@@ -351,6 +371,7 @@ To contribute to the Spotify integration:
 ## Support
 
 For issues with the Spotify integration:
+
 1. Check the troubleshooting section
 2. Review error logs
 3. Verify Spotify API status
