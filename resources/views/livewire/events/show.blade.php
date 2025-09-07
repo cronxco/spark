@@ -222,7 +222,7 @@ new class extends Component {
 
         $this->event->detachTag($name);
         $this->event->refresh()->loadMissing('tags');
-        \Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
+        Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
     }
 };
 ?>
@@ -457,8 +457,8 @@ new class extends Component {
                         </h3>
                         <div class="space-y-2" wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
                             <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
-                            <script type="application/json" id="tag-initial-{{ $this->event->id }}">@json($this->event->tags->pluck('name')->values()->all())</script>
-                            <script type="application/json" id="tag-suggestions-{{ $this->event->id }}">@json(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all())</script>
+                            <script type="application/json" id="tag-initial-{{ $this->event->id }}">{!! json_encode($this->event->tags->pluck('name')->values()->all()) !!}</script>
+                            <script type="application/json" id="tag-suggestions-{{ $this->event->id }}">{!! json_encode(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all()) !!}</script>
                         </div>
                     </x-card>
                     <!-- Add Comment -->

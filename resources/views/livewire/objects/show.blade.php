@@ -950,8 +950,8 @@ new class extends Component {
                         </h3>
                         <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
                             <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
-                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">@json(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all())</script>
-                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">@json($this->object->tags->pluck('name')->values()->all())</script>
+                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">{!! json_encode(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all()) !!}</script>
+                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">{!! json_encode($this->object->tags->pluck('name')->values()->all()) !!}</script>
                         </div>
                     </x-card>
                     @if ($this->object->metadata && count($this->object->metadata) > 0)

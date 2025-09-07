@@ -124,8 +124,8 @@ new class extends Component {
     <div class="w-full" wire:ignore>
         <input id="tag-input-{{ $cid }}" data-tagify data-whitelist="tag-whitelist-{{ $cid }}" data-initial="tag-initial-{{ $cid }}" aria-label="Tags" class="w-full" placeholder="Add tags" />
     </div>
-    <script type="application/json" id="tag-whitelist-{{ $cid }}">@json($this->allTags)</script>
-    <script type="application/json" id="tag-initial-{{ $cid }}">@json($this->currentTags)</script>
+    <script type="application/json" id="tag-whitelist-{{ $cid }}">{!! json_encode($this->allTags) !!}</script>
+    <script type="application/json" id="tag-initial-{{ $cid }}">{!! json_encode($this->currentTags) !!}</script>
 </div>
 
 
