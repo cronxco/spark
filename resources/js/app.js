@@ -68,6 +68,12 @@ function stripKnownPrefixForDisplay(value) {
 
 function iconForTagType(type) {
     switch ((type || "").toLowerCase()) {
+        case "music_album":
+            return "💿";
+        case "music_artist":
+            return "🎤";
+        case "spotify_context":
+            return "🎧";
         case "album":
             return "💿";
         case "artist":
