@@ -529,7 +529,7 @@ new class extends Component {
                                     @endphp
                                     <x-timeline-item title="{{ $title }}" subtitle="{{ $subtitle }}" description="{{ $desc }}" />
                                 @endforeach
-                        
+
                         </x-slot:content>
                     </x-collapse>
                     <!-- Actor Details -->

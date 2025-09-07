@@ -941,7 +941,7 @@ new class extends Component {
                             </div>
                         </x-form>
                     </x-card>
-                    
+
                     <!-- Tags Manager -->
                     <x-card>
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
