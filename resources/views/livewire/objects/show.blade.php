@@ -916,13 +916,16 @@ new class extends Component {
                                     }
                                     if (($props['comment'] ?? null) !== null) {
                                         $desc = (string) $props['comment'];
-                                    } elseif (!empty($changes)) {
-                                        $desc = implode(', ', $changes);
                                     } else {
                                         $desc = '';
                                     }
                                 @endphp
                                 <x-timeline-item title="{{ $title }}" subtitle="{{ $subtitle }}" description="{{ $desc }}" />
+                                @if (!empty($new) || !empty($old))
+                                    <div class="mt-2 mb-4">
+                                        <x-change-details :new="$new" :old="$old" />
+                                    </div>
+                                @endif
                             @endforeach
                         @endif
                         </x-slot:content>
@@ -935,7 +938,7 @@ new class extends Component {
                             Comment
                         </h3>
                         <x-form wire:submit="addComment">
-                            <x-textarea wire:model="comment" rows="3" placeholder="Add a comment..." />
+                            <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." />
                             <div class="mt-3 flex justify-end">
                                 <x-button type="submit" class="btn-primary btn-sm" label="Post" />
                             </div>
@@ -963,9 +966,7 @@ new class extends Component {
                                 </div>
                             </x-slot:heading>
                             <x-slot:content>
-                                <div class="bg-base-200 rounded-lg p-3">
-                                    <pre class="text-xs text-base-content/80 whitespace-pre-wrap overflow-x-auto">{{ $this->formatJson($this->object->metadata) }}</pre>
-                                </div>
+                                <x-metadata-list :data="$this->object->metadata" />
                             </x-slot:content>
                         </x-collapse>
                     @endif
