@@ -35,10 +35,12 @@ class TagManagerComponentTest extends TestCase
         $event->refresh();
 
         $this->assertTrue($event->hasTag('important'));
-        $this->assertDatabaseHas('tags', [
-            'name' => json_encode(['en' => 'important']),
-            'type' => 'spark',
-        ]);
+        $this->assertTrue(
+            Tag::query()
+                ->where('type', 'spark')
+                ->whereRaw("name->>'en' = ?", ['important'])
+                ->exists()
+        );
     }
 
     #[Test]
@@ -58,10 +60,12 @@ class TagManagerComponentTest extends TestCase
 
         $event->refresh();
         $this->assertTrue($event->hasTag('Laravel'));
-        $this->assertDatabaseHas('tags', [
-            'name' => json_encode(['en' => 'Laravel']),
-            'type' => 'topic',
-        ]);
+        $this->assertTrue(
+            Tag::query()
+                ->where('type', 'topic')
+                ->whereRaw("name->>'en' = ?", ['Laravel'])
+                ->exists()
+        );
     }
 
     #[Test]
@@ -82,10 +86,12 @@ class TagManagerComponentTest extends TestCase
 
         $event->refresh();
         $this->assertTrue($event->hasTag('Livewire'));
-        $this->assertDatabaseHas('tags', [
-            'name' => json_encode(['en' => 'Livewire']),
-            'type' => 'topic',
-        ]);
+        $this->assertTrue(
+            Tag::query()
+                ->where('type', 'topic')
+                ->whereRaw("name->>'en' = ?", ['Livewire'])
+                ->exists()
+        );
     }
 
     #[Test]
@@ -105,10 +111,12 @@ class TagManagerComponentTest extends TestCase
 
         $event->refresh();
         $this->assertTrue($event->hasTag('🔥'));
-        $this->assertDatabaseHas('tags', [
-            'name' => json_encode(['en' => '🔥']),
-            'type' => 'emoji',
-        ]);
+        $this->assertTrue(
+            Tag::query()
+                ->where('type', 'emoji')
+                ->whereRaw("name->>'en' = ?", ['🔥'])
+                ->exists()
+        );
     }
 
     #[Test]
@@ -127,7 +135,7 @@ class TagManagerComponentTest extends TestCase
             'modelId' => (string) $event->id,
         ]);
 
-        $component->call('removeTag', 'Laravel');
+        $component->call('removeTag', 'Laravel', 'topic');
 
         $event->refresh();
         $this->assertFalse($event->hasTag('Laravel'));
@@ -141,7 +149,7 @@ class TagManagerComponentTest extends TestCase
         $event = $this->createEventFor($user);
         $this->actingAs($user);
 
-        $component = Volt::test('livewire.tag-manager', [
+        $component = Volt::test('tag-manager', [
             'modelClass' => Event::class,
             'modelId' => (string) $event->id,
         ]);

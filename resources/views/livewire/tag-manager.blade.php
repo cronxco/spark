@@ -28,12 +28,23 @@ new class extends Component {
         $this->refreshData();
     }
 
+    private function getModel(): EloquentModel
+    {
+        if (! isset($this->model)) {
+            /** @var EloquentModel $model */
+            $model = $this->modelClass::query()->with('tags')->findOrFail($this->modelId);
+            $this->model = $model;
+        }
+        return $this->model;
+    }
+
     private function refreshData(): void
     {
-        $this->model->refresh();
-        $this->model->loadMissing('tags');
+        $model = $this->getModel();
+        $model->refresh();
+        $model->loadMissing('tags');
 
-        $this->currentTags = $this->model->tags
+        $this->currentTags = $model->tags
             ->map(function (Tag $tag) {
                 return [
                     'value' => (string) $tag->name,
@@ -66,6 +77,8 @@ new class extends Component {
             return;
         }
 
+        $model = $this->getModel();
+
         // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
         $detectedType = $type !== null ? trim($type) : null;
         if ($detectedType === null) {
@@ -95,7 +108,7 @@ new class extends Component {
         }
 
         // @phpstan-ignore-next-line attachTag provided by HasTags
-        $this->model->attachTag($tag);
+        $model->attachTag($tag);
 
         $this->refreshData();
         $this->dispatch('tag-added', name: $name);
@@ -108,8 +121,10 @@ new class extends Component {
             return;
         }
 
+        $model = $this->getModel();
+
         // @phpstan-ignore-next-line detachTag provided by HasTags
-        $this->model->detachTag($name, $type ?: null);
+        $model->detachTag($name, $type ?: null);
 
         $this->refreshData();
         $this->dispatch('tag-removed', name: $name);
