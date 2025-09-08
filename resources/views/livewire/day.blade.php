@@ -965,4 +965,3 @@ $areAllGroupsExpanded = computed(function () {
                 @endif
             </div>
             </div>
-</div>
