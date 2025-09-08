@@ -167,7 +167,7 @@ use Carbon\Carbon;
                                             @endphp
                                             <div class="p-3 rounded-lg bg-base-100 border border-base-300" data-preset-wrapper data-type-key="{{ $typeKey }}" data-preset-key="{{ $presetKey }}">
                                                 <label class="flex items-center gap-2">
-                                                    <input type="checkbox" name="config[{{ $typeKey }}][presets][]" value="{{ $presetKey }}" class="checkbox preset-toggle" data-type-key="{{ $typeKey }}" data-preset-key="{{ $presetKey }}" data-defaults='@json($defaults)'
+                                                    <input type="checkbox" name="config[{{ $typeKey }}][presets][]" value="{{ $presetKey }}" class="checkbox preset-toggle" data-type-key="{{ $typeKey }}" data-preset-key="{{ $presetKey }}" data-defaults='{!! json_encode($defaults) !!}'
                                                         @checked(in_array($presetKey, old('config.'.$typeKey.'.presets', [])))>
                                                     <span class="font-medium">{{ $preset['name'] ?? 'Preset' }}</span>
                                                 </label>
