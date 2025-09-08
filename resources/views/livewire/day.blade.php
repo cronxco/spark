@@ -2,14 +2,24 @@
 
 use function Livewire\Volt\{state, computed, on, layout};
 use App\Models\Event;
+use App\Models\Integration;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Integrations\PluginRegistry;
+use App\Integrations\Outline\OutlineApi;
+use App\Jobs\Outline\OutlinePullTodayDayNote;
 
 state([
     'view' => 'index',
     'eventId' => null,
     'search' => '',
+    // Day Note editor state
+    'dayNoteDocId' => null,
+    'dayNoteIntegrationId' => null,
+    'dayNoteText' => '',
+    'dayNoteSaving' => false,
+    'dayNoteSavedAt' => null,
+    'dayNoteAutoSaveMs' => 800,
     // Selected date in Y-m-d format for native date input (driven by route)
     'date' => (function () {
         try {
@@ -35,6 +45,8 @@ state([
     'collapsedGroups' => [],
     // Polling mode: 'keep' (keep-alive) or 'visible'
     'pollMode' => 'visible',
+    // UI state: Day Note collapse (expanded by default)
+    'dayNoteOpen' => true,
 ]);
 
 layout('components.layouts.app');
@@ -177,6 +189,111 @@ $dateLabel = computed(function () {
 
     return $date->format('M j, Y');
 });
+
+// Load Outline Day Note for the selected date into editor state
+$loadDayNote = function (): void {
+    // One-off background Outline pull before loading, to ensure freshness
+    try {
+        // Attempt to find any Outline integration for this user
+        $outlineIntegration = Integration::query()
+            ->where('service', 'outline')
+            ->where('user_id', optional(auth()->guard('web')->user())->id)
+            ->first();
+        if ($outlineIntegration) {
+            OutlinePullTodayDayNote::dispatch($outlineIntegration, (string) $this->date)->onQueue('pull');
+        }
+    } catch (\Throwable $e) {
+        // ignore if dispatch fails; we'll still load cached note
+    }
+
+    $this->dayNoteDocId = null;
+    $this->dayNoteIntegrationId = null;
+    $this->dayNoteText = '';
+    $this->dayNoteSavedAt = null;
+
+    $event = $this->events
+        ->first(function ($e) {
+            return $e->service === 'outline' && $e->action === 'had_day_note';
+        });
+
+    if (! $event) {
+        return;
+    }
+
+    // Extract document id and current text from target object
+    $metadata = $event->target?->metadata ?? [];
+    $docId = $metadata['id'] ?? null;
+    $text = $event->target?->content ?? '';
+
+    if ($docId) {
+        $this->dayNoteDocId = $docId;
+        $this->dayNoteIntegrationId = (string) $event->integration_id;
+        $this->dayNoteText = (string) ($text ?? '');
+    }
+};
+
+// Save editor back to Outline and optionally trigger a refresh pull
+$saveDayNote = function (): void {
+    if (empty($this->dayNoteDocId) || empty($this->dayNoteIntegrationId)) {
+        return;
+    }
+
+    $this->dayNoteSaving = true;
+
+    try {
+        /** @var Integration $integration */
+        $integration = Integration::findOrFail($this->dayNoteIntegrationId);
+        $api = new OutlineApi($integration);
+        $api->updateDocumentContent((string) $this->dayNoteDocId, (string) $this->dayNoteText, null, true);
+
+        // Trigger a lightweight targeted refresh for this date to reconcile tasks/blocks
+        OutlinePullTodayDayNote::dispatch($integration, (string) $this->date)->onQueue('pull');
+
+        $this->dayNoteSavedAt = now()->toIso8601String();
+
+    } catch (\Throwable $e) {
+        // Swallow; UI can show failure later if needed
+    } finally {
+        $this->dayNoteSaving = false;
+    }
+};
+
+// Autosave on content change with debounce
+$updatedDayNoteText = function ($value): void {
+    if ($this->dayNoteSaving) {
+        return;
+    }
+    if (! is_string($value)) {
+        return;
+    }
+    $this->saveDayNote();
+};
+
+// Refresh Day Note from Outline if editor is not focused
+$refreshDayNoteFromOutline = function (): void {
+    if ($this->dayNoteEditorFocused) {
+        return;
+    }
+    if (empty($this->dayNoteDocId) || empty($this->dayNoteIntegrationId)) {
+        return;
+    }
+    if ($this->dayNoteSaving) {
+        return;
+    }
+
+    try {
+        /** @var Integration $integration */
+        $integration = Integration::findOrFail($this->dayNoteIntegrationId);
+        $api = new OutlineApi($integration);
+        $doc = $api->getDocument((string) $this->dayNoteDocId);
+        $remoteText = (string) ($doc['data']['text'] ?? ($doc['text'] ?? ''));
+        if ($remoteText !== '' && $remoteText !== (string) $this->dayNoteText) {
+            $this->dayNoteText = $remoteText;
+        }
+    } catch (\Throwable $e) {
+        // ignore transient errors
+    }
+};
 
 $formatAction = function ($action) {
     return format_action_title($action);
@@ -615,80 +732,112 @@ $areAllGroupsExpanded = computed(function () {
 
 ?>
 
-<div>
-        <!-- Day Index -->
-        <div>
-            <x-header :title="'Day — ' . $this->dateLabel" separator>
-                <x-slot:actions>
-                    <div class="flex items-center gap-2 sm:gap-3 w-full">
-                        <div class="join">
-                            <x-button class="join-item btn-ghost btn-sm" wire:click="previousDay">
-                                <x-icon name="o-chevron-left" class="w-4 h-4" />
-                            </x-button>
-                            <label class="join-item">
-                                <input
-                                    type="date"
-                                    class="input input-sm"
-                                    wire:model.live.debounce.0ms="date"
-                                    @change="$wire.call('navigateToDate')"
-                                />
-                            </label>
-                            <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">
-                                <x-icon name="o-chevron-right" class="w-4 h-4" />
-                            </x-button>
-                        </div>
+<div wire:init="loadDayNote">
+    <x-header :title="'Day — ' . $this->dateLabel" separator>
+        <x-slot:actions>
+            <div class="flex items-center gap-2 sm:gap-3 w-full">
+                <div class="join">
+                    <x-button class="join-item btn-ghost btn-sm" wire:click="previousDay">
+                        <x-icon name="o-chevron-left" class="w-4 h-4" />
+                    </x-button>
+                    <label class="join-item">
+                        <input
+                            type="date"
+                            class="input input-sm"
+                            wire:model.live.debounce.0ms="date"
+                            @change="$wire.call('navigateToDate')"
+                        />
+                    </label>
+                    <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">
+                        <x-icon name="o-chevron-right" class="w-4 h-4" />
+                    </x-button>
+                </div>
 
-                        <div class="flex-1 min-w-0" wire:ignore.self>
-                            <x-input
-                                wire:model.live.debounce.300ms="search"
-                                placeholder="Search events..."
-                                class="w-full"
-                            />
-                        </div>
+                <div class="flex-1 min-w-0" wire:ignore.self>
+                    <x-input
+                        wire:model.live.debounce.300ms="search"
+                        placeholder="Search events..."
+                        class="w-full"
+                    />
+                </div>
 
-                        <div class="hidden sm:flex items-center gap-2">
-                                <!-- Expand/Collapse all (icon-only) -->
-                                <x-button
-                                    class="btn-ghost btn-sm"
-                                    wire:click="toggleAllGroups"
-                                    aria-label="{{ $this->areAllGroupsExpanded ? 'Collapse all' : 'Expand all' }}">
-                                    <x-icon name="{{ $this->areAllGroupsExpanded ? 'o-arrows-pointing-in' : 'o-arrows-pointing-out' }}" class="w-4 h-4" />
-                                </x-button>
-                                <!-- Polling mode toggle: keep-alive vs visible -->
-                                <x-button
-                                    class="btn-ghost btn-sm"
-                                    wire:click="togglePollMode"
-                                    aria-label="{{ $this->pollMode === 'keep' ? 'Switch to visible polling' : 'Switch to keep-alive polling' }}"
-                                    title="{{ $this->pollMode === 'keep' ? 'Polling: keep-alive' : 'Polling: visible' }}">
-                                    <x-icon name="{{ $this->pollMode === 'keep' ? 'o-bolt' : 'o-eye' }}" class="w-4 h-4" />
-                                </x-button>
-                        </div>
-                    </div>
-                </x-slot:actions>
-            </x-header>
+                <div class="hidden sm:flex items-center gap-2">
+                        <!-- Expand/Collapse all (icon-only) -->
+                        <x-button
+                            class="btn-ghost btn-sm"
+                            wire:click="toggleAllGroups"
+                            aria-label="{{ $this->areAllGroupsExpanded ? 'Collapse all' : 'Expand all' }}">
+                            <x-icon name="{{ $this->areAllGroupsExpanded ? 'o-arrows-pointing-in' : 'o-arrows-pointing-out' }}" class="w-4 h-4" />
+                        </x-button>
+                        <!-- Polling mode toggle: keep-alive vs visible -->
+                        <x-button
+                            class="btn-ghost btn-sm"
+                            wire:click="togglePollMode"
+                            aria-label="{{ $this->pollMode === 'keep' ? 'Switch to visible polling' : 'Switch to keep-alive polling' }}"
+                            title="{{ $this->pollMode === 'keep' ? 'Polling: keep-alive' : 'Polling: visible' }}">
+                            <x-icon name="{{ $this->pollMode === 'keep' ? 'o-bolt' : 'o-eye' }}" class="w-4 h-4" />
+                        </x-button>
+                </div>
+            </div>
+        </x-slot:actions>
+    </x-header>
 
-            <div class="space-y-6">
-                @if ($this->events->isEmpty())
-                    <x-card>
-                        <div class="text-center py-8">
-                            <x-icon name="o-calendar" class="w-12 h-12 text-base-300 mx-auto mb-4" />
-                            <h3 class="text-lg font-semibold text-base-content mb-2">No events for this date</h3>
-                            <p class="text-base-content/70">Try another day using the arrows or date picker.</p>
+    <!-- Day Note editor -->
+    <div class="mb-2">
+        <x-collapse wire:model="dayNoteOpen" separator class="bg-base-200">
+            <x-slot:heading>
+                <div class="flex items-center gap-2">
+                    <x-icon name="o-book-open" />
+                    <span>
+                        Day Note 
+                        @if ($this->dayNoteSaving)
+                            - <span class="text-sm text-info">Saving…</span>
+                        @elseif ($this->dayNoteSavedAt)
+                            - <span class="text-sm text-success">Saved</span>
+                        @endif
+                    </span>
+                </div>
+            </x-slot:heading>
+            <x-slot:content>
+                @if ($this->dayNoteDocId)
+                    <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200">
+                        <div class="space-y-3">
+                            <x-markdown wire:model.live.debounce.800ms="dayNoteText" label="" :config="['maxHeight' => '200px', 'status' => 'false', 'sideBySideFullscreen' => 'false']" />
                         </div>
                     </x-card>
                 @else
-                <!-- Custom Vertical Timeline View -->
-                <div class="bg-base-100 rounded-lg p-2 sm:p-4" {{ $this->pollMode === 'keep' ? 'wire:poll.90s.keep-alive' : 'wire:poll.90s.visible' }}>
-                    @php $previousHour = null; @endphp
+                    <x-alert title="No Day Note found for this date" icon="o-calendar" />
+                @endif
+            </x-slot:content>
+        </x-collapse>
+    </div>
 
-                    @foreach ($this->groupedEvents as $group)
-                        @php
-                            $first = $group['events'][0];
-                            $hour = $first->time->format('H');
-                            $showHourMarker = $previousHour !== $hour;
-                            $previousHour = $hour;
-                            $isCollapsed = $collapsedGroups[$group['key']] ?? false;
-                        @endphp
+    <div class="space-y-6">
+        @if ($this->events->isEmpty())
+            <x-card>
+                <div class="text-center py-8">
+                    <x-icon name="o-calendar" class="w-12 h-12 text-base-300 mx-auto mb-4" />
+                    <h3 class="text-lg font-semibold text-base-content mb-2">No events for this date</h3>
+                    <p class="text-base-content/70">Try another day using the arrows or date picker.</p>
+                </div>
+            </x-card>
+        @else
+        <!-- Custom Vertical Timeline View -->
+        @if ($this->pollMode === 'keep')
+        <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
+        @else
+        <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.visible>
+        @endif
+            @php $previousHour = null; @endphp
+
+            @foreach (($this->groupedEvents ?? []) as $eventGroup)
+                @php
+                    $first = $eventGroup['events'][0];
+                    $hour = $first->time->format('H');
+                    $showHourMarker = $previousHour !== $hour;
+                    $previousHour = $hour;
+                    $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? false);
+                @endphp
 
                         <!-- Hour marker inside spine -->
                         @if ($showHourMarker)
@@ -707,21 +856,21 @@ $areAllGroupsExpanded = computed(function () {
                             <div class="relative">
                                 <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                                 <button class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center hover:bg-base-200"
-                                        wire:click="toggleGroup('{{ $group['key'] }}')"
+                                        wire:click="toggleGroup(@js($eventGroup['key']))"
                                         aria-expanded="{{ $isCollapsed ? 'false' : 'true' }}"
                                         aria-label="Toggle group">
-                                    <x-icon name="{{ $this->getEventIcon($group['action'], $group['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($group['service']) }}" />
+                                    <x-icon name="{{ $this->getEventIcon($eventGroup['action'], $eventGroup['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($eventGroup['service']) }}" />
                                 </button>
                             </div>
                             <div class="{{ $isCollapsed ? 'py-3' : '' }}">
                                 <div class="min-w-0">
                                     @if ($isCollapsed)
                                         <div class="truncate">
-                                            <span class="font-semibold">{{ $group['formatted_action'] }}</span>
-                                            <span class="text-base-content/90">{{ ' ' . $group['count'] . ' ' . $group['object_type_plural'] }}</span>
+                                            <span class="font-semibold">{{ $eventGroup['formatted_action'] }}</span>
+                                            <span class="text-base-content/90">{{ ' ' . $eventGroup['count'] . ' ' . $eventGroup['object_type_plural'] }}</span>
                                         </div>
                                     @else
-                                        @php $firstEvent = $group['events'][0]; @endphp
+                                        @php $firstEvent = $eventGroup['events'][0]; @endphp
                                         <a href="{{ route('events.show', $firstEvent->id) }}" class="group block py-2 px-2 rounded-lg hover:bg-base-200/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                                             <div class="font-semibold truncate">
                                                 {{ $this->formatAction($firstEvent->action) }}
@@ -756,7 +905,7 @@ $areAllGroupsExpanded = computed(function () {
                             </div>
                             <div class="{{ $isCollapsed ? 'py-3' : 'py-2' }} text-right pr-2">
                                 @if (! $isCollapsed)
-                                    @php $firstEvent = $group['events'][0]; @endphp
+                                    @php $firstEvent = $eventGroup['events'][0]; @endphp
                                     @if (! is_null($firstEvent->value))
                                         <span class="text-sm {{ $this->valueColorClass($firstEvent) }}">{{ $this->formatValueDisplay($firstEvent) }}</span>
                                     @endif
@@ -765,7 +914,7 @@ $areAllGroupsExpanded = computed(function () {
                         </div>
 
                         @if (! $isCollapsed)
-                            @php $eventsToShow = array_slice($group['events'], 1); @endphp
+                            @php $eventsToShow = array_slice($eventGroup['events'], 1); @endphp
                             @foreach ($eventsToShow as $event)
                                 <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3">
                                     <div class="relative">

@@ -48,6 +48,10 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <!-- <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css"> -->
 
+        <!-- EasyMDE (required by MaryUI x-markdown) -->
+        <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+        <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+
         @if (env('VITE_SENTRY_DSN'))
         <script>
             window.SENTRY_DSN = "{{ env('VITE_SENTRY_DSN') }}";

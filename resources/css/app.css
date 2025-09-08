@@ -542,3 +542,24 @@ pretty-json {
     background-color: var(--tagify-dd-color-primary);
     color: var(--color-primary-content);
 }
+
+.EasyMDEContainer .CodeMirror {
+    @apply bg-base-100 text-base-content;
+}
+
+.EasyMDEContainer .CodeMirror {
+    @apply bg-base-100 text-base-content;
+}
+
+.EasyMDEContainer .CodeMirror-cursor {
+    @apply border border-b-base-100;
+}
+
+.EasyMDEContainer .editor-toolbar > button:hover,
+.EasyMDEContainer .editor-toolbar > .active {
+    @apply bg-base-100 text-base-content;
+}
+
+.EasyMDEContainer .editor-statusbar {
+    @apply hidden;
+}

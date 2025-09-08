@@ -111,6 +111,21 @@ class OutlineApi
         ]);
     }
 
+    public function updateDocumentContent(string $documentId, string $text, ?string $title = null, bool $publish = true): array
+    {
+        $endpoint = '/api/documents.update';
+        $payload = [
+            'id' => $documentId,
+            'text' => $text,
+            'publish' => $publish,
+        ];
+        if (! empty($title)) {
+            $payload['title'] = $title;
+        }
+
+        return $this->post($endpoint, $payload);
+    }
+
     protected function baseUrl(): string
     {
         $config = $this->integration->configuration ?? [];
