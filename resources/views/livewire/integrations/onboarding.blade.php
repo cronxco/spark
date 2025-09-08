@@ -147,7 +147,7 @@ use Carbon\Carbon;
                         </div>
                     @endif
 
-                    
+
 
                     @if (!empty($presets))
                         <div class="p-4 bg-base-200 rounded-lg">

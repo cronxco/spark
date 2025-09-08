@@ -789,7 +789,7 @@ $areAllGroupsExpanded = computed(function () {
                 <div class="flex items-center gap-2">
                     <x-icon name="o-book-open" />
                     <span>
-                        Day Note 
+                        Day Note
                         @if ($this->dayNoteSaving)
                             - <span class="text-sm text-info">Saving…</span>
                         @elseif ($this->dayNoteSavedAt)
