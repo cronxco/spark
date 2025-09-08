@@ -1444,6 +1444,21 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         $event->syncTags($tags);
 
+        // Add typed tags from structured additional data
+        $additional = $tx['additionalDataStructured'] ?? null;
+        if (is_array($additional)) {
+            $name = $additional['Name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                $normalized = Str::headline(Str::lower($name));
+                $event->attachTag($normalized, 'person');
+            }
+
+            $identification = $additional['Identification'] ?? null;
+            if (is_string($identification) && $identification !== '') {
+                $event->attachTag($identification, 'card_pan');
+            }
+        }
+
     }
 
     /**
@@ -1602,7 +1617,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     protected function determineBestTimestamp(array $currentTx, ?Event $existingEvent, string $status, bool $isStatusChange): string
     {
-        $currentTimestamp = $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
+        $currentTimestamp = $currentTx['bookingDateTime'] ?? $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
 
         // If no existing event, use current timestamp
         if (! $existingEvent) {
@@ -1708,7 +1723,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         $existingTime = $existingEvent->time;
-        $currentTime = $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
+        $currentTime = $currentTx['bookingDateTime'] ?? $currentTx['bookingDate'] ?? $currentTx['valueDate'] ?? now();
 
         if ($existingTime === $chosenTimestamp) {
             $newDateTime = Carbon::parse($currentTime);
