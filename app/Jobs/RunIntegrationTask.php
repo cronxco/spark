@@ -38,6 +38,11 @@ class RunIntegrationTask implements ShouldQueue
                 $jobClass = (string) ($config['task_job_class'] ?? '');
                 $payload = $config['task_payload'] ?? [];
 
+                // Always inject integration_id for jobs to resolve their Integration
+                if (is_array($payload)) {
+                    $payload = array_merge(['integration_id' => (string) $this->integration->id], $payload);
+                }
+
                 if ($jobClass === '' || ! class_exists($jobClass)) {
                     throw new Exception('Invalid task_job_class');
                 }

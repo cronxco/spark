@@ -28,6 +28,10 @@ use Carbon\Carbon;
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             @foreach (($types ?? []) as $key => $meta)
+                                @php $hasPresets = !empty(($presets[$key] ?? [])); @endphp
+                                @if ($hasPresets)
+                                    @continue
+                                @endif
                                 @php
                                     $isMandatory = $meta['mandatory'] ?? false;
                                     $isChecked = in_array($key, old('types', array_keys($types ?? [])));
@@ -143,8 +147,51 @@ use Carbon\Carbon;
                         </div>
                     @endif
 
-                    <!-- Per-type configuration sections (includes per-instance refresh time) -->
+
+
+                    @if (!empty($presets))
+                        <div class="p-4 bg-base-200 rounded-lg">
+                            <div class="mb-4">
+                                <h4 class="text-lg font-medium">Task Presets</h4>
+                                <p class="text-sm text-base-content/70">Choose which task presets to enable. You can override default values below.</p>
+                            </div>
+
+                            @foreach (($presets ?? []) as $typeKey => $presetList)
+                                <div class="mb-3">
+                                    <div class="font-medium mb-2">{{ $types[$typeKey]['label'] ?? ucfirst($typeKey) }}</div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        @foreach ($presetList as $preset)
+                                            @php
+                                                $presetKey = $preset['key'] ?? $preset['name'];
+                                                $defaults = $preset['configuration'] ?? [];
+                                            @endphp
+                                            <div class="p-3 rounded-lg bg-base-100 border border-base-300" data-preset-wrapper data-type-key="{{ $typeKey }}" data-preset-key="{{ $presetKey }}">
+                                                <label class="flex items-center gap-2">
+                                                    <input type="checkbox" name="config[{{ $typeKey }}][presets][]" value="{{ $presetKey }}" class="checkbox preset-toggle" data-type-key="{{ $typeKey }}" data-preset-key="{{ $presetKey }}" data-defaults='{!! json_encode($defaults) !!}'
+                                                        @checked(in_array($presetKey, old('config.'.$typeKey.'.presets', [])))>
+                                                    <span class="font-medium">{{ $preset['name'] ?? 'Preset' }}</span>
+                                                </label>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                                                    <x-input label="Task Queue" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][task_queue]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.task_queue') }}" placeholder="pull" />
+                                                    <x-input label="Use Schedule (0/1)" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][use_schedule]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.use_schedule') }}" placeholder="1" />
+                                                    <x-input label="Schedule Times (HH:mm)" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][schedule_times]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.schedule_times') }}" placeholder="00:05" />
+                                                    <x-input label="Schedule Timezone" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][schedule_timezone]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.schedule_timezone') }}" placeholder="UTC" />
+                                                    <x-textarea label="Task Payload (JSON)" rows="2" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][task_payload]">{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.task_payload') }}</x-textarea>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <!-- Per-type configuration sections (includes per-instance refresh time); hide types that have presets -->
                     @foreach (($types ?? []) as $typeKey => $meta)
+                        @php $hasPresets = !empty(($presets[$typeKey] ?? [])); @endphp
+                        @if ($hasPresets)
+                            @continue
+                        @endif
                         <div class="p-4 bg-base-200 rounded-lg">
                             <div class="mb-4">
                                 <h4 class="text-lg font-medium">{{ $meta['label'] ?? ucfirst($typeKey) }}</h4>
@@ -203,6 +250,9 @@ use Carbon\Carbon;
                                               @enderror
                                         @else
                                              <x-input name="config[{{ $typeKey }}][{{ $field }}]" value="{{ old('config.'.$typeKey.'.'.$field, $config['default'] ?? '') }}" />
+                                             @if ($field === 'task_job_class' && !empty(($presets[$typeKey] ?? [])))
+                                                 <div class="text-xs text-base-content/70 mt-1">Tip: Selecting a preset above will set sensible defaults. You can still override them here.</div>
+                                             @endif
                                              @error('config.'.$typeKey.'.'.$field)
                                                  <div class="text-xs text-error mt-1">{{ $message }}</div>
                                              @enderror
@@ -253,5 +303,37 @@ use Carbon\Carbon;
         </div>
     </div>
 </x-layouts.app>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.preset-toggle').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const checkbox = e.target;
+            const wrapper = checkbox.closest('[data-preset-wrapper]');
+            const defaults = checkbox.dataset.defaults ? JSON.parse(checkbox.dataset.defaults) : {};
+            if (!wrapper) return;
+            const typeKey = wrapper.getAttribute('data-type-key');
+            const presetKey = wrapper.getAttribute('data-preset-key');
+
+            const q = (name) => wrapper.querySelector(`[name="config[${typeKey}][preset_overrides][${presetKey}][${name}]\"]`);
+
+            if (checkbox.checked) {
+                // Populate override inputs with defaults for a better UX
+                const setIfEmpty = (el, val) => { if (el && (!el.value || el.value.trim() === '')) el.value = Array.isArray(val) ? val.join(' ') : (val ?? ''); };
+                setIfEmpty(q('task_queue'), defaults.task_queue ?? defaults.taskQueue ?? 'pull');
+                setIfEmpty(q('use_schedule'), (defaults.use_schedule ?? 0).toString());
+                setIfEmpty(q('schedule_times'), (defaults.schedule_times ?? []).join(' '));
+                setIfEmpty(q('schedule_timezone'), defaults.schedule_timezone ?? 'UTC');
+                const payloadEl = q('task_payload');
+                if (payloadEl && (!payloadEl.value || payloadEl.value.trim() === '')) {
+                    if (defaults.task_payload) {
+                        try { payloadEl.value = JSON.stringify(defaults.task_payload); } catch (_) {}
+                    }
+                }
+            }
+        });
+    });
+});
+</script>
 
 

@@ -100,4 +100,11 @@ return [
         'release' => env('SENTRY_RELEASE'),
     ],
 
+    'outline' => [
+        'url' => env('OUTLINE_URL'),
+        'access_token' => env('OUTLINE_ACCESS_TOKEN'),
+        'daynotes_collection_id' => env('OUTLINE_DAYNOTES_COLLECTION_ID', '5622670a-e725-437d-b747-a17905038df8'),
+        'poll_interval_minutes' => env('OUTLINE_POLL_INTERVAL_MINUTES', 15),
+    ],
+
 ];

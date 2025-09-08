@@ -9,6 +9,7 @@ use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\Hevy\HevyPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Oura\OuraPlugin;
+use App\Integrations\Outline\OutlinePlugin;
 use App\Integrations\PluginRegistry;
 use App\Integrations\Reddit\RedditPlugin;
 use App\Integrations\Slack\SlackPlugin;
@@ -35,6 +36,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(AppleHealthPlugin::class);
         PluginRegistry::register(RedditPlugin::class);
         PluginRegistry::register(TaskPlugin::class);
+        PluginRegistry::register(OutlinePlugin::class);
     }
 
     /**

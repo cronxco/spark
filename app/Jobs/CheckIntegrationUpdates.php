@@ -212,6 +212,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             'reddit' => $this->getRedditFetchJobs($integration),
             'oura' => $this->getOuraFetchJobs($integration),
             'hevy' => $this->getHevyFetchJobs($integration),
+            'outline' => $this->getOutlineFetchJobs($integration),
             // Add other services here as they are implemented
             default => [],
         };
@@ -304,6 +305,16 @@ class CheckIntegrationUpdates implements ShouldQueue
 
         return match ($instanceType) {
             'workouts' => [HevyWorkoutPull::class],
+            default => [],
+        };
+    }
+
+    private function getOutlineFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'pull';
+
+        return match ($instanceType) {
+            'pull' => [\App\Jobs\Outline\OutlinePull::class],
             default => [],
         };
     }

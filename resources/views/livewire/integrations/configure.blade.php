@@ -30,7 +30,13 @@ new class extends Component {
             abort(404);
         }
 
-        $this->schema = $pluginClass::getConfigurationSchema();
+        // Prefer instance-type specific schema when available
+        $instanceTypes = method_exists($pluginClass, 'getInstanceTypes') ? $pluginClass::getInstanceTypes() : [];
+        if (!empty($instanceTypes) && isset($instanceTypes[$integration->instance_type]['schema'])) {
+            $this->schema = $instanceTypes[$integration->instance_type]['schema'];
+        } else {
+            $this->schema = $pluginClass::getConfigurationSchema();
+        }
         $this->configuration = $integration->configuration ?? [];
 
         // Ensure update_frequency_minutes is in configuration if it exists in schema
@@ -44,6 +50,10 @@ new class extends Component {
                 $this->configuration[$field] = [];
             }
         }
+
+        // Coerce booleans for toggles so UI reflects saved values
+        $this->configuration['use_schedule'] = (bool) (int) ($this->configuration['use_schedule'] ?? 0);
+        $this->configuration['paused'] = (bool) (int) ($this->configuration['paused'] ?? 0);
     }
 
     public function updateName(): void
@@ -198,7 +208,7 @@ new class extends Component {
         $rules['configuration.use_schedule'] = ['nullable'];
         $rules['configuration.paused'] = ['nullable'];
         $rules['configuration.schedule_timezone'] = [$useSchedule ? 'required' : 'nullable', 'string'];
-        $rules['configuration.schedule_times'] = [$useSchedule ? 'required' : 'nullable', 'array', 'min:1'];
+        $rules['configuration.schedule_times'] = [$useSchedule ? 'required' : 'nullable', 'array'];
         $rules['configuration.schedule_times.*'] = ['regex:/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/'];
         $taskMode = (string) ($this->configuration['task_mode'] ?? '');
         $rules['configuration.task_mode'] = ['nullable', 'string', 'in:artisan,job'];
