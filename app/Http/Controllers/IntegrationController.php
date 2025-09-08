@@ -338,6 +338,13 @@ class IntegrationController extends Controller
         $pluginClass = PluginRegistry::getPlugin($group->service);
         $pluginName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($group->service);
         $types = $pluginClass ? $pluginClass::getInstanceTypes() : [];
+        // Extract presets for display in onboarding (task instance types)
+        $presets = [];
+        foreach ($types as $typeKey => $meta) {
+            if (! empty($meta['presets'])) {
+                $presets[$typeKey] = $meta['presets'];
+            }
+        }
 
         // Get available accounts for GoCardless onboarding
         $availableAccounts = [];
@@ -353,6 +360,7 @@ class IntegrationController extends Controller
             'pluginName' => $pluginName,
             'types' => $types,
             'availableAccounts' => $availableAccounts,
+            'presets' => $presets,
         ]);
     }
 
@@ -414,7 +422,62 @@ class IntegrationController extends Controller
             }
         }
 
-        $data = $request->validate($rules);
+        // Pre-normalize array-type fields (e.g., schedule_times) before validation
+        $preInput = $request->all();
+        // Keep a working copy of normalized config so we don't lose keys not covered by validation rules (e.g., presets)
+        $normalizedConfig = $preInput['config'] ?? [];
+
+        foreach ($allowedTypes as $typeKey) {
+            $schema = $typesMeta[$typeKey]['schema'] ?? [];
+            foreach ($schema as $field => $fieldConfig) {
+                if (($fieldConfig['type'] ?? null) === 'array') {
+                    $raw = Arr::get($preInput, "config.{$typeKey}.{$field}");
+                    if (is_string($raw)) {
+                        $decoded = json_decode($raw, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                            Arr::set($preInput, "config.{$typeKey}.{$field}", array_values(array_filter(array_map('trim', $decoded))));
+                            Arr::set($normalizedConfig, "{$typeKey}.{$field}", array_values(array_filter(array_map('trim', $decoded))));
+                        } else {
+                            $parts = preg_split('/[\s,]+/', $raw) ?: [];
+                            Arr::set($preInput, "config.{$typeKey}.{$field}", array_values(array_filter(array_map('trim', $parts))));
+                            Arr::set($normalizedConfig, "{$typeKey}.{$field}", array_values(array_filter(array_map('trim', $parts))));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ensure `types` includes any types that have presets selected (when the type checkbox is hidden)
+        $presetSelectedTypesPre = [];
+        if (isset($preInput['config']) && is_array($preInput['config'])) {
+            foreach ($preInput['config'] as $typeKey => $conf) {
+                if (! empty($conf['presets']) && is_array($conf['presets'])) {
+                    $presetSelectedTypesPre[] = $typeKey;
+                }
+            }
+        }
+        if (! empty($presetSelectedTypesPre)) {
+            $preInput['types'] = array_values(array_unique(array_merge((array) ($preInput['types'] ?? []), $presetSelectedTypesPre)));
+        }
+
+        // If presets are selected for a type, relax that type's field rules (we'll merge preset defaults later)
+        $typesWithSelectedPresets = [];
+        foreach (($preInput['config'] ?? []) as $typeKey => $conf) {
+            if (! empty($conf['presets']) && is_array($conf['presets'])) {
+                $typesWithSelectedPresets[] = $typeKey;
+            }
+        }
+
+        if (! empty($typesWithSelectedPresets)) {
+            foreach ($typesWithSelectedPresets as $typeKey) {
+                $schema = $typesMeta[$typeKey]['schema'] ?? [];
+                foreach (array_keys($schema) as $field) {
+                    $rules["config.{$typeKey}.{$field}"] = ['nullable'];
+                }
+            }
+        }
+
+        $data = validator($preInput, $rules)->validate();
 
         // Ensure mandatory types are included
         $selectedTypes = $data['types'];
@@ -423,13 +486,26 @@ class IntegrationController extends Controller
                 $selectedTypes[] = $mandatoryType;
             }
         }
+
+        // Also include any types that have presets selected (even if hidden in UI)
+        $presetSelectedTypes = [];
+        foreach (($data['config'] ?? []) as $typeKey => $conf) {
+            if (! empty($conf['presets']) && is_array($conf['presets']) && count($conf['presets']) > 0) {
+                $presetSelectedTypes[] = $typeKey;
+            }
+        }
+        foreach ($presetSelectedTypes as $t) {
+            if (! in_array($t, $selectedTypes, true) && in_array($t, $allowedTypes, true)) {
+                $selectedTypes[] = $t;
+            }
+        }
         $data['types'] = $selectedTypes;
 
         // Read optional migration timebox from validated data
         $timeboxMinutes = $data['migration_timebox_minutes'] ?? null;
 
-        // Only keep config entries for selected types
-        $data['config'] = Arr::only(($data['config'] ?? []), $selectedTypes);
+        // Only keep config entries for selected types (use normalized config to retain preset keys)
+        $configForCreation = Arr::only(($normalizedConfig ?? []), $data['types']);
 
         // Preserve instance names from request (not validated, so not in $data)
         $instanceNames = [];
@@ -437,7 +513,7 @@ class IntegrationController extends Controller
             $instanceNames[$type] = $request->input("config.{$type}.name");
         }
         foreach ($data['types'] as $type) {
-            $initial = $data['config'][$type] ?? [];
+            $initial = $configForCreation[$type] ?? [];
             // Keep update_frequency_minutes in configuration
             // The database column is now optional and will be read from configuration
             // Normalize schema-declared array fields that may arrive as strings
@@ -449,10 +525,15 @@ class IntegrationController extends Controller
                     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                         $initial[$field] = array_values(array_filter(array_map('trim', $decoded)));
                     } else {
-                        $parts = preg_split('/[,\n]/', $raw) ?: [];
+                        $parts = preg_split('/[\s,]+/', $raw) ?: [];
                         $initial[$field] = array_values(array_filter(array_map('trim', $parts)));
                     }
                 }
+            }
+
+            // Apply preset overrides (if any) into initial config for creation path without selectedPresets
+            if (! empty($initial['preset_overrides']) && is_array($initial['preset_overrides'])) {
+                // Not merging here; actual merging handled in the presets branch below
             }
 
             if (method_exists($plugin, 'createInstance')) {
@@ -485,7 +566,93 @@ class IntegrationController extends Controller
                 } else {
                     // Standard single instance creation for other services
                     $customName = $instanceNames[$type] ?? null;
+                    // If task instance type with presets selected, create one instance per selected preset
+                    $selectedPresets = (array) ($initial['presets'] ?? []);
+                    if (! empty($selectedPresets) && ! empty(($typesMeta[$type]['presets'] ?? []))) {
+                        $presetMap = [];
+                        foreach ($typesMeta[$type]['presets'] as $p) {
+                            $presetMap[$p['key'] ?? $p['name']] = $p['configuration'] ?? [];
+                        }
+
+                        foreach ($selectedPresets as $presetKey) {
+                            $presetConfig = $presetMap[$presetKey] ?? [];
+
+                            // Start from preset defaults
+                            $merged = $presetConfig;
+
+                            // Prepare user initial overrides (ignore empties and internal keys)
+                            $initialClean = $initial;
+                            unset($initialClean['presets'], $initialClean['preset_overrides']);
+                            foreach ($initialClean as $k => $v) {
+                                if (is_string($v) && trim($v) === '') {
+                                    unset($initialClean[$k]);
+                                } elseif (is_array($v) && count($v) === 0) {
+                                    unset($initialClean[$k]);
+                                } elseif ($v === null) {
+                                    unset($initialClean[$k]);
+                                }
+                            }
+
+                            // Apply non-empty initial values (user-provided) over preset
+                            foreach ($initialClean as $k => $v) {
+                                $merged[$k] = $v;
+                            }
+
+                            // Merge per-preset overrides (normalize types)
+                            $overrides = $initial['preset_overrides'][$presetKey] ?? [];
+                            if (isset($overrides['task_payload']) && is_string($overrides['task_payload']) && $overrides['task_payload'] !== '') {
+                                $ov = json_decode($overrides['task_payload'], true);
+                                if (json_last_error() === JSON_ERROR_NONE && is_array($ov)) {
+                                    $overrides['task_payload'] = $ov;
+                                } else {
+                                    unset($overrides['task_payload']);
+                                }
+                            }
+                            if (isset($overrides['use_schedule'])) {
+                                $overrides['use_schedule'] = (int) $overrides['use_schedule'] === 1 ? 1 : (int) $overrides['use_schedule'];
+                            }
+                            if (isset($overrides['schedule_times']) && is_string($overrides['schedule_times'])) {
+                                $parts = preg_split('/[\s,]+/', $overrides['schedule_times']) ?: [];
+                                $overrides['schedule_times'] = array_values(array_filter(array_map('trim', $parts)));
+                            }
+                            foreach ($overrides as $k => $v) {
+                                if (is_string($v) && trim($v) === '') {
+                                    continue;
+                                }
+                                $merged[$k] = $v;
+                            }
+
+                            $presetName = null;
+                            foreach ($typesMeta[$type]['presets'] as $p) {
+                                if (($p['key'] ?? $p['name']) === $presetKey) {
+                                    $presetName = $p['name'] ?? ucfirst($presetKey);
+                                    break;
+                                }
+                            }
+
+                            $instance = $plugin->createInstance($group, $type, $merged);
+                            // Ensure configuration persisted exactly as merged
+                            $instance->update(['configuration' => $merged]);
+                            // Name the instance: prefer type label (avoid duplicated service name)
+                            $typeLabel = $typesMeta[$type]['label'] ?? ucfirst($type);
+                            $base = $instanceNames[$type] ?? $typeLabel;
+                            $customName = trim($base . ' - ' . ($presetName ?? ucfirst($presetKey)));
+                            $instance->update(['name' => $customName]);
+
+                            if ($request->boolean('run_migration')) {
+                                $timeboxUntil = $timeboxMinutes ? now()->addMinutes($timeboxMinutes) : null;
+                                StartIntegrationMigration::dispatch($instance, $timeboxUntil)
+                                    ->onConnection('redis')
+                                    ->onQueue('migration');
+                            }
+                        }
+
+                        // Skip default single instance creation when presets used
+                        continue;
+                    }
+
                     $instance = $plugin->createInstance($group, $type, $initial);
+                    $instance->update(['configuration' => $initial]);
                     if ($customName) {
                         $instance->update(['name' => $customName]);
                     }
