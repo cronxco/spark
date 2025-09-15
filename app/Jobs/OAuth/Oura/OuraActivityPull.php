@@ -5,6 +5,7 @@ namespace App\Jobs\OAuth\Oura;
 use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\Oura\OuraActivityData;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use ReflectionClass;
 
@@ -28,9 +29,13 @@ class OuraActivityPull extends BaseFetchJob
     protected function fetchData(): array
     {
         $plugin = new OuraPlugin;
-        $daysBack = (int) ($this->integration->configuration['days_back'] ?? 7);
-        $startDate = now()->subDays($daysBack)->toDateString();
+        $config = $this->integration->configuration ?? [];
+        // Incremental window 3 days; daily sweep 30 days
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
         $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
 
         // Use reflection to access the protected getJson method
         $reflection = new ReflectionClass($plugin);
@@ -41,7 +46,29 @@ class OuraActivityPull extends BaseFetchJob
             'end_date' => $endDate,
         ]);
 
-        return $data['data'] ?? [];
+        $items = $data['data'] ?? [];
+        if ($doSweep) {
+            $sweepData = $getJsonMethod->invoke($plugin, '/usercollection/daily_activity', $this->integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by date
+                $byDate = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDate[$key] = $row;
+                    }
+                }
+                $items = array_values($byDate);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $this->integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
     }
 
     protected function dispatchProcessingJobs(array $rawData): void

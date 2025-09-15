@@ -224,6 +224,11 @@ new class extends Component {
         $this->event->refresh()->loadMissing('tags');
         Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
     }
+
+    public function notifyCopied(string $what): void
+    {
+        $this->success($what . ' copied to clipboard!');
+    }
 };
 ?>
 
@@ -235,6 +240,14 @@ new class extends Component {
                 <!-- Header -->
                 <x-header title="Event Details" separator>
                     <x-slot:actions>
+                        <script type="application/json" id="event-json-{{ $this->event->id }}">{!! json_encode($this->event->toArray(), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+                        <x-button
+                            icon="o-clipboard"
+                            class="btn-ghost btn-xs"
+                            label=""
+                            title="Copy event JSON"
+                            onclick="(function(){ var el=document.getElementById('event-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Event'); }); })()"
+                        />
                         <x-button
                             wire:click="toggleSidebar"
                             class="btn-ghost btn-sm"
@@ -659,9 +672,19 @@ new class extends Component {
                     @if ($this->event->event_metadata && count($this->event->event_metadata) > 0)
                         <x-collapse wire:model="eventMetaOpen">
                             <x-slot:heading>
-                                <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
-                                    Event Metadata
+                                <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
+                                        Event Metadata
+                                    </div>
+                                    <script type="application/json" id="event-meta-json-{{ $this->event->id }}">{!! json_encode($this->event->event_metadata, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+                                    <x-button
+                                        icon="o-clipboard"
+                                        label="Copy"
+                                        class="btn-ghost btn-xs"
+                                        title="Copy JSON"
+                                        onclick="(function(){ var el=document.getElementById('event-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Event metadata'); }); })()"
+                                    />
                                 </div>
                             </x-slot:heading>
                             <x-slot:content>
@@ -673,9 +696,19 @@ new class extends Component {
                     @if ($this->event->actor && $this->event->actor->metadata && count($this->event->actor->metadata) > 0)
                         <x-collapse wire:model="actorMetaOpen">
                             <x-slot:heading>
-                                <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-secondary" />
-                                    Actor Metadata
+                                <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-secondary" />
+                                        Actor Metadata
+                                    </div>
+                                    <script type="application/json" id="actor-meta-json-{{ $this->event->id }}">{!! json_encode($this->event->actor->metadata, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+                                    <x-button
+                                        icon="o-clipboard"
+                                        label="Copy"
+                                        class="btn-ghost btn-xs"
+                                        title="Copy JSON"
+                                        onclick="(function(){ var el=document.getElementById('actor-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Actor metadata'); }); })()"
+                                    />
                                 </div>
                             </x-slot:heading>
                             <x-slot:content>
@@ -687,9 +720,19 @@ new class extends Component {
                     @if ($this->event->target && $this->event->target->metadata && count($this->event->target->metadata) > 0)
                         <x-collapse wire:model="targetMetaOpen">
                             <x-slot:heading>
-                                <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-accent" />
-                                    Target Metadata
+                                <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-accent" />
+                                        Target Metadata
+                                    </div>
+                                    <script type="application/json" id="target-meta-json-{{ $this->event->id }}">{!! json_encode($this->event->target->metadata, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+                                    <x-button
+                                        icon="o-clipboard"
+                                        label="Copy"
+                                        class="btn-ghost btn-xs"
+                                        title="Copy JSON"
+                                        onclick="(function(){ var el=document.getElementById('target-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Target metadata'); }); })()"
+                                    />
                                 </div>
                             </x-slot:heading>
                             <x-slot:content>

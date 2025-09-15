@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
+use Carbon\Carbon;
 
 new class extends Component {
     use Toast;
@@ -83,6 +84,67 @@ new class extends Component {
                 }
             }
 
+            // Sweep status (service-specific)
+            $cfg = $integration->configuration ?? [];
+            $service = (string) $integration->service;
+            $sweepEnabled = false;
+            $sweepLabel = null;
+            $sweepWindow = null;
+            $sweepLastAt = null;
+            $sweepNextAt = null;
+            $sweepPercent = null;
+
+            try {
+                $now = Carbon::now();
+                $periodHours = null;
+
+                if ($service === 'monzo') {
+                    $sweepEnabled = true;
+                    $sweepLabel = 'Daily sweep';
+                    $sweepWindow = 'last 30 days';
+                    $sweepLastAt = $cfg['monzo_last_sweep_at'] ?? null;
+                    $periodHours = 24;
+                } elseif ($service === 'spotify') {
+                    $sweepEnabled = true;
+                    $sweepLabel = 'Daily sweep';
+                    $sweepWindow = 'last 36 hours';
+                    $sweepLastAt = $cfg['spotify_last_sweep_at'] ?? null;
+                    $periodHours = 24;
+                } elseif ($service === 'hevy') {
+                    $sweepEnabled = true;
+                    $sweepLabel = 'Weekly sweep';
+                    $sweepWindow = 'last 30 days';
+                    $sweepLastAt = $cfg['hevy_last_sweep_at'] ?? null;
+                    $periodHours = 24 * 7;
+                } elseif ($service === 'oura') {
+                    $sweepEnabled = true;
+                    $sweepLabel = 'Daily sweep';
+                    $sweepWindow = 'last 30 days';
+                    $sweepLastAt = $cfg['oura_last_sweep_at'] ?? null;
+                    $periodHours = 24;
+                } elseif ($service === 'gocardless') {
+                    $sweepEnabled = true;
+                    $sweepLabel = 'Weekly sweep';
+                    $sweepWindow = 'last 60 days';
+                    $sweepLastAt = $cfg['gocardless_last_sweep_at'] ?? null;
+                    $periodHours = 24 * 7;
+                }
+
+                if ($sweepEnabled) {
+                    if ($sweepLastAt) {
+                        $last = Carbon::parse($sweepLastAt);
+                        $sweepNextAt = $last->copy()->addHours($periodHours)->toIso8601String();
+                        $elapsed = max(0, $now->diffInSeconds($last, false));
+                        $periodSec = $periodHours * 3600;
+                        $sweepPercent = (int) max(0, min(100, round(($elapsed / $periodSec) * 100)));
+                    } else {
+                        $sweepPercent = 0;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // leave sweep values null on error
+            }
+
             return [
                 'id' => $integration->id,
                 'name' => $integration->name ?: $integration->service,
@@ -104,6 +166,12 @@ new class extends Component {
                 'migration_phase' => $migrationPhase,
                 'migration_fetched_back_to' => $fetchedBackTo,
                 'migration_tx_window_count' => $txWindowCount,
+                'sweep_enabled' => $sweepEnabled,
+                'sweep_label' => $sweepLabel,
+                'sweep_window' => $sweepWindow,
+                'sweep_last_at' => $sweepLastAt,
+                'sweep_next_at' => $sweepNextAt,
+                'sweep_percent' => $sweepPercent,
             ];
         })->toArray();
     }
@@ -378,6 +446,30 @@ new class extends Component {
                                             <div class="font-medium mb-1">{{ __('Schedule') }}</div>
                                             <div class="text-base-content/70">
                                                 {{ $integration['schedule_summary'] }}
+                                            </div>
+                                        </div>
+                                        @endif
+                                        @if (!empty($integration['sweep_enabled']))
+                                        <div class="bg-base-300 rounded-lg p-3 md:col-span-3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <div class="font-medium">
+                                                    {{ $integration['sweep_label'] }}
+                                                    <span class="text-xs text-base-content/60 ml-2">{{ $integration['sweep_window'] }}</span>
+                                                </div>
+                                                <div class="text-xs text-base-content/60">
+                                                    @if (!empty($integration['sweep_last_at']))
+                                                        {{ __('Last') }}: {{ \Carbon\Carbon::parse($integration['sweep_last_at'])->diffForHumans() }}
+                                                    @else
+                                                        {{ __('Last') }}: {{ __('never') }}
+                                                    @endif
+                                                    @if (!empty($integration['sweep_next_at']))
+                                                        <span class="ml-3">{{ __('Next') }}: {{ \Carbon\Carbon::parse($integration['sweep_next_at'])->diffForHumans() }}</span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <progress class="progress progress-info w-full" value="{{ (int) ($integration['sweep_percent'] ?? 0) }}" max="100"></progress>
+                                                <span class="text-xs text-base-content/70 w-10 text-right">{{ (int) ($integration['sweep_percent'] ?? 0) }}%</span>
                                             </div>
                                         </div>
                                         @endif
