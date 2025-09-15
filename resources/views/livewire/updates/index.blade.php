@@ -134,7 +134,7 @@ new class extends Component {
                     if ($sweepLastAt) {
                         $last = Carbon::parse($sweepLastAt);
                         $sweepNextAt = $last->copy()->addHours($periodHours)->toIso8601String();
-                        $elapsed = max(0, $now->diffInSeconds($last, false) * -1 ? 0 : $now->diffInSeconds($last));
+                        $elapsed = max(0, $now->diffInSeconds($last, false));
                         $periodSec = $periodHours * 3600;
                         $sweepPercent = (int) max(0, min(100, round(($elapsed / $periodSec) * 100)));
                     } else {
@@ -468,7 +468,7 @@ new class extends Component {
                                                 </div>
                                             </div>
                                             <div class="flex items-center gap-3">
-                                                <progress class="progress progress-primary w-full" value="{{ (int) ($integration['sweep_percent'] ?? 0) }}" max="100"></progress>
+                                                <progress class="progress progress-info w-full" value="{{ (int) ($integration['sweep_percent'] ?? 0) }}" max="100"></progress>
                                                 <span class="text-xs text-base-content/70 w-10 text-right">{{ (int) ($integration['sweep_percent'] ?? 0) }}%</span>
                                             </div>
                                         </div>
