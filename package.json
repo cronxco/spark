@@ -15,7 +15,7 @@
         "gitmoji-cli": "^9.7.0",
         "laravel-vite-plugin": "^2.0",
         "tailwindcss": "^4.0.7",
-        "vite": "^7.0.4"
+        "vite": "^7.1.5"
     },
     "optionalDependencies": {
         "@rollup/rollup-linux-x64-gnu": "4.46.2",
