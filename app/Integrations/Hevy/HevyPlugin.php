@@ -3,11 +3,11 @@
 namespace App\Integrations\Hevy;
 
 use App\Integrations\Contracts\IntegrationPlugin;
-use Carbon\Carbon;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;

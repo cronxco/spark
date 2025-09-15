@@ -3,16 +3,16 @@
 namespace App\Integrations\GoCardless;
 
 use App\Integrations\Base\OAuthPlugin;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
-// Carbon already imported above
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+// Carbon already imported above
+use Illuminate\Support\Facades\Log;
 // Http and Log already imported above
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
