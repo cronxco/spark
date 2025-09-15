@@ -84,6 +84,11 @@ new class extends Component {
         // Fallback to default icon if plugin doesn't have this block type
         return 'o-squares-2x2';
     }
+    
+    public function notifyCopied(string $what): void
+    {
+        $this->success($what . ' copied to clipboard!');
+    }
 };
 
 ?>
@@ -212,9 +217,18 @@ new class extends Component {
                     @if (!empty($meta))
                         <x-collapse wire:model="blockMetaOpen">
                             <x-slot:heading>
-                                <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-info" />
-                                    Block Metadata
+                                <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-info" />
+                                        Block Metadata
+                                    </div>
+                                    <script type="application/json" id="block-meta-json-{{ $this->block->id }}">{!! json_encode($meta, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+                                    <x-button
+                                        icon="o-clipboard"
+                                        class="btn-ghost btn-xs"
+                                        title="Copy JSON"
+                                        onclick="(function(){ var el=document.getElementById('block-meta-json-{{ $this->block->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Block metadata'); }); })()"
+                                    />
                                 </div>
                             </x-slot:heading>
                             <x-slot:content>
