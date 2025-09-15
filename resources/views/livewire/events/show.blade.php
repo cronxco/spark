@@ -224,7 +224,7 @@ new class extends Component {
         $this->event->refresh()->loadMissing('tags');
         Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
     }
-    
+
     public function notifyCopied(string $what): void
     {
         $this->success($what . ' copied to clipboard!');

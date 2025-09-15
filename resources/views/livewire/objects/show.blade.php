@@ -723,7 +723,7 @@ new class extends Component {
         $this->object->detachTag($name);
         $this->object->refresh()->loadMissing('tags');
     }
-    
+
     public function notifyCopied(string $what): void
     {
         $this->success($what . ' copied to clipboard!');

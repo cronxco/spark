@@ -84,7 +84,7 @@ new class extends Component {
         // Fallback to default icon if plugin doesn't have this block type
         return 'o-squares-2x2';
     }
-    
+
     public function notifyCopied(string $what): void
     {
         $this->success($what . ' copied to clipboard!');
