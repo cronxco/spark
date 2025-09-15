@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
+use Carbon\Carbon;
 
 new class extends Component {
     use Toast;
@@ -94,7 +95,7 @@ new class extends Component {
             $sweepPercent = null;
 
             try {
-                $now = \Carbon\Carbon::now();
+                $now = Carbon::now();
                 $periodHours = null;
 
                 if ($service === 'monzo') {
@@ -131,7 +132,7 @@ new class extends Component {
 
                 if ($sweepEnabled) {
                     if ($sweepLastAt) {
-                        $last = \Carbon\Carbon::parse($sweepLastAt);
+                        $last = Carbon::parse($sweepLastAt);
                         $sweepNextAt = $last->copy()->addHours($periodHours)->toIso8601String();
                         $elapsed = max(0, $now->diffInSeconds($last, false) * -1 ? 0 : $now->diffInSeconds($last));
                         $periodSec = $periodHours * 3600;
