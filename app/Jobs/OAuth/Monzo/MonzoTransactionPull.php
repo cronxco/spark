@@ -5,6 +5,7 @@ namespace App\Jobs\OAuth\Monzo;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\Monzo\MonzoTransactionData;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Http;
 
@@ -31,8 +32,17 @@ class MonzoTransactionPull extends BaseFetchJob
 
         $allTransactions = [];
 
+        $config = $this->integration->configuration ?? [];
+        $isDailySweep = false;
+        $lastSweepAt = isset($config['monzo_last_sweep_at']) ? Carbon::parse($config['monzo_last_sweep_at']) : null;
+        if (! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22))) {
+            $isDailySweep = true;
+        }
+
         foreach ($accounts as $account) {
-            $sinceIso = now()->subDays(7)->toIso8601String();
+            // Incremental: 1 day; Sweep: 30 days
+            $daysBack = $isDailySweep ? 30 : 1;
+            $sinceIso = now()->subDays($daysBack)->toIso8601String();
 
             // Log the API request
             $plugin->logApiRequest('GET', '/transactions', [
@@ -60,7 +70,40 @@ class MonzoTransactionPull extends BaseFetchJob
             }
 
             $transactions = $response->json('transactions') ?? [];
+
+            // If we hit the limit, page forward using the oldest transaction created date
+            while (count($transactions) === 100) {
+                $lastCreated = end($transactions)['created'] ?? null;
+                if (! $lastCreated) {
+                    break;
+                }
+                $nextResp = Http::withHeaders($plugin->authHeaders($this->integration))
+                    ->get($plugin->getBaseUrl() . '/transactions', [
+                        'account_id' => $account['id'],
+                        'expand[]' => 'merchant',
+                        'since' => $sinceIso,
+                        'before' => $lastCreated, // Monzo supports before cursor by created timestamp
+                        'limit' => 100,
+                    ]);
+                $plugin->logApiResponse('GET', '/transactions', $nextResp->status(), $nextResp->body(), $nextResp->headers(), $this->integration->id);
+                if (! $nextResp->successful()) {
+                    break;
+                }
+                $batch = $nextResp->json('transactions') ?? [];
+                if (empty($batch)) {
+                    break;
+                }
+                $transactions = array_merge($transactions, $batch);
+                if (count($batch) < 100) {
+                    break;
+                }
+            }
             $allTransactions[$account['id']] = $transactions;
+        }
+
+        if ($isDailySweep) {
+            $config['monzo_last_sweep_at'] = now()->toIso8601String();
+            $this->integration->update(['configuration' => $config]);
         }
 
         return $allTransactions;

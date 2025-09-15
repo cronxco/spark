@@ -11,7 +11,9 @@ use App\Models\IntegrationGroup;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+// Carbon already imported above
 use Illuminate\Support\Facades\Log;
+// Http and Log already imported above
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -1244,6 +1246,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'account_count' => count($accounts),
         ]);
 
+        // Determine windowing
+        $config = $integration->configuration ?? [];
+        $lastSweepAt = isset($config['gocardless_last_sweep_at']) ? Carbon::parse($config['gocardless_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subDays(6));
+        $recentSinceDate = now()->subDays(3)->toDateString();
+        $sweepSinceDate = now()->subDays(60)->toDateString();
+
         foreach ($accounts as $account) {
             Log::info('GoCardless processRecentTransactions: processing account', [
                 'integration_id' => $integration->id,
@@ -1251,9 +1260,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'account_name' => $account['details'] ?? $account['ownerName'] ?? 'Unknown',
             ]);
 
-            $transactionData = $this->getAccountTransactions($account['id']);
-            $bookedTransactions = $transactionData['booked'] ?? [];
-            $pendingTransactions = $transactionData['pending'] ?? [];
+            // Prefer date-filtered call if available; fallback to unfiltered then filter locally
+            $recent = $this->getAccountTransactionsWindowed($account['id'], $recentSinceDate, null);
+            $bookedTransactions = $recent['booked'] ?? [];
+            $pendingTransactions = $recent['pending'] ?? [];
 
             Log::info('GoCardless processRecentTransactions: got transactions', [
                 'integration_id' => $integration->id,
@@ -1263,36 +1273,101 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'total_count' => count($bookedTransactions) + count($pendingTransactions),
             ]);
 
-            // Process pending transactions first
+            // Process pending first
             foreach ($pendingTransactions as $transaction) {
-                Log::info('GoCardless processRecentTransactions: processing pending transaction', [
-                    'integration_id' => $integration->id,
-                    'account_id' => $account['id'],
-                    'transaction_id' => $transaction['transactionId'] ?? $transaction['internalTransactionId'] ?? 'unknown',
-                    'amount' => $transaction['transactionAmount']['amount'] ?? 'unknown',
-                    'description' => $transaction['remittanceInformationUnstructured'] ?? 'unknown',
-                ]);
-
                 $this->processTransactionItem($integration, $account, $transaction, 'pending');
             }
 
-            // Process booked transactions (these may update existing pending transactions)
             foreach ($bookedTransactions as $transaction) {
-                Log::info('GoCardless processRecentTransactions: processing booked transaction', [
-                    'integration_id' => $integration->id,
-                    'account_id' => $account['id'],
-                    'transaction_id' => $transaction['transactionId'] ?? $transaction['internalTransactionId'] ?? 'unknown',
-                    'amount' => $transaction['transactionAmount']['amount'] ?? 'unknown',
-                    'description' => $transaction['remittanceInformationUnstructured'] ?? 'unknown',
-                ]);
-
                 $this->processTransactionItem($integration, $account, $transaction, 'booked');
             }
+
+            // Weekly sweep over last 60 days to reconcile
+            if ($doSweep) {
+                $sweep = $this->getAccountTransactionsWindowed($account['id'], $sweepSinceDate, null);
+                foreach (($sweep['pending'] ?? []) as $tx) {
+                    $this->processTransactionItem($integration, $account, $tx, 'pending');
+                }
+                foreach (($sweep['booked'] ?? []) as $tx) {
+                    $this->processTransactionItem($integration, $account, $tx, 'booked');
+                }
+            }
+        }
+
+        if ($doSweep) {
+            $config['gocardless_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
         }
 
         Log::info('GoCardless processRecentTransactions: completed', [
             'integration_id' => $integration->id,
         ]);
+    }
+
+    /**
+     * Fetch transactions with optional date window. If the API doesn't support filtering,
+     * it will fetch all and filter locally by bookingDate.
+     */
+    protected function getAccountTransactionsWindowed(string $accountId, ?string $dateFrom, ?string $dateTo): array
+    {
+        // Log the API request
+        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/transactions/', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            // Some BADA providers ignore date params; include if accepted
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ]);
+
+        $query = [];
+        if ($dateFrom) {
+            $query['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $query['date_to'] = $dateTo;
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ])->get($this->apiBase . '/accounts/' . $accountId . '/transactions/', $query);
+
+        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/transactions/', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            Log::error('Failed to get account transactions (windowed)', [
+                'account_id' => $accountId,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
+            return ['booked' => [], 'pending' => []];
+        }
+
+        $data = $response->json();
+        $booked = $data['transactions']['booked'] ?? [];
+        $pending = $data['transactions']['pending'] ?? [];
+
+        // Local filter as safety net
+        if ($dateFrom || $dateTo) {
+            $booked = array_values(array_filter($booked, function ($tx) use ($dateFrom, $dateTo) {
+                $d = $tx['bookingDate'] ?? $tx['valueDate'] ?? null;
+                if (! $d) {
+                    return true;
+                }
+
+                return (! $dateFrom || $d >= $dateFrom) && (! $dateTo || $d <= $dateTo);
+            }));
+            $pending = array_values(array_filter($pending, function ($tx) use ($dateFrom, $dateTo) {
+                $d = $tx['bookingDate'] ?? $tx['valueDate'] ?? null;
+                if (! $d) {
+                    return true;
+                }
+
+                return (! $dateFrom || $d >= $dateFrom) && (! $dateTo || $d <= $dateTo);
+            }));
+        }
+
+        return ['booked' => $booked, 'pending' => $pending];
     }
 
     /**
