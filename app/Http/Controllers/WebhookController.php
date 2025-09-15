@@ -28,6 +28,10 @@ class WebhookController extends Controller
             abort(404);
         }
 
+        // Ensure downstream jobs receive the webhook secret header expected by validators
+        // This mirrors the secret already validated via the route parameter
+        $request->headers->set('x-webhook-secret', $secret);
+
         // Create plugin instance once and reuse it
         $plugin = new $pluginClass;
 
