@@ -723,6 +723,11 @@ new class extends Component {
         $this->object->detachTag($name);
         $this->object->refresh()->loadMissing('tags');
     }
+
+    public function notifyCopied(string $what): void
+    {
+        $this->success($what . ' copied to clipboard!');
+    }
 };
 
 ?>
@@ -960,9 +965,18 @@ new class extends Component {
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
                         <x-collapse wire:model="objectMetaOpen">
                             <x-slot:heading>
-                                <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
-                                    Object Metadata
+                                <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
+                                        Object Metadata
+                                    </div>
+                                    <script type="application/json" id="object-meta-json-{{ $this->object->id }}">{!! json_encode($this->object->metadata, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+                                    <x-button
+                                        icon="o-clipboard"
+                                        class="btn-ghost btn-xs"
+                                        title="Copy JSON"
+                                        onclick="(function(){ var el=document.getElementById('object-meta-json-{{ $this->object->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Object metadata'); }); })()"
+                                    />
                                 </div>
                             </x-slot:heading>
                             <x-slot:content>

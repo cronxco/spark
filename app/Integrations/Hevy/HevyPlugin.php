@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -210,9 +211,16 @@ class HevyPlugin implements IntegrationPlugin
 
     public function fetchData(Integration $integration): void
     {
-        $daysBack = (int) ($integration->configuration['days_back'] ?? 14);
-        $startDate = now()->subDays($daysBack)->toDateString();
+        $config = $integration->configuration ?? [];
+        // Incremental window: default 3 days to reduce payload, configurable via days_back
+        $incrementalDays = max(1, (int) ($config['incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
         $endDate = now()->toDateString();
+
+        // Weekly sweep over last 30 days
+        $lastSweepAt = isset($config['hevy_last_sweep_at']) ? Carbon::parse($config['hevy_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subDays(6));
+        $sweepStartDate = now()->subDays(30)->toDateString();
 
         $query = http_build_query([
             'start_date' => $startDate,
@@ -256,6 +264,39 @@ class HevyPlugin implements IntegrationPlugin
                 continue;
             }
             $this->createWorkoutEvent($integration, $workout);
+        }
+
+        // Weekly sweep to backfill edits/late data
+        if ($doSweep) {
+            try {
+                $sweepQuery = http_build_query([
+                    'start_date' => $sweepStartDate,
+                    'end_date' => $endDate,
+                    'limit' => 100,
+                ]);
+                $sweepEndpoint = '/v1/workouts?' . $sweepQuery;
+                $sweepJson = $this->getJson($sweepEndpoint, $integration);
+                $sweepItems = [];
+                if (isset($sweepJson['data']) && is_array($sweepJson['data'])) {
+                    $sweepItems = $sweepJson['data'];
+                } elseif (isset($sweepJson['workouts']) && is_array($sweepJson['workouts'])) {
+                    $sweepItems = $sweepJson['workouts'];
+                } elseif (is_array($sweepJson) && array_is_list($sweepJson)) {
+                    $sweepItems = $sweepJson;
+                }
+                foreach ($sweepItems as $sIdx => $workout) {
+                    if (is_array($workout)) {
+                        $this->createWorkoutEvent($integration, $workout);
+                    }
+                }
+                $config['hevy_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            } catch (Throwable $e) {
+                Log::warning('Hevy weekly sweep failed', [
+                    'integration_id' => $integration->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 
