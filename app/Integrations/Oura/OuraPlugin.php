@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -724,6 +725,654 @@ class OuraPlugin extends OAuthPlugin
         ];
     }
 
+    /**
+     * Generic daily record event creator with contributory blocks.
+     * Options: score_field, contributors_field, title, value_unit, details_fields
+     */
+    public function createDailyRecordEvent(Integration $integration, string $kind, array $item, array $options): void
+    {
+        $day = $item['day'] ?? $item['date'] ?? null;
+        if (! $day) {
+            return;
+        }
+
+        $sourceId = "oura_{$kind}_{$integration->id}_{$day}";
+        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+        if ($exists) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+        $target = EventObject::updateOrCreate([
+            'user_id' => $integration->user_id,
+            'concept' => 'metric',
+            'type' => "oura_daily_{$kind}",
+            'title' => $options['title'] ?? Str::title($kind),
+        ], [
+            'time' => $day . ' 00:00:00',
+            'content' => ($options['title'] ?? Str::title($kind)) . ' daily summary',
+            'metadata' => $item,
+        ]);
+
+        $scoreField = $options['score_field'] ?? 'score';
+        $score = Arr::get($item, $scoreField);
+        [$encodedScore, $scoreMultiplier] = $this->encodeNumericValue(is_numeric($score) ? (float) $score : null);
+
+        // Action mapping for daily score-based instances
+        $actionMap = [
+            'activity' => 'had_activity_score',
+            'sleep' => 'had_sleep_score',
+            'readiness' => 'had_readiness_score',
+            'resilience' => 'had_resilience_score',
+            'stress' => 'had_stress_score',
+            'spo2' => 'had_spo2',
+        ];
+        $action = $actionMap[$kind] ?? 'scored';
+
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $day . ' 00:00:00',
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => self::getDomain(),
+            'action' => $action,
+            'value' => $encodedScore,
+            'value_multiplier' => $scoreMultiplier,
+            'value_unit' => $options['value_unit'] ?? 'score',
+            'event_metadata' => [
+                'day' => $day,
+                'kind' => $kind,
+            ],
+            'target_id' => $target->id,
+        ]);
+
+        $contributorsField = $options['contributors_field'] ?? null;
+        $contributors = $contributorsField ? Arr::get($item, $contributorsField, []) : [];
+        foreach ($contributors as $name => $value) {
+            [$encodedContrib, $contribMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
+            $event->blocks()->create([
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => Str::title(str_replace('_', ' ', (string) $name)),
+                'metadata' => ['text' => 'Contributor score'],
+                'value' => $encodedContrib,
+                'value_multiplier' => $contribMultiplier,
+                'value_unit' => $options['contributors_value_unit'] ?? $options['value_unit'] ?? 'score',
+            ]);
+        }
+
+        $detailsFields = $options['details_fields'] ?? [];
+        if (! empty($detailsFields)) {
+            $unitMap = [
+                'steps' => 'count',
+                'cal_total' => 'kcal',
+                'equivalent_walking_distance' => 'km',
+                'target_calories' => 'kcal',
+                'non_wear_time' => 'seconds',
+            ];
+            foreach ($detailsFields as $field) {
+                if (! array_key_exists($field, $item)) {
+                    continue;
+                }
+                $label = Str::title(str_replace('_', ' ', $field));
+                $value = $item[$field];
+                [$encodedDetail, $detailMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
+                $event->blocks()->create([
+                    'time' => $event->time,
+                    'integration_id' => $integration->id,
+                    'title' => $label,
+                    'content' => null,
+                    'value' => $encodedDetail,
+                    'value_multiplier' => $detailMultiplier,
+                    'value_unit' => $unitMap[$field] ?? null,
+                ]);
+            }
+        }
+    }
+
+    public function createWorkoutEvent(Integration $integration, array $item): void
+    {
+        $start = Arr::get($item, 'start_datetime');
+        $end = Arr::get($item, 'end_datetime');
+        $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
+        $sourceId = "oura_workout_{$integration->id}_" . (Arr::get($item, 'id') ?? ($day . '_' . md5(json_encode($item))));
+        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+        if ($exists) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+        $target = EventObject::updateOrCreate([
+            'user_id' => $integration->user_id,
+            'concept' => 'workout',
+            'type' => Arr::get($item, 'activity', 'workout'),
+            'title' => Str::title((string) Arr::get($item, 'activity', 'Workout')),
+        ], [
+            'time' => $start ?? ($day . ' 00:00:00'),
+            'content' => 'Oura workout session',
+            'metadata' => $item,
+        ]);
+
+        $durationSec = (int) Arr::get($item, 'duration', 0);
+        $calories = (float) Arr::get($item, 'calories', Arr::get($item, 'total_calories', 0));
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $start ?? ($day . ' 00:00:00'),
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => self::getDomain(),
+            'action' => 'did_workout',
+            'value' => $durationSec,
+            'value_multiplier' => 1,
+            'value_unit' => 'seconds',
+            'event_metadata' => [
+                'end' => $end,
+                'calories' => $calories,
+            ],
+            'target_id' => $target->id,
+        ]);
+
+        [$encodedCalories, $calMultiplier] = $this->encodeNumericValue($calories);
+        $event->blocks()->create(['block_type' => 'workout',
+
+            'time' => $event->time,
+            'integration_id' => $integration->id,
+            'title' => 'Calories',
+            'content' => 'Estimated calories for the workout',
+            'value' => $encodedCalories,
+            'value_multiplier' => $calMultiplier,
+            'value_unit' => 'kcal',
+        ]);
+
+        $avgHr = Arr::get($item, 'average_heart_rate');
+        if ($avgHr !== null) {
+            [$encodedAvgHr, $avgHrMultiplier] = $this->encodeNumericValue($avgHr);
+            $event->blocks()->create(['block_type' => 'workout',
+
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Average Heart Rate',
+                'content' => 'Average heart rate during workout',
+                'value' => $encodedAvgHr,
+                'value_multiplier' => $avgHrMultiplier,
+                'value_unit' => 'bpm',
+            ]);
+        }
+    }
+
+    /**
+     * Encode a numeric value into an integer with a multiplier to retain precision.
+     * If the value has a fractional part, scale by 1000 and round.
+     * Returns [encodedInt|null, multiplier|null].
+     */
+    public function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
+    {
+        if ($raw === null || $raw === '') {
+            return [null, null];
+        }
+        $float = (float) $raw;
+        if (! is_finite($float)) {
+            return [null, null];
+        }
+        if (fmod($float, 1.0) !== 0.0) {
+            $multiplier = 1000;
+            $intValue = (int) round($float * $multiplier);
+
+            return [$intValue, $multiplier];
+        }
+
+        return [(int) $float, $defaultMultiplier];
+    }
+
+    /**
+     * Helper method to create or update objects.
+     */
+    public function createOrUpdateObject(Integration $integration, array $objectData): EventObject
+    {
+        return EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => $objectData['concept'],
+                'type' => $objectData['type'],
+                'title' => $objectData['title'],
+            ],
+            [
+                'time' => $objectData['time'] ?? now(),
+                'content' => $objectData['content'] ?? null,
+                'metadata' => $objectData['metadata'] ?? [],
+                'url' => $objectData['url'] ?? null,
+                'media_url' => $objectData['image_url'] ?? null,
+                'embeddings' => $objectData['embeddings'] ?? null,
+            ]
+        );
+    }
+
+    /**
+     * Create events safely with race condition protection
+     */
+    public function createEventsSafely(Integration $integration, array $eventData): void
+    {
+        foreach ($eventData as $data) {
+            // Use updateOrCreate to prevent race conditions
+            $event = Event::updateOrCreate(
+                [
+                    'integration_id' => $integration->id,
+                    'source_id' => $data['source_id'],
+                ],
+                [
+                    'time' => $data['time'],
+                    'actor_id' => $this->createOrUpdateObject($integration, $data['actor'])->id,
+                    'service' => 'oura',
+                    'domain' => $data['domain'],
+                    'action' => $data['action'],
+                    'value' => $data['value'] ?? null,
+                    'value_multiplier' => $data['value_multiplier'] ?? 1,
+                    'value_unit' => $data['value_unit'] ?? null,
+                    'event_metadata' => $data['event_metadata'] ?? [],
+                    'target_id' => $this->createOrUpdateObject($integration, $data['target'])->id,
+                ]
+            );
+
+            // Create blocks if any
+            if (isset($data['blocks'])) {
+                foreach ($data['blocks'] as $blockData) {
+                    $event->blocks()->create([
+                        'time' => $blockData['time'] ?? $event->time,
+                        'block_type' => $blockData['block_type'] ?? '',
+                        'title' => $blockData['title'],
+                        'metadata' => $blockData['metadata'] ?? [],
+                        'url' => $blockData['url'] ?? null,
+                        'media_url' => $blockData['media_url'] ?? null,
+                        'value' => $blockData['value'] ?? null,
+                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
+                        'value_unit' => $blockData['value_unit'] ?? null,
+                        'embeddings' => $blockData['embeddings'] ?? null,
+                    ]);
+                }
+            }
+
+            Log::info('Oura: Created event safely', [
+                'integration_id' => $integration->id,
+                'source_id' => $data['source_id'],
+                'action' => $data['action'],
+            ]);
+        }
+    }
+
+    public function getJson(string $endpoint, Integration $integration, array $query = []): array
+    {
+        $group = $integration->group;
+        $token = $group?->access_token;
+        if ($group && $group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+            $token = $group->access_token;
+        }
+
+        if (empty($token)) {
+            throw new Exception('Missing access token for authenticated request');
+        }
+
+        // Log the API request
+        $this->logApiRequest('GET', $endpoint, [
+            'Authorization' => '[REDACTED]',
+        ], $query, $integration->id);
+
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
+        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
+        $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+
+        if (! $response->successful()) {
+            Log::warning('Oura API request failed', [
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
+            return [];
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Pull activity data for pull jobs
+     */
+    public function pullActivityData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        // Incremental window 3 days; daily sweep 30 days
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/daily_activity', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/daily_activity', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by date
+                $byDate = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDate[$key] = $row;
+                    }
+                }
+                $items = array_values($byDate);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull heartrate data for pull jobs
+     */
+    public function pullHeartrateData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDatetime = now()->subDays($incrementalDays)->toIso8601String();
+        $endDatetime = now()->toIso8601String();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/heartrate', $integration, [
+            'start_datetime' => $startDatetime,
+            'end_datetime' => $endDatetime,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/heartrate', $integration, [
+                'start_datetime' => now()->subDays(7)->toIso8601String(),
+                'end_datetime' => $endDatetime,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by timestamp and source
+                $byKey = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = ($row['timestamp'] ?? '') . '|' . ($row['source'] ?? '');
+                    if ($key !== '|') {
+                        $byKey[$key] = $row;
+                    }
+                }
+                $items = array_values($byKey);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull readiness data for pull jobs
+     */
+    public function pullReadinessData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/daily_readiness', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull resilience data for pull jobs
+     */
+    public function pullResilienceData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/daily_resilience', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull sessions data for pull jobs
+     */
+    public function pullSessionsData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/session', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/session', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by day/date
+                $byDay = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDay[$key] = $row;
+                    }
+                }
+                $items = array_values($byDay);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull sleep data for pull jobs
+     */
+    public function pullSleepData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/daily_sleep', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/daily_sleep', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by day/date
+                $byDay = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDay[$key] = $row;
+                    }
+                }
+                $items = array_values($byDay);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull sleep records data for pull jobs
+     */
+    public function pullSleepRecordsData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/sleep', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull SpO2 data for pull jobs
+     */
+    public function pullSpo2Data(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        try {
+            $data = $this->getJson('/usercollection/daily_spo2', $integration, [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ]);
+
+            return $data['data'] ?? [];
+        } catch (Exception $e) {
+            // Handle authorization errors gracefully
+            if (str_contains($e->getMessage(), '403') || str_contains($e->getMessage(), 'authorization')) {
+                Log::warning('Oura SpO2 access not authorized for integration', [
+                    'integration_id' => $integration->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return []; // Return empty array to skip processing
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Pull stress data for pull jobs
+     */
+    public function pullStressData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/daily_stress', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull tags data for pull jobs
+     */
+    public function pullTagsData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/tag', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull workouts data for pull jobs
+     */
+    public function pullWorkoutsData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/workout', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/workout', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by day/date
+                $byDay = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDay[$key] = $row;
+                    }
+                }
+                $items = array_values($byDay);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
     protected function getRequiredScopes(): string
     {
         return implode(' ', [
@@ -787,47 +1436,6 @@ class OuraPlugin extends OAuthPlugin
         $group->update([
             'account_id' => Arr::get($info, 'data.0.user_id') ?? Arr::get($info, 'user_id') ?? Arr::get($info, 'email'),
         ]);
-    }
-
-    protected function getJson(string $endpoint, Integration $integration, array $query = []): array
-    {
-        $group = $integration->group;
-        $token = $group?->access_token;
-        if ($group && $group->expiry && $group->expiry->isPast()) {
-            $this->refreshToken($group);
-            $token = $group->access_token;
-        }
-
-        if (empty($token)) {
-            throw new Exception('Missing access token for authenticated request');
-        }
-
-        // Log the API request
-        $this->logApiRequest('GET', $endpoint, [
-            'Authorization' => '[REDACTED]',
-        ], $query, $integration->id);
-
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
-        $span?->finish();
-
-        // Log the API response
-        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
-
-        if (! $response->successful()) {
-            Log::warning('Oura API request failed', [
-                'endpoint' => $endpoint,
-                'status' => $response->status(),
-                'response' => $response->body(),
-            ]);
-
-            return [];
-        }
-
-        return $response->json();
     }
 
     protected function createOrUpdateUser(Integration $integration, array $profile = []): EventObject
@@ -1212,183 +1820,6 @@ class OuraPlugin extends OAuthPlugin
         }
     }
 
-    /**
-     * Generic daily record event creator with contributory blocks.
-     * Options: score_field, contributors_field, title, value_unit, details_fields
-     */
-    protected function createDailyRecordEvent(Integration $integration, string $kind, array $item, array $options): void
-    {
-        $day = $item['day'] ?? $item['date'] ?? null;
-        if (! $day) {
-            return;
-        }
-
-        $sourceId = "oura_{$kind}_{$integration->id}_{$day}";
-        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
-        if ($exists) {
-            return;
-        }
-
-        $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'metric',
-            'type' => "oura_daily_{$kind}",
-            'title' => $options['title'] ?? Str::title($kind),
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => ($options['title'] ?? Str::title($kind)) . ' daily summary',
-            'metadata' => $item,
-        ]);
-
-        $scoreField = $options['score_field'] ?? 'score';
-        $score = Arr::get($item, $scoreField);
-        [$encodedScore, $scoreMultiplier] = $this->encodeNumericValue(is_numeric($score) ? (float) $score : null);
-
-        // Action mapping for daily score-based instances
-        $actionMap = [
-            'activity' => 'had_activity_score',
-            'sleep' => 'had_sleep_score',
-            'readiness' => 'had_readiness_score',
-            'resilience' => 'had_resilience_score',
-            'stress' => 'had_stress_score',
-            'spo2' => 'had_spo2',
-        ];
-        $action = $actionMap[$kind] ?? 'scored';
-
-        $event = Event::create([
-            'source_id' => $sourceId,
-            'time' => $day . ' 00:00:00',
-            'integration_id' => $integration->id,
-            'actor_id' => $actor->id,
-            'service' => 'oura',
-            'domain' => self::getDomain(),
-            'action' => $action,
-            'value' => $encodedScore,
-            'value_multiplier' => $scoreMultiplier,
-            'value_unit' => $options['value_unit'] ?? 'score',
-            'event_metadata' => [
-                'day' => $day,
-                'kind' => $kind,
-            ],
-            'target_id' => $target->id,
-        ]);
-
-        $contributorsField = $options['contributors_field'] ?? null;
-        $contributors = $contributorsField ? Arr::get($item, $contributorsField, []) : [];
-        foreach ($contributors as $name => $value) {
-            [$encodedContrib, $contribMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
-            $event->blocks()->create([
-                'time' => $event->time,
-                'integration_id' => $integration->id,
-                'title' => Str::title(str_replace('_', ' ', (string) $name)),
-                'metadata' => ['text' => 'Contributor score'],
-                'value' => $encodedContrib,
-                'value_multiplier' => $contribMultiplier,
-                'value_unit' => $options['contributors_value_unit'] ?? $options['value_unit'] ?? 'score',
-            ]);
-        }
-
-        $detailsFields = $options['details_fields'] ?? [];
-        if (! empty($detailsFields)) {
-            $unitMap = [
-                'steps' => 'count',
-                'cal_total' => 'kcal',
-                'equivalent_walking_distance' => 'km',
-                'target_calories' => 'kcal',
-                'non_wear_time' => 'seconds',
-            ];
-            foreach ($detailsFields as $field) {
-                if (! array_key_exists($field, $item)) {
-                    continue;
-                }
-                $label = Str::title(str_replace('_', ' ', $field));
-                $value = $item[$field];
-                [$encodedDetail, $detailMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
-                $event->blocks()->create([
-                    'time' => $event->time,
-                    'integration_id' => $integration->id,
-                    'title' => $label,
-                    'content' => null,
-                    'value' => $encodedDetail,
-                    'value_multiplier' => $detailMultiplier,
-                    'value_unit' => $unitMap[$field] ?? null,
-                ]);
-            }
-        }
-    }
-
-    protected function createWorkoutEvent(Integration $integration, array $item): void
-    {
-        $start = Arr::get($item, 'start_datetime');
-        $end = Arr::get($item, 'end_datetime');
-        $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
-        $sourceId = "oura_workout_{$integration->id}_" . (Arr::get($item, 'id') ?? ($day . '_' . md5(json_encode($item))));
-        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
-        if ($exists) {
-            return;
-        }
-
-        $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'workout',
-            'type' => Arr::get($item, 'activity', 'workout'),
-            'title' => Str::title((string) Arr::get($item, 'activity', 'Workout')),
-        ], [
-            'time' => $start ?? ($day . ' 00:00:00'),
-            'content' => 'Oura workout session',
-            'metadata' => $item,
-        ]);
-
-        $durationSec = (int) Arr::get($item, 'duration', 0);
-        $calories = (float) Arr::get($item, 'calories', Arr::get($item, 'total_calories', 0));
-        $event = Event::create([
-            'source_id' => $sourceId,
-            'time' => $start ?? ($day . ' 00:00:00'),
-            'integration_id' => $integration->id,
-            'actor_id' => $actor->id,
-            'service' => 'oura',
-            'domain' => self::getDomain(),
-            'action' => 'did_workout',
-            'value' => $durationSec,
-            'value_multiplier' => 1,
-            'value_unit' => 'seconds',
-            'event_metadata' => [
-                'end' => $end,
-                'calories' => $calories,
-            ],
-            'target_id' => $target->id,
-        ]);
-
-        [$encodedCalories, $calMultiplier] = $this->encodeNumericValue($calories);
-        $event->blocks()->create(['block_type' => 'workout',
-
-            'time' => $event->time,
-            'integration_id' => $integration->id,
-            'title' => 'Calories',
-            'content' => 'Estimated calories for the workout',
-            'value' => $encodedCalories,
-            'value_multiplier' => $calMultiplier,
-            'value_unit' => 'kcal',
-        ]);
-
-        $avgHr = Arr::get($item, 'average_heart_rate');
-        if ($avgHr !== null) {
-            [$encodedAvgHr, $avgHrMultiplier] = $this->encodeNumericValue($avgHr);
-            $event->blocks()->create(['block_type' => 'workout',
-
-                'time' => $event->time,
-                'integration_id' => $integration->id,
-                'title' => 'Average Heart Rate',
-                'content' => 'Average heart rate during workout',
-                'value' => $encodedAvgHr,
-                'value_multiplier' => $avgHrMultiplier,
-                'value_unit' => 'bpm',
-            ]);
-        }
-    }
-
     protected function createSessionEvent(Integration $integration, array $item): void
     {
         $start = Arr::get($item, 'start_datetime') ?? Arr::get($item, 'timestamp');
@@ -1577,30 +2008,6 @@ class OuraPlugin extends OAuthPlugin
         }
 
         return $body;
-    }
-
-    /**
-     * Encode a numeric value into an integer with a multiplier to retain precision.
-     * If the value has a fractional part, scale by 1000 and round.
-     * Returns [encodedInt|null, multiplier|null].
-     */
-    private function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
-    {
-        if ($raw === null || $raw === '') {
-            return [null, null];
-        }
-        $float = (float) $raw;
-        if (! is_finite($float)) {
-            return [null, null];
-        }
-        if (fmod($float, 1.0) !== 0.0) {
-            $multiplier = 1000;
-            $intValue = (int) round($float * $multiplier);
-
-            return [$intValue, $multiplier];
-        }
-
-        return [(int) $float, $defaultMultiplier];
     }
 
     /**

@@ -370,6 +370,67 @@ class SpotifyPlugin extends OAuthPlugin
     }
 
     /**
+     * Pull listening data for pull jobs
+     */
+    public function pullListeningData(Integration $integration): array
+    {
+        $accountId = $integration->group?->account_id ?? $integration->account_id;
+
+        Log::info("Fetching Spotify listening data for user {$accountId}", [
+            'integration_id' => $integration->id,
+        ]);
+
+        $listeningData = [
+            'account_id' => $accountId,
+            'recently_played' => [],
+            'fetched_at' => now()->toISOString(),
+        ];
+
+        // Skip fetching currently playing to avoid duplicates
+
+        try {
+            $config = $integration->configuration ?? [];
+            $afterMs = (int) ($config['spotify_after_ms'] ?? 0);
+
+            // Get recently played tracks
+            $recentlyPlayed = $this->getRecentlyPlayed($integration);
+
+            // Advance 'after' cursor to the newest played_at we saw
+            $maxPlayedMs = 0;
+            foreach ($recentlyPlayed as $it) {
+                if (isset($it['played_at'])) {
+                    $ms = (int) round(Carbon::parse($it['played_at'])->valueOf());
+                    if ($ms > $maxPlayedMs) {
+                        $maxPlayedMs = $ms;
+                    }
+                }
+            }
+            if ($maxPlayedMs > $afterMs) {
+                $config['spotify_after_ms'] = $maxPlayedMs;
+            }
+
+            $integration->update(['configuration' => $config]);
+
+            $listeningData['recently_played'] = $recentlyPlayed;
+
+            Log::info('Spotify: Fetched recently played tracks', [
+                'integration_id' => $integration->id,
+                'track_count' => count($recentlyPlayed),
+                'used_after_ms' => $afterMs,
+                'new_after_ms' => $config['spotify_after_ms'] ?? null,
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Spotify: Failed to get recently played tracks', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Continue without recently played data
+        }
+
+        return $listeningData;
+    }
+
+    /**
      * Log API request details for debugging
      */
     public function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void
@@ -400,6 +461,180 @@ class SpotifyPlugin extends OAuthPlugin
             $integrationId ?: '',
             true // Use per-instance logging
         );
+    }
+
+    /**
+     * Encode a numeric value into an integer with a multiplier to retain precision.
+     * If the value has a fractional part, scale by 1000 and round.
+     * Returns [encodedInt|null, multiplier|null].
+     */
+    public function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
+    {
+        if ($raw === null || $raw === '') {
+            return [null, null];
+        }
+        $float = (float) $raw;
+        if (! is_finite($float)) {
+            return [null, null];
+        }
+        if (fmod($float, 1.0) !== 0.0) {
+            $multiplier = 1000;
+            $intValue = (int) round($float * $multiplier);
+
+            return [$intValue, $multiplier];
+        }
+
+        return [(int) $float, $defaultMultiplier];
+    }
+
+    /**
+     * Create events safely with race condition protection
+     */
+    public function createEventsSafely(Integration $integration, array $eventData): void
+    {
+        foreach ($eventData as $data) {
+            // Use updateOrCreate to prevent race conditions
+            $event = Event::updateOrCreate(
+                [
+                    'integration_id' => $integration->id,
+                    'source_id' => $data['source_id'],
+                ],
+                [
+                    'time' => $data['time'],
+                    'actor_id' => $this->createOrUpdateObject($integration, $data['actor'])->id,
+                    'service' => 'spotify',
+                    'domain' => $data['domain'],
+                    'action' => $data['action'],
+                    'value' => $data['value'] ?? null,
+                    'value_multiplier' => $data['value_multiplier'] ?? 1,
+                    'value_unit' => $data['value_unit'] ?? null,
+                    'event_metadata' => $data['event_metadata'] ?? [],
+                    'target_id' => $this->createOrUpdateObject($integration, $data['target'])->id,
+                ]
+            );
+
+            // Create blocks if any
+            if (isset($data['blocks'])) {
+                foreach ($data['blocks'] as $blockData) {
+                    $event->blocks()->create([
+                        'time' => $blockData['time'] ?? $event->time,
+                        'block_type' => $blockData['block_type'] ?? '',
+                        'title' => $blockData['title'],
+                        'metadata' => $blockData['metadata'] ?? [],
+                        'url' => $blockData['url'] ?? null,
+                        'media_url' => $blockData['media_url'] ?? null,
+                        'value' => $blockData['value'] ?? null,
+                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
+                        'value_unit' => $blockData['value_unit'] ?? null,
+                        'embeddings' => $blockData['embeddings'] ?? null,
+                    ]);
+                }
+            }
+
+            Log::info('Spotify: Created event safely', [
+                'integration_id' => $integration->id,
+                'source_id' => $data['source_id'],
+                'action' => $data['action'],
+            ]);
+        }
+    }
+
+    /**
+     * Helper method to create or update objects.
+     */
+    public function createOrUpdateObject(Integration $integration, array $objectData): EventObject
+    {
+        return EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => $objectData['concept'],
+                'type' => $objectData['type'],
+                'title' => $objectData['title'],
+            ],
+            [
+                'time' => $objectData['time'] ?? now(),
+                'content' => $objectData['content'] ?? null,
+                'metadata' => $objectData['metadata'] ?? [],
+                'url' => $objectData['url'] ?? null,
+                'media_url' => $objectData['image_url'] ?? null,
+                'embeddings' => $objectData['embeddings'] ?? null,
+            ]
+        );
+    }
+
+    public function processListeningData(Integration $integration, array $listeningData): void
+    {
+        // Check for potential duplicate processing
+        $this->checkForDuplicateProcessing($integration, $listeningData);
+
+        // Process recently played tracks
+        if (! empty($listeningData['recently_played'])) {
+            $processedCount = 0;
+            $skippedCount = 0;
+
+            foreach ($listeningData['recently_played'] as $playedItem) {
+                try {
+                    $this->processTrackPlay($integration, $playedItem, 'recently_played');
+                    $processedCount++;
+                } catch (Exception $e) {
+                    Log::error('Spotify: Failed to process recently played track', [
+                        'integration_id' => $integration->id,
+                        'track_id' => $playedItem['track']['id'] ?? 'unknown',
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            Log::info('Spotify: Completed processing recently played tracks', [
+                'integration_id' => $integration->id,
+                'total_tracks' => count($listeningData['recently_played']),
+                'processed_count' => $processedCount,
+            ]);
+        }
+    }
+
+    public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void
+    {
+        $recentlyPlayed = $listeningData['recently_played'] ?? [];
+        $duplicateCount = 0;
+
+        foreach ($recentlyPlayed as $playedItem) {
+            if (! isset($playedItem['track']['id'])) {
+                continue;
+            }
+
+            $trackId = $playedItem['track']['id'];
+            $playedAt = $playedItem['played_at'];
+
+            // Check if this exact track play was processed very recently (within last 5 minutes)
+            $recentEvent = Event::where('integration_id', $integration->id)
+                ->where('service', 'spotify')
+                ->where('action', 'listened_to')
+                ->where('event_metadata->track_id', $trackId)
+                ->where('time', '>=', now()->subMinutes(5))
+                ->first();
+
+            if ($recentEvent) {
+                $duplicateCount++;
+                Log::warning('Spotify: Potential duplicate processing detected', [
+                    'integration_id' => $integration->id,
+                    'track_id' => $trackId,
+                    'track_name' => $playedItem['track']['name'] ?? 'Unknown',
+                    'played_at' => $playedAt,
+                    'recent_event_time' => $recentEvent->time->toISOString(),
+                    'time_difference_minutes' => now()->diffInMinutes($recentEvent->time),
+                ]);
+            }
+        }
+
+        if ($duplicateCount > 0) {
+            Log::warning('Spotify: Multiple potential duplicate tracks detected in this batch', [
+                'integration_id' => $integration->id,
+                'total_tracks' => count($recentlyPlayed),
+                'potential_duplicates' => $duplicateCount,
+                'percentage' => round(($duplicateCount / count($recentlyPlayed)) * 100, 1) . '%',
+            ]);
+        }
     }
 
     protected function getRequiredScopes(): string

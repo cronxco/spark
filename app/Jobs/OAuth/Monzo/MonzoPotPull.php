@@ -5,8 +5,6 @@ namespace App\Jobs\OAuth\Monzo;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\Monzo\MonzoPotData;
-use Exception;
-use Illuminate\Support\Facades\Http;
 
 class MonzoPotPull extends BaseFetchJob
 {
@@ -23,39 +21,8 @@ class MonzoPotPull extends BaseFetchJob
     protected function fetchData(): array
     {
         $plugin = new MonzoPlugin;
-        $accounts = $plugin->listAccounts($this->integration);
 
-        if (empty($accounts)) {
-            return [];
-        }
-
-        $allPots = [];
-
-        foreach ($accounts as $account) {
-            // Log the API request
-            $plugin->logApiRequest('GET', '/pots', [
-                'Authorization' => '[REDACTED]',
-            ], [
-                'current_account_id' => $account['id'],
-            ], $this->integration->id);
-
-            $response = Http::withHeaders($plugin->authHeaders($this->integration))
-                ->get($plugin->getBaseUrl() . '/pots', [
-                    'current_account_id' => $account['id'],
-                ]);
-
-            // Log the API response
-            $plugin->logApiResponse('GET', '/pots', $response->status(), $response->body(), $response->headers(), $this->integration->id);
-
-            if (! $response->successful()) {
-                throw new Exception('Failed to fetch pots from Monzo API: ' . $response->body());
-            }
-
-            $pots = $response->json('pots') ?? [];
-            $allPots[$account['id']] = $pots;
-        }
-
-        return $allPots;
+        return $plugin->pullPotData($this->integration);
     }
 
     protected function dispatchProcessingJobs(array $rawData): void

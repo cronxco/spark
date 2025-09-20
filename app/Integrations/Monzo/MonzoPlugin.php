@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -735,6 +736,185 @@ class MonzoPlugin extends OAuthPlugin
         return $resp->json('accounts') ?? [];
     }
 
+    /**
+     * Pull account data for pull jobs
+     */
+    public function pullAccountData(Integration $integration): array
+    {
+        return $this->listAccounts($integration);
+    }
+
+    /**
+     * Pull balance data for pull jobs
+     */
+    public function pullBalanceData(Integration $integration): array
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            return [];
+        }
+
+        $allBalances = [];
+
+        foreach ($accounts as $account) {
+            // Log the API request
+            $this->logApiRequest('GET', '/balance', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'account_id' => $account['id'],
+            ], $integration->id);
+
+            $response = Http::withHeaders($this->authHeaders($integration))
+                ->get($this->getBaseUrl() . '/balance', [
+                    'account_id' => $account['id'],
+                ]);
+
+            // Log the API response
+            $this->logApiResponse('GET', '/balance', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+            if (! $response->successful()) {
+                throw new Exception('Failed to fetch balance from Monzo API: ' . $response->body());
+            }
+
+            $balanceData = $response->json();
+            $balanceData['_account'] = $account;
+            $allBalances[$account['id']] = $balanceData;
+        }
+
+        return $allBalances;
+    }
+
+    /**
+     * Pull pot data for pull jobs
+     */
+    public function pullPotData(Integration $integration): array
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            return [];
+        }
+
+        $allPots = [];
+
+        foreach ($accounts as $account) {
+            // Log the API request
+            $this->logApiRequest('GET', '/pots', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'current_account_id' => $account['id'],
+            ], $integration->id);
+
+            $response = Http::withHeaders($this->authHeaders($integration))
+                ->get($this->getBaseUrl() . '/pots', [
+                    'current_account_id' => $account['id'],
+                ]);
+
+            // Log the API response
+            $this->logApiResponse('GET', '/pots', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+            if (! $response->successful()) {
+                throw new Exception('Failed to fetch pots from Monzo API: ' . $response->body());
+            }
+
+            $pots = $response->json('pots') ?? [];
+            $allPots[$account['id']] = $pots;
+        }
+
+        return $allPots;
+    }
+
+    /**
+     * Pull transaction data for pull jobs
+     */
+    public function pullTransactionData(Integration $integration): array
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            return [];
+        }
+
+        $allTransactions = [];
+
+        $config = $integration->configuration ?? [];
+        $isDailySweep = false;
+        $lastSweepAt = isset($config['monzo_last_sweep_at']) ? Carbon::parse($config['monzo_last_sweep_at']) : null;
+        if (! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22))) {
+            $isDailySweep = true;
+        }
+
+        foreach ($accounts as $account) {
+            // Incremental: 1 day; Sweep: 30 days
+            $daysBack = $isDailySweep ? 30 : 1;
+            $sinceIso = now()->subDays($daysBack)->toIso8601String();
+
+            // Log the API request
+            $this->logApiRequest('GET', '/transactions', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'account_id' => $account['id'],
+                'expand[]' => 'merchant',
+                'since' => $sinceIso,
+                'limit' => 100,
+            ], $integration->id);
+
+            $response = Http::withHeaders($this->authHeaders($integration))
+                ->get($this->getBaseUrl() . '/transactions', [
+                    'account_id' => $account['id'],
+                    'expand[]' => 'merchant',
+                    'since' => $sinceIso,
+                    'limit' => 100,
+                ]);
+
+            // Log the API response
+            $this->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+            if (! $response->successful()) {
+                throw new Exception('Failed to fetch transactions from Monzo API: ' . $response->body());
+            }
+
+            $transactions = $response->json('transactions') ?? [];
+
+            // If we hit the limit, page forward using the oldest transaction created date
+            while (count($transactions) === 100) {
+                $lastCreated = end($transactions)['created'] ?? null;
+                if (! $lastCreated) {
+                    break;
+                }
+                $nextResp = Http::withHeaders($this->authHeaders($integration))
+                    ->get($this->getBaseUrl() . '/transactions', [
+                        'account_id' => $account['id'],
+                        'expand[]' => 'merchant',
+                        'since' => $sinceIso,
+                        'before' => $lastCreated, // Monzo supports before cursor by created timestamp
+                        'limit' => 100,
+                    ]);
+                $this->logApiResponse('GET', '/transactions', $nextResp->status(), $nextResp->body(), $nextResp->headers(), $integration->id);
+                if (! $nextResp->successful()) {
+                    break;
+                }
+                $batch = $nextResp->json('transactions') ?? [];
+                if (empty($batch)) {
+                    break;
+                }
+                $transactions = array_merge($transactions, $batch);
+                if (count($batch) < 100) {
+                    break;
+                }
+            }
+            $allTransactions[$account['id']] = $transactions;
+        }
+
+        if ($isDailySweep) {
+            $config['monzo_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
+        }
+
+        return $allTransactions;
+    }
+
     public function getAuthHeaders(Integration $integration): array
     {
         return $this->authHeaders($integration);
@@ -748,6 +928,20 @@ class MonzoPlugin extends OAuthPlugin
         return [
             'Authorization' => 'Bearer ' . $token,
         ];
+    }
+
+    public function resolveMasterIntegration(Integration $integration): Integration
+    {
+        $group = $integration->group;
+        $master = Integration::where('integration_group_id', $group->id)
+            ->where('service', static::getIdentifier())
+            ->where('instance_type', 'accounts')
+            ->first();
+        if (! $master) {
+            $master = $this->createInstance($group, 'accounts');
+        }
+
+        return $master;
     }
 
     protected function getRequiredScopes(): string
@@ -970,20 +1164,6 @@ class MonzoPlugin extends OAuthPlugin
         foreach ($txs as $tx) {
             $this->processTransactionItem($integration, $tx, $account['id']);
         }
-    }
-
-    private function resolveMasterIntegration(Integration $integration): Integration
-    {
-        $group = $integration->group;
-        $master = Integration::where('integration_group_id', $group->id)
-            ->where('service', static::getIdentifier())
-            ->where('instance_type', 'accounts')
-            ->first();
-        if (! $master) {
-            $master = $this->createInstance($group, 'accounts');
-        }
-
-        return $master;
     }
 
     private function setAction(array $tx): string

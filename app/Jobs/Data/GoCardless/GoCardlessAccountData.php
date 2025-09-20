@@ -2,8 +2,10 @@
 
 namespace App\Jobs\Data\GoCardless;
 
+use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\EventObject;
+use Illuminate\Support\Facades\Log;
 
 class GoCardlessAccountData extends BaseProcessingJob
 {
@@ -20,6 +22,11 @@ class GoCardlessAccountData extends BaseProcessingJob
     protected function process(): void
     {
         $accountData = $this->rawData;
+        $plugin = new GoCardlessBankPlugin;
+
+        Log::info('GoCardlessAccountData: Processing account data', [
+            'integration_id' => $this->integration->id,
+        ]);
 
         // Handle rate-limited fallback response
         if (isset($accountData['status']) && $accountData['status'] === 'rate_limited') {
@@ -31,44 +38,15 @@ class GoCardlessAccountData extends BaseProcessingJob
         // Extract account details from the nested API response
         $accountDetails = $accountData['account'] ?? $accountData;
 
-        // Create or update the account object
-        $this->createAccountObject($accountDetails);
+        // Create or update the account object using the plugin
+        $plugin->upsertAccountObject($this->integration, $accountDetails);
 
         // Update integration names if needed
         $this->updateIntegrationNames();
-    }
 
-    private function createAccountObject(array $accountDetails): void
-    {
-        $accountId = $accountDetails['resourceId'] ?? $accountDetails['id'] ?? 'unknown';
-        $ownerName = $accountDetails['ownerName'] ?? 'Unknown';
-        $iban = $accountDetails['iban'] ?? '';
-        $currency = $accountDetails['currency'] ?? 'EUR';
-        $cashAccountType = $accountDetails['cashAccountType'] ?? 'checking';
-
-        $accountObject = EventObject::updateOrCreate(
-            [
-                'user_id' => $this->integration->user_id,
-                'concept' => 'account',
-                'type' => 'bank_account',
-                'title' => $ownerName,
-            ],
-            [
-                'time' => now(),
-                'content' => "IBAN: {$iban}",
-                'metadata' => [
-                    'account_id' => $accountId,
-                    'owner_name' => $ownerName,
-                    'iban' => $iban,
-                    'currency' => $currency,
-                    'cash_account_type' => $cashAccountType,
-                    'provider' => 'GoCardless',
-                    'account_type' => $this->mapAccountType($cashAccountType),
-                    'account_number' => $this->deriveAccountNumber($accountDetails),
-                    'raw_details' => $accountDetails,
-                ],
-            ]
-        );
+        Log::info('GoCardlessAccountData: Completed processing account data', [
+            'integration_id' => $this->integration->id,
+        ]);
     }
 
     private function createRateLimitedAccountObject(array $accountData): void
@@ -116,90 +94,5 @@ class GoCardlessAccountData extends BaseProcessingJob
                 $integration->update(['name' => $accountObject->title]);
             }
         }
-    }
-
-    private function mapAccountType(string $cashAccountType): string
-    {
-        $code = strtoupper($cashAccountType);
-
-        // ISO 20022 mapping (ExternalCashAccountType1Code)
-        // Reference: https://dz-privatbank-xs2a.pass-consulting.com/apidocs/json_ExternalCashAccountType1Code.html
-        $isoMapping = [
-            'CACC' => 'current_account',
-            'TRAN' => 'current_account',
-            'SVGS' => 'savings_account',
-            'LLSV' => 'savings_account',
-            'ONDP' => 'savings_account',
-            'LOAN' => 'loan',
-            'ODFT' => 'loan',
-            'MOMA' => 'investment_account',
-            'MGLD' => 'investment_account',
-            'TRAS' => 'investment_account',
-        ];
-
-        if (isset($isoMapping[$code])) {
-            return $isoMapping[$code];
-        }
-
-        // Fallback for simple strings
-        return match (strtolower($cashAccountType)) {
-            'checking', 'current' => 'current_account',
-            'savings' => 'savings_account',
-            'credit' => 'credit_card',
-            'loan' => 'loan',
-            default => 'other',
-        };
-    }
-
-    /**
-     * Derive account_number from IBAN, maskedPan, BBAN, then resourceId (last 8 chars)
-     */
-    private function deriveAccountNumber(array $data): ?string
-    {
-        $iban = $data['iban']
-            ?? ($data['debtorAccount']['iban'] ?? null)
-            ?? ($data['creditorAccount']['iban'] ?? null);
-        if ($iban) {
-            $clean = str_replace(' ', '', $iban);
-
-            return substr($clean, -8);
-        }
-
-        $maskedPan = $data['maskedPan']
-            ?? ($data['debtorAccount']['maskedPan'] ?? null)
-            ?? ($data['creditorAccount']['maskedPan'] ?? null);
-        if ($maskedPan) {
-            return $maskedPan;
-        }
-
-        $bban = $data['bban']
-            ?? ($data['debtorAccount']['bban'] ?? null)
-            ?? ($data['creditorAccount']['bban'] ?? null);
-        if ($bban) {
-            return $bban;
-        }
-
-        $resourceId = $data['resourceId'] ?? ($data['id'] ?? null);
-        if ($resourceId) {
-            return substr((string) $resourceId, -8);
-        }
-
-        return null;
-    }
-
-    /**
-     * Encode currency values for storage in bigint column
-     * Uses multiplier of 100 for 2 decimal place precision
-     */
-    private function encodeCurrencyValue(float $amount): array
-    {
-        if ($amount === 0.0) {
-            return [0, 100];
-        }
-
-        // Currency values: multiply by 100 for 2 decimal precision
-        $encodedValue = (int) round($amount * 100);
-
-        return [$encodedValue, 100];
     }
 }

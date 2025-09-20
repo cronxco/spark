@@ -300,6 +300,47 @@ class HevyPlugin implements IntegrationPlugin
         }
     }
 
+    /**
+     * Pull workout data for pull jobs
+     */
+    public function pullWorkoutData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 14);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $query = http_build_query([
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'limit' => 100,
+        ]);
+
+        $endpoint = '/v1/workouts?' . $query;
+
+        Log::info('Hevy: Fetching workouts', [
+            'integration_id' => $integration->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'endpoint' => $endpoint,
+        ]);
+
+        try {
+            $json = $this->getJson($endpoint, $integration);
+            Log::info('Hevy: Fetched workout data', [
+                'integration_id' => $integration->id,
+                'data_count' => count($json['data'] ?? []),
+            ]);
+
+            return $json;
+        } catch (Throwable $e) {
+            Log::error('Hevy: Workout fetch failed', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
     public function convertData(array $externalData, Integration $integration): array
     {
         // Not used; data is fetched directly and persisted as events/blocks
@@ -312,25 +353,7 @@ class HevyPlugin implements IntegrationPlugin
         throw new Exception('Hevy integration does not support webhooks');
     }
 
-    /**
-     * Simple HTTP helper using API key authentication.
-     */
-    protected function getJson(string $endpoint, Integration $integration): array
-    {
-        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
-        // In tests we allow empty; in production recommend providing api key
-        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
-        $response = Http::withHeaders([
-            'api-key' => $apiKey,
-        ])->get($url);
-        if (! $response->successful()) {
-            throw new RuntimeException('Hevy API request failed with status ' . $response->status());
-        }
-
-        return $response->json() ?? [];
-    }
-
-    private function createWorkoutEvent(Integration $integration, array $workout): void
+    public function createWorkoutEvent(Integration $integration, array $workout): void
     {
         $workoutId = (string) (Arr::get($workout, 'id') ?? md5(json_encode([$integration->id, Arr::get($workout, 'start_time'), Arr::get($workout, 'title')])));
         $startIso = Arr::get($workout, 'start_time') ?? Arr::get($workout, 'date') ?? now()->toIso8601String();
@@ -431,6 +454,24 @@ class HevyPlugin implements IntegrationPlugin
                 ]);
             }
         }
+    }
+
+    /**
+     * Simple HTTP helper using API key authentication.
+     */
+    protected function getJson(string $endpoint, Integration $integration): array
+    {
+        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
+        // In tests we allow empty; in production recommend providing api key
+        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
+        $response = Http::withHeaders([
+            'api-key' => $apiKey,
+        ])->get($url);
+        if (! $response->successful()) {
+            throw new RuntimeException('Hevy API request failed with status ' . $response->status());
+        }
+
+        return $response->json() ?? [];
     }
 
     private function ensureUserProfile(Integration $integration): EventObject

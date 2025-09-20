@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Jobs;
 
+use App\Integrations\Hevy\HevyPlugin;
 use App\Jobs\Data\Hevy\HevyWorkoutData;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -34,8 +35,15 @@ class HevyWorkoutDataTest extends TestCase
     {
         $job = $this->createTestableJob([]);
 
-        $this->assertEquals('hevy', $job->publicGetServiceName());
-        $this->assertEquals('workout', $job->publicGetJobType());
+        $reflection = new ReflectionClass($job);
+
+        $serviceNameMethod = $reflection->getMethod('getServiceName');
+        $serviceNameMethod->setAccessible(true);
+        $this->assertEquals('hevy', $serviceNameMethod->invoke($job));
+
+        $jobTypeMethod = $reflection->getMethod('getJobType');
+        $jobTypeMethod->setAccessible(true);
+        $this->assertEquals('workout', $jobTypeMethod->invoke($job));
     }
 
     /**
@@ -205,15 +213,15 @@ class HevyWorkoutDataTest extends TestCase
         // Test with preferred kg units
         $this->integration->update(['configuration' => ['units' => 'kg']]);
 
-        $job = new HevyWorkoutData($this->integration, []);
-        $reflection = new ReflectionClass($job);
+        $plugin = new HevyPlugin;
+        $reflection = new ReflectionClass($plugin);
         $method = $reflection->getMethod('inferWeightUnit');
         $method->setAccessible(true);
 
-        $result = $method->invoke($job, 'lb'); // Workout specifies lb
+        $result = $method->invoke($plugin, $this->integration, 'lb'); // Workout specifies lb
         $this->assertEquals('lb', $result); // Should use workout unit
 
-        $result = $method->invoke($job, null); // No workout unit
+        $result = $method->invoke($plugin, $this->integration, null); // No workout unit
         $this->assertEquals('kg', $result); // Should use preferred unit
     }
 
@@ -222,23 +230,23 @@ class HevyWorkoutDataTest extends TestCase
      */
     public function encode_numeric_value()
     {
-        $job = new HevyWorkoutData($this->integration, []);
-        $reflection = new ReflectionClass($job);
+        $plugin = new HevyPlugin;
+        $reflection = new ReflectionClass($plugin);
         $method = $reflection->getMethod('encodeNumericValue');
         $method->setAccessible(true);
 
         // Test integer value
-        [$value, $multiplier] = $method->invoke($job, 100);
+        [$value, $multiplier] = $method->invoke($plugin, 100);
         $this->assertEquals(100, $value);
         $this->assertEquals(1, $multiplier);
 
         // Test float value
-        [$value, $multiplier] = $method->invoke($job, 100.5);
+        [$value, $multiplier] = $method->invoke($plugin, 100.5);
         $this->assertEquals(100500, $value);
         $this->assertEquals(1000, $multiplier);
 
         // Test null value
-        [$value, $multiplier] = $method->invoke($job, null);
+        [$value, $multiplier] = $method->invoke($plugin, null);
         $this->assertNull($value);
         $this->assertNull($multiplier);
     }

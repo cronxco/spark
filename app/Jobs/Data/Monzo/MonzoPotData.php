@@ -2,10 +2,11 @@
 
 namespace App\Jobs\Data\Monzo;
 
+use App\Integrations\Monzo\MonzoPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Models\EventObject;
-use App\Models\Integration;
+use Illuminate\Support\Facades\Log;
 
 class MonzoPotData extends BaseProcessingJob
 {
@@ -30,7 +31,13 @@ class MonzoPotData extends BaseProcessingJob
     protected function process(): void
     {
         $pots = $this->rawData;
+        $plugin = new MonzoPlugin;
         $date = now()->toDateString();
+
+        Log::info('MonzoPotData: Processing pot data', [
+            'integration_id' => $this->integration->id,
+            'pot_count' => count($pots),
+        ]);
 
         // Create or update the target "day" object for pot balance events
         $dayObject = EventObject::updateOrCreate(
@@ -49,7 +56,7 @@ class MonzoPotData extends BaseProcessingJob
 
         foreach ($pots as $pot) {
             // Upsert the pot object
-            $potObject = $this->upsertPotObject($pot);
+            $potObject = $plugin->upsertPotObject($this->integration, $pot);
 
             // Create balance event for the pot
             $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
@@ -78,60 +85,9 @@ class MonzoPotData extends BaseProcessingJob
                 ]
             );
         }
-    }
 
-    private function upsertPotObject(array $pot): EventObject
-    {
-        $master = $this->resolveMasterIntegration();
-
-        // Determine account type based on deletion status
-        $isDeleted = (bool) ($pot['deleted'] ?? false);
-        $accountType = $isDeleted ? 'monzo_archived_pot' : 'monzo_pot';
-
-        return EventObject::updateOrCreate(
-            [
-                'user_id' => $this->integration->user_id,
-                'concept' => 'account',
-                'type' => $accountType,
-                'title' => $pot['name'] ?? 'Pot',
-            ],
-            [
-                'time' => $pot['created'] ?? now(),
-                'content' => (string) ($pot['balance'] ?? 0),
-                'metadata' => [
-                    'name' => $pot['name'] ?? 'Pot',
-                    'provider' => 'Monzo',
-                    'account_type' => 'savings_account',
-                    'pot_id' => $pot['id'] ?? null,
-                    'deleted' => $isDeleted,
-                    'currency' => 'GBP',
-                ],
-                'url' => null,
-                'media_url' => null,
-            ]
-        );
-    }
-
-    private function resolveMasterIntegration()
-    {
-        $group = $this->integration->group;
-        $master = Integration::where('integration_group_id', $group->id)
-            ->where('service', 'monzo')
-            ->where('instance_type', 'accounts')
-            ->first();
-
-        if (! $master) {
-            // Create master instance if it doesn't exist
-            $master = Integration::create([
-                'user_id' => $this->integration->user_id,
-                'integration_group_id' => $group->id,
-                'service' => 'monzo',
-                'name' => 'Accounts (Master)',
-                'instance_type' => 'accounts',
-                'configuration' => [],
-            ]);
-        }
-
-        return $master;
+        Log::info('MonzoPotData: Completed processing pot data', [
+            'integration_id' => $this->integration->id,
+        ]);
     }
 }

@@ -2,10 +2,10 @@
 
 namespace App\Jobs\Webhook\AppleHealth;
 
+use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Jobs\Base\BaseWebhookHookJob;
 use App\Jobs\Data\AppleHealth\AppleHealthMetricData;
 use App\Jobs\Data\AppleHealth\AppleHealthWorkoutData;
-use Exception;
 
 class AppleHealthWebhookHook extends BaseWebhookHookJob
 {
@@ -26,57 +26,15 @@ class AppleHealthWebhookHook extends BaseWebhookHookJob
 
     protected function validateWebhook(): void
     {
-        // Get the secret from the route parameter
-        $routeSecret = $this->headers['x-webhook-secret'][0] ?? null;
-
-        // Get the expected secret from the integration's account_id
-        $expectedSecret = $this->integration->account_id;
-
-        // Perform constant-time comparison to prevent timing attacks
-        if (empty($routeSecret) || empty($expectedSecret)) {
-            throw new Exception('Missing webhook secret');
-        }
-
-        if (! hash_equals($expectedSecret, $routeSecret)) {
-            throw new Exception('Invalid webhook secret');
-        }
+        $plugin = new AppleHealthPlugin;
+        $plugin->validateWebhookSignature($this->webhookPayload, $this->headers, $this->integration);
     }
 
     protected function splitWebhookData(): array
     {
-        $this->logWebhookPayload();
+        $plugin = new AppleHealthPlugin;
 
-        $instanceType = (string) ($this->integration->instance_type ?? 'workouts');
-        $processingData = [];
-
-        // Extract data from the nested payload structure
-        $payloadData = $this->webhookPayload['payload']['data'] ?? $this->webhookPayload;
-
-        if ($instanceType === 'workouts') {
-            $workouts = is_array($payloadData['workouts'] ?? null) ? $payloadData['workouts'] : [];
-            foreach ($workouts as $workout) {
-                if (is_array($workout)) {
-                    $processingData[] = [
-                        'type' => 'workout',
-                        'data' => $workout,
-                    ];
-                }
-            }
-        }
-
-        if ($instanceType === 'metrics') {
-            $metrics = is_array($payloadData['metrics'] ?? null) ? $payloadData['metrics'] : [];
-            foreach ($metrics as $metricEntry) {
-                if (is_array($metricEntry)) {
-                    $processingData[] = [
-                        'type' => 'metric',
-                        'data' => $metricEntry,
-                    ];
-                }
-            }
-        }
-
-        return $processingData;
+        return $plugin->processWebhookData($this->webhookPayload, $this->headers, $this->integration);
     }
 
     protected function dispatchProcessingJobs(array $processingData): void

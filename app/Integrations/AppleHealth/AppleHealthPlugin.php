@@ -5,6 +5,7 @@ namespace App\Integrations\AppleHealth;
 use App\Integrations\Base\WebhookPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Exception;
 use Illuminate\Support\Arr;
 
 class AppleHealthPlugin extends WebhookPlugin
@@ -116,6 +117,24 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Health metric from Apple Health',
                 'hidden' => true,
             ],
+            'apple_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Apple Workout',
+                'description' => 'Workout from Apple Health',
+                'hidden' => true,
+            ],
+            'workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout',
+                'description' => 'Workout data type',
+                'hidden' => true,
+            ],
+            'metric' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Metric',
+                'description' => 'Metric data type',
+                'hidden' => true,
+            ],
         ];
     }
 
@@ -175,7 +194,66 @@ class AppleHealthPlugin extends WebhookPlugin
         return ['events' => array_values(array_filter($events))];
     }
 
-    private function mapWorkoutToEvent(array $workout, Integration $integration): array
+    /**
+     * Validate webhook signature for webhook jobs
+     */
+    public function validateWebhookSignature(array $webhookPayload, array $headers, Integration $integration): void
+    {
+        // Get the secret from the route parameter
+        $routeSecret = $headers['x-webhook-secret'][0] ?? null;
+
+        // Get the expected secret from the integration's account_id
+        $expectedSecret = $integration->account_id;
+
+        // Perform constant-time comparison to prevent timing attacks
+        if (empty($routeSecret) || empty($expectedSecret)) {
+            throw new Exception('Missing webhook secret');
+        }
+
+        if (! hash_equals($expectedSecret, $routeSecret)) {
+            throw new Exception('Invalid webhook secret');
+        }
+    }
+
+    /**
+     * Process webhook data for webhook jobs
+     */
+    public function processWebhookData(array $webhookPayload, array $headers, Integration $integration): array
+    {
+        $instanceType = (string) ($integration->instance_type ?? 'workouts');
+        $processingData = [];
+
+        // Extract data from the nested payload structure
+        $payloadData = $webhookPayload['payload']['data'] ?? $webhookPayload;
+
+        if ($instanceType === 'workouts') {
+            $workouts = is_array($payloadData['workouts'] ?? null) ? $payloadData['workouts'] : [];
+            foreach ($workouts as $workout) {
+                if (is_array($workout)) {
+                    $processingData[] = [
+                        'type' => 'workout',
+                        'data' => $workout,
+                    ];
+                }
+            }
+        }
+
+        if ($instanceType === 'metrics') {
+            $metrics = is_array($payloadData['metrics'] ?? null) ? $payloadData['metrics'] : [];
+            foreach ($metrics as $metricEntry) {
+                if (is_array($metricEntry)) {
+                    $processingData[] = [
+                        'type' => 'metric',
+                        'data' => $metricEntry,
+                    ];
+                }
+            }
+        }
+
+        return $processingData;
+    }
+
+    public function mapWorkoutToEvent(array $workout, Integration $integration): array
     {
         $id = (string) (Arr::get($workout, 'id') ?? md5(json_encode([
             $integration->id,
@@ -312,7 +390,7 @@ class AppleHealthPlugin extends WebhookPlugin
         ];
     }
 
-    private function mapMetricPointToEvent(string $name, ?string $unit, array $point, Integration $integration): array
+    public function mapMetricPointToEvent(string $name, ?string $unit, array $point, Integration $integration): array
     {
         $date = (string) (Arr::get($point, 'date') ?? now()->toDateString());
         $sourceId = 'apple_metric_' . $name . '_' . str_replace([' ', ':', '+'], ['_', '', ''], $date);
