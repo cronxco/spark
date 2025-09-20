@@ -393,6 +393,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'group_id' => $integration->group_id,
         ]);
 
+        // Check if we should perform a sweep for this integration
+        $this->performSweepIfNeeded($integration);
+
         if ($instanceType === 'accounts') {
             Log::info('GoCardless fetchData: skipping accounts instance type', [
                 'integration_id' => $integration->id,
@@ -1985,12 +1988,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'account_count' => count($accounts),
         ]);
 
-        // Determine windowing
-        $config = $integration->configuration ?? [];
-        $lastSweepAt = isset($config['gocardless_last_sweep_at']) ? Carbon::parse($config['gocardless_last_sweep_at']) : null;
-        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subDays(6));
+        // Process recent transactions only (sweep is handled separately)
         $recentSinceDate = now()->subDays(3)->toDateString();
-        $sweepSinceDate = now()->subDays(60)->toDateString();
 
         foreach ($accounts as $account) {
             Log::info('GoCardless processRecentTransactions: processing account', [
@@ -2020,27 +2019,95 @@ class GoCardlessBankPlugin extends OAuthPlugin
             foreach ($bookedTransactions as $transaction) {
                 $this->processTransactionItem($integration, $account, $transaction, 'booked');
             }
-
-            // Weekly sweep over last 60 days to reconcile
-            if ($doSweep) {
-                $sweep = $this->getAccountTransactionsWindowed($account['id'], $sweepSinceDate, null);
-                foreach (($sweep['pending'] ?? []) as $tx) {
-                    $this->processTransactionItem($integration, $account, $tx, 'pending');
-                }
-                foreach (($sweep['booked'] ?? []) as $tx) {
-                    $this->processTransactionItem($integration, $account, $tx, 'booked');
-                }
-            }
-        }
-
-        if ($doSweep) {
-            $config['gocardless_last_sweep_at'] = now()->toIso8601String();
-            $integration->update(['configuration' => $config]);
         }
 
         Log::info('GoCardless processRecentTransactions: completed', [
             'integration_id' => $integration->id,
         ]);
+    }
+
+    /**
+     * Perform a sweep if needed for any instance type
+     */
+    protected function performSweepIfNeeded(Integration $integration): void
+    {
+        $config = $integration->configuration ?? [];
+        $lastSweepAt = isset($config['gocardless_last_sweep_at']) ? Carbon::parse($config['gocardless_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subDays(6));
+
+        if ($doSweep) {
+            Log::info('GoCardless sweep triggered', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+                'last_sweep_at' => $lastSweepAt?->toIso8601String(),
+            ]);
+
+            // Perform sweep for all data types
+            $this->performDataSweep($integration);
+
+            // Update sweep timestamp
+            $config['gocardless_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
+
+            Log::info('GoCardless sweep completed', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+            ]);
+        }
+    }
+
+    /**
+     * Perform the actual data sweep across all GoCardless data types
+     */
+    protected function performDataSweep(Integration $integration): void
+    {
+        if (empty($integration->configuration['account_id'])) {
+            Log::warning('GoCardless sweep: missing account_id in integration configuration', [
+                'integration_id' => $integration->id,
+            ]);
+
+            return;
+        }
+
+        $accountId = $integration->configuration['account_id'];
+        $sweepSinceDate = now()->subDays(60)->toDateString();
+
+        try {
+            // Sweep transactions data
+            $sweep = $this->getAccountTransactionsWindowed($accountId, $sweepSinceDate, null);
+
+            $pendingCount = 0;
+            $bookedCount = 0;
+
+            // Process pending transactions
+            foreach (($sweep['pending'] ?? []) as $transaction) {
+                $this->processTransactionItem($integration, ['id' => $accountId], $transaction, 'pending');
+                $pendingCount++;
+            }
+
+            // Process booked transactions
+            foreach (($sweep['booked'] ?? []) as $transaction) {
+                $this->processTransactionItem($integration, ['id' => $accountId], $transaction, 'booked');
+                $bookedCount++;
+            }
+
+            Log::info('GoCardless data sweep completed successfully', [
+                'integration_id' => $integration->id,
+                'account_id' => $accountId,
+                'pending_transactions_count' => $pendingCount,
+                'booked_transactions_count' => $bookedCount,
+                'total_transactions_count' => $pendingCount + $bookedCount,
+            ]);
+
+        } catch (Throwable $e) {
+            Log::error('GoCardless data sweep failed', [
+                'integration_id' => $integration->id,
+                'account_id' => $accountId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -2968,6 +3035,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $responseData = $response->json();
             // The API returns {"account": {...}}, so extract the account data
             $accountData = $responseData['account'] ?? $responseData;
+
+            // Ensure the account data always has an 'id' key
+            $accountData['id'] = $accountId;
 
             Log::info('GoCardless getAccount response', [
                 'account_id' => $accountId,
