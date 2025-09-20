@@ -160,9 +160,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'icon' => 'o-currency-pound',
                 'display_name' => 'Balance Update',
                 'description' => 'Account balance was updated',
-                'display_with_object' => true,
+                'display_with_object' => false,
                 'value_unit' => 'GBP',
-                'hidden' => false,
+                'hidden' => true,
             ],
         ];
     }
@@ -1087,6 +1087,373 @@ class GoCardlessBankPlugin extends OAuthPlugin
         return $this->accessToken;
     }
 
+    /**
+     * Process a single transaction item
+     */
+    public function processTransactionItem(Integration $integration, array $account, array $tx, string $status = 'booked'): void
+    {
+        Log::info('GoCardless processTransactionItem: processing transaction', [
+            'integration_id' => $integration->id,
+            'account_id' => $account['id'],
+            'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
+            'amount' => $tx['transactionAmount']['amount'] ?? 'unknown',
+            'currency' => $tx['transactionAmount']['currency'] ?? 'unknown',
+            'description' => $tx['remittanceInformationUnstructured'] ?? 'unknown',
+        ]);
+
+        // Derive category from transaction code
+        $category = 'other';
+        if (isset($tx['bankTransactionCode'])) {
+            $category = Str::slug($tx['bankTransactionCode']);
+        } elseif (isset($tx['proprietaryBankTransactionCode'])) {
+            $category = Str::slug($tx['proprietaryBankTransactionCode']);
+        }
+
+        Log::info('GoCardless processTransactionItem: derived category', [
+            'integration_id' => $integration->id,
+            'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
+            'category' => $category,
+            'bank_transaction_code' => $tx['bankTransactionCode'] ?? null,
+            'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
+        ]);
+
+        // Create consistent source ID based on transaction content
+        // This ensures pending and booked versions of the same transaction have the same ID
+        $sourceId = $this->generateConsistentTransactionId($tx);
+
+        // Check if this transaction already exists (for status transitions)
+        $existingEvent = Event::where('integration_id', $integration->id)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        // Determine if this is a status change
+        $isStatusChange = $existingEvent && $existingEvent->event_metadata['transaction_status'] !== $status;
+
+        // Determine action based on transaction amount and direction
+        $amount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+        $action = $this->determineTransactionAction($amount, $status);
+
+        // Preserve the best available timestamp
+        $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
+
+        // Create or update actor (bank account)
+        $actorObject = $this->upsertAccountObject($integration, $account);
+
+        // Create or update target (counterparty)
+        $targetObject = $this->upsertCounterpartyObject($integration, $tx);
+
+        $eventData = [
+            'user_id' => $integration->user_id,
+            'action' => $action,
+            'domain' => self::getDomain(),
+            'service' => 'gocardless',
+            'time' => $timestamp,
+            'value' => abs($amount),
+            'value_unit' => $tx['transactionAmount']['currency'] ?? 'EUR',
+            'actor_id' => $actorObject->id, // Set directly (original simple design)
+            'target_id' => $targetObject->id, // Set directly (original simple design)
+            'event_metadata' => [
+                'category' => $category,
+                'description' => $tx['remittanceInformationUnstructured'] ?? '',
+                'bank_transaction_code' => $tx['bankTransactionCode'] ?? null,
+                'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
+                'booking_date' => $tx['bookingDate'] ?? null,
+                'value_date' => $tx['valueDate'] ?? null,
+                'check_id' => $tx['checkId'] ?? null,
+                'creditor_id' => $tx['creditorId'] ?? null,
+                'mandate_id' => $tx['mandateId'] ?? null,
+                'creditor_account' => $tx['creditorAccount'] ?? null,
+                'debtor_account' => $tx['debtorAccount'] ?? null,
+                'transaction_status' => $status, // Track pending vs booked
+                'timestamp_preserved' => $isStatusChange && $existingEvent && $existingEvent->time === $timestamp,
+                'timestamp_reason' => $this->getTimestampReason($tx, $existingEvent, $status, $isStatusChange, $timestamp),
+                'raw' => $tx,
+            ],
+        ];
+
+        Log::info('GoCardless processTransactionItem: processing event', [
+            'integration_id' => $integration->id,
+            'source_id' => $sourceId,
+            'status' => $status,
+            'existing_event' => $existingEvent?->id,
+            'is_status_change' => $isStatusChange,
+        ]);
+
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'source_id' => $sourceId,
+            ],
+            $eventData
+        );
+
+        Log::info('GoCardless processTransactionItem: event processed', [
+            'integration_id' => $integration->id,
+            'event_id' => $event->id,
+            'source_id' => $sourceId,
+            'status' => $status,
+            'created' => $event->wasRecentlyCreated,
+            'updated' => $isStatusChange,
+        ]);
+
+        // Add relevant tags based on transaction status
+        $tags = [
+            'money',
+            'transaction',
+            'bank',
+            'gocardless',
+            $category,
+        ];
+
+        // Add status-specific tags
+        if ($status === 'pending') {
+            $tags[] = 'pending';
+        } elseif ($status === 'booked') {
+            $tags[] = 'settled';
+            // Remove pending tag if it exists (status transition)
+            if ($isStatusChange && $existingEvent) {
+                $event->detachTag('pending');
+                Log::info('GoCardless: Transitioned transaction from pending to settled', [
+                    'event_id' => $event->id,
+                    'source_id' => $sourceId,
+                    'previous_status' => $existingEvent->event_metadata['transaction_status'],
+                    'new_status' => $status,
+                ]);
+            }
+        }
+
+        // Add direction-based tags for booked transactions
+        if ($status === 'booked') {
+            $txAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+            if ($txAmount < 0) {
+                $tags[] = 'debit';
+            } else {
+                $tags[] = 'credit';
+            }
+        }
+
+        $event->syncTags($tags);
+
+        // Add typed tags from structured additional data
+        $additional = $tx['additionalDataStructured'] ?? null;
+        if (is_array($additional)) {
+            $name = $additional['Name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                $normalized = Str::headline(Str::lower($name));
+                $event->attachTag($normalized, 'person');
+            }
+
+            $identification = $additional['Identification'] ?? null;
+            if (is_string($identification) && $identification !== '') {
+                $event->attachTag($identification, 'card_pan');
+            }
+        }
+
+    }
+
+    /**
+     * Create balance event
+     */
+    public function createBalanceEvent(Integration $integration, array $balance): void
+    {
+        $balanceReferenceDate = $balance['referenceDate'] ?? now()->toDateString();
+        $balanceType = $balance['balanceType'] ?? 'unknown';
+        $accountId = $integration->configuration['account_id'] ?? 'unknown';
+
+        $sourceId = 'balance_' . $accountId . '_' . $balanceReferenceDate;
+
+        // Create or update actor (bank account)
+        $accountObject = $this->upsertAccountObject($integration, $balance);
+
+        // Create day target
+        $dayObject = EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $balanceReferenceDate,
+            ],
+            [
+                'time' => $balanceReferenceDate . ' 00:00:00',
+                'content' => null,
+                'metadata' => ['date' => $balanceReferenceDate],
+            ]
+        );
+
+        $balanceAmount = abs((float) ($balance['balanceAmount']['amount'] ?? 0));
+        [$encodedValue, $valueMultiplier] = $this->encodeCurrencyValue($balanceAmount);
+
+        $eventData = [
+            'user_id' => $integration->user_id,
+            'action' => 'had_balance',
+            'domain' => 'money',
+            'service' => 'gocardless',
+            'time' => $balance['referenceDate'] ?? now(),
+            'value' => $encodedValue,
+            'value_multiplier' => $valueMultiplier,
+            'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
+            'actor_id' => $accountObject->id,
+            'target_id' => $dayObject->id,
+            'event_metadata' => [
+                'balance_type' => $balanceType,
+                'reference_date' => $balanceReferenceDate,
+                'account_id' => $accountId,
+                'last_change_date_time' => $balance['lastChangeDateTime'] ?? null,
+                'last_committed_transaction' => $balance['lastCommittedTransaction'] ?? null,
+                'credit_limit_included' => $balance['creditLimitIncluded'] ?? false,
+            ],
+        ];
+
+        Log::info('GoCardlessBankPlugin createBalanceEvent: creating balance event', [
+            'integration_id' => $integration->id,
+            'account_id' => $accountId,
+            'source_id' => $sourceId,
+            'balance_type' => $balanceType,
+            'balance_amount' => $balance['balanceAmount']['amount'] ?? 'unknown',
+            'balance_currency' => $balance['balanceAmount']['currency'] ?? 'unknown',
+            'event_data' => $eventData,
+        ]);
+
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'source_id' => $sourceId,
+            ],
+            $eventData
+        );
+
+        Log::info('GoCardlessBankPlugin createBalanceEvent: balance event created/updated', [
+            'integration_id' => $integration->id,
+            'event_id' => $event->id,
+            'source_id' => $sourceId,
+        ]);
+
+        // Add tags
+        $event->syncTags([
+            'money',
+            'balance',
+            'bank',
+            'gocardless',
+            $balanceType,
+        ]);
+
+        // Add balance blocks for additional data
+        $accountData = ['id' => $accountId]; // Create minimal account data for the block
+        $this->createBalanceBlock($integration, $accountData, $balance, $balanceReferenceDate);
+    }
+
+    /**
+     * Upsert account object - handles both onboarding-created and transaction-created objects
+     */
+    public function upsertAccountObject(Integration $integration, array $account): EventObject
+    {
+        // Determine account type based on GoCardless data
+        $accountType = $this->mapCashAccountType($account['cashAccountType'] ?? null);
+
+        // Generate a proper account name
+        $accountName = $this->generateAccountName($account);
+
+        // First, try to find an existing onboarding-created account object
+        $accountId = $account['id'] ?? 'unknown';
+        $onboardingIntegrationId = 'onboarding_' . $integration->group_id . '_' . $accountId;
+
+        $existingObject = EventObject::where('user_id', $integration->user_id)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->where('title', $accountName)
+            ->whereJsonContains('metadata->integration_id', $onboardingIntegrationId)
+            ->first();
+
+        if ($existingObject) {
+            Log::info('GoCardless: Found existing onboarding account object, updating with integration ID', [
+                'account_id' => $accountId,
+                'existing_integration_id' => $existingObject->metadata['integration_id'] ?? null,
+                'new_integration_id' => $integration->id,
+            ]);
+
+            // Update the integration ID to point to the real integration
+            $existingObject->update([
+                'metadata->integration_id' => $integration->id,
+                'metadata->onboarding_created' => false, // Remove onboarding flag
+            ]);
+
+            return $existingObject;
+        }
+
+        // No existing onboarding object found, create new one
+        return EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'account',
+                'type' => 'bank_account',
+                'title' => $accountName,
+            ],
+            [
+                'user_id' => $integration->user_id,
+                'content' => json_encode($account),
+                'url' => null,
+                'image_url' => null,
+                'metadata' => [
+                    'integration_id' => $integration->id,
+                    'name' => $accountName,
+                    'provider' => $this->deriveProviderName($integration->group, $account),
+                    'account_type' => $accountType,
+                    'currency' => $account['currency'] ?? 'GBP',
+                    'account_number' => $this->deriveAccountNumber($account),
+                    'raw' => $account,
+                ],
+            ]
+        );
+    }
+
+    /**
+     * Encode a currency value into an integer with a multiplier to retain precision.
+     * If the value has a fractional part, scale by 1000 and round.
+     * Returns [encodedInt|null, multiplier|null].
+     */
+    public function encodeCurrencyValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
+    {
+        if ($raw === null || $raw === '') {
+            return [null, null];
+        }
+        $float = (float) $raw;
+        if (! is_finite($float)) {
+            return [null, null];
+        }
+        if (fmod($float, 1.0) !== 0.0) {
+            $multiplier = 1000;
+            $intValue = (int) round($float * $multiplier);
+
+            return [$intValue, $multiplier];
+        }
+
+        return [(int) $float, $defaultMultiplier];
+    }
+
+    public function processBalanceData(Integration $integration, array $balanceData): void
+    {
+        // Extract balances from the API response
+        $balances = $balanceData['balances'] ?? [];
+
+        if (empty($balances)) {
+            return;
+        }
+
+        Log::info('GoCardlessBankPlugin: Processing balance data', [
+            'integration_id' => $integration->id,
+            'balance_count' => count($balances),
+        ]);
+
+        // Process balances for each account
+        foreach ($balances as $balance) {
+            $this->createBalanceEvent($integration, $balance);
+        }
+
+        Log::info('GoCardlessBankPlugin: Completed processing balance data', [
+            'integration_id' => $integration->id,
+        ]);
+    }
+
     protected function getRequiredScopes(): string
     {
         // Not applicable for GoCardless Bank Account Data API
@@ -1371,252 +1738,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
-     * Process a single transaction item
-     */
-    protected function processTransactionItem(Integration $integration, array $account, array $tx, string $status = 'booked'): void
-    {
-        Log::info('GoCardless processTransactionItem: processing transaction', [
-            'integration_id' => $integration->id,
-            'account_id' => $account['id'],
-            'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
-            'amount' => $tx['transactionAmount']['amount'] ?? 'unknown',
-            'currency' => $tx['transactionAmount']['currency'] ?? 'unknown',
-            'description' => $tx['remittanceInformationUnstructured'] ?? 'unknown',
-        ]);
-
-        // Derive category from transaction code
-        $category = 'other';
-        if (isset($tx['bankTransactionCode'])) {
-            $category = Str::slug($tx['bankTransactionCode']);
-        } elseif (isset($tx['proprietaryBankTransactionCode'])) {
-            $category = Str::slug($tx['proprietaryBankTransactionCode']);
-        }
-
-        Log::info('GoCardless processTransactionItem: derived category', [
-            'integration_id' => $integration->id,
-            'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
-            'category' => $category,
-            'bank_transaction_code' => $tx['bankTransactionCode'] ?? null,
-            'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
-        ]);
-
-        // Create consistent source ID based on transaction content
-        // This ensures pending and booked versions of the same transaction have the same ID
-        $sourceId = $this->generateConsistentTransactionId($tx);
-
-        // Check if this transaction already exists (for status transitions)
-        $existingEvent = Event::where('integration_id', $integration->id)
-            ->where('source_id', $sourceId)
-            ->first();
-
-        // Determine if this is a status change
-        $isStatusChange = $existingEvent && $existingEvent->event_metadata['transaction_status'] !== $status;
-
-        // Determine action based on transaction amount and direction
-        $amount = (float) ($tx['transactionAmount']['amount'] ?? 0);
-        $action = $this->determineTransactionAction($amount, $status);
-
-        // Preserve the best available timestamp
-        $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
-
-        // Create or update actor (bank account)
-        $actorObject = $this->upsertAccountObject($integration, $account);
-
-        // Create or update target (counterparty)
-        $targetObject = $this->upsertCounterpartyObject($integration, $tx);
-
-        $eventData = [
-            'user_id' => $integration->user_id,
-            'action' => $action,
-            'domain' => self::getDomain(),
-            'service' => 'gocardless',
-            'time' => $timestamp,
-            'value' => abs($amount),
-            'value_unit' => $tx['transactionAmount']['currency'] ?? 'EUR',
-            'actor_id' => $actorObject->id, // Set directly (original simple design)
-            'target_id' => $targetObject->id, // Set directly (original simple design)
-            'event_metadata' => [
-                'category' => $category,
-                'description' => $tx['remittanceInformationUnstructured'] ?? '',
-                'bank_transaction_code' => $tx['bankTransactionCode'] ?? null,
-                'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
-                'booking_date' => $tx['bookingDate'] ?? null,
-                'value_date' => $tx['valueDate'] ?? null,
-                'check_id' => $tx['checkId'] ?? null,
-                'creditor_id' => $tx['creditorId'] ?? null,
-                'mandate_id' => $tx['mandateId'] ?? null,
-                'creditor_account' => $tx['creditorAccount'] ?? null,
-                'debtor_account' => $tx['debtorAccount'] ?? null,
-                'transaction_status' => $status, // Track pending vs booked
-                'status_changed' => $isStatusChange, // Track if this is a status transition
-                'previous_status' => $existingEvent?->event_metadata['transaction_status'] ?? null,
-                'timestamp_preserved' => $isStatusChange && $existingEvent && $existingEvent->time === $timestamp,
-                'timestamp_reason' => $this->getTimestampReason($tx, $existingEvent, $status, $isStatusChange, $timestamp),
-                'raw' => $tx,
-            ],
-        ];
-
-        Log::info('GoCardless processTransactionItem: processing event', [
-            'integration_id' => $integration->id,
-            'source_id' => $sourceId,
-            'status' => $status,
-            'existing_event' => $existingEvent?->id,
-            'is_status_change' => $isStatusChange,
-        ]);
-
-        $event = Event::updateOrCreate(
-            [
-                'integration_id' => $integration->id,
-                'source_id' => $sourceId,
-            ],
-            $eventData
-        );
-
-        Log::info('GoCardless processTransactionItem: event processed', [
-            'integration_id' => $integration->id,
-            'event_id' => $event->id,
-            'source_id' => $sourceId,
-            'status' => $status,
-            'created' => $event->wasRecentlyCreated,
-            'updated' => $isStatusChange,
-        ]);
-
-        // Add relevant tags based on transaction status
-        $tags = [
-            'money',
-            'transaction',
-            'bank',
-            'gocardless',
-            $category,
-        ];
-
-        // Add status-specific tags
-        if ($status === 'pending') {
-            $tags[] = 'pending';
-        } elseif ($status === 'booked') {
-            $tags[] = 'settled';
-            // Remove pending tag if it exists (status transition)
-            if ($isStatusChange && $existingEvent) {
-                $event->detachTag('pending');
-                Log::info('GoCardless: Transitioned transaction from pending to settled', [
-                    'event_id' => $event->id,
-                    'source_id' => $sourceId,
-                    'previous_status' => $existingEvent->event_metadata['transaction_status'],
-                    'new_status' => $status,
-                ]);
-            }
-        }
-
-        // Add direction-based tags for booked transactions
-        if ($status === 'booked') {
-            $txAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
-            if ($txAmount < 0) {
-                $tags[] = 'debit';
-            } else {
-                $tags[] = 'credit';
-            }
-        }
-
-        $event->syncTags($tags);
-
-        // Add typed tags from structured additional data
-        $additional = $tx['additionalDataStructured'] ?? null;
-        if (is_array($additional)) {
-            $name = $additional['Name'] ?? null;
-            if (is_string($name) && $name !== '') {
-                $normalized = Str::headline(Str::lower($name));
-                $event->attachTag($normalized, 'person');
-            }
-
-            $identification = $additional['Identification'] ?? null;
-            if (is_string($identification) && $identification !== '') {
-                $event->attachTag($identification, 'card_pan');
-            }
-        }
-
-    }
-
-    /**
-     * Create balance event
-     */
-    protected function createBalanceEvent(Integration $integration, array $account, array $balance): void
-    {
-        $balanceReferenceDate = $balance['referenceDate'] ?? now()->toDateString();
-        $sourceId = 'balance_' . $account['id'] . '_' . $balanceReferenceDate;
-        // Create or update actor (bank account)
-        $actorObject = $this->upsertAccountObject($integration, $account);
-
-        // Create day target
-        $dayObject = EventObject::updateOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'day',
-                'type' => 'day',
-                'title' => $balanceReferenceDate,
-            ],
-            [
-                'integration_id' => $integration->id,
-                'time' => $balanceReferenceDate . ' 00:00:00',
-                'content' => null,
-                'url' => null,
-                'image_url' => null,
-            ]
-        );
-
-        $eventData = [
-            'user_id' => $integration->user_id,
-            'action' => 'had_balance',
-            'domain' => self::getDomain(),
-            'service' => 'gocardless',
-            'time' => $balance['referenceDate'] ?? now(),
-            'value' => abs((float) ($balance['balanceAmount']['amount'] ?? 0)),
-            'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
-            'actor_id' => $actorObject->id, // Set directly (original simple design)
-            'target_id' => $dayObject->id, // Set directly (original simple design)
-            'event_metadata' => [
-                'balance_type' => $balance['balanceType'] ?? null,
-                'reference_date' => $balance['referenceDate'] ?? null,
-                'account_id' => $account['id'],
-            ],
-        ];
-
-        Log::info('GoCardless createBalanceEvent: creating balance event', [
-            'integration_id' => $integration->id,
-            'account_id' => $account['id'],
-            'source_id' => $sourceId,
-            'balance_type' => $balance['balanceType'] ?? 'unknown',
-            'balance_amount' => $balance['balanceAmount']['amount'] ?? 'unknown',
-            'balance_currency' => $balance['balanceAmount']['currency'] ?? 'unknown',
-            'event_data' => $eventData,
-        ]);
-
-        $event = Event::updateOrCreate(
-            [
-                'integration_id' => $integration->id,
-                'source_id' => $sourceId,
-            ],
-            $eventData
-        );
-
-        Log::info('GoCardless createBalanceEvent: balance event created/updated', [
-            'integration_id' => $integration->id,
-            'event_id' => $event->id,
-            'source_id' => $sourceId,
-        ]);
-
-        // Add relevant tags
-        $event->syncTags([
-            'money',
-            'balance',
-            'bank',
-            'gocardless',
-        ]);
-
-        // Create balance block
-        $this->createBalanceBlock($integration, $account, $balance, $balanceReferenceDate);
-    }
-
-    /**
      * Create balance block
      */
     protected function createBalanceBlock(Integration $integration, array $account, array $data, string $balanceReferenceDate): void
@@ -1794,7 +1915,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         if (! $isStatusChange) {
-            return 'same_status_update';
+            return $existingEvent->event_metadata['timestamp_reason'] ?? 'existing_timestamp';
         }
 
         $existingTime = $existingEvent->time;
@@ -1803,14 +1924,14 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if ($existingTime === $chosenTimestamp) {
             $newDateTime = Carbon::parse($currentTime);
             if ($this->isGenericTime($newDateTime)) {
-                return 'preserved_pending_over_generic_booked';
+                return 'used_more_precise_old_timestamp';
             }
 
             return 'preserved_existing_timestamp';
         } else {
             $existingDateTime = Carbon::parse($existingTime);
             if ($this->isGenericTime($existingDateTime)) {
-                return 'used_more_precise_booked_timestamp';
+                return 'used_more_precise_new_timestamp';
             }
 
             return 'used_new_timestamp';
@@ -1857,70 +1978,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'account_number' => $this->deriveAccountNumber($account),
                     'raw' => $account,
                     'onboarding_created' => true, // Flag to indicate this was created during onboarding
-                ],
-            ]
-        );
-    }
-
-    /**
-     * Upsert account object - handles both onboarding-created and transaction-created objects
-     */
-    protected function upsertAccountObject(Integration $integration, array $account): EventObject
-    {
-        // Determine account type based on GoCardless data
-        $accountType = $this->mapCashAccountType($account['cashAccountType'] ?? null);
-
-        // Generate a proper account name
-        $accountName = $this->generateAccountName($account);
-
-        // First, try to find an existing onboarding-created account object
-        $accountId = $account['id'] ?? 'unknown';
-        $onboardingIntegrationId = 'onboarding_' . $integration->group_id . '_' . $accountId;
-
-        $existingObject = EventObject::where('user_id', $integration->user_id)
-            ->where('concept', 'account')
-            ->where('type', 'bank_account')
-            ->where('title', $accountName)
-            ->whereJsonContains('metadata->integration_id', $onboardingIntegrationId)
-            ->first();
-
-        if ($existingObject) {
-            Log::info('GoCardless: Found existing onboarding account object, updating with integration ID', [
-                'account_id' => $accountId,
-                'existing_integration_id' => $existingObject->metadata['integration_id'] ?? null,
-                'new_integration_id' => $integration->id,
-            ]);
-
-            // Update the integration ID to point to the real integration
-            $existingObject->update([
-                'metadata->integration_id' => $integration->id,
-                'metadata->onboarding_created' => false, // Remove onboarding flag
-            ]);
-
-            return $existingObject;
-        }
-
-        // No existing onboarding object found, create new one
-        return EventObject::updateOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'account',
-                'type' => 'bank_account',
-                'title' => $accountName,
-            ],
-            [
-                'user_id' => $integration->user_id,
-                'content' => json_encode($account),
-                'url' => null,
-                'image_url' => null,
-                'metadata' => [
-                    'integration_id' => $integration->id,
-                    'name' => $accountName,
-                    'provider' => $this->deriveProviderName($integration->group, $account),
-                    'account_type' => $accountType,
-                    'currency' => $account['currency'] ?? 'GBP',
-                    'account_number' => $this->deriveAccountNumber($account),
-                    'raw' => $account,
                 ],
             ]
         );

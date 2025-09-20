@@ -312,25 +312,7 @@ class HevyPlugin implements IntegrationPlugin
         throw new Exception('Hevy integration does not support webhooks');
     }
 
-    /**
-     * Simple HTTP helper using API key authentication.
-     */
-    protected function getJson(string $endpoint, Integration $integration): array
-    {
-        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
-        // In tests we allow empty; in production recommend providing api key
-        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
-        $response = Http::withHeaders([
-            'api-key' => $apiKey,
-        ])->get($url);
-        if (! $response->successful()) {
-            throw new RuntimeException('Hevy API request failed with status ' . $response->status());
-        }
-
-        return $response->json() ?? [];
-    }
-
-    private function createWorkoutEvent(Integration $integration, array $workout): void
+    public function createWorkoutEvent(Integration $integration, array $workout): void
     {
         $workoutId = (string) (Arr::get($workout, 'id') ?? md5(json_encode([$integration->id, Arr::get($workout, 'start_time'), Arr::get($workout, 'title')])));
         $startIso = Arr::get($workout, 'start_time') ?? Arr::get($workout, 'date') ?? now()->toIso8601String();
@@ -431,6 +413,24 @@ class HevyPlugin implements IntegrationPlugin
                 ]);
             }
         }
+    }
+
+    /**
+     * Simple HTTP helper using API key authentication.
+     */
+    protected function getJson(string $endpoint, Integration $integration): array
+    {
+        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
+        // In tests we allow empty; in production recommend providing api key
+        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
+        $response = Http::withHeaders([
+            'api-key' => $apiKey,
+        ])->get($url);
+        if (! $response->successful()) {
+            throw new RuntimeException('Hevy API request failed with status ' . $response->status());
+        }
+
+        return $response->json() ?? [];
     }
 
     private function ensureUserProfile(Integration $integration): EventObject

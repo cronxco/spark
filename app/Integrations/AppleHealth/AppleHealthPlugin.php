@@ -175,7 +175,7 @@ class AppleHealthPlugin extends WebhookPlugin
         return ['events' => array_values(array_filter($events))];
     }
 
-    private function mapWorkoutToEvent(array $workout, Integration $integration): array
+    public function mapWorkoutToEvent(array $workout, Integration $integration): array
     {
         $id = (string) (Arr::get($workout, 'id') ?? md5(json_encode([
             $integration->id,
@@ -312,7 +312,7 @@ class AppleHealthPlugin extends WebhookPlugin
         ];
     }
 
-    private function mapMetricPointToEvent(string $name, ?string $unit, array $point, Integration $integration): array
+    public function mapMetricPointToEvent(string $name, ?string $unit, array $point, Integration $integration): array
     {
         $date = (string) (Arr::get($point, 'date') ?? now()->toDateString());
         $sourceId = 'apple_metric_' . $name . '_' . str_replace([' ', ':', '+'], ['_', '', ''], $date);

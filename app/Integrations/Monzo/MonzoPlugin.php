@@ -750,6 +750,20 @@ class MonzoPlugin extends OAuthPlugin
         ];
     }
 
+    public function resolveMasterIntegration(Integration $integration): Integration
+    {
+        $group = $integration->group;
+        $master = Integration::where('integration_group_id', $group->id)
+            ->where('service', static::getIdentifier())
+            ->where('instance_type', 'accounts')
+            ->first();
+        if (! $master) {
+            $master = $this->createInstance($group, 'accounts');
+        }
+
+        return $master;
+    }
+
     protected function getRequiredScopes(): string
     {
         // Monzo OAuth scopes needed for read-only ingestion
@@ -970,20 +984,6 @@ class MonzoPlugin extends OAuthPlugin
         foreach ($txs as $tx) {
             $this->processTransactionItem($integration, $tx, $account['id']);
         }
-    }
-
-    private function resolveMasterIntegration(Integration $integration): Integration
-    {
-        $group = $integration->group;
-        $master = Integration::where('integration_group_id', $group->id)
-            ->where('service', static::getIdentifier())
-            ->where('instance_type', 'accounts')
-            ->first();
-        if (! $master) {
-            $master = $this->createInstance($group, 'accounts');
-        }
-
-        return $master;
     }
 
     private function setAction(array $tx): string

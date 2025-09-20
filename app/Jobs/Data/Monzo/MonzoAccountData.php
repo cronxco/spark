@@ -2,8 +2,10 @@
 
 namespace App\Jobs\Data\Monzo;
 
+use App\Integrations\Monzo\MonzoPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\EventObject;
+use Illuminate\Support\Facades\Log;
 
 class MonzoAccountData extends BaseProcessingJob
 {
@@ -29,54 +31,22 @@ class MonzoAccountData extends BaseProcessingJob
 
     protected function process(): void
     {
+        $plugin = new MonzoPlugin;
+
+        Log::info('MonzoAccountData: Processing account data', [
+            'integration_id' => $this->integration->id,
+        ]);
+
         // For accounts, we only need to upsert the account objects
         // Events are created by transaction/balance processing jobs
-        $this->upsertAccountObject($this->rawData);
+        $plugin->upsertAccountObject($this->integration, $this->rawData);
 
         // Also create day object for balance events if it doesn't exist
         $this->createDayObject();
-    }
 
-    private function upsertAccountObject(array $account): void
-    {
-        $title = match ($account['type'] ?? null) {
-            'uk_retail' => 'Current Account',
-            'uk_retail_joint' => 'Joint Account',
-            'uk_monzo_flex' => 'Monzo Flex',
-            'uk_prepaid' => 'Monzo OG',
-            'uk_reward_account' => 'Monzo Rewards',
-            default => 'Monzo Account',
-        };
-
-        $accountType = match ($account['type'] ?? null) {
-            'uk_retail' => 'current_account',
-            'uk_retail_joint' => 'current_account',
-            'uk_monzo_flex' => 'credit_card',
-            'uk_prepaid' => 'current_account',
-            'uk_reward_account' => 'savings_account',
-            default => 'other',
-        };
-
-        EventObject::updateOrCreate(
-            [
-                'user_id' => $this->integration->user_id,
-                'concept' => 'account',
-                'type' => 'monzo_account',
-                'title' => $title,
-            ],
-            [
-                'time' => now(),
-                'content' => null,
-                'metadata' => [
-                    'name' => $title,
-                    'provider' => 'Monzo',
-                    'account_type' => $accountType,
-                    'account_id' => $account['id'] ?? null,
-                    'currency' => $account['currency'] ?? 'GBP',
-                    'raw' => $account,
-                ],
-            ]
-        );
+        Log::info('MonzoAccountData: Completed processing account data', [
+            'integration_id' => $this->integration->id,
+        ]);
     }
 
     private function createDayObject(): void

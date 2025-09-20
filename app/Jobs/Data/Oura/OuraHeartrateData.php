@@ -2,10 +2,10 @@
 
 namespace App\Jobs\Data\Oura;
 
+use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OuraHeartrateData extends BaseProcessingJob
@@ -23,6 +23,7 @@ class OuraHeartrateData extends BaseProcessingJob
     protected function process(): void
     {
         $heartratePoints = $this->rawData;
+        $plugin = new OuraPlugin;
 
         if (empty($heartratePoints)) {
             return;
@@ -33,18 +34,18 @@ class OuraHeartrateData extends BaseProcessingJob
 
         $events = [];
         foreach ($byDay as $day => $points) {
-            $eventData = $this->createHeartrateEvent($day, $points);
+            $eventData = $this->createHeartrateEvent($day, $points, $plugin);
             if ($eventData) {
                 $events[] = $eventData;
             }
         }
 
         if (! empty($events)) {
-            $this->createEventsSafely($events);
+            $plugin->createEventsSafely($this->integration, $events);
         }
     }
 
-    private function createHeartrateEvent(string $day, Collection $points): ?array
+    private function createHeartrateEvent(string $day, Collection $points, OuraPlugin $plugin): ?array
     {
         $sourceId = "oura_heartrate_{$this->integration->id}_{$day}";
 
@@ -69,10 +70,10 @@ class OuraHeartrateData extends BaseProcessingJob
         $max = (int) $points->max('bpm');
         $avg = (float) $points->avg('bpm');
 
-        [$encodedAvg, $avgMultiplier] = $this->encodeNumericValue($avg);
+        [$encodedAvg, $avgMultiplier] = $plugin->encodeNumericValue($avg);
 
         $blocks = [];
-        [$encMin, $minMult] = $this->encodeNumericValue($min);
+        [$encMin, $minMult] = $plugin->encodeNumericValue($min);
         $blocks[] = [
             'time' => $day . ' 00:00:00',
             'title' => 'Min Heart Rate',
@@ -82,7 +83,7 @@ class OuraHeartrateData extends BaseProcessingJob
             'value_unit' => 'bpm',
         ];
 
-        [$encMax, $maxMult] = $this->encodeNumericValue($max);
+        [$encMax, $maxMult] = $plugin->encodeNumericValue($max);
         $blocks[] = [
             'time' => $day . ' 00:00:00',
             'title' => 'Max Heart Rate',
@@ -120,76 +121,5 @@ class OuraHeartrateData extends BaseProcessingJob
             'blocks' => $blocks,
             'integration_id' => $this->integration->id,
         ];
-    }
-
-    private function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
-    {
-        if ($raw === null || $raw === '') {
-            return [null, null];
-        }
-        $float = (float) $raw;
-        if (! is_finite($float)) {
-            return [null, null];
-        }
-        if (fmod($float, 1.0) !== 0.0) {
-            $multiplier = 1000;
-            $intValue = (int) round($float * $multiplier);
-
-            return [$intValue, $multiplier];
-        }
-
-        return [(int) $float, $defaultMultiplier];
-    }
-
-    /**
-     * Create events safely with race condition protection
-     */
-    private function createEventsSafely(array $eventData): void
-    {
-        foreach ($eventData as $data) {
-            // Use updateOrCreate to prevent race conditions
-            $event = Event::updateOrCreate(
-                [
-                    'integration_id' => $this->integration->id,
-                    'source_id' => $data['source_id'],
-                ],
-                [
-                    'time' => $data['time'],
-                    'actor_id' => $this->createOrUpdateObject($data['actor'])->id,
-                    'service' => $this->serviceName,
-                    'domain' => $data['domain'],
-                    'action' => $data['action'],
-                    'value' => $data['value'] ?? null,
-                    'value_multiplier' => $data['value_multiplier'] ?? 1,
-                    'value_unit' => $data['value_unit'] ?? null,
-                    'event_metadata' => $data['event_metadata'] ?? [],
-                    'target_id' => $this->createOrUpdateObject($data['target'])->id,
-                ]
-            );
-
-            // Create blocks if any
-            if (isset($data['blocks'])) {
-                foreach ($data['blocks'] as $blockData) {
-                    $event->blocks()->create([
-                        'time' => $blockData['time'] ?? $event->time,
-                        'block_type' => $blockData['block_type'] ?? '',
-                        'title' => $blockData['title'],
-                        'metadata' => $blockData['metadata'] ?? [],
-                        'url' => $blockData['url'] ?? null,
-                        'media_url' => $blockData['media_url'] ?? null,
-                        'value' => $blockData['value'] ?? null,
-                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
-                        'value_unit' => $blockData['value_unit'] ?? null,
-                        'embeddings' => $blockData['embeddings'] ?? null,
-                    ]);
-                }
-            }
-
-            Log::info('Oura: Created heartrate event safely', [
-                'integration_id' => $this->integration->id,
-                'source_id' => $data['source_id'],
-                'action' => $data['action'],
-            ]);
-        }
     }
 }
