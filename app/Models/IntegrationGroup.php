@@ -56,4 +56,55 @@ class IntegrationGroup extends Model
     {
         return $this->hasMany(Integration::class, 'integration_group_id');
     }
+
+    /**
+     * Get all events from integrations in this group
+     */
+    public function getRelatedEvents()
+    {
+        return Event::whereIn('integration_id', $this->integrations()->pluck('id'))
+            ->with(['blocks', 'actor', 'target'])
+            ->get();
+    }
+
+    /**
+     * Get all blocks from events in this group
+     */
+    public function getRelatedBlocks()
+    {
+        $eventIds = $this->getRelatedEvents()->pluck('id');
+
+        return Block::whereIn('event_id', $eventIds)->get();
+    }
+
+    /**
+     * Get all objects used by events in this group
+     */
+    public function getRelatedObjects()
+    {
+        $events = $this->getRelatedEvents();
+        $actorIds = $events->pluck('actor_id')->filter();
+        $targetIds = $events->pluck('target_id')->filter();
+
+        return EventObject::whereIn('id', $actorIds->merge($targetIds))->get();
+    }
+
+    /**
+     * Get deletion summary for this group
+     */
+    public function getDeletionSummary(): array
+    {
+        $events = $this->getRelatedEvents();
+        $blocks = $this->getRelatedBlocks();
+        $objects = $this->getRelatedObjects();
+
+        return [
+            'integrations' => $this->integrations()->count(),
+            'events' => $events->count(),
+            'blocks' => $blocks->count(),
+            'objects' => $objects->count(),
+            'service_name' => $this->service,
+            'account_id' => $this->account_id,
+        ];
+    }
 }
