@@ -36,11 +36,11 @@ class HevyWorkoutDataTest extends TestCase
         $job = $this->createTestableJob([]);
 
         $reflection = new ReflectionClass($job);
-        
+
         $serviceNameMethod = $reflection->getMethod('getServiceName');
         $serviceNameMethod->setAccessible(true);
         $this->assertEquals('hevy', $serviceNameMethod->invoke($job));
-        
+
         $jobTypeMethod = $reflection->getMethod('getJobType');
         $jobTypeMethod->setAccessible(true);
         $this->assertEquals('workout', $jobTypeMethod->invoke($job));
