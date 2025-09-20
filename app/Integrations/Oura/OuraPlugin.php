@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -1000,6 +1001,378 @@ class OuraPlugin extends OAuthPlugin
         }
     }
 
+    public function getJson(string $endpoint, Integration $integration, array $query = []): array
+    {
+        $group = $integration->group;
+        $token = $group?->access_token;
+        if ($group && $group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+            $token = $group->access_token;
+        }
+
+        if (empty($token)) {
+            throw new Exception('Missing access token for authenticated request');
+        }
+
+        // Log the API request
+        $this->logApiRequest('GET', $endpoint, [
+            'Authorization' => '[REDACTED]',
+        ], $query, $integration->id);
+
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
+        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
+        $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+
+        if (! $response->successful()) {
+            Log::warning('Oura API request failed', [
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
+            return [];
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Pull activity data for pull jobs
+     */
+    public function pullActivityData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        // Incremental window 3 days; daily sweep 30 days
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/daily_activity', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/daily_activity', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by date
+                $byDate = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDate[$key] = $row;
+                    }
+                }
+                $items = array_values($byDate);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull heartrate data for pull jobs
+     */
+    public function pullHeartrateData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDatetime = now()->subDays($incrementalDays)->toIso8601String();
+        $endDatetime = now()->toIso8601String();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/heartrate', $integration, [
+            'start_datetime' => $startDatetime,
+            'end_datetime' => $endDatetime,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/heartrate', $integration, [
+                'start_datetime' => now()->subDays(7)->toIso8601String(),
+                'end_datetime' => $endDatetime,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by timestamp and source
+                $byKey = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = ($row['timestamp'] ?? '') . '|' . ($row['source'] ?? '');
+                    if ($key !== '|') {
+                        $byKey[$key] = $row;
+                    }
+                }
+                $items = array_values($byKey);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull readiness data for pull jobs
+     */
+    public function pullReadinessData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/daily_readiness', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull resilience data for pull jobs
+     */
+    public function pullResilienceData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/daily_resilience', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull sessions data for pull jobs
+     */
+    public function pullSessionsData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/session', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/session', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by day/date
+                $byDay = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDay[$key] = $row;
+                    }
+                }
+                $items = array_values($byDay);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull sleep data for pull jobs
+     */
+    public function pullSleepData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/daily_sleep', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/daily_sleep', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by day/date
+                $byDay = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDay[$key] = $row;
+                    }
+                }
+                $items = array_values($byDay);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pull sleep records data for pull jobs
+     */
+    public function pullSleepRecordsData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/sleep', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull SpO2 data for pull jobs
+     */
+    public function pullSpo2Data(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        try {
+            $data = $this->getJson('/usercollection/daily_spo2', $integration, [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ]);
+
+            return $data['data'] ?? [];
+        } catch (Exception $e) {
+            // Handle authorization errors gracefully
+            if (str_contains($e->getMessage(), '403') || str_contains($e->getMessage(), 'authorization')) {
+                Log::warning('Oura SpO2 access not authorized for integration', [
+                    'integration_id' => $integration->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return []; // Return empty array to skip processing
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Pull stress data for pull jobs
+     */
+    public function pullStressData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/daily_stress', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull tags data for pull jobs
+     */
+    public function pullTagsData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $data = $this->getJson('/usercollection/tag', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Pull workouts data for pull jobs
+     */
+    public function pullWorkoutsData(Integration $integration): array
+    {
+        $config = $integration->configuration ?? [];
+        $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
+        $startDate = now()->subDays($incrementalDays)->toDateString();
+        $endDate = now()->toDateString();
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        $data = $this->getJson('/usercollection/workout', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $items = $data['data'] ?? [];
+
+        if ($doSweep) {
+            $sweepData = $this->getJson('/usercollection/workout', $integration, [
+                'start_date' => now()->subDays(30)->toDateString(),
+                'end_date' => $endDate,
+            ]);
+            $sweepItems = $sweepData['data'] ?? [];
+            if (! empty($sweepItems)) {
+                // Merge unique by day/date
+                $byDay = [];
+                foreach (array_merge($items, $sweepItems) as $row) {
+                    $key = $row['day'] ?? ($row['date'] ?? null);
+                    if ($key) {
+                        $byDay[$key] = $row;
+                    }
+                }
+                $items = array_values($byDay);
+                $config['oura_last_sweep_at'] = now()->toIso8601String();
+                $integration->update(['configuration' => $config]);
+            }
+        }
+
+        return $items;
+    }
+
     protected function getRequiredScopes(): string
     {
         return implode(' ', [
@@ -1063,47 +1436,6 @@ class OuraPlugin extends OAuthPlugin
         $group->update([
             'account_id' => Arr::get($info, 'data.0.user_id') ?? Arr::get($info, 'user_id') ?? Arr::get($info, 'email'),
         ]);
-    }
-
-    protected function getJson(string $endpoint, Integration $integration, array $query = []): array
-    {
-        $group = $integration->group;
-        $token = $group?->access_token;
-        if ($group && $group->expiry && $group->expiry->isPast()) {
-            $this->refreshToken($group);
-            $token = $group->access_token;
-        }
-
-        if (empty($token)) {
-            throw new Exception('Missing access token for authenticated request');
-        }
-
-        // Log the API request
-        $this->logApiRequest('GET', $endpoint, [
-            'Authorization' => '[REDACTED]',
-        ], $query, $integration->id);
-
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
-        $span?->finish();
-
-        // Log the API response
-        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
-
-        if (! $response->successful()) {
-            Log::warning('Oura API request failed', [
-                'endpoint' => $endpoint,
-                'status' => $response->status(),
-                'response' => $response->body(),
-            ]);
-
-            return [];
-        }
-
-        return $response->json();
     }
 
     protected function createOrUpdateUser(Integration $integration, array $profile = []): EventObject

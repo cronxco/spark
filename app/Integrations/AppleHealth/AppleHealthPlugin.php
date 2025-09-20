@@ -5,6 +5,7 @@ namespace App\Integrations\AppleHealth;
 use App\Integrations\Base\WebhookPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use Exception;
 use Illuminate\Support\Arr;
 
 class AppleHealthPlugin extends WebhookPlugin
@@ -173,6 +174,59 @@ class AppleHealthPlugin extends WebhookPlugin
         }
 
         return ['events' => array_values(array_filter($events))];
+    }
+
+    /**
+     * Process webhook data for webhook jobs
+     */
+    public function processWebhookData(array $webhookPayload, array $headers, Integration $integration): array
+    {
+        // Get the secret from the route parameter
+        $routeSecret = $headers['x-webhook-secret'][0] ?? null;
+
+        // Get the expected secret from the integration's account_id
+        $expectedSecret = $integration->account_id;
+
+        // Perform constant-time comparison to prevent timing attacks
+        if (empty($routeSecret) || empty($expectedSecret)) {
+            throw new Exception('Missing webhook secret');
+        }
+
+        if (! hash_equals($expectedSecret, $routeSecret)) {
+            throw new Exception('Invalid webhook secret');
+        }
+
+        $instanceType = (string) ($integration->instance_type ?? 'workouts');
+        $processingData = [];
+
+        // Extract data from the nested payload structure
+        $payloadData = $webhookPayload['payload']['data'] ?? $webhookPayload;
+
+        if ($instanceType === 'workouts') {
+            $workouts = is_array($payloadData['workouts'] ?? null) ? $payloadData['workouts'] : [];
+            foreach ($workouts as $workout) {
+                if (is_array($workout)) {
+                    $processingData[] = [
+                        'type' => 'workout',
+                        'data' => $workout,
+                    ];
+                }
+            }
+        }
+
+        if ($instanceType === 'metrics') {
+            $metrics = is_array($payloadData['metrics'] ?? null) ? $payloadData['metrics'] : [];
+            foreach ($metrics as $metricEntry) {
+                if (is_array($metricEntry)) {
+                    $processingData[] = [
+                        'type' => 'metric',
+                        'data' => $metricEntry,
+                    ];
+                }
+            }
+        }
+
+        return $processingData;
     }
 
     public function mapWorkoutToEvent(array $workout, Integration $integration): array

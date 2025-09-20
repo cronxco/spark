@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Jobs;
 
+use App\Integrations\GitHub\GitHubPlugin;
 use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -99,18 +100,18 @@ class GitHubActivityPullTest extends TestCase
      */
     public function normalize_repositories()
     {
-        $job = new GitHubActivityPull($this->integration);
+        $plugin = new GitHubPlugin;
 
         // Test array input
-        $result = $this->invokePrivateMethod($job, 'normalizeRepositories', [['repo1', 'repo2']]);
+        $result = $plugin->normalizeRepositories(['repo1', 'repo2']);
         $this->assertEquals(['repo1', 'repo2'], $result);
 
         // Test comma-separated string
-        $result = $this->invokePrivateMethod($job, 'normalizeRepositories', ['repo1, repo2']);
+        $result = $plugin->normalizeRepositories('repo1, repo2');
         $this->assertEquals(['repo1', 'repo2'], $result);
 
         // Test empty input
-        $result = $this->invokePrivateMethod($job, 'normalizeRepositories', [[]]);
+        $result = $plugin->normalizeRepositories([]);
         $this->assertEquals([], $result);
     }
 
@@ -119,22 +120,22 @@ class GitHubActivityPullTest extends TestCase
      */
     public function normalize_events()
     {
-        $job = new GitHubActivityPull($this->integration);
+        $plugin = new GitHubPlugin;
 
         // Test array input
-        $result = $this->invokePrivateMethod($job, 'normalizeEvents', [['push', 'pull_request']]);
+        $result = $plugin->normalizeEvents(['push', 'pull_request']);
         $this->assertEquals(['push', 'pull_request'], $result);
 
         // Test comma-separated string
-        $result = $this->invokePrivateMethod($job, 'normalizeEvents', ['push, pull_request']);
+        $result = $plugin->normalizeEvents('push, pull_request');
         $this->assertEquals(['push', 'pull_request'], $result);
 
         // Test empty array should return empty array (not defaults)
-        $result = $this->invokePrivateMethod($job, 'normalizeEvents', [[]]);
+        $result = $plugin->normalizeEvents([]);
         $this->assertEquals([], $result);
 
         // Test null input should return defaults
-        $result = $this->invokePrivateMethod($job, 'normalizeEvents', [null]);
+        $result = $plugin->normalizeEvents(null);
         $this->assertEquals(['push', 'pull_request'], $result);
     }
 

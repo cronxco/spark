@@ -453,6 +453,156 @@ class GitHubPlugin extends OAuthPlugin
         );
     }
 
+    /**
+     * Pull GitHub activity data for pull jobs
+     */
+    public function pullActivityData(Integration $integration, array $config): array
+    {
+        // Normalize repositories to array of owner/repo strings
+        $repositories = $this->normalizeRepositories($config['repositories'] ?? []);
+
+        // Normalize events to array of strings
+        $events = $this->normalizeEvents($config['events'] ?? ['push', 'pull_request']);
+
+        $allRepositoryEvents = [];
+
+        foreach ($repositories as $repo) {
+            try {
+                Log::info('GitHub Activity Pull: Fetching events for repository', [
+                    'integration_id' => $integration->id,
+                    'repository' => $repo,
+                ]);
+
+                $repositoryEvents = $this->fetchRepositoryEventsForPull($repo, $events, $integration);
+                $allRepositoryEvents[$repo] = $repositoryEvents;
+
+            } catch (Exception $e) {
+                Log::error('GitHub Activity Pull: Failed to fetch events for repository', [
+                    'integration_id' => $integration->id,
+                    'repository' => $repo,
+                    'error' => $e->getMessage(),
+                ]);
+
+                // Continue with other repositories even if one fails
+                $allRepositoryEvents[$repo] = [];
+            }
+        }
+
+        return [
+            'repositories' => $repositories,
+            'events' => $events,
+            'repository_events' => $allRepositoryEvents,
+            'fetched_at' => now()->toISOString(),
+        ];
+    }
+
+    /**
+     * Normalize repositories configuration
+     */
+    public function normalizeRepositories($repositoriesRaw): array
+    {
+        if (is_string($repositoriesRaw)) {
+            // Try JSON array first
+            $decoded = json_decode($repositoriesRaw, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $repositories = array_values(array_filter(array_map('trim', $decoded)));
+            } else {
+                // Support comma or newline separated strings
+                $parts = preg_split('/[,\n]/', $repositoriesRaw) ?: [];
+                $repositories = array_values(array_filter(array_map('trim', $parts)));
+            }
+        } elseif (is_array($repositoriesRaw)) {
+            $repositories = array_values(array_filter(array_map('trim', $repositoriesRaw)));
+        } else {
+            $repositories = [];
+        }
+
+        // Final guards against strings
+        if (! is_array($repositories)) {
+            $repositories = $repositories ? [trim((string) $repositories)] : [];
+        }
+
+        return $repositories;
+    }
+
+    /**
+     * Normalize events configuration
+     */
+    public function normalizeEvents($eventsRaw): array
+    {
+        if (is_string($eventsRaw)) {
+            $decoded = json_decode($eventsRaw, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $events = array_values(array_filter(array_map('trim', $decoded)));
+            } else {
+                $parts = preg_split('/[,\n\s]+/', $eventsRaw) ?: [];
+                $events = array_values(array_filter(array_map('trim', $parts)));
+            }
+        } elseif (is_array($eventsRaw)) {
+            $events = array_values(array_filter(array_map('trim', $eventsRaw)));
+        } else {
+            $events = ['push', 'pull_request'];
+        }
+
+        // Final guards against strings
+        if (! is_array($events)) {
+            $events = $events ? [trim((string) $events)] : ['push', 'pull_request'];
+        }
+
+        return $events;
+    }
+
+    /**
+     * Fetch repository events for pull jobs (returns raw data instead of processing)
+     */
+    public function fetchRepositoryEventsForPull(string $repo, array $events, Integration $integration): array
+    {
+        $repo = trim($repo);
+        if ($repo === '') {
+            return [];
+        }
+
+        $endpoint = "/repos/{$repo}/events";
+        $eventsData = $this->makeAuthenticatedRequest($endpoint, $integration);
+
+        if (! is_array($eventsData)) {
+            return [];
+        }
+
+        // Filter by configured event types (map config labels -> GitHub event types)
+        $configured = array_map('trim', $events);
+        $labelToType = [
+            'push' => 'PushEvent',
+            'pull_request' => 'PullRequestEvent',
+            'issue' => 'IssuesEvent',
+            'commit_comment' => 'CommitCommentEvent',
+        ];
+        $allowedTypes = [];
+        foreach ($configured as $label) {
+            if ($label === '') {
+                continue;
+            }
+            $allowedTypes[] = $labelToType[$label] ?? $label; // accept direct API type names too
+        }
+        $allowedTypes = array_values(array_unique($allowedTypes));
+
+        $filteredEvents = [];
+        foreach ($eventsData as $eventData) {
+            if (! is_array($eventData)) {
+                continue;
+            }
+            if (! isset($eventData['type'])) {
+                continue;
+            }
+            if (! empty($allowedTypes) && ! in_array($eventData['type'], $allowedTypes, true)) {
+                continue;
+            }
+            $filteredEvents[] = $eventData;
+        }
+
+        return $filteredEvents;
+    }
+
     protected function getRequiredScopes(): string
     {
         return 'repo read:user';

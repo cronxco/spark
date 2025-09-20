@@ -300,6 +300,47 @@ class HevyPlugin implements IntegrationPlugin
         }
     }
 
+    /**
+     * Pull workout data for pull jobs
+     */
+    public function pullWorkoutData(Integration $integration): array
+    {
+        $daysBack = (int) ($integration->configuration['days_back'] ?? 14);
+        $startDate = now()->subDays($daysBack)->toDateString();
+        $endDate = now()->toDateString();
+
+        $query = http_build_query([
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'limit' => 100,
+        ]);
+
+        $endpoint = '/v1/workouts?' . $query;
+
+        Log::info('Hevy: Fetching workouts', [
+            'integration_id' => $integration->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'endpoint' => $endpoint,
+        ]);
+
+        try {
+            $json = $this->getJson($endpoint, $integration);
+            Log::info('Hevy: Fetched workout data', [
+                'integration_id' => $integration->id,
+                'data_count' => count($json['data'] ?? []),
+            ]);
+
+            return $json;
+        } catch (Throwable $e) {
+            Log::error('Hevy: Workout fetch failed', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
     public function convertData(array $externalData, Integration $integration): array
     {
         // Not used; data is fetched directly and persisted as events/blocks

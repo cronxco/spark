@@ -370,6 +370,67 @@ class SpotifyPlugin extends OAuthPlugin
     }
 
     /**
+     * Pull listening data for pull jobs
+     */
+    public function pullListeningData(Integration $integration): array
+    {
+        $accountId = $integration->group?->account_id ?? $integration->account_id;
+
+        Log::info("Fetching Spotify listening data for user {$accountId}", [
+            'integration_id' => $integration->id,
+        ]);
+
+        $listeningData = [
+            'account_id' => $accountId,
+            'recently_played' => [],
+            'fetched_at' => now()->toISOString(),
+        ];
+
+        // Skip fetching currently playing to avoid duplicates
+
+        try {
+            $config = $integration->configuration ?? [];
+            $afterMs = (int) ($config['spotify_after_ms'] ?? 0);
+
+            // Get recently played tracks
+            $recentlyPlayed = $this->getRecentlyPlayed($integration);
+
+            // Advance 'after' cursor to the newest played_at we saw
+            $maxPlayedMs = 0;
+            foreach ($recentlyPlayed as $it) {
+                if (isset($it['played_at'])) {
+                    $ms = (int) round(Carbon::parse($it['played_at'])->valueOf());
+                    if ($ms > $maxPlayedMs) {
+                        $maxPlayedMs = $ms;
+                    }
+                }
+            }
+            if ($maxPlayedMs > $afterMs) {
+                $config['spotify_after_ms'] = $maxPlayedMs;
+            }
+
+            $integration->update(['configuration' => $config]);
+
+            $listeningData['recently_played'] = $recentlyPlayed;
+
+            Log::info('Spotify: Fetched recently played tracks', [
+                'integration_id' => $integration->id,
+                'track_count' => count($recentlyPlayed),
+                'used_after_ms' => $afterMs,
+                'new_after_ms' => $config['spotify_after_ms'] ?? null,
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Spotify: Failed to get recently played tracks', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Continue without recently played data
+        }
+
+        return $listeningData;
+    }
+
+    /**
      * Log API request details for debugging
      */
     public function logApiRequest(string $method, string $endpoint, array $headers = [], array $data = [], ?string $integrationId = null): void

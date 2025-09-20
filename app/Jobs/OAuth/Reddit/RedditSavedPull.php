@@ -6,7 +6,6 @@ use App\Integrations\Reddit\RedditPlugin;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\Reddit\RedditSavedData;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Log;
 
 class RedditSavedPull extends BaseFetchJob
 {
@@ -24,30 +23,7 @@ class RedditSavedPull extends BaseFetchJob
     {
         $plugin = new RedditPlugin;
 
-        $username = $this->integration->group?->account_id ?? $this->integration->account_id;
-
-        $after = Arr::get($this->integration->configuration ?? [], 'reddit.after');
-        $limit = 100;
-
-        $endpoint = "/user/{$username}/saved?limit={$limit}&raw_json=1";
-        if (! empty($after)) {
-            $endpoint .= "&after={$after}";
-        }
-
-        Log::info('Reddit: fetching saved items', [
-            'integration_id' => $this->integration->id,
-            'username' => $username,
-            'after' => $after,
-        ]);
-
-        $saved = $plugin->makeAuthenticatedApiRequest($endpoint, $this->integration);
-
-        $me = $plugin->makeAuthenticatedApiRequest('/api/v1/me', $this->integration);
-
-        return [
-            'saved' => $saved,
-            'me' => $me,
-        ];
+        return $plugin->pullSavedData($this->integration);
     }
 
     protected function dispatchProcessingJobs(array $rawData): void
@@ -59,10 +35,6 @@ class RedditSavedPull extends BaseFetchJob
         $after = $saved['data']['after'] ?? null;
 
         if (empty($children)) {
-            Log::info('Reddit: no saved items to process', [
-                'integration_id' => $this->integration->id,
-            ]);
-
             return;
         }
 

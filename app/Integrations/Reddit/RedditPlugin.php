@@ -273,6 +273,36 @@ class RedditPlugin extends OAuthPlugin
     }
 
     /**
+     * Pull saved data for pull jobs
+     */
+    public function pullSavedData(Integration $integration): array
+    {
+        $username = $integration->group?->account_id ?? $integration->account_id;
+
+        $after = $integration->configuration['reddit']['after'] ?? null;
+        $limit = 100;
+
+        $endpoint = "/user/{$username}/saved?limit={$limit}&raw_json=1";
+        if (! empty($after)) {
+            $endpoint .= "&after={$after}";
+        }
+
+        Log::info('Reddit: fetching saved items', [
+            'integration_id' => $integration->id,
+            'username' => $username,
+            'after' => $after,
+        ]);
+
+        $saved = $this->makeAuthenticatedApiRequest($endpoint, $integration);
+        $me = $this->makeAuthenticatedApiRequest('/api/v1/me', $integration);
+
+        return [
+            'saved' => $saved,
+            'me' => $me,
+        ];
+    }
+
+    /**
      * Implement interface - primary fetching is handled by jobs; this is a no-op.
      */
     public function fetchData(Integration $integration): void
