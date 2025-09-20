@@ -117,6 +117,24 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Health metric from Apple Health',
                 'hidden' => true,
             ],
+            'apple_workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Apple Workout',
+                'description' => 'Workout from Apple Health',
+                'hidden' => true,
+            ],
+            'workout' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout',
+                'description' => 'Workout data type',
+                'hidden' => true,
+            ],
+            'metric' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Metric',
+                'description' => 'Metric data type',
+                'hidden' => true,
+            ],
         ];
     }
 
