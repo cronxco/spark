@@ -47,6 +47,7 @@ class OutlineMigrationPull extends BaseFetchJob
 
         // Documents with pagination
         $documents = $api->listDocuments([
+            'offset' => $this->offset,
             'limit' => $this->limit,
             'sort' => 'createdAt', // Use createdAt for consistent ordering
             'direction' => 'ASC', // Start from oldest
