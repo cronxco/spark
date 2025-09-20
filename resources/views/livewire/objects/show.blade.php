@@ -845,10 +845,12 @@ new class extends Component {
                                             <div class="mb-1">
                                                 <span class="font-medium">
                                                     {{ $this->formatAction($event->action) }}
-                                                    @if ($event->target)
-                                                        to {{ $event->target->title }}
-                                                    @elseif ($event->actor)
-                                                        {{ $event->actor->title }}
+                                                    @if (should_display_action_with_object($event->action, $event->service))
+                                                        @if ($event->target)
+                                                            to {{ $event->target->title }}
+                                                        @elseif ($event->actor)
+                                                            {{ $event->actor->title }}
+                                                        @endif
                                                     @endif
                                                     @if ($event->value)
                                                         <span class="text-primary">
