@@ -54,7 +54,7 @@ class HevySweepTest extends TestCase
                         'id' => 'workout-1',
                         'start_time' => '2024-01-01T10:00:00Z',
                         'end_time' => '2024-01-01T11:00:00Z',
-                        'name' => 'Test Workout 1',
+                        'title' => 'Test Workout 1',
                         'exercises' => [
                             [
                                 'name' => 'Bench Press',
@@ -69,7 +69,7 @@ class HevySweepTest extends TestCase
                         'id' => 'workout-2',
                         'start_time' => '2024-01-02T10:00:00Z',
                         'end_time' => '2024-01-02T11:00:00Z',
-                        'name' => 'Test Workout 2',
+                        'title' => 'Test Workout 2',
                         'exercises' => [
                             [
                                 'name' => 'Squat',
