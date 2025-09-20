@@ -874,10 +874,12 @@ $areAllGroupsExpanded = computed(function () {
                                         <a href="{{ route('events.show', $firstEvent->id) }}" class="group block py-2 px-2 rounded-lg hover:bg-base-200/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                                             <div class="font-semibold truncate">
                                                 {{ $this->formatAction($firstEvent->action) }}
-                                                @if ($firstEvent->target)
-                                                    <span class="text-base-content/80">{{ ' ' . $firstEvent->target->title }}</span>
-                                                @elseif ($firstEvent->actor)
-                                                    <span class="text-base-content/80">{{ ' ' . $firstEvent->actor->title }}</span>
+                                                @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
+                                                    @if ($firstEvent->target)
+                                                        <span class="text-base-content/80">{{ ' ' . $firstEvent->target->title }}</span>
+                                                    @elseif ($firstEvent->actor)
+                                                        <span class="text-base-content/80">{{ ' ' . $firstEvent->actor->title }}</span>
+                                                    @endif
                                                 @endif
                                             </div>
                                             <div class="mt-1 text-sm text-base-content/70 flex items-center gap-2 flex-wrap">
@@ -924,10 +926,12 @@ $areAllGroupsExpanded = computed(function () {
                                         <div class="flex items-baseline gap-2">
                                             <div class="font-semibold text-base-content">
                                                 {{ $this->formatAction($event->action) }}
-                                                @if ($event->target)
-                                                    <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
-                                                @elseif ($event->actor)
-                                                    <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
+                                                @if (should_display_action_with_object($event->action, $event->service))
+                                                    @if ($event->target)
+                                                        <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
+                                                    @elseif ($event->actor)
+                                                        <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </div>

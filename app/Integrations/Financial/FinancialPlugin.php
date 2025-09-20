@@ -148,7 +148,7 @@ class FinancialPlugin extends ManualPlugin
                 'icon' => 'o-currency-pound',
                 'display_name' => 'Balance Update',
                 'description' => 'Account balance was updated',
-                'display_with_object' => true,
+                'display_with_object' => false,
                 'value_unit' => 'GBP',
                 'hidden' => false,
             ],

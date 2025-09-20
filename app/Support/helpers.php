@@ -1,5 +1,6 @@
 <?php
 
+use App\Integrations\PluginRegistry;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -38,6 +39,34 @@ if (! function_exists('format_action_title')) {
         }
 
         return implode(' ', $words);
+    }
+}
+
+if (! function_exists('should_display_action_with_object')) {
+    /**
+     * Check if an action should display with its object title based on plugin configuration.
+     *
+     * @param  string  $action  The action key (e.g., 'had_balance', 'card_payment_to')
+     * @param  string  $service  The service identifier (e.g., 'monzo', 'gocardless')
+     * @return bool True if the action should display with object title, false otherwise
+     */
+    function should_display_action_with_object(string $action, string $service): bool
+    {
+        $pluginClass = PluginRegistry::getPlugin($service);
+
+        if (! $pluginClass) {
+            // If plugin not found, default to showing with object (backward compatibility)
+            return true;
+        }
+
+        $actionTypes = $pluginClass::getActionTypes();
+
+        if (! isset($actionTypes[$action])) {
+            // If action not found in plugin config, default to showing with object
+            return true;
+        }
+
+        return $actionTypes[$action]['display_with_object'] ?? true;
     }
 }
 

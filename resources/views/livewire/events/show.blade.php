@@ -275,10 +275,12 @@ new class extends Component {
                             <div class="mb-4 text-center sm:text-left">
                                 <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2 leading-tight">
                                     {{ $this->formatAction($this->event->action) }}
-                                    @if ($this->event->target)
-                                            {{ $this->event->target->title }}
-                                    @elseif ($this->event->actor)
-                                        {{ $this->event->actor->title }}
+                                    @if (should_display_action_with_object($this->event->action, $this->event->service))
+                                        @if ($this->event->target)
+                                                {{ $this->event->target->title }}
+                                        @elseif ($this->event->actor)
+                                            {{ $this->event->actor->title }}
+                                        @endif
                                     @endif
                                 </h2>
 
@@ -433,10 +435,12 @@ new class extends Component {
                                                 <div class="mb-1">
                                                     <span class="font-medium">
                                                         {{ $this->formatAction($relatedEvent->action) }}
-                                                        @if ($relatedEvent->target)
-                                                            {{ $relatedEvent->target->title }}
-                                                        @elseif ($relatedEvent->actor)
-                                                            {{ $relatedEvent->actor->title }}
+                                                        @if (should_display_action_with_object($relatedEvent->action, $relatedEvent->service))
+                                                            @if ($relatedEvent->target)
+                                                                {{ $relatedEvent->target->title }}
+                                                            @elseif ($relatedEvent->actor)
+                                                                {{ $relatedEvent->actor->title }}
+                                                            @endif
                                                         @endif
                                                         @if ($relatedEvent->value)
                                                             <span class="text-primary">
