@@ -403,6 +403,9 @@ class OuraPlugin extends OAuthPlugin
         $startDate = now()->subDays($daysBack)->toDateString();
         $endDate = now()->toDateString();
 
+        // Check if we should perform a sweep for this integration
+        $this->performSweepIfNeeded($integration);
+
         if ($type === 'sleep') {
             $this->fetchDailySleep($integration, $startDate, $endDate);
 
@@ -1339,38 +1342,143 @@ class OuraPlugin extends OAuthPlugin
         $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
         $startDate = now()->subDays($incrementalDays)->toDateString();
         $endDate = now()->toDateString();
-        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
-        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
 
         $data = $this->getJson('/usercollection/workout', $integration, [
             'start_date' => $startDate,
             'end_date' => $endDate,
         ]);
 
-        $items = $data['data'] ?? [];
+        return $data['data'] ?? [];
+    }
 
-        if ($doSweep) {
-            $sweepData = $this->getJson('/usercollection/workout', $integration, [
-                'start_date' => now()->subDays(30)->toDateString(),
+    /**
+     * Perform a sweep if needed for any instance type
+     */
+    protected function performSweepIfNeeded(Integration $integration): void
+    {
+        $config = $integration->configuration ?? [];
+        $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        // Only perform sweep for specific instance types that benefit from it
+        // Skip sweep for specific instance types to avoid duplicate events
+        $skipSweepTypes = ['readiness', 'resilience', 'stress', 'spo2'];
+        $instanceType = $integration->instance_type ?? 'activity';
+
+        if ($doSweep && ! in_array($instanceType, $skipSweepTypes)) {
+            Log::info('Oura sweep triggered', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+                'last_sweep_at' => $lastSweepAt?->toIso8601String(),
+            ]);
+
+            // Perform sweep for all data types
+            $this->performDataSweep($integration);
+
+            // Update sweep timestamp
+            $config['oura_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
+
+            Log::info('Oura sweep completed', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+            ]);
+        } else {
+            Log::info('Oura sweep skipped', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+                'reason' => $doSweep ? 'instance_type_excluded' : 'recent_sweep',
+                'last_sweep_at' => $lastSweepAt?->toIso8601String(),
+            ]);
+        }
+    }
+
+    /**
+     * Perform the actual data sweep across all Oura data types
+     */
+    protected function performDataSweep(Integration $integration): void
+    {
+        $sweepStartDate = now()->subDays(30)->toDateString();
+        $endDate = now()->toDateString();
+
+        try {
+            // Sweep workouts data
+            $workoutData = $this->getJson('/usercollection/workout', $integration, [
+                'start_date' => $sweepStartDate,
                 'end_date' => $endDate,
             ]);
-            $sweepItems = $sweepData['data'] ?? [];
-            if (! empty($sweepItems)) {
-                // Merge unique by day/date
-                $byDay = [];
-                foreach (array_merge($items, $sweepItems) as $row) {
-                    $key = $row['day'] ?? ($row['date'] ?? null);
-                    if ($key) {
-                        $byDay[$key] = $row;
-                    }
-                }
-                $items = array_values($byDay);
-                $config['oura_last_sweep_at'] = now()->toIso8601String();
-                $integration->update(['configuration' => $config]);
+            $workoutItems = $workoutData['data'] ?? [];
+            foreach ($workoutItems as $workout) {
+                $this->createWorkoutEvent($integration, $workout);
             }
-        }
 
-        return $items;
+            // Sweep daily activity data
+            $activityData = $this->getJson('/usercollection/daily_activity', $integration, [
+                'start_date' => $sweepStartDate,
+                'end_date' => $endDate,
+            ]);
+            $activityItems = $activityData['data'] ?? [];
+            foreach ($activityItems as $activity) {
+                $this->createDailyRecordEvent($integration, 'activity', $activity, [
+                    'score_field' => 'score',
+                    'contributors_field' => 'contributors',
+                    'title' => 'Activity',
+                    'value_unit' => 'percent',
+                    'contributors_value_unit' => 'percent',
+                    'details_fields' => ['steps', 'cal_total', 'equivalent_walking_distance', 'target_calories', 'non_wear_time'],
+                ]);
+            }
+
+            // Sweep sleep data
+            $sleepData = $this->getJson('/usercollection/daily_sleep', $integration, [
+                'start_date' => $sweepStartDate,
+                'end_date' => $endDate,
+            ]);
+            $sleepItems = $sleepData['data'] ?? [];
+            foreach ($sleepItems as $sleep) {
+                $this->createDailyRecordEvent($integration, 'sleep', $sleep, [
+                    'score_field' => 'score',
+                    'contributors_field' => 'contributors',
+                    'title' => 'Sleep',
+                    'value_unit' => 'percent',
+                    'contributors_value_unit' => 'percent',
+                    'details_fields' => ['total_sleep_duration', 'rem_sleep_duration', 'deep_sleep_duration', 'light_sleep_duration', 'awake_time', 'sleep_efficiency', 'bedtime_start', 'bedtime_end'],
+                ]);
+            }
+
+            // Sweep readiness data
+            $readinessData = $this->getJson('/usercollection/daily_readiness', $integration, [
+                'start_date' => $sweepStartDate,
+                'end_date' => $endDate,
+            ]);
+            $readinessItems = $readinessData['data'] ?? [];
+            foreach ($readinessItems as $readiness) {
+                $this->createDailyRecordEvent($integration, 'readiness', $readiness, [
+                    'score_field' => 'score',
+                    'contributors_field' => 'contributors',
+                    'title' => 'Readiness',
+                    'value_unit' => 'percent',
+                    'contributors_value_unit' => 'percent',
+                    'details_fields' => ['temperature_deviation', 'temperature_trend_deviation', 'resting_heart_rate', 'heart_rate_variability', 'recovery_index'],
+                ]);
+            }
+
+            Log::info('Oura data sweep completed successfully', [
+                'integration_id' => $integration->id,
+                'workouts_count' => count($workoutItems),
+                'activity_count' => count($activityItems),
+                'sleep_count' => count($sleepItems),
+                'readiness_count' => count($readinessItems),
+            ]);
+
+        } catch (Throwable $e) {
+            Log::error('Oura data sweep failed', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
     }
 
     protected function getRequiredScopes(): string

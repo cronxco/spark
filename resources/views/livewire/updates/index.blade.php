@@ -308,51 +308,34 @@ new class extends Component {
 }; ?>
 
 <div wire:poll.5s="refreshData">
-    <div class="flex flex-col gap-6">
-        <!-- Header -->
-        <div class="flex flex-col gap-4">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl font-bold text-base-content">Updates</h1>
-                    <p class="text-base-content/70">Monitor and manage your integration data updates</p>
+    <x-header title="Updates" subtitle="Monitor and manage your integration data updates" separator>
+        <x-slot:actions>
+            <div class="flex items-center gap-2 sm:gap-3 w-full">
+                <div class="join">
+                    <button class="btn btn-sm join-item {{ $filter === 'all' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('all')">All</button>
+                    <button class="btn btn-sm join-item {{ $filter === 'integrations' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('integrations')">Integrations</button>
+                    <button class="btn btn-sm join-item {{ $filter === 'tasks' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('tasks')">Tasks</button>
                 </div>
-                <div class="flex items-center gap-2">
-                    <div class="join">
-                        <button class="btn btn-sm join-item {{ $filter === 'all' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('all')">All</button>
-                        <button class="btn btn-sm join-item {{ $filter === 'integrations' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('integrations')">Integrations</button>
-                        <button class="btn btn-sm join-item {{ $filter === 'tasks' ? 'btn-primary' : 'btn-outline' }}" wire:click="setFilter('tasks')">Tasks</button>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Search Input -->
-            <div class="flex items-center gap-2">
-                <div class="relative flex-1 max-w-md">
-                    <input
-                        type="text"
-                        placeholder="Search by plugin name or integration name..."
-                        class="input input-bordered w-full pr-10 text-sm sm:text-base"
+                <div class="flex-1 min-w-0" wire:ignore.self>
+                    <x-input
                         wire:model.live.debounce.300ms="search"
+                        placeholder="Search by plugin name or integration name..."
+                        class="w-full"
                     />
-                    @if ($search)
-                        <button
-                            class="absolute right-2 top-1/2 transform -translate-y-1/2 btn btn-ghost btn-xs"
-                            wire:click="clearSearch"
-                        >
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
-                        </button>
-                    @else
-                        <x-icon name="o-magnifying-glass" class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-base-content/50" />
-                    @endif
                 </div>
+
+                @if ($isRefreshing)
+                    <div class="flex items-center gap-2">
+                        <x-loading class="loading-spinner loading-sm" />
+                        <span class="text-sm text-base-content/70">{{ __('Refreshing...') }}</span>
+                    </div>
+                @endif
             </div>
-            @if ($isRefreshing)
-                <div class="flex items-center space-x-2">
-                    <x-loading class="loading-spinner loading-sm" />
-                    <span class="text-sm text-base-content/70">{{ __('Refreshing...') }}</span>
-                </div>
-            @endif
-        </div>
+        </x-slot:actions>
+    </x-header>
+
+    <div class="flex flex-col gap-6">
 
         <!-- Integrations List -->
         <div class="card bg-base-100 shadow-sm">

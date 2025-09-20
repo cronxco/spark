@@ -492,6 +492,9 @@ class MonzoPlugin extends OAuthPlugin
 
     public function fetchData(Integration $integration): void
     {
+        // Check if we should perform a sweep for this integration
+        $this->performSweepIfNeeded($integration);
+
         // Only do the work relevant to this instance type to avoid duplicate events across instances
         $instanceType = $integration->instance_type ?: 'transactions';
         if ($instanceType === 'accounts') {
@@ -942,6 +945,119 @@ class MonzoPlugin extends OAuthPlugin
         }
 
         return $master;
+    }
+
+    /**
+     * Perform a sweep if needed for any instance type
+     */
+    protected function performSweepIfNeeded(Integration $integration): void
+    {
+        $config = $integration->configuration ?? [];
+        $lastSweepAt = isset($config['monzo_last_sweep_at']) ? Carbon::parse($config['monzo_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        if ($doSweep) {
+            Log::info('Monzo sweep triggered', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+                'last_sweep_at' => $lastSweepAt?->toIso8601String(),
+            ]);
+
+            // Perform sweep for all data types
+            $this->performDataSweep($integration);
+
+            // Update sweep timestamp
+            $config['monzo_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
+
+            Log::info('Monzo sweep completed', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+            ]);
+        }
+    }
+
+    /**
+     * Perform the actual data sweep across all Monzo data types
+     */
+    protected function performDataSweep(Integration $integration): void
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            Log::warning('Monzo sweep: no accounts found', [
+                'integration_id' => $integration->id,
+            ]);
+
+            return;
+        }
+
+        try {
+            $totalTransactions = 0;
+            $totalBalances = 0;
+            $totalPots = 0;
+
+            foreach ($accounts as $account) {
+                // Sweep transactions (30 days)
+                $sinceIso = now()->subDays(30)->toIso8601String();
+
+                // Log the API request
+                $this->logApiRequest('GET', '/transactions', [
+                    'Authorization' => '[REDACTED]',
+                ], [
+                    'account_id' => $account['id'],
+                    'expand[]' => 'merchant',
+                    'since' => $sinceIso,
+                    'limit' => 100,
+                ], $integration->id);
+
+                $response = Http::withHeaders($this->authHeaders($integration))
+                    ->get($this->getBaseUrl() . '/transactions', [
+                        'account_id' => $account['id'],
+                        'expand[]' => 'merchant',
+                        'since' => $sinceIso,
+                        'limit' => 100,
+                    ]);
+
+                // Log the API response
+                $this->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+                if (! $response->successful()) {
+                    throw new Exception('Failed to fetch transactions from Monzo API: ' . $response->body());
+                }
+
+                $transactions = $response->json();
+                $transactionItems = $transactions['transactions'] ?? [];
+                foreach ($transactionItems as $transaction) {
+                    $this->processTransactionItem($integration, $transaction, $account['id']);
+                    $totalTransactions++;
+                }
+
+                // Sweep balance snapshots
+                $this->processBalanceSnapshot($integration, $account);
+                $totalBalances++;
+
+                // Sweep pots
+                $this->processPotsSnapshot($integration, $account);
+                $totalPots++;
+            }
+
+            Log::info('Monzo data sweep completed successfully', [
+                'integration_id' => $integration->id,
+                'accounts_count' => count($accounts),
+                'transactions_count' => $totalTransactions,
+                'balances_count' => $totalBalances,
+                'pots_count' => $totalPots,
+            ]);
+
+        } catch (Throwable $e) {
+            Log::error('Monzo data sweep failed', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
     }
 
     protected function getRequiredScopes(): string

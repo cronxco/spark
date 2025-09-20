@@ -231,7 +231,7 @@ new class extends Component {
                                                         <div class="flex items-center justify-between mb-2">
                                                             <div class="flex items-center space-x-2">
                                                                 <x-icon name="o-link" class="w-3 h-3 text-base-content/50" />
-                                                                <div x-data="{ editing: false, name: '{{ $integration['name'] ?: $integration['service'] }}' }" class="flex-1">
+                                                                <div x-data="{ editing: false, name: {{ json_encode($integration['name'] ?: $integration['service']) }} }" class="flex-1">
                                                                     <div x-show="!editing" class="flex items-center space-x-2">
                                                                         <span class="text-sm font-medium">{{ $integration['name'] ?: $integration['service'] }}</span>
                                                                         <x-button
@@ -248,7 +248,7 @@ new class extends Component {
                                                                             x-model="name"
                                                                             class="input input-xs input-bordered flex-1"
                                                                             @keydown.enter="$wire.updateIntegrationNameFromIndex('{{ $integration['id'] }}', name); editing = false"
-                                                                            @keydown.escape="editing = false; name = '{{ $integration['name'] ?: $integration['service'] }}'"
+                                                                            @keydown.escape="editing = false; name = {{ json_encode($integration['name'] ?: $integration['service']) }}"
                                                                             placeholder="Enter name"
                                                                         />
                                                                         <x-button
@@ -260,7 +260,7 @@ new class extends Component {
                                                                         <x-button
                                                                             icon="o-x-mark"
                                                                             class="btn-ghost btn-xs btn-error"
-                                                                            @click="editing = false; name = '{{ $integration['name'] ?: $integration['service'] }}'"
+                                                                            @click="editing = false; name = {{ json_encode($integration['name'] ?: $integration['service']) }}"
                                                                             title="Cancel"
                                                                         />
                                                                     </div>
