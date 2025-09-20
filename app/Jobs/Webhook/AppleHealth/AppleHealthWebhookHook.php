@@ -27,7 +27,7 @@ class AppleHealthWebhookHook extends BaseWebhookHookJob
     protected function validateWebhook(): void
     {
         $plugin = new AppleHealthPlugin;
-        $plugin->processWebhookData($this->webhookPayload, $this->headers, $this->integration);
+        $plugin->validateWebhookSignature($this->webhookPayload, $this->headers, $this->integration);
     }
 
     protected function splitWebhookData(): array

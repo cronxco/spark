@@ -195,9 +195,9 @@ class AppleHealthPlugin extends WebhookPlugin
     }
 
     /**
-     * Process webhook data for webhook jobs
+     * Validate webhook signature for webhook jobs
      */
-    public function processWebhookData(array $webhookPayload, array $headers, Integration $integration): array
+    public function validateWebhookSignature(array $webhookPayload, array $headers, Integration $integration): void
     {
         // Get the secret from the route parameter
         $routeSecret = $headers['x-webhook-secret'][0] ?? null;
@@ -213,7 +213,13 @@ class AppleHealthPlugin extends WebhookPlugin
         if (! hash_equals($expectedSecret, $routeSecret)) {
             throw new Exception('Invalid webhook secret');
         }
+    }
 
+    /**
+     * Process webhook data for webhook jobs
+     */
+    public function processWebhookData(array $webhookPayload, array $headers, Integration $integration): array
+    {
         $instanceType = (string) ($integration->instance_type ?? 'workouts');
         $processingData = [];
 

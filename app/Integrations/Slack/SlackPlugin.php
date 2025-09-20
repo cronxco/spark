@@ -178,6 +178,17 @@ class SlackPlugin extends WebhookPlugin
     }
 
     /**
+     * Validate webhook signature for webhook jobs
+     */
+    public function validateWebhookSignature(array $webhookPayload, array $headers, Integration $integration): void
+    {
+        // Verify Slack signature
+        if (! $this->verifySlackSignatureFromJob($webhookPayload, $headers, $integration)) {
+            throw new Exception('Invalid Slack webhook signature');
+        }
+    }
+
+    /**
      * Process webhook data for webhook jobs
      */
     public function processWebhookData(array $webhookPayload, array $headers, Integration $integration): array
@@ -195,11 +206,6 @@ class SlackPlugin extends WebhookPlugin
         // Verify this is a valid event payload
         if (! isset($webhookPayload['event'])) {
             throw new Exception('Slack webhook payload missing event data');
-        }
-
-        // Verify Slack signature
-        if (! $this->verifySlackSignatureFromJob($webhookPayload, $headers, $integration)) {
-            throw new Exception('Invalid Slack webhook signature');
         }
 
         $event = $webhookPayload['event'];
