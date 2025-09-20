@@ -203,16 +203,16 @@ new class extends Component {
         // Group integrations by plugin and integration group
         $groupedIntegrations = [];
         foreach ($integrationsData as $integration) {
-            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration['service']);
+            $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration['service']);
             $pluginName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($integration['service']);
             $pluginIcon = $pluginClass ? $pluginClass::getIcon() : 'fas.puzzle-piece';
-            
+
             // Get integration group info
             $integrationModel = $userIntegrations->firstWhere('id', $integration['id']);
-            $groupName = $integrationModel && $integrationModel->group ? 
-                ($integrationModel->group->account_id ?: 'Default Group') : 
+            $groupName = $integrationModel && $integrationModel->group ?
+                ($integrationModel->group->account_id ?: 'Default Group') :
                 'Default Group';
-            
+
             if (!isset($groupedIntegrations[$pluginName])) {
                 $groupedIntegrations[$pluginName] = [
                     'plugin_name' => $pluginName,
@@ -221,14 +221,14 @@ new class extends Component {
                     'groups' => []
                 ];
             }
-            
+
             if (!isset($groupedIntegrations[$pluginName]['groups'][$groupName])) {
                 $groupedIntegrations[$pluginName]['groups'][$groupName] = [
                     'group_name' => $groupName,
                     'integrations' => []
                 ];
             }
-            
+
             $groupedIntegrations[$pluginName]['groups'][$groupName]['integrations'][] = $integration;
         }
 
@@ -324,18 +324,18 @@ new class extends Component {
                     </div>
                 </div>
             </div>
-            
+
             <!-- Search Input -->
             <div class="flex items-center gap-2">
                 <div class="relative flex-1 max-w-md">
-                    <input 
-                        type="text" 
-                        placeholder="Search by plugin name or integration name..." 
-                        class="input input-bordered w-full pr-10 text-sm sm:text-base" 
+                    <input
+                        type="text"
+                        placeholder="Search by plugin name or integration name..."
+                        class="input input-bordered w-full pr-10 text-sm sm:text-base"
                         wire:model.live.debounce.300ms="search"
                     />
-                    @if($search)
-                        <button 
+                    @if ($search)
+                        <button
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 btn btn-ghost btn-xs"
                             wire:click="clearSearch"
                         >
@@ -388,7 +388,7 @@ new class extends Component {
                                     ->where('is_processing', true)
                                     ->count();
                             @endphp
-                            
+
                             <!-- Plugin Header -->
                             <div class="card bg-base-100 shadow-sm">
                                 <div class="card-body p-3 sm:p-4">
@@ -401,16 +401,16 @@ new class extends Component {
                                                 <h3 class="text-lg sm:text-xl font-semibold truncate">{{ $pluginName }}</h3>
                                                 <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-xs sm:text-sm text-base-content/70 space-y-1 sm:space-y-0">
                                                     <span>{{ $totalInstances }} {{ Str::plural('instance', $totalInstances) }}</span>
-                                                    @if($needsUpdateCount > 0)
+                                                    @if ($needsUpdateCount > 0)
                                                         <span class="text-error">{{ $needsUpdateCount }} need{{ $needsUpdateCount === 1 ? 's' : '' }} update</span>
                                                     @endif
-                                                    @if($processingCount > 0)
+                                                    @if ($processingCount > 0)
                                                         <span class="text-info">{{ $processingCount }} processing</span>
                                                     @endif
                                                 </div>
                                             </div>
                                         </div>
-                                        <button 
+                                        <button
                                             class="btn btn-ghost btn-sm flex-shrink-0"
                                             wire:click="togglePluginCollapse('{{ $pluginName }}')"
                                         >
@@ -419,20 +419,20 @@ new class extends Component {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Integration Groups -->
-                            @if(!$isCollapsed)
+                            @if (!$isCollapsed)
                                 <div class="ml-2 sm:ml-6 space-y-4">
                                     @foreach ($pluginData['groups'] as $groupName => $groupData)
                                         <div class="space-y-3">
-                                            @if(count($pluginData['groups']) > 1)
+                                            @if (count($pluginData['groups']) > 1)
                                                 <div class="flex items-center space-x-2 text-xs sm:text-sm text-base-content/70">
                                                     <x-icon name="o-folder" class="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                                                     <span class="font-medium truncate">{{ $groupName }}</span>
                                                     <span class="text-xs flex-shrink-0">({{ count($groupData['integrations']) }} {{ Str::plural('instance', count($groupData['integrations'])) }})</span>
                                                 </div>
                                             @endif
-                                            
+
                                             <div class="space-y-3">
                                                 @foreach ($groupData['integrations'] as $integration)
                                                     @php
@@ -456,7 +456,7 @@ new class extends Component {
                                         <div class="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                                             <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-base-300 flex items-center justify-center flex-shrink-0">
                                                 @php
-                                                    $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration['service']);
+                                                    $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration['service']);
                                                     $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.puzzle-piece';
                                                 @endphp
                                                 <x-icon :name="$icon" class="w-4 h-4 sm:w-5 sm:h-5 text-base-content" />
@@ -489,7 +489,7 @@ new class extends Component {
                                         </div>
 
                                         @php
-                                            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration['service']);
+                                            $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration['service']);
                                             $isWebhook = $pluginClass && $pluginClass::getServiceType() === 'webhook';
                                             $isManual = $pluginClass && $pluginClass::getServiceType() === 'manual';
                                             $isTask = ($integration['instance_type'] === 'task') || ($integration['service'] === 'task');
