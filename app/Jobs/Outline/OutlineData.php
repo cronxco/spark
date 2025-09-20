@@ -6,6 +6,7 @@ use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use Carbon\CarbonImmutable;
 use DateTime;
+use Illuminate\Support\Facades\Log;
 
 class OutlineData extends BaseProcessingJob
 {
@@ -23,6 +24,7 @@ class OutlineData extends BaseProcessingJob
     {
         $collections = $this->rawData['collections'] ?? [];
         $documents = $this->rawData['documents'] ?? [];
+        $migrationMetadata = $this->rawData['migration_metadata'] ?? null;
 
         $daynotesCollectionId = (string) (($this->integration->configuration['daynotes_collection_id'] ?? null)
             ?: config('services.outline.daynotes_collection_id'));
@@ -130,6 +132,18 @@ class OutlineData extends BaseProcessingJob
             } else {
                 $this->createEvents($eventData);
             }
+        }
+
+        // Log migration progress if this is a migration chunk
+        if ($migrationMetadata) {
+            Log::info('Outline migration chunk processed', [
+                'integration_id' => $this->integration->id,
+                'offset' => $migrationMetadata['offset'],
+                'limit' => $migrationMetadata['limit'],
+                'documents_processed' => count($documents),
+                'collections_processed' => count($collections),
+                'is_last_chunk' => $migrationMetadata['is_last_chunk'],
+            ]);
         }
     }
 
