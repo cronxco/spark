@@ -5,6 +5,7 @@ namespace App\Jobs\Outline;
 use App\Integrations\Outline\OutlineApi;
 use App\Models\Integration;
 use Carbon\CarbonImmutable;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -83,28 +84,70 @@ class PinTodayDayNote implements ShouldQueue
                 continue;
             }
 
-            $docInfo = $api->getDocument($docId);
-            $doc = $docInfo['data'] ?? $docInfo;
-            $docCollectionId = $doc['collectionId'] ?? null;
-            if ($docCollectionId === $collectionId) {
-                Log::debug('PinTodayDayNote: unpinning previous day note', [
+            try {
+                // Get minimal document info to check collection without triggering full processing
+                $docInfo = $api->getDocument($docId);
+                $doc = $docInfo['data'] ?? $docInfo;
+                $docCollectionId = $doc['collectionId'] ?? null;
+
+                if ($docCollectionId === $collectionId) {
+                    Log::debug('PinTodayDayNote: unpinning previous day note', [
+                        'doc_id' => $docId,
+                        'pin_id' => $pinId,
+                    ]);
+
+                    $deleteResult = $api->deletePin($pinId);
+
+                    // Verify the pin was actually deleted
+                    if ($deleteResult && ! isset($deleteResult['error'])) {
+                        Log::debug('PinTodayDayNote: successfully unpinned', [
+                            'doc_id' => $docId,
+                            'pin_id' => $pinId,
+                        ]);
+                    } else {
+                        Log::warning('PinTodayDayNote: failed to unpin', [
+                            'doc_id' => $docId,
+                            'pin_id' => $pinId,
+                            'result' => $deleteResult,
+                        ]);
+                    }
+                } else {
+                    Log::debug('PinTodayDayNote: keeping pin (different collection)', [
+                        'doc_id' => $docId,
+                        'pin_id' => $pinId,
+                        'doc_collection_id' => $docCollectionId,
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::error('PinTodayDayNote: error processing pin', [
                     'doc_id' => $docId,
                     'pin_id' => $pinId,
+                    'error' => $e->getMessage(),
                 ]);
-                $api->deletePin($pinId);
-            } else {
-                Log::debug('PinTodayDayNote: keeping pin (different collection)', [
-                    'doc_id' => $docId,
-                    'pin_id' => $pinId,
-                    'doc_collection_id' => $docCollectionId,
-                ]);
+                // Continue with other pins even if one fails
             }
         }
 
         // Pin today's note
-        $api->createPin($todayDoc['id']);
-        Log::info('PinTodayDayNote: pinned today note', [
-            'doc_id' => $todayDoc['id'] ?? null,
-        ]);
+        try {
+            $pinResult = $api->createPin($todayDoc['id']);
+
+            if ($pinResult && ! isset($pinResult['error'])) {
+                Log::info('PinTodayDayNote: successfully pinned today note', [
+                    'doc_id' => $todayDoc['id'] ?? null,
+                    'pin_id' => $pinResult['id'] ?? null,
+                ]);
+            } else {
+                Log::error('PinTodayDayNote: failed to pin today note', [
+                    'doc_id' => $todayDoc['id'] ?? null,
+                    'result' => $pinResult,
+                ]);
+            }
+        } catch (Exception $e) {
+            Log::error('PinTodayDayNote: error pinning today note', [
+                'doc_id' => $todayDoc['id'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

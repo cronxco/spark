@@ -311,11 +311,13 @@ class CheckIntegrationUpdates implements ShouldQueue
 
     private function getOutlineFetchJobs(Integration $integration): array
     {
-        $instanceType = $integration->instance_type ?: 'pull';
+        $instanceType = $integration->instance_type ?: 'recent_daynotes';
 
         return match ($instanceType) {
-            'pull' => [\App\Jobs\Outline\OutlinePull::class],
-            default => [],
+            'recent_daynotes' => [\App\Jobs\Outline\OutlinePullRecentDayNotes::class],
+            'recent_documents' => [\App\Jobs\Outline\OutlinePullRecentDocuments::class],
+            'pull' => [\App\Jobs\Outline\OutlinePull::class], // Legacy support
+            default => [\App\Jobs\Outline\OutlinePullRecentDayNotes::class], // Fallback to recent daynotes
         };
     }
 }

@@ -26,9 +26,9 @@ class OutlinePlugin extends ManualPlugin
         return 'Sync collections and documents from Outline, generate Day Notes, and extract tasks.';
     }
 
-    public static function getConfigurationSchema(): array
+    public static function getConfigurationSchema($instanceType = null): array
     {
-        return [
+        $baseSchema = [
             'api_url' => [
                 'type' => 'string',
                 'label' => 'API URL',
@@ -47,6 +47,78 @@ class OutlinePlugin extends ManualPlugin
                 'required' => true,
                 'default' => config('services.outline.daynotes_collection_id'),
             ],
+            'migration_status' => [
+                'type' => 'string',
+                'label' => 'Migration Status',
+                'required' => false,
+                'default' => 'not_started',
+                'options' => [
+                    'not_started' => 'Not Started',
+                    'started' => 'In Progress',
+                    'completed' => 'Completed',
+                    'failed' => 'Failed',
+                ],
+            ],
+            'migration_started_at' => [
+                'type' => 'string',
+                'label' => 'Migration Started At',
+                'required' => false,
+            ],
+            'migration_completed_at' => [
+                'type' => 'string',
+                'label' => 'Migration Completed At',
+                'required' => false,
+            ],
+        ];
+
+        if ($instanceType === 'recent_daynotes') {
+            return array_merge($baseSchema, [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 5,
+                    'max' => 60,
+                    'default' => 15,
+                    'description' => 'How often to sync recent day notes (5-60 minutes)',
+                ],
+                'document_limit' => [
+                    'type' => 'integer',
+                    'label' => 'Document Limit',
+                    'required' => false,
+                    'min' => 1,
+                    'max' => 20,
+                    'default' => 5,
+                    'description' => 'Number of most recent day notes to sync',
+                ],
+            ]);
+        }
+
+        if ($instanceType === 'recent_documents') {
+            return array_merge($baseSchema, [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 60,
+                    'max' => 1440,
+                    'default' => 120,
+                    'description' => 'How often to sync recent documents (1-24 hours)',
+                ],
+                'document_limit' => [
+                    'type' => 'integer',
+                    'label' => 'Document Limit',
+                    'required' => false,
+                    'min' => 1,
+                    'max' => 50,
+                    'default' => 10,
+                    'description' => 'Number of most recent documents to sync',
+                ],
+            ]);
+        }
+
+        // Legacy schema for backward compatibility
+        return array_merge($baseSchema, [
             'poll_interval_minutes' => [
                 'type' => 'integer',
                 'label' => 'Polling Interval (minutes)',
@@ -65,25 +137,25 @@ class OutlinePlugin extends ManualPlugin
                 'required' => false,
                 'default' => 3,
             ],
-        ];
+        ]);
     }
 
     public static function getInstanceTypes(): array
     {
-        // Start from base connection schema but relax requirements not needed for tasks
-        $connectionSchema = self::getConfigurationSchema();
-        if (isset($connectionSchema['poll_interval_minutes'])) {
-            $connectionSchema['poll_interval_minutes']['required'] = false;
-        }
-
         return [
-            'pull' => [
-                'label' => 'Outline Pull',
-                'schema' => self::getConfigurationSchema(),
+            'recent_daynotes' => [
+                'label' => 'Recent Day Notes',
+                'schema' => self::getConfigurationSchema('recent_daynotes'),
+                'description' => 'Syncs the 5 most recently edited documents from the day notes collection every 15 minutes',
+            ],
+            'recent_documents' => [
+                'label' => 'Recent Documents',
+                'schema' => self::getConfigurationSchema('recent_documents'),
+                'description' => 'Syncs the 10 most recently updated documents across all collections every 2 hours',
             ],
             'task' => [
                 'label' => 'Outline Task',
-                'schema' => array_merge($connectionSchema, [
+                'schema' => array_merge(self::getConfigurationSchema(), [
                     // Task execution controls
                     'task_mode' => [
                         'type' => 'string',
