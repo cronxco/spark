@@ -66,57 +66,88 @@ class DeleteIntegrationGroupJob implements ShouldQueue
             'account_id' => $group->account_id,
         ]);
 
-        DB::transaction(function () use ($group, $user) {
-            $this->updateProgress('starting', 'Starting deletion process...', 0);
+        // Step 1: Get all related data
+        $this->updateProgress('analyzing', 'Analyzing related data...', 10);
+        $integrations = $group->integrations;
+        $events = $this->getRelatedEvents($integrations);
+        $blocks = $this->getRelatedBlocks($events);
+        $objects = $this->getRelatedObjects($events);
 
-            // Step 1: Get all related data
-            $this->updateProgress('analyzing', 'Analyzing related data...', 10);
-            $integrations = $group->integrations;
-            $events = $this->getRelatedEvents($integrations);
-            $blocks = $this->getRelatedBlocks($events);
-            $objects = $this->getRelatedObjects($events);
+        Log::info('Found related data for deletion', [
+            'integrations_count' => $integrations->count(),
+            'events_count' => $events->count(),
+            'blocks_count' => $blocks->count(),
+            'objects_count' => $objects->count(),
+        ]);
 
-            Log::info('Found related data for deletion', [
-                'integrations_count' => $integrations->count(),
-                'events_count' => $events->count(),
-                'blocks_count' => $blocks->count(),
-                'objects_count' => $objects->count(),
-            ]);
+        $this->updateProgress('analyzing', 'Found data to delete', 20, [
+            'integrations' => $integrations->count(),
+            'events' => $events->count(),
+            'blocks' => $blocks->count(),
+            'objects' => $objects->count(),
+        ]);
 
-            $this->updateProgress('analyzing', 'Found data to delete', 20, [
+        // Step 2: Delete blocks first (they depend on events)
+        $this->updateProgress('deleting_blocks', 'Deleting blocks...', 30);
+        DB::transaction(function () use ($blocks) {
+            $this->deleteBlocks($blocks);
+        });
+
+        // Step 3: Delete events
+        $this->updateProgress('deleting_events', 'Deleting events...', 50);
+        DB::transaction(function () use ($events) {
+            $this->deleteEvents($events);
+        });
+
+        // Step 4: Find and delete orphaned objects (after events are deleted)
+        $this->updateProgress('finding_orphans', 'Finding orphaned objects...', 60);
+        $orphanedObjects = $this->findOrphanedObjects($user);
+        $this->updateProgress('deleting_objects', 'Deleting orphaned objects...', 70);
+        DB::transaction(function () use ($orphanedObjects) {
+            $this->deleteOrphanedObjects($orphanedObjects);
+        });
+
+        // Step 5: Delete activity logs for all deleted models
+        $this->updateProgress('cleaning_logs', 'Cleaning up activity logs...', 80);
+        DB::transaction(function () use ($events, $blocks, $objects, $orphanedObjects) {
+            $this->deleteActivityLogs($events, $blocks, $objects, $orphanedObjects);
+        });
+
+        // Step 6: Permanently delete integrations
+        $this->updateProgress('deleting_integrations', 'Deleting integration instances...', 90);
+        DB::transaction(function () use ($integrations) {
+            $this->forceDeleteIntegrations($integrations);
+        });
+
+        // Step 7: Permanently delete integration group
+        $this->updateProgress('deleting_group', 'Deleting integration group...', 95);
+        DB::transaction(function () use ($group) {
+            $group->forceDelete();
+        });
+
+        Log::info('Integration group deletion completed successfully', [
+            'group_id' => $this->integrationGroupId,
+            'deleted_counts' => [
                 'integrations' => $integrations->count(),
                 'events' => $events->count(),
                 'blocks' => $blocks->count(),
-                'objects' => $objects->count(),
-            ]);
+                'objects' => $objects->count() + $orphanedObjects->count(),
+            ],
+        ]);
 
-            // Step 2: Delete blocks first (they depend on events)
-            $this->updateProgress('deleting_blocks', 'Deleting blocks...', 30);
-            $this->deleteBlocks($blocks);
+        // Update progress and mark as completed
+        $this->updateProgress('completed', 'Deletion completed successfully!', 100, [
+            'deleted_counts' => [
+                'integrations' => $integrations->count(),
+                'events' => $events->count(),
+                'blocks' => $blocks->count(),
+                'objects' => $objects->count() + $orphanedObjects->count(),
+            ],
+        ]);
 
-            // Step 3: Delete events
-            $this->updateProgress('deleting_events', 'Deleting events...', 50);
-            $this->deleteEvents($events);
-
-            // Step 4: Find and delete orphaned objects
-            $this->updateProgress('finding_orphans', 'Finding orphaned objects...', 60);
-            $orphanedObjects = $this->findOrphanedObjects($user);
-            $this->updateProgress('deleting_objects', 'Deleting orphaned objects...', 70);
-            $this->deleteOrphanedObjects($orphanedObjects);
-
-            // Step 5: Delete activity logs for all deleted models
-            $this->updateProgress('cleaning_logs', 'Cleaning up activity logs...', 80);
-            $this->deleteActivityLogs($events, $blocks, $objects, $orphanedObjects);
-
-            // Step 6: Permanently delete integrations
-            $this->updateProgress('deleting_integrations', 'Deleting integration instances...', 90);
-            $this->forceDeleteIntegrations($integrations);
-
-            // Step 7: Permanently delete integration group
-            $this->updateProgress('deleting_group', 'Deleting integration group...', 95);
-            $group->forceDelete();
-
-            $this->updateProgress('completed', 'Deletion completed successfully!', 100, [
+        // Mark as completed
+        if ($this->progressRecord) {
+            $this->progressRecord->markCompleted([
                 'deleted_counts' => [
                     'integrations' => $integrations->count(),
                     'events' => $events->count(),
@@ -124,29 +155,7 @@ class DeleteIntegrationGroupJob implements ShouldQueue
                     'objects' => $objects->count() + $orphanedObjects->count(),
                 ],
             ]);
-
-            // Mark as completed
-            if ($this->progressRecord) {
-                $this->progressRecord->markCompleted([
-                    'deleted_counts' => [
-                        'integrations' => $integrations->count(),
-                        'events' => $events->count(),
-                        'blocks' => $blocks->count(),
-                        'objects' => $objects->count() + $orphanedObjects->count(),
-                    ],
-                ]);
-            }
-
-            Log::info('Integration group deletion completed successfully', [
-                'group_id' => $this->integrationGroupId,
-                'deleted_counts' => [
-                    'integrations' => $integrations->count(),
-                    'events' => $events->count(),
-                    'blocks' => $blocks->count(),
-                    'objects' => $objects->count() + $orphanedObjects->count(),
-                ],
-            ]);
-        });
+        }
     }
 
     public function failed(Throwable $exception): void
