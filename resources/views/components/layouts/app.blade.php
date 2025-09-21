@@ -97,7 +97,7 @@
                 </x-menu>
                 <form method="POST" action="{{ route('logout') }}" x-data>
                 @csrf
-                <x-menu-item @click.prevent="$root.submit();" title="Logout" />
+                <x-menu-item @click.prevent="$el.closest('form').submit();" title="Logout" />
                 </form>
             </x-dropdown>
             @endif

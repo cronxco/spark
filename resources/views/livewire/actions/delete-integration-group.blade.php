@@ -1,8 +1,274 @@
+<?php
+
+use App\Jobs\DeleteIntegrationGroupJob;
+use App\Models\ActionProgress;
+use App\Models\IntegrationGroup;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Validate;
+use Livewire\Volt\Component;
+use Mary\Traits\Toast;
+
+new class extends Component {
+    use Toast;
+
+    public bool $showModal = false;
+    public ?string $groupId = null;
+    public ?IntegrationGroup $group = null;
+    public array $deletionSummary = [
+        'integrations' => 0,
+        'events' => 0,
+        'blocks' => 0,
+        'objects' => 0,
+        'service_name' => '',
+        'account_id' => null,
+    ];
+
+    #[Validate('required|string')]
+    public string $confirmationText = '';
+
+    public bool $finalConfirmation = false;
+    public int $step = 1;
+    public bool $isDeleting = false;
+    public bool $showProgress = false;
+    public string $progressMessage = '';
+    public int $progressPercentage = 0;
+    public string $progressStep = '';
+    public array $progressDetails = [];
+    public bool $deletionComplete = false;
+
+    protected $listeners = ['confirmDeleteGroup'];
+
+    public function mount(): void
+    {
+        // Initialize component
+    }
+
+    public function confirmDeleteGroup(string $groupId): void
+    {
+        // Reset all state first to ensure clean start
+        $this->resetAllState();
+
+        $this->groupId = $groupId;
+        $this->group = IntegrationGroup::where('id', $groupId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $this->loadDeletionSummary();
+        $this->showModal = true;
+    }
+
+    public function nextStep(): void
+    {
+        if ($this->step === 1) {
+            $this->step = 2;
+        } elseif ($this->step === 2) {
+            if ($this->validateConfirmationText()) {
+                $this->step = 3;
+            }
+        }
+    }
+
+    public function previousStep(): void
+    {
+        if ($this->step > 1) {
+            $this->step--;
+        }
+    }
+
+    public function deleteGroup(): void
+    {
+        if (! $this->finalConfirmation) {
+            $this->error('Please confirm that you understand this action cannot be undone.');
+            return;
+        }
+
+        if ($this->step !== 3) {
+            $this->error('Please complete all confirmation steps before proceeding.');
+            return;
+        }
+
+        if (! $this->group) {
+            $this->error('Invalid integration group. Please refresh the page and try again.');
+            return;
+        }
+
+        $this->isDeleting = true;
+
+        try {
+            DeleteIntegrationGroupJob::dispatch($this->groupId, Auth::id());
+
+            // Show progress modal instead of closing
+            $this->showProgress = true;
+            $this->progressMessage = 'Deletion started...';
+            $this->progressPercentage = 0;
+            $this->progressStep = 'starting';
+
+        } catch (Exception $e) {
+            Log::error('Failed to dispatch integration group deletion job', [
+                'group_id' => $this->groupId,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->error('Failed to start deletion process. Please try again or contact support if the problem persists.');
+            $this->isDeleting = false;
+        }
+    }
+
+    public function closeModal(): void
+    {
+        $this->resetAllState();
+    }
+
+    public function checkProgress(): void
+    {
+        // Early return if component is in invalid state
+        if (! $this->groupId || ! $this->showProgress || $this->deletionComplete) {
+            return;
+        }
+
+        try {
+            // Verify the group still exists before checking progress
+            $groupExists = IntegrationGroup::where('id', $this->groupId)
+                ->where('user_id', Auth::id())
+                ->exists();
+
+            if (! $groupExists) {
+                // Group was deleted, mark as complete
+                $this->handleDeletionComplete();
+                return;
+            }
+
+            // Get the latest progress record for this deletion action
+            $progress = ActionProgress::getLatestProgress(
+                Auth::id(),
+                'deletion',
+                $this->groupId
+            );
+
+            if (! $progress) {
+                // No progress record found, might be completed or failed
+                $this->handleDeletionComplete();
+                return;
+            }
+
+            // Update progress properties
+            $this->progressStep = $progress->step;
+            $this->progressMessage = $progress->message;
+            $this->progressPercentage = $progress->progress;
+            $this->progressDetails = $progress->details ?? [];
+
+            if ($progress->isCompleted()) {
+                $this->handleDeletionComplete();
+            } elseif ($progress->isFailed()) {
+                $this->handleDeletionFailed($progress->error_message ?? 'Unknown error');
+            }
+        } catch (Exception $e) {
+            Log::error('Failed to check deletion progress', [
+                'group_id' => $this->groupId,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            // If we get an exception, it might be because the group was deleted
+            // Mark as complete to stop further polling
+            $this->handleDeletionComplete();
+        }
+    }
+
+    public function handleDeletionComplete(): void
+    {
+        $this->deletionComplete = true;
+
+        // Reset all component state to prevent rehydration issues
+        $this->groupId = null;
+        $this->group = null;
+        $this->showProgress = false;
+        $this->isDeleting = false;
+
+        $this->success('Integration group deleted successfully!');
+
+        // Skip rendering to prevent rehydration issues
+        $this->skipRender();
+
+        $this->closeModal();
+
+        // Refresh the integrations page data
+        $this->dispatch('$refresh');
+    }
+
+    public function handleDeletionFailed(string $error): void
+    {
+        $this->deletionComplete = true;
+
+        // Reset component state
+        $this->groupId = null;
+        $this->group = null;
+        $this->showProgress = false;
+        $this->isDeleting = false;
+
+        $this->error('Deletion failed: ' . $error);
+
+        // Skip rendering to prevent rehydration issues
+        $this->skipRender();
+    }
+
+    public function validateConfirmationText(): bool
+    {
+        if (! $this->group) {
+            return false;
+        }
+
+        $expectedText = strtolower($this->group->service);
+        $providedText = strtolower(trim($this->confirmationText));
+
+        return $expectedText === $providedText;
+    }
+
+    private function loadDeletionSummary(): void
+    {
+        if (!$this->group) {
+            return;
+        }
+
+        $this->deletionSummary = $this->group->getDeletionSummary();
+    }
+
+    private function resetAllState(): void
+    {
+        $this->showModal = false;
+        $this->groupId = null;
+        $this->group = null;
+        $this->deletionSummary = [
+            'integrations' => 0,
+            'events' => 0,
+            'blocks' => 0,
+            'objects' => 0,
+            'service_name' => '',
+            'account_id' => null,
+        ];
+        $this->confirmationText = '';
+        $this->finalConfirmation = false;
+        $this->step = 1;
+        $this->isDeleting = false;
+        $this->showProgress = false;
+        $this->progressMessage = '';
+        $this->progressPercentage = 0;
+        $this->progressStep = '';
+        $this->progressDetails = [];
+        $this->deletionComplete = false;
+    }
+};
+?>
+
 <div>
-    <x-modal wire:model="showModal" title="Delete Integration Group" class="modal-lg">
+    @if ($showModal && $group)
+        <x-modal wire:model="showModal" title="Delete Integration Group" class="modal-lg">
         <div class="space-y-6">
             <!-- Step 1: Warning -->
-            <div x-show="step === 1" x-transition>
+            @if ($step === 1)
+            <div x-transition>
                 <div class="space-y-4">
                     <x-alert icon="o-exclamation-triangle" class="alert-warning">
                         <div class="font-semibold">Warning: This action cannot be undone!</div>
@@ -41,12 +307,13 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Step 2: Confirmation -->
-            <div x-show="step === 2" x-transition>
+            @if ($step === 2)
+            <div x-transition>
                 <div class="space-y-4">
                     <div class="text-center">
-                        <x-icon name="o-shield-exclamation" class="w-16 h-16 text-error mx-auto mb-4" />
                         <h3 class="text-lg font-semibold mb-2">Confirm Deletion</h3>
                         <p class="text-base-content/70">
                             To confirm this deletion, please type the service name:
@@ -78,12 +345,13 @@
                     @endif
                 </div>
             </div>
+            @endif
 
             <!-- Step 3: Final confirmation -->
-            <div x-show="step === 3" x-transition>
+            @if ($step === 3)
+            <div x-transition>
                 <div class="space-y-4">
                     <div class="text-center">
-                        <x-icon name="o-trash" class="w-16 h-16 text-error mx-auto mb-4" />
                         <h3 class="text-lg font-semibold mb-2">Final Confirmation</h3>
                         <p class="text-base-content/70 mb-4">
                             This is your last chance to cancel. Once confirmed, the deletion will begin immediately and cannot be stopped.
@@ -115,12 +383,13 @@
                                 class="checkbox checkbox-error"
                             />
                             <span class="label-text">
-                                I understand this action cannot be undone and I want to proceed with the deletion
+                                I understand this action cannot be undone
                             </span>
                         </label>
                     </div>
                 </div>
             </div>
+            @endif
         </div>
 
         <x-slot:actions>
@@ -167,10 +436,11 @@
             </div>
         </x-slot:actions>
     </x-modal>
+    @endif
 
     <!-- Progress Modal -->
     <x-modal wire:model="showProgress" title="Deleting Integration Group" class="modal-lg" :closable="false">
-        <div class="space-y-6" wire:poll.2s="checkProgress">
+        <div class="space-y-6" @if (!$deletionComplete) wire:poll.2s="checkProgress" @endif>
             <!-- Progress Bar -->
             <div class="space-y-2">
                 <div class="flex justify-between text-sm">

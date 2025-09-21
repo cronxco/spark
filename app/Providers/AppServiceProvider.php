@@ -7,6 +7,7 @@ use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Support\Facades\Event;
 /** @phpstan-ignore-next-line */
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Horizon\Horizon;
 use Sentry\EventHint;
@@ -31,6 +32,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+
+        // Force HTTPS in development
+        URL::forceScheme('https');
+
         // Register the Authelia socialite provider
         // This allows the use of Authelia for authentication via Socialite
         Event::listen(function (SocialiteWasCalled $event) {

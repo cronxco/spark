@@ -15,6 +15,8 @@ new class extends Component {
     // Back-compat for tests expecting this property
     public array $integrationsByService = [];
 
+    protected $listeners = ['$refresh' => 'loadData'];
+
     public function mount(): void
     {
         $this->loadData();
