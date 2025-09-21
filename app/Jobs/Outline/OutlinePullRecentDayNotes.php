@@ -29,14 +29,8 @@ class OutlinePullRecentDayNotes extends BaseFetchJob
             ];
         }
 
-        $limit = (int) ($this->integration->configuration['document_limit'] ?? 5);
-
-        $documents = $api->listDocuments([
-            'collectionId' => $collectionId,
-            'limit' => $limit,
-            'sort' => 'updatedAt',
-            'direction' => 'DESC',
-        ]);
+        // Get day notes from current month, previous month, and next month
+        $documents = $this->fetchDayNotesForMonths($api, $collectionId);
 
         return [
             'collections' => [],
@@ -48,6 +42,65 @@ class OutlinePullRecentDayNotes extends BaseFetchJob
     {
         OutlineData::dispatch($this->integration, $rawData)
             ->onQueue('pull');
+    }
+
+    private function fetchDayNotesForMonths(OutlineApi $api, string $collectionId): array
+    {
+        $now = CarbonImmutable::now('UTC');
+
+        // Define the three months we want to fetch
+        $months = [
+            $now->subMonth(), // Previous month
+            $now,             // Current month
+            $now->addMonth(), // Next month
+        ];
+
+        $allDocuments = [];
+
+        foreach ($months as $month) {
+            $yearMonth = $month->format('Y-m'); // e.g., "2025-09"
+
+            // Search for documents in this month within the Day Notes collection
+            // Since we're filtering by collectionId, we should only get day notes
+            // Use limited search to avoid unnecessary pagination
+            $searchResults = $api->searchDocumentsLimited([
+                'collectionId' => $collectionId,
+                'query' => $yearMonth,
+            ], 50); // Limit to 50 results per month (should be more than enough)
+
+            // Extract documents from search results
+            foreach ($searchResults as $searchResult) {
+                $doc = $searchResult['document'] ?? $searchResult;
+
+                // Verify this is actually a day note for this month
+                $title = $doc['title'] ?? '';
+                if (str_starts_with($title, $yearMonth)) {
+                    $allDocuments[] = $doc;
+                }
+            }
+        }
+
+        // Remove duplicates (in case a document appears in multiple searches)
+        $uniqueDocuments = [];
+        $seenIds = [];
+
+        foreach ($allDocuments as $doc) {
+            $docId = $doc['id'] ?? null;
+            if ($docId && ! in_array($docId, $seenIds)) {
+                $uniqueDocuments[] = $doc;
+                $seenIds[] = $docId;
+            }
+        }
+
+        // Sort by updatedAt DESC to get most recent first
+        usort($uniqueDocuments, function ($a, $b) {
+            $updatedA = $a['updatedAt'] ?? '';
+            $updatedB = $b['updatedAt'] ?? '';
+
+            return strcmp($updatedB, $updatedA); // DESC order
+        });
+
+        return $uniqueDocuments;
     }
 
     private function getDayNotesCollectionId(): string

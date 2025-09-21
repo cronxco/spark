@@ -26,8 +26,7 @@ class PinTodayDayNote implements ShouldQueue
             : Integration::findOrFail($this->integration);
 
         $api = new OutlineApi($integration);
-        $collectionId = (string) (($integration->configuration['daynotes_collection_id'] ?? null)
-            ?: config('services.outline.daynotes_collection_id'));
+        $collectionId = $api->daynotesCollectionId();
 
         // Compute today's title (UTC)
         $today = CarbonImmutable::now('UTC');
@@ -39,20 +38,29 @@ class PinTodayDayNote implements ShouldQueue
             'title' => $title,
         ]);
 
-        // Find today's document in the collection
-        $documents = $api->listDocuments([
+        // Find today's document using efficient search
+        $searchResult = $api->searchSingleDocument([
             'collectionId' => $collectionId,
+            'query' => $today->format('Y-m-d'), // Search by date for efficiency
         ]);
 
-        Log::info('PinTodayDayNote: fetched collection documents', [
-            'fetched_count' => is_countable($documents) ? count($documents) : 0,
-        ]);
-
-        $todayDoc = collect($documents)->firstWhere('title', $title);
-        if (! $todayDoc) {
-            Log::info('PinTodayDayNote: no document found for today title; exiting');
+        if (! $searchResult) {
+            Log::info('PinTodayDayNote: no document found for today; exiting');
 
             return; // Nothing to pin
+        }
+
+        // Extract document from search result structure
+        $todayDoc = $searchResult['document'] ?? $searchResult;
+
+        // Verify it's the correct document by checking the full title
+        if (($todayDoc['title'] ?? '') !== $title) {
+            Log::info('PinTodayDayNote: found document but title mismatch; exiting', [
+                'found_title' => $todayDoc['title'] ?? 'No title',
+                'expected_title' => $title,
+            ]);
+
+            return; // Wrong document
         }
 
         Log::info('PinTodayDayNote: found today document', [

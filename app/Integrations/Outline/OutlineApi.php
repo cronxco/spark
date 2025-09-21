@@ -60,6 +60,103 @@ class OutlineApi
         return $documents;
     }
 
+    /**
+     * Search for a single document using Outline's dedicated search endpoint
+     * This is optimized for finding one specific document and stops after the first result
+     */
+    public function searchSingleDocument(array $params = []): ?array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Return the first document if found
+        if (! empty($documents)) {
+            return $documents[0];
+        }
+
+        return null;
+    }
+
+    /**
+     * Search for documents with early termination when we have enough results
+     * This is optimized for cases where we know we don't need all results
+     */
+    public function searchDocumentsLimited(array $params = [], int $maxResults = 50): array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Stop if we already have enough results
+        if (count($documents) >= $maxResults) {
+            return array_slice($documents, 0, $maxResults);
+        }
+
+        // Follow pagination with early termination
+        $pageCount = 0;
+        while (isset($data['pagination']['nextPath']) && ! empty($data['pagination']['nextPath'])) {
+            if ($pageCount++ >= 5) { // Reduced cap for efficiency
+                Log::warning('Outline documents search pagination capped at 5 pages');
+                break;
+            }
+
+            $data = $this->post($data['pagination']['nextPath'], $query);
+            $newDocuments = $data['data'] ?? [];
+            $documents = array_merge($documents, $newDocuments);
+
+            // Stop if we have enough results
+            if (count($documents) >= $maxResults) {
+                return array_slice($documents, 0, $maxResults);
+            }
+        }
+
+        return $documents;
+    }
+
+    /**
+     * Search for documents using Outline's dedicated search endpoint
+     * This uses /documents.search which is designed for keyword searching
+     */
+    public function searchDocuments(array $params = []): array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Follow pagination with a sensible upper bound
+        $pageCount = 0;
+        while (isset($data['pagination']['nextPath']) && ! empty($data['pagination']['nextPath'])) {
+            if ($pageCount++ >= 10) { // Reasonable cap for search results
+                Log::warning('Outline documents search pagination capped at 10 pages');
+                break;
+            }
+
+            $data = $this->post($data['pagination']['nextPath'], $query);
+            $documents = array_merge($documents, $data['data'] ?? []);
+        }
+
+        return $documents;
+    }
+
     public function getDocument(string $documentId): array
     {
         $endpoint = '/api/documents.info';
@@ -126,10 +223,17 @@ class OutlineApi
         return $this->post($endpoint, $payload);
     }
 
-    protected function baseUrl(): string
+    public function baseUrl(): string
     {
-        $config = $this->integration->configuration ?? [];
-        $raw = (string) ($config['api_url'] ?? config('services.outline.url'));
+        // First try to get from IntegrationGroup (preferred)
+        if ($this->integration->group && $this->integration->group->auth_metadata && isset($this->integration->group->auth_metadata['api_url'])) {
+            $raw = (string) $this->integration->group->auth_metadata['api_url'];
+        } else {
+            // Fallback to individual integration configuration
+            $config = $this->integration->configuration ?? [];
+            $raw = (string) ($config['api_url'] ?? config('services.outline.url'));
+        }
+
         $url = trim($raw);
 
         if ($url === '') {
@@ -144,10 +248,30 @@ class OutlineApi
         return $url;
     }
 
-    protected function token(): string
+    public function daynotesCollectionId(): string
     {
+        // First try to get from IntegrationGroup (preferred)
+        if ($this->integration->group && $this->integration->group->auth_metadata && isset($this->integration->group->auth_metadata['daynotes_collection_id'])) {
+            return (string) $this->integration->group->auth_metadata['daynotes_collection_id'];
+        }
+
+        // Fallback to individual integration configuration
         $config = $this->integration->configuration ?? [];
-        $raw = (string) ($config['access_token'] ?? config('services.outline.access_token') ?? '');
+
+        return (string) ($config['daynotes_collection_id'] ?? config('services.outline.daynotes_collection_id'));
+    }
+
+    public function token(): string
+    {
+        // First try to get from IntegrationGroup (preferred)
+        if ($this->integration->group && $this->integration->group->access_token) {
+            $raw = (string) $this->integration->group->access_token;
+        } else {
+            // Fallback to individual integration configuration
+            $config = $this->integration->configuration ?? [];
+            $raw = (string) ($config['access_token'] ?? config('services.outline.access_token') ?? '');
+        }
+
         $token = trim($raw);
 
         if (str_starts_with($token, 'Bearer ')) {
