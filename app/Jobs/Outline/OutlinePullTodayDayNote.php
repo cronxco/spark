@@ -6,6 +6,7 @@ use App\Integrations\Outline\OutlineApi;
 use App\Jobs\Base\BaseFetchJob;
 use App\Models\Integration;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
 
 class OutlinePullTodayDayNote extends BaseFetchJob
 {
@@ -40,8 +41,7 @@ class OutlinePullTodayDayNote extends BaseFetchJob
     {
         $api = new OutlineApi($this->integration);
 
-        $daynotesCollectionId = (string) (($this->integration->configuration['daynotes_collection_id'] ?? null)
-            ?: config('services.outline.daynotes_collection_id'));
+        $daynotesCollectionId = $api->daynotesCollectionId();
 
         if ($daynotesCollectionId === '') {
             return [
@@ -54,16 +54,17 @@ class OutlinePullTodayDayNote extends BaseFetchJob
         $title = CarbonImmutable::createFromFormat('Y-m-d', $this->forDate, 'UTC')->format('Y-m-d: l');
 
         // Try to locate today's document within the Day Notes collection
-        $docsPage = $api->listDocuments([
+        // Use Outline's dedicated search endpoint with date-only query for efficiency
+        $searchResult = $api->searchSingleDocument([
             'collectionId' => $daynotesCollectionId,
-            'limit' => 100,
-            'sort' => 'updatedAt',
-            'direction' => 'DESC',
-            'query' => $title,
+            'query' => $this->forDate, // Search by date (Y-m-d) instead of full title
         ]);
 
-        $documents = [];
-        foreach (($docsPage['data'] ?? $docsPage ?? []) as $doc) {
+        $foundDocuments = [];
+        if ($searchResult) {
+            // Search results have a different structure - the document is nested under 'document'
+            $doc = $searchResult['document'] ?? $searchResult;
+
             if (($doc['title'] ?? '') === $title) {
                 // Enrich with full content
                 $info = $api->getDocument((string) ($doc['id'] ?? ''));
@@ -71,20 +72,26 @@ class OutlinePullTodayDayNote extends BaseFetchJob
                 if (! isset($full['text']) && isset($full['id'])) {
                     // Some Outline responses may nest text differently; prefer 'text' when available
                 }
-                $documents[] = array_merge($doc, $full);
-                break;
+                $foundDocuments[] = array_merge($doc, $full);
             }
         }
 
         return [
             'collections' => [],
-            'documents' => $documents,
+            'documents' => $foundDocuments,
         ];
     }
 
     protected function dispatchProcessingJobs(array $rawData): void
     {
         if (empty($rawData['documents'])) {
+            // Log warning when no day note is found for the requested date
+            Log::warning('OutlinePullTodayDayNote: No day note found for date', [
+                'integration_id' => $this->integration->id,
+                'requested_date' => $this->forDate,
+                'title_searched' => CarbonImmutable::createFromFormat('Y-m-d', $this->forDate, 'UTC')->format('Y-m-d: l'),
+            ]);
+
             return;
         }
 

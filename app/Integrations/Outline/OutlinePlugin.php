@@ -3,6 +3,10 @@
 namespace App\Integrations\Outline;
 
 use App\Integrations\Base\ManualPlugin;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Models\User;
+use Throwable;
 
 class OutlinePlugin extends ManualPlugin
 {
@@ -21,6 +25,33 @@ class OutlinePlugin extends ManualPlugin
         return 'Outline';
     }
 
+    public static function getGroupConfigurationSchema(): array
+    {
+        return [
+            'api_url' => [
+                'type' => 'string',
+                'label' => 'API URL',
+                'required' => true,
+                'default' => config('services.outline.url'),
+                'description' => 'The base URL of your Outline instance (e.g., https://outline.example.com)',
+            ],
+            'access_token' => [
+                'type' => 'string',
+                'label' => 'Access Token',
+                'required' => true,
+                'default' => config('services.outline.access_token'),
+                'description' => 'Your Outline API access token (found in Settings > API)',
+            ],
+            'daynotes_collection_id' => [
+                'type' => 'string',
+                'label' => 'Day Notes Collection ID',
+                'required' => true,
+                'default' => config('services.outline.daynotes_collection_id'),
+                'description' => 'The ID of the collection where your day notes are stored',
+            ],
+        ];
+    }
+
     public static function getDescription(): string
     {
         return 'Sync collections and documents from Outline, generate Day Notes, and extract tasks.';
@@ -29,24 +60,6 @@ class OutlinePlugin extends ManualPlugin
     public static function getConfigurationSchema($instanceType = null): array
     {
         $baseSchema = [
-            'api_url' => [
-                'type' => 'string',
-                'label' => 'API URL',
-                'required' => true,
-                'default' => config('services.outline.url'),
-            ],
-            'access_token' => [
-                'type' => 'string',
-                'label' => 'Access Token',
-                'required' => true,
-                'default' => config('services.outline.access_token'),
-            ],
-            'daynotes_collection_id' => [
-                'type' => 'string',
-                'label' => 'Day Notes Collection ID',
-                'required' => true,
-                'default' => config('services.outline.daynotes_collection_id'),
-            ],
             'migration_status' => [
                 'type' => 'string',
                 'label' => 'Migration Status',
@@ -322,5 +335,72 @@ class OutlinePlugin extends ManualPlugin
                 'hidden' => true,
             ],
         ];
+    }
+
+    public function initializeGroup(User $user): IntegrationGroup
+    {
+        return IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => static::getIdentifier(),
+            'account_id' => null,
+            'access_token' => null,
+            'refresh_token' => null,
+            'expiry' => null,
+            'refresh_expiry' => null,
+            'auth_metadata' => [
+                'api_url' => config('services.outline.url'),
+                'daynotes_collection_id' => config('services.outline.daynotes_collection_id'),
+            ],
+        ]);
+    }
+
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    {
+        // Extract group-level configuration from initialConfig
+        $groupConfig = [];
+        $instanceConfig = $initialConfig;
+
+        if (isset($initialConfig['api_url'])) {
+            $groupConfig['api_url'] = $initialConfig['api_url'];
+            unset($instanceConfig['api_url']);
+        }
+
+        if (isset($initialConfig['access_token'])) {
+            $group->update(['access_token' => $initialConfig['access_token']]);
+            unset($instanceConfig['access_token']);
+        }
+
+        if (isset($initialConfig['daynotes_collection_id'])) {
+            $groupConfig['daynotes_collection_id'] = $initialConfig['daynotes_collection_id'];
+            unset($instanceConfig['daynotes_collection_id']);
+        }
+
+        // Update group auth_metadata if we have group-level config
+        if (! empty($groupConfig)) {
+            $currentMetadata = $group->auth_metadata ?? [];
+            $group->update(['auth_metadata' => array_merge($currentMetadata, $groupConfig)]);
+        }
+
+        // Derive a sensible default name from plugin instance types if available
+        $defaultName = static::getDisplayName();
+        if (method_exists(static::class, 'getInstanceTypes')) {
+            try {
+                $types = static::getInstanceTypes();
+                $defaultName = $types[$instanceType]['label'] ?? ucfirst($instanceType);
+            } catch (Throwable $e) {
+                $defaultName = ucfirst($instanceType);
+            }
+        } else {
+            $defaultName = ucfirst($instanceType);
+        }
+
+        return Integration::create([
+            'user_id' => $group->user_id,
+            'integration_group_id' => $group->id,
+            'service' => static::getIdentifier(),
+            'name' => $defaultName,
+            'instance_type' => $instanceType,
+            'configuration' => $instanceConfig,
+        ]);
     }
 }
