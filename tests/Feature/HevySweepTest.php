@@ -211,9 +211,9 @@ class HevySweepTest extends TestCase
     {
         // Test different response formats that Hevy might return
         $responseFormats = [
-            ['data' => [['id' => 'workout-1', 'name' => 'Test Workout Format 1']]],
-            ['workouts' => [['id' => 'workout-2', 'name' => 'Test Workout Format 2']]],
-            [['id' => 'workout-3', 'name' => 'Test Workout Format 3']], // Direct array
+            ['data' => [['id' => 'workout-1', 'title' => 'Test Workout Format 1', 'start_time' => '2024-01-01T10:00:00Z']]],
+            ['workouts' => [['id' => 'workout-2', 'title' => 'Test Workout Format 2', 'start_time' => '2024-01-02T10:00:00Z']]],
+            [['id' => 'workout-3', 'title' => 'Test Workout Format 3', 'start_time' => '2024-01-03T10:00:00Z']], // Direct array
         ];
 
         foreach ($responseFormats as $index => $responseFormat) {
