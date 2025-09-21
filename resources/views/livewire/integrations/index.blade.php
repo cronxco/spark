@@ -130,6 +130,11 @@ new class extends Component {
         $this->dispatch('copy-to-clipboard', url: $url);
     }
 
+    public function confirmDeleteGroup(string $groupId): void
+    {
+        $this->dispatch('confirmDeleteGroup', groupId: $groupId);
+    }
+
 
 
     public function updateIntegrationNameFromIndex($integrationId, string $name): void
@@ -223,8 +228,16 @@ new class extends Component {
                                     <div class="space-y-3">
                                         @foreach ($grouped as $group)
                                             <div class="border border-base-300 rounded-lg p-3 bg-base-100">
-                                                <div class="mb-2 text-xs text-base-content/70">
-                                                    Account: {{ $group['account_id'] ?? '—' }}
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <div class="text-xs text-base-content/70">
+                                                        Account: {{ $group['account_id'] ?? '—' }}
+                                                    </div>
+                                                    <x-button
+                                                        icon="o-trash"
+                                                        class="btn-error btn-sm"
+                                                        wire:click="confirmDeleteGroup('{{ $group['id'] }}')"
+                                                        title="Delete entire group"
+                                                    />
                                                 </div>
                                                 @foreach ($group['instances'] as $integration)
                                                     <div class="border border-base-300 rounded-lg p-3 bg-base-200 mb-2">
@@ -374,4 +387,7 @@ new class extends Component {
 
     <!-- Toast notifications -->
     <x-toast position="toast-top toast-end" />
+
+    <!-- Delete Group Modal -->
+    <livewire:actions.delete-integration-group />
 </div>
