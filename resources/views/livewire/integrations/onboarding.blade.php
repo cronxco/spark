@@ -271,7 +271,7 @@ use Carbon\Carbon;
                         $pluginClass = \App\Integrations\PluginRegistry::getPlugin($group->service);
                         $supportsMigration = $pluginClass && $pluginClass::supportsMigration();
                     @endphp
-                    
+
                     @if ($supportsMigration)
                         <div class="p-4 bg-base-200 rounded-lg space-y-3">
                             <label class="flex items-center gap-3">

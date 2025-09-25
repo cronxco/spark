@@ -103,13 +103,13 @@ new class extends Component {
             $migrationProgressStep = null;
             $migrationProgressDetails = null;
             $migrationProgressFailed = false;
-            
+
             $actionProgress = ActionProgress::getLatestProgress(
                 $integration->user_id,
                 'migration',
                 "integration_{$integration->id}"
             );
-            
+
             if ($actionProgress) {
                 $migrationProgress = $actionProgress->progress;
                 $migrationProgressMessage = $actionProgress->message;
@@ -546,14 +546,14 @@ new class extends Component {
                                             @endif
 
                                             @if (!is_null($integration['migration_progress']) || !is_null($integration['action_progress']))
-                                                @php 
-                                                    $phase = $integration['migration_phase']; 
+                                                @php
+                                                    $phase = $integration['migration_phase'];
                                                     $actionProgress = $integration['action_progress'];
                                                     $actionMessage = $integration['action_progress_message'];
                                                     $actionStep = $integration['action_progress_step'];
                                                     $actionFailed = $integration['action_progress_failed'];
                                                 @endphp
-                                                
+
                                                 @if ($actionFailed)
                                                     <x-badge value="{{ __('Migration Failed') }}" class="badge-error badge-sm" />
                                                 @elseif (($actionProgress !== null && $actionProgress >= 100) || ($integration['migration_progress'] !== null && $integration['migration_progress'] >= 100))
