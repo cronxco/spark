@@ -1,6 +1,7 @@
 <?php
 use App\Jobs\ProcessIntegrationData;
 use App\Jobs\RunIntegrationTask;
+use App\Models\ActionProgress;
 use App\Models\Integration;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -94,6 +95,27 @@ new class extends Component {
                 } catch (\Throwable $e) {
                     // ignore
                 }
+            }
+
+            // Get ActionProgress for migration tracking
+            $migrationProgress = null;
+            $migrationProgressMessage = null;
+            $migrationProgressStep = null;
+            $migrationProgressDetails = null;
+            $migrationProgressFailed = false;
+
+            $actionProgress = ActionProgress::getLatestProgress(
+                $integration->user_id,
+                'migration',
+                "integration_{$integration->id}"
+            );
+
+            if ($actionProgress) {
+                $migrationProgress = $actionProgress->progress;
+                $migrationProgressMessage = $actionProgress->message;
+                $migrationProgressStep = $actionProgress->step;
+                $migrationProgressDetails = $actionProgress->details;
+                $migrationProgressFailed = $actionProgress->isFailed();
             }
 
             // Monzo migration hints from cache (fetched back to date and tx window count)
@@ -191,6 +213,11 @@ new class extends Component {
                 'migration_phase' => $migrationPhase,
                 'migration_fetched_back_to' => $fetchedBackTo,
                 'migration_tx_window_count' => $txWindowCount,
+                'action_progress' => $migrationProgress,
+                'action_progress_message' => $migrationProgressMessage,
+                'action_progress_step' => $migrationProgressStep,
+                'action_progress_details' => $migrationProgressDetails,
+                'action_progress_failed' => $migrationProgressFailed,
                 'sweep_enabled' => $sweepEnabled,
                 'sweep_label' => $sweepLabel,
                 'sweep_window' => $sweepWindow,
@@ -454,7 +481,11 @@ new class extends Component {
                                                     <div class="truncate">
                                                         {{ \Illuminate\Support\Str::of($integration['service'])->replace('_', ' ')->title() }}
                                                     </div>
-                                                    @if ($integration['service'] === 'monzo'
+                                                    @if ($integration['action_progress_message'] && $integration['action_progress'] < 100)
+                                                        <div class="text-xs text-base-content/70 truncate">
+                                                            {{ $integration['action_progress_message'] }}
+                                                        </div>
+                                                    @elseif ($integration['service'] === 'monzo'
                                                     && !is_null($integration['migration_progress'])
                                                     && $integration['migration_progress'] < 100
                                                     && $integration['migration_fetched_back_to'])
@@ -514,13 +545,33 @@ new class extends Component {
                                                 @endif
                                             @endif
 
-                                            @if (!is_null($integration['migration_progress']))
-                                                @php $phase = $integration['migration_phase']; @endphp
-                                                @if ($integration['migration_progress'] >= 100)
+                                            @if (!is_null($integration['migration_progress']) || !is_null($integration['action_progress']))
+                                                @php
+                                                    $phase = $integration['migration_phase'];
+                                                    $actionProgress = $integration['action_progress'];
+                                                    $actionMessage = $integration['action_progress_message'];
+                                                    $actionStep = $integration['action_progress_step'];
+                                                    $actionFailed = $integration['action_progress_failed'];
+                                                @endphp
+
+                                                @if ($actionFailed)
+                                                    <x-badge value="{{ __('Migration Failed') }}" class="badge-error badge-sm" />
+                                                @elseif (($actionProgress !== null && $actionProgress >= 100) || ($integration['migration_progress'] !== null && $integration['migration_progress'] >= 100))
                                                     <x-badge value="{{ __('Migrated') }}" class="badge-success badge-sm" />
                                                 @else
                                                     <div class="flex items-center space-x-2">
-                                                        @if ($phase === 'process')
+                                                        @if ($actionProgress !== null)
+                                                            @php
+                                                                $progressColor = 'progress-info';
+                                                                if ($actionStep === 'processing' || $actionStep === 'processing_monzo' || $actionStep === 'processing_pots') {
+                                                                    $progressColor = 'progress-accent';
+                                                                } elseif ($actionStep === 'fetching' || $actionStep === 'configuring') {
+                                                                    $progressColor = 'progress-info';
+                                                                }
+                                                            @endphp
+                                                            <progress class="progress {{ $progressColor }} progress-xs w-32" value="{{ $actionProgress }}" max="100"></progress>
+                                                            <span class="text-xs text-base-content/70">{{ $actionProgress }}%</span>
+                                                        @elseif ($phase === 'process')
                                                             <progress class="progress progress-accent progress-xs w-32" value="{{ $integration['migration_progress'] }}" max="100"></progress>
                                                             <span class="text-xs text-base-content/70">{{ $integration['migration_progress'] }}%</span>
                                                         @else

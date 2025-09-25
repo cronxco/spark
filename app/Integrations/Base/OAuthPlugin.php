@@ -31,6 +31,11 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
         return 'oauth';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return false;
+    }
+
     /**
      * Back-compat: old method signature created an instance immediately.
      * We now create a group first. This helper returns a placeholder instance

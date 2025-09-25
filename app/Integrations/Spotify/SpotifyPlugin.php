@@ -122,6 +122,11 @@ class SpotifyPlugin extends OAuthPlugin
         return 'media';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return true;
+    }
+
     public static function getActionTypes(): array
     {
         return [

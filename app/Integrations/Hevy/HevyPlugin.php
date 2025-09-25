@@ -111,6 +111,11 @@ class HevyPlugin implements IntegrationPlugin
         return 'health';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return false;
+    }
+
     public static function getActionTypes(): array
     {
         return [

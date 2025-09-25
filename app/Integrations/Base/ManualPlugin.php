@@ -16,6 +16,11 @@ abstract class ManualPlugin implements IntegrationPlugin
         return 'manual';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return false;
+    }
+
     public function initializeGroup(User $user): IntegrationGroup
     {
         return IntegrationGroup::create([

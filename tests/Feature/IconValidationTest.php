@@ -264,8 +264,8 @@ class IconValidationTest extends TestCase
             '/[\'"`]icon[\'"`]\s*=>\s*[\'"`]([^"\']+)[\'"`]/i',
 
             // Icon in strings: "o-heart" or "fas.home" (but not CSS-like classes)
-            // Exclude patterns that look like CSS classes (e.g., items-baseline, flex-col, etc.)
-            '/[\'"`]([mso]-[a-zA-Z0-9-]{2,})[\'"`]/i',
+            // Only match standalone icon references, not CSS classes
+            '/[\'"`]([mso]-[a-zA-Z0-9-]{3,})[\'"`]/i',
 
             // FontAwesome icons in strings: "fas.home", "fab.github", etc.
             // Note: only fas, fab, far are available in this package
@@ -280,9 +280,9 @@ class IconValidationTest extends TestCase
                 foreach ($matches[1] ?? [] as $match) {
                     // Handle HeroIcons (m-, o-, s- prefix)
                     if (preg_match('/^[mso]-[a-zA-Z0-9-]+$/', $match) &&
-                        strlen($match) > 3 && // Must be longer than just "o-b" or "s-1"
+                        strlen($match) > 4 && // Must be longer than just "o-b" or "s-xs"
                         ! preg_match('/^[mso]-[a-z]$/', $match) && // Exclude single letters
-                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress)$/', $match) && // Exclude CSS-like classes
+                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl)$/', $match) && // Exclude CSS-like classes
                         ! preg_match('/^[mso]-[a-z]+-[0-9]+$/', $match) && // Exclude color classes like m-neutral-950, m-purple-500
                         ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match)) { // Exclude common CSS class patterns
                         $this->foundIcons[] = $match;

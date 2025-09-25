@@ -269,6 +269,11 @@ class OutlinePlugin extends ManualPlugin
         return 'knowledge';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return true;
+    }
+
     public static function getActionTypes(): array
     {
         return [

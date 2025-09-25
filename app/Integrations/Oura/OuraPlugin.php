@@ -58,6 +58,11 @@ class OuraPlugin extends OAuthPlugin
         return 'health';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return true;
+    }
+
     public static function getActionTypes(): array
     {
         return [
