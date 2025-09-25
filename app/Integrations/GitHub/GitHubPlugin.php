@@ -119,6 +119,11 @@ class GitHubPlugin extends OAuthPlugin
         return 'online';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return true;
+    }
+
     public static function getActionTypes(): array
     {
         return [

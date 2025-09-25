@@ -70,6 +70,11 @@ interface IntegrationPlugin
     public static function getActionTypes(): array;
 
     /**
+     * Check if this integration supports historical data migration
+     */
+    public static function supportsMigration(): bool;
+
+    /**
      * Get the integration block types configuration
      *
      * @return array<string, array{

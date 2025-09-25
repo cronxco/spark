@@ -20,6 +20,11 @@ abstract class WebhookPlugin implements IntegrationPlugin
         return 'webhook';
     }
 
+    public static function supportsMigration(): bool
+    {
+        return false;
+    }
+
     public function initializeGroup(User $user): IntegrationGroup
     {
         $webhookSecret = Str::random(32);
