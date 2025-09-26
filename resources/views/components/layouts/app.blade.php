@@ -137,6 +137,11 @@
 
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')"/>
                 </x-menu-sub>
+
+                <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')">
+                    <x-menu-item title="GoCardless" icon="fas.credit-card" link="{{ route('admin.gocardless.index') }}" :active="request()->routeIs('admin.gocardless.*')"/>
+                    <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')"/>
+                </x-menu-sub>
             </x-menu>
         </x-slot:sidebar>
 

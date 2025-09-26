@@ -237,4 +237,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('gocardless', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'index'])->name('gocardless.index');
     Route::delete('gocardless/agreements/{agreementId}', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
     Route::delete('gocardless/requisitions/{requisitionId}', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+
+    Route::get('migrations', [App\Http\Controllers\Admin\MigrationsController::class, 'index'])->name('migrations.index');
+    Route::post('migrations/oura', [App\Http\Controllers\Admin\MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
 });
