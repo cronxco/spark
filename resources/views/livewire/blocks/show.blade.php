@@ -128,7 +128,7 @@ new class extends Component {
                                 {{ $this->block->title }}
                             </h2>
                             @if ($this->block->value)
-                                <x-badge :value="$this->block->formatted_value . ($this->block->value_unit ? ' ' . $this->block->value_unit : '')" class="badge-info" />
+                                <x-badge :value="format_event_value_display($this->block->formatted_value, $this->block->value_unit)" class="badge-info" />
                             @endif
                         </div>
 

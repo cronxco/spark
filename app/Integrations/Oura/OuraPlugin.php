@@ -3,6 +3,7 @@
 namespace App\Integrations\Oura;
 
 use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsValueMapping;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -20,7 +21,7 @@ use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
 use Throwable;
 
-class OuraPlugin extends OAuthPlugin
+class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 {
     protected string $baseUrl = 'https://api.ouraring.com/v2';
 
@@ -104,6 +105,32 @@ class OuraPlugin extends OAuthPlugin
                 'description' => 'User-defined tag for the day',
                 'display_with_object' => true,
                 'value_unit' => null,
+                'hidden' => false,
+            ],
+            'had_stress_level' => [
+                'icon' => 'o-exclamation-triangle',
+                'display_name' => 'Stress Level',
+                'description' => 'Daily stress level assessment',
+                'display_with_object' => false,
+                'value_unit' => 'stress_level',
+                'value_mapping' => 'stress_day_summary',
+                'hidden' => false,
+            ],
+            'had_resilience_level' => [
+                'icon' => 'o-shield-check',
+                'display_name' => 'Resilience Level',
+                'description' => 'Daily resilience level assessment',
+                'display_with_object' => false,
+                'value_unit' => 'resilience_level',
+                'value_mapping' => 'resilience_level',
+                'hidden' => false,
+            ],
+            'had_spo2' => [
+                'icon' => 'o-heart',
+                'display_name' => 'SpO2',
+                'description' => 'Blood oxygen saturation level',
+                'display_with_object' => false,
+                'value_unit' => 'percent',
                 'hidden' => false,
             ],
         ];
@@ -198,6 +225,48 @@ class OuraPlugin extends OAuthPlugin
         return 'Connect your Oura Ring to track daily activity, sleep, readiness, resilience, stress, workouts, sessions, tags, and time-series metrics like heart rate and SpO2.';
     }
 
+    public static function getValueMappings(): array
+    {
+        return [
+            'stress_day_summary' => [
+                'field_name' => 'day_summary',
+                'mappings' => [
+                    'stressful' => 3,
+                    'normal' => 2,
+                    'restful' => 1,
+                    null => 0,
+                ],
+                'display_mappings' => [
+                    3 => 'Stressful',
+                    2 => 'Normal',
+                    1 => 'Restful',
+                    0 => 'No Data',
+                ],
+                'unit' => 'stress_level',
+            ],
+            'resilience_level' => [
+                'field_name' => 'level',
+                'mappings' => [
+                    'excellent' => 5,
+                    'solid' => 4,
+                    'adequate' => 3,
+                    'limited' => 2,
+                    'poor' => 1,
+                    null => 0,
+                ],
+                'display_mappings' => [
+                    5 => 'Excellent',
+                    4 => 'Solid',
+                    3 => 'Adequate',
+                    2 => 'Limited',
+                    1 => 'Poor',
+                    0 => 'No Data',
+                ],
+                'unit' => 'resilience_level',
+            ],
+        ];
+    }
+
     public static function getConfigurationSchema(): array
     {
         return [
@@ -266,6 +335,32 @@ class OuraPlugin extends OAuthPlugin
                 'schema' => self::getConfigurationSchema(),
             ],
         ];
+    }
+
+    public function mapValueForStorage(string $mappingKey, mixed $value): ?float
+    {
+        $mappings = static::getValueMappings();
+
+        if (! isset($mappings[$mappingKey])) {
+            return is_numeric($value) ? (float) $value : null;
+        }
+
+        $mapping = $mappings[$mappingKey]['mappings'];
+
+        return $mapping[$value] ?? $mapping[null] ?? null;
+    }
+
+    public function mapValueForDisplay(string $mappingKey, ?float $numericValue): string
+    {
+        $mappings = static::getValueMappings();
+
+        if (! isset($mappings[$mappingKey]) || $numericValue === null) {
+            return 'No Data';
+        }
+
+        $displayMappings = $mappings[$mappingKey]['display_mappings'];
+
+        return $displayMappings[(int) $numericValue] ?? 'Unknown';
     }
 
     public function getBaseUrl(): string
@@ -551,7 +646,7 @@ class OuraPlugin extends OAuthPlugin
             case 'spo2':
                 foreach ($items as $item) {
                     $this->createDailyRecordEvent($integration, 'spo2', $item, [
-                        'score_field' => 'spo2_average',
+                        'score_field' => 'spo2_percentage.average',
                         'contributors_field' => null,
                         'title' => 'SpO2',
                         'value_unit' => 'percent',
@@ -1751,6 +1846,8 @@ class OuraPlugin extends OAuthPlugin
         ]);
         $items = $json['data'] ?? [];
         foreach ($items as $item) {
+            // Existing numeric score processing (if any)
+            // Note: Resilience might not have a numeric score field, so this might not create events
             $this->createDailyRecordEvent($integration, 'resilience', $item, [
                 'score_field' => 'resilience_score',
                 'contributors_field' => 'contributors',
@@ -1758,6 +1855,17 @@ class OuraPlugin extends OAuthPlugin
                 'value_unit' => 'percent',
                 'contributors_value_unit' => 'percent',
             ]);
+
+            // NEW: Process non-numeric level
+            if (isset($item['level'])) {
+                $this->createMappedValueEvent(
+                    $integration,
+                    'had_resilience_level',
+                    $item['day'],
+                    $item['level'],
+                    'resilience_level'
+                );
+            }
         }
     }
 
@@ -1770,6 +1878,7 @@ class OuraPlugin extends OAuthPlugin
         ]);
         $items = $json['data'] ?? [];
         foreach ($items as $item) {
+            // Existing numeric score processing
             $this->createDailyRecordEvent($integration, 'stress', $item, [
                 'score_field' => 'stress_score',
                 'contributors_field' => 'contributors',
@@ -1777,6 +1886,17 @@ class OuraPlugin extends OAuthPlugin
                 'value_unit' => 'percent',
                 'contributors_value_unit' => 'percent',
             ]);
+
+            // NEW: Process non-numeric day_summary
+            if (isset($item['day_summary'])) {
+                $this->createMappedValueEvent(
+                    $integration,
+                    'had_stress_level',
+                    $item['day'],
+                    $item['day_summary'],
+                    'stress_day_summary'
+                );
+            }
         }
     }
 
@@ -1790,7 +1910,7 @@ class OuraPlugin extends OAuthPlugin
         $items = $json['data'] ?? [];
         foreach ($items as $item) {
             $this->createDailyRecordEvent($integration, 'spo2', $item, [
-                'score_field' => 'spo2_average',
+                'score_field' => 'spo2_percentage.average',
                 'contributors_field' => null,
                 'title' => 'SpO2',
                 'value_unit' => 'percent',
@@ -2121,6 +2241,47 @@ class OuraPlugin extends OAuthPlugin
         }
 
         return $body;
+    }
+
+    private function createMappedValueEvent(
+        Integration $integration,
+        string $action,
+        string $day,
+        mixed $originalValue,
+        string $mappingKey
+    ): void {
+        $mappedValue = $this->mapValueForStorage($mappingKey, $originalValue);
+
+        if ($mappedValue === null) {
+            return; // Skip if no mapping found
+        }
+
+        $sourceId = "oura_{$action}_{$integration->id}_{$day}";
+
+        if (Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->exists()) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+
+        [$encodedValue, $multiplier] = $this->encodeNumericValue($mappedValue);
+
+        Event::create([
+            'source_id' => $sourceId,
+            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
+            'action' => $action,
+            'actor_id' => $actor->id,
+            'target_id' => null,
+            'time' => $day . ' 12:00:00',
+            'value' => $encodedValue,
+            'value_multiplier' => $multiplier,
+            'metadata' => [
+                'original_value' => $originalValue,
+                'mapping_key' => $mappingKey,
+                'mapped_value' => $mappedValue,
+            ],
+        ]);
     }
 
     /**

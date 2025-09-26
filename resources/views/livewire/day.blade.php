@@ -545,11 +545,7 @@ $formatValueDisplay = function ($event): string {
         return $this->formatDurationShort($value, $unit);
     }
 
-    if ($value === null) {
-        return '';
-    }
-
-    return (string) $value . ($unit ? (' ' . $unit) : '');
+    return format_event_value_display($value, $unit);
 };
 
 $previousDay = function () {

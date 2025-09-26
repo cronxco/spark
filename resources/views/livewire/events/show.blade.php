@@ -286,7 +286,7 @@ new class extends Component {
 
                                 @if ($this->event->value)
                                     <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary">
-                                        {{ $this->event->formatted_value }}{{ $this->event->value_unit ? ' ' . $this->event->value_unit : '' }}
+                                        {{ format_event_value_display($this->event->formatted_value, $this->event->value_unit) }}
                                     </div>
                                 @endif
                             </div>
@@ -381,7 +381,7 @@ new class extends Component {
                                             {{ $block->title }}
                                         </a>
                                         @if ($block->value)
-                                            <x-badge :value="$block->formatted_value . ($block->value_unit ? ' ' . $block->value_unit : '')" class="badge-xs" />
+                                            <x-badge :value="format_event_value_display($block->formatted_value, $block->value_unit)" class="badge-xs" />
                                         @endif
                                     </div>
 
@@ -444,7 +444,7 @@ new class extends Component {
                                                         @endif
                                                         @if ($relatedEvent->value)
                                                             <span class="text-primary">
-                                                                ({{ $relatedEvent->formatted_value }}{{ $relatedEvent->value_unit ? ' ' . $relatedEvent->value_unit : '' }})
+                                                                ({{ format_event_value_display($relatedEvent->formatted_value, $relatedEvent->value_unit) }})
                                                             </span>
                                                         @endif
                                                     </span>
