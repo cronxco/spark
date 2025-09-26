@@ -70,6 +70,30 @@ if (! function_exists('should_display_action_with_object')) {
     }
 }
 
+if (! function_exists('format_event_value_display')) {
+    /**
+     * Format an event's value for display, handling mapped values correctly.
+     *
+     * @param  mixed  $value  The event's formatted_value or value
+     * @param  string|null  $unit  The event's value_unit
+     * @return string The formatted value for display
+     */
+    function format_event_value_display($value, ?string $unit): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        // Handle mapped values (stress_level, resilience_level, etc.)
+        // These should display just the mapped text without the unit
+        if (in_array($unit, ['stress_level', 'resilience_level'])) {
+            return (string) $value;
+        }
+
+        return (string) $value . ($unit ? (' ' . $unit) : '');
+    }
+}
+
 /**
  * Sanitize headers for logging (remove sensitive data)
  */
