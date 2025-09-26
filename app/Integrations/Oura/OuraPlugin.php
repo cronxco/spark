@@ -234,15 +234,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                     'stressful' => 3,
                     'normal' => 2,
                     'restful' => 1,
-                    null => 0
+                    null => 0,
                 ],
                 'display_mappings' => [
                     3 => 'Stressful',
                     2 => 'Normal',
                     1 => 'Restful',
-                    0 => 'No Data'
+                    0 => 'No Data',
                 ],
-                'unit' => 'stress_level'
+                'unit' => 'stress_level',
             ],
             'resilience_level' => [
                 'field_name' => 'level',
@@ -252,7 +252,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                     'adequate' => 3,
                     'limited' => 2,
                     'poor' => 1,
-                    null => 0
+                    null => 0,
                 ],
                 'display_mappings' => [
                     5 => 'Excellent',
@@ -260,76 +260,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                     3 => 'Adequate',
                     2 => 'Limited',
                     1 => 'Poor',
-                    0 => 'No Data'
+                    0 => 'No Data',
                 ],
-                'unit' => 'resilience_level'
+                'unit' => 'resilience_level',
             ],
         ];
-    }
-
-    public function mapValueForStorage(string $mappingKey, mixed $value): ?float
-    {
-        $mappings = static::getValueMappings();
-        
-        if (!isset($mappings[$mappingKey])) {
-            return is_numeric($value) ? (float) $value : null;
-        }
-        
-        $mapping = $mappings[$mappingKey]['mappings'];
-        return $mapping[$value] ?? $mapping[null] ?? null;
-    }
-    
-    public function mapValueForDisplay(string $mappingKey, ?float $numericValue): string
-    {
-        $mappings = static::getValueMappings();
-        
-        if (!isset($mappings[$mappingKey]) || $numericValue === null) {
-            return 'No Data';
-        }
-        
-        $displayMappings = $mappings[$mappingKey]['display_mappings'];
-        return $displayMappings[(int) $numericValue] ?? 'Unknown';
-    }
-
-    private function createMappedValueEvent(
-        Integration $integration,
-        string $action,
-        string $day,
-        mixed $originalValue,
-        string $mappingKey
-    ): void {
-        $mappedValue = $this->mapValueForStorage($mappingKey, $originalValue);
-        
-        if ($mappedValue === null) {
-            return; // Skip if no mapping found
-        }
-        
-        $sourceId = "oura_{$action}_{$integration->id}_{$day}";
-        
-        if (Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->exists()) {
-            return;
-        }
-
-        $actor = $this->ensureUserProfile($integration);
-        
-        [$encodedValue, $multiplier] = $this->encodeNumericValue($mappedValue);
-        
-        Event::create([
-            'source_id' => $sourceId,
-            'integration_id' => $integration->id,
-            'user_id' => $integration->user_id,
-            'action' => $action,
-            'actor_id' => $actor->id,
-            'target_id' => null,
-            'time' => $day . ' 12:00:00',
-            'value' => $encodedValue,
-            'value_multiplier' => $multiplier,
-            'metadata' => [
-                'original_value' => $originalValue,
-                'mapping_key' => $mappingKey,
-                'mapped_value' => $mappedValue,
-            ],
-        ]);
     }
 
     public static function getConfigurationSchema(): array
@@ -400,6 +335,32 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'schema' => self::getConfigurationSchema(),
             ],
         ];
+    }
+
+    public function mapValueForStorage(string $mappingKey, mixed $value): ?float
+    {
+        $mappings = static::getValueMappings();
+
+        if (! isset($mappings[$mappingKey])) {
+            return is_numeric($value) ? (float) $value : null;
+        }
+
+        $mapping = $mappings[$mappingKey]['mappings'];
+
+        return $mapping[$value] ?? $mapping[null] ?? null;
+    }
+
+    public function mapValueForDisplay(string $mappingKey, ?float $numericValue): string
+    {
+        $mappings = static::getValueMappings();
+
+        if (! isset($mappings[$mappingKey]) || $numericValue === null) {
+            return 'No Data';
+        }
+
+        $displayMappings = $mappings[$mappingKey]['display_mappings'];
+
+        return $displayMappings[(int) $numericValue] ?? 'Unknown';
     }
 
     public function getBaseUrl(): string
@@ -1894,7 +1855,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'percent',
                 'contributors_value_unit' => 'percent',
             ]);
-            
+
             // NEW: Process non-numeric level
             if (isset($item['level'])) {
                 $this->createMappedValueEvent(
@@ -1925,7 +1886,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'percent',
                 'contributors_value_unit' => 'percent',
             ]);
-            
+
             // NEW: Process non-numeric day_summary
             if (isset($item['day_summary'])) {
                 $this->createMappedValueEvent(
@@ -2280,6 +2241,47 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         return $body;
+    }
+
+    private function createMappedValueEvent(
+        Integration $integration,
+        string $action,
+        string $day,
+        mixed $originalValue,
+        string $mappingKey
+    ): void {
+        $mappedValue = $this->mapValueForStorage($mappingKey, $originalValue);
+
+        if ($mappedValue === null) {
+            return; // Skip if no mapping found
+        }
+
+        $sourceId = "oura_{$action}_{$integration->id}_{$day}";
+
+        if (Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->exists()) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+
+        [$encodedValue, $multiplier] = $this->encodeNumericValue($mappedValue);
+
+        Event::create([
+            'source_id' => $sourceId,
+            'integration_id' => $integration->id,
+            'user_id' => $integration->user_id,
+            'action' => $action,
+            'actor_id' => $actor->id,
+            'target_id' => null,
+            'time' => $day . ' 12:00:00',
+            'value' => $encodedValue,
+            'value_multiplier' => $multiplier,
+            'metadata' => [
+                'original_value' => $originalValue,
+                'mapping_key' => $mappingKey,
+                'mapped_value' => $mappedValue,
+            ],
+        ]);
     }
 
     /**

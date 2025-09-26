@@ -30,7 +30,7 @@ class OutlinePullRecentDocuments extends BaseFetchJob
 
         // Exclude documents from the daynotes collection to avoid duplicate "had_day_note" events
         $daynotesCollectionId = $this->getDayNotesCollectionId();
-        if (!empty($daynotesCollectionId)) {
+        if (! empty($daynotesCollectionId)) {
             $documents = array_filter($documents, function ($doc) use ($daynotesCollectionId) {
                 return ($doc['collectionId'] ?? '') !== $daynotesCollectionId;
             });
