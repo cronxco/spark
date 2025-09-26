@@ -33,7 +33,7 @@
                                 </p>
                                 <form method="POST" action="{{ route('admin.migrations.oura') }}" class="inline">
                                     @csrf
-                                    <button type="submit" class="btn btn-primary" 
+                                    <button type="submit" class="btn btn-primary"
                                             onclick="return confirm('Are you sure you want to migrate all Oura integrations? This may take several minutes.')">
                                         <x-icon name="o-arrow-path" class="w-4 h-4" />
                                         Migrate All
@@ -49,8 +49,8 @@
                                 <p class="text-sm text-base-content/70 mb-4">
                                     Select a specific Oura integration to migrate. Useful for testing or targeted updates.
                                 </p>
-                                
-                                @if($ouraIntegrations->isEmpty())
+
+                                @if ($ouraIntegrations->isEmpty())
                                     <p class="text-sm text-base-content/50">No Oura integrations found.</p>
                                 @else
                                     <form method="POST" action="{{ route('admin.migrations.oura') }}" class="space-y-4">
@@ -61,7 +61,7 @@
                                             </label>
                                             <select name="integration_id" id="integration_id" class="select select-bordered w-full" required>
                                                 <option value="">Choose an integration...</option>
-                                                @foreach($ouraIntegrations as $integration)
+                                                @foreach ($ouraIntegrations as $integration)
                                                     <option value="{{ $integration->id }}">
                                                         {{ $integration->name }} ({{ $integration->user->name }})
                                                     </option>
@@ -79,7 +79,7 @@
                     </div>
 
                     <!-- Integration List -->
-                    @if($ouraIntegrations->isNotEmpty())
+                    @if ($ouraIntegrations->isNotEmpty())
                         <div class="mt-6">
                             <h4 class="font-semibold mb-3">Available Oura Integrations</h4>
                             <div class="overflow-x-auto">
@@ -94,7 +94,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($ouraIntegrations as $integration)
+                                        @foreach ($ouraIntegrations as $integration)
                                             <tr>
                                                 <td>{{ $integration->name }}</td>
                                                 <td>{{ $integration->user->name }}</td>
@@ -105,7 +105,7 @@
                                                 </td>
                                                 <td>{{ $integration->created_at->format('M j, Y') }}</td>
                                                 <td>
-                                                    @if($integration->group && $integration->group->access_token)
+                                                    @if ($integration->group && $integration->group->access_token)
                                                         <span class="badge badge-success">Active</span>
                                                     @else
                                                         <span class="badge badge-error">Inactive</span>
@@ -135,7 +135,7 @@
                                 <li>Enables proper timeline display of mapped values</li>
                             </ul>
                         </div>
-                        
+
                         <div>
                             <h4 class="font-semibold">Affected Events:</h4>
                             <ul class="list-disc list-inside text-sm text-base-content/70 space-y-1">
