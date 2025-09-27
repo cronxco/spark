@@ -107,7 +107,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'had_stress_level' => [
+            'had_stress_score' => [
                 'icon' => 'o-exclamation-triangle',
                 'display_name' => 'Stress Level',
                 'description' => 'Daily stress level assessment',
@@ -116,7 +116,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_mapping' => 'stress_day_summary',
                 'hidden' => false,
             ],
-            'had_resilience_level' => [
+            'had_resilience_score' => [
                 'icon' => 'o-shield-check',
                 'display_name' => 'Resilience Level',
                 'description' => 'Daily resilience level assessment',
@@ -2154,7 +2154,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             if (isset($item['level'])) {
                 $this->createMappedValueEvent(
                     $integration,
-                    'had_resilience_level',
+                    'had_resilience_score',
                     $item['day'],
                     $item['level'],
                     'resilience_level'
@@ -2185,7 +2185,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             if (isset($item['day_summary'])) {
                 $this->createMappedValueEvent(
                     $integration,
-                    'had_stress_level',
+                    'had_stress_score',
                     $item['day'],
                     $item['day_summary'],
                     'stress_day_summary'

@@ -43,7 +43,7 @@ class MigrateOuraValueMappings implements ShouldQueue
         ]);
 
         $query = Event::where('service', 'oura')
-            ->whereIn('action', ['had_stress_level', 'had_resilience_level']);
+            ->whereIn('action', ['had_stress_score', 'had_resilience_score']);
 
         if ($this->integration) {
             $query->where('integration_id', $this->integration->id);

@@ -442,7 +442,7 @@ class OuraIntegrationTest extends TestCase
             'configuration' => ['days_back' => 1],
         ]);
         (new OuraPlugin)->fetchData($stress);
-        $this->assertEquals('had_stress_level', Event::where('integration_id', $stress->id)->first()->action);
+        $this->assertEquals('had_stress_score', Event::where('integration_id', $stress->id)->first()->action);
 
         // SpO2
         $spo2 = Integration::factory()->create([
