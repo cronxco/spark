@@ -373,7 +373,7 @@ class OuraIntegrationTest extends TestCase
             'https://api.ouraring.com/v2/usercollection/daily_readiness*' => Http::response(['data' => [['day' => $day, 'score' => 90, 'contributors' => []]]], 200),
             'https://api.ouraring.com/v2/usercollection/daily_resilience*' => Http::response(['data' => [['day' => $day, 'resilience_score' => 70, 'contributors' => []]]], 200),
             'https://api.ouraring.com/v2/usercollection/daily_stress*' => Http::response(['data' => [['day' => $day, 'day_summary' => 'normal']]], 200),
-            'https://api.ouraring.com/v2/usercollection/daily_spo2*' => Http::response(['data' => [['day' => $day, 'spo2_percentage' => ['average' => 97]]]], 200),
+            'https://api.ouraring.com/v2/usercollection/daily_spo2*' => Http::response(['data' => [['id' => 'spo2-test-id', 'day' => $day, 'breathing_disturbance_index' => 5, 'spo2_percentage' => ['average' => 97.125]]]], 200),
         ]);
 
         // Readiness
@@ -420,4 +420,5 @@ class OuraIntegrationTest extends TestCase
         (new OuraPlugin)->fetchData($spo2);
         $this->assertEquals('had_spo2', Event::where('integration_id', $spo2->id)->first()->action);
     }
+
 }
