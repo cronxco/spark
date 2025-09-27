@@ -26,7 +26,7 @@ class DeleteBinItemsBatch implements ShouldQueue
      * The user ID to filter records by
      */
     public function __construct(
-        private int $userId,
+        private string $userId,
         private int $batchSize = 100
     ) {}
 
