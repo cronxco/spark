@@ -1,21 +1,26 @@
 <x-layouts.app :title="__('Migrations Admin')">
+    <div>
+        <x-header title="Migrations Admin" subtitle="Manage data migrations and system updates" separator>
+            <x-slot:actions>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="alert alert-success mb-6">
-                    {{ session('success') }}
-                </div>
-            @endif
+            </x-slot:actions>
+        </x-header>
 
-            @if (session('error'))
-                <div class="alert alert-error mb-6">
-                    {{ session('error') }}
-                </div>
-            @endif
+        @if (session('success'))
+            <div class="alert alert-success mb-6">
+                {{ session('success') }}
+            </div>
+        @endif
 
+        @if (session('error'))
+            <div class="alert alert-error mb-6">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        <div class="flex flex-col gap-6">
             <!-- Oura Value Mapping Migration Section -->
-            <div class="card mb-8">
+            <div class="card bg-base-100 shadow-sm">
                 <div class="card-body">
                     <h3 class="card-title">Oura Value Mapping Migration</h3>
                     <p class="text-sm text-base-content/70 mb-4">
@@ -122,7 +127,7 @@
             </div>
 
             <!-- Migration Information -->
-            <div class="card">
+            <div class="card bg-base-100 shadow-sm">
                 <div class="card-body">
                     <h3 class="card-title">Migration Information</h3>
                     <div class="space-y-4">
@@ -156,5 +161,4 @@
             </div>
         </div>
     </div>
-
 </x-layouts.app>

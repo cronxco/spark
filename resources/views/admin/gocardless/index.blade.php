@@ -1,36 +1,41 @@
 <x-layouts.app :title="__('GoCardless Admin')">
+    <div>
+        <x-header title="GoCardless Admin" subtitle="Manage GoCardless agreements and requisitions" separator>
+            <x-slot:actions>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="alert alert-success mb-6">
-                    {{ session('success') }}
-                </div>
-            @endif
+            </x-slot:actions>
+        </x-header>
 
-            @if (session('error'))
-                <div class="alert alert-error mb-6">
-                    {{ session('error') }}
-                </div>
-            @endif
+        @if (session('success'))
+            <div class="alert alert-success mb-6">
+                {{ session('success') }}
+            </div>
+        @endif
 
-            @if (isset($error))
-                <div class="alert alert-error mb-6">
-                    <strong>Error:</strong> {{ $error }}
-                </div>
-            @endif
+        @if (session('error'))
+            <div class="alert alert-error mb-6">
+                {{ session('error') }}
+            </div>
+        @endif
 
+        @if (isset($error))
+            <div class="alert alert-error mb-6">
+                <strong>Error:</strong> {{ $error }}
+            </div>
+        @endif
+
+        <div class="flex flex-col gap-6">
             <!-- Agreements Section -->
-            <div class="card mb-8">
+            <div class="card bg-base-100 shadow-sm">
                 <div class="card-body">
                     <h3 class="card-title">End User Agreements</h3>
-                    <p class="text-sm text-gray-600 mb-4">
+                    <p class="text-sm text-base-content/70 mb-4">
                         These are the agreements that have been created with GoCardless for accessing bank data.
                     </p>
 
                     @if (empty($agreements))
                         <div class="text-center py-8">
-                            <p class="text-gray-500">No agreements found.</p>
+                            <p class="text-base-content/50">No agreements found.</p>
                         </div>
                     @else
                         <div class="overflow-x-auto">
@@ -52,7 +57,7 @@
                                             <td>
                                                 <div class="font-medium">{{ $agreement['institution_id'] }}</div>
                                                 @if (isset($agreement['max_historical_days']))
-                                                    <div class="text-sm text-gray-500">
+                                                    <div class="text-sm text-base-content/70">
                                                         Max: {{ $agreement['max_historical_days'] }} days
                                                     </div>
                                                 @endif
@@ -98,16 +103,16 @@
             </div>
 
             <!-- Requisitions Section -->
-            <div class="card">
+            <div class="card bg-base-100 shadow-sm">
                 <div class="card-body">
                     <h3 class="card-title">Requisitions</h3>
-                    <p class="text-sm text-gray-600 mb-4">
+                    <p class="text-sm text-base-content/70 mb-4">
                         These are the requisitions that have been created to access specific bank accounts.
                     </p>
 
                     @if (empty($requisitions))
                         <div class="text-center py-8">
-                            <p class="text-gray-500">No requisitions found.</p>
+                            <p class="text-base-content/50">No requisitions found.</p>
                         </div>
                     @else
                         <div class="overflow-x-auto">
@@ -129,7 +134,7 @@
                                             <td>
                                                 <div class="font-medium">{{ $requisition['institution_id'] }}</div>
                                                 @if (isset($requisition['agreement']))
-                                                    <div class="text-sm text-gray-500">
+                                                    <div class="text-sm text-base-content/70">
                                                         Agreement: {{ Str::limit($requisition['agreement'], 20) }}
                                                     </div>
                                                 @endif
@@ -163,12 +168,12 @@
                                                         {{ count($requisition['accounts']) }} account(s)
                                                     </div>
                                                     @if (count($requisition['accounts']) > 0)
-                                                        <div class="text-xs text-gray-500">
+                                                        <div class="text-xs text-base-content/70">
                                                             {{ Str::limit(implode(', ', $requisition['accounts']), 30) }}
                                                         </div>
                                                     @endif
                                                 @else
-                                                    <span class="text-gray-500">No accounts</span>
+                                                    <span class="text-base-content/50">No accounts</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -191,7 +196,7 @@
             </div>
 
             <!-- Help Section -->
-            <div class="card mt-8">
+            <div class="card bg-base-100 shadow-sm">
                 <div class="card-body">
                     <h3 class="card-title">Help & Information</h3>
                     <div class="prose max-w-none">

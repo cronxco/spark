@@ -207,6 +207,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'A tag from Oura Ring',
                 'hidden' => false,
             ],
+            'oura_mapped_value' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Oura Mapped Value',
+                'description' => 'A mapped value from Oura Ring data',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -859,6 +865,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $scoreField = $options['score_field'] ?? 'score';
         $score = Arr::get($item, $scoreField);
+
+        // Don't create event if score field is missing
+        if ($score === null) {
+            return;
+        }
+
         [$encodedScore, $scoreMultiplier] = $this->encodeNumericValue(is_numeric($score) ? (float) $score : null);
 
         // Action mapping for daily score-based instances
@@ -2264,6 +2276,22 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $actor = $this->ensureUserProfile($integration);
 
+        // Create a simple target object to satisfy non-null target_id constraint
+        $target = EventObject::updateOrCreate([
+            'user_id' => $integration->user_id,
+            'concept' => 'mapped_value',
+            'type' => 'oura_mapped_value',
+            'title' => 'Oura Mapped Value',
+        ], [
+            'time' => $day . ' 12:00:00',
+            'content' => 'Oura mapped value entry',
+            'metadata' => [
+                'mapping_key' => $mappingKey,
+                'original_value' => $originalValue,
+                'mapped_value' => $mappedValue,
+            ],
+        ]);
+
         [$encodedValue, $multiplier] = $this->encodeNumericValue($mappedValue);
 
         Event::create([
@@ -2272,10 +2300,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'user_id' => $integration->user_id,
             'action' => $action,
             'actor_id' => $actor->id,
-            'target_id' => null,
+            'target_id' => $target->id,
             'time' => $day . ' 12:00:00',
             'value' => $encodedValue,
             'value_multiplier' => $multiplier,
+            'service' => 'oura',
+            'domain' => self::getDomain(),
             'metadata' => [
                 'original_value' => $originalValue,
                 'mapping_key' => $mappingKey,
