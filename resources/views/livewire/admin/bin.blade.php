@@ -401,7 +401,7 @@ new class extends Component {
     {
         // Dispatch the job to permanently delete all soft-deleted items
         DeleteBinItemsBatch::dispatch(Auth::id());
-        
+
         $this->success('Deletion process started. All items will be permanently deleted.');
     }
 
@@ -433,7 +433,7 @@ new class extends Component {
                         Delete Selected ({{ count($selectedItems) }})
                     </button>
                 @endif
-                
+
                 <!-- Delete All Button -->
                 <button class="btn btn-error btn-sm" wire:click="deleteAll"
                         onclick="return confirm('Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.')">
