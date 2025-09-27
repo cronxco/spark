@@ -13,15 +13,20 @@ use App\Jobs\OAuth\Monzo\MonzoBalancePull;
 use App\Jobs\OAuth\Monzo\MonzoPotPull;
 use App\Jobs\OAuth\Monzo\MonzoTransactionPull;
 use App\Jobs\OAuth\Oura\OuraActivityPull;
+use App\Jobs\OAuth\Oura\OuraCardiovascularAgePull;
+use App\Jobs\OAuth\Oura\OuraEnhancedTagPull;
 use App\Jobs\OAuth\Oura\OuraHeartratePull;
 use App\Jobs\OAuth\Oura\OuraReadinessPull;
 use App\Jobs\OAuth\Oura\OuraResiliencePull;
+use App\Jobs\OAuth\Oura\OuraRestModePeriodPull;
 use App\Jobs\OAuth\Oura\OuraSessionsPull;
 use App\Jobs\OAuth\Oura\OuraSleepPull;
 use App\Jobs\OAuth\Oura\OuraSleepRecordsPull;
+use App\Jobs\OAuth\Oura\OuraSleepTimePull;
 use App\Jobs\OAuth\Oura\OuraSpo2Pull;
 use App\Jobs\OAuth\Oura\OuraStressPull;
 use App\Jobs\OAuth\Oura\OuraTagsPull;
+use App\Jobs\OAuth\Oura\OuraVO2MaxPull;
 use App\Jobs\OAuth\Oura\OuraWorkoutsPull;
 use App\Jobs\OAuth\Reddit\RedditSavedPull;
 use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
@@ -287,14 +292,19 @@ class CheckIntegrationUpdates implements ShouldQueue
             'activity' => [OuraActivityPull::class],
             'sleep' => [OuraSleepPull::class],
             'sleep_records' => [OuraSleepRecordsPull::class],
+            'sleep_time' => [OuraSleepTimePull::class],
             'readiness' => [OuraReadinessPull::class],
             'resilience' => [OuraResiliencePull::class],
+            'rest_mode_period' => [OuraRestModePeriodPull::class],
             'stress' => [OuraStressPull::class],
             'workouts' => [OuraWorkoutsPull::class],
             'sessions' => [OuraSessionsPull::class],
             'tags' => [OuraTagsPull::class],
+            'enhanced_tag' => [OuraEnhancedTagPull::class],
             'heartrate' => [OuraHeartratePull::class],
             'spo2' => [OuraSpo2Pull::class],
+            'cardiovascular_age' => [OuraCardiovascularAgePull::class],
+            'vo2_max' => [OuraVO2MaxPull::class],
             default => [],
         };
     }

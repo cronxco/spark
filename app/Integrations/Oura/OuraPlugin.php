@@ -133,42 +133,122 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'percent',
                 'hidden' => false,
             ],
+            'had_cardiovascular_age' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Cardiovascular Age',
+                'description' => 'Estimated cardiovascular age',
+                'display_with_object' => false,
+                'value_unit' => 'years',
+                'hidden' => false,
+            ],
+            'had_vo2_max' => [
+                'icon' => 'o-fire',
+                'display_name' => 'VO2 Max',
+                'description' => 'Maximum oxygen consumption rate',
+                'display_with_object' => false,
+                'value_unit' => 'ml/kg/min',
+                'hidden' => false,
+            ],
+            'had_enhanced_tag' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Enhanced Tag',
+                'description' => 'Enhanced tag with detailed information',
+                'display_with_object' => true,
+                'value_unit' => 'seconds',
+                'hidden' => false,
+            ],
+            'had_sleep_recommendation' => [
+                'icon' => 'o-moon',
+                'display_name' => 'Sleep Recommendation',
+                'description' => 'Personalized sleep timing recommendation',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'had_rest_period' => [
+                'icon' => 'o-pause',
+                'display_name' => 'Rest Period',
+                'description' => 'Rest mode period duration',
+                'display_with_object' => true,
+                'value_unit' => 'seconds',
+                'hidden' => false,
+            ],
         ];
     }
 
     public static function getBlockTypes(): array
     {
         return [
+            'activity_metrics' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Activity Metrics',
+                'description' => 'Detailed activity measurements and statistics',
+                'display_with_object' => true,
+                'value_unit' => 'various',
+                'hidden' => false,
+            ],
             'sleep_stages' => [
                 'icon' => 'o-clock',
                 'display_name' => 'Sleep Stages',
                 'description' => 'Sleep stage duration information',
                 'display_with_object' => true,
-                'value_unit' => 'minutes',
+                'value_unit' => 'seconds',
                 'hidden' => false,
             ],
             'heart_rate' => [
                 'icon' => 'o-heart',
-                'display_name' => 'Heart Rate',
-                'description' => 'Heart rate data from Oura Ring',
+                'display_name' => 'Heart Rate Data',
+                'description' => 'Heart rate measurements and statistics',
                 'display_with_object' => true,
                 'value_unit' => 'bpm',
                 'hidden' => false,
             ],
-            'tag' => [
+            'contributors' => [
+                'icon' => 'o-puzzle-piece',
+                'display_name' => 'Score Contributors',
+                'description' => 'Individual components contributing to daily scores',
+                'display_with_object' => true,
+                'value_unit' => 'percent',
+                'hidden' => false,
+            ],
+            'workout_metrics' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Workout Metrics',
+                'description' => 'Detailed workout measurements',
+                'display_with_object' => true,
+                'value_unit' => 'various',
+                'hidden' => false,
+            ],
+            'tag_info' => [
                 'icon' => 'o-tag',
-                'display_name' => 'Tag',
-                'description' => 'Tag information from Oura Ring',
+                'display_name' => 'Tag Information',
+                'description' => 'User-defined tags and annotations',
                 'display_with_object' => true,
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'workout' => [
-                'icon' => 'o-fire',
-                'display_name' => 'Workout',
-                'description' => 'Workout details from Oura Ring',
+            'biometrics' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Biometric Data',
+                'description' => 'Physiological measurements and health metrics',
                 'display_with_object' => true,
-                'value_unit' => 'calories',
+                'value_unit' => 'various',
+                'hidden' => false,
+            ],
+            'configuration' => [
+                'icon' => 'o-cog',
+                'display_name' => 'Configuration',
+                'description' => 'Device and system configuration details',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'recommendation' => [
+                'icon' => 'o-light-bulb',
+                'display_name' => 'Recommendation',
+                'description' => 'Personalized recommendations and insights',
+                'display_with_object' => true,
+                'value_unit' => null,
                 'hidden' => false,
             ],
         ];
@@ -213,6 +293,121 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'A mapped value from Oura Ring data',
                 'hidden' => false,
             ],
+            'cardiovascular_age' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Cardiovascular Age',
+                'description' => 'Estimated cardiovascular age measurement',
+                'hidden' => false,
+            ],
+            'vo2_max' => [
+                'icon' => 'o-fire',
+                'display_name' => 'VO2 Max',
+                'description' => 'Maximum oxygen consumption measurement',
+                'hidden' => false,
+            ],
+            'enhanced_tag' => [
+                'icon' => 'o-tag',
+                'display_name' => 'Enhanced Tag',
+                'description' => 'Enhanced tag with detailed metadata',
+                'hidden' => false,
+            ],
+            'sleep_recommendation' => [
+                'icon' => 'o-moon',
+                'display_name' => 'Sleep Recommendation',
+                'description' => 'Personalized sleep timing recommendation',
+                'hidden' => false,
+            ],
+            'rest_period' => [
+                'icon' => 'o-pause',
+                'display_name' => 'Rest Period',
+                'description' => 'Rest mode period with episodes',
+                'hidden' => false,
+            ],
+            // Metadata object types used in blocks and processing
+            'contributor' => [
+                'icon' => 'o-puzzle-piece',
+                'display_name' => 'Score Contributor',
+                'description' => 'Individual component contributing to daily scores',
+                'hidden' => true,
+            ],
+            'detail' => [
+                'icon' => 'o-document-text',
+                'display_name' => 'Detail Information',
+                'description' => 'Detailed information or metadata',
+                'hidden' => true,
+            ],
+            'calorie_burn' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Calorie Burn',
+                'description' => 'Calorie burn measurement',
+                'hidden' => true,
+            ],
+            'average' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Average Value',
+                'description' => 'Average measurement value',
+                'hidden' => true,
+            ],
+            'stage_duration' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Stage Duration',
+                'description' => 'Duration of a specific sleep stage',
+                'hidden' => true,
+            ],
+            'minimum' => [
+                'icon' => 'o-minus',
+                'display_name' => 'Minimum Value',
+                'description' => 'Minimum measurement value',
+                'hidden' => true,
+            ],
+            'maximum' => [
+                'icon' => 'o-plus',
+                'display_name' => 'Maximum Value',
+                'description' => 'Maximum measurement value',
+                'hidden' => true,
+            ],
+            'count' => [
+                'icon' => 'o-hashtag',
+                'display_name' => 'Count',
+                'description' => 'Count or quantity measurement',
+                'hidden' => true,
+            ],
+            'mood_state' => [
+                'icon' => 'o-face-smile',
+                'display_name' => 'Mood State',
+                'description' => 'Mood or emotional state indicator',
+                'hidden' => true,
+            ],
+            'user_tag' => [
+                'icon' => 'o-tag',
+                'display_name' => 'User Tag',
+                'description' => 'User-defined tag or annotation',
+                'hidden' => true,
+            ],
+            'tag_type_code' => [
+                'icon' => 'o-code-bracket',
+                'display_name' => 'Tag Type Code',
+                'description' => 'Tag type classification code',
+                'hidden' => true,
+            ],
+            'user_comment' => [
+                'icon' => 'o-chat-bubble-left-right',
+                'display_name' => 'User Comment',
+                'description' => 'User-provided comment or note',
+                'hidden' => true,
+            ],
+            'sleep_guidance' => [
+                'icon' => 'o-light-bulb',
+                'display_name' => 'Sleep Guidance',
+                'description' => 'Sleep-related guidance or recommendation',
+                'hidden' => true,
+            ],
+            'episode_count' => [
+                'icon' => 'o-list-bullet',
+                'display_name' => 'Episode Count',
+                'description' => 'Number of episodes or occurrences',
+                'hidden' => true,
+            ],
         ];
     }
 
@@ -239,13 +434,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'mappings' => [
                     'stressful' => 3,
                     'normal' => 2,
-                    'restful' => 1,
+                    'restored' => 1,  // Fixed: API uses 'restored' not 'restful'
                     null => 0,
                 ],
                 'display_mappings' => [
                     3 => 'Stressful',
                     2 => 'Normal',
-                    1 => 'Restful',
+                    1 => 'Restored',  // Fixed: Updated display text
                     0 => 'No Data',
                 ],
                 'unit' => 'stress_level',
@@ -253,19 +448,19 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'resilience_level' => [
                 'field_name' => 'level',
                 'mappings' => [
-                    'excellent' => 5,
-                    'solid' => 4,
-                    'adequate' => 3,
-                    'limited' => 2,
-                    'poor' => 1,
+                    'exceptional' => 5,  // Fixed: API uses 'exceptional' not 'excellent'
+                    'strong' => 4,       // Fixed: API includes 'strong' level
+                    'solid' => 3,        // Fixed: Moved from 4 to 3
+                    'adequate' => 2,     // Fixed: Moved from 3 to 2
+                    'limited' => 1,      // Fixed: Moved from 2 to 1
                     null => 0,
                 ],
                 'display_mappings' => [
-                    5 => 'Excellent',
-                    4 => 'Solid',
-                    3 => 'Adequate',
-                    2 => 'Limited',
-                    1 => 'Poor',
+                    5 => 'Exceptional',  // Fixed: Updated display text
+                    4 => 'Strong',       // Fixed: New level
+                    3 => 'Solid',
+                    2 => 'Adequate',
+                    1 => 'Limited',
                     0 => 'No Data',
                 ],
                 'unit' => 'resilience_level',
@@ -296,6 +491,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     public static function getInstanceTypes(): array
     {
         return [
+            // Existing endpoints (enhanced)
             'activity' => [
                 'label' => 'Daily Activity',
                 'schema' => self::getConfigurationSchema(),
@@ -338,6 +534,28 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             ],
             'spo2' => [
                 'label' => 'Daily SpO2',
+                'schema' => self::getConfigurationSchema(),
+            ],
+
+            // New API v2 endpoints
+            'cardiovascular_age' => [
+                'label' => 'Cardiovascular Age',
+                'schema' => self::getConfigurationSchema(),
+            ],
+            'vo2_max' => [
+                'label' => 'VO2 Max',
+                'schema' => self::getConfigurationSchema(),
+            ],
+            'enhanced_tag' => [
+                'label' => 'Enhanced Tags',
+                'schema' => self::getConfigurationSchema(),
+            ],
+            'sleep_time' => [
+                'label' => 'Sleep Recommendations',
+                'schema' => self::getConfigurationSchema(),
+            ],
+            'rest_mode_period' => [
+                'label' => 'Rest Mode Periods',
                 'schema' => self::getConfigurationSchema(),
             ],
         ];
@@ -574,6 +792,37 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         if ($type === 'spo2') {
             $this->fetchDailySpO2($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        // New API v2 endpoints
+        if ($type === 'cardiovascular_age') {
+            $this->fetchCardiovascularAge($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'vo2_max') {
+            $this->fetchVO2Max($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'enhanced_tag') {
+            $this->fetchEnhancedTags($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'sleep_time') {
+            $this->fetchSleepTime($integration, $startDate, $endDate);
+
+            return;
+        }
+
+        if ($type === 'rest_mode_period') {
+            $this->fetchRestModePeriods($integration, $startDate, $endDate);
 
             return;
         }
@@ -907,10 +1156,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         foreach ($contributors as $name => $value) {
             [$encodedContrib, $contribMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
             $event->blocks()->create([
+                'block_type' => 'contributors',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => Str::title(str_replace('_', ' ', (string) $name)),
-                'metadata' => ['text' => 'Contributor score'],
+                'metadata' => ['type' => 'contributor', 'field' => $name],
                 'value' => $encodedContrib,
                 'value_multiplier' => $contribMultiplier,
                 'value_unit' => $options['contributors_value_unit'] ?? $options['value_unit'] ?? 'score',
@@ -934,10 +1184,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 $value = $item[$field];
                 [$encodedDetail, $detailMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
                 $event->blocks()->create([
+                    'block_type' => 'activity_metrics',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => $label,
-                    'content' => null,
+                    'metadata' => ['type' => 'detail', 'field' => $field],
                     'value' => $encodedDetail,
                     'value_multiplier' => $detailMultiplier,
                     'value_unit' => $unitMap[$field] ?? null,
@@ -990,12 +1241,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         ]);
 
         [$encodedCalories, $calMultiplier] = $this->encodeNumericValue($calories);
-        $event->blocks()->create(['block_type' => 'workout',
-
+        $event->blocks()->create([
+            'block_type' => 'workout_metrics',
             'time' => $event->time,
             'integration_id' => $integration->id,
             'title' => 'Calories',
-            'content' => 'Estimated calories for the workout',
+            'metadata' => ['type' => 'calorie_burn', 'estimated' => true],
             'value' => $encodedCalories,
             'value_multiplier' => $calMultiplier,
             'value_unit' => 'kcal',
@@ -1004,12 +1255,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $avgHr = Arr::get($item, 'average_heart_rate');
         if ($avgHr !== null) {
             [$encodedAvgHr, $avgHrMultiplier] = $this->encodeNumericValue($avgHr);
-            $event->blocks()->create(['block_type' => 'workout',
-
+            $event->blocks()->create([
+                'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Average Heart Rate',
-                'content' => 'Average heart rate during workout',
+                'metadata' => ['type' => 'average', 'context' => 'workout'],
                 'value' => $encodedAvgHr,
                 'value_multiplier' => $avgHrMultiplier,
                 'value_unit' => 'bpm',
@@ -1596,16 +1847,16 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     protected function getRequiredScopes(): string
     {
         return implode(' ', [
-            'email',
-            'personal',
-            'daily',
-            'heartrate',
-            'workout',
-            'tag',
-            'session',
-            'spo2',
-            'stress',
-            'resilience',
+            'email',           // For personal_info endpoint
+            'personal',        // For personal_info, ring_configuration endpoints
+            'daily',           // For all daily_* endpoints (activity, readiness, resilience, sleep, spo2, stress, cardiovascular_age), vo2_max, sleep_time, rest_mode_period
+            'heartrate',       // For heartrate time-series endpoint
+            'workout',         // For workout endpoint
+            'tag',             // For tag, enhanced_tag endpoints
+            'session',         // For session endpoint (mindfulness/meditation)
+            'spo2',            // For daily_spo2 endpoint (if separate scope required)
+            'stress',          // For daily_stress endpoint (if separate scope required)
+            'resilience',      // For daily_resilience endpoint (if separate scope required)
         ]);
     }
 
@@ -1779,12 +2030,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 if ($seconds === null) {
                     continue;
                 }
-                $event->blocks()->create(['block_type' => 'tag',
-
+                $event->blocks()->create([
+                    'block_type' => 'sleep_stages',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
-                    'metadata' => ['text' => 'Stage duration'],
+                    'metadata' => ['type' => 'stage_duration', 'stage' => $stage],
                     'value' => (int) $seconds,
                     'value_multiplier' => 1,
                     'value_unit' => 'seconds',
@@ -1794,12 +2045,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             $hrAvg = Arr::get($item, 'average_heart_rate');
             if ($hrAvg !== null) {
                 [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
-                $event->blocks()->create(['block_type' => 'sleep_stages',
-
+                $event->blocks()->create([
+                    'block_type' => 'heart_rate',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => 'Average Heart Rate',
-                    'metadata' => ['text' => 'Average sleeping heart rate'],
+                    'metadata' => ['type' => 'average', 'context' => 'sleep'],
                     'value' => $encodedHrAvg,
                     'value_multiplier' => $hrAvgMultiplier,
                     'value_unit' => 'bpm',
@@ -2032,10 +2283,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             // Replace summary with separate min/max blocks
             [$encMin, $minMult] = $this->encodeNumericValue($min);
             $event->blocks()->create([
+                'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Min Heart Rate',
-                'metadata' => [],
+                'metadata' => ['type' => 'minimum', 'context' => 'daily_series'],
                 'value' => $encMin,
                 'value_multiplier' => $minMult,
                 'value_unit' => 'bpm',
@@ -2043,21 +2295,22 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
             [$encMax, $maxMult] = $this->encodeNumericValue($max);
             $event->blocks()->create([
+                'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Max Heart Rate',
-                'metadata' => [],
+                'metadata' => ['type' => 'maximum', 'context' => 'daily_series'],
                 'value' => $encMax,
                 'value_multiplier' => $maxMult,
                 'value_unit' => 'bpm',
             ]);
 
-            $event->blocks()->create(['block_type' => 'heart_rate',
-
+            $event->blocks()->create([
+                'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Data Points',
-                'metadata' => ['text' => 'Count of heart rate points collected for the day'],
+                'metadata' => ['type' => 'count', 'context' => 'daily_series'],
                 'value' => (int) $points->count(),
                 'value_multiplier' => 1,
                 'value_unit' => 'count',
@@ -2105,9 +2358,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $state = Arr::get($item, 'mood', Arr::get($item, 'state'));
         if ($state) {
             $event->blocks()->create([
+                'block_type' => 'biometrics',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'State',
+                'metadata' => ['type' => 'mood_state', 'value' => (string) $state],
                 'content' => (string) $state,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -2158,11 +2413,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'target_id' => $tagTarget->id,
         ]);
 
-        $event->blocks()->create(['block_type' => 'tag',
-
+        $event->blocks()->create([
+            'block_type' => 'tag_info',
             'time' => $event->time,
             'integration_id' => $integration->id,
             'title' => 'Tag',
+            'metadata' => ['type' => 'user_tag', 'label' => (string) $label],
             'content' => (string) $label,
         ]);
     }
@@ -2253,6 +2509,363 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         return $body;
+    }
+
+    protected function fetchCardiovascularAge(Integration $integration, string $startDate, string $endDate): void
+    {
+        $this->ensureUserProfile($integration);
+        $json = $this->getJson('/usercollection/daily_cardiovascular_age', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+        $items = $json['data'] ?? [];
+
+        foreach ($items as $item) {
+            $day = $item['day'] ?? null;
+            $vascularAge = $item['vascular_age'] ?? null;
+
+            if (! $day || $vascularAge === null) {
+                continue;
+            }
+
+            $sourceId = "oura_cardiovascular_age_{$integration->id}_{$day}";
+            $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+            if ($exists) {
+                continue;
+            }
+
+            $actor = $this->ensureUserProfile($integration);
+            $target = EventObject::updateOrCreate([
+                'user_id' => $integration->user_id,
+                'concept' => 'metric',
+                'type' => 'cardiovascular_age',
+                'title' => 'Cardiovascular Age',
+            ], [
+                'time' => $day . ' 00:00:00',
+                'content' => 'Estimated cardiovascular age measurement',
+                'metadata' => $item,
+            ]);
+
+            [$encodedAge, $ageMultiplier] = $this->encodeNumericValue((float) $vascularAge);
+
+            Event::create([
+                'source_id' => $sourceId,
+                'time' => $day . ' 00:00:00',
+                'integration_id' => $integration->id,
+                'actor_id' => $actor->id,
+                'service' => 'oura',
+                'domain' => self::getDomain(),
+                'action' => 'had_cardiovascular_age',
+                'value' => $encodedAge,
+                'value_multiplier' => $ageMultiplier,
+                'value_unit' => 'years',
+                'event_metadata' => ['day' => $day],
+                'target_id' => $target->id,
+            ]);
+        }
+    }
+
+    protected function fetchVO2Max(Integration $integration, string $startDate, string $endDate): void
+    {
+        $this->ensureUserProfile($integration);
+        $json = $this->getJson('/usercollection/vO2_max', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+        $items = $json['data'] ?? [];
+
+        foreach ($items as $item) {
+            $day = $item['day'] ?? null;
+            $id = $item['id'] ?? null;
+            $vo2Max = $item['vo2_max'] ?? null;
+
+            if (! $day || ! $id || $vo2Max === null) {
+                continue;
+            }
+
+            $sourceId = "oura_vo2_max_{$integration->id}_{$id}";
+            $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+            if ($exists) {
+                continue;
+            }
+
+            $actor = $this->ensureUserProfile($integration);
+            $target = EventObject::updateOrCreate([
+                'user_id' => $integration->user_id,
+                'concept' => 'metric',
+                'type' => 'vo2_max',
+                'title' => 'VO2 Max',
+            ], [
+                'time' => $item['timestamp'] ?? ($day . ' 00:00:00'),
+                'content' => 'Maximum oxygen consumption measurement',
+                'metadata' => $item,
+            ]);
+
+            [$encodedVO2, $vo2Multiplier] = $this->encodeNumericValue((float) $vo2Max);
+
+            Event::create([
+                'source_id' => $sourceId,
+                'time' => $item['timestamp'] ?? ($day . ' 00:00:00'),
+                'integration_id' => $integration->id,
+                'actor_id' => $actor->id,
+                'service' => 'oura',
+                'domain' => self::getDomain(),
+                'action' => 'had_vo2_max',
+                'value' => $encodedVO2,
+                'value_multiplier' => $vo2Multiplier,
+                'value_unit' => 'ml/kg/min',
+                'event_metadata' => ['day' => $day, 'measurement_id' => $id],
+                'target_id' => $target->id,
+            ]);
+        }
+    }
+
+    protected function fetchEnhancedTags(Integration $integration, string $startDate, string $endDate): void
+    {
+        $this->ensureUserProfile($integration);
+        $json = $this->getJson('/usercollection/enhanced_tag', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+        $items = $json['data'] ?? [];
+
+        foreach ($items as $item) {
+            // Use existing createTagEvent method or create enhanced version
+            $this->createEnhancedTagEvent($integration, $item);
+        }
+    }
+
+    protected function fetchSleepTime(Integration $integration, string $startDate, string $endDate): void
+    {
+        $this->ensureUserProfile($integration);
+        $json = $this->getJson('/usercollection/sleep_time', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+        $items = $json['data'] ?? [];
+
+        foreach ($items as $item) {
+            $this->createSleepTimeEvent($integration, $item);
+        }
+    }
+
+    protected function fetchRestModePeriods(Integration $integration, string $startDate, string $endDate): void
+    {
+        $this->ensureUserProfile($integration);
+        $json = $this->getJson('/usercollection/rest_mode_period', $integration, [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+        $items = $json['data'] ?? [];
+
+        foreach ($items as $item) {
+            $this->createRestModePeriodEvent($integration, $item);
+        }
+    }
+
+    protected function createEnhancedTagEvent(Integration $integration, array $item): void
+    {
+        $id = $item['id'] ?? null;
+        $startDay = $item['start_day'] ?? null;
+
+        if (! $id || ! $startDay) {
+            return;
+        }
+
+        $sourceId = "oura_enhanced_tag_{$integration->id}_{$id}";
+        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+        if ($exists) {
+            return;
+        }
+
+        $duration = $this->calculateTagDuration($item);
+        [$encodedDuration, $durationMultiplier] = $this->encodeNumericValue($duration);
+
+        $actor = $this->ensureUserProfile($integration);
+        $tagType = $item['tag_type_code'] ?? 'unknown';
+        $customName = $item['custom_name'] ?? null;
+
+        $target = EventObject::updateOrCreate([
+            'user_id' => $integration->user_id,
+            'concept' => 'tag',
+            'type' => 'enhanced_tag',
+            'title' => $customName ?: "Enhanced Tag ({$tagType})",
+        ], [
+            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'content' => $item['comment'] ?: 'Enhanced tag with detailed metadata',
+            'metadata' => $item,
+        ]);
+
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => self::getDomain(),
+            'action' => 'had_enhanced_tag',
+            'value' => $encodedDuration,
+            'value_multiplier' => $durationMultiplier,
+            'value_unit' => 'seconds',
+            'event_metadata' => [
+                'start_day' => $startDay,
+                'end_day' => $item['end_day'] ?? null,
+                'tag_type' => $tagType,
+                'tag_id' => $id,
+            ],
+            'target_id' => $target->id,
+        ]);
+
+        // Add tag details as blocks
+        if ($tagType) {
+            $event->blocks()->create([
+                'block_type' => 'tag_info',
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Tag Type',
+                'metadata' => ['type' => 'tag_type_code', 'code' => $tagType],
+                'content' => $tagType,
+            ]);
+        }
+
+        if ($item['comment'] ?? null) {
+            $event->blocks()->create([
+                'block_type' => 'tag_info',
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Comment',
+                'metadata' => ['type' => 'user_comment'],
+                'content' => $item['comment'],
+            ]);
+        }
+    }
+
+    protected function createSleepTimeEvent(Integration $integration, array $item): void
+    {
+        $day = $item['day'] ?? null;
+        $id = $item['id'] ?? null;
+
+        if (! $day || ! $id) {
+            return;
+        }
+
+        $sourceId = "oura_sleep_time_{$integration->id}_{$id}";
+        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+        if ($exists) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+        $recommendation = $item['recommendation'] ?? 'Sleep timing recommendation';
+
+        $target = EventObject::updateOrCreate([
+            'user_id' => $integration->user_id,
+            'concept' => 'recommendation',
+            'type' => 'sleep_recommendation',
+            'title' => 'Sleep Recommendation',
+        ], [
+            'time' => $day . ' 00:00:00',
+            'content' => $recommendation,
+            'metadata' => $item,
+        ]);
+
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $day . ' 00:00:00',
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => self::getDomain(),
+            'action' => 'had_sleep_recommendation',
+            'value' => null,
+            'value_multiplier' => 1,
+            'value_unit' => null,
+            'event_metadata' => [
+                'day' => $day,
+                'status' => $item['status'] ?? 'unknown',
+                'recommendation_id' => $id,
+            ],
+            'target_id' => $target->id,
+        ]);
+
+        // Add recommendation blocks
+        if ($recommendation) {
+            $event->blocks()->create([
+                'block_type' => 'recommendation',
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Recommendation',
+                'metadata' => ['type' => 'sleep_guidance'],
+                'content' => $recommendation,
+            ]);
+        }
+    }
+
+    protected function createRestModePeriodEvent(Integration $integration, array $item): void
+    {
+        $id = $item['id'] ?? null;
+        $startDay = $item['start_day'] ?? null;
+
+        if (! $id || ! $startDay) {
+            return;
+        }
+
+        $duration = $this->calculateRestPeriodDuration($item);
+        [$encodedDuration, $durationMultiplier] = $this->encodeNumericValue($duration);
+
+        $sourceId = "oura_rest_mode_period_{$integration->id}_{$id}";
+        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
+        if ($exists) {
+            return;
+        }
+
+        $actor = $this->ensureUserProfile($integration);
+        $episodes = $item['episodes'] ?? [];
+
+        $target = EventObject::updateOrCreate([
+            'user_id' => $integration->user_id,
+            'concept' => 'rest_period',
+            'type' => 'rest_period',
+            'title' => 'Rest Mode Period',
+        ], [
+            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'content' => 'Rest mode period with episodes',
+            'metadata' => $item,
+        ]);
+
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => self::getDomain(),
+            'action' => 'had_rest_period',
+            'value' => $encodedDuration,
+            'value_multiplier' => $durationMultiplier,
+            'value_unit' => 'seconds',
+            'event_metadata' => [
+                'start_day' => $startDay,
+                'end_day' => $item['end_day'] ?? null,
+                'episode_count' => is_array($episodes) ? count($episodes) : 0,
+                'period_id' => $id,
+            ],
+            'target_id' => $target->id,
+        ]);
+
+        // Add episode blocks
+        if (is_array($episodes) && count($episodes) > 0) {
+            $event->blocks()->create([
+                'block_type' => 'biometrics',
+                'time' => $event->time,
+                'integration_id' => $integration->id,
+                'title' => 'Episodes',
+                'metadata' => ['type' => 'episode_count', 'episodes' => $episodes],
+                'value' => count($episodes),
+                'value_multiplier' => 1,
+                'value_unit' => 'count',
+            ]);
+        }
     }
 
     private function createMappedValueEvent(
@@ -2373,12 +2986,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             if ($seconds === null) {
                 continue;
             }
-            $event->blocks()->create(['block_type' => 'tag',
-
+            $event->blocks()->create([
+                'block_type' => 'sleep_stages',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
-                'content' => 'Stage duration',
+                'metadata' => ['type' => 'stage_duration', 'stage' => $stage],
                 'value' => (int) $seconds,
                 'value_multiplier' => 1,
                 'value_unit' => 'seconds',
@@ -2388,16 +3001,42 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $hrAvg = Arr::get($item, 'average_heart_rate');
         if ($hrAvg !== null) {
             [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
-            $event->blocks()->create(['block_type' => 'sleep_stages',
-
+            $event->blocks()->create([
+                'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => 'Average Heart Rate',
-                'content' => 'Average sleeping heart rate',
+                'metadata' => ['type' => 'average', 'context' => 'sleep'],
                 'value' => $encodedHrAvg,
                 'value_multiplier' => $hrAvgMultiplier,
                 'value_unit' => 'bpm',
             ]);
         }
+    }
+
+    private function calculateTagDuration(array $item): ?int
+    {
+        $startDay = $item['start_day'] ?? null;
+        $startTime = $item['start_time'] ?? null;
+        $endDay = $item['end_day'] ?? null;
+        $endTime = $item['end_time'] ?? null;
+
+        if (! $startDay || ! $endDay || ! $endTime) {
+            return null;
+        }
+
+        try {
+            $start = Carbon::parse($startDay . ' ' . ($startTime ?? '00:00:00'));
+            $end = Carbon::parse($endDay . ' ' . $endTime);
+
+            return $end->diffInSeconds($start);
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    private function calculateRestPeriodDuration(array $item): ?int
+    {
+        return $this->calculateTagDuration($item); // Same logic
     }
 }

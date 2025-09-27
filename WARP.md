@@ -504,4 +504,112 @@ SENTRY_TRACES_SAMPLE_RATE=1.0
 6. Write comprehensive tests for all components
 7. Document plugin configuration and capabilities
 
+## Oura Integration Patterns
+
+### HasOuraBlocks Trait
+
+The Oura integration uses a specialized trait `HasOuraBlocks` to standardize block creation across all processing jobs. This trait provides consistent methods for creating different types of blocks from Oura API data.
+
+#### Key Methods
+
+```php
+// Activity and health metrics
+$this->createActivityMetricBlocks($event, $item, $metrics, $plugin);
+$this->createContributorBlocks($event, $contributors, $plugin);
+
+// Sleep-related blocks
+$this->createSleepStageBlocks($event, $item, $metrics, $plugin);
+$this->createSleepTimingBlocks($event, $item, $fields, $plugin);
+$this->createRecommendationBlocks($event, $recommendations, $plugin);
+
+// Heart rate data
+$this->createHeartRateBlocks($event, $heartRateData, $plugin);
+```
+
+#### Standard Metric Configurations
+
+The trait provides pre-configured metric definitions for common Oura data types:
+
+```php
+// Activity metrics (steps, calories, distance, etc.)
+$activityMetrics = $this->getStandardActivityMetrics();
+
+// MET (Metabolic Equivalent) metrics
+$metMetrics = $this->getMetActivityMetrics();
+
+// Sleep stage and quality metrics
+$sleepMetrics = $this->getStandardSleepMetrics();
+
+// Sleep timing field mappings
+$timingFields = $this->getStandardSleepTimingFields();
+```
+
+#### Usage Pattern
+
+All Oura processing jobs follow this pattern:
+
+1. **Add the trait**: `use HasOuraBlocks;`
+2. **Use trait methods**: Replace inline block creation with trait method calls
+3. **Leverage standard configs**: Use pre-defined metric configurations where possible
+4. **Maintain consistency**: All jobs create blocks using the same patterns
+
+#### Example Processing Job
+
+```php
+class OuraSleepTimeData extends BaseProcessingJob
+{
+    use HasOuraBlocks;
+
+    protected function processData(): void
+    {
+        // Process sleep time data
+        foreach ($this->data['sleep'] as $sleepRecord) {
+            $event = $this->createEventsSafely([
+                [
+                    'title' => 'Sleep Time Data',
+                    'occurred_at' => $sleepRecord['bedtime_start'],
+                    // ... other event data
+                ]
+            ])[0];
+
+            // Use trait method for recommendations
+            if (!empty($sleepRecord['recommendations'])) {
+                $this->createRecommendationBlocks(
+                    $event,
+                    $sleepRecord['recommendations'],
+                    $this->plugin
+                );
+            }
+
+            // Use trait method for sleep timing
+            $timingFields = $this->getStandardSleepTimingFields();
+            $this->createSleepTimingBlocks($event, $sleepRecord, $timingFields, $this->plugin);
+        }
+    }
+}
+```
+
+#### Benefits
+
+- **Consistency**: All Oura jobs create blocks using identical patterns
+- **Maintainability**: Changes to block creation logic only need to be made in one place
+- **Testability**: Trait methods can be thoroughly unit tested
+- **Reusability**: Common patterns are shared across all processing jobs
+- **Standards**: Pre-defined metric configurations ensure data consistency
+
+### Oura Processing Jobs
+
+The following processing jobs use the `HasOuraBlocks` trait:
+
+- `OuraActivityData` - Daily activity metrics and contributors
+- `OuraSleepRecordsData` - Sleep stage analysis and metrics
+- `OuraSleepTimeData` - Sleep timing and recommendations
+- `OuraHeartrateData` - Heart rate time series and statistics
+- `OuraSessionsData` - Meditation and mindfulness sessions
+- `OuraTagsData` - User-defined tags and annotations
+- `OuraSpo2Data` - Blood oxygen saturation readings
+- `OuraEnhancedTagData` - Enhanced tag metadata
+- `OuraRestModePeriodData` - Rest mode periods and recovery
+- `OuraResilienceData` - Resilience scoring and analysis
+
 This architecture ensures scalability, maintainability, and consistency across all external service integrations while providing a unified API for consuming applications.
