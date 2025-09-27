@@ -4,6 +4,7 @@ use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\PluginRegistry;
+use App\Jobs\DeleteBinItemsBatch;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -244,5 +245,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Volt::route('events', 'admin.events')->name('events.index');
     Volt::route('objects', 'admin.objects')->name('objects.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
+    Route::post('bin/delete', function () {
+        DeleteBinItemsBatch::dispatch(Auth::id());
+
+        return response()->json([
+            'message' => 'Deletion process started. All items will be permanently deleted.',
+        ]);
+    })->name('bin.delete');
     Volt::route('activity', 'admin.activity')->name('activity.index');
 });

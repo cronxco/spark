@@ -396,6 +396,14 @@ new class extends Component {
         return ['event', 'object', 'block', 'integration', 'integration_group'];
     }
 
+    public function deleteAll(): void
+    {
+        // Dispatch the job to permanently delete all soft-deleted items
+        \App\Jobs\DeleteBinItemsBatch::dispatch(Auth::id());
+        
+        $this->success('Deletion process started. All items will be permanently deleted.');
+    }
+
     public function truncateId(string $id): string
     {
         return Str::limit($id, 8, '');
@@ -424,6 +432,13 @@ new class extends Component {
                         Delete Selected ({{ count($selectedItems) }})
                     </button>
                 @endif
+                
+                <!-- Delete All Button -->
+                <button class="btn btn-error btn-sm" wire:click="deleteAll"
+                        onclick="return confirm('Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.')">
+                    <x-icon name="o-fire" class="w-4 h-4 mr-1" />
+                    Delete All
+                </button>
             </div>
         </x-slot:actions>
     </x-header>
