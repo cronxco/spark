@@ -323,6 +323,91 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Rest mode period with episodes',
                 'hidden' => false,
             ],
+            // Metadata object types used in blocks and processing
+            'contributor' => [
+                'icon' => 'o-puzzle-piece',
+                'display_name' => 'Score Contributor',
+                'description' => 'Individual component contributing to daily scores',
+                'hidden' => true,
+            ],
+            'detail' => [
+                'icon' => 'o-document-text',
+                'display_name' => 'Detail Information',
+                'description' => 'Detailed information or metadata',
+                'hidden' => true,
+            ],
+            'calorie_burn' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Calorie Burn',
+                'description' => 'Calorie burn measurement',
+                'hidden' => true,
+            ],
+            'average' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Average Value',
+                'description' => 'Average measurement value',
+                'hidden' => true,
+            ],
+            'stage_duration' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Stage Duration',
+                'description' => 'Duration of a specific sleep stage',
+                'hidden' => true,
+            ],
+            'minimum' => [
+                'icon' => 'o-minus',
+                'display_name' => 'Minimum Value',
+                'description' => 'Minimum measurement value',
+                'hidden' => true,
+            ],
+            'maximum' => [
+                'icon' => 'o-plus',
+                'display_name' => 'Maximum Value',
+                'description' => 'Maximum measurement value',
+                'hidden' => true,
+            ],
+            'count' => [
+                'icon' => 'o-hashtag',
+                'display_name' => 'Count',
+                'description' => 'Count or quantity measurement',
+                'hidden' => true,
+            ],
+            'mood_state' => [
+                'icon' => 'o-face-smile',
+                'display_name' => 'Mood State',
+                'description' => 'Mood or emotional state indicator',
+                'hidden' => true,
+            ],
+            'user_tag' => [
+                'icon' => 'o-tag',
+                'display_name' => 'User Tag',
+                'description' => 'User-defined tag or annotation',
+                'hidden' => true,
+            ],
+            'tag_type_code' => [
+                'icon' => 'o-code-bracket',
+                'display_name' => 'Tag Type Code',
+                'description' => 'Tag type classification code',
+                'hidden' => true,
+            ],
+            'user_comment' => [
+                'icon' => 'o-chat-bubble-left-right',
+                'display_name' => 'User Comment',
+                'description' => 'User-provided comment or note',
+                'hidden' => true,
+            ],
+            'sleep_guidance' => [
+                'icon' => 'o-light-bulb',
+                'display_name' => 'Sleep Guidance',
+                'description' => 'Sleep-related guidance or recommendation',
+                'hidden' => true,
+            ],
+            'episode_count' => [
+                'icon' => 'o-list-bullet',
+                'display_name' => 'Episode Count',
+                'description' => 'Number of episodes or occurrences',
+                'hidden' => true,
+            ],
         ];
     }
 
