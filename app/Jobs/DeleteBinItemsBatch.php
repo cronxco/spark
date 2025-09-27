@@ -100,12 +100,35 @@ class DeleteBinItemsBatch implements ShouldQueue
      */
     private function deleteEvents(): int
     {
-        $query = Event::onlyTrashed()
+        $events = Event::onlyTrashed()
             ->whereHas('integration', function ($q) {
                 $q->where('user_id', $this->userId);
-            });
+            })
+            ->limit($this->batchSize)
+            ->get();
 
-        return $this->processBatch($query, 'events');
+        if ($events->isEmpty()) {
+            return 0;
+        }
+
+        $deleted = 0;
+        foreach ($events as $event) {
+            // First delete all blocks for this event (both trashed and non-trashed)
+            Block::withTrashed()->where('event_id', $event->id)->forceDelete();
+
+            // Then delete the event
+            $event->forceDelete();
+            $deleted++;
+        }
+
+        if ($deleted > 0) {
+            Log::info('Hard deleted events with their blocks', [
+                'user_id' => $this->userId,
+                'count' => $deleted,
+            ]);
+        }
+
+        return $deleted;
     }
 
     /**
@@ -113,10 +136,37 @@ class DeleteBinItemsBatch implements ShouldQueue
      */
     private function deleteIntegrations(): int
     {
-        $query = Integration::onlyTrashed()
-            ->where('user_id', $this->userId);
+        $integrations = Integration::onlyTrashed()
+            ->where('user_id', $this->userId)
+            ->limit($this->batchSize)
+            ->get();
 
-        return $this->processBatch($query, 'integrations');
+        if ($integrations->isEmpty()) {
+            return 0;
+        }
+
+        $deleted = 0;
+        foreach ($integrations as $integration) {
+            // First delete all events and their blocks for this integration
+            $events = Event::withTrashed()->where('integration_id', $integration->id)->get();
+            foreach ($events as $event) {
+                Block::withTrashed()->where('event_id', $event->id)->forceDelete();
+                $event->forceDelete();
+            }
+
+            // Then delete the integration
+            $integration->forceDelete();
+            $deleted++;
+        }
+
+        if ($deleted > 0) {
+            Log::info('Hard deleted integrations with their events and blocks', [
+                'user_id' => $this->userId,
+                'count' => $deleted,
+            ]);
+        }
+
+        return $deleted;
     }
 
     /**
@@ -124,10 +174,41 @@ class DeleteBinItemsBatch implements ShouldQueue
      */
     private function deleteIntegrationGroups(): int
     {
-        $query = IntegrationGroup::onlyTrashed()
-            ->where('user_id', $this->userId);
+        $groups = IntegrationGroup::onlyTrashed()
+            ->where('user_id', $this->userId)
+            ->limit($this->batchSize)
+            ->get();
 
-        return $this->processBatch($query, 'integration_groups');
+        if ($groups->isEmpty()) {
+            return 0;
+        }
+
+        $deleted = 0;
+        foreach ($groups as $group) {
+            // First delete all integrations, events, and blocks for this group
+            $integrations = Integration::withTrashed()->where('integration_group_id', $group->id)->get();
+            foreach ($integrations as $integration) {
+                $events = Event::withTrashed()->where('integration_id', $integration->id)->get();
+                foreach ($events as $event) {
+                    Block::withTrashed()->where('event_id', $event->id)->forceDelete();
+                    $event->forceDelete();
+                }
+                $integration->forceDelete();
+            }
+
+            // Then delete the integration group
+            $group->forceDelete();
+            $deleted++;
+        }
+
+        if ($deleted > 0) {
+            Log::info('Hard deleted integration groups with their integrations, events, and blocks', [
+                'user_id' => $this->userId,
+                'count' => $deleted,
+            ]);
+        }
+
+        return $deleted;
     }
 
     /**
