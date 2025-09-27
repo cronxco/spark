@@ -1899,14 +1899,44 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
     protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
     {
-        // Create a temp Integration bound to the group to reuse token handling
-        $temp = new Integration;
-        $temp->setRelation('group', $group);
-        $info = $this->getJson('/usercollection/personal_info', $temp);
+        try {
+            // Create a temp Integration bound to the group to reuse token handling
+            $temp = new Integration;
+            $temp->setRelation('group', $group);
+            $info = $this->getJson('/usercollection/personal_info', $temp);
 
-        $group->update([
-            'account_id' => Arr::get($info, 'data.0.user_id') ?? Arr::get($info, 'user_id') ?? Arr::get($info, 'email'),
-        ]);
+            // Extract account ID with proper fallback logic for Oura API response format
+            // Oura personal_info endpoint returns: {"id": "...", "email": "...", ...}
+            $accountId = Arr::get($info, 'id') ??           // Direct id field (current Oura API)
+                        Arr::get($info, 'data.0.user_id') ?? // Legacy nested format
+                        Arr::get($info, 'user_id') ??        // Legacy flat format
+                        Arr::get($info, 'data.0.email') ??   // Fallback to email in nested format
+                        Arr::get($info, 'email');            // Fallback to email in flat format
+
+            if (! $accountId) {
+                Log::warning('Oura fetchAccountInfoForGroup: No account ID found in API response', [
+                    'group_id' => $group->id,
+                    'api_response' => $info,
+                ]);
+                throw new Exception('Unable to extract account ID from Oura personal_info response');
+            }
+
+            $group->update([
+                'account_id' => $accountId,
+            ]);
+
+            Log::info('Oura account info fetched successfully', [
+                'group_id' => $group->id,
+                'account_id' => $accountId,
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Oura fetchAccountInfoForGroup failed', [
+                'group_id' => $group->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e; // Re-throw to fail the OAuth callback if account info can't be fetched
+        }
     }
 
     protected function createOrUpdateUser(Integration $integration, array $profile = []): EventObject
