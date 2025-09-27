@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DeleteBinItemsBatch;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Block;
@@ -399,7 +400,7 @@ new class extends Component {
     public function deleteAll(): void
     {
         // Dispatch the job to permanently delete all soft-deleted items
-        \App\Jobs\DeleteBinItemsBatch::dispatch(Auth::id());
+        DeleteBinItemsBatch::dispatch(Auth::id());
         
         $this->success('Deletion process started. All items will be permanently deleted.');
     }
