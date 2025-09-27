@@ -1714,6 +1714,23 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         return $data['data'] ?? [];
     }
 
+    public function ensureUserProfile(Integration $integration): EventObject
+    {
+        $info = $this->getJson('/usercollection/personal_info', $integration);
+        $data = Arr::first($info['data'] ?? []) ?? $info;
+        $profile = [
+            'user_id' => $integration->group?->account_id,
+            'email' => Arr::get($data, 'email'),
+            'age' => Arr::get($data, 'age'),
+            'biological_sex' => Arr::get($data, 'biological_sex'),
+            'weight' => Arr::get($data, 'weight'),
+            'height' => Arr::get($data, 'height'),
+            'dominant_hand' => Arr::get($data, 'dominant_hand'),
+        ];
+
+        return $this->createOrUpdateUser($integration, $profile);
+    }
+
     /**
      * Perform a sweep if needed for any instance type
      */
@@ -1961,23 +1978,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         );
     }
 
-    protected function ensureUserProfile(Integration $integration): EventObject
-    {
-        $info = $this->getJson('/usercollection/personal_info', $integration);
-        $data = Arr::first($info['data'] ?? []) ?? $info;
-        $profile = [
-            'user_id' => $integration->group?->account_id,
-            'email' => Arr::get($data, 'email'),
-            'age' => Arr::get($data, 'age'),
-            'biological_sex' => Arr::get($data, 'biological_sex'),
-            'weight' => Arr::get($data, 'weight'),
-            'height' => Arr::get($data, 'height'),
-            'dominant_hand' => Arr::get($data, 'dominant_hand'),
-        ];
-
-        return $this->createOrUpdateUser($integration, $profile);
-    }
-
     protected function fetchDailySleep(Integration $integration, string $startDate, string $endDate): void
     {
         $this->ensureUserProfile($integration);
@@ -2028,7 +2028,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'metadata' => $item,
             ]);
 
-            $duration = (int) Arr::get($item, 'duration', 0);
+            // Use total_sleep_duration as the main value (matching our OuraSleepRecordsData job)
+            $totalSleepDuration = (int) Arr::get($item, 'total_sleep_duration', Arr::get($item, 'duration', 0));
             $efficiency = Arr::get($item, 'efficiency');
             $event = Event::create([
                 'source_id' => $sourceId,
@@ -2038,7 +2039,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'service' => 'oura',
                 'domain' => self::getDomain(),
                 'action' => 'slept_for',
-                'value' => $duration,
+                'value' => $totalSleepDuration, // Use total_sleep_duration as main event value
                 'value_multiplier' => 1,
                 'value_unit' => 'seconds',
                 'event_metadata' => [
@@ -2048,15 +2049,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'target_id' => $target->id,
             ]);
 
-            $stages = Arr::get($item, 'sleep_stages', []);
-            $stageMap = [
-                'deep' => 'Deep Sleep',
-                'light' => 'Light Sleep',
-                'rem' => 'REM Sleep',
-                'awake' => 'Awake Time',
+            // Use actual API field names (not sleep_stages array)
+            $sleepStages = [
+                'deep_sleep_duration' => 'Deep Sleep',
+                'light_sleep_duration' => 'Light Sleep',
+                'rem_sleep_duration' => 'REM Sleep',
+                'awake_time' => 'Awake Time',
             ];
-            foreach (['deep', 'light', 'rem', 'awake'] as $stage) {
-                $seconds = Arr::get($stages, $stage);
+            foreach ($sleepStages as $field => $title) {
+                $seconds = Arr::get($item, $field);
                 if ($seconds === null) {
                     continue;
                 }
@@ -2064,8 +2065,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                     'block_type' => 'sleep_stages',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
-                    'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
-                    'metadata' => ['type' => 'stage_duration', 'stage' => $stage],
+                    'title' => $title,
+                    'metadata' => ['type' => 'stage_duration', 'field' => $field],
                     'value' => (int) $seconds,
                     'value_multiplier' => 1,
                     'value_unit' => 'seconds',
@@ -2984,7 +2985,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'metadata' => $item,
         ]);
 
-        $duration = (int) Arr::get($item, 'duration', 0);
+        // Use total_sleep_duration as the main value (consistent with OuraSleepRecordsData job)
+        $totalSleepDuration = (int) Arr::get($item, 'total_sleep_duration', Arr::get($item, 'duration', 0));
         $efficiency = Arr::get($item, 'efficiency');
         $event = Event::create([
             'source_id' => $sourceId,
@@ -2994,7 +2996,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'service' => 'oura',
             'domain' => self::getDomain(),
             'action' => 'slept_for',
-            'value' => $duration,
+            'value' => $totalSleepDuration,
             'value_multiplier' => 1,
             'value_unit' => 'seconds',
             'event_metadata' => [
@@ -3004,15 +3006,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'target_id' => $target->id,
         ]);
 
-        $stages = Arr::get($item, 'sleep_stages', []);
-        $stageMap = [
-            'deep' => 'Deep Sleep',
-            'light' => 'Light Sleep',
-            'rem' => 'REM Sleep',
-            'awake' => 'Awake Time',
+        // Use actual API field names (not sleep_stages array)
+        $sleepStages = [
+            'deep_sleep_duration' => 'Deep Sleep',
+            'light_sleep_duration' => 'Light Sleep',
+            'rem_sleep_duration' => 'REM Sleep',
+            'awake_time' => 'Awake Time',
         ];
-        foreach (['deep', 'light', 'rem', 'awake'] as $stage) {
-            $seconds = Arr::get($stages, $stage);
+        foreach ($sleepStages as $field => $title) {
+            $seconds = Arr::get($item, $field);
             if ($seconds === null) {
                 continue;
             }
@@ -3020,8 +3022,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'block_type' => 'sleep_stages',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
-                'title' => $stageMap[$stage] ?? Str::title($stage) . ' Sleep',
-                'metadata' => ['type' => 'stage_duration', 'stage' => $stage],
+                'title' => $title,
+                'metadata' => ['type' => 'stage_duration', 'field' => $field],
                 'value' => (int) $seconds,
                 'value_multiplier' => 1,
                 'value_unit' => 'seconds',
