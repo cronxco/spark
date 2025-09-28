@@ -374,6 +374,22 @@ class MonzoPlugin extends OAuthPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'merchant' => [
+                'icon' => 'o-building-storefront',
+                'display_name' => 'Merchant',
+                'description' => 'Merchant information for transaction',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'pot_transfer' => [
+                'icon' => 'o-arrow-path-rounded-square',
+                'display_name' => 'Pot Transfer',
+                'description' => 'Money transfer to or from a Monzo pot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
         ];
     }
 

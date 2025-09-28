@@ -9,10 +9,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Get the table name with prefix
+        $tableName = DB::getTablePrefix() . 'blocks';
+
         // First, remove any existing duplicate blocks before adding the constraint
         DB::statement("
-            DELETE FROM blocks b1
-            USING blocks b2
+            DELETE FROM {$tableName} b1
+            USING {$tableName} b2
             WHERE b1.id > b2.id
             AND b1.event_id = b2.event_id
             AND b1.title = b2.title

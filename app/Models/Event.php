@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -107,38 +106,7 @@ class Event extends Model
 
     public function blocks()
     {
-        return new class($this->hasMany(Block::class)->withTrashed())
-        {
-            private $relation;
-
-            public function __construct($relation)
-            {
-                $this->relation = $relation;
-            }
-
-            public function create(array $attributes = [])
-            {
-                Log::warning('DEPRECATED: Using blocks()->create() is deprecated. Use $event->createBlock() instead to prevent duplicate blocks.', [
-                    'event_id' => $this->relation->getParent()->id ?? 'unknown',
-                    'block_title' => $attributes['title'] ?? 'unknown',
-                    'stack_trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3),
-                ]);
-
-                // Still allow it to work for backward compatibility, but warn
-                return $this->relation->create($attributes);
-            }
-
-            // Proxy all other methods to the original relation
-            public function __call($method, $arguments)
-            {
-                return $this->relation->$method(...$arguments);
-            }
-
-            public function __get($property)
-            {
-                return $this->relation->$property;
-            }
-        };
+        return $this->hasMany(Block::class)->withTrashed();
     }
 
     /**

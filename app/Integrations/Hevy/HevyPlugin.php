@@ -141,6 +141,14 @@ class HevyPlugin implements IntegrationPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'exercise_summary' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Exercise Summary',
+                'description' => 'Summary statistics for an exercise in a workout',
+                'display_with_object' => true,
+                'value_unit' => 'kg',
+                'hidden' => false,
+            ],
         ];
     }
 
