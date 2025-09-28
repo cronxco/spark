@@ -97,7 +97,7 @@ class SlackEventsData extends BaseProcessingJob
         // Add blocks if any
         if (! empty($eventData['blocks'])) {
             foreach ($eventData['blocks'] as $blockData) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'time' => $blockData['time'] ?? $event->time,
                     'block_type' => $blockData['block_type'] ?? 'generic',
                     'title' => $blockData['title'],

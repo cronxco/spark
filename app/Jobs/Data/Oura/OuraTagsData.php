@@ -121,7 +121,7 @@ class OuraTagsData extends BaseProcessingJob
             // Create blocks if any
             if (isset($data['blocks'])) {
                 foreach ($data['blocks'] as $blockData) {
-                    $event->blocks()->create([
+                    $event->createBlock([
                         'time' => $blockData['time'] ?? $event->time,
                         'block_type' => $blockData['block_type'] ?? '',
                         'title' => $blockData['title'],

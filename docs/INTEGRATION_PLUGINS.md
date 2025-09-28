@@ -1,5 +1,82 @@
 # Integration Plugins Architecture
 
+## ⚠️ Block Creation Best Practices
+
+### Always Use `createBlock()` Instead of `blocks()->create()`
+
+**❌ DEPRECATED - Don't use:**
+
+```php
+// This creates duplicate blocks!
+$event->blocks()->create([
+    'title' => 'Heart Rate',
+    'block_type' => 'biometric',
+    'value' => 75,
+]);
+```
+
+**✅ CORRECT - Use instead:**
+
+```php
+// This prevents duplicates and updates existing blocks
+$event->createBlock([
+    'title' => 'Heart Rate',
+    'block_type' => 'biometric',
+    'value' => 75,
+    'value_unit' => 'bpm',
+]);
+```
+
+### Why `createBlock()` is Required
+
+1. **Prevents Duplicate Blocks**: The `createBlock()` method ensures only one block exists per `(event_id, title, block_type)` combination
+2. **Updates Existing Data**: When new data comes in, existing blocks are updated instead of creating duplicates
+3. **Database Constraints**: A unique constraint prevents duplicates even in race conditions
+4. **Memory Efficiency**: Eliminates redundant storage of duplicate block data
+
+### Block Creation Rules
+
+- **Always specify `block_type`**: This helps categorize and deduplicate blocks properly
+- **Use descriptive titles**: The `title` field is part of the uniqueness constraint
+- **Include all relevant data**: Values, units, metadata, URLs, etc.
+- **Let the system handle deduplication**: Don't try to check for existing blocks manually
+
+### Examples
+
+```php
+// Health metrics
+$event->createBlock([
+    'title' => 'Average Heart Rate',
+    'block_type' => 'heart_rate',
+    'value' => 75,
+    'value_unit' => 'bpm',
+    'metadata' => ['type' => 'average', 'context' => 'workout'],
+]);
+
+// Activity data
+$event->createBlock([
+    'title' => 'Steps',
+    'block_type' => 'activity_metrics',
+    'value' => 10000,
+    'value_unit' => 'count',
+    'metadata' => ['source' => 'pedometer'],
+]);
+
+// Financial transaction details
+$event->createBlock([
+    'title' => 'Merchant',
+    'block_type' => 'transaction_details',
+    'metadata' => [
+        'merchant_name' => 'Coffee Shop',
+        'category' => 'food_drink',
+        'address' => '123 Main St',
+    ],
+    'media_url' => 'https://logo.example.com/merchant.png',
+]);
+```
+
+---
+
 ## Multi-instance with instance groups
 
 Integrations can now create multiple instances that share the same authentication. Tokens and account metadata are stored on `integration_groups` and each logical instance is an `integrations` row with its own `instance_type` and `configuration`.
@@ -353,13 +430,13 @@ abstract class WebhookPlugin implements IntegrationPlugin
                 'embeddings' => $eventData['embeddings'] ?? null,
             ]);
 
-            // Create blocks if any
+            // Create blocks if any - Use createBlock() to prevent duplicates
             foreach ($eventData['blocks'] ?? [] as $blockData) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'time' => $blockData['time'] ?? now(),
-                    'integration_id' => $integration->id,
+                    'block_type' => $blockData['block_type'] ?? 'general',
                     'title' => $blockData['title'],
-                    'content' => $blockData['content'],
+                    'metadata' => $blockData['metadata'] ?? ['content' => $blockData['content'] ?? ''],
                     'url' => $blockData['url'] ?? null,
                     'media_url' => $blockData['media_url'] ?? null,
                     'value' => $blockData['value'] ?? null,

@@ -398,8 +398,8 @@ class HevyPlugin implements IntegrationPlugin
                     $content .= "\n**Rest:** {$rest} s";
                 }
 
-                $event->blocks()->create(['block_type' => 'exercise',
-
+                $event->createBlock([
+                    'block_type' => 'exercise',
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Set ' . $setNum,
                     'metadata' => ['text' => $content],
@@ -413,8 +413,8 @@ class HevyPlugin implements IntegrationPlugin
 
             if ($includeExerciseSummary && $exerciseName !== '') {
                 [$encExVol, $exVolMult] = $this->encodeNumericValue($exerciseVolume);
-                $event->blocks()->create(['block_type' => 'exercise',
-
+                $event->createBlock([
+                    'block_type' => 'exercise_summary',
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Total Volume',
                     'metadata' => ['text' => 'Total volume (weight x reps) for this exercise'],

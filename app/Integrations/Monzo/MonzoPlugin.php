@@ -527,10 +527,9 @@ class MonzoPlugin extends OAuthPlugin
     public function addBalanceBlocks(Event $event, Integration $integration, array $account, string $date, int $balance, int $spendToday): void
     {
         // Spend Today block
-        $event->blocks()->create([
+        $event->createBlock([
             'time' => $event->time,
             'block_type' => 'spend_today',
-            'integration_id' => $event->integration_id,
             'title' => 'Spend Today',
             'metadata' => [],
             'media_url' => null,
@@ -553,11 +552,9 @@ class MonzoPlugin extends OAuthPlugin
             $currentVal = (int) abs($balance);
             $delta = $currentVal - $prevVal; // cents
             if ($delta !== 0) {
-                $event->blocks()->create(['block_type' => 'balance',
-
+                $event->createBlock([
                     'time' => $event->time,
                     'block_type' => 'balance_change',
-                    'integration_id' => $event->integration_id,
                     'title' => 'Balance Change',
                     'metadata' => ['text' => $delta > 0 ? 'Up' : 'Down'],
                     'media_url' => null,
@@ -1396,8 +1393,9 @@ class MonzoPlugin extends OAuthPlugin
                     $parts['address'] = $addrLine;
                 }
             }
-            $event->blocks()->create([
+            $event->createBlock([
                 'time' => $event->time,
+                'block_type' => 'merchant',
                 'title' => 'Merchant',
                 'metadata' => $parts,
                 'media_url' => $m['logo'] ?? null,
@@ -1422,7 +1420,7 @@ class MonzoPlugin extends OAuthPlugin
             if ($rate !== null) {
                 $metadata['rate'] = $rate;
             }
-            $event->blocks()->create([
+            $event->createBlock([
                 'time' => $event->time,
                 'block_type' => 'foreign_exchange',
                 'title' => 'FX',
@@ -1437,7 +1435,7 @@ class MonzoPlugin extends OAuthPlugin
         // Example block for virtual cards
         if (! empty($tx['virtual_card'])) {
             $vc = (array) $tx['virtual_card'];
-            $event->blocks()->create([
+            $event->createBlock([
                 'time' => $event->time,
                 'block_type' => 'virtual_card',
                 'title' => 'Virtual Card',
@@ -1465,9 +1463,9 @@ class MonzoPlugin extends OAuthPlugin
             } catch (Throwable $e) {
                 // ignore
             }
-            $event->blocks()->create(['block_type' => 'pot',
-
+            $event->createBlock([
                 'time' => $event->time,
+                'block_type' => 'pot_transfer',
                 'title' => 'Pot Transfer',
                 'metadata' => ['direction' => $direction, 'pot_name' => $potName ?? 'Pot'],
                 'media_url' => null,
@@ -1488,10 +1486,9 @@ class MonzoPlugin extends OAuthPlugin
                 $details['sort_code'] = $cp['sort_code'];
                 $details['account_number'] = $cp['account_number'];
             }
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'bank_transfer',
                 'time' => $event->time,
-                'integration_id' => $event->integration_id,
                 'title' => 'Bank Transfer',
                 'metadata' => $details,
                 'media_url' => null,

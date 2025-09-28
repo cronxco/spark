@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -106,7 +107,73 @@ class Event extends Model
 
     public function blocks()
     {
-        return $this->hasMany(Block::class)->withTrashed();
+        return new class($this->hasMany(Block::class)->withTrashed())
+        {
+            private $relation;
+
+            public function __construct($relation)
+            {
+                $this->relation = $relation;
+            }
+
+            public function create(array $attributes = [])
+            {
+                Log::warning('DEPRECATED: Using blocks()->create() is deprecated. Use $event->createBlock() instead to prevent duplicate blocks.', [
+                    'event_id' => $this->relation->getParent()->id ?? 'unknown',
+                    'block_title' => $attributes['title'] ?? 'unknown',
+                    'stack_trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3),
+                ]);
+
+                // Still allow it to work for backward compatibility, but warn
+                return $this->relation->create($attributes);
+            }
+
+            // Proxy all other methods to the original relation
+            public function __call($method, $arguments)
+            {
+                return $this->relation->$method(...$arguments);
+            }
+
+            public function __get($property)
+            {
+                return $this->relation->$property;
+            }
+        };
+    }
+
+    /**
+     * Create or update a block for this event, ensuring no duplicates
+     * based on title and block_type combination.
+     *
+     * ✅ PREFERRED METHOD: This method prevents duplicate blocks and updates existing ones.
+     * ❌ DO NOT USE: $event->blocks()->create() - This creates duplicates!
+     *
+     * @param  array  $blockData  Block data including:
+     *                            - string $title (required) - Block title, used for uniqueness
+     *                            - string $block_type (optional) - Block category, used for uniqueness
+     *                            - mixed $value (optional) - Numeric value
+     *                            - int $value_multiplier (optional) - Value multiplier, defaults to 1
+     *                            - string $value_unit (optional) - Value unit (e.g., 'bpm', 'kcal')
+     *                            - array $metadata (optional) - Additional metadata
+     *                            - string $url (optional) - Related URL
+     *                            - string $media_url (optional) - Media/image URL
+     *                            - mixed $embeddings (optional) - Vector embeddings
+     *                            - string $time (optional) - Block timestamp, defaults to event time
+     * @return Block The created or updated block
+     *
+     * @example
+     * // Create a heart rate block
+     * $event->createBlock([
+     *     'title' => 'Average Heart Rate',
+     *     'block_type' => 'heart_rate',
+     *     'value' => 75,
+     *     'value_unit' => 'bpm',
+     *     'metadata' => ['type' => 'average'],
+     * ]);
+     */
+    public function createBlock(array $blockData): Block
+    {
+        return Block::updateOrCreateForEvent($this->id, $blockData);
     }
 
     /**

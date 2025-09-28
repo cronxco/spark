@@ -124,10 +124,9 @@ class OuraStressData extends BaseProcessingJob
 
         // Add stress_high block (in seconds)
         if (isset($item['stress_high'])) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'biometrics',
                 'time' => $event->time,
-                'integration_id' => $this->integration->id,
                 'title' => 'Stress High Duration',
                 'metadata' => [
                     'type' => 'stress_duration',
@@ -142,10 +141,9 @@ class OuraStressData extends BaseProcessingJob
 
         // Add recovery_high block (in seconds)
         if (isset($item['recovery_high'])) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'biometrics',
                 'time' => $event->time,
-                'integration_id' => $this->integration->id,
                 'title' => 'Recovery High Duration',
                 'metadata' => [
                     'type' => 'recovery_duration',

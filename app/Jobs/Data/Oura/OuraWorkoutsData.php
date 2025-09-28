@@ -110,10 +110,9 @@ class OuraWorkoutsData extends BaseProcessingJob
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'workout_metrics',
                     'time' => $event->time,
-                    'integration_id' => $this->integration->id,
                     'title' => $config['title'],
                     'metadata' => ['type' => $config['type'], 'field' => $field],
                     'value' => $encodedValue,
@@ -134,10 +133,9 @@ class OuraWorkoutsData extends BaseProcessingJob
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'heart_rate',
                     'time' => $event->time,
-                    'integration_id' => $this->integration->id,
                     'title' => $config['title'],
                     'metadata' => ['type' => $config['type'], 'context' => 'workout'],
                     'value' => $encodedValue,
@@ -158,10 +156,9 @@ class OuraWorkoutsData extends BaseProcessingJob
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'workout_metrics',
                     'time' => $event->time,
-                    'integration_id' => $this->integration->id,
                     'title' => $config['title'],
                     'metadata' => ['type' => 'performance', 'field' => $field],
                     'value' => $encodedValue,
@@ -177,10 +174,9 @@ class OuraWorkoutsData extends BaseProcessingJob
             foreach ($heartRateZones as $zoneName => $zoneData) {
                 if (is_array($zoneData) && isset($zoneData['duration'])) {
                     [$encodedDuration, $durationMultiplier] = $plugin->encodeNumericValue($zoneData['duration']);
-                    $event->blocks()->create([
+                    $event->createBlock([
                         'block_type' => 'heart_rate',
                         'time' => $event->time,
-                        'integration_id' => $this->integration->id,
                         'title' => 'HR Zone: ' . ucwords(str_replace('_', ' ', $zoneName)),
                         'metadata' => [
                             'type' => 'heart_rate_zone',
@@ -198,10 +194,9 @@ class OuraWorkoutsData extends BaseProcessingJob
         // Add source information
         $source = $item['source'] ?? null;
         if ($source) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'workout_metrics',
                 'time' => $event->time,
-                'integration_id' => $this->integration->id,
                 'title' => 'Workout Source',
                 'metadata' => ['type' => 'source'],
                 'content' => $source,
@@ -211,10 +206,9 @@ class OuraWorkoutsData extends BaseProcessingJob
         // Add labels if present
         $labels = $item['labels'] ?? null;
         if ($labels && is_array($labels)) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'workout_metrics',
                 'time' => $event->time,
-                'integration_id' => $this->integration->id,
                 'title' => 'Workout Labels',
                 'metadata' => [
                     'type' => 'labels',
