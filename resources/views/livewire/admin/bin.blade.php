@@ -268,7 +268,7 @@ new class extends Component {
         $queries = $this->buildOptimizedQueries();
         $totalCounts = $this->getTotalCounts($queries);
         $totalItems = array_sum($totalCounts);
-        
+
         if ($totalItems === 0) {
             return new Illuminate\Pagination\LengthAwarePaginator(
                 collect([]), 0, $this->perPage, $this->getPage(),
@@ -299,15 +299,15 @@ new class extends Component {
     private function buildOptimizedQueries()
     {
         $userId = Auth::id();
-        
+
         $queries = [];
-        
+
         // Events query
         $eventsQuery = Event::onlyTrashed()
             ->whereHas('integration', fn($q) => $q->where('user_id', $userId))
             ->with(['target:id,title', 'integration:id,user_id'])
             ->orderBy('deleted_at', 'desc');
-            
+
         if ($this->search) {
             $eventsQuery->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
@@ -321,7 +321,7 @@ new class extends Component {
         $objectsQuery = EventObject::onlyTrashed()
             ->where('user_id', $userId)
             ->orderBy('deleted_at', 'desc');
-            
+
         if ($this->search) {
             $objectsQuery->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
@@ -336,7 +336,7 @@ new class extends Component {
             ->whereHas('event.integration', fn($q) => $q->where('user_id', $userId))
             ->with(['event:id,integration_id'])
             ->orderBy('deleted_at', 'desc');
-            
+
         if ($this->search) {
             $blocksQuery->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
@@ -349,7 +349,7 @@ new class extends Component {
         $integrationsQuery = Integration::onlyTrashed()
             ->where('user_id', $userId)
             ->orderBy('deleted_at', 'desc');
-            
+
         if ($this->search) {
             $integrationsQuery->where(function ($q) {
                 $q->where('name', 'ilike', '%' . $this->search . '%')
@@ -363,7 +363,7 @@ new class extends Component {
         $integrationGroupsQuery = IntegrationGroup::onlyTrashed()
             ->where('user_id', $userId)
             ->orderBy('deleted_at', 'desc');
-            
+
         if ($this->search) {
             $integrationGroupsQuery->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
@@ -395,7 +395,7 @@ new class extends Component {
             if ($remaining <= 0) break;
 
             $count = $query->count();
-            
+
             if ($currentOffset >= $count) {
                 // Skip this entire query
                 $currentOffset -= $count;
