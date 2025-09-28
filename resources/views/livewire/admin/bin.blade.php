@@ -259,130 +259,34 @@ new class extends Component {
 
     public function getDeletedItems()
     {
-        $items = collect();
-
-        // Get deleted events
-        $events = Event::onlyTrashed()
-            ->whereHas('integration', function ($q) {
-                $q->where('user_id', Auth::id());
-            })
-            ->with(['actor', 'target', 'integration'])
-            ->get()
-            ->map(function ($event) {
-                return (object) [
-                    'id' => $event->id,
-                    'type' => 'event',
-                    'type_label' => 'Event',
-                    'title' => $event->service . ' - ' . $event->action,
-                    'subtitle' => $event->target?->title ?? 'No target',
-                    'deleted_at' => $event->deleted_at,
-                    'created_at' => $event->created_at,
-                ];
-            });
-
-        // Get deleted objects
-        $objects = EventObject::onlyTrashed()
-            ->where('user_id', Auth::id())
-            ->get()
-            ->map(function ($object) {
-                return (object) [
-                    'id' => $object->id,
-                    'type' => 'object',
-                    'type_label' => 'Object',
-                    'title' => $object->title,
-                    'subtitle' => $object->concept . ' - ' . $object->type,
-                    'deleted_at' => $object->deleted_at,
-                    'created_at' => $object->created_at,
-                ];
-            });
-
-        // Get deleted blocks
-        $blocks = Block::onlyTrashed()
-            ->whereHas('event.integration', function ($q) {
-                $q->where('user_id', Auth::id());
-            })
-            ->with('event')
-            ->get()
-            ->map(function ($block) {
-                return (object) [
-                    'id' => $block->id,
-                    'type' => 'block',
-                    'type_label' => 'Block',
-                    'title' => $block->title,
-                    'subtitle' => $block->block_type,
-                    'deleted_at' => $block->deleted_at,
-                    'created_at' => $block->created_at,
-                ];
-            });
-
-        // Get deleted integrations
-        $integrations = Integration::onlyTrashed()
-            ->where('user_id', Auth::id())
-            ->get()
-            ->map(function ($integration) {
-                return (object) [
-                    'id' => $integration->id,
-                    'type' => 'integration',
-                    'type_label' => 'Integration',
-                    'title' => $integration->name,
-                    'subtitle' => $integration->service . ' - ' . $integration->instance_type,
-                    'deleted_at' => $integration->deleted_at,
-                    'created_at' => $integration->created_at,
-                ];
-            });
-
-        // Get deleted integration groups
-        $integrationGroups = IntegrationGroup::onlyTrashed()
-            ->where('user_id', Auth::id())
-            ->get()
-            ->map(function ($group) {
-                return (object) [
-                    'id' => $group->id,
-                    'type' => 'integration_group',
-                    'type_label' => 'Integration Group',
-                    'title' => $group->service,
-                    'subtitle' => $group->account_id,
-                    'deleted_at' => $group->deleted_at,
-                    'created_at' => $group->created_at,
-                ];
-            });
-
-        $items = $items->merge($events)
-            ->merge($objects)
-            ->merge($blocks)
-            ->merge($integrations)
-            ->merge($integrationGroups);
-
-        // Apply search filter
-        if ($this->search) {
-            $items = $items->filter(function ($item) {
-                return stripos($item->title, $this->search) !== false ||
-                       stripos($item->subtitle, $this->search) !== false ||
-                       stripos($item->type_label, $this->search) !== false;
-            });
-        }
-
-        // Apply type filter
+        // If filtering by specific type, use optimized single-model query
         if ($this->typeFilter) {
-            $items = $items->filter(function ($item) {
-                return $item->type === $this->typeFilter;
-            });
+            return $this->getDeletedItemsByType($this->typeFilter);
         }
 
-        // Sort by deleted_at desc
-        $items = $items->sortByDesc('deleted_at');
+        // Get counts and items from each model efficiently
+        $queries = $this->buildOptimizedQueries();
+        $totalCounts = $this->getTotalCounts($queries);
+        $totalItems = array_sum($totalCounts);
 
-        // Convert to paginated collection
+        if ($totalItems === 0) {
+            return new Illuminate\Pagination\LengthAwarePaginator(
+                collect([]), 0, $this->perPage, $this->getPage(),
+                ['path' => request()->url(), 'pageName' => 'page']
+            );
+        }
+
+        // Calculate pagination
         $perPage = $this->perPage;
         $currentPage = $this->getPage();
         $offset = ($currentPage - 1) * $perPage;
 
-        $paginatedItems = $items->slice($offset, $perPage)->values();
+        // Get items for current page using efficient chunked approach
+        $items = $this->getItemsForPage($queries, $offset, $perPage);
 
-        // Create a custom paginator
         return new Illuminate\Pagination\LengthAwarePaginator(
-            $paginatedItems,
-            $items->count(),
+            $items,
+            $totalItems,
             $perPage,
             $currentPage,
             [
@@ -390,6 +294,241 @@ new class extends Component {
                 'pageName' => 'page',
             ]
         );
+    }
+
+    private function buildOptimizedQueries()
+    {
+        $userId = Auth::id();
+
+        $queries = [];
+
+        // Events query
+        $eventsQuery = Event::onlyTrashed()
+            ->whereHas('integration', fn($q) => $q->where('user_id', $userId))
+            ->with(['target:id,title', 'integration:id,user_id'])
+            ->orderBy('deleted_at', 'desc');
+
+        if ($this->search) {
+            $eventsQuery->where(function ($q) {
+                $q->where('service', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('action', 'ilike', '%' . $this->search . '%')
+                  ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+            });
+        }
+        $queries['event'] = $eventsQuery;
+
+        // Objects query
+        $objectsQuery = EventObject::onlyTrashed()
+            ->where('user_id', $userId)
+            ->orderBy('deleted_at', 'desc');
+
+        if ($this->search) {
+            $objectsQuery->where(function ($q) {
+                $q->where('title', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('concept', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('type', 'ilike', '%' . $this->search . '%');
+            });
+        }
+        $queries['object'] = $objectsQuery;
+
+        // Blocks query
+        $blocksQuery = Block::onlyTrashed()
+            ->whereHas('event.integration', fn($q) => $q->where('user_id', $userId))
+            ->with(['event:id,integration_id'])
+            ->orderBy('deleted_at', 'desc');
+
+        if ($this->search) {
+            $blocksQuery->where(function ($q) {
+                $q->where('title', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('block_type', 'ilike', '%' . $this->search . '%');
+            });
+        }
+        $queries['block'] = $blocksQuery;
+
+        // Integrations query
+        $integrationsQuery = Integration::onlyTrashed()
+            ->where('user_id', $userId)
+            ->orderBy('deleted_at', 'desc');
+
+        if ($this->search) {
+            $integrationsQuery->where(function ($q) {
+                $q->where('name', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('service', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('instance_type', 'ilike', '%' . $this->search . '%');
+            });
+        }
+        $queries['integration'] = $integrationsQuery;
+
+        // Integration Groups query
+        $integrationGroupsQuery = IntegrationGroup::onlyTrashed()
+            ->where('user_id', $userId)
+            ->orderBy('deleted_at', 'desc');
+
+        if ($this->search) {
+            $integrationGroupsQuery->where(function ($q) {
+                $q->where('service', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('account_id', 'ilike', '%' . $this->search . '%');
+            });
+        }
+        $queries['integration_group'] = $integrationGroupsQuery;
+
+        return $queries;
+    }
+
+    private function getTotalCounts($queries)
+    {
+        $counts = [];
+        foreach ($queries as $type => $query) {
+            $counts[$type] = $query->count();
+        }
+        return $counts;
+    }
+
+    private function getItemsForPage($queries, $offset, $limit)
+    {
+        $items = collect();
+        $remaining = $limit;
+        $currentOffset = $offset;
+
+        // Get items from each query in deleted_at desc order
+        foreach ($queries as $type => $query) {
+            if ($remaining <= 0) break;
+
+            $count = $query->count();
+
+            if ($currentOffset >= $count) {
+                // Skip this entire query
+                $currentOffset -= $count;
+                continue;
+            }
+
+            // Get items from this query
+            $queryItems = $query
+                ->offset($currentOffset)
+                ->limit($remaining)
+                ->get()
+                ->map(function ($item) use ($type) {
+                    return $this->formatItemForDisplay($item, $type);
+                });
+
+            $items = $items->merge($queryItems);
+            $remaining -= $queryItems->count();
+            $currentOffset = 0; // Reset offset for subsequent queries
+        }
+
+        // Sort the final collection by deleted_at
+        return $items->sortByDesc('deleted_at')->values();
+    }
+
+    private function getDeletedItemsByType($type)
+    {
+        $query = match($type) {
+            'event' => Event::onlyTrashed()
+                ->whereHas('integration', fn($q) => $q->where('user_id', Auth::id()))
+                ->with(['target:id,title', 'integration:id,user_id']),
+            'object' => EventObject::onlyTrashed()->where('user_id', Auth::id()),
+            'block' => Block::onlyTrashed()
+                ->whereHas('event.integration', fn($q) => $q->where('user_id', Auth::id()))
+                ->with(['event:id,integration_id']),
+            'integration' => Integration::onlyTrashed()->where('user_id', Auth::id()),
+            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', Auth::id()),
+            default => throw new InvalidArgumentException("Unknown type: {$type}")
+        };
+
+        // Apply search filter
+        if ($this->search) {
+            $query = $this->applySearchToQuery($query, $type);
+        }
+
+        $paginated = $query->orderBy('deleted_at', 'desc')
+            ->paginate($this->perPage, ['*'], 'page', $this->getPage());
+
+        // Transform the paginated results
+        $paginated->getCollection()->transform(function ($item) use ($type) {
+            return $this->formatItemForDisplay($item, $type);
+        });
+
+        return $paginated;
+    }
+
+    private function applySearchToQuery($query, $type)
+    {
+        return match($type) {
+            'event' => $query->where(function ($q) {
+                $q->where('service', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('action', 'ilike', '%' . $this->search . '%')
+                  ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+            }),
+            'object' => $query->where(function ($q) {
+                $q->where('title', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('concept', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('type', 'ilike', '%' . $this->search . '%');
+            }),
+            'block' => $query->where(function ($q) {
+                $q->where('title', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('block_type', 'ilike', '%' . $this->search . '%');
+            }),
+            'integration' => $query->where(function ($q) {
+                $q->where('name', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('service', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('instance_type', 'ilike', '%' . $this->search . '%');
+            }),
+            'integration_group' => $query->where(function ($q) {
+                $q->where('service', 'ilike', '%' . $this->search . '%')
+                  ->orWhere('account_id', 'ilike', '%' . $this->search . '%');
+            }),
+        };
+    }
+
+    private function formatItemForDisplay($item, $type)
+    {
+        return (object) match($type) {
+            'event' => [
+                'id' => $item->id,
+                'type' => 'event',
+                'type_label' => 'Event',
+                'title' => $item->service . ' - ' . $item->action,
+                'subtitle' => $item->target?->title ?? 'No target',
+                'deleted_at' => $item->deleted_at,
+                'created_at' => $item->created_at,
+            ],
+            'object' => [
+                'id' => $item->id,
+                'type' => 'object',
+                'type_label' => 'Object',
+                'title' => $item->title,
+                'subtitle' => $item->concept . ' - ' . $item->type,
+                'deleted_at' => $item->deleted_at,
+                'created_at' => $item->created_at,
+            ],
+            'block' => [
+                'id' => $item->id,
+                'type' => 'block',
+                'type_label' => 'Block',
+                'title' => $item->title,
+                'subtitle' => $item->block_type,
+                'deleted_at' => $item->deleted_at,
+                'created_at' => $item->created_at,
+            ],
+            'integration' => [
+                'id' => $item->id,
+                'type' => 'integration',
+                'type_label' => 'Integration',
+                'title' => $item->name,
+                'subtitle' => $item->service . ' - ' . $item->instance_type,
+                'deleted_at' => $item->deleted_at,
+                'created_at' => $item->created_at,
+            ],
+            'integration_group' => [
+                'id' => $item->id,
+                'type' => 'integration_group',
+                'type_label' => 'Integration Group',
+                'title' => $item->service,
+                'subtitle' => $item->account_id,
+                'deleted_at' => $item->deleted_at,
+                'created_at' => $item->created_at,
+            ],
+        };
     }
 
     public function getUniqueTypes()

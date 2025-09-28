@@ -94,15 +94,12 @@ class IntegrationGroup extends Model
      */
     public function getDeletionSummary(): array
     {
-        $events = $this->getRelatedEvents();
-        $blocks = $this->getRelatedBlocks();
-        $objects = $this->getRelatedObjects();
 
         return [
             'integrations' => $this->integrations()->count(),
-            'events' => $events->count(),
-            'blocks' => $blocks->count(),
-            'objects' => $objects->count(),
+            'events' => $this->getRelatedEvents()->count(),
+            'blocks' => $this->getRelatedBlocks()->count(),
+            'objects' => $this->getRelatedObjects()->count(),
             'service_name' => $this->service,
             'account_id' => $this->account_id,
         ];
