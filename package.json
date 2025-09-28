@@ -32,7 +32,7 @@
         "@tailwindcss/vite": "4.1.13",
         "daisyui": "5.1.25",
         "husky": "9.1.7",
-        "lint-staged": "16.2.2",
+        "lint-staged": "16.2.3",
         "prettier": "3.6.2",
         "semantic-release": "24.2.9",
         "semantic-release-gitmoji": "1.6.8",
