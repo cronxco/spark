@@ -144,8 +144,8 @@
                         <div>
                             <h4 class="font-semibold">Affected Events:</h4>
                             <ul class="list-disc list-inside text-sm text-base-content/70 space-y-1">
-                                <li><code>had_stress_level</code> - Maps day_summary values (stressful, normal, restful)</li>
-                                <li><code>had_resilience_level</code> - Maps level values (excellent, solid, adequate, limited, poor)</li>
+                                <li><code>had_stress_score</code> - Maps day_summary values (stressful, normal, restored)</li>
+                                <li><code>had_resilience_score</code> - Maps level values (exceptional, strong, solid, adequate, limited)</li>
                             </ul>
                         </div>
 

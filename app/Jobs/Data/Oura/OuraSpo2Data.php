@@ -2,13 +2,18 @@
 
 namespace App\Jobs\Data\Oura;
 
+use App\Integrations\Oura\OuraPlugin;
+use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
+use App\Models\EventObject;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class OuraSpo2Data extends BaseProcessingJob
 {
+    use HasOuraBlocks;
+
     protected function getServiceName(): string
     {
         return 'oura';
@@ -22,144 +27,90 @@ class OuraSpo2Data extends BaseProcessingJob
     protected function process(): void
     {
         $spo2Items = $this->rawData;
+        $plugin = new OuraPlugin;
 
         if (empty($spo2Items)) {
             return;
         }
 
-        $events = [];
+        Log::info('OuraSpo2Data: Processing SpO2 data', [
+            'integration_id' => $this->integration->id,
+            'item_count' => count($spo2Items),
+        ]);
+
         foreach ($spo2Items as $item) {
-            $eventData = $this->createDailyRecordEvent($item, [
-                'score_field' => 'spo2_average',
-                'contributors_field' => null,
-                'title' => 'SpO2',
-                'value_unit' => 'percent',
-            ]);
-            if ($eventData) {
-                $events[] = $eventData;
-            }
+            $this->createSpo2Event($item, $plugin);
         }
 
-        if (! empty($events)) {
-            $this->createEventsSafely($events);
-        }
+        Log::info('OuraSpo2Data: Completed processing SpO2 data', [
+            'integration_id' => $this->integration->id,
+        ]);
     }
 
-    private function createDailyRecordEvent(array $item, array $options): ?array
+    private function createSpo2Event(array $item, OuraPlugin $plugin): void
     {
-        $day = $item['day'] ?? $item['date'] ?? null;
-        if (! $day) {
-            return null;
+        $day = $item['day'] ?? null;
+        $id = $item['id'] ?? null;
+
+        if (! $day || ! $id) {
+            return;
         }
 
-        $sourceId = "oura_spo2_{$this->integration->id}_{$day}";
+        $sourceId = "oura_spo2_{$this->integration->id}_{$id}";
+        $exists = Event::where('source_id', $sourceId)
+            ->where('integration_id', $this->integration->id)
+            ->first();
+        if ($exists) {
+            return;
+        }
 
-        $actor = [
-            'concept' => 'user',
-            'type' => 'oura_user',
-            'title' => 'Oura User',
-            'time' => $day . ' 00:00:00',
-        ];
-
-        $target = [
+        $actor = $plugin->ensureUserProfile($this->integration);
+        $target = EventObject::updateOrCreate([
+            'user_id' => $this->integration->user_id,
             'concept' => 'metric',
-            'type' => 'oura_daily_spo2',
-            'title' => $options['title'] ?? 'SpO2',
+            'type' => 'daily_spo2',
+            'title' => 'Blood Oxygen Saturation (SpO2)',
+        ], [
             'time' => $day . ' 00:00:00',
+            'content' => 'Daily blood oxygen saturation measurement',
             'metadata' => $item,
-        ];
+        ]);
 
-        $scoreField = $options['score_field'] ?? 'score';
-        $score = Arr::get($item, $scoreField);
-        [$encodedScore, $scoreMultiplier] = $this->encodeNumericValue(is_numeric($score) ? (float) $score : null);
+        // Extract the correct SpO2 average from nested structure
+        $spo2Average = Arr::get($item, 'spo2_percentage.average');
+        [$encodedSpo2, $spo2Multiplier] = $plugin->encodeNumericValue($spo2Average);
 
-        return [
+        $event = Event::create([
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
-            'actor' => $actor,
-            'target' => $target,
+            'integration_id' => $this->integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
             'domain' => 'health',
             'action' => 'had_spo2',
-            'value' => $encodedScore,
-            'value_multiplier' => $scoreMultiplier,
-            'value_unit' => $options['value_unit'] ?? 'score',
+            'value' => $encodedSpo2,
+            'value_multiplier' => $spo2Multiplier,
+            'value_unit' => 'percent',
             'event_metadata' => [
                 'day' => $day,
-                'kind' => 'spo2',
+                'measurement_id' => $id,
+                'spo2_average' => $spo2Average,
             ],
-            'blocks' => [],
-            'integration_id' => $this->integration->id,
-        ];
-    }
+            'target_id' => $target->id,
+        ]);
 
-    private function encodeNumericValue(null|int|float|string $raw, int $defaultMultiplier = 1): array
-    {
-        if ($raw === null || $raw === '') {
-            return [null, null];
-        }
-        $float = (float) $raw;
-        if (! is_finite($float)) {
-            return [null, null];
-        }
-        if (fmod($float, 1.0) !== 0.0) {
-            $multiplier = 1000;
-            $intValue = (int) round($float * $multiplier);
-
-            return [$intValue, $multiplier];
-        }
-
-        return [(int) $float, $defaultMultiplier];
-    }
-
-    /**
-     * Create events safely with race condition protection
-     */
-    private function createEventsSafely(array $eventData): void
-    {
-        foreach ($eventData as $data) {
-            // Use updateOrCreate to prevent race conditions
-            $event = Event::updateOrCreate(
-                [
-                    'integration_id' => $this->integration->id,
-                    'source_id' => $data['source_id'],
+        // Add breathing disturbance index as a biometric block
+        $breathingDisturbanceIndex = $item['breathing_disturbance_index'] ?? null;
+        if ($breathingDisturbanceIndex !== null) {
+            $biometrics = [
+                'breathing_disturbance_index' => [
+                    'unit' => 'index',
+                    'title' => 'Breathing Disturbance Index',
+                    'type' => 'breathing_metric',
                 ],
-                [
-                    'time' => $data['time'],
-                    'actor_id' => $this->createOrUpdateObject($data['actor'])->id,
-                    'service' => $this->serviceName,
-                    'domain' => $data['domain'],
-                    'action' => $data['action'],
-                    'value' => $data['value'] ?? null,
-                    'value_multiplier' => $data['value_multiplier'] ?? 1,
-                    'value_unit' => $data['value_unit'] ?? null,
-                    'event_metadata' => $data['event_metadata'] ?? [],
-                    'target_id' => $this->createOrUpdateObject($data['target'])->id,
-                ]
-            );
+            ];
 
-            // Create blocks if any
-            if (isset($data['blocks'])) {
-                foreach ($data['blocks'] as $blockData) {
-                    $event->blocks()->create([
-                        'time' => $blockData['time'] ?? $event->time,
-                        'block_type' => $blockData['block_type'] ?? '',
-                        'title' => $blockData['title'],
-                        'metadata' => $blockData['metadata'] ?? [],
-                        'url' => $blockData['url'] ?? null,
-                        'media_url' => $blockData['media_url'] ?? null,
-                        'value' => $blockData['value'] ?? null,
-                        'value_multiplier' => $blockData['value_multiplier'] ?? 1,
-                        'value_unit' => $blockData['value_unit'] ?? null,
-                        'embeddings' => $blockData['embeddings'] ?? null,
-                    ]);
-                }
-            }
-
-            Log::info('Oura: Created spo2 event safely', [
-                'integration_id' => $this->integration->id,
-                'source_id' => $data['source_id'],
-                'action' => $data['action'],
-            ]);
+            $this->createBiometricBlocks($event, $item, $biometrics, $plugin);
         }
     }
 }
