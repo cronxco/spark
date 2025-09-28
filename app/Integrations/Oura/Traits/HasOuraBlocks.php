@@ -14,7 +14,7 @@ trait HasOuraBlocks
     {
         foreach ($contributors as $name => $value) {
             [$encodedContrib, $contribMultiplier] = $plugin->encodeNumericValue($value);
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'contributors',
                 'time' => $event->time,
                 'integration_id' => $event->integration_id,
@@ -36,7 +36,7 @@ trait HasOuraBlocks
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'activity_metrics',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -63,7 +63,7 @@ trait HasOuraBlocks
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'sleep_stages',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -89,7 +89,7 @@ trait HasOuraBlocks
         foreach ($fields as $field => $title) {
             $value = $item[$field] ?? null;
             if ($value) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'sleep_stages',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -113,7 +113,7 @@ trait HasOuraBlocks
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'biometrics',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -146,7 +146,7 @@ trait HasOuraBlocks
         foreach ($heartRateData as $type => $value) {
             if ($value !== null && isset($heartRateTypes[$type])) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'heart_rate',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -172,7 +172,7 @@ trait HasOuraBlocks
             $value = $item[$field] ?? null;
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'workout_metrics',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -198,7 +198,7 @@ trait HasOuraBlocks
         foreach ($fields as $field => $title) {
             $value = $item[$field] ?? null;
             if ($value !== null) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'tag_info',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
@@ -380,7 +380,7 @@ trait HasOuraBlocks
         foreach ($fields as $field => $title) {
             $value = $item[$field] ?? null;
             if ($value !== null) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'recommendation',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,

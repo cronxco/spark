@@ -522,7 +522,7 @@ class SpotifyPlugin extends OAuthPlugin
             // Create blocks if any
             if (isset($data['blocks'])) {
                 foreach ($data['blocks'] as $blockData) {
-                    $event->blocks()->create([
+                    $event->createBlock([
                         'time' => $blockData['time'] ?? $event->time,
                         'block_type' => $blockData['block_type'] ?? '',
                         'title' => $blockData['title'],
@@ -956,10 +956,9 @@ class SpotifyPlugin extends OAuthPlugin
         $includeAlbumArt = $configuration['include_album_art'] ?? ['enabled'];
         if (in_array('enabled', $includeAlbumArt) && ! empty($track['album']['images'])) {
             $albumImage = $track['album']['images'][0];
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'album_art',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Album Art',
                 'metadata' => [
                     'text' => "Album artwork for {$track['album']['name']}",
@@ -976,10 +975,9 @@ class SpotifyPlugin extends OAuthPlugin
         $artists = collect($track['artists'])->pluck('name')->implode(', ');
         $duration = gmdate('i:s', ($track['duration_ms'] ?? 0) / 1000);
 
-        $event->blocks()->create([
+        $event->createBlock([
             'block_type' => 'track_details',
             'time' => $event->time,
-            'integration_id' => $integration->id,
             'title' => 'Track Details',
             'metadata' => [
                 'track' => $track['name'],
@@ -998,10 +996,9 @@ class SpotifyPlugin extends OAuthPlugin
         // Artist information block
         if (! empty($track['artists'])) {
             $artist = $track['artists'][0];
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'artist',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Artist Info',
                 'metadata' => [
                     'artist' => $artist['name'] ?? null,

@@ -197,8 +197,9 @@ abstract class WebhookPlugin implements IntegrationPlugin
 
             // Create blocks if any
             foreach ($eventData['blocks'] ?? [] as $blockData) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'time' => $blockData['time'] ?? now(),
+                    'block_type' => $blockData['block_type'] ?? '',
                     'title' => $blockData['title'],
                     'metadata' => $blockData['metadata'] ?? (isset($blockData['content']) ? ['text' => (string) $blockData['content']] : []),
                     'url' => $blockData['url'] ?? null,

@@ -41,7 +41,34 @@ class OuraHeartrateData extends BaseProcessingJob
         }
 
         if (! empty($events)) {
-            $plugin->createEventsSafely($this->integration, $events);
+            foreach ($events as $eventData) {
+                // Create the event first
+                $event = Event::updateOrCreate(
+                    [
+                        'integration_id' => $this->integration->id,
+                        'source_id' => $eventData['source_id'],
+                    ],
+                    [
+                        'time' => $eventData['time'],
+                        'actor_id' => $plugin->createOrUpdateObject($this->integration, $eventData['actor'])->id,
+                        'service' => 'oura',
+                        'domain' => $eventData['domain'],
+                        'action' => $eventData['action'],
+                        'value' => $eventData['value'] ?? null,
+                        'value_multiplier' => $eventData['value_multiplier'] ?? 1,
+                        'value_unit' => $eventData['value_unit'] ?? null,
+                        'event_metadata' => $eventData['event_metadata'] ?? [],
+                        'target_id' => $plugin->createOrUpdateObject($this->integration, $eventData['target'])->id,
+                    ]
+                );
+
+                // Create blocks using the new unique method
+                if (isset($eventData['blocks_data'])) {
+                    foreach ($eventData['blocks_data'] as $blockData) {
+                        $event->createBlock($blockData);
+                    }
+                }
+            }
         }
     }
 
@@ -72,31 +99,36 @@ class OuraHeartrateData extends BaseProcessingJob
 
         [$encodedAvg, $avgMultiplier] = $plugin->encodeNumericValue($avg);
 
-        $blocks = [];
+        // Prepare blocks data to be created separately
+        $blocksData = [];
+
         [$encMin, $minMult] = $plugin->encodeNumericValue($min);
-        $blocks[] = [
+        $blocksData[] = [
             'time' => $day . ' 00:00:00',
             'title' => 'Min Heart Rate',
-            'metadata' => [],
+            'block_type' => 'heart_rate',
+            'metadata' => ['type' => 'minimum', 'context' => 'daily_series'],
             'value' => $encMin,
             'value_multiplier' => $minMult,
             'value_unit' => 'bpm',
         ];
 
         [$encMax, $maxMult] = $plugin->encodeNumericValue($max);
-        $blocks[] = [
+        $blocksData[] = [
             'time' => $day . ' 00:00:00',
             'title' => 'Max Heart Rate',
-            'metadata' => [],
+            'block_type' => 'heart_rate',
+            'metadata' => ['type' => 'maximum', 'context' => 'daily_series'],
             'value' => $encMax,
             'value_multiplier' => $maxMult,
             'value_unit' => 'bpm',
         ];
 
-        $blocks[] = [
+        $blocksData[] = [
             'time' => $day . ' 00:00:00',
             'title' => 'Data Points',
-            'metadata' => ['text' => 'Count of heart rate points collected for the day'],
+            'block_type' => 'heart_rate',
+            'metadata' => ['type' => 'count', 'context' => 'daily_series'],
             'value' => (int) $points->count(),
             'value_multiplier' => 1,
             'value_unit' => 'count',
@@ -118,7 +150,7 @@ class OuraHeartrateData extends BaseProcessingJob
                 'max_bpm' => $max,
                 'avg_bpm' => $avg,
             ],
-            'blocks' => $blocks,
+            'blocks_data' => $blocksData,
             'integration_id' => $this->integration->id,
         ];
     }

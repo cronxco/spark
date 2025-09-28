@@ -1155,10 +1155,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $contributors = $contributorsField ? Arr::get($item, $contributorsField, []) : [];
         foreach ($contributors as $name => $value) {
             [$encodedContrib, $contribMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'contributors',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => Str::title(str_replace('_', ' ', (string) $name)),
                 'metadata' => ['type' => 'contributor', 'field' => $name],
                 'value' => $encodedContrib,
@@ -1183,10 +1182,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 $label = Str::title(str_replace('_', ' ', $field));
                 $value = $item[$field];
                 [$encodedDetail, $detailMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'activity_metrics',
                     'time' => $event->time,
-                    'integration_id' => $integration->id,
                     'title' => $label,
                     'metadata' => ['type' => 'detail', 'field' => $field],
                     'value' => $encodedDetail,
@@ -1241,10 +1239,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         ]);
 
         [$encodedCalories, $calMultiplier] = $this->encodeNumericValue($calories);
-        $event->blocks()->create([
+        $event->createBlock([
             'block_type' => 'workout_metrics',
             'time' => $event->time,
-            'integration_id' => $integration->id,
             'title' => 'Calories',
             'metadata' => ['type' => 'calorie_burn', 'estimated' => true],
             'value' => $encodedCalories,
@@ -1255,10 +1252,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $avgHr = Arr::get($item, 'average_heart_rate');
         if ($avgHr !== null) {
             [$encodedAvgHr, $avgHrMultiplier] = $this->encodeNumericValue($avgHr);
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Average Heart Rate',
                 'metadata' => ['type' => 'average', 'context' => 'workout'],
                 'value' => $encodedAvgHr,
@@ -1341,10 +1337,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 ]
             );
 
-            // Create blocks if any
+            // Create blocks if any using the new unique creation method
             if (isset($data['blocks'])) {
                 foreach ($data['blocks'] as $blockData) {
-                    $event->blocks()->create([
+                    $event->createBlock([
                         'time' => $blockData['time'] ?? $event->time,
                         'block_type' => $blockData['block_type'] ?? '',
                         'title' => $blockData['title'],
@@ -2062,7 +2058,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 if ($seconds === null) {
                     continue;
                 }
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'sleep_stages',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
@@ -2077,7 +2073,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             $hrAvg = Arr::get($item, 'average_heart_rate');
             if ($hrAvg !== null) {
                 [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
-                $event->blocks()->create([
+                $event->createBlock([
                     'block_type' => 'heart_rate',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
@@ -2314,10 +2310,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
             // Replace summary with separate min/max blocks
             [$encMin, $minMult] = $this->encodeNumericValue($min);
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Min Heart Rate',
                 'metadata' => ['type' => 'minimum', 'context' => 'daily_series'],
                 'value' => $encMin,
@@ -2326,10 +2321,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             ]);
 
             [$encMax, $maxMult] = $this->encodeNumericValue($max);
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Max Heart Rate',
                 'metadata' => ['type' => 'maximum', 'context' => 'daily_series'],
                 'value' => $encMax,
@@ -2337,10 +2331,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'bpm',
             ]);
 
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'Data Points',
                 'metadata' => ['type' => 'count', 'context' => 'daily_series'],
                 'value' => (int) $points->count(),
@@ -2389,10 +2382,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $state = Arr::get($item, 'mood', Arr::get($item, 'state'));
         if ($state) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'biometrics',
                 'time' => $event->time,
-                'integration_id' => $integration->id,
                 'title' => 'State',
                 'metadata' => ['type' => 'mood_state', 'value' => (string) $state],
                 'content' => (string) $state,
@@ -2445,10 +2437,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'target_id' => $tagTarget->id,
         ]);
 
-        $event->blocks()->create([
+        $event->createBlock([
             'block_type' => 'tag_info',
             'time' => $event->time,
-            'integration_id' => $integration->id,
             'title' => 'Tag',
             'metadata' => ['type' => 'user_tag', 'label' => (string) $label],
             'content' => (string) $label,
@@ -2750,7 +2741,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         // Add tag details as blocks
         if ($tagType) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'tag_info',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
@@ -2761,7 +2752,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         if ($item['comment'] ?? null) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'tag_info',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
@@ -2822,7 +2813,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         // Add recommendation blocks
         if ($recommendation) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'recommendation',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
@@ -2887,7 +2878,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         // Add episode blocks
         if (is_array($episodes) && count($episodes) > 0) {
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'biometrics',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
@@ -3019,7 +3010,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             if ($seconds === null) {
                 continue;
             }
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'sleep_stages',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
@@ -3034,7 +3025,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $hrAvg = Arr::get($item, 'average_heart_rate');
         if ($hrAvg !== null) {
             [$encodedHrAvg, $hrAvgMultiplier] = $this->encodeNumericValue($hrAvg);
-            $event->blocks()->create([
+            $event->createBlock([
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'integration_id' => $integration->id,

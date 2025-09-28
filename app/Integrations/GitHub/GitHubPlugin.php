@@ -1015,9 +1015,9 @@ class GitHubPlugin extends OAuthPlugin
                 $blocks = [];
             }
             foreach ($blocks as $blockData) {
-                $event->blocks()->create([
+                $event->createBlock([
                     'time' => $blockData['time'] ?? now(),
-                    'integration_id' => $integration->id,
+                    'block_type' => $blockData['block_type'] ?? '',
                     'title' => $blockData['title'],
                     'metadata' => $blockData['metadata'] ?? (isset($blockData['content']) ? ['text' => (string) $blockData['content']] : []),
                     'url' => $blockData['url'] ?? null,
