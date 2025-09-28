@@ -1874,6 +1874,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'spo2',            // For daily_spo2 endpoint (if separate scope required)
             'stress',          // For daily_stress endpoint (if separate scope required)
             'resilience',      // For daily_resilience endpoint (if separate scope required)
+            'heart_health',    // For heart_health (vO2 Max, CVA)
         ]);
     }
 
