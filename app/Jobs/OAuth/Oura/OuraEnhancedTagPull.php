@@ -2,6 +2,7 @@
 
 namespace App\Jobs\OAuth\Oura;
 
+use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\Oura\OuraEnhancedTagData;
 
@@ -19,7 +20,7 @@ class OuraEnhancedTagPull extends BaseFetchJob
 
     protected function fetchData(): array
     {
-        $plugin = $this->getPlugin();
+        $plugin = new OuraPlugin;
         $daysBack = (int) ($this->integration->configuration['days_back'] ?? 14); // Enhanced tags may span multiple days
         $startDate = now()->subDays($daysBack)->toDateString();
         $endDate = now()->toDateString();
