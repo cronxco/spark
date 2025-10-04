@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "jenssegers/agent": "^2.6",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.30.3",
         "laravel/sanctum": "^4.0",
@@ -20,7 +21,7 @@
         "pgvector/pgvector": "^0.2.2",
         "pragmarx/version": "dev-master",
         "predis/predis": "^3.2",
-        "robsontenorio/mary": "^2.4",
+        "robsontenorio/mary": "dev-main",
         "sentry/sentry-laravel": "^4.9",
         "socialiteproviders/authelia": "^4.0",
         "spatie/laravel-activitylog": "^4",
@@ -103,6 +104,10 @@
         {
             "type": "vcs",
             "url": "git@github.com:cronxco/graby.git"
+        },
+        {
+            "type": "vcs",
+            "url": "git@github.com:cronxco/mary.git"
         },
         {
             "type": "vcs",

@@ -4,6 +4,7 @@ namespace App\Jobs\Outline;
 
 use App\Integrations\Outline\OutlineApi;
 use App\Jobs\Base\BaseFetchJob;
+use Carbon\CarbonImmutable;
 
 class OutlinePullRecentDayNotes extends BaseFetchJob
 {

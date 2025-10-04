@@ -92,7 +92,7 @@
                 <x-menu title="">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')"/>
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')"/>
-
+                    <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')"/>
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')"/>
                 </x-menu>
                 <form method="POST" action="{{ route('logout') }}" x-data>
@@ -109,7 +109,7 @@
 
         {{-- This is a sidebar that works also as a drawer on small screens --}}
         {{-- Notice the `main-drawer` reference here --}}
-        <x-slot:sidebar drawer="main-drawer" collapsible class="bg-base-200">
+        <x-slot:sidebar drawer="main-drawer" collapsible class="bg-base-200" version version-route="{{ route('updates.index') }}">
             <input id="main-drawer" type="checkbox" class="hidden" />
             <x-menu title="">
             <div class="lg:hidden">
@@ -133,8 +133,8 @@
                 <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')"/>
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')"/>
+                    <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')"/>
                     <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')"/>
-
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')"/>
                 </x-menu-sub>
 
