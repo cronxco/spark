@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Session;
+use Carbon\Carbon;
+use Jenssegers\Agent\Agent;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Component;
@@ -30,7 +32,7 @@ new class extends Component {
                 ->orderBy('last_activity', 'desc')
                 ->get()
         )->map(function ($session) {
-            $agent = new \Jenssegers\Agent\Agent();
+            $agent = new Agent();
             $agent->setUserAgent($session->user_agent ?? '');
             
             return [
@@ -47,7 +49,7 @@ new class extends Component {
                     'is_tablet' => $agent->isTablet(),
                 ],
                 'device_name' => $this->getDeviceName($agent),
-                'last_activity_human' => \Carbon\Carbon::createFromTimestamp($session->last_activity)->diffForHumans(),
+                'last_activity_human' => Carbon::createFromTimestamp($session->last_activity)->diffForHumans(),
             ];
         })->toArray();
     }
