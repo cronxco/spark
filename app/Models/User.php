@@ -88,6 +88,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's sessions
+     */
+    public function sessions()
+    {
+        return $this->hasMany(Session::class)->orderBy('last_activity', 'desc');
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
