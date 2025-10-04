@@ -34,7 +34,7 @@ new class extends Component {
         )->map(function ($session) {
             $agent = new Agent();
             $agent->setUserAgent($session->user_agent ?? '');
-            
+
             return [
                 'id' => $session->id,
                 'ip_address' => $session->ip_address,
@@ -65,7 +65,7 @@ new class extends Component {
         }
 
         DB::table('sessions')->where('id', $sessionId)->where('user_id', Auth::id())->delete();
-        
+
         $this->loadSessions();
         $this->success('Session revoked successfully.');
     }
@@ -79,7 +79,7 @@ new class extends Component {
             ->where('user_id', Auth::id())
             ->where('id', '!=', session()->getId())
             ->delete();
-            
+
         $this->loadSessions();
         $this->success("Revoked {$deleted} other sessions successfully.");
     }
@@ -92,23 +92,23 @@ new class extends Component {
         if ($agent->isAndroidOS()) {
             return 'Android';
         }
-        
+
         if ($agent->isIOS()) {
             return 'iOS';
         }
-        
+
         if ($agent->isMac()) {
             return 'macOS';
         }
-        
+
         if ($agent->isWindows()) {
             return 'Windows';
         }
-        
+
         if ($agent->isLinux()) {
             return 'Linux';
         }
-        
+
         return $agent->platform() ?: 'Unknown';
     }
 
@@ -119,15 +119,15 @@ new class extends Component {
     {
         $platform = $this->getPlatform($agent);
         $browser = $agent->browser() ?: 'Unknown';
-        
+
         if ($agent->isMobile()) {
             return "$platform Mobile - $browser";
         }
-        
+
         if ($agent->isTablet()) {
             return "$platform Tablet - $browser";
         }
-        
+
         return "$platform Desktop - $browser";
     }
 }; ?>
@@ -171,7 +171,7 @@ new class extends Component {
                                                 <x-badge value="{{ __('This Device') }}" class="badge-primary badge-sm" />
                                             @endif
                                         </div>
-                                        
+
                                         <div class="text-sm text-base-content/70 space-y-1">
                                             <p>
                                                 <i class="fas fa-map-marker-alt mr-1"></i>
