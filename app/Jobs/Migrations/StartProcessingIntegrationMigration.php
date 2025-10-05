@@ -3,6 +3,7 @@
 namespace App\Jobs\Migrations;
 
 use App\Models\Integration;
+use App\Traits\MigrationPauser;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,10 +12,11 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class StartProcessingIntegrationMigration implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, MigrationPauser, Queueable, SerializesModels;
 
     protected Integration $integration;
 
@@ -62,6 +64,13 @@ class StartProcessingIntegrationMigration implements ShouldQueue
         $batch = Bus::batch($jobs)
             ->name('monzo_process_' . $this->integration->id)
             ->onConnection('redis')->onQueue('migration')
+            ->finally(function () {
+                // Unpause integration when processing batch completes
+                static::unpauseAfterMigration($this->integration);
+                Log::info('Monzo/GoCardless processing migration completed - unpausing integration', [
+                    'integration_id' => $this->integration->id,
+                ]);
+            })
             ->dispatch();
 
         // Hint the UI by swapping batch id to the processing batch

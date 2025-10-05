@@ -5,6 +5,7 @@ namespace App\Jobs\Migrations;
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Traits\MigrationPauser;
 use Carbon\Carbon;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -23,7 +24,7 @@ use Throwable;
 
 class FetchIntegrationPage implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, MigrationPauser, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
@@ -129,7 +130,13 @@ class FetchIntegrationPage implements ShouldQueue
 
         $items = $resp['items'] ?? [];
         if (empty($items)) {
-            // No more data; stop chain
+            // No more data; stop chain and unpause integration
+            static::unpauseAfterMigration($this->integration);
+            Log::info('Oura migration completed - no more data', [
+                'integration_id' => $this->integration->id,
+                'instance_type' => $type,
+            ]);
+
             return;
         }
 
@@ -191,6 +198,12 @@ class FetchIntegrationPage implements ShouldQueue
         $json = $resp->json();
         $items = $json['items'] ?? [];
         if (empty($items)) {
+            // No more data; stop chain and unpause integration
+            static::unpauseAfterMigration($this->integration);
+            Log::info('Spotify migration completed - no more data', [
+                'integration_id' => $this->integration->id,
+            ]);
+
             return;
         }
 
@@ -237,13 +250,26 @@ class FetchIntegrationPage implements ShouldQueue
             $repositories = array_values(array_filter(array_map('trim', $repositories)));
         }
         if (empty($repositories)) {
-            return; // nothing to do
+            // No repositories to migrate; unpause integration
+            static::unpauseAfterMigration($this->integration);
+            Log::info('GitHub migration completed - no repositories configured', [
+                'integration_id' => $this->integration->id,
+            ]);
+
+            return;
         }
         $cursor = $this->context['cursor'] ?? ['repo_index' => 0, 'page' => 1];
         $repoIndex = (int) ($cursor['repo_index'] ?? 0);
         $page = (int) ($cursor['page'] ?? 1);
         if (! isset($repositories[$repoIndex])) {
-            return; // finished all repos
+            // Finished all repos; unpause integration
+            static::unpauseAfterMigration($this->integration);
+            Log::info('GitHub migration completed - finished all repositories', [
+                'integration_id' => $this->integration->id,
+                'total_repos' => count($repositories),
+            ]);
+
+            return;
         }
         $repo = $repositories[$repoIndex];
         $group = $this->integration->group;

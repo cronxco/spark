@@ -34,7 +34,7 @@ abstract class ManualPlugin implements IntegrationPlugin
         ]);
     }
 
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = [], bool $withMigration = false): Integration
     {
         // Derive a sensible default name from plugin instance types if available
         $defaultName = static::getDisplayName();
@@ -49,13 +49,19 @@ abstract class ManualPlugin implements IntegrationPlugin
             $defaultName = ucfirst($instanceType);
         }
 
+        // If creating with migration, pause the integration by default
+        $config = $initialConfig;
+        if ($withMigration && static::supportsMigration()) {
+            $config['paused'] = true;
+        }
+
         return Integration::create([
             'user_id' => $group->user_id,
             'integration_group_id' => $group->id,
             'service' => static::getIdentifier(),
             'name' => $defaultName,
             'instance_type' => $instanceType,
-            'configuration' => $initialConfig,
+            'configuration' => $config,
         ]);
     }
 

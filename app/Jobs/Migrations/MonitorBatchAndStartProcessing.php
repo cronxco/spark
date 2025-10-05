@@ -3,6 +3,7 @@
 namespace App\Jobs\Migrations;
 
 use App\Models\Integration;
+use App\Traits\MigrationPauser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Bus;
 
 class MonitorBatchAndStartProcessing implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, MigrationPauser, Queueable, SerializesModels;
 
     protected Integration $integration;
 

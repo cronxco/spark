@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\Outline\OutlineMigrationPull;
 use App\Models\ActionProgress;
 use App\Models\Integration;
+use App\Traits\MigrationPauser;
 use Carbon\Carbon;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -19,7 +20,7 @@ use Throwable;
 
 class StartIntegrationMigration implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, MigrationPauser, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
@@ -46,6 +47,9 @@ class StartIntegrationMigration implements ShouldQueue
 
     public function handle(): void
     {
+        // Pause the integration during migration to prevent regular updates
+        static::pauseDuringMigration($this->integration);
+
         // Create progress record for migration
         $this->progressRecord = ActionProgress::createProgress(
             $this->integration->user_id,
@@ -126,6 +130,9 @@ class StartIntegrationMigration implements ShouldQueue
             'integration_id' => $this->integration->id,
             'service' => $this->integration->service,
         ]);
+
+        // Ensure integration is unpaused on job failure
+        static::unpauseAfterMigration($this->integration);
     }
 
     protected function startOura(): void
@@ -251,7 +258,7 @@ class StartIntegrationMigration implements ShouldQueue
                     ->where('instance_type', 'accounts')
                     ->first();
                 if (! $existingMaster) {
-                    $existingMaster = $plugin->createInstance($group, 'accounts');
+                    $existingMaster = $plugin->createInstance($group, 'accounts', [], true);
                 }
                 // Seed the master with account and pot objects (no events)
                 SeedMonzoAccounts::dispatch($existingMaster)
@@ -370,10 +377,31 @@ class StartIntegrationMigration implements ShouldQueue
 
     protected function startOutline(): void
     {
+        $instanceType = $this->integration->instance_type ?: 'recent_documents';
+
         $this->updateProgress('configuring', 'Configuring Outline migration...', 20, [
             'service' => 'outline',
-            'instance_type' => $this->integration->instance_type ?: 'recent_documents',
+            'instance_type' => $instanceType,
         ]);
+
+        // Skip migration for task instances - they don't need backfill
+        if ($instanceType === 'task') {
+            $this->updateProgress('skipped', 'Task instances do not require migration', 100, [
+                'service' => 'outline',
+                'instance_type' => $instanceType,
+                'reason' => 'Task instances do not perform data backfill',
+            ]);
+
+            // Unpause immediately since we're not running a migration
+            static::unpauseAfterMigration($this->integration);
+
+            Log::info('Outline migration skipped for task instance', [
+                'integration_id' => $this->integration->id,
+                'instance_type' => $instanceType,
+            ]);
+
+            return;
+        }
 
         // Update migration status to started
         $this->integration->update([
@@ -381,19 +409,24 @@ class StartIntegrationMigration implements ShouldQueue
             'configuration->migration_started_at' => now()->toIso8601String(),
         ]);
 
+        // Build context for collection filtering based on instance type
+        $context = $this->buildOutlineContext($instanceType);
+
         $this->updateProgress('fetching', 'Starting Outline migration pull...', 30, [
             'service' => 'outline',
-            'instance_type' => $this->integration->instance_type,
+            'instance_type' => $instanceType,
+            'context' => $context,
         ]);
 
-        // Dispatch the Outline migration job directly
-        OutlineMigrationPull::dispatch($this->integration, 0, 50)
+        // Dispatch the Outline migration job with context
+        OutlineMigrationPull::dispatch($this->integration, 0, 50, $context)
             ->onConnection('redis')
             ->onQueue('migration');
 
         $this->updateProgress('monitoring', 'Outline migration started...', 40, [
             'service' => 'outline',
-            'instance_type' => $this->integration->instance_type,
+            'instance_type' => $instanceType,
+            'context' => $context,
             'note' => 'Outline migration runs independently and will update its own status',
         ]);
     }
@@ -416,5 +449,41 @@ class StartIntegrationMigration implements ShouldQueue
         if ($this->progressRecord) {
             $this->progressRecord->markFailed($errorMessage, $details);
         }
+
+        // Unpause the integration when migration fails so it's not stuck
+        static::unpauseAfterMigration($this->integration);
+    }
+
+    /**
+     * Build context array for Outline migration collection filtering
+     */
+    private function buildOutlineContext(string $instanceType): array
+    {
+        $context = [
+            'timebox_until' => $this->timeboxUntil?->toIso8601String(),
+        ];
+
+        // Get the daynotes collection ID from the integration group
+        $daynotesCollectionId = null;
+        if ($this->integration->group && $this->integration->group->auth_metadata) {
+            $daynotesCollectionId = $this->integration->group->auth_metadata['daynotes_collection_id'] ?? null;
+        }
+
+        // Fallback to config if not in group
+        if (! $daynotesCollectionId) {
+            $daynotesCollectionId = config('services.outline.daynotes_collection_id');
+        }
+
+        // Apply collection filtering based on instance type
+        if ($instanceType === 'recent_daynotes' && $daynotesCollectionId) {
+            // Include only day notes collection
+            $context['include_collection_ids'] = [$daynotesCollectionId];
+        } elseif ($instanceType === 'recent_documents' && $daynotesCollectionId) {
+            // Exclude day notes collection for regular documents
+            $context['exclude_collection_ids'] = [$daynotesCollectionId];
+        }
+        // For other instance types or when no collection ID is configured, fetch all documents
+
+        return $context;
     }
 }

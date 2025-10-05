@@ -362,7 +362,7 @@ class AppleHealthPlugin extends WebhookPlugin
         return parent::initializeGroup($user);
     }
 
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = [], bool $withMigration = false): Integration
     {
         $integration = parent::createInstance($group, $instanceType, $initialConfig);
 
