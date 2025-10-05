@@ -739,22 +739,13 @@ class MonzoPlugin extends OAuthPlugin
 
     public function listAccounts(Integration $integration): array
     {
-        // Log the API request
-        $this->logApiRequest('GET', '/accounts', [
-            'Authorization' => '[REDACTED]',
-        ], [], $integration->id);
+        $response = $this->makeAuthenticatedMonzoRequest('GET', '/accounts', [], $integration);
 
-        $resp = Http::withHeaders($this->authHeaders($integration))
-            ->get($this->apiBase . '/accounts');
-
-        // Log the API response
-        $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
-
-        if (! $resp->successful()) {
+        if (! $response->successful()) {
             return [];
         }
 
-        return $resp->json('accounts') ?? [];
+        return $response->json('accounts') ?? [];
     }
 
     /**
@@ -944,7 +935,23 @@ class MonzoPlugin extends OAuthPlugin
     public function authHeaders(Integration $integration): array
     {
         $group = $integration->group;
-        $token = $group?->access_token ?? $integration->access_token;
+        $token = $integration->access_token; // legacy fallback only
+
+        if ($group) {
+            // Check if token is expired and refresh if needed
+            if ($group->expiry && $group->expiry->isPast()) {
+                try {
+                    $this->refreshToken($group);
+                } catch (Exception $e) {
+                    Log::warning('Token refresh failed in authHeaders, using existing token', [
+                        'group_id' => $group->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Continue with existing token - will likely fail but allows graceful degradation
+                }
+            }
+            $token = $group->access_token;
+        }
 
         return [
             'Authorization' => 'Bearer ' . $token,
@@ -1089,6 +1096,123 @@ class MonzoPlugin extends OAuthPlugin
         ]);
     }
 
+    /**
+     * Override parent refreshToken method to use Monzo-specific endpoint
+     */
+    protected function refreshToken(IntegrationGroup $group): void
+    {
+        $clientId = $this->clientId;
+        $clientSecret = $this->clientSecret;
+        $refreshToken = $group->refresh_token;
+
+        if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+            Log::warning('Monzo refresh skipped due to missing credentials or refresh_token', [
+                'group_id' => $group->id,
+            ]);
+
+            return;
+        }
+
+        // Log the API request
+        $this->logApiRequest('POST', '/oauth2/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'grant_type' => 'refresh_token',
+            'client_id' => $clientId,
+        ]);
+
+        $response = Http::asForm()->post($this->apiBase . '/oauth2/token', [
+            'grant_type' => 'refresh_token',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+        ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/oauth2/token', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            Log::error('Monzo token refresh failed', [
+                'group_id' => $group->id,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            throw new Exception('Failed to refresh Monzo token');
+        }
+
+        $data = $response->json();
+        $group->update([
+            'access_token' => $data['access_token'] ?? null,
+            'refresh_token' => $data['refresh_token'] ?? $group->refresh_token,
+            'expiry' => isset($data['expires_in']) ? now()->addSeconds((int) $data['expires_in']) : null,
+        ]);
+
+        Log::info('Monzo token refreshed successfully', [
+            'group_id' => $group->id,
+            'expires_at' => $group->expiry?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Make an authenticated request with automatic token refresh on 401
+     */
+    protected function makeAuthenticatedMonzoRequest(string $method, string $endpoint, array $params = [], ?Integration $integration = null): \Illuminate\Http\Client\Response
+    {
+        $url = $this->apiBase . $endpoint;
+
+        // Log the API request
+        $this->logApiRequest($method, $endpoint, [
+            'Authorization' => '[REDACTED]',
+        ], $params, $integration?->id);
+
+        // Make the initial request
+        $http = Http::withHeaders($this->authHeaders($integration));
+        $response = match ($method) {
+            'GET' => $http->get($url, $params),
+            'POST' => $http->post($url, $params),
+            'PUT' => $http->put($url, $params),
+            'DELETE' => $http->delete($url, $params),
+            default => throw new Exception("Unsupported HTTP method: {$method}"),
+        };
+
+        // Log the API response
+        $this->logApiResponse($method, $endpoint, $response->status(), $response->body(), $response->headers(), $integration?->id);
+
+        // Handle 401 unauthorized - try to refresh token and retry once
+        if ($response->status() === 401 && $integration?->group) {
+            Log::info('Monzo API returned 401, attempting token refresh', [
+                'integration_id' => $integration->id,
+                'method' => $method,
+                'endpoint' => $endpoint,
+            ]);
+
+            try {
+                $this->refreshToken($integration->group);
+
+                // Retry the request with new token
+                $http = Http::withHeaders($this->authHeaders($integration));
+                $response = match ($method) {
+                    'GET' => $http->get($url, $params),
+                    'POST' => $http->post($url, $params),
+                    'PUT' => $http->put($url, $params),
+                    'DELETE' => $http->delete($url, $params),
+                    default => throw new Exception("Unsupported HTTP method: {$method}"),
+                };
+
+                $this->logApiResponse($method, $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+            } catch (Exception $e) {
+                Log::error('Monzo token refresh failed during API request', [
+                    'integration_id' => $integration?->id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $response;
+    }
+
     protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
     {
         $account = $this->getPrimaryAccount($group);
@@ -1101,6 +1225,11 @@ class MonzoPlugin extends OAuthPlugin
 
     protected function getPrimaryAccount(IntegrationGroup $group): ?array
     {
+        // Check if token is expired and refresh if needed
+        if ($group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+        }
+
         // Log the API request
         $this->logApiRequest('GET', '/accounts', [
             'Authorization' => '[REDACTED]',
@@ -1111,6 +1240,30 @@ class MonzoPlugin extends OAuthPlugin
 
         // Log the API response
         $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
+
+        // Handle 401 unauthorized - try to refresh token and retry once
+        if ($resp->status() === 401) {
+            Log::info('Monzo API returned 401 in getPrimaryAccount, attempting token refresh', [
+                'group_id' => $group->id,
+            ]);
+
+            try {
+                $this->refreshToken($group);
+
+                // Retry the request with new token
+                $resp = Http::withToken((string) $group->access_token)
+                    ->get($this->apiBase . '/accounts');
+
+                $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
+            } catch (Exception $e) {
+                Log::error('Monzo token refresh failed during getPrimaryAccount', [
+                    'group_id' => $group->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+        }
 
         if (! $resp->successful()) {
             return null;
