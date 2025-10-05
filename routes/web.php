@@ -245,7 +245,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     Volt::route('events', 'admin.events')->name('events.index');
     Volt::route('objects', 'admin.objects')->name('objects.index');
+    Volt::route('blocks', 'admin.blocks')->name('blocks.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
+    Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
     Route::post('bin/delete', function () {
         DeleteBinItemsBatch::dispatch(Auth::id());
 

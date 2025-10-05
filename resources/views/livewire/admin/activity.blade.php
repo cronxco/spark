@@ -19,6 +19,10 @@ new class extends Component {
     public string $subjectTypeFilter = '';
     public int $perPage = 25;
 
+    // Modal state
+    public bool $showModal = false;
+    public ?Activity $selectedActivity = null;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'logNameFilter' => ['except' => ''],
@@ -194,6 +198,40 @@ new class extends Component {
 
         return implode(' | ', $changes) ?: 'No details';
     }
+
+    public function showActivityDetails(string $activityId): void
+    {
+        $this->selectedActivity = Activity::with(['subject', 'causer'])->find($activityId);
+        $this->showModal = true;
+    }
+
+    public function closeModal(): void
+    {
+        $this->showModal = false;
+        $this->selectedActivity = null;
+    }
+
+    public function getFormattedProperties($properties): array
+    {
+        if (!$properties) {
+            return [];
+        }
+
+        if (is_string($properties)) {
+            $properties = json_decode($properties, true);
+        }
+
+        return $properties ?: [];
+    }
+
+    public function formatJson($data): string
+    {
+        if (is_string($data)) {
+            $data = json_decode($data, true);
+        }
+
+        return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
 };
 
 ?>
@@ -303,9 +341,13 @@ new class extends Component {
                             @forelse ($this->getActivities() as $activity)
                                 <tr>
                                     <td>
-                                        <span class="font-mono text-xs" title="{{ $activity->id }}">
+                                        <button
+                                            wire:click="showActivityDetails('{{ $activity->id }}')"
+                                            class="font-mono text-xs link link-primary hover:link-accent"
+                                            title="{{ $activity->id }} - Click to view details"
+                                        >
                                             {{ $this->truncateId($activity->id) }}
-                                        </span>
+                                        </button>
                                     </td>
                                     <td>
                                         <span class="badge badge-outline">{{ $activity->log_name ?? 'default' }}</span>

@@ -18,7 +18,8 @@ new class extends Component {
     public bool $isRefreshing = false;
     public string $filter = 'all'; // all|integrations|tasks
     public string $search = '';
-    public array $collapsedPlugins = [];
+    /** @var array<string, bool> */
+    public array $collapse = [];
 
     public function setFilter(string $filter): void
     {
@@ -32,13 +33,9 @@ new class extends Component {
         $this->loadData();
     }
 
-    public function togglePluginCollapse(string $pluginName): void
+    public function toggle(string $key): void
     {
-        if (in_array($pluginName, $this->collapsedPlugins)) {
-            $this->collapsedPlugins = array_filter($this->collapsedPlugins, fn($p) => $p !== $pluginName);
-        } else {
-            $this->collapsedPlugins[] = $pluginName;
-        }
+        $this->collapse[$key] = !($this->collapse[$key] ?? false);
     }
 
     public function mount(): void
@@ -259,7 +256,60 @@ new class extends Component {
             $groupedIntegrations[$pluginName]['groups'][$groupName]['integrations'][] = $integration;
         }
 
-        $this->integrations = $groupedIntegrations;
+        // Initialize collapse state for new plugins (default to collapsed)
+        foreach (array_keys($groupedIntegrations) as $pluginName) {
+            if (!isset($this->collapse[$pluginName])) {
+                $this->collapse[$pluginName] = false; // false = collapsed
+            }
+        }
+
+        // Sort plugins by status - issues first
+        $sortedIntegrations = [];
+        foreach ($groupedIntegrations as $pluginName => $pluginData) {
+            $needsUpdateCount = 0;
+            $pendingUpdateCount = 0;
+            $processingCount = 0;
+
+            // Count issues across all groups and integrations for this plugin
+            foreach ($pluginData['groups'] as $group) {
+                foreach ($group['integrations'] as $integration) {
+                    if ($integration['status'] === 'needs_update') {
+                        $needsUpdateCount++;
+                    } elseif ($integration['status'] === 'pending_update') {
+                        $pendingUpdateCount++;
+                    }
+                    if ($integration['is_processing']) {
+                        $processingCount++;
+                    }
+                }
+            }
+
+            $pluginData['has_issues'] = ($needsUpdateCount + $pendingUpdateCount + $processingCount) > 0;
+            $pluginData['issue_count'] = $needsUpdateCount + $pendingUpdateCount + $processingCount;
+            $pluginData['needs_update_count'] = $needsUpdateCount;
+            $pluginData['pending_update_count'] = $pendingUpdateCount;
+            $pluginData['processing_count'] = $processingCount;
+
+            $sortedIntegrations[$pluginName] = $pluginData;
+        }
+
+        // Sort: sections with issues first, then clean sections
+        uasort($sortedIntegrations, function ($a, $b) {
+            // First, sort by whether they have issues (issues first)
+            if ($a['has_issues'] && !$b['has_issues']) {
+                return -1;
+            }
+            if (!$a['has_issues'] && $b['has_issues']) {
+                return 1;
+            }
+            // Within same issue status, sort by issue count (desc) or alphabetically
+            if ($a['has_issues'] && $b['has_issues']) {
+                return $b['issue_count'] <=> $a['issue_count'];
+            }
+            return strcmp($a['plugin_name'], $b['plugin_name']);
+        });
+
+        $this->integrations = $sortedIntegrations;
     }
 
     private function getIntegrationStatus(Integration $integration): string
@@ -269,6 +319,16 @@ new class extends Component {
         }
 
         if ($integration->needsUpdate()) {
+            // Check if update is more than 2 minutes overdue
+            $nextUpdateTime = $integration->getNextUpdateTime();
+            if ($nextUpdateTime && $nextUpdateTime->isPast()) {
+                $minutesOverdue = $nextUpdateTime->diffInMinutes(now());
+                if ($minutesOverdue >= 2) {
+                    return 'needs_update'; // Red - critically overdue
+                } else {
+                    return 'pending_update'; // Yellow/warning - recently overdue
+                }
+            }
             return 'needs_update';
         }
 
@@ -380,59 +440,43 @@ new class extends Component {
                         />
                     </div>
                 @else
-                    <div class="space-y-6">
+                    <div class="space-y-2">
                         @foreach ($integrations as $pluginName => $pluginData)
                             @php
-                                $isCollapsed = in_array($pluginName, $collapsedPlugins);
                                 $totalInstances = collect($pluginData['groups'])->sum(fn($group) => count($group['integrations']));
-                                $needsUpdateCount = collect($pluginData['groups'])
-                                    ->flatten()
-                                    ->filter(fn($item) => isset($item['integrations']))
-                                    ->flatten()
-                                    ->where('status', 'needs_update')
-                                    ->count();
-                                $processingCount = collect($pluginData['groups'])
-                                    ->flatten()
-                                    ->filter(fn($item) => isset($item['integrations']))
-                                    ->flatten()
-                                    ->where('is_processing', true)
-                                    ->count();
+                                $needsUpdateCount = $pluginData['needs_update_count'] ?? 0;
+                                $pendingUpdateCount = $pluginData['pending_update_count'] ?? 0;
+                                $processingCount = $pluginData['processing_count'] ?? 0;
+                                $hasIssues = $pluginData['has_issues'] ?? false;
+                                $issueCount = $pluginData['issue_count'] ?? 0;
                             @endphp
 
-                            <!-- Plugin Header -->
-                            <div class="card bg-base-100 shadow-sm">
-                                <div class="card-body p-3 sm:p-4">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-                                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-base-200 flex items-center justify-center flex-shrink-0">
-                                                <x-icon :name="$pluginData['plugin_icon']" class="w-5 h-5 sm:w-6 sm:h-6 text-base-content" />
-                                            </div>
-                                            <div class="min-w-0 flex-1">
-                                                <h3 class="text-lg sm:text-xl font-semibold truncate">{{ $pluginName }}</h3>
-                                                <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-xs sm:text-sm text-base-content/70 space-y-1 sm:space-y-0">
-                                                    <span>{{ $totalInstances }} {{ Str::plural('instance', $totalInstances) }}</span>
-                                                    @if ($needsUpdateCount > 0)
-                                                        <span class="text-error">{{ $needsUpdateCount }} need{{ $needsUpdateCount === 1 ? 's' : '' }} update</span>
-                                                    @endif
-                                                    @if ($processingCount > 0)
-                                                        <span class="text-info">{{ $processingCount }} processing</span>
-                                                    @endif
-                                                </div>
-                                            </div>
+                            <x-collapse wire:model="collapse.{{ $pluginName }}" separator class="bg-base-100">
+                                <x-slot:heading>
+                                    <div class="flex items-center gap-3 w-full" wire:click="toggle('{{ $pluginName }}')">
+                                        <x-icon :name="$pluginData['plugin_icon']" class="w-5 h-5" />
+                                        <span class="flex-1 text-left">{{ $pluginName }}</span>
+                                        <div class="flex items-center gap-2 text-xs sm:text-sm text-base-content/70">
+                                            <span>{{ $totalInstances }} {{ Str::plural('instance', $totalInstances) }}</span>
+                                            @if ($hasIssues)
+                                                @if ($needsUpdateCount > 0)
+                                                    <x-badge :value="$needsUpdateCount . ' need update'" class="badge-error" />
+                                                @endif
+                                                @if ($pendingUpdateCount > 0)
+                                                    <x-badge :value="$pendingUpdateCount . ' pending'" class="badge-warning" />
+                                                @endif
+                                                @if ($processingCount > 0)
+                                                    <x-badge :value="$processingCount . ' processing'" class="badge-info" />
+                                                @endif
+                                            @else
+                                                <x-badge value="✓" class="badge-success" />
+                                            @endif
                                         </div>
-                                        <button
-                                            class="btn btn-ghost btn-sm flex-shrink-0"
-                                            wire:click="togglePluginCollapse('{{ $pluginName }}')"
-                                        >
-                                            <x-icon :name="$isCollapsed ? 'o-chevron-right' : 'o-chevron-down'" class="w-4 h-4" />
-                                        </button>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Integration Groups -->
-                            @if (!$isCollapsed)
-                                <div class="ml-2 sm:ml-6 space-y-4">
+                                </x-slot:heading>
+                                <x-slot:content>
+                                    <!-- Integration Groups -->
+                                    <div class="space-y-4">
                                     @foreach ($pluginData['groups'] as $groupName => $groupData)
                                         <div class="space-y-3">
                                             @if (count($pluginData['groups']) > 1)
@@ -454,6 +498,8 @@ new class extends Component {
                                                             $cardBorderClass .= 'border-neutral';
                                                         } elseif ($integration['status'] === 'needs_update') {
                                                             $cardBorderClass .= 'border-error';
+                                                        } elseif ($integration['status'] === 'pending_update') {
+                                                            $cardBorderClass .= 'border-warning';
                                                         } elseif ($integration['status'] === 'up_to_date') {
                                                             $cardBorderClass .= 'border-success';
                                                         } else {
@@ -523,6 +569,10 @@ new class extends Component {
                                                     <x-badge value="{{ __('Needs Update') }}" class="badge-error badge-xs sm:badge-sm">
                                                         <x-icon name="o-exclamation-triangle" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
+                                                @elseif ($integration['status'] === 'pending_update')
+                                                    <x-badge value="{{ __('Pending Update') }}" class="badge-warning badge-xs sm:badge-sm">
+                                                        <x-icon name="o-clock" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                    </x-badge>
                                                 @else
                                                     <x-badge value="{{ __('Up to Date') }}" class="badge-success badge-xs sm:badge-sm">
                                                         <x-icon name="o-check-circle" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
@@ -582,7 +632,7 @@ new class extends Component {
                                                 @endif
                                             @endif
 
-                                            @if ($showScheduledUpdates && !$integration['is_processing'] && !$integration['is_paused'] && $integration['status'] === 'needs_update')
+                                            @if ($showScheduledUpdates && !$integration['is_processing'] && !$integration['is_paused'] && in_array($integration['status'], ['needs_update', 'pending_update']))
                                                 <x-button
                                                     label="{{ __('Update') }}"
                                                     icon="o-arrow-path"
@@ -743,8 +793,9 @@ new class extends Component {
                                             </div>
                                         </div>
                                     @endforeach
-                                </div>
-                            @endif
+                                    </div>
+                                </x-slot:content>
+                            </x-collapse>
                         @endforeach
                     </div>
 

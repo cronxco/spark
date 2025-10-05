@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Exception;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 
 class AppleHealthPlugin extends WebhookPlugin
 {
@@ -78,20 +79,237 @@ class AppleHealthPlugin extends WebhookPlugin
     public static function getActionTypes(): array
     {
         return [
-            'completed_workout' => [
+            'did_workout' => [
                 'icon' => 'o-fire',
-                'display_name' => 'Completed Workout',
-                'description' => 'A workout session that has been completed',
-                'display_with_object' => true,
+                'display_name' => 'Did Workout',
+                'description' => 'A workout session completed by the user',
+                'display_with_object' => false,
                 'value_unit' => 'kcal',
                 'hidden' => false,
             ],
-            'measurement' => [
-                'icon' => 'o-chart-bar',
-                'display_name' => 'Health Measurement',
-                'description' => 'A health metric measurement from Apple Health',
+            // Health Metrics
+            'had_environmental_audio_exposure' => [
+                'icon' => 'o-musical-note',
+                'display_name' => 'Had Environmental Audio Exposure',
+                'description' => 'Environmental audio exposure measurement',
+                'display_with_object' => false,
+                'value_unit' => 'dB',
+                'hidden' => false,
+            ],
+            'had_heart_rate' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Had Heart Rate',
+                'description' => 'Heart rate measurement',
+                'display_with_object' => false,
+                'value_unit' => 'bpm',
+                'hidden' => false,
+            ],
+            'had_walking_speed' => [
+                'icon' => 'o-arrow-right',
+                'display_name' => 'Had Walking Speed',
+                'description' => 'Walking speed measurement',
+                'display_with_object' => false,
+                'value_unit' => 'km/h',
+                'hidden' => false,
+            ],
+            'had_walking_heart_rate_average' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Had Walking Heart Rate Average',
+                'description' => 'Average heart rate while walking',
+                'display_with_object' => false,
+                'value_unit' => 'bpm',
+                'hidden' => false,
+            ],
+            'had_basal_energy_burned' => [
+                'icon' => 'o-fire',
+                'display_name' => 'Had Basal Energy Burned',
+                'description' => 'Basal energy expenditure measurement',
+                'display_with_object' => false,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+            'had_resting_heart_rate' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Had Resting Heart Rate',
+                'description' => 'Resting heart rate measurement',
+                'display_with_object' => false,
+                'value_unit' => 'bpm',
+                'hidden' => false,
+            ],
+            'had_breathing_disturbances' => [
+                'icon' => 'o-cloud',
+                'display_name' => 'Had Breathing Disturbances',
+                'description' => 'Sleep breathing disturbances measurement',
                 'display_with_object' => false,
                 'value_unit' => null,
+                'hidden' => false,
+            ],
+            'had_stair_speed_down' => [
+                'icon' => 'o-arrow-down',
+                'display_name' => 'Had Stair Speed Down',
+                'description' => 'Speed going down stairs',
+                'display_with_object' => false,
+                'value_unit' => 'steps/s',
+                'hidden' => false,
+            ],
+            'had_headphone_audio_exposure' => [
+                'icon' => 'o-speaker-wave',
+                'display_name' => 'Had Headphone Audio Exposure',
+                'description' => 'Audio exposure through headphones',
+                'display_with_object' => false,
+                'value_unit' => 'dB',
+                'hidden' => false,
+            ],
+            'had_active_energy' => [
+                'icon' => 'o-bolt',
+                'display_name' => 'Had Active Energy',
+                'description' => 'Active energy burned measurement',
+                'display_with_object' => false,
+                'value_unit' => 'kcal',
+                'hidden' => false,
+            ],
+            'had_flights_climbed' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Had Flights Climbed',
+                'description' => 'Number of flights of stairs climbed',
+                'display_with_object' => false,
+                'value_unit' => 'flights',
+                'hidden' => false,
+            ],
+            'had_walking_step_length' => [
+                'icon' => 'o-arrow-right',
+                'display_name' => 'Had Walking Step Length',
+                'description' => 'Average length of walking steps',
+                'display_with_object' => false,
+                'value_unit' => 'cm',
+                'hidden' => false,
+            ],
+            'had_stair_speed_up' => [
+                'icon' => 'o-arrow-up',
+                'display_name' => 'Had Stair Speed Up',
+                'description' => 'Speed going up stairs',
+                'display_with_object' => false,
+                'value_unit' => 'steps/s',
+                'hidden' => false,
+            ],
+            'had_walking_asymmetry_percentage' => [
+                'icon' => 'o-scale',
+                'display_name' => 'Had Walking Asymmetry Percentage',
+                'description' => 'Walking gait asymmetry measurement',
+                'display_with_object' => false,
+                'value_unit' => '%',
+                'hidden' => false,
+            ],
+            'had_apple_sleeping_wrist_temperature' => [
+                'icon' => 'o-sun',
+                'display_name' => 'Had Apple Sleeping Wrist Temperature',
+                'description' => 'Wrist temperature during sleep',
+                'display_with_object' => false,
+                'value_unit' => '°C',
+                'hidden' => false,
+            ],
+            'had_walking_double_support_percentage' => [
+                'icon' => 'o-scale',
+                'display_name' => 'Had Walking Double Support Percentage',
+                'description' => 'Percentage of walking cycle with both feet on ground',
+                'display_with_object' => false,
+                'value_unit' => '%',
+                'hidden' => false,
+            ],
+            'had_vo2_max' => [
+                'icon' => 'o-heart',
+                'display_name' => 'Had VO2 Max',
+                'description' => 'Maximum oxygen consumption measurement',
+                'display_with_object' => false,
+                'value_unit' => 'mL/kg/min',
+                'hidden' => false,
+            ],
+            'had_respiratory_rate' => [
+                'icon' => 'o-cloud',
+                'display_name' => 'Had Respiratory Rate',
+                'description' => 'Breathing rate measurement',
+                'display_with_object' => false,
+                'value_unit' => 'breaths/min',
+                'hidden' => false,
+            ],
+            'had_apple_exercise_time' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Had Apple Exercise Time',
+                'description' => 'Exercise time tracked by Apple Watch',
+                'display_with_object' => false,
+                'value_unit' => 'min',
+                'hidden' => false,
+            ],
+            'had_time_in_daylight' => [
+                'icon' => 'o-sun',
+                'display_name' => 'Had Time in Daylight',
+                'description' => 'Time spent in daylight',
+                'display_with_object' => false,
+                'value_unit' => 'min',
+                'hidden' => false,
+            ],
+            'had_walking_running_distance' => [
+                'icon' => 'o-map',
+                'display_name' => 'Had Walking + Running Distance',
+                'description' => 'Distance covered walking and running',
+                'display_with_object' => false,
+                'value_unit' => 'km',
+                'hidden' => false,
+            ],
+            'had_physical_effort' => [
+                'icon' => 'o-bolt',
+                'display_name' => 'Had Physical Effort',
+                'description' => 'Physical effort measurement',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'had_step_count' => [
+                'icon' => 'o-cursor-arrow-rays',
+                'display_name' => 'Had Step Count',
+                'description' => 'Number of steps taken',
+                'display_with_object' => false,
+                'value_unit' => 'steps',
+                'hidden' => false,
+            ],
+            'had_blood_oxygen_saturation' => [
+                'icon' => 'o-beaker',
+                'display_name' => 'Had Blood Oxygen Saturation',
+                'description' => 'Blood oxygen saturation level',
+                'display_with_object' => false,
+                'value_unit' => '%',
+                'hidden' => false,
+            ],
+            'had_heart_rate_variability' => [
+                'icon' => 'o-chart-bar',
+                'display_name' => 'Had Heart Rate Variability',
+                'description' => 'Heart rate variability measurement',
+                'display_with_object' => false,
+                'value_unit' => 'ms',
+                'hidden' => false,
+            ],
+            'had_apple_stand_hour' => [
+                'icon' => 'o-arrow-up-circle',
+                'display_name' => 'Had Apple Stand Hour',
+                'description' => 'Stand hours tracked by Apple Watch',
+                'display_with_object' => false,
+                'value_unit' => 'hours',
+                'hidden' => false,
+            ],
+            'had_six_minute_walking_test_distance' => [
+                'icon' => 'o-map',
+                'display_name' => 'Had Six Minute Walking Test Distance',
+                'description' => 'Distance covered in 6-minute walking test',
+                'display_with_object' => false,
+                'value_unit' => 'm',
+                'hidden' => false,
+            ],
+            'had_apple_stand_time' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Had Apple Stand Time',
+                'description' => 'Stand time tracked by Apple Watch',
+                'display_with_object' => false,
+                'value_unit' => 'min',
                 'hidden' => false,
             ],
         ];
@@ -223,11 +441,22 @@ class AppleHealthPlugin extends WebhookPlugin
         $instanceType = (string) ($integration->instance_type ?? 'workouts');
         $processingData = [];
 
-        // Extract data from the nested payload structure
-        $payloadData = $webhookPayload['payload']['data'] ?? $webhookPayload;
+        // Extract data from the nested payload structure (robust to variations)
+        $payloadData = $webhookPayload['payload']['data']
+            ?? ($webhookPayload['data'] ?? $webhookPayload);
 
+        // Try multiple common shapes
+        $workouts = $payloadData['workouts']
+            ?? ($webhookPayload['payload']['data']['workouts'] ?? ($webhookPayload['data']['workouts'] ?? ($webhookPayload['workouts'] ?? [])));
+        $metrics = $payloadData['metrics']
+            ?? ($webhookPayload['payload']['data']['metrics'] ?? ($webhookPayload['data']['metrics'] ?? ($webhookPayload['metrics'] ?? [])));
+
+        // Normalize to arrays
+        $workouts = is_array($workouts) ? $workouts : [];
+        $metrics = is_array($metrics) ? $metrics : [];
+
+        // Respect explicit instance_type only to avoid cross-processing duplicates
         if ($instanceType === 'workouts') {
-            $workouts = is_array($payloadData['workouts'] ?? null) ? $payloadData['workouts'] : [];
             foreach ($workouts as $workout) {
                 if (is_array($workout)) {
                     $processingData[] = [
@@ -236,10 +465,7 @@ class AppleHealthPlugin extends WebhookPlugin
                     ];
                 }
             }
-        }
-
-        if ($instanceType === 'metrics') {
-            $metrics = is_array($payloadData['metrics'] ?? null) ? $payloadData['metrics'] : [];
+        } elseif ($instanceType === 'metrics') {
             foreach ($metrics as $metricEntry) {
                 if (is_array($metricEntry)) {
                     $processingData[] = [
@@ -249,6 +475,20 @@ class AppleHealthPlugin extends WebhookPlugin
                 }
             }
         }
+
+        // Diagnostics
+        Log::info('AppleHealthPlugin.processWebhookData split', [
+            'integration_id' => $integration->id,
+            'instance_type' => $instanceType,
+            'workouts_in_payload' => is_countable($workouts) ? count($workouts) : 0,
+            'metrics_in_payload' => is_countable($metrics) ? count($metrics) : 0,
+            'initial_chunks' => is_countable($processingData) ? count($processingData) : 0,
+            'top_level_keys' => array_slice(array_keys($webhookPayload), 0, 10),
+            'has_payload_key' => array_key_exists('payload', $webhookPayload),
+            'payload_has_data_key' => isset($webhookPayload['payload']) && is_array($webhookPayload['payload']) && array_key_exists('data', $webhookPayload['payload']),
+        ]);
+
+        // No fallback: if instance type doesn't match payload, we intentionally do nothing here
 
         return $processingData;
     }
@@ -261,6 +501,13 @@ class AppleHealthPlugin extends WebhookPlugin
             Arr::get($workout, 'name'),
         ])));
         $name = (string) (Arr::get($workout, 'name') ?? 'Workout');
+        // Strip indoor/outdoor prefixes for cleaner titles
+        $lower = strtolower($name);
+        if (str_starts_with($lower, 'indoor ')) {
+            $name = substr($name, 7);
+        } elseif (str_starts_with($lower, 'outdoor ')) {
+            $name = substr($name, 8);
+        }
         $start = (string) (Arr::get($workout, 'start') ?? Arr::get($workout, 'startDate') ?? now()->toIso8601String());
         $end = (string) (Arr::get($workout, 'end') ?? Arr::get($workout, 'endDate') ?? $start);
         $duration = Arr::get($workout, 'duration');
@@ -290,31 +537,6 @@ class AppleHealthPlugin extends WebhookPlugin
         ];
 
         $blocks = [];
-        // Summary block
-        $summaryMetadata = [];
-        if ($distanceQty !== null && $distanceUnit) {
-            $summaryMetadata['distance'] = "{$distanceQty} {$distanceUnit}";
-        }
-        if ($duration !== null) {
-            $summaryMetadata['duration'] = "{$duration} s";
-        }
-        if ($energyQty !== null && $energyUnit) {
-            $summaryMetadata['active_energy'] = "{$energyQty} {$energyUnit}";
-        }
-        if ($intensityQty !== null && $intensityUnit) {
-            $summaryMetadata['intensity'] = "{$intensityQty} {$intensityUnit}";
-        }
-        if ($location) {
-            $summaryMetadata['location'] = "{$location}";
-        }
-        if (! empty($summaryMetadata)) {
-            $blocks[] = [
-                'block_type' => 'summary',
-                'time' => $start,
-                'title' => 'Summary',
-                'metadata' => [$summaryMetadata],
-            ];
-        }
         // Distance block
         if ($distanceQty !== null && $distanceUnit) {
             [$encDistance, $distMult] = $this->encodeNumericValue($distanceQty);
@@ -367,13 +589,21 @@ class AppleHealthPlugin extends WebhookPlugin
             ];
         }
 
+        $tags = [];
+        if ($location) {
+            $tags[] = [
+                'name' => (string) $location,
+                'type' => 'location',
+            ];
+        }
+
         return [
             'source_id' => 'apple_workout_' . $id,
             'time' => $start,
             'actor' => $actor,
             'target' => $target,
             'domain' => self::getDomain(),
-            'action' => 'completed_workout',
+            'action' => 'did_workout',
             'value' => $encEnergy,
             'value_multiplier' => $energyMult,
             'value_unit' => $energyUnit,
@@ -384,9 +614,9 @@ class AppleHealthPlugin extends WebhookPlugin
                 'distance_unit' => $distanceUnit,
                 'intensity' => $intensityQty,
                 'intensity_unit' => $intensityUnit,
-                'location' => $location,
             ],
             'blocks' => $blocks,
+            'tags' => $tags,
         ];
     }
 
@@ -409,10 +639,14 @@ class AppleHealthPlugin extends WebhookPlugin
             'time' => $date,
         ];
 
+        // Convert metric name to Title Case for object title
+        $metricTitle = str_replace('_', ' ', $name);
+        $metricTitle = ucwords($metricTitle);
+
         $target = [
             'concept' => 'metric',
             'type' => 'apple_metric',
-            'title' => $name,
+            'title' => $metricTitle,
             'time' => $date,
         ];
 
@@ -436,11 +670,11 @@ class AppleHealthPlugin extends WebhookPlugin
                 ];
             }
         }
-        if (array_key_exists('source', $point)) {
-            $blocks[] = [
-                'time' => $date,
-                'title' => 'Source',
-                'metadata' => ['text' => (string) $point['source']],
+        $tags = [];
+        if (array_key_exists('source', $point) && is_string($point['source']) && $point['source'] !== '') {
+            $tags[] = [
+                'name' => (string) $point['source'],
+                'type' => 'data_source',
             ];
         }
 
@@ -450,7 +684,7 @@ class AppleHealthPlugin extends WebhookPlugin
             'actor' => $actor,
             'target' => $target,
             'domain' => self::getDomain(),
-            'action' => 'measurement',
+            'action' => 'had_' . $name,
             'value' => $enc,
             'value_multiplier' => $mult,
             'value_unit' => $unit,
@@ -459,6 +693,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'raw' => $point,
             ],
             'blocks' => $blocks,
+            'tags' => $tags,
         ];
     }
 
