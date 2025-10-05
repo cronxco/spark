@@ -339,9 +339,16 @@ class PluginTypeValidationTest extends TestCase
             $objectTypes = array_merge($objectTypes, $matches[1]);
         }
 
-        // Look for 'type' => '...' patterns anywhere (for cases where EventObject is used in different contexts)
-        // But exclude common PHP types and generic terms
-        preg_match_all("/'type'\s*=>\s*['\"]([^'\"]+)['\"]/", $fileContent, $matches);
+        // Look for 'type' => '...' patterns but exclude tag contexts
+        // Tag contexts are arrays that contain BOTH 'name' => and 'type' => keys
+        // We'll use negative lookahead/lookbehind to exclude those patterns
+
+        // Remove tag array assignments specifically
+        // Target the exact pattern: $tags[] = [ ... 'type' => '...' ... ];
+        $withoutTagArrays = preg_replace('/\$tags\[\]\s*=\s*\[[^;]*?\];/s', '', $fileContent);
+
+        // Now look for 'type' => '...' patterns in the cleaned content
+        preg_match_all("/'type'\s*=>\s*['\"]([^'\"]+)['\"]/", $withoutTagArrays, $matches);
         if (! empty($matches[1])) {
             $filtered = array_filter($matches[1], function ($type) {
                 return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
@@ -349,9 +356,8 @@ class PluginTypeValidationTest extends TestCase
             $objectTypes = array_merge($objectTypes, $filtered);
         }
 
-        // Look for "type" => "..." patterns anywhere (for cases where EventObject is used in different contexts)
-        // But exclude common PHP types and generic terms
-        preg_match_all('/"type"\s*=>\s*["\']([^"\']+)["\']/', $fileContent, $matches);
+        // Look for "type" => "..." patterns in the cleaned content
+        preg_match_all('/"type"\s*=>\s*["\']([^"\']+)["\']/', $withoutTagArrays, $matches);
         if (! empty($matches[1])) {
             $filtered = array_filter($matches[1], function ($type) {
                 return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);

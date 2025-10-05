@@ -209,6 +209,25 @@ abstract class BaseProcessingJob implements ShouldQueue
                     }
                 }
 
+                // Attach tags if provided in payload (supports optional typed tags)
+                if (isset($data['tags']) && is_array($data['tags'])) {
+                    foreach ($data['tags'] as $tag) {
+                        if (is_array($tag)) {
+                            $name = (string) ($tag['name'] ?? '');
+                            $type = $tag['type'] ?? null;
+                            if ($name !== '') {
+                                if ($type) {
+                                    $event->attachTag($name, (string) $type);
+                                } else {
+                                    $event->attachTag($name);
+                                }
+                            }
+                        } elseif (is_string($tag) && $tag !== '') {
+                            $event->attachTag($tag);
+                        }
+                    }
+                }
+
                 $events->push($event);
 
             } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {

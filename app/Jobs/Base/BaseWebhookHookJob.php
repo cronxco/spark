@@ -59,11 +59,21 @@ abstract class BaseWebhookHookJob implements ShouldQueue
         try {
             Log::info("Processing {$this->getJobType()} webhook for integration {$this->integration->id} ({$this->serviceName})");
 
+            // Log webhook payload for debugging/traceability
+            $this->logWebhookPayload();
+
             // Validate webhook signature if required
             $this->validateWebhook();
 
             // Split the webhook data into processing chunks
             $processingData = $this->splitWebhookData();
+
+            Log::info('Webhook split complete', [
+                'integration_id' => $this->integration->id,
+                'service' => $this->serviceName,
+                'job_type' => $this->getJobType(),
+                'chunks' => is_array($processingData) ? count($processingData) : 0,
+            ]);
 
             // Dispatch processing jobs for each chunk
             $this->dispatchProcessingJobs($processingData);

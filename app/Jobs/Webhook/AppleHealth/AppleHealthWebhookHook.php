@@ -6,9 +6,16 @@ use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Jobs\Base\BaseWebhookHookJob;
 use App\Jobs\Data\AppleHealth\AppleHealthMetricData;
 use App\Jobs\Data\AppleHealth\AppleHealthWorkoutData;
+use Illuminate\Support\Facades\Log;
 
 class AppleHealthWebhookHook extends BaseWebhookHookJob
 {
+    public function __construct(array $webhookPayload, array $headers, \App\Models\Integration $integration)
+    {
+        parent::__construct($webhookPayload, $headers, $integration);
+        $this->onQueue('pull');
+    }
+
     public function getIntegration()
     {
         return $this->integration;
@@ -40,10 +47,15 @@ class AppleHealthWebhookHook extends BaseWebhookHookJob
     protected function dispatchProcessingJobs(array $processingData): void
     {
         foreach ($processingData as $item) {
+            Log::info('Dispatching Apple Health processing job', [
+                'integration_id' => $this->integration->id,
+                'type' => $item['type'] ?? null,
+                'service' => $this->getServiceName(),
+            ]);
             if ($item['type'] === 'workout') {
-                AppleHealthWorkoutData::dispatch($this->integration, $item['data']);
+                AppleHealthWorkoutData::dispatch($this->integration, $item['data'])->onQueue('pull');
             } elseif ($item['type'] === 'metric') {
-                AppleHealthMetricData::dispatch($this->integration, $item['data']);
+                AppleHealthMetricData::dispatch($this->integration, $item['data'])->onQueue('pull');
             }
         }
     }

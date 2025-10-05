@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\Log;
 
 class AppleHealthMetricData extends BaseProcessingJob
 {
+    public function __construct(\App\Models\Integration $integration, array $rawData)
+    {
+        parent::__construct($integration, $rawData);
+        $this->onQueue('pull');
+    }
+
     protected function getServiceName(): string
     {
         return 'apple_health';
