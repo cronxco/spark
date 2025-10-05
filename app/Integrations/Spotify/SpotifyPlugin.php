@@ -168,6 +168,14 @@ class SpotifyPlugin extends OAuthPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'track_info' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Track Information',
+                'description' => 'Detailed track metadata and information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 

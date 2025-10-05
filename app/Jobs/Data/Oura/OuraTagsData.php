@@ -78,16 +78,7 @@ class OuraTagsData extends BaseProcessingJob
                 'day' => $day,
                 'label' => $label,
             ],
-            'blocks' => [
-                [
-                    'time' => $timestamp,
-                    'title' => 'Tag',
-                    'metadata' => ['text' => (string) $label],
-                    'value' => null,
-                    'value_multiplier' => 1,
-                    'value_unit' => null,
-                ],
-            ],
+            'blocks' => [],
             'integration_id' => $this->integration->id,
         ];
     }

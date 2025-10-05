@@ -663,7 +663,11 @@ class AppleHealthPlugin extends WebhookPlugin
                 $blocks[] = [
                     'time' => $date,
                     'title' => $label,
-                    'metadata' => ['text' => $label . ' value for ' . $name],
+                    'metadata' => [
+                        'statistic' => strtolower($label),
+                        'metric' => $name,
+                        'original_key' => $key,
+                    ],
                     'value' => $bVal,
                     'value_multiplier' => $bMult,
                     'value_unit' => $unit,
