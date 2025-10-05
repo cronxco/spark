@@ -380,10 +380,21 @@ class OutlinePlugin extends ManualPlugin
             unset($instanceConfig['daynotes_collection_id']);
         }
 
+        // Extract migration-related flags from initialConfig
+        $withMigration = $initialConfig['with_migration'] ?? false;
+        if (isset($instanceConfig['with_migration'])) {
+            unset($instanceConfig['with_migration']);
+        }
+
         // Update group auth_metadata if we have group-level config
         if (! empty($groupConfig)) {
             $currentMetadata = $group->auth_metadata ?? [];
             $group->update(['auth_metadata' => array_merge($currentMetadata, $groupConfig)]);
+        }
+
+        // If this plugin supports migration and we're creating for migration, start paused
+        if (static::supportsMigration() && $withMigration) {
+            $instanceConfig['paused'] = true;
         }
 
         // Derive a sensible default name from plugin instance types if available
