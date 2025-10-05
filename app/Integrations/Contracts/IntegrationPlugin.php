@@ -108,7 +108,7 @@ interface IntegrationPlugin
     /**
      * Create an instance attached to a group
      */
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration;
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = [], bool $withMigration = false): Integration;
 
     /**
      * Handle OAuth callback

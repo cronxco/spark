@@ -205,7 +205,7 @@ class HevyPlugin implements IntegrationPlugin
         ]);
     }
 
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = [], bool $withMigration = false): Integration
     {
         return Integration::create([
             'user_id' => $group->user_id,

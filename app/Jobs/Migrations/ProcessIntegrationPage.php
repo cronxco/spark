@@ -7,6 +7,7 @@ use App\Models\ActionProgress;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Traits\MigrationPauser;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,7 +22,7 @@ use Throwable;
 
 class ProcessIntegrationPage implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, MigrationPauser, Queueable, SerializesModels;
 
     public int $timeout = 300;
 

@@ -258,7 +258,7 @@ class StartIntegrationMigration implements ShouldQueue
                     ->where('instance_type', 'accounts')
                     ->first();
                 if (! $existingMaster) {
-                    $existingMaster = $plugin->createInstance($group, 'accounts');
+                    $existingMaster = $plugin->createInstance($group, 'accounts', [], true);
                 }
                 // Seed the master with account and pot objects (no events)
                 SeedMonzoAccounts::dispatch($existingMaster)

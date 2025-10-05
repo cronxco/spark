@@ -44,15 +44,21 @@ abstract class WebhookPlugin implements IntegrationPlugin
         ]);
     }
 
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
+    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = [], bool $withMigration = false): Integration
     {
+        // If creating with migration, pause the integration by default
+        $config = $initialConfig;
+        if ($withMigration && static::supportsMigration()) {
+            $config['paused'] = true;
+        }
+
         return Integration::create([
             'user_id' => $group->user_id,
             'integration_group_id' => $group->id,
             'service' => static::getIdentifier(),
             'name' => static::getDisplayName(),
             'instance_type' => $instanceType,
-            'configuration' => $initialConfig,
+            'configuration' => $config,
             'account_id' => $group->account_id, // reuse secret if relevant
             'access_token' => $group->access_token, // webhook url for convenience
         ]);
