@@ -61,6 +61,32 @@ class OutlineApi
     }
 
     /**
+     * List documents with external pagination control (for migration)
+     * Unlike listDocuments(), this respects offset/limit without internal pagination
+     */
+    public function listDocumentsPaginated(array $params = []): array
+    {
+        $query = array_merge([
+            'limit' => 50,
+        ], $params);
+
+        // Build endpoint with limit parameter
+        $endpoint = '/api/documents.list?limit=' . (int) $query['limit'];
+
+        // Add offset parameter if provided
+        if (isset($query['offset'])) {
+            $endpoint .= '&offset=' . (int) $query['offset'];
+        }
+
+        // Remove limit and offset from query body since they're in the endpoint
+        unset($query['limit'], $query['offset']);
+
+        $data = $this->post($endpoint, $query);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
      * Search for a single document using Outline's dedicated search endpoint
      * This is optimized for finding one specific document and stops after the first result
      */
