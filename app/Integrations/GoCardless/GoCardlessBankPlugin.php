@@ -181,7 +181,32 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     public static function getBlockTypes(): array
     {
-        return [];
+        return [
+            'balance_change' => [
+                'icon' => 'o-arrow-trending-up',
+                'display_name' => 'Balance Change',
+                'description' => 'Details about a balance change transaction',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'balance_info' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Balance Information',
+                'description' => 'Detailed balance information and metadata',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'hidden' => false,
+            ],
+            'transaction_status' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Transaction Status',
+                'description' => 'Status information for transaction processing',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getObjectTypes(): array

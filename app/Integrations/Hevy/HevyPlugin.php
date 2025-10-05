@@ -398,19 +398,26 @@ class HevyPlugin implements IntegrationPlugin
                 $exerciseVolume += ($weight * max(0, $reps));
 
                 [$encWeight, $weightMult] = $this->encodeNumericValue($weight);
-                $content = "**Exercise:** {$exerciseName}\n**Set:** {$setNum}\n**Reps:** {$reps}\n**Weight:** {$weight} {$unit}";
+
+                $metadata = [
+                    'exercise_name' => $exerciseName,
+                    'set_number' => $setNum,
+                    'reps' => $reps,
+                    'weight' => $weight,
+                    'unit' => $unit,
+                ];
                 if ($rpe !== null && $rpe !== '') {
-                    $content .= "\n**RPE:** {$rpe}";
+                    $metadata['rpe'] = $rpe;
                 }
                 if ($rest !== null && $rest !== '') {
-                    $content .= "\n**Rest:** {$rest} s";
+                    $metadata['rest_seconds'] = $rest;
                 }
 
                 $event->createBlock([
                     'block_type' => 'exercise',
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Set ' . $setNum,
-                    'metadata' => ['text' => $content],
+                    'metadata' => $metadata,
                     'url' => null,
                     'media_url' => null,
                     'value' => $encWeight,
@@ -425,7 +432,13 @@ class HevyPlugin implements IntegrationPlugin
                     'block_type' => 'exercise_summary',
                     'time' => $startIso,
                     'title' => $exerciseName . ' - Total Volume',
-                    'metadata' => ['text' => 'Total volume (weight x reps) for this exercise'],
+                    'metadata' => [
+                        'exercise_name' => $exerciseName,
+                        'total_volume' => $exerciseVolume,
+                        'volume_formula' => 'weight x reps',
+                        'sets_count' => count($sets),
+                        'unit' => $this->inferWeightUnit($integration, Arr::get($exercise, 'weight_unit')),
+                    ],
                     'value' => $encExVol,
                     'value_multiplier' => $exVolMult,
                     'value_unit' => $this->inferWeightUnit($integration, Arr::get($exercise, 'weight_unit')),

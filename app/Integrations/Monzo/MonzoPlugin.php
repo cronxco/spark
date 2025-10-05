@@ -414,6 +414,18 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'A calendar day',
                 'hidden' => false,
             ],
+            'monzo_pot' => [
+                'icon' => 'o-banknotes',
+                'display_name' => 'Monzo Pot',
+                'description' => 'An active Monzo savings pot',
+                'hidden' => false,
+            ],
+            'monzo_archived_pot' => [
+                'icon' => 'o-archive-box',
+                'display_name' => 'Archived Monzo Pot',
+                'description' => 'A deleted or archived Monzo savings pot',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -572,7 +584,7 @@ class MonzoPlugin extends OAuthPlugin
                     'time' => $event->time,
                     'block_type' => 'balance_change',
                     'title' => 'Balance Change',
-                    'metadata' => ['text' => $delta > 0 ? 'Up' : 'Down'],
+                    'metadata' => ['direction' => $delta > 0 ? 'Up' : 'Down'],
                     'media_url' => null,
                     'value' => abs($delta),
                     'value_multiplier' => 100,

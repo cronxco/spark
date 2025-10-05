@@ -2,6 +2,7 @@
 
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -66,13 +67,15 @@ new class extends Component {
     {
         $query = Activity::with(['subject', 'causer']);
 
-        // Apply search filter
+        // Apply search filter - optimized for better index usage
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('description', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('log_name', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('event', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('subject_type', 'ilike', '%' . $this->search . '%');
+            $searchTerm = strtolower(trim($this->search));
+            $query->where(function ($q) use ($searchTerm) {
+                // Use LOWER() functions to utilize the expression indexes
+                $q->whereRaw('LOWER(description) LIKE ?', ['%' . $searchTerm . '%'])
+                  ->orWhereRaw('LOWER(log_name) LIKE ?', ['%' . $searchTerm . '%'])
+                  ->orWhereRaw('LOWER(event) LIKE ?', ['%' . $searchTerm . '%'])
+                  ->orWhereRaw('LOWER(subject_type) LIKE ?', ['%' . $searchTerm . '%']);
             });
         }
 
@@ -96,17 +99,23 @@ new class extends Component {
 
     public function getUniqueLogNames()
     {
-        return Activity::distinct()->pluck('log_name')->filter()->sort()->values();
+        return Cache::remember('activity_log_unique_log_names', 3600, function () {
+            return Activity::distinct()->pluck('log_name')->filter()->sort()->values()->toArray();
+        });
     }
 
     public function getUniqueEvents()
     {
-        return Activity::distinct()->pluck('event')->filter()->sort()->values();
+        return Cache::remember('activity_log_unique_events', 3600, function () {
+            return Activity::distinct()->pluck('event')->filter()->sort()->values()->toArray();
+        });
     }
 
     public function getUniqueSubjectTypes()
     {
-        return Activity::distinct()->pluck('subject_type')->filter()->sort()->values();
+        return Cache::remember('activity_log_unique_subject_types', 3600, function () {
+            return Activity::distinct()->pluck('subject_type')->filter()->sort()->values()->toArray();
+        });
     }
 
     public function truncateId(string $id): string
@@ -217,11 +226,23 @@ new class extends Component {
             return [];
         }
 
-        if (is_string($properties)) {
-            $properties = json_decode($properties, true);
+        // If it's already an array, return it
+        if (is_array($properties)) {
+            return $properties;
         }
 
-        return $properties ?: [];
+        // If it's a string, try to decode it
+        if (is_string($properties)) {
+            $decoded = json_decode($properties, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        // If it's an object (like Laravel's cast attributes), convert to array
+        if (is_object($properties)) {
+            return json_decode(json_encode($properties), true) ?: [];
+        }
+
+        return [];
     }
 
     public function formatJson($data): string
@@ -330,7 +351,6 @@ new class extends Component {
                                 <th>ID</th>
                                 <th>Log Name</th>
                                 <th>Event</th>
-                                <th>Description</th>
                                 <th>Subject</th>
                                 <th>Changes</th>
                                 <th>Causer</th>
@@ -354,9 +374,6 @@ new class extends Component {
                                     </td>
                                     <td>
                                         <span class="badge badge-neutral">{{ $this->prettifyEvent($activity->event) }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm">{{ Str::limit($activity->description, 50) }}</span>
                                     </td>
                                     <td>
                                         @if ($this->getSubjectUrl($activity))
@@ -384,7 +401,7 @@ new class extends Component {
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-8">
+                                    <td colspan="7" class="text-center py-8">
                                         <div class="text-gray-500">
                                             @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
                                                 No activities found matching your criteria.
@@ -406,4 +423,145 @@ new class extends Component {
             </div>
         </div>
     </div>
+
+    <!-- Activity Details Modal -->
+    @if ($showModal && $selectedActivity)
+        <div class="modal modal-open">
+            <div class="modal-box w-11/12 max-w-5xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-lg">Activity Details</h3>
+                    <button class="btn btn-sm btn-circle" wire:click="closeModal">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Basic Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="card bg-base-200">
+                            <div class="card-body">
+                                <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide">Basic Information</h4>
+                                <div class="space-y-2 mt-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-sm font-medium">ID:</span>
+                                        <span class="text-sm font-mono">{{ $selectedActivity->id }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-sm font-medium">Log Name:</span>
+                                        <span class="badge badge-outline">{{ $selectedActivity->log_name ?? 'default' }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-sm font-medium">Event:</span>
+                                        <span class="badge badge-neutral">{{ $this->prettifyEvent($selectedActivity->event) }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-sm font-medium">Created:</span>
+                                        <span class="text-sm">{{ $selectedActivity->created_at->format('M j, Y g:i:s A') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card bg-base-200">
+                            <div class="card-body">
+                                <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide">Subject & Causer</h4>
+                                <div class="space-y-2 mt-2">
+                                    <div>
+                                        <span class="text-sm font-medium">Subject:</span>
+                                        <div class="mt-1">
+                                            @if ($this->getSubjectUrl($selectedActivity))
+                                                <a href="{{ $this->getSubjectUrl($selectedActivity) }}" class="link link-primary font-medium" target="_blank">
+                                                    {{ $this->getSubjectTitle($selectedActivity) }}
+                                                </a>
+                                            @else
+                                                <span class="text-gray-500">{{ $this->getSubjectTitle($selectedActivity) }}</span>
+                                            @endif
+                                            <div class="text-xs text-gray-500">{{ $this->prettifySubjectType($selectedActivity->subject_type) }}</div>
+                                            @if ($selectedActivity->subject_id)
+                                                <div class="text-xs text-gray-500 font-mono">ID: {{ $selectedActivity->subject_id }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="text-sm font-medium">Caused by:</span>
+                                        <div class="mt-1">
+                                            @if ($selectedActivity->causer)
+                                                <span class="text-sm">{{ $selectedActivity->causer->name ?? $selectedActivity->causer->email ?? 'Unknown User' }}</span>
+                                                @if ($selectedActivity->causer_id)
+                                                    <div class="text-xs text-gray-500 font-mono">ID: {{ $selectedActivity->causer_id }}</div>
+                                                @endif
+                                            @else
+                                                <span class="text-gray-500">System</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Changes -->
+                    @if ($selectedActivity->properties)
+                        @php
+                            $properties = $this->getFormattedProperties($selectedActivity->properties);
+                            $newData = $properties['attributes'] ?? [];
+                            $oldData = $properties['old'] ?? [];
+                            $comment = $properties['comment'] ?? null;
+                        @endphp
+
+                        @if (!empty($newData) || !empty($oldData))
+                            <div class="card bg-base-200">
+                                <div class="card-body">
+                                    <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide flex items-center gap-2">
+                                        <x-icon name="o-arrow-path" class="w-4 h-4" />
+                                        Changes
+                                    </h4>
+                                    <div class="mt-3">
+                                        <x-change-details :new="$newData" :old="$oldData" />
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if ($comment)
+                            <div class="card bg-base-200">
+                                <div class="card-body">
+                                    <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide flex items-center gap-2">
+                                        <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
+                                        Comment
+                                    </h4>
+                                    <div class="mt-2">
+                                        <p class="text-sm whitespace-pre-wrap">{{ $comment }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if (!empty($properties) && (empty($newData) && empty($oldData) && !$comment))
+                            <div class="card bg-base-200">
+                                <div class="card-body">
+                                    <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide flex items-center gap-2">
+                                        <x-icon name="o-document-text" class="w-4 h-4" />
+                                        Raw Properties
+                                    </h4>
+                                    <div class="mt-2">
+                                        <details class="bg-transparent p-0">
+                                            <summary class="cursor-pointer list-none text-sm text-base-content/80 hover:text-base-content">View raw data</summary>
+                                            <div class="mt-2">
+                                                <pre class="text-xs bg-base-300 p-3 rounded overflow-x-auto">{{ $this->formatJson($properties) }}</pre>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+                </div>
+
+                <div class="modal-action">
+                    <button class="btn" wire:click="closeModal">Close</button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

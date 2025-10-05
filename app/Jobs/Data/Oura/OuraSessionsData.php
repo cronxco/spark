@@ -70,7 +70,12 @@ class OuraSessionsData extends BaseProcessingJob
             $blocks[] = [
                 'time' => $start ?? ($day . ' 00:00:00'),
                 'title' => 'State',
-                'metadata' => ['text' => (string) $state],
+                'metadata' => [
+                    'state' => [
+                        'value' => $state,
+                        'source_field' => Arr::has($item, 'mood') ? 'mood' : 'state',
+                    ],
+                ],
                 'value' => null,
                 'value_multiplier' => 1,
                 'value_unit' => null,
