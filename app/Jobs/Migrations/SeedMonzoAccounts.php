@@ -80,13 +80,15 @@ class SeedMonzoAccounts implements ShouldQueue
     private function getValidAccessToken(bool $forceRefresh = false): ?string
     {
         $group = $this->integration->group;
-        $token = $group?->access_token ?? $this->integration->access_token;
-        $expired = $group?->expiry && $group->expiry->isPast();
+        if (! $group) {
+            return $this->integration->access_token;
+        }
+
+        $token = $group->access_token;
+        $expired = $group->expiry && $group->expiry->isPast();
 
         if ($forceRefresh || empty($token) || $expired) {
-            if ($group) {
-                $token = $this->refreshGroupToken($group);
-            }
+            $token = $this->refreshGroupToken($group);
         }
 
         return $token ?: null;

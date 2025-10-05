@@ -4,6 +4,7 @@ namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use Carbon\Carbon;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -338,7 +339,7 @@ class FetchIntegrationPage implements ShouldQueue
 
         // Probe each account with limit=1; only record and continue if any account returns data
         $group = $this->integration->group;
-        $token = $group?->access_token ?? $this->integration->access_token;
+        $token = $this->getValidMonzoToken($group);
         $hasData = false;
         if (! empty($token)) {
             $accountsResp = Http::withToken($token)
@@ -352,6 +353,14 @@ class FetchIntegrationPage implements ShouldQueue
                     ->delay(now()->addSeconds(max(5, $retryAfter)));
 
                 return;
+            }
+
+            // Handle 401 unauthorized - try to refresh token and retry once
+            if ($accountsResp->status() === 401 && $group) {
+                $token = $this->getValidMonzoToken($group, true); // Force refresh
+                if ($token) {
+                    $accountsResp = Http::withToken($token)->get('https://api.monzo.com/accounts');
+                }
             }
 
             if (! $accountsResp->successful()) {
@@ -490,5 +499,66 @@ class FetchIntegrationPage implements ShouldQueue
     private function cacheKey(string $suffix): string
     {
         return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
+    }
+
+    private function getValidMonzoToken(?IntegrationGroup $group, bool $forceRefresh = false): ?string
+    {
+        if (! $group) {
+            return $this->integration->access_token;
+        }
+
+        $token = $group->access_token;
+        $expired = $group->expiry && $group->expiry->isPast();
+
+        if ($forceRefresh || empty($token) || $expired) {
+            $token = $this->refreshMonzoToken($group);
+        }
+
+        return $token ?: null;
+    }
+
+    private function refreshMonzoToken(IntegrationGroup $group): ?string
+    {
+        $clientId = config('services.monzo.client_id');
+        $clientSecret = config('services.monzo.client_secret');
+        $refreshToken = $group->refresh_token;
+
+        if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+            Log::warning('Monzo refresh skipped in migration due to missing credentials', [
+                'group_id' => $group->id,
+            ]);
+
+            return null;
+        }
+
+        $resp = Http::asForm()->post('https://api.monzo.com/oauth2/token', [
+            'grant_type' => 'refresh_token',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+        ]);
+
+        if (! $resp->successful()) {
+            Log::error('Monzo token refresh failed in migration', [
+                'group_id' => $group->id,
+                'status' => $resp->status(),
+                'body' => $resp->body(),
+            ]);
+
+            return null;
+        }
+
+        $data = $resp->json();
+        $group->update([
+            'access_token' => $data['access_token'] ?? null,
+            'refresh_token' => $data['refresh_token'] ?? $group->refresh_token,
+            'expiry' => isset($data['expires_in']) ? now()->addSeconds((int) $data['expires_in']) : null,
+        ]);
+
+        Log::info('Monzo token refreshed successfully in migration', [
+            'group_id' => $group->id,
+        ]);
+
+        return $group->access_token;
     }
 }
