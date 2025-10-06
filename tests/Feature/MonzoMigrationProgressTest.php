@@ -63,7 +63,7 @@ class MonzoMigrationProgressTest extends TestCase
         $finalProgress = ActionProgress::getLatestProgress(
             $integration->user_id,
             'migration',
-            "integration_{$integration->id}"
+            "integration_{$integration->id}_transactions_" . substr(md5($since . $before), 0, 8)
         );
 
         $this->assertNotNull($finalProgress);
@@ -102,7 +102,7 @@ class MonzoMigrationProgressTest extends TestCase
         $progress = ActionProgress::getLatestProgress(
             $integration->user_id,
             'migration',
-            "integration_{$integration->id}"
+            "integration_{$integration->id}_pots"
         );
 
         $this->assertNotNull($progress);
@@ -140,7 +140,7 @@ class MonzoMigrationProgressTest extends TestCase
         $progress = ActionProgress::getLatestProgress(
             $integration->user_id,
             'migration',
-            "integration_{$integration->id}"
+            "integration_{$integration->id}_balances"
         );
 
         $this->assertNotNull($progress);

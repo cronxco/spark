@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\Carbon|null $completed_at
  * @property \Carbon\Carbon|null $failed_at
  * @property string|null $error_message
+ * @property array|null $updates
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
  */
@@ -49,6 +50,7 @@ class ActionProgress extends Model
         'progress',
         'total',
         'details',
+        'updates',
         'completed_at',
         'failed_at',
         'error_message',
@@ -56,6 +58,7 @@ class ActionProgress extends Model
 
     protected $casts = [
         'details' => 'array',
+        'updates' => 'array',
         'completed_at' => 'datetime',
         'failed_at' => 'datetime',
     ];
@@ -125,6 +128,28 @@ class ActionProgress extends Model
     {
         return self::where('created_at', '<', now()->subDay())
             ->delete();
+    }
+
+    /**
+     * Boot the model and set up automatic updates tracking
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updating(function ($model) {
+            $model->trackProgressUpdate();
+        });
+
+        static::creating(function ($model) {
+            // Initialize updates array with the initial state
+            $model->updates = [[
+                'timestamp' => now()->toIso8601String(),
+                'step' => $model->step,
+                'message' => $model->message,
+                'percentage' => $model->progress,
+            ]];
+        });
     }
 
     public function user(): BelongsTo
@@ -198,5 +223,40 @@ class ActionProgress extends Model
             'step' => 'failed',
             'details' => array_merge($this->details ?? [], $details),
         ]);
+    }
+
+    /**
+     * Track progress updates by storing changes to percentage, step, or message
+     */
+    protected function trackProgressUpdate(): void
+    {
+        // Only track if percentage, step, or message have changed
+        $trackedFields = ['progress', 'step', 'message'];
+        $hasTrackedFieldChanged = false;
+
+        foreach ($trackedFields as $field) {
+            if ($this->isDirty($field)) {
+                $hasTrackedFieldChanged = true;
+                break;
+            }
+        }
+
+        if (! $hasTrackedFieldChanged) {
+            return;
+        }
+
+        // Get current updates array or initialize if null
+        $updates = $this->updates ?? [];
+
+        // Add new update record
+        $updates[] = [
+            'timestamp' => now()->toIso8601String(),
+            'step' => $this->step,
+            'message' => $this->message,
+            'percentage' => $this->progress,
+        ];
+
+        // Update the updates array
+        $this->updates = $updates;
     }
 }

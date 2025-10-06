@@ -38,6 +38,7 @@ CREATE TABLE action_progress (
     progress INTEGER DEFAULT 0,        -- Current progress (0-100)
     total INTEGER DEFAULT 100,          -- Total progress (usually 100)
     details JSON NULL,                  -- Additional metadata
+    updates JSON NULL,                  -- Automatic tracking of progress changes
     completed_at TIMESTAMP NULL,        -- When action completed
     failed_at TIMESTAMP NULL,           -- When action failed
     error_message TEXT NULL,            -- Error details if failed
@@ -83,6 +84,9 @@ $progress->updateProgress(
     progress: 50,
     details: ['events_deleted' => 75, 'events_total' => 150]
 );
+
+// The 'updates' column automatically tracks all changes to step, message, or progress
+// Each update is stored with a timestamp for complete history
 ```
 
 #### 3. Completing Actions
@@ -184,6 +188,7 @@ class DeleteIntegrationGroup extends Component
         $this->progressMessage = $progress->message;
         $this->progressPercentage = $progress->progress;
         $this->progressDetails = $progress->details ?? [];
+        $this->progressHistory = $progress->updates ?? []; // Complete update history
 
         if ($progress->isCompleted()) {
             $this->handleDeletionComplete();
@@ -216,6 +221,23 @@ class DeleteIntegrationGroup extends Component
                 <div class="card-body">
                     <h4 class="font-semibold mb-3">Progress Details:</h4>
                     <!-- Display details based on action type -->
+                </div>
+            </div>
+        @endif
+
+        <!-- Progress History -->
+        @if($progressHistory && count($progressHistory) > 1)
+            <div class="card bg-base-200">
+                <div class="card-body">
+                    <h4 class="font-semibold mb-3">Progress History:</h4>
+                    <div class="space-y-2">
+                        @foreach($progressHistory as $update)
+                            <div class="flex justify-between text-sm">
+                                <span>{{ $update['step'] }}: {{ $update['message'] }}</span>
+                                <span class="text-base-content/70">{{ $update['percentage'] }}%</span>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             </div>
         @endif
@@ -433,6 +455,102 @@ $progress->updateProgress(
     75,
     ['tests_passed' => 15, 'tests_total' => 20]
 );
+```
+
+## Updates Tracking
+
+The Action Progress system automatically tracks all changes to the `progress`, `step`, and `message` fields in the `updates` JSON column. This provides a complete history of progress changes without any additional code.
+
+### Automatic Tracking
+
+```php
+// Initial creation automatically creates the first update entry
+$progress = ActionProgress::createProgress(
+    $userId,
+    'sync',
+    $integrationId,
+    'starting',
+    'Starting synchronization...',
+    0
+);
+
+// Each update automatically adds to the updates array
+$progress->updateProgress('fetching', 'Fetching data...', 25);
+$progress->updateProgress('processing', 'Processing data...', 75);
+$progress->updateProgress('completed', 'Sync completed!', 100);
+
+// Access complete history
+$updateHistory = $progress->updates;
+/*
+[
+    ['timestamp' => '2024-01-01T10:00:00Z', 'step' => 'starting', 'message' => 'Starting synchronization...', 'percentage' => 0],
+    ['timestamp' => '2024-01-01T10:01:30Z', 'step' => 'fetching', 'message' => 'Fetching data...', 'percentage' => 25],
+    ['timestamp' => '2024-01-01T10:03:15Z', 'step' => 'processing', 'message' => 'Processing data...', 'percentage' => 75],
+    ['timestamp' => '2024-01-01T10:05:00Z', 'step' => 'completed', 'message' => 'Sync completed!', 'percentage' => 100]
+]
+*/
+```
+
+### Tracking Behavior
+
+- **Automatic**: No additional code needed - tracking happens automatically
+- **Selective**: Only tracks changes to `progress`, `step`, or `message` fields
+- **Timestamped**: Each update includes an ISO 8601 timestamp
+- **Non-intrusive**: Updates to other fields (like `details` or `updated_at`) don't create new entries
+- **Initial State**: The first update entry is created during record creation
+
+### Usage in UI
+
+```php
+class ProgressComponent extends Component
+{
+    public array $progressHistory = [];
+
+    public function checkProgress(): void
+    {
+        $progress = ActionProgress::getLatestProgress(...);
+
+        if ($progress) {
+            $this->progressHistory = $progress->updates ?? [];
+            // Display progress history, show step transitions, etc.
+        }
+    }
+}
+```
+
+```blade
+<!-- Show progress timeline -->
+@if(count($progressHistory) > 1)
+    <div class="timeline">
+        @foreach($progressHistory as $update)
+            <div class="timeline-item">
+                <span class="timeline-time">{{ $update['timestamp'] }}</span>
+                <span class="timeline-step">{{ $update['step'] }}</span>
+                <span class="timeline-message">{{ $update['message'] }}</span>
+                <span class="timeline-percentage">{{ $update['percentage'] }}%</span>
+            </div>
+        @endforeach
+    </div>
+@endif
+```
+
+### Testing Updates
+
+```php
+// Test automatic tracking
+$progress = ActionProgress::createProgress($userId, 'test', 'test_id', 'start', 'Starting...', 0);
+$this->assertCount(1, $progress->updates);
+
+$progress->updateProgress('middle', 'Processing...', 50);
+$progress->refresh();
+$this->assertCount(2, $progress->updates);
+$this->assertEquals('middle', $progress->updates[1]['step']);
+$this->assertEquals(50, $progress->updates[1]['percentage']);
+
+// Test that non-tracked field updates don't create entries
+$progress->update(['details' => ['new' => 'data']]);
+$progress->refresh();
+$this->assertCount(2, $progress->updates); // Still only 2 entries
 ```
 
 ## Best Practices

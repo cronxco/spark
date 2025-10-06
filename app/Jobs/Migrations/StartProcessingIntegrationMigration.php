@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Migrations;
 
+use App\Models\ActionProgress;
 use App\Models\Integration;
 use App\Traits\MigrationPauser;
 use Illuminate\Bus\Batchable;
@@ -12,7 +13,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class StartProcessingIntegrationMigration implements ShouldQueue
 {
@@ -29,6 +29,12 @@ class StartProcessingIntegrationMigration implements ShouldQueue
 
     public function handle(): void
     {
+        // Update progress to show processing phase has started
+        $this->updateProgress('processing', 'Processing migration data...', 70, [
+            'service' => 'monzo',
+            'phase' => 'processing',
+        ]);
+
         // Build one job per fetched window for accurate batch progress
         $jobs = [];
         $baseContext = [
@@ -61,19 +67,37 @@ class StartProcessingIntegrationMigration implements ShouldQueue
                 ->onConnection('redis')->onQueue('migration');
         }
 
+        // Add completion job to the end of the batch
+        $jobs[] = new CompleteMigration($this->integration, 'monzo');
+
+        $this->updateProgress('processing_batch', 'Starting processing batch...', 75, [
+            'service' => 'monzo',
+            'jobs_count' => count($jobs),
+            'transaction_windows' => count($windows),
+        ]);
+
         $batch = Bus::batch($jobs)
             ->name('monzo_process_' . $this->integration->id)
             ->onConnection('redis')->onQueue('migration')
-            ->finally(function () {
-                // Unpause integration when processing batch completes
-                static::unpauseAfterMigration($this->integration);
-                Log::info('Monzo/GoCardless processing migration completed - unpausing integration', [
-                    'integration_id' => $this->integration->id,
-                ]);
-            })
             ->dispatch();
 
         // Hint the UI by swapping batch id to the processing batch
         $this->integration->update(['migration_batch_id' => $batch->id]);
+    }
+
+    /**
+     * Update the migration progress record
+     */
+    protected function updateProgress(string $step, string $message, int $progress, array $details = []): void
+    {
+        $progressRecord = ActionProgress::getLatestProgress(
+            $this->integration->user_id,
+            'migration',
+            "integration_{$this->integration->id}"
+        );
+
+        if ($progressRecord) {
+            $progressRecord->updateProgress($step, $message, $progress, $details);
+        }
     }
 }
