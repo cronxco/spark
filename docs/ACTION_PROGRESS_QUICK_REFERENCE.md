@@ -24,6 +24,9 @@ $progress->updateProgress(
     progress: 50,
     details: ['items_processed' => 25, 'items_total' => 50]
 );
+
+// Updates are automatically tracked in the 'updates' JSON column
+// Each change to step, message, or progress is recorded with a timestamp
 ```
 
 ### 3. Complete Action
@@ -61,6 +64,7 @@ public function checkProgress(): void
         $this->progressMessage = $progress->message;
         $this->progressPercentage = $progress->progress;
         $this->progressDetails = $progress->details ?? [];
+        $this->progressUpdates = $progress->updates ?? []; // Access update history
 
         if ($progress->isCompleted()) {
             $this->handleComplete();
@@ -147,6 +151,10 @@ $progress->isCompleted();  // bool
 $progress->isFailed();      // bool
 $progress->isInProgress();  // bool
 
+// Access update history (automatically tracked)
+$updates = $progress->updates; // Array of all progress updates
+// Each update contains: timestamp, step, message, percentage
+
 // Clean up old records (run daily)
 ActionProgress::cleanupOldRecords();
 ```
@@ -158,6 +166,11 @@ ActionProgress::cleanupOldRecords();
 $progress = ActionProgressFactory::new()
     ->deletion($userId, $groupId)
     ->inProgress()
+    ->create();
+
+// Create progress with multiple update entries for testing
+$progress = ActionProgressFactory::new()
+    ->withMultipleUpdates(5) // Creates 5 update entries
     ->create();
 
 // Test completion

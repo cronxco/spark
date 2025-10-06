@@ -53,11 +53,14 @@ class ProcessIntegrationPage implements ShouldQueue
             return;
         }
 
+        // Create unique action ID for this specific processing job
+        $actionId = $this->generateActionId();
+
         // Get or create progress record for this processing job
         $this->progressRecord = ActionProgress::getLatestProgress(
             $this->integration->user_id,
             'migration',
-            "integration_{$this->integration->id}"
+            $actionId
         );
 
         // Create progress record if it doesn't exist
@@ -65,7 +68,7 @@ class ProcessIntegrationPage implements ShouldQueue
             $this->progressRecord = ActionProgress::createProgress(
                 $this->integration->user_id,
                 'migration',
-                "integration_{$this->integration->id}",
+                $actionId,
                 'processing',
                 'Processing migration data...',
                 50
@@ -328,6 +331,8 @@ class ProcessIntegrationPage implements ShouldQueue
                 $since = $window['since'] ?? null;
                 $before = $window['before'] ?? null;
                 $instType = $this->integration->instance_type ?: 'transactions';
+                $windows = []; // Initialize windows variable to prevent undefined variable error
+
                 if ($instType === 'transactions') {
                     // If explicit window provided, process it now (test/back-compat)
                     if ($since && $before) {
@@ -606,5 +611,40 @@ class ProcessIntegrationPage implements ShouldQueue
     private function gcCacheKey(string $suffix): string
     {
         return 'gocardless:migration:' . $this->integration->id . ':' . $suffix;
+    }
+
+    /**
+     * Generate a unique action ID for this specific processing job
+     */
+    private function generateActionId(): string
+    {
+        $service = $this->context['service'] ?? $this->integration->service;
+        $instanceType = $this->context['instance_type'] ?? $this->integration->instance_type;
+        $baseId = "integration_{$this->integration->id}";
+
+        // For single-job types (pots, balances), use a simple suffix
+        if ($instanceType === 'pots') {
+            return "{$baseId}_pots";
+        }
+
+        if ($instanceType === 'balances') {
+            return "{$baseId}_balances";
+        }
+
+        // For transactions, create unique ID based on the window
+        if ($instanceType === 'transactions' && ! empty($this->items)) {
+            $item = $this->items[0];
+            if (isset($item['kind']) && $item['kind'] === 'transactions_window') {
+                $since = $item['since'] ?? 'unknown';
+                $before = $item['before'] ?? 'unknown';
+                // Create a hash of the time window to ensure uniqueness
+                $windowHash = substr(md5($since . $before), 0, 8);
+
+                return "{$baseId}_transactions_{$windowHash}";
+            }
+        }
+
+        // Fallback for other job types
+        return "{$baseId}_{$instanceType}_" . substr(uniqid(), -8);
     }
 }

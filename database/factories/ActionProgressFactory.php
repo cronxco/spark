@@ -25,18 +25,28 @@ class ActionProgressFactory extends Factory
      */
     public function definition(): array
     {
+        $progress = $this->faker->numberBetween(0, 100);
+        $step = $this->faker->randomElement(['starting', 'processing', 'completed', 'failed']);
+        $message = $this->faker->sentence();
+
         return [
             'user_id' => User::factory(),
             'action_type' => $this->faker->randomElement(['deletion', 'migration', 'sync', 'backup']),
             'action_id' => $this->faker->uuid(),
-            'step' => $this->faker->randomElement(['starting', 'processing', 'completed', 'failed']),
-            'message' => $this->faker->sentence(),
-            'progress' => $this->faker->numberBetween(0, 100),
+            'step' => $step,
+            'message' => $message,
+            'progress' => $progress,
             'total' => 100,
             'details' => [
                 'items_processed' => $this->faker->numberBetween(1, 100),
                 'items_total' => $this->faker->numberBetween(100, 1000),
             ],
+            'updates' => [[
+                'timestamp' => now()->toIso8601String(),
+                'step' => $step,
+                'message' => $message,
+                'percentage' => $progress,
+            ]],
         ];
     }
 
@@ -100,5 +110,39 @@ class ActionProgressFactory extends Factory
             'action_type' => 'migration',
             'action_id' => $migrationName,
         ]);
+    }
+
+    /**
+     * Create a progress record with multiple update entries.
+     */
+    public function withMultipleUpdates(int $updateCount = 3): static
+    {
+        return $this->state(function (array $attributes) use ($updateCount) {
+            $updates = [];
+            $baseTime = now()->subMinutes($updateCount * 2);
+
+            for ($i = 0; $i < $updateCount; $i++) {
+                $progress = ($i + 1) * (100 / $updateCount);
+                $step = match ($i) {
+                    0 => 'starting',
+                    $updateCount - 1 => 'completed',
+                    default => 'processing'
+                };
+
+                $updates[] = [
+                    'timestamp' => $baseTime->addMinutes($i * 2)->toIso8601String(),
+                    'step' => $step,
+                    'message' => "Progress update {({$i} + 1)}: {$step}",
+                    'percentage' => (int) $progress,
+                ];
+            }
+
+            return [
+                'updates' => $updates,
+                'progress' => (int) (100 / $updateCount * $updateCount), // Final progress
+                'step' => $updates[count($updates) - 1]['step'],
+                'message' => $updates[count($updates) - 1]['message'],
+            ];
+        });
     }
 }
