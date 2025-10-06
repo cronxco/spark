@@ -60,6 +60,18 @@ class ProcessIntegrationPage implements ShouldQueue
             "integration_{$this->integration->id}"
         );
 
+        // Create progress record if it doesn't exist
+        if (! $this->progressRecord) {
+            $this->progressRecord = ActionProgress::createProgress(
+                $this->integration->user_id,
+                'migration',
+                "integration_{$this->integration->id}",
+                'processing',
+                'Processing migration data...',
+                50
+            );
+        }
+
         try {
             $service = $this->context['service'] ?? $this->integration->service;
             $instanceType = $this->context['instance_type'] ?? $this->integration->instance_type;
@@ -78,7 +90,7 @@ class ProcessIntegrationPage implements ShouldQueue
                     $this->items
                 );
 
-                $this->updateProgress('completed', 'Oura data processing completed', 100, [
+                $this->markCompleted([
                     'service' => 'oura',
                     'items_processed' => count($this->items),
                 ]);
@@ -93,7 +105,7 @@ class ProcessIntegrationPage implements ShouldQueue
                     $plugin->processRecentlyPlayedMigrationItem($this->integration, $item);
                 }
 
-                $this->updateProgress('completed', 'Spotify data processing completed', 100, [
+                $this->markCompleted([
                     'service' => 'spotify',
                     'items_processed' => count($this->items),
                 ]);
@@ -108,7 +120,7 @@ class ProcessIntegrationPage implements ShouldQueue
                     $plugin->processEventPayload($this->integration, $event);
                 }
 
-                $this->updateProgress('completed', 'GitHub data processing completed', 100, [
+                $this->markCompleted([
                     'service' => 'github',
                     'items_processed' => count($this->items),
                 ]);
@@ -160,7 +172,7 @@ class ProcessIntegrationPage implements ShouldQueue
                             }
                         }
 
-                        $this->updateProgress('completed', 'Monzo pots processing completed', 100, [
+                        $this->markCompleted([
                             'service' => 'monzo',
                             'instance_type' => 'pots',
                             'accounts_processed' => count($accounts),
@@ -181,7 +193,7 @@ class ProcessIntegrationPage implements ShouldQueue
                         }
                     }
 
-                    $this->updateProgress('completed', 'Monzo pots processing completed', 100, [
+                    $this->markCompleted([
                         'service' => 'monzo',
                         'instance_type' => 'pots',
                         'accounts_processed' => count($accounts),
@@ -241,6 +253,13 @@ class ProcessIntegrationPage implements ShouldQueue
                             }
                         }
 
+                        $this->markCompleted([
+                            'service' => 'monzo',
+                            'instance_type' => 'balances',
+                            'accounts_processed' => count($accounts),
+                            'snapshot_date' => $date,
+                        ]);
+
                         return;
                     }
 
@@ -295,6 +314,13 @@ class ProcessIntegrationPage implements ShouldQueue
                         }
                     }
 
+                    $this->markCompleted([
+                        'service' => 'monzo',
+                        'instance_type' => 'balances',
+                        'accounts_processed' => count($accounts ?? []),
+                        'snapshot_date' => $lastDate,
+                    ]);
+
                     return;
                 }
                 // transactions window - only act if this integration is a transactions instance
@@ -336,6 +362,13 @@ class ProcessIntegrationPage implements ShouldQueue
                                 $currentBefore = $nextBefore;
                             } while (count($txs) === 100);
                         }
+
+                        $this->markCompleted([
+                            'service' => 'monzo',
+                            'instance_type' => 'transactions',
+                            'accounts_processed' => count($accounts),
+                            'window' => ['since' => $since, 'before' => $before],
+                        ]);
 
                         return;
                     }
@@ -381,6 +414,12 @@ class ProcessIntegrationPage implements ShouldQueue
                     }
                 }
 
+                $this->markCompleted([
+                    'service' => 'monzo',
+                    'instance_type' => 'transactions',
+                    'windows_processed' => count($windows),
+                ]);
+
                 return;
             }
 
@@ -407,6 +446,12 @@ class ProcessIntegrationPage implements ShouldQueue
                             // ignore in processing path
                         }
                     }
+
+                    $this->markCompleted([
+                        'service' => 'gocardless',
+                        'instance_type' => 'balances',
+                        'snapshot_date' => $lastDate,
+                    ]);
 
                     return;
                 }
@@ -449,6 +494,12 @@ class ProcessIntegrationPage implements ShouldQueue
                     // Non-fatal: stop processing on error
                 }
 
+                $this->markCompleted([
+                    'service' => 'gocardless',
+                    'instance_type' => 'transactions',
+                    'windows_processed' => count($windows ?? []),
+                ]);
+
                 return;
             }
 
@@ -462,7 +513,7 @@ class ProcessIntegrationPage implements ShouldQueue
                 // This processing job is mainly for compatibility with the migration system
                 // The actual processing happens in OutlineData job
 
-                $this->updateProgress('completed', 'Outline migration processing completed', 100, [
+                $this->markCompleted([
                     'service' => 'outline',
                     'instance_type' => $this->integration->instance_type,
                     'note' => 'Outline migration runs independently via OutlineMigrationPull',
@@ -513,6 +564,16 @@ class ProcessIntegrationPage implements ShouldQueue
     {
         if ($this->progressRecord) {
             $this->progressRecord->updateProgress($step, $message, $progress, $details);
+        }
+    }
+
+    /**
+     * Mark the migration as completed
+     */
+    protected function markCompleted(array $details = []): void
+    {
+        if ($this->progressRecord) {
+            $this->progressRecord->markCompleted($details);
         }
     }
 
