@@ -53,7 +53,7 @@ class MonzoAccountData extends BaseProcessingJob
     {
         $date = now()->toDateString();
 
-        EventObject::updateOrCreate(
+        EventObject::firstOrCreate(
             [
                 'user_id' => $this->integration->user_id,
                 'concept' => 'day',
@@ -63,7 +63,7 @@ class MonzoAccountData extends BaseProcessingJob
             [
                 'time' => $date . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $date],
+                'metadata' => [],
             ]
         );
     }

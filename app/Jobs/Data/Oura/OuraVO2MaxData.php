@@ -5,7 +5,6 @@ namespace App\Jobs\Data\Oura;
 use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -67,16 +66,12 @@ class OuraVO2MaxData extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'metric',
-            'type' => 'vo2_max',
-            'title' => 'VO2 Max',
-        ], [
-            'time' => $timestamp ? Str::substr($timestamp, 0, 19) : ($day . ' 00:00:00'),
-            'content' => 'Maximum oxygen consumption measurement',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'vo2_max',
+            'VO2 Max',
+            'Maximum oxygen consumption measurement'
+        );
 
         [$encodedVO2, $vo2Multiplier] = $plugin->encodeNumericValue((float) $vo2Max);
 

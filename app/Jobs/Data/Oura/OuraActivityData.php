@@ -6,7 +6,6 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Facades\Log;
 
 class OuraActivityData extends BaseProcessingJob
@@ -75,16 +74,12 @@ class OuraActivityData extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'activity',
-            'type' => 'daily_activity',
-            'title' => 'Daily Activity',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => 'Daily activity summary with comprehensive metrics',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'daily_activity',
+            'Daily Activity',
+            'Daily activity summary with comprehensive metrics'
+        );
 
         $score = $item['score'] ?? null;
         [$encodedScore, $scoreMultiplier] = $plugin->encodeNumericValue($score);

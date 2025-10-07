@@ -1305,8 +1305,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Create or update actor (bank account)
         $accountObject = $this->upsertAccountObject($integration, $balance);
 
-        // Create day target
-        $dayObject = EventObject::updateOrCreate(
+        // Create day target once
+        $dayObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'day',
@@ -1316,7 +1316,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             [
                 'time' => $balanceReferenceDate . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $balanceReferenceDate],
+                'metadata' => [],
             ]
         );
 

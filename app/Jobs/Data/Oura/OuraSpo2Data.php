@@ -6,7 +6,6 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -65,16 +64,12 @@ class OuraSpo2Data extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'metric',
-            'type' => 'daily_spo2',
-            'title' => 'Blood Oxygen Saturation (SpO2)',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => 'Daily blood oxygen saturation measurement',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'daily_spo2',
+            'Blood Oxygen Saturation (SpO2)',
+            'Daily blood oxygen saturation measurement'
+        );
 
         // Extract the correct SpO2 average from nested structure
         $spo2Average = Arr::get($item, 'spo2_percentage.average');

@@ -185,7 +185,21 @@ class FinancialPlugin extends ManualPlugin
     {
         $title = $accountData['name'] ?? 'Manual Account';
 
-        return EventObject::updateOrCreate(
+        $metadata = [
+            'name' => $accountData['name'],
+            'account_type' => $accountData['account_type'],
+            'provider' => $accountData['provider'],
+            'account_number' => $accountData['account_number'] ?? null,
+            'sort_code' => $accountData['sort_code'] ?? null,
+            'currency' => $accountData['currency'] ?? 'GBP',
+            'interest_rate' => $accountData['interest_rate'] ?? null,
+            'start_date' => $accountData['start_date'] ?? null,
+            'integration_id' => $integration->id,
+            'raw' => $accountData,
+        ];
+
+        // Use firstOrCreate to avoid updating 'time' on every call
+        $accountObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'account',
@@ -195,20 +209,13 @@ class FinancialPlugin extends ManualPlugin
             [
                 'time' => now(),
                 'content' => null,
-                'metadata' => [
-                    'name' => $accountData['name'],
-                    'account_type' => $accountData['account_type'],
-                    'provider' => $accountData['provider'],
-                    'account_number' => $accountData['account_number'] ?? null,
-                    'sort_code' => $accountData['sort_code'] ?? null,
-                    'currency' => $accountData['currency'] ?? 'GBP',
-                    'interest_rate' => $accountData['interest_rate'] ?? null,
-                    'start_date' => $accountData['start_date'] ?? null,
-                    'integration_id' => $integration->id,
-                    'raw' => $accountData,
-                ],
             ]
         );
+
+        // Update metadata (account details like interest rates can change)
+        $accountObject->update(['metadata' => $metadata]);
+
+        return $accountObject;
     }
 
     /**
@@ -219,8 +226,8 @@ class FinancialPlugin extends ManualPlugin
         $date = $balanceData['date'] ?? now()->toDateString();
         $balance = (float) ($balanceData['balance'] ?? 0);
 
-        // Create or update the target "day" object
-        $dayObject = EventObject::updateOrCreate(
+        // Create the target "day" object once
+        $dayObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'day',
@@ -230,7 +237,7 @@ class FinancialPlugin extends ManualPlugin
             [
                 'time' => $date . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $date],
+                'metadata' => [],
             ]
         );
 

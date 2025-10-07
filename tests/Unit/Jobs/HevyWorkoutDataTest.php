@@ -54,7 +54,7 @@ class HevyWorkoutDataTest extends TestCase
         $rawData = [
             'data' => [
                 [
-                    'id' => 'workout_123',
+                    'id' => 'workout123',
                     'title' => 'Morning Workout',
                     'start_time' => '2024-01-15T08:00:00Z',
                     'total_volume' => 1500.5,
@@ -101,11 +101,11 @@ class HevyWorkoutDataTest extends TestCase
             'type' => 'hevy_user',
         ]);
 
-        // Assert workout object was created
+        // Assert workout object was created (title includes workout ID for uniqueness)
         $this->assertDatabaseHas('objects', [
             'user_id' => $this->integration->user_id,
             'type' => 'hevy_workout',
-            'title' => 'Morning Workout',
+            'title' => 'Morning Workout (workout1)',
         ]);
     }
 
@@ -131,7 +131,7 @@ class HevyWorkoutDataTest extends TestCase
 
         // Create a workout event first
         Event::create([
-            'source_id' => "hevy_workout_{$this->integration->id}_workout_123",
+            'source_id' => "hevy_workout_{$this->integration->id}_workout123",
             'time' => '2024-01-15T08:00:00Z',
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
@@ -147,7 +147,7 @@ class HevyWorkoutDataTest extends TestCase
         $rawData = [
             'data' => [
                 [
-                    'id' => 'workout_123',
+                    'id' => 'workout123',
                     'title' => 'Morning Workout',
                     'start_time' => '2024-01-15T08:00:00Z',
                     'total_volume' => 1500.5,
@@ -159,7 +159,7 @@ class HevyWorkoutDataTest extends TestCase
         $job->handle();
 
         // Assert only one event exists (no duplicate)
-        $this->assertEquals(1, Event::where('source_id', "hevy_workout_{$this->integration->id}_workout_123")->count());
+        $this->assertEquals(1, Event::where('source_id', "hevy_workout_{$this->integration->id}_workout123")->count());
     }
 
     /**
@@ -170,7 +170,7 @@ class HevyWorkoutDataTest extends TestCase
         $rawData = [
             'data' => [
                 [
-                    'id' => 'workout_123',
+                    'id' => 'workout123',
                     'title' => 'Bench Day',
                     'start_time' => '2024-01-15T08:00:00Z',
                     'exercises' => [

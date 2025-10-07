@@ -184,7 +184,7 @@ class MonzoPlugin extends OAuthPlugin
                 'value_unit' => 'GBP',
                 'hidden' => false,
             ],
-            'pot_withdrawal_from' => [
+            'pot_withdrawal_to' => [
                 'icon' => 'o-arrow-up',
                 'display_name' => 'Pot Withdrawal',
                 'description' => 'Money withdrawn from a Monzo pot',
@@ -597,41 +597,78 @@ class MonzoPlugin extends OAuthPlugin
     // Migration helpers used by ProcessIntegrationPage
     public function processTransactionItem(Integration $integration, array $tx, string $accountId): void
     {
-        $actor = $this->upsertAccountObject($integration, ['id' => $accountId, 'type' => 'uk_retail']);
+        $accountObject = $this->upsertAccountObject($integration, ['id' => $accountId, 'type' => 'uk_retail']);
         $master = $this->resolveMasterIntegration($integration);
+        $scheme = $tx['scheme'] ?? null;
+        $amount = (int) ($tx['amount'] ?? 0);
 
-        // If counterparty matches a known pot id, link to the pot account object
-        $counterpartyId = $tx['counterparty']['account_id'] ?? $tx['counterparty']['id'] ?? $tx['counterparty'] ?? null;
-        $target = null;
-        if ($counterpartyId) {
-            $target = EventObject::where('user_id', $integration->user_id)
+        // For pot transactions, the pot ID is in metadata->pot_id (counterparty is empty)
+        // For other transactions, pot ID might be in counterparty fields
+        $potId = null;
+        if ($scheme === 'uk_retail_pot') {
+            $potId = $tx['metadata']['pot_id'] ?? null;
+        } else {
+            $potId = $tx['counterparty']['account_id'] ?? $tx['counterparty']['id'] ?? $tx['counterparty'] ?? null;
+        }
+
+        $potObject = null;
+        if ($potId) {
+            $potObject = EventObject::where('user_id', $integration->user_id)
                 ->where('concept', 'account')
-                ->where('type', 'monzo_pot')
-                ->whereJsonContains('metadata->pot_id', $counterpartyId)
+                ->whereIn('type', ['monzo_pot', 'monzo_archived_pot'])
+                ->whereJsonContains('metadata->pot_id', $potId)
                 ->first();
         }
 
-        if (! $target) {
-            // Fallback: create/find generic counterparty
-            $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
-            $target = EventObject::updateOrCreate(
-                [
-                    'user_id' => $integration->user_id,
-                    'concept' => 'counterparty',
-                    'type' => 'monzo_counterparty',
-                    'title' => $targetTitle,
-                ],
-                [
-                    'integration_id' => $master->id,
-                    'time' => $tx['created'] ?? now(),
-                    'content' => $tx['description'] ?? null,
-                    'metadata' => [
-                        'merchant_id' => $tx['merchant']['id'] ?? null,
-                        'category' => $tx['category'] ?? null,
-                        'currency' => $tx['currency'] ?? 'GBP',
+        // Determine actor and target based on transaction type
+        $actor = null;
+        $target = null;
+
+        if ($scheme === 'uk_retail_pot' && $potObject) {
+            // Pot transfer: set actor/target based on direction
+            if ($amount < 0) {
+                // pot_transfer_to: Money leaving account going to pot (actor:account, target:pot)
+                $actor = $accountObject;
+                $target = $potObject;
+            } else {
+                // pot_withdrawal_to: Money leaving pot going to account (actor:pot, target:account)
+                $actor = $potObject;
+                $target = $accountObject;
+            }
+        } else {
+            // Non-pot transaction: account is always actor
+            $actor = $accountObject;
+
+            if ($potObject) {
+                // Counterparty is a pot (shouldn't happen for non-uk_retail_pot, but handle anyway)
+                $target = $potObject;
+            } else {
+                // Fallback: create/find generic counterparty
+                $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
+                $metadata = [
+                    'merchant_id' => $tx['merchant']['id'] ?? null,
+                    'category' => $tx['category'] ?? null,
+                    'currency' => $tx['currency'] ?? 'GBP',
+                ];
+
+                // Use firstOrCreate to avoid updating 'time' on every transaction
+                $target = EventObject::firstOrCreate(
+                    [
+                        'user_id' => $integration->user_id,
+                        'concept' => 'counterparty',
+                        'type' => 'monzo_counterparty',
+                        'title' => $targetTitle,
                     ],
-                ]
-            );
+                    [
+                        'integration_id' => $master->id,
+                        'time' => $tx['created'] ?? now(),
+                        'content' => $tx['description'] ?? null,
+                    ]
+                );
+
+                // Update metadata (category/currency can change)
+                $target->update(['metadata' => $metadata]);
+            }
         }
 
         $action = $this->setAction($tx);
@@ -721,7 +758,17 @@ class MonzoPlugin extends OAuthPlugin
 
         $master = $this->resolveMasterIntegration($integration);
 
-        return EventObject::updateOrCreate(
+        $metadata = [
+            'name' => $title,
+            'provider' => 'Monzo',
+            'account_type' => $accountType,
+            'account_id' => $account['id'] ?? null,
+            'currency' => $account['currency'] ?? 'GBP',
+            'raw' => $account,
+        ];
+
+        // Use firstOrCreate to avoid updating 'time' on every call
+        $accountObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'account',
@@ -732,16 +779,13 @@ class MonzoPlugin extends OAuthPlugin
                 'integration_id' => $master->id,
                 'time' => now(),
                 'content' => null,
-                'metadata' => [
-                    'name' => $title,
-                    'provider' => 'Monzo',
-                    'account_type' => $accountType,
-                    'account_id' => $account['id'] ?? null,
-                    'currency' => $account['currency'] ?? 'GBP',
-                    'raw' => $account,
-                ],
             ]
         );
+
+        // Update metadata (account details can change)
+        $accountObject->update(['metadata' => $metadata]);
+
+        return $accountObject;
     }
 
     public function convertData(array $externalData, Integration $integration): array
@@ -1313,8 +1357,8 @@ class MonzoPlugin extends OAuthPlugin
         $pots = $resp->json('pots') ?? [];
         $date = now()->toDateString();
 
-        // Create or update the target "day" object for pot balance events
-        $dayObject = EventObject::updateOrCreate(
+        // Create the target "day" object once for pot balance events
+        $dayObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'day',
@@ -1325,7 +1369,7 @@ class MonzoPlugin extends OAuthPlugin
                 'integration_id' => $integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $date],
+                'metadata' => [],
             ]
         );
 
@@ -1387,8 +1431,8 @@ class MonzoPlugin extends OAuthPlugin
         $spendToday = (int) ($json['spend_today'] ?? 0); // cents
         $date = now()->toDateString();
 
-        // Create or update the target "day" object (target_id is NOT NULL in events)
-        $dayObject = EventObject::updateOrCreate(
+        // Create the target "day" object once (target_id is NOT NULL in events)
+        $dayObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'day',
@@ -1399,7 +1443,7 @@ class MonzoPlugin extends OAuthPlugin
                 'integration_id' => $integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $date],
+                'metadata' => [],
             ]
         );
 
@@ -1487,7 +1531,7 @@ class MonzoPlugin extends OAuthPlugin
             return $amount < 0 ? 'card_payment_to' : 'card_refund_from';
         }
         if ($scheme === 'uk_retail_pot') {
-            return $amount < 0 ? 'pot_transfer_to' : 'pot_withdrawal_from';
+            return $amount < 0 ? 'pot_transfer_to' : 'pot_withdrawal_to';
         }
         if ($scheme === 'account_interest') {
             return $amount < 0 ? 'interest_repaid' : 'interest_earned';

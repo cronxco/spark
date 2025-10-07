@@ -5,7 +5,6 @@ namespace App\Jobs\Data\Oura;
 use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -63,16 +62,12 @@ class OuraCardiovascularAgeData extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'metric',
-            'type' => 'cardiovascular_age',
-            'title' => 'Cardiovascular Age',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => 'Estimated cardiovascular age measurement',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'cardiovascular_age',
+            'Cardiovascular Age',
+            'Estimated cardiovascular age measurement'
+        );
 
         [$encodedAge, $ageMultiplier] = $plugin->encodeNumericValue((float) $vascularAge);
 

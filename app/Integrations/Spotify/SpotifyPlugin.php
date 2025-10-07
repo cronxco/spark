@@ -901,7 +901,19 @@ class SpotifyPlugin extends OAuthPlugin
 
     protected function createOrUpdateUser(Integration $integration): EventObject
     {
-        return EventObject::updateOrCreate(
+        $metadata = [
+            'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
+            'email' => $integration->configuration['email'] ?? null,
+            'country' => $integration->configuration['country'] ?? null,
+            'product' => $integration->configuration['product'] ?? null,
+        ];
+
+        $url = $integration->group?->account_id
+            ? "https://open.spotify.com/user/{$integration->group->account_id}"
+            : ($integration->account_id ? "https://open.spotify.com/user/{$integration->account_id}" : null);
+
+        // Use firstOrCreate to avoid updating 'time' on every call
+        $user = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'user',
@@ -911,18 +923,17 @@ class SpotifyPlugin extends OAuthPlugin
             [
                 'time' => now(),
                 'content' => 'Spotify user account',
-                'metadata' => [
-                    'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
-                    'email' => $integration->configuration['email'] ?? null,
-                    'country' => $integration->configuration['country'] ?? null,
-                    'product' => $integration->configuration['product'] ?? null,
-                ],
-                'url' => $integration->group?->account_id
-                    ? "https://open.spotify.com/user/{$integration->group->account_id}"
-                    : ($integration->account_id ? "https://open.spotify.com/user/{$integration->account_id}" : null),
                 'media_url' => null,
             ]
         );
+
+        // Update metadata and URL (these can change)
+        $user->update([
+            'metadata' => $metadata,
+            'url' => $url,
+        ]);
+
+        return $user;
     }
 
     protected function createOrUpdateTrack(Integration $integration, array $track): EventObject

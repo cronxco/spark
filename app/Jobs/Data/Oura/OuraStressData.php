@@ -5,7 +5,6 @@ namespace App\Jobs\Data\Oura;
 use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Facades\Log;
 
 class OuraStressData extends BaseProcessingJob
@@ -88,16 +87,12 @@ class OuraStressData extends BaseProcessingJob
 
         // Create actor and target
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'metric',
-            'type' => 'oura_daily_stress',
-            'title' => 'Daily Stress',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => 'Daily stress level assessment with timing data',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'oura_daily_stress',
+            'Daily Stress',
+            'Daily stress level assessment with timing data'
+        );
 
         // Encode the mapped value
         [$encodedValue, $multiplier] = $plugin->encodeNumericValue($mappedValue);

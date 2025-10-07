@@ -6,7 +6,6 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -68,16 +67,12 @@ class OuraSleepTimeData extends BaseProcessingJob
         $status = Arr::get($item, 'status', 'unknown');
         $optimalBedtime = Arr::get($item, 'optimal_bedtime');
 
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'recommendation',
-            'type' => 'sleep_recommendation',
-            'title' => 'Sleep Recommendation',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => $recommendation,
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'sleep_recommendation',
+            'Sleep Recommendation',
+            'Sleep timing recommendation'
+        );
 
         $event = Event::create([
             'source_id' => $sourceId,

@@ -1369,16 +1369,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'metric',
-            'type' => "oura_daily_{$kind}",
-            'title' => $options['title'] ?? Str::title($kind),
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => ($options['title'] ?? Str::title($kind)) . ' daily summary',
-            'metadata' => $item,
-        ]);
+        $target = $this->getStaticMetricObject(
+            $integration,
+            "oura_daily_{$kind}",
+            $options['title'] ?? Str::title($kind),
+            ($options['title'] ?? Str::title($kind)) . ' daily summary'
+        );
 
         $scoreField = $options['score_field'] ?? 'score';
         $score = Arr::get($item, $scoreField);
@@ -1475,15 +1471,19 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
+        $workoutId = Arr::get($item, 'id', md5(json_encode($item)));
+        $activityType = Arr::get($item, 'activity', 'workout');
+
+        // Create workout object once per workout instance
+        $target = EventObject::firstOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'workout',
-            'type' => Arr::get($item, 'activity', 'workout'),
-            'title' => Str::title((string) Arr::get($item, 'activity', 'Workout')),
+            'type' => $activityType,
+            'title' => Str::title((string) $activityType) . ' (' . substr($workoutId, 0, 8) . ')',
         ], [
             'time' => $start ?? ($day . ' 00:00:00'),
             'content' => 'Oura workout session',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         $durationSec = (int) Arr::get($item, 'duration', 0);
@@ -1996,6 +1996,27 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     }
 
     /**
+     * Get or create a static metric reference object (never updates metadata).
+     * Use this for metric types that don't have changing identity - just a label.
+     */
+    public function getStaticMetricObject(Integration $integration, string $type, string $title, string $content): EventObject
+    {
+        return EventObject::firstOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'metric',
+                'type' => $type,
+                'title' => $title,
+            ],
+            [
+                'time' => now(),
+                'content' => $content,
+                'metadata' => [],
+            ]
+        );
+    }
+
+    /**
      * Perform a sweep if needed for any instance type
      */
     protected function performSweepIfNeeded(Integration $integration): void
@@ -2225,7 +2246,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     {
         $title = $integration->name ?: 'Oura Account';
 
-        return EventObject::updateOrCreate(
+        // Use firstOrCreate to avoid updating 'time' on every call
+        $user = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'user',
@@ -2236,11 +2258,17 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'integration_id' => $integration->id,
                 'time' => now(),
                 'content' => 'Oura account',
-                'metadata' => $profile,
                 'url' => null,
                 'media_url' => null,
             ]
         );
+
+        // Only update metadata if provided and different
+        if (! empty($profile)) {
+            $user->update(['metadata' => $profile]);
+        }
+
+        return $user;
     }
 
     protected function fetchDailySleep(Integration $integration, string $startDate, string $endDate): void
@@ -2282,16 +2310,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             }
 
             $actor = $this->ensureUserProfile($integration);
-            $target = EventObject::updateOrCreate([
-                'user_id' => $integration->user_id,
-                'concept' => 'sleep',
-                'type' => 'oura_sleep_record',
-                'title' => 'Sleep Record',
-            ], [
-                'time' => $start ?? ($day . ' 00:00:00'),
-                'content' => 'Detailed sleep record including stages and efficiency',
-                'metadata' => $item,
-            ]);
+            $target = $this->getStaticMetricObject(
+                $integration,
+                'oura_sleep_record',
+                'Sleep Record',
+                'Detailed sleep record including stages and efficiency'
+            );
 
             // Use total_sleep_duration as the main value (matching our OuraSleepRecordsData job)
             $totalSleepDuration = (int) Arr::get($item, 'total_sleep_duration', Arr::get($item, 'duration', 0));
@@ -2542,18 +2566,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             }
 
             $actor = $this->ensureUserProfile($integration);
-            $target = EventObject::updateOrCreate([
-                'user_id' => $integration->user_id,
-                'concept' => 'metric',
-                'type' => 'heartrate_series',
-                'title' => 'Heart Rate',
-            ], [
-                'time' => now(),
-                'content' => 'Heart rate time series',
-                'metadata' => [
-                    'interval' => 'irregular',
-                ],
-            ]);
+            $target = $this->getStaticMetricObject(
+                $integration,
+                'heartrate_series',
+                'Heart Rate',
+                'Heart rate time series'
+            );
 
             [$encodedAvg, $avgMultiplier] = $this->encodeNumericValue($avg);
             $event = Event::create([
@@ -2622,15 +2640,19 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
+        $sessionId = Arr::get($item, 'id', md5(json_encode($item)));
+        $sessionType = Arr::get($item, 'type', 'session');
+
+        // Create session object once per session instance
+        $target = EventObject::firstOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'mindfulness_session',
-            'type' => Arr::get($item, 'type', 'session'),
-            'title' => Str::title((string) Arr::get($item, 'type', 'Session')),
+            'type' => $sessionType,
+            'title' => Str::title((string) $sessionType) . ' (' . substr($sessionId, 0, 8) . ')',
         ], [
             'time' => $start ?? ($day . ' 00:00:00'),
             'content' => 'Oura guided or unguided session',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         $durationSec = (int) Arr::get($item, 'duration', 0);
@@ -2675,16 +2697,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $actor = $this->ensureUserProfile($integration);
         // Create a simple target object for tag to satisfy non-null target_id
-        $tagTarget = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'tag',
-            'type' => 'oura_tag',
-            'title' => 'Oura Tag',
-        ], [
-            'time' => $timestamp,
-            'content' => 'Oura tag entry',
-            'metadata' => $item,
-        ]);
+        $tagTarget = $this->getStaticMetricObject(
+            $integration,
+            'oura_tag',
+            'Oura Tag',
+            'Oura tag entry'
+        );
 
         $label = Arr::get($item, 'tag') ?? Arr::get($item, 'label', 'Tag');
         $event = Event::create([
@@ -2826,16 +2844,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             }
 
             $actor = $this->ensureUserProfile($integration);
-            $target = EventObject::updateOrCreate([
-                'user_id' => $integration->user_id,
-                'concept' => 'metric',
-                'type' => 'cardiovascular_age',
-                'title' => 'Cardiovascular Age',
-            ], [
-                'time' => $day . ' 00:00:00',
-                'content' => 'Estimated cardiovascular age measurement',
-                'metadata' => $item,
-            ]);
+            $target = $this->getStaticMetricObject(
+                $integration,
+                'cardiovascular_age',
+                'Cardiovascular Age',
+                'Estimated cardiovascular age measurement'
+            );
 
             [$encodedAge, $ageMultiplier] = $this->encodeNumericValue((float) $vascularAge);
 
@@ -2881,16 +2895,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             }
 
             $actor = $this->ensureUserProfile($integration);
-            $target = EventObject::updateOrCreate([
-                'user_id' => $integration->user_id,
-                'concept' => 'metric',
-                'type' => 'vo2_max',
-                'title' => 'VO2 Max',
-            ], [
-                'time' => $item['timestamp'] ?? ($day . ' 00:00:00'),
-                'content' => 'Maximum oxygen consumption measurement',
-                'metadata' => $item,
-            ]);
+            $target = $this->getStaticMetricObject(
+                $integration,
+                'vo2_max',
+                'VO2 Max',
+                'Maximum oxygen consumption measurement'
+            );
 
             [$encodedVO2, $vo2Multiplier] = $this->encodeNumericValue((float) $vo2Max);
 
@@ -2975,8 +2985,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $actor = $this->ensureUserProfile($integration);
         $tagType = $item['tag_type_code'] ?? 'unknown';
         $customName = $item['custom_name'] ?? null;
+        $tagId = $item['id'] ?? md5(json_encode($item));
 
-        $target = EventObject::updateOrCreate([
+        // Create tag object once per tag instance
+        $target = EventObject::firstOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'tag',
             'type' => 'enhanced_tag',
@@ -2984,7 +2996,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         ], [
             'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
             'content' => $item['comment'] ?: 'Enhanced tag with detailed metadata',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         $event = Event::create([
@@ -3047,18 +3059,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $actor = $this->ensureUserProfile($integration);
-        $recommendation = $item['recommendation'] ?? 'Sleep timing recommendation';
 
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'recommendation',
-            'type' => 'sleep_recommendation',
-            'title' => 'Sleep Recommendation',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => $recommendation,
-            'metadata' => $item,
-        ]);
+        $target = $this->getStaticMetricObject(
+            $integration,
+            'sleep_recommendation',
+            'Sleep Recommendation',
+            'Sleep timing recommendation'
+        );
 
         $event = Event::create([
             'source_id' => $sourceId,
@@ -3112,16 +3119,18 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $actor = $this->ensureUserProfile($integration);
         $episodes = $item['episodes'] ?? [];
+        $periodId = $item['id'] ?? md5(json_encode($item));
 
-        $target = EventObject::updateOrCreate([
+        // Create rest period object once per period instance
+        $target = EventObject::firstOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'rest_period',
             'type' => 'rest_period',
-            'title' => 'Rest Mode Period',
+            'title' => 'Rest Mode Period (' . substr($periodId, 0, 8) . ')',
         ], [
             'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
             'content' => 'Rest mode period with episodes',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         $event = Event::create([
@@ -3181,20 +3190,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $actor = $this->ensureUserProfile($integration);
 
         // Create a simple target object to satisfy non-null target_id constraint
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'mapped_value',
-            'type' => 'oura_mapped_value',
-            'title' => 'Oura Mapped Value',
-        ], [
-            'time' => $day . ' 12:00:00',
-            'content' => 'Oura mapped value entry',
-            'metadata' => [
-                'mapping_key' => $mappingKey,
-                'original_value' => $originalValue,
-                'mapped_value' => $mappedValue,
-            ],
-        ]);
+        $target = $this->getStaticMetricObject(
+            $integration,
+            'oura_mapped_value',
+            'Oura Mapped Value',
+            'Oura mapped value entry'
+        );
 
         [$encodedValue, $multiplier] = $this->encodeNumericValue($mappedValue);
 
@@ -3234,16 +3235,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $integration->user_id,
-            'concept' => 'sleep',
-            'type' => 'oura_sleep_record',
-            'title' => 'Sleep Record',
-        ], [
-            'time' => $start ?? ($day . ' 00:00:00'),
-            'content' => 'Detailed sleep record including stages and efficiency',
-            'metadata' => $item,
-        ]);
+        $target = $this->getStaticMetricObject(
+            $integration,
+            'oura_sleep_record',
+            'Sleep Record',
+            'Detailed sleep record including stages and efficiency'
+        );
 
         // Use total_sleep_duration as the main value (consistent with OuraSleepRecordsData job)
         $totalSleepDuration = (int) Arr::get($item, 'total_sleep_duration', Arr::get($item, 'duration', 0));

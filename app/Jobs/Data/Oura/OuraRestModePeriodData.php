@@ -89,15 +89,16 @@ class OuraRestModePeriodData extends BaseProcessingJob
         $episodes = Arr::get($item, 'episodes', []);
         $episodeCount = is_array($episodes) ? count($episodes) : 0;
 
-        $target = EventObject::updateOrCreate([
+        // Create rest period object only once per period ID
+        $target = EventObject::firstOrCreate([
             'user_id' => $this->integration->user_id,
             'concept' => 'rest_period',
             'type' => 'rest_period',
-            'title' => 'Rest Mode Period',
+            'title' => 'Rest Mode Period (' . substr($id, 0, 8) . ')',
         ], [
             'time' => $startDay . ' ' . ($startTime ?? '00:00:00'),
             'content' => 'Rest mode period with episodes',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         [$encodedDuration, $durationMultiplier] = $plugin->encodeNumericValue($duration);

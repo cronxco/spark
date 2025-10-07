@@ -5,7 +5,6 @@ namespace App\Jobs\Data\Oura;
 use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Facades\Log;
 
 class OuraResilienceData extends BaseProcessingJob
@@ -88,16 +87,12 @@ class OuraResilienceData extends BaseProcessingJob
 
         // Create actor and target
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'metric',
-            'type' => 'oura_daily_resilience',
-            'title' => 'Daily Resilience',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => 'Daily resilience level assessment',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'oura_daily_resilience',
+            'Daily Resilience',
+            'Daily resilience level assessment'
+        );
 
         // Encode the mapped value
         [$encodedValue, $multiplier] = $plugin->encodeNumericValue($mappedValue);
