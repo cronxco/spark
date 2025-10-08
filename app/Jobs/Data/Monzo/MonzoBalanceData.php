@@ -47,8 +47,8 @@ class MonzoBalanceData extends BaseProcessingJob
             'spend_today' => $spendToday,
         ]);
 
-        // Create or update the target "day" object (target_id is NOT NULL in events)
-        $dayObject = EventObject::updateOrCreate(
+        // Create the target "day" object once (target_id is NOT NULL in events)
+        $dayObject = EventObject::firstOrCreate(
             [
                 'user_id' => $this->integration->user_id,
                 'concept' => 'day',
@@ -59,7 +59,7 @@ class MonzoBalanceData extends BaseProcessingJob
                 'integration_id' => $this->integration->id,
                 'time' => $date . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $date],
+                'metadata' => [],
             ]
         );
 

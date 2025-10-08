@@ -53,7 +53,7 @@ class GoCardlessAccountData extends BaseProcessingJob
     {
         $accountId = $accountData['id'] ?? 'unknown';
 
-        EventObject::updateOrCreate(
+        EventObject::firstOrCreate(
             [
                 'user_id' => $this->integration->user_id,
                 'concept' => 'account',

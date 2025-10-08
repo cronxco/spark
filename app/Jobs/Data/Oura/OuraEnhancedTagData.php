@@ -90,7 +90,8 @@ class OuraEnhancedTagData extends BaseProcessingJob
         $customName = Arr::get($item, 'custom_name');
         $comment = Arr::get($item, 'comment');
 
-        $target = EventObject::updateOrCreate([
+        // Create tag object only once per tag ID
+        $target = EventObject::firstOrCreate([
             'user_id' => $this->integration->user_id,
             'concept' => 'tag',
             'type' => 'enhanced_tag',
@@ -98,7 +99,7 @@ class OuraEnhancedTagData extends BaseProcessingJob
         ], [
             'time' => $startDay . ' ' . ($startTime ?? '00:00:00'),
             'content' => $comment ?: 'Enhanced tag with detailed metadata',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         [$encodedDuration, $durationMultiplier] = $plugin->encodeNumericValue($duration);

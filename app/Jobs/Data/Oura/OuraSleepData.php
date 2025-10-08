@@ -6,7 +6,6 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use App\Models\EventObject;
 use Illuminate\Support\Facades\Log;
 
 class OuraSleepData extends BaseProcessingJob
@@ -65,16 +64,12 @@ class OuraSleepData extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        $target = EventObject::updateOrCreate([
-            'user_id' => $this->integration->user_id,
-            'concept' => 'sleep',
-            'type' => 'daily_sleep_summary',
-            'title' => 'Daily Sleep Summary',
-        ], [
-            'time' => $day . ' 00:00:00',
-            'content' => 'Daily sleep quality summary with comprehensive metrics',
-            'metadata' => $item,
-        ]);
+        $target = $plugin->getStaticMetricObject(
+            $this->integration,
+            'daily_sleep_summary',
+            'Daily Sleep Summary',
+            'Daily sleep quality summary with comprehensive metrics'
+        );
 
         $score = $item['score'] ?? null;
         [$encodedScore, $scoreMultiplier] = $plugin->encodeNumericValue($score);

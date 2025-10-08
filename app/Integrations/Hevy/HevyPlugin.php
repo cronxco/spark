@@ -347,17 +347,21 @@ class HevyPlugin implements IntegrationPlugin
         }
 
         $actor = $this->ensureUserProfile($integration);
-        $target = EventObject::updateOrCreate([
+
+        // Use workout ID + title as discriminator (not time which would create duplicates)
+        $target = EventObject::firstOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'workout',
             'type' => 'hevy_workout',
-            'title' => $title,
-            'time' => $startIso, // Add time as discriminator to prevent collapsing identical titles
+            'title' => $title . ' (' . substr($workoutId, 0, 8) . ')',
         ], [
+            'time' => $startIso,
             'content' => Arr::get($workout, 'notes') ?? 'Hevy workout',
-            'metadata' => $workout,
             'url' => Arr::get($workout, 'url'),
         ]);
+
+        // Update metadata if workout details changed
+        $target->update(['metadata' => $workout]);
 
         [$encVolume, $volMult] = $this->encodeNumericValue($volume);
         $event = Event::create([
@@ -556,7 +560,8 @@ class HevyPlugin implements IntegrationPlugin
 
         $title = $integration->name ?: 'Hevy Account';
 
-        return EventObject::updateOrCreate([
+        // Use firstOrCreate to avoid updating 'time' on every call
+        $user = EventObject::firstOrCreate([
             'user_id' => $integration->user_id,
             'concept' => 'user',
             'type' => 'hevy_user',
@@ -565,10 +570,16 @@ class HevyPlugin implements IntegrationPlugin
             'integration_id' => $integration->id,
             'time' => now(),
             'content' => 'Hevy user account',
-            'metadata' => is_array($profile) ? $profile : [],
             'url' => null,
             'media_url' => null,
         ]);
+
+        // Only update metadata if provided
+        if (is_array($profile) && ! empty($profile)) {
+            $user->update(['metadata' => $profile]);
+        }
+
+        return $user;
     }
 
     /**

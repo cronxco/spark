@@ -67,15 +67,16 @@ class OuraWorkoutsData extends BaseProcessingJob
         $actor = $plugin->ensureUserProfile($this->integration);
         $activityType = $item['activity'] ?? 'workout';
 
-        $target = EventObject::updateOrCreate([
+        // Create workout object only once per workout ID
+        $target = EventObject::firstOrCreate([
             'user_id' => $this->integration->user_id,
             'concept' => 'workout',
             'type' => $activityType,
-            'title' => ucwords(str_replace('_', ' ', $activityType)),
+            'title' => ucwords(str_replace('_', ' ', $activityType)) . ' (' . substr($id, 0, 8) . ')',
         ], [
             'time' => $start,
             'content' => 'Enhanced workout session with comprehensive metrics',
-            'metadata' => $item,
+            'metadata' => [],
         ]);
 
         $duration = $item['duration'] ?? 0;

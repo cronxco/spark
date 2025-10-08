@@ -39,8 +39,8 @@ class MonzoPotData extends BaseProcessingJob
             'pot_count' => count($pots),
         ]);
 
-        // Create or update the target "day" object for pot balance events
-        $dayObject = EventObject::updateOrCreate(
+        // Create the target "day" object once for pot balance events
+        $dayObject = EventObject::firstOrCreate(
             [
                 'user_id' => $this->integration->user_id,
                 'concept' => 'day',
@@ -50,7 +50,7 @@ class MonzoPotData extends BaseProcessingJob
             [
                 'time' => $date . ' 00:00:00',
                 'content' => null,
-                'metadata' => ['date' => $date],
+                'metadata' => [],
             ]
         );
 
