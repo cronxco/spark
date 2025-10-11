@@ -72,7 +72,7 @@ class ProcessIntegrationPageUndefinedVariableTest extends TestCase
             ], 200),
             'api.monzo.com/balance*' => Http::response([
                 'balance' => 1000,
-                'spend_today' => -200,
+                'spent_today' => -200,
             ], 200),
         ]);
 

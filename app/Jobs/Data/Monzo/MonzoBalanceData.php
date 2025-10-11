@@ -37,14 +37,14 @@ class MonzoBalanceData extends BaseProcessingJob
         unset($balanceData['_account']);
 
         $balance = (int) ($balanceData['balance'] ?? 0); // cents
-        $spendToday = (int) ($balanceData['spend_today'] ?? 0); // cents
+        $spendToday = (int) ($balanceData['spent_today'] ?? 0); // cents
         $date = now()->toDateString();
 
         Log::info('MonzoBalanceData: Processing balance data', [
             'integration_id' => $this->integration->id,
             'account_id' => $this->accountId,
             'balance' => $balance,
-            'spend_today' => $spendToday,
+            'spent_today' => $spendToday,
         ]);
 
         // Create the target "day" object once (target_id is NOT NULL in events)
@@ -78,13 +78,13 @@ class MonzoBalanceData extends BaseProcessingJob
                 'value_multiplier' => 100,
                 'value_unit' => 'GBP',
                 'event_metadata' => [
-                    'spend_today' => $spendToday / 100,
+                    'spent_today' => $spendToday / 100,
                 ],
                 'target_id' => $dayObject->id,
             ]
         );
 
-        // Add balance blocks (Spend Today + Balance Change)
+        // Add balance blocks (Spent Today + Balance Change)
         $plugin->addBalanceBlocks($event, $this->integration, $account, $date, $balance, $spendToday);
 
         Log::info('MonzoBalanceData: Completed processing balance data', [

@@ -156,7 +156,7 @@ class MonzoMigrationTest extends TestCase
             ], 200),
             'api.monzo.com/balance*' => Http::response([
                 'balance' => 1000,
-                'spend_today' => -200,
+                'spent_today' => -200,
             ], 200),
         ]);
 
@@ -183,11 +183,11 @@ class MonzoMigrationTest extends TestCase
         $this->assertNotNull($event);
         $this->assertEquals(1000, $event->value);
         $this->assertEquals(100, $event->value_multiplier);
-        $this->assertEquals(-2.0, $event->event_metadata['spend_today']);
+        $this->assertEquals(-2.0, $event->event_metadata['spent_today']);
 
-        // Blocks: Spend Today exists with value 200 cents
+        // Blocks: Spent Today exists with value 200 cents
         $this->assertTrue($event->blocks->contains(function ($b) {
-            return $b->title === 'Spend Today' && (int) $b->value === 200 && (int) $b->value_multiplier === 100 && $b->value_unit === 'GBP';
+            return $b->title === 'Spent Today' && (int) $b->value === 200 && (int) $b->value_multiplier === 100 && $b->value_unit === 'GBP';
         }));
     }
 

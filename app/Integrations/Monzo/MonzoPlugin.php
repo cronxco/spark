@@ -318,9 +318,9 @@ class MonzoPlugin extends OAuthPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'spend_today' => [
+            'spent_today' => [
                 'icon' => 'o-currency-pound',
-                'display_name' => 'Spend Today',
+                'display_name' => 'Spent Today',
                 'description' => 'Amount spent today for this account',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
@@ -554,11 +554,11 @@ class MonzoPlugin extends OAuthPlugin
 
     public function addBalanceBlocks(Event $event, Integration $integration, array $account, string $date, int $balance, int $spendToday): void
     {
-        // Spend Today block
+        // Spent Today block
         $event->createBlock([
             'time' => $event->time,
-            'block_type' => 'spend_today',
-            'title' => 'Spend Today',
+            'block_type' => 'spent_today',
+            'title' => 'Spent Today',
             'metadata' => [],
             'media_url' => null,
             'value' => abs($spendToday),
@@ -645,8 +645,9 @@ class MonzoPlugin extends OAuthPlugin
             } else {
                 // Fallback: create/find generic counterparty
                 $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
+                $merchantId = $tx['merchant']['id'] ?? null;
                 $metadata = [
-                    'merchant_id' => $tx['merchant']['id'] ?? null,
+                    'merchant_id' => $merchantId,
                     'category' => $tx['category'] ?? null,
                     'currency' => $tx['currency'] ?? 'GBP',
                 ];
@@ -663,11 +664,15 @@ class MonzoPlugin extends OAuthPlugin
                         'integration_id' => $master->id,
                         'time' => $tx['created'] ?? now(),
                         'content' => $tx['description'] ?? null,
+                        'metadata' => $metadata,
                     ]
                 );
 
-                // Update metadata (category/currency can change)
-                $target->update(['metadata' => $metadata]);
+                // Only update metadata if we have a merchant_id
+                // This prevents refunds (which have no merchant_id) from overwriting metadata from the original payment
+                if ($merchantId !== null) {
+                    $target->update(['metadata' => $metadata]);
+                }
             }
         }
 
@@ -710,15 +715,23 @@ class MonzoPlugin extends OAuthPlugin
         // Determine account type based on deletion status
         $isDeleted = (bool) ($pot['deleted'] ?? false);
         $accountType = $isDeleted ? 'monzo_archived_pot' : 'monzo_pot';
+        $potId = $pot['id'] ?? null;
 
-        return EventObject::updateOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'account',
+        // First try to find existing pot by pot_id in metadata
+        $potObject = null;
+        if ($potId) {
+            $potObject = EventObject::where('user_id', $integration->user_id)
+                ->where('concept', 'account')
+                ->whereIn('type', ['monzo_pot', 'monzo_archived_pot'])
+                ->whereJsonContains('metadata->pot_id', $potId)
+                ->first();
+        }
+
+        // If found, update it; otherwise create new
+        if ($potObject) {
+            $potObject->update([
                 'type' => $accountType,
                 'title' => $pot['name'] ?? 'Pot',
-            ],
-            [
                 'integration_id' => $master->id,
                 'time' => $pot['created'] ?? now(),
                 'content' => (string) ($pot['balance'] ?? 0),
@@ -726,14 +739,37 @@ class MonzoPlugin extends OAuthPlugin
                     'name' => $pot['name'] ?? 'Pot',
                     'provider' => 'Monzo',
                     'account_type' => 'savings_account',
-                    'pot_id' => $pot['id'] ?? null,
+                    'pot_id' => $potId,
                     'deleted' => $isDeleted,
                     'currency' => 'GBP',
                 ],
                 'url' => null,
                 'media_url' => null,
-            ]
-        );
+            ]);
+
+            return $potObject;
+        }
+
+        // Create new pot object
+        return EventObject::create([
+            'user_id' => $integration->user_id,
+            'concept' => 'account',
+            'type' => $accountType,
+            'title' => $pot['name'] ?? 'Pot',
+            'integration_id' => $master->id,
+            'time' => $pot['created'] ?? now(),
+            'content' => (string) ($pot['balance'] ?? 0),
+            'metadata' => [
+                'name' => $pot['name'] ?? 'Pot',
+                'provider' => 'Monzo',
+                'account_type' => 'savings_account',
+                'pot_id' => $potId,
+                'deleted' => $isDeleted,
+                'currency' => 'GBP',
+            ],
+            'url' => null,
+            'media_url' => null,
+        ]);
     }
 
     public function upsertAccountObject(Integration $integration, array $account): EventObject
@@ -744,6 +780,7 @@ class MonzoPlugin extends OAuthPlugin
             'uk_monzo_flex' => 'Monzo Flex',
             'uk_prepaid' => 'Monzo OG',
             'uk_reward_account' => 'Monzo Rewards',
+            'uk_rewards' => 'Monzo Rewards',
             default => 'Monzo Account',
         };
 
@@ -753,39 +790,60 @@ class MonzoPlugin extends OAuthPlugin
             'uk_monzo_flex' => 'credit_card',
             'uk_prepaid' => 'current_account',
             'uk_reward_account' => 'savings_account',
+            'uk_rewards' => 'savings_account',
             default => 'other',
         };
 
         $master = $this->resolveMasterIntegration($integration);
+        $accountId = $account['id'] ?? null;
 
         $metadata = [
             'name' => $title,
             'provider' => 'Monzo',
             'account_type' => $accountType,
-            'account_id' => $account['id'] ?? null,
+            'account_id' => $accountId,
             'currency' => $account['currency'] ?? 'GBP',
             'raw' => $account,
         ];
 
-        // Use firstOrCreate to avoid updating 'time' on every call
-        $accountObject = EventObject::firstOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'account',
-                'type' => 'monzo_account',
-                'title' => $title,
-            ],
-            [
-                'integration_id' => $master->id,
-                'time' => now(),
-                'content' => null,
-            ]
-        );
+        // First try to find existing account by account_id in metadata
+        $accountObject = null;
+        if ($accountId) {
+            $accountObject = EventObject::where('user_id', $integration->user_id)
+                ->where('concept', 'account')
+                ->where('type', 'monzo_account')
+                ->whereJsonContains('metadata->account_id', $accountId)
+                ->first();
+        }
 
-        // Update metadata (account details can change)
-        $accountObject->update(['metadata' => $metadata]);
+        // If found, only update if we have complete account data (not minimal stub data)
+        if ($accountObject) {
+            // Check if this is complete account data or just a minimal stub (id + type only)
+            $hasCompleteData = count($account) > 2 || isset($account['created']) || isset($account['product_type']);
 
-        return $accountObject;
+            if ($hasCompleteData) {
+                // We have full account data from the API, safe to update
+                $accountObject->update([
+                    'title' => $title,
+                    'metadata' => $metadata,
+                ]);
+            }
+            // If we don't have complete data, return existing object without updating
+
+            return $accountObject;
+        }
+
+        // Create new account object (only if we don't have an existing one)
+        return EventObject::create([
+            'user_id' => $integration->user_id,
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => $title,
+            'integration_id' => $master->id,
+            'time' => now(),
+            'content' => null,
+            'metadata' => $metadata,
+        ]);
     }
 
     public function convertData(array $externalData, Integration $integration): array
@@ -1130,7 +1188,6 @@ class MonzoPlugin extends OAuthPlugin
                 'balances_count' => $totalBalances,
                 'pots_count' => $totalPots,
             ]);
-
         } catch (Throwable $e) {
             Log::error('Monzo data sweep failed', [
                 'integration_id' => $integration->id,
@@ -1428,7 +1485,7 @@ class MonzoPlugin extends OAuthPlugin
         }
         $json = $resp->json();
         $balance = (int) ($json['balance'] ?? 0); // cents
-        $spendToday = (int) ($json['spend_today'] ?? 0); // cents
+        $spendToday = (int) ($json['spent_today'] ?? 0); // cents
         $date = now()->toDateString();
 
         // Create the target "day" object once (target_id is NOT NULL in events)
@@ -1462,13 +1519,13 @@ class MonzoPlugin extends OAuthPlugin
                 'value_multiplier' => 100,
                 'value_unit' => 'GBP',
                 'event_metadata' => [
-                    'spend_today' => $spendToday / 100,
+                    'spent_today' => $spendToday / 100,
                 ],
                 'target_id' => $dayObject->id,
             ]
         );
 
-        // Add balance blocks (Spend Today + Balance Change)
+        // Add balance blocks (Spent Today + Balance Change)
         try {
             $this->addBalanceBlocks($event, $integration, $account, $date, $balance, $spendToday);
         } catch (Throwable $e) {
