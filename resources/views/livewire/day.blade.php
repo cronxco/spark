@@ -867,8 +867,8 @@ $areAllGroupsExpanded = computed(function () {
                                         </div>
                                     @else
                                         @php $firstEvent = $eventGroup['events'][0]; @endphp
-                                        <a href="{{ route('events.show', $firstEvent->id) }}" class="group block py-2 px-2 rounded-lg hover:bg-base-200/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                                            <div class="font-semibold truncate">
+                                        <div class="py-2 px-2">
+                                            <a href="{{ route('events.show', $firstEvent->id) }}" class="font-semibold truncate block hover:text-primary transition-colors">
                                                 {{ $this->formatAction($firstEvent->action) }}
                                                 @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                                     @if ($firstEvent->target)
@@ -877,10 +877,11 @@ $areAllGroupsExpanded = computed(function () {
                                                         <span class="text-base-content/80">{{ ' ' . $firstEvent->actor->title }}</span>
                                                     @endif
                                                 @endif
-                                            </div>
-                                            <div class="mt-1 text-sm text-base-content/70 flex items-center gap-2 flex-wrap">
-                                                <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }} ·</span>
-
+                                            </a>
+                                            <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
+                                                <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }}</span>
+                                                <span class="hidden sm:inline">·</span>
+                                                <span class="sm:hidden w-full"></span>
                                                 @if ($firstEvent->domain)
                                                     <x-badge :value="$firstEvent->domain" class="badge-xs badge-outline" />
                                                 @endif
@@ -888,16 +889,10 @@ $areAllGroupsExpanded = computed(function () {
                                                 @if ($firstEvent->integration)
                                                     <x-badge :value="$firstEvent->integration->name" class="badge-xs badge-outline" />
                                                 @endif
-                                                @if ($firstEvent->tags->isNotEmpty())
-                                                    <span class="hidden sm:inline">·</span>
-                                                    <span class="flex flex-wrap gap-1">
-                                                        @foreach ($firstEvent->tags as $tag)
-                                                            <x-badge :value="$tag->name" class="badge-ghost badge-xs" />
-                                                        @endforeach
-                                                    </span>
-                                                @endif
+                                                @if ($firstEvent->tags && count($firstEvent->tags) > 0)<span class="hidden sm:inline">·</span><span class="sm:hidden w-full"></span>@endif
+                                                @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" />@endforeach
                                             </div>
-                                        </a>
+                                        </div>
                                     @endif
                                 </div>
                             </div>
@@ -918,22 +913,21 @@ $areAllGroupsExpanded = computed(function () {
                                     <div class="relative">
                                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                                     </div>
-                                    <a href="{{ route('events.show', $event->id) }}" class="group py-2 px-2 rounded-lg hover:bg-base-200/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                                        <div class="flex items-baseline gap-2">
-                                            <div class="font-semibold text-base-content">
-                                                {{ $this->formatAction($event->action) }}
-                                                @if (should_display_action_with_object($event->action, $event->service))
-                                                    @if ($event->target)
-                                                        <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
-                                                    @elseif ($event->actor)
-                                                        <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
-                                                    @endif
+                                    <div class="py-2 px-2">
+                                        <a href="{{ route('events.show', $event->id) }}" class="font-semibold text-base-content block hover:text-primary transition-colors">
+                                            {{ $this->formatAction($event->action) }}
+                                            @if (should_display_action_with_object($event->action, $event->service))
+                                                @if ($event->target)
+                                                    <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
+                                                @elseif ($event->actor)
+                                                    <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
                                                 @endif
-                                            </div>
-                                        </div>
-                                        <div class="mt-1 text-sm text-base-content/70 flex items-center gap-2 flex-wrap">
-                                            <span title="{{ $event->time->toDayDateTimeString() }}">{{ $event->time->diffForHumans() }} ·</span>
-
+                                            @endif
+                                        </a>
+                                        <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
+                                            <span title="{{ $event->time->toDayDateTimeString() }}">{{ $event->time->diffForHumans() }}</span>
+                                            <span class="hidden sm:inline">·</span>
+                                            <span class="sm:hidden w-full"></span>
                                             @if ($event->domain)
                                                 <x-badge :value="$event->domain" class="badge-xs badge-outline" />
                                             @endif
@@ -941,16 +935,10 @@ $areAllGroupsExpanded = computed(function () {
                                             @if ($event->integration)
                                                 <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
                                             @endif
-                                            @if ($event->tags->isNotEmpty())
-                                                <span class="hidden sm:inline">·</span>
-                                                <span class="flex flex-wrap gap-1">
-                                                    @foreach ($event->tags as $tag)
-                                                        <x-badge :value="$tag->name" class="badge-ghost badge-xs" />
-                                                    @endforeach
-                                                </span>
-                                            @endif
+                                            @if ($event->tags && count($event->tags) > 0)<span class="hidden sm:inline">·</span><span class="sm:hidden w-full"></span>@endif
+                                            @foreach ($event->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" />@endforeach
                                         </div>
-                                    </a>
+                                    </div>
                                     <div class="py-2 pr-2 text-right">
                                         @if (! is_null($event->value))
                                             <span class="text-sm {{ $this->valueColorClass($event) }}">{{ $this->formatValueDisplay($event) }}</span>

@@ -26,6 +26,7 @@
         "socialiteproviders/authelia": "^4.0",
         "spatie/laravel-activitylog": "^4",
         "spatie/laravel-tags": "^4.10",
+        "symfony/emoji": "^7.3",
         "willscottuk/monzo-php": "dev-master"
     },
     "require-dev": {
