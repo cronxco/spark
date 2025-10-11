@@ -287,29 +287,66 @@ class HevyPlugin implements IntegrationPlugin
         $startDate = now()->subDays($daysBack)->toDateString();
         $endDate = now()->toDateString();
 
-        $query = http_build_query([
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'limit' => 100,
-        ]);
-
-        $endpoint = '/v1/workouts?' . $query;
-
         Log::info('Hevy: Fetching workouts', [
             'integration_id' => $integration->id,
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'endpoint' => $endpoint,
         ]);
 
         try {
-            $json = $this->getJson($endpoint, $integration);
-            Log::info('Hevy: Fetched workout data', [
+            $allWorkouts = [];
+            $page = 1;
+            $pageCount = 1;
+
+            // Follow pagination with a sensible upper bound to avoid long-running jobs
+            $maxPages = 0;
+            do {
+                if ($maxPages++ >= 20) {
+                    Log::warning('Hevy: Workout pagination capped at 20 pages', [
+                        'integration_id' => $integration->id,
+                    ]);
+                    break;
+                }
+
+                $query = http_build_query([
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'limit' => 100,
+                    'page' => $page,
+                ]);
+
+                $endpoint = '/v1/workouts?' . $query;
+                $json = $this->getJson($endpoint, $integration);
+
+                $workouts = $json['workouts'] ?? $json['data'] ?? [];
+                $allWorkouts = array_merge($allWorkouts, $workouts);
+
+                $pageCount = (int) ($json['page_count'] ?? 1);
+                $currentPage = (int) ($json['page'] ?? 1);
+
+                Log::info('Hevy: Fetched workout page', [
+                    'integration_id' => $integration->id,
+                    'page' => $currentPage,
+                    'page_count' => $pageCount,
+                    'workouts_in_page' => count($workouts),
+                    'total_workouts' => count($allWorkouts),
+                ]);
+
+                $page++;
+            } while ($page <= $pageCount);
+
+            Log::info('Hevy: Completed fetching all workout pages', [
                 'integration_id' => $integration->id,
-                'data_count' => count($json['data'] ?? []),
+                'total_workouts' => count($allWorkouts),
+                'pages_fetched' => $page - 1,
             ]);
 
-            return $json;
+            // Return in the same format as the API response
+            return [
+                'workouts' => $allWorkouts,
+                'page' => 1,
+                'page_count' => 1,
+            ];
         } catch (Throwable $e) {
             Log::error('Hevy: Workout fetch failed', [
                 'integration_id' => $integration->id,
@@ -337,8 +374,19 @@ class HevyPlugin implements IntegrationPlugin
         $startIso = Arr::get($workout, 'start_time') ?? Arr::get($workout, 'date') ?? now()->toIso8601String();
         $endIso = Arr::get($workout, 'end_time');
         $title = (string) (Arr::get($workout, 'title') ?? 'Workout');
-        $volume = (float) (Arr::get($workout, 'total_volume', 0.0));
-        $durationSec = (int) (Arr::get($workout, 'duration_seconds', 0));
+
+        // Calculate duration from timestamps if available
+        $durationSec = 0;
+        if ($startIso && $endIso) {
+            try {
+                $start = Carbon::parse($startIso);
+                $end = Carbon::parse($endIso);
+                $durationSec = (int) $end->diffInSeconds($start);
+            } catch (Exception $e) {
+                // Fallback to 0 if parsing fails
+                $durationSec = 0;
+            }
+        }
 
         $sourceId = "hevy_workout_{$integration->id}_{$workoutId}";
         $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
@@ -356,14 +404,39 @@ class HevyPlugin implements IntegrationPlugin
             'title' => $title . ' (' . substr($workoutId, 0, 8) . ')',
         ], [
             'time' => $startIso,
-            'content' => Arr::get($workout, 'notes') ?? 'Hevy workout',
+            'content' => Arr::get($workout, 'description') ?? 'Hevy workout',
             'url' => Arr::get($workout, 'url'),
         ]);
 
         // Update metadata if workout details changed
         $target->update(['metadata' => $workout]);
 
-        [$encVolume, $volMult] = $this->encodeNumericValue($volume);
+        // Calculate total volume from all exercises and determine weight unit
+        $exercises = Arr::get($workout, 'exercises', []);
+        $totalVolume = 0.0;
+        $workoutWeightUnit = null;
+
+        foreach ($exercises as $exercise) {
+            $sets = Arr::get($exercise, 'sets', []);
+            foreach ($sets as $set) {
+                $reps = (int) (Arr::get($set, 'reps', 0));
+                // Try weight_kg first, then weight_lb
+                $weight = (float) (Arr::get($set, 'weight_kg') ?? Arr::get($set, 'weight_lb', 0));
+                $totalVolume += ($weight * max(0, $reps));
+
+                // Infer unit from first set that has a weight
+                if ($workoutWeightUnit === null && $weight > 0) {
+                    $workoutWeightUnit = isset($set['weight_kg']) ? 'kg' : (isset($set['weight_lb']) ? 'lb' : null);
+                }
+            }
+        }
+
+        // Fallback to config if no weight unit found
+        if ($workoutWeightUnit === null) {
+            $workoutWeightUnit = $integration->configuration['units'] ?? 'kg';
+        }
+
+        [$encVolume, $volMult] = $this->encodeNumericValue($totalVolume);
         $event = Event::create([
             'source_id' => $sourceId,
             'time' => $startIso,
@@ -374,7 +447,7 @@ class HevyPlugin implements IntegrationPlugin
             'action' => 'completed_workout',
             'value' => $encVolume,
             'value_multiplier' => $volMult,
-            'value_unit' => $this->inferWeightUnit($integration, Arr::get($workout, 'weight_unit')),
+            'value_unit' => $workoutWeightUnit,
             'event_metadata' => [
                 'end' => $endIso,
                 'duration_seconds' => $durationSec,
@@ -383,21 +456,30 @@ class HevyPlugin implements IntegrationPlugin
         ]);
 
         // Create blocks per exercise set
-        $exercises = Arr::get($workout, 'exercises', []);
         $includeExerciseSummary = in_array('enabled', ($integration->configuration['include_exercise_summary_blocks'] ?? ['enabled']), true);
 
         foreach ($exercises as $exercise) {
-            $exerciseName = (string) (Arr::get($exercise, 'name') ?? 'Exercise');
+            $exerciseName = (string) (Arr::get($exercise, 'title') ?? 'Exercise');
             $sets = Arr::get($exercise, 'sets', []);
             $exerciseVolume = 0.0;
+            $exerciseUnit = null;
 
             foreach ($sets as $index => $set) {
                 $reps = (int) (Arr::get($set, 'reps', 0));
-                $weight = (float) (Arr::get($set, 'weight', 0));
+                // Try weight_kg first, then weight_lb
+                $weight = (float) (Arr::get($set, 'weight_kg') ?? Arr::get($set, 'weight_lb', 0));
                 $rest = Arr::get($set, 'rest_seconds');
                 $rpe = Arr::get($set, 'rpe');
+                $setType = Arr::get($set, 'type');
                 $setNum = $index + 1;
-                $unit = $this->inferWeightUnit($integration, Arr::get($set, 'weight_unit', Arr::get($exercise, 'weight_unit')));
+
+                // Infer unit from the actual field present
+                $unit = isset($set['weight_kg']) ? 'kg' : (isset($set['weight_lb']) ? 'lb' : ($workoutWeightUnit ?? 'kg'));
+
+                // Track exercise unit for summary
+                if ($exerciseUnit === null && $weight > 0) {
+                    $exerciseUnit = $unit;
+                }
 
                 $exerciseVolume += ($weight * max(0, $reps));
 
@@ -410,6 +492,9 @@ class HevyPlugin implements IntegrationPlugin
                     'weight' => $weight,
                     'unit' => $unit,
                 ];
+                if ($setType !== null && $setType !== '') {
+                    $metadata['type'] = $setType;
+                }
                 if ($rpe !== null && $rpe !== '') {
                     $metadata['rpe'] = $rpe;
                 }
@@ -432,6 +517,7 @@ class HevyPlugin implements IntegrationPlugin
 
             if ($includeExerciseSummary && $exerciseName !== '') {
                 [$encExVol, $exVolMult] = $this->encodeNumericValue($exerciseVolume);
+                $summaryUnit = $exerciseUnit ?? $workoutWeightUnit ?? 'kg';
                 $event->createBlock([
                     'block_type' => 'exercise_summary',
                     'time' => $startIso,
@@ -441,11 +527,11 @@ class HevyPlugin implements IntegrationPlugin
                         'total_volume' => $exerciseVolume,
                         'volume_formula' => 'weight x reps',
                         'sets_count' => count($sets),
-                        'unit' => $this->inferWeightUnit($integration, Arr::get($exercise, 'weight_unit')),
+                        'unit' => $summaryUnit,
                     ],
                     'value' => $encExVol,
                     'value_multiplier' => $exVolMult,
-                    'value_unit' => $this->inferWeightUnit($integration, Arr::get($exercise, 'weight_unit')),
+                    'value_unit' => $summaryUnit,
                 ]);
             }
         }
@@ -538,9 +624,32 @@ class HevyPlugin implements IntegrationPlugin
         $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
         // In tests we allow empty; in production recommend providing api key
         $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
-        $response = Http::withHeaders([
-            'api-key' => $apiKey,
-        ])->get($url);
+
+        $headers = ['api-key' => $apiKey];
+
+        // Log the API request
+        log_integration_api_request(
+            static::getIdentifier(),
+            'GET',
+            $endpoint,
+            $headers,
+            [],
+            $integration->id
+        );
+
+        $response = Http::withHeaders($headers)->get($url);
+
+        // Log the API response
+        log_integration_api_response(
+            static::getIdentifier(),
+            'GET',
+            $endpoint,
+            $response->status(),
+            $response->body(),
+            $response->headers(),
+            $integration->id
+        );
+
         if (! $response->successful()) {
             throw new RuntimeException('Hevy API request failed with status ' . $response->status());
         }
