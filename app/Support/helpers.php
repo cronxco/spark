@@ -243,7 +243,7 @@ if (! function_exists('log_integration_api_request')) {
         $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
-        
+
         // If the logger is null (can happen in tests with spies), use the default Log facade
         if (is_null($logger)) {
             Log::debug('API Request', [
@@ -257,9 +257,10 @@ if (! function_exists('log_integration_api_request')) {
                 'data' => sanitizeData($data),
                 'timestamp' => now()->toISOString(),
             ]);
+
             return;
         }
-        
+
         $logger->debug('API Request', [
             'service' => $service,
             'integration_id' => $integrationId ?: null,
@@ -324,7 +325,7 @@ if (! function_exists('log_integration_api_response')) {
         $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
-        
+
         // If the logger is null (can happen in tests with spies), use the default Log facade
         if (is_null($logger)) {
             Log::debug('API Response', [
@@ -341,9 +342,10 @@ if (! function_exists('log_integration_api_response')) {
                     : $body,
                 'timestamp' => now()->toISOString(),
             ]);
+
             return;
         }
-        
+
         $logger->debug('API Response', [
             'service' => $service,
             'integration_id' => $integrationId ?: null,
