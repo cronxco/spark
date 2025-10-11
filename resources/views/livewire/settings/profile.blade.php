@@ -12,6 +12,7 @@ new class extends Component {
 
     public string $name = '';
     public string $email = '';
+    public bool $debugLoggingEnabled = false;
 
     /**
      * Mount the component.
@@ -20,6 +21,7 @@ new class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->debugLoggingEnabled = Auth::user()->hasDebugLoggingEnabled();
     }
 
     /**
@@ -69,6 +71,22 @@ new class extends Component {
         $user->sendEmailVerificationNotification();
 
         $this->success('A new verification link has been sent to your email address.');
+    }
+
+    /**
+     * Toggle debug logging setting
+     */
+    public function toggleDebugLogging(): void
+    {
+        $user = Auth::user();
+
+        if ($this->debugLoggingEnabled) {
+            $user->enableDebugLogging();
+            $this->success('Debug logging enabled. API calls and detailed logs will now be recorded.');
+        } else {
+            $user->disableDebugLogging();
+            $this->success('Debug logging disabled. Only important events will be logged.');
+        }
     }
 }; ?>
 
@@ -143,6 +161,30 @@ new class extends Component {
                         </div>
                     </div>
                 @endif
+
+                <!-- Debug Logging Section -->
+                <div class="p-4 bg-base-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-lg font-medium">{{ __('Debug Logging') }}</h4>
+                            <p class="text-sm text-base-content/70">
+                                {{ __('Enable detailed logging for integration API calls and debugging') }}
+                            </p>
+                            <p class="text-xs text-base-content/60 mt-1">
+                                When enabled, all API requests and responses will be logged to help troubleshoot integration issues.
+                                These logs are automatically deleted after 7 days.
+                            </p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                class="toggle toggle-primary"
+                                wire:model.live="debugLoggingEnabled"
+                                wire:change="toggleDebugLogging"
+                            />
+                        </div>
+                    </div>
+                </div>
 
                 <div class="pt-6 border-t border-base-300">
                     <livewire:settings.delete-user-form />

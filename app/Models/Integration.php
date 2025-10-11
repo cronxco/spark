@@ -430,4 +430,12 @@ class Integration extends Model
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at', 'last_triggered_at']);
     }
+
+    /**
+     * Get the first block of the integration's UUID for log filenames
+     */
+    public function getUuidBlock(): string
+    {
+        return explode('-', $this->id)[0] ?? $this->id;
+    }
 }

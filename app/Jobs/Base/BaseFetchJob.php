@@ -52,7 +52,13 @@ abstract class BaseFetchJob implements ShouldQueue
         $hub->setSpan($transaction);
 
         try {
-            Log::info("Starting {$this->getJobType()} fetch for integration {$this->integration->id} ({$this->serviceName})");
+            // Log start to all levels (instance, group, user)
+            log_hierarchical($this->integration, 'info', "Starting {$this->getJobType()} fetch", [
+                'integration_id' => $this->integration->id,
+                'integration_name' => $this->integration->name,
+                'service' => $this->serviceName,
+                'job_type' => $this->getJobType(),
+            ]);
 
             // Fetch the raw data
             $rawData = $this->fetchData();
@@ -63,11 +69,22 @@ abstract class BaseFetchJob implements ShouldQueue
             // Mark the integration as successfully updated
             $this->integration->markAsSuccessfullyUpdated();
 
-            Log::info("Completed {$this->getJobType()} fetch for integration {$this->integration->id} ({$this->serviceName})");
+            // Log completion to all levels
+            log_hierarchical($this->integration, 'info', "Completed {$this->getJobType()} fetch", [
+                'integration_id' => $this->integration->id,
+                'integration_name' => $this->integration->name,
+                'service' => $this->serviceName,
+                'job_type' => $this->getJobType(),
+            ]);
             $transaction->setStatus(SpanStatus::ok());
 
         } catch (Exception $e) {
-            Log::error("Failed {$this->getJobType()} fetch for integration {$this->integration->id} ({$this->serviceName})", [
+            // Log errors to all levels
+            log_hierarchical($this->integration, 'error', "Failed {$this->getJobType()} fetch", [
+                'integration_id' => $this->integration->id,
+                'integration_name' => $this->integration->name,
+                'service' => $this->serviceName,
+                'job_type' => $this->getJobType(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -85,7 +102,12 @@ abstract class BaseFetchJob implements ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
-        Log::error("{$this->getJobType()} fetch job failed permanently for integration {$this->integration->id} ({$this->serviceName})", [
+        // Log permanent failure to all levels
+        log_hierarchical($this->integration, 'critical', "{$this->getJobType()} fetch job failed permanently", [
+            'integration_id' => $this->integration->id,
+            'integration_name' => $this->integration->name,
+            'service' => $this->serviceName,
+            'job_type' => $this->getJobType(),
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);

@@ -60,7 +60,16 @@ Route::middleware(['auth'])->group(function () {
             abort(404);
         }
 
-        return view('plugins.show', ['service' => $service, 'pluginClass' => $pluginClass]);
+        // Get the integration group for this service if exists
+        $group = IntegrationGroup::where('service', $service)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        return view('plugins.show', [
+            'service' => $service,
+            'pluginClass' => $pluginClass,
+            'group' => $group,
+        ]);
     })->name('plugins.show');
 
     Route::get('integrations/{integration}/details', \App\Livewire\IntegrationDetails::class)
@@ -248,6 +257,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Volt::route('blocks', 'admin.blocks')->name('blocks.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
     Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
+    Volt::route('logs', 'pages.admin.logs')->name('logs.index');
     Route::post('bin/delete', function () {
         DeleteBinItemsBatch::dispatch(Auth::id());
 

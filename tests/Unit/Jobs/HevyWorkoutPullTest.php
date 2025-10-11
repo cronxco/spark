@@ -56,7 +56,7 @@ class HevyWorkoutPullTest extends TestCase
     public function fetch_data_success()
     {
         $mockResponse = [
-            'data' => [
+            'workouts' => [
                 [
                     'id' => 'workout_123',
                     'title' => 'Morning Workout',
@@ -80,15 +80,20 @@ class HevyWorkoutPullTest extends TestCase
                     ],
                 ],
             ],
+            'page' => 1,
+            'page_count' => 1,
         ];
 
         Http::fake([
-            'api.hevyapp.com/v1/workouts*' => Http::response($mockResponse, 200),
+            'api.hevyapp.com/v1/workouts*' => Http::response([
+                'workouts' => $mockResponse['workouts'],
+            ], 200),
         ]);
 
         $job = $this->createTestableJob();
         $result = $job->publicFetchData();
 
+        // The pullWorkoutData method returns a normalized structure
         $this->assertEquals($mockResponse, $result);
     }
 

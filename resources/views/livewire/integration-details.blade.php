@@ -33,6 +33,15 @@
             </div>
         </div>
 
+        <!-- Logs Section -->
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title">Logs</h2>
+                <p class="text-base-content/70 mb-4">View logs for this integration instance</p>
+                <livewire:log-viewer type="integration" :entity-id="$integration->id" />
+            </div>
+        </div>
+
         @if ($this->getPluginClass())
             <!-- Action Types Section -->
             <div class="card bg-base-100 shadow-sm">

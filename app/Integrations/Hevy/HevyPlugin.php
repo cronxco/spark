@@ -459,7 +459,7 @@ class HevyPlugin implements IntegrationPlugin
         $includeExerciseSummary = in_array('enabled', ($integration->configuration['include_exercise_summary_blocks'] ?? ['enabled']), true);
 
         foreach ($exercises as $exercise) {
-            $exerciseName = (string) (Arr::get($exercise, 'title') ?? 'Exercise');
+            $exerciseName = (string) (Arr::get($exercise, 'name') ?? Arr::get($exercise, 'title') ?? 'Exercise');
             $sets = Arr::get($exercise, 'sets', []);
             $exerciseVolume = 0.0;
             $exerciseUnit = null;

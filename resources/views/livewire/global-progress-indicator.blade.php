@@ -132,19 +132,19 @@ new class extends Component {
 ?>
 
 <div>
-    @if($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty())
+    @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty())
         <div class="dropdown dropdown-end"
-             @if($activeProgresses->isNotEmpty()) wire:poll.3s="checkProgress" @endif>
+             @if ($activeProgresses->isNotEmpty()) wire:poll.3s="checkProgress" @endif>
 
             <label tabindex="0" class="btn btn-ghost btn-sm gap-2">
                 <div class="indicator">
-                    @if($activeProgresses->isNotEmpty())
+                    @if ($activeProgresses->isNotEmpty())
                         <span class="indicator-item badge badge-primary badge-xs">
                             {{ $activeProgresses->count() }}
                         </span>
                         <span class="loading loading-spinner loading-xs"></span>
-                    @elseif($recentlyCompleted->isNotEmpty())
-                        @if($recentlyCompleted->where('failed_at', '!=', null)->isNotEmpty())
+                    @elseif ($recentlyCompleted->isNotEmpty())
+                        @if ($recentlyCompleted->where('failed_at', '!=', null)->isNotEmpty())
                             <span class="indicator-item badge badge-error badge-xs">
                                 {{ $recentlyCompleted->count() }}
                             </span>
@@ -169,9 +169,9 @@ new class extends Component {
                     <h3 class="font-semibold text-sm mb-3">Task Progress</h3>
 
                     {{-- Active Operations --}}
-                    @if($activeProgresses->isNotEmpty())
+                    @if ($activeProgresses->isNotEmpty())
                         <div class="space-y-3 mb-4">
-                            @foreach($activeProgresses as $progress)
+                            @foreach ($activeProgresses as $progress)
                                 <div class="card bg-base-100 border border-primary/20">
                                     <div class="card-body p-3">
                                         <div class="flex items-start gap-2">
@@ -199,16 +199,16 @@ new class extends Component {
                                                     </span>
                                                 </div>
 
-                                                @if($progress->step)
+                                                @if ($progress->step)
                                                     <div class="text-xs text-base-content/60 mt-1">
                                                         <span class="opacity-70">Step:</span> {{ $progress->step }}
                                                     </div>
                                                 @endif
 
-                                                @if($progress->details && count($progress->details) > 0)
+                                                @if ($progress->details && count($progress->details) > 0)
                                                     <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                                        @foreach($progress->details as $key => $value)
-                                                            @if(is_numeric($value))
+                                                        @foreach ($progress->details as $key => $value)
+                                                            @if (is_numeric($value))
                                                                 <div class="flex justify-between">
                                                                     <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
                                                                     <span class="font-semibold">{{ number_format($value) }}</span>
@@ -218,7 +218,7 @@ new class extends Component {
                                                     </div>
                                                 @endif
 
-                                                @if($progress->updates && count($progress->updates) > 0)
+                                                @if ($progress->updates && count($progress->updates) > 0)
                                                     <div class="mt-2 pt-2 border-t border-base-300">
                                                         <button wire:click="toggleUpdates('{{ $progress->id }}')"
                                                                 class="flex items-center gap-1 text-xs text-base-content/60 hover:text-base-content">
@@ -226,13 +226,13 @@ new class extends Component {
                                                             <span>{{ count($progress->updates) }} update{{ count($progress->updates) !== 1 ? 's' : '' }}</span>
                                                         </button>
 
-                                                        @if(in_array($progress->id, $expandedUpdates))
+                                                        @if (in_array($progress->id, $expandedUpdates))
                                                             <div class="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                                                                @foreach(array_reverse($progress->updates) as $update)
+                                                                @foreach (array_reverse($progress->updates) as $update)
                                                                     <div class="text-xs text-base-content/60 pl-2 border-l-2 border-base-300">
                                                                         <div class="flex items-start justify-between gap-2">
                                                                             <span>{{ $update['message'] ?? '' }}</span>
-                                                                            @if(isset($update['timestamp']))
+                                                                            @if (isset($update['timestamp']))
                                                                                 <span class="text-base-content/40 font-mono text-[10px]">
                                                                                     {{ $this->getRelativeTime($update['timestamp']) }}
                                                                                 </span>
@@ -253,17 +253,17 @@ new class extends Component {
                     @endif
 
                     {{-- Recently Completed (last 1 minute) --}}
-                    @if($recentlyCompleted->isNotEmpty())
-                        @if($activeProgresses->isNotEmpty())
+                    @if ($recentlyCompleted->isNotEmpty())
+                        @if ($activeProgresses->isNotEmpty())
                             <div class="divider my-2 text-xs">Recently Completed</div>
                         @endif
 
                         <div class="space-y-2 mb-4">
-                            @foreach($recentlyCompleted as $progress)
-                                <div class="card bg-base-100 border @if($progress->isFailed()) border-error/20 @else border-success/20 @endif">
+                            @foreach ($recentlyCompleted as $progress)
+                                <div class="card bg-base-100 border @if ($progress->isFailed()) border-error/20 @else border-success/20 @endif">
                                     <div class="card-body p-3">
                                         <div class="flex items-start gap-2">
-                                            @if($progress->isFailed())
+                                            @if ($progress->isFailed())
                                                 <x-icon name="o-x-circle" class="w-4 h-4 mt-0.5 text-error" />
                                             @else
                                                 <x-icon name="o-check-circle" class="w-4 h-4 mt-0.5 text-success" />
@@ -279,18 +279,18 @@ new class extends Component {
                                                     </div>
                                                 </div>
 
-                                                <div class="text-xs @if($progress->isFailed()) text-error @else text-success @endif">
-                                                    @if($progress->isFailed())
+                                                <div class="text-xs @if ($progress->isFailed()) text-error @else text-success @endif">
+                                                    @if ($progress->isFailed())
                                                         Failed: {{ $progress->error_message ?? $progress->message }}
                                                     @else
                                                         {{ $progress->message }}
                                                     @endif
                                                 </div>
 
-                                                @if($progress->details && count($progress->details) > 0)
+                                                @if ($progress->details && count($progress->details) > 0)
                                                     <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                                        @foreach($progress->details as $key => $value)
-                                                            @if(is_numeric($value))
+                                                        @foreach ($progress->details as $key => $value)
+                                                            @if (is_numeric($value))
                                                                 <div class="flex justify-between">
                                                                     <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
                                                                     <span class="font-semibold">{{ number_format($value) }}</span>
@@ -308,7 +308,7 @@ new class extends Component {
                     @endif
 
                     {{-- Recent History (1-5 minutes ago) - Collapsible --}}
-                    @if($recentHistory->isNotEmpty())
+                    @if ($recentHistory->isNotEmpty())
                         <div x-data="{ open: @entangle('showHistory') }">
                             <button @click="open = !open"
                                     class="flex items-center justify-between w-full text-xs text-base-content/70 hover:text-base-content py-2 px-1">
@@ -319,11 +319,11 @@ new class extends Component {
                             <div x-show="open"
                                  x-collapse
                                  class="space-y-2">
-                                @foreach($recentHistory as $progress)
+                                @foreach ($recentHistory as $progress)
                                     <div class="card bg-base-100/50 border border-base-300/50">
                                         <div class="card-body p-2">
                                             <div class="flex items-start gap-2">
-                                                @if($progress->isFailed())
+                                                @if ($progress->isFailed())
                                                     <x-icon name="o-x-circle" class="w-3.5 h-3.5 mt-0.5 text-error/70" />
                                                 @else
                                                     <x-icon name="o-check-circle" class="w-3.5 h-3.5 mt-0.5 text-success/70" />
@@ -340,7 +340,7 @@ new class extends Component {
                                                     </div>
 
                                                     <div class="text-xs text-base-content/60 truncate">
-                                                        @if($progress->isFailed())
+                                                        @if ($progress->isFailed())
                                                             {{ $progress->error_message ?? $progress->message }}
                                                         @else
                                                             {{ $progress->message }}
