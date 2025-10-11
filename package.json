@@ -28,9 +28,9 @@
     "devDependencies": {
         "@semantic-release/exec": "7.1.0",
         "@sentry/browser": "10.15.0",
-        "@sentry/vite-plugin": "4.3.0",
+        "@sentry/vite-plugin": "4.4.0",
         "@tailwindcss/vite": "4.1.14",
-        "daisyui": "5.2.0",
+        "daisyui": "5.2.1",
         "husky": "9.1.7",
         "lint-staged": "16.2.4",
         "prettier": "3.6.2",
