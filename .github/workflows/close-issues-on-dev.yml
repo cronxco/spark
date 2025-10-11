@@ -19,15 +19,21 @@ jobs:
       - name: Collect commit messages from this push
         id: commits
         run: |
-          echo "messages<<EOF" >> $GITHUB_OUTPUT
-          git log ${{ github.event.before }}..${{ github.sha }} --pretty=format:"%s%n%b" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Collect all commit messages from this push range
+          commits=$(git log ${{ github.event.before }}..${{ github.sha }} --pretty=format:"%s%n%b")
+          # Use a unique delimiter for multiline output
+          delimiter="$(openssl rand -hex 8)"
+          {
+            echo "messages<<${delimiter}"
+            echo "${commits}"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Extract issue numbers from commit messages
         id: extract
         run: |
-          matches=$(echo "${{ steps.commits.outputs.messages }}" | grep -Eio '(fixes|closes|resolves)[[:space:]]+#([0-9]+)' | grep -Eo '[0-9]+' | sort -u || true)
-          echo "issues=$matches" >> $GITHUB_OUTPUT
+          issues=$(echo "${{ steps.commits.outputs.messages }}" | grep -Eio '(fixes|closes|resolves)[[:space:]]+#([0-9]+)' | grep -Eo '[0-9]+' | sort -u || true)
+          echo "issues=$issues" >> "$GITHUB_OUTPUT"
 
       - name: Close dev-labelled issues
         if: ${{ steps.extract.outputs.issues != '' }}
