@@ -217,7 +217,7 @@ class ProcessIntegrationPage implements ShouldQueue
                             if ($resp->successful()) {
                                 $json = $resp->json();
                                 $balance = (int) ($json['balance'] ?? 0);
-                                $spendToday = (int) ($json['spend_today'] ?? 0);
+                                $spendToday = (int) ($json['spent_today'] ?? 0);
                                 // Ensure day target exists
                                 $dayObject = EventObject::updateOrCreate([
                                     'user_id' => $this->integration->user_id,
@@ -245,7 +245,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                         'value_multiplier' => 100,
                                         'value_unit' => 'GBP',
                                         'event_metadata' => [
-                                            'spend_today' => $spendToday / 100,
+                                            'spent_today' => $spendToday / 100,
                                             'snapshot_date' => $date,
                                         ],
                                         'target_id' => $dayObject->id,
@@ -277,7 +277,7 @@ class ProcessIntegrationPage implements ShouldQueue
                             if ($resp->successful()) {
                                 $json = $resp->json();
                                 $balance = (int) ($json['balance'] ?? 0);
-                                $spendToday = (int) ($json['spend_today'] ?? 0);
+                                $spendToday = (int) ($json['spent_today'] ?? 0);
                                 // Ensure day target exists
                                 $dayObject = EventObject::updateOrCreate([
                                     'user_id' => $this->integration->user_id,
@@ -305,7 +305,7 @@ class ProcessIntegrationPage implements ShouldQueue
                                         'value_multiplier' => 100,
                                         'value_unit' => 'GBP',
                                         'event_metadata' => [
-                                            'spend_today' => $spendToday / 100,
+                                            'spent_today' => $spendToday / 100,
                                             'snapshot_date' => $date,
                                         ],
                                         'target_id' => $dayObject->id,
