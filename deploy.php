@@ -89,7 +89,7 @@ task('version:prepare', function () {
         'projects' => getenv('SENTRY_PROJECT_ARRAY'),
         'token' => getenv('SENTRY_TOKEN'),
         'environment' => 'production',
-        'version' => $ver . '+' . $commit,
+        'version' => $ver . ' (' . $commit . ')',
         'version_prefix' => getenv('SENTRY_PREFIX'),
         'sentry_server' => getenv('SENTRY_SERVER'),
     ]);

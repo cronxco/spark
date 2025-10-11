@@ -65,7 +65,7 @@ class RedditSavedData extends BaseProcessingJob
 
             // Actor (reddit account)
             $actor = [
-                'concept' => 'a_party',
+                'concept' => 'user',
                 'type' => 'reddit_account',
                 'title' => ($me['subreddit']['display_name_prefixed'] ?? 'u/' . ($me['name'] ?? 'me')),
                 'content' => null,

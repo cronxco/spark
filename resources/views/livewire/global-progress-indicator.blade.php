@@ -2,18 +2,22 @@
 use App\Models\ActionProgress;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Collection;
+use Illuminate\Notifications\DatabaseNotification;
 use Livewire\Volt\Component;
 
 new class extends Component {
     public Collection $activeProgresses;
     public Collection $recentlyCompleted;
     public Collection $recentHistory;
+    public Collection $unreadNotifications;
     public bool $showHistory = false;
+    public bool $showNotifications = false;
     public array $expandedUpdates = [];
 
     public function mount(): void
     {
         $this->checkProgress();
+        $this->loadNotifications();
     }
 
     public function toggleUpdates(string $progressId): void
@@ -67,6 +71,40 @@ new class extends Component {
             })
             ->latest('updated_at')
             ->get();
+
+        $this->loadNotifications();
+    }
+
+    public function loadNotifications(): void
+    {
+        $this->unreadNotifications = Auth::user()->unreadNotifications()
+            ->latest()
+            ->limit(10)
+            ->get();
+    }
+
+    public function markNotificationAsRead(string $notificationId): void
+    {
+        $notification = Auth::user()->notifications()->find($notificationId);
+        if ($notification) {
+            $notification->markAsRead();
+        }
+        $this->loadNotifications();
+    }
+
+    public function markAllNotificationsAsRead(): void
+    {
+        Auth::user()->unreadNotifications->markAsRead();
+        $this->loadNotifications();
+    }
+
+    public function deleteNotification(string $notificationId): void
+    {
+        $notification = Auth::user()->notifications()->find($notificationId);
+        if ($notification) {
+            $notification->delete();
+        }
+        $this->loadNotifications();
     }
 
     public function toggleHistory(): void
@@ -132,37 +170,47 @@ new class extends Component {
 ?>
 
 <div>
-    @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty())
-        <div class="dropdown dropdown-end"
-             @if ($activeProgresses->isNotEmpty()) wire:poll.3s="checkProgress" @endif>
+    {{-- Always show the notification bell, with polling when there are active operations --}}
+    <div class="dropdown dropdown-end"
+         @if ($activeProgresses->isNotEmpty()) wire:poll.3s="checkProgress" @elseif ($unreadNotifications->isNotEmpty()) wire:poll.30s="loadNotifications" @endif>
 
-            <label tabindex="0" class="btn btn-ghost btn-sm gap-2">
-                <div class="indicator">
-                    @if ($activeProgresses->isNotEmpty())
-                        <span class="indicator-item badge badge-primary badge-xs">
-                            {{ $activeProgresses->count() }}
+        <label tabindex="0" class="btn btn-ghost btn-sm gap-2">
+            <div class="indicator">
+                @if ($activeProgresses->isNotEmpty())
+                    <span class="indicator-item badge badge-primary badge-xs">
+                        {{ $activeProgresses->count() }}
+                    </span>
+                    <span class="loading loading-spinner loading-xs"></span>
+                @elseif ($unreadNotifications->isNotEmpty())
+                    <span class="indicator-item badge badge-info badge-xs">
+                        {{ $unreadNotifications->count() }}
+                    </span>
+                    <x-icon name="o-bell" class="w-4 h-4" />
+                @elseif ($recentlyCompleted->isNotEmpty())
+                    @if ($recentlyCompleted->where('failed_at', '!=', null)->isNotEmpty())
+                        <span class="indicator-item badge badge-error badge-xs">
+                            {{ $recentlyCompleted->count() }}
                         </span>
-                        <span class="loading loading-spinner loading-xs"></span>
-                    @elseif ($recentlyCompleted->isNotEmpty())
-                        @if ($recentlyCompleted->where('failed_at', '!=', null)->isNotEmpty())
-                            <span class="indicator-item badge badge-error badge-xs">
-                                {{ $recentlyCompleted->count() }}
-                            </span>
-                            <x-icon name="o-exclamation-circle" class="w-4 h-4" />
-                        @else
-                            <span class="indicator-item badge badge-success badge-xs">
-                                {{ $recentlyCompleted->count() }}
-                            </span>
-                            <x-icon name="o-check-circle" class="w-4 h-4" />
-                        @endif
+                        <x-icon name="o-exclamation-circle" class="w-4 h-4" />
                     @else
-                        <span class="indicator-item badge badge-ghost badge-xs">
-                            {{ $recentHistory->count() }}
+                        <span class="indicator-item badge badge-success badge-xs">
+                            {{ $recentlyCompleted->count() }}
                         </span>
-                        <x-icon name="o-clock" class="w-4 h-4" />
+                        <x-icon name="o-check-circle" class="w-4 h-4" />
                     @endif
-                </div>
-            </label>
+                @elseif ($recentHistory->isNotEmpty())
+                    <span class="indicator-item badge badge-ghost badge-xs">
+                        {{ $recentHistory->count() }}
+                    </span>
+                    <x-icon name="o-clock" class="w-4 h-4" />
+                @else
+                    {{-- Show bell icon when nothing is happening --}}
+                    <x-icon name="o-bell" class="w-4 h-4" />
+                @endif
+            </div>
+        </label>
+
+        @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
 
             <div tabindex="0" class="dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto">
                 <div class="card-body">
@@ -354,8 +402,89 @@ new class extends Component {
                             </div>
                         </div>
                     @endif
+
+                    {{-- Notifications --}}
+                    @if ($unreadNotifications->isNotEmpty())
+                        @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty())
+                            <div class="divider my-2 text-xs">Notifications</div>
+                        @endif
+
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold">Unread Notifications</span>
+                            <button wire:click="markAllNotificationsAsRead" class="text-xs text-base-content/60 hover:text-base-content">
+                                Mark all as read
+                            </button>
+                        </div>
+
+                        <div class="space-y-2">
+                            @foreach ($unreadNotifications as $notification)
+                                @php
+                                    $data = $notification->data;
+                                    $iconName = $data['icon'] ?? 'o-bell';
+                                    $color = $data['color'] ?? 'primary';
+                                    $title = $data['title'] ?? 'Notification';
+                                    $message = $data['message'] ?? '';
+                                    $actionUrl = $data['action_url'] ?? null;
+                                @endphp
+
+                                <div class="card bg-base-100 border border-{{ $color }}/20">
+                                    <div class="card-body p-3">
+                                        <div class="flex items-start gap-2">
+                                            <x-icon :name="$iconName" class="w-4 h-4 mt-0.5 text-{{ $color }}" />
+
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <div class="font-semibold text-sm">
+                                                        {{ $title }}
+                                                    </div>
+                                                    <div class="flex items-center gap-1">
+                                                        <span class="text-xs text-base-content/50">
+                                                            {{ $this->getRelativeTime($notification->created_at) }}
+                                                        </span>
+                                                        <button wire:click="deleteNotification('{{ $notification->id }}')"
+                                                                class="btn btn-ghost btn-xs">
+                                                            <x-icon name="o-x-mark" class="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="text-xs text-base-content/70">
+                                                    {{ $message }}
+                                                </div>
+
+                                                <div class="flex items-center gap-2 mt-2">
+                                                    @if ($actionUrl)
+                                                        <a href="{{ $actionUrl }}"
+                                                           wire:click="markNotificationAsRead('{{ $notification->id }}')"
+                                                           class="btn btn-xs btn-{{ $color }}">
+                                                            View
+                                                        </a>
+                                                    @endif
+                                                    <button wire:click="markNotificationAsRead('{{ $notification->id }}')"
+                                                            class="btn btn-xs btn-ghost">
+                                                        Mark as read
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             </div>
-        </div>
-    @endif
+        @else
+            {{-- Show empty state when dropdown is opened with no items --}}
+            <div tabindex="0" class="dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3">
+                <div class="card-body">
+                    <div class="flex flex-col items-center justify-center py-8 text-center">
+                        <x-icon name="o-bell-slash" class="w-12 h-12 text-base-content/30 mb-3" />
+                        <p class="text-sm text-base-content/60">No notifications</p>
+                        <p class="text-xs text-base-content/40 mt-1">You're all caught up!</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+    </div>
 </div>

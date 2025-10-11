@@ -35,6 +35,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     Volt::route('settings/sessions', 'settings.sessions')->name('settings.sessions');
+    Volt::route('settings/notifications', 'settings.notifications')->name('settings.notifications');
     // Removed settings/appearance route
     Volt::route('settings/api-tokens', 'settings.api-tokens')->name('settings.api-tokens');
     Volt::route('settings/integrations', 'integrations.index')->name('integrations.index');

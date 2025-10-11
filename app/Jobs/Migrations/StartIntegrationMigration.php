@@ -6,8 +6,10 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\Outline\OutlineMigrationPull;
 use App\Models\ActionProgress;
 use App\Models\Integration;
+use App\Notifications\MigrationFailed;
 use App\Traits\MigrationPauser;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -133,6 +135,26 @@ class StartIntegrationMigration implements ShouldQueue
 
         // Ensure integration is unpaused on job failure
         static::unpauseAfterMigration($this->integration);
+
+        // Notify user of migration failure
+        try {
+            $this->integration->user->notify(
+                new MigrationFailed(
+                    $this->integration,
+                    $exception->getMessage(),
+                    [
+                        'service' => $this->integration->service,
+                        'instance_type' => $this->integration->instance_type,
+                        'attempts' => $this->attempts(),
+                    ]
+                )
+            );
+        } catch (Exception $e) {
+            Log::error('Failed to send MigrationFailed notification', [
+                'integration_id' => $this->integration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function startOura(): void
