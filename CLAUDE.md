@@ -40,9 +40,6 @@ sail artisan test --parallel
 ### Code Quality
 
 ```bash
-# Format code with Laravel Pint
-sail artisan pint
-
 # Format with Duster (includes Pint + more)
 sail vendor/bin/duster fix
 

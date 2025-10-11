@@ -45,7 +45,7 @@ Reference: Outline API docs (`https://www.getoutline.com/developers`).
     - Collections: `concept=category`, `type=outline_collection`
     - Documents: `concept=document`, `type=outline_document`
     - Day Notes: `concept=day_note` when in configured collection and title matches `YYYY-MM-DD: DayName`
-    - Users (actors): `concept=b_party`, `type=outline_user`
+    - Users (actors): `concept=user`, `type=outline_user`
 - Events
     - Day Notes: `action=had_day_note`, time is start of the day (UTC)
     - Other documents: `action=created`, time is Outline `createdAt`

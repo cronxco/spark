@@ -51,7 +51,7 @@ class User extends Authenticatable
     public static function booted()
     {
         static::creating(function ($model) {
-            $model->id = Str::uuid();
+            $model->id = (string) Str::uuid();
         });
     }
 
@@ -138,6 +138,122 @@ class User extends Authenticatable
     public function getUuidBlock(): string
     {
         return explode('-', $this->id)[0] ?? $this->id;
+    }
+
+    /**
+     * Get notification preferences from settings
+     */
+    public function getNotificationPreferences(): array
+    {
+        $settings = $this->settings ?? [];
+
+        return $settings['notifications'] ?? [
+            'email_enabled' => [],
+            'work_hours' => [
+                'enabled' => false,
+                'timezone' => 'UTC',
+                'start' => '09:00',
+                'end' => '17:00',
+            ],
+            'delayed_sending' => [
+                'mode' => 'immediate',
+                'digest_time' => '09:00',
+            ],
+        ];
+    }
+
+    /**
+     * Check if email notifications are enabled for a specific notification type
+     */
+    public function hasEmailNotificationsEnabled(string $notificationType): bool
+    {
+        $preferences = $this->getNotificationPreferences();
+
+        return $preferences['email_enabled'][$notificationType] ?? true;
+    }
+
+    /**
+     * Enable email notifications for a specific notification type
+     */
+    public function enableEmailNotifications(string $notificationType): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+        $emailEnabled = $notifications['email_enabled'] ?? [];
+
+        $emailEnabled[$notificationType] = true;
+        $notifications['email_enabled'] = $emailEnabled;
+        $settings['notifications'] = $notifications;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Disable email notifications for a specific notification type
+     */
+    public function disableEmailNotifications(string $notificationType): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+        $emailEnabled = $notifications['email_enabled'] ?? [];
+
+        $emailEnabled[$notificationType] = false;
+        $notifications['email_enabled'] = $emailEnabled;
+        $settings['notifications'] = $notifications;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Update notification preferences
+     */
+    public function updateNotificationPreferences(array $preferences): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+
+        $settings['notifications'] = array_merge($notifications, $preferences);
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Check if user is currently in work hours
+     */
+    public function isInWorkHours(): bool
+    {
+        $preferences = $this->getNotificationPreferences();
+        $workHours = $preferences['work_hours'];
+
+        if (! $workHours['enabled']) {
+            return true;
+        }
+
+        $timezone = $workHours['timezone'];
+        $now = now()->timezone($timezone);
+        $currentTime = $now->format('H:i');
+
+        return $currentTime >= $workHours['start'] && $currentTime < $workHours['end'];
+    }
+
+    /**
+     * Get the delayed sending mode
+     */
+    public function getDelayedSendingMode(): string
+    {
+        $preferences = $this->getNotificationPreferences();
+
+        return $preferences['delayed_sending']['mode'] ?? 'immediate';
+    }
+
+    /**
+     * Get the digest time for daily digest notifications
+     */
+    public function getDigestTime(): string
+    {
+        $preferences = $this->getNotificationPreferences();
+
+        return $preferences['delayed_sending']['digest_time'] ?? '09:00';
     }
 
     /**

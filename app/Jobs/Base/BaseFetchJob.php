@@ -4,6 +4,7 @@ namespace App\Jobs\Base;
 
 use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Integration;
+use App\Notifications\IntegrationFailed;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -77,7 +78,6 @@ abstract class BaseFetchJob implements ShouldQueue
                 'job_type' => $this->getJobType(),
             ]);
             $transaction->setStatus(SpanStatus::ok());
-
         } catch (Exception $e) {
             // Log errors to all levels
             log_hierarchical($this->integration, 'error', "Failed {$this->getJobType()} fetch", [
@@ -114,6 +114,26 @@ abstract class BaseFetchJob implements ShouldQueue
 
         // Mark integration as failed so it can be retried in the future
         $this->integration->markAsFailed();
+
+        // Notify user of permanent failure
+        try {
+            $this->integration->user->notify(
+                new IntegrationFailed(
+                    $this->integration,
+                    $exception->getMessage(),
+                    [
+                        'job_type' => $this->getJobType(),
+                        'service' => $this->serviceName,
+                        'attempts' => $this->attempts(),
+                    ]
+                )
+            );
+        } catch (Exception $e) {
+            Log::error('Failed to send IntegrationFailed notification', [
+                'integration_id' => $this->integration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -67,7 +67,7 @@ class OutlineData extends BaseProcessingJob
             // Actor object (Outline user who created the doc)
             $createdBy = $doc['createdBy'] ?? [];
             $actor = $this->createOrUpdateObject([
-                'concept' => 'b_party',
+                'concept' => 'user',
                 'type' => 'outline_user',
                 'title' => $createdBy['name'] ?? 'Outline User',
                 'time' => $createdBy['createdAt'] ?? now()->toISOString(),

@@ -6,6 +6,7 @@ use App\Integrations\Contracts\OAuthIntegrationPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Notifications\IntegrationAuthenticationFailed;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -265,6 +266,36 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
         $this->logApiResponse('POST', '/oauth/token', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
+            // Check if this is an authentication failure (invalid refresh token)
+            // These typically return 400 or 401 with error codes like 'invalid_grant'
+            if (in_array($response->status(), [400, 401])) {
+                $errorData = $response->json();
+                $errorCode = $errorData['error'] ?? '';
+
+                // invalid_grant means the refresh token is no longer valid - user must re-auth
+                if ($errorCode === 'invalid_grant' || $response->status() === 401) {
+                    // Send notification to user - they need to re-authorize
+                    try {
+                        // Get any integration from this group to use in the notification
+                        $integration = $group->integrations()->first();
+                        if ($integration) {
+                            $group->user->notify(
+                                new IntegrationAuthenticationFailed(
+                                    $integration,
+                                    'Your connection has expired and needs to be re-authorized.',
+                                    ['error_code' => $errorCode, 'status' => $response->status()]
+                                )
+                            );
+                        }
+                    } catch (Exception $e) {
+                        Log::error('Failed to send IntegrationAuthenticationFailed notification', [
+                            'group_id' => $group->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
             throw new Exception('Failed to refresh token');
         }
 
