@@ -40,7 +40,7 @@ class NotificationSystemTest extends TestCase
             'notifiable_type' => User::class,
         ]);
 
-        $notification = $this->user->notifications->first();
+        $notification = $this->user->notifications()->first();
         $this->assertEquals('Integration Completed', $notification->data['title']);
         $this->assertEquals('integration_completed', $notification->data['type']);
     }
@@ -280,7 +280,7 @@ class NotificationSystemTest extends TestCase
 
         $this->user->notify(new IntegrationCompleted($integration));
 
-        $notification = $this->user->notifications->first();
+        $notification = $this->user->notifications()->first();
         $this->assertNotNull($notification->data['action_url']);
         $this->assertStringContainsString((string) $integration->id, $notification->data['action_url']);
     }
@@ -293,7 +293,7 @@ class NotificationSystemTest extends TestCase
         $this->user->notify(new IntegrationCompleted($integration));
         $this->user->notify(new IntegrationCompleted($integration));
 
-        $unread = $this->user->unreadNotifications;
+        $unread = $this->user->unreadNotifications()->get();
 
         $this->assertCount(2, $unread);
     }
@@ -305,11 +305,11 @@ class NotificationSystemTest extends TestCase
 
         $this->user->notify(new IntegrationCompleted($integration));
 
-        $notification = $this->user->unreadNotifications->first();
+        $notification = $this->user->unreadNotifications()->first();
         $notification->markAsRead();
 
         $this->assertNotNull($notification->fresh()->read_at);
-        $this->assertCount(0, $this->user->unreadNotifications);
+        $this->assertCount(0, $this->user->unreadNotifications()->get());
     }
 
     /** @test */
@@ -385,7 +385,7 @@ class NotificationSystemTest extends TestCase
 
         $this->user->notify(new IntegrationCompleted($integration, $details));
 
-        $notification = $this->user->notifications->first();
+        $notification = $this->user->notifications()->first();
 
         // Details are included in the notification data
         $this->assertArrayHasKey('title', $notification->data);
