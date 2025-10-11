@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Mockery;
 use Tests\TestCase;
 
 class ChainMigrationUnpauseTest extends TestCase
@@ -70,12 +71,20 @@ class ChainMigrationUnpauseTest extends TestCase
             ->once();
 
         // Mock any other potential log calls
-        Log::shouldReceive('channel')->andReturnSelf();
+        $mockChannel = Mockery::mock();
+        $mockChannel->shouldReceive('log')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('info')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('error')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('debug')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('warning')->withAnyArgs()->andReturnSelf();
+
+        Log::shouldReceive('channel')->andReturn($mockChannel);
         Log::shouldReceive('info')->withAnyArgs();
         Log::shouldReceive('error')->withAnyArgs();
         Log::shouldReceive('debug')->withAnyArgs();
         Log::shouldReceive('warning')->withAnyArgs();
-        Log::shouldReceive('build')->andReturnSelf();
+        Log::shouldReceive('log')->withAnyArgs();
+        Log::shouldReceive('build')->andReturn($mockChannel);
 
         // Act
         $job = new FetchIntegrationPage($integration, [
@@ -139,12 +148,20 @@ class ChainMigrationUnpauseTest extends TestCase
             ->once();
 
         // Mock any other potential log calls
-        Log::shouldReceive('channel')->andReturnSelf();
+        $mockChannel = Mockery::mock();
+        $mockChannel->shouldReceive('log')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('info')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('error')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('debug')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('warning')->withAnyArgs()->andReturnSelf();
+
+        Log::shouldReceive('channel')->andReturn($mockChannel);
         Log::shouldReceive('info')->withAnyArgs();
         Log::shouldReceive('error')->withAnyArgs();
         Log::shouldReceive('debug')->withAnyArgs();
         Log::shouldReceive('warning')->withAnyArgs();
-        Log::shouldReceive('build')->andReturnSelf();
+        Log::shouldReceive('log')->withAnyArgs();
+        Log::shouldReceive('build')->andReturn($mockChannel);
 
         // Act
         $job = new FetchIntegrationPage($integration, [
@@ -203,12 +220,20 @@ class ChainMigrationUnpauseTest extends TestCase
             ->once();
 
         // Mock any other potential log calls
-        Log::shouldReceive('channel')->andReturnSelf();
+        $mockChannel = Mockery::mock();
+        $mockChannel->shouldReceive('log')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('info')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('error')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('debug')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('warning')->withAnyArgs()->andReturnSelf();
+
+        Log::shouldReceive('channel')->andReturn($mockChannel);
         Log::shouldReceive('info')->withAnyArgs();
         Log::shouldReceive('error')->withAnyArgs();
         Log::shouldReceive('debug')->withAnyArgs();
         Log::shouldReceive('warning')->withAnyArgs();
-        Log::shouldReceive('build')->andReturnSelf();
+        Log::shouldReceive('log')->withAnyArgs();
+        Log::shouldReceive('build')->andReturn($mockChannel);
 
         // Act
         $job = new FetchIntegrationPage($integration, [
@@ -269,12 +294,20 @@ class ChainMigrationUnpauseTest extends TestCase
             ->once();
 
         // Mock any other potential log calls
-        Log::shouldReceive('channel')->andReturnSelf();
+        $mockChannel = Mockery::mock();
+        $mockChannel->shouldReceive('log')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('info')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('error')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('debug')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('warning')->withAnyArgs()->andReturnSelf();
+
+        Log::shouldReceive('channel')->andReturn($mockChannel);
         Log::shouldReceive('info')->withAnyArgs();
         Log::shouldReceive('error')->withAnyArgs();
         Log::shouldReceive('debug')->withAnyArgs();
         Log::shouldReceive('warning')->withAnyArgs();
-        Log::shouldReceive('build')->andReturnSelf();
+        Log::shouldReceive('log')->withAnyArgs();
+        Log::shouldReceive('build')->andReturn($mockChannel);
 
         // Act - simulate being past the last repository index
         $job = new FetchIntegrationPage($integration, [
@@ -333,12 +366,20 @@ class ChainMigrationUnpauseTest extends TestCase
         ]);
 
         // Mock all log calls
-        Log::shouldReceive('channel')->andReturnSelf();
+        $mockChannel = Mockery::mock();
+        $mockChannel->shouldReceive('log')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('info')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('error')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('debug')->withAnyArgs()->andReturnSelf();
+        $mockChannel->shouldReceive('warning')->withAnyArgs()->andReturnSelf();
+
+        Log::shouldReceive('channel')->andReturn($mockChannel);
         Log::shouldReceive('info')->withAnyArgs();
         Log::shouldReceive('error')->withAnyArgs();
         Log::shouldReceive('debug')->withAnyArgs();
         Log::shouldReceive('warning')->withAnyArgs();
-        Log::shouldReceive('build')->andReturnSelf();
+        Log::shouldReceive('log')->withAnyArgs();
+        Log::shouldReceive('build')->andReturn($mockChannel);
 
         // Mock job dispatch to prevent Redis issues
         Bus::fake();

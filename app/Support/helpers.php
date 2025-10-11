@@ -1,6 +1,10 @@
 <?php
 
 use App\Integrations\PluginRegistry;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Models\User;
+use App\Services\LoggingService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -196,6 +200,7 @@ if (! function_exists('get_integration_log_channel')) {
 if (! function_exists('log_integration_api_request')) {
     /**
      * Log an API request for a specific integration
+     * Logs to integration instance channel as debug (if enabled)
      */
     function log_integration_api_request(
         string $service,
@@ -206,6 +211,26 @@ if (! function_exists('log_integration_api_request')) {
         string $integrationId = '',
         bool $perInstance = false
     ): void {
+        // Try to load the integration (only if it looks like a valid UUID)
+        if (! empty($integrationId) && preg_match('/^[a-f0-9\-]{36}$/i', $integrationId)) {
+            $integration = Integration::find($integrationId);
+            if ($integration) {
+                log_to_integration($integration, 'debug', 'API Request', [
+                    'service' => $service,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'headers' => array_map(function ($header) {
+                        return is_array($header) ? $header : [$header];
+                    }, sanitizeHeaders($headers)),
+                    'data' => sanitizeData($data),
+                    'timestamp' => now()->toISOString(),
+                ]);
+
+                return;
+            }
+        }
+
+        // Fallback to old behavior if integration not found
         $baseConfig = [
             'driver' => 'daily',
             'level' => 'debug',
@@ -214,10 +239,28 @@ if (! function_exists('log_integration_api_request')) {
         ];
 
         $filename = generate_api_log_filename($service, $integrationId, $perInstance);
-        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+        $channelName = pathinfo($filename, PATHINFO_FILENAME);
         $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
+
+        // If the logger is null (can happen in tests with spies), use the default Log facade
+        if (is_null($logger)) {
+            Log::debug('API Request', [
+                'service' => $service,
+                'integration_id' => $integrationId ?: null,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'headers' => array_map(function ($header) {
+                    return is_array($header) ? $header : [$header];
+                }, sanitizeHeaders($headers)),
+                'data' => sanitizeData($data),
+                'timestamp' => now()->toISOString(),
+            ]);
+
+            return;
+        }
+
         $logger->debug('API Request', [
             'service' => $service,
             'integration_id' => $integrationId ?: null,
@@ -235,6 +278,7 @@ if (! function_exists('log_integration_api_request')) {
 if (! function_exists('log_integration_api_response')) {
     /**
      * Log an API response for a specific integration
+     * Logs to integration instance channel as debug (if enabled)
      */
     function log_integration_api_response(
         string $service,
@@ -246,6 +290,29 @@ if (! function_exists('log_integration_api_response')) {
         string $integrationId = '',
         bool $perInstance = false
     ): void {
+        // Try to load the integration (only if it looks like a valid UUID)
+        if (! empty($integrationId) && preg_match('/^[a-f0-9\-]{36}$/i', $integrationId)) {
+            $integration = Integration::find($integrationId);
+            if ($integration) {
+                log_to_integration($integration, 'debug', 'API Response', [
+                    'service' => $service,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'status_code' => $statusCode,
+                    'headers' => array_map(function ($header) {
+                        return is_array($header) ? $header : [$header];
+                    }, sanitizeHeaders($headers)),
+                    'response_body' => strlen($body) > 10000
+                        ? substr($body, 0, 10000) . '... [TRUNCATED]'
+                        : $body,
+                    'timestamp' => now()->toISOString(),
+                ]);
+
+                return;
+            }
+        }
+
+        // Fallback to old behavior if integration not found
         $baseConfig = [
             'driver' => 'daily',
             'level' => 'debug',
@@ -254,10 +321,31 @@ if (! function_exists('log_integration_api_response')) {
         ];
 
         $filename = generate_api_log_filename($service, $integrationId, $perInstance);
-        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+        $channelName = pathinfo($filename, PATHINFO_FILENAME);
         $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
+
+        // If the logger is null (can happen in tests with spies), use the default Log facade
+        if (is_null($logger)) {
+            Log::debug('API Response', [
+                'service' => $service,
+                'integration_id' => $integrationId ?: null,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'status_code' => $statusCode,
+                'headers' => array_map(function ($header) {
+                    return is_array($header) ? $header : [$header];
+                }, sanitizeHeaders($headers)),
+                'response_body' => strlen($body) > 10000
+                    ? substr($body, 0, 10000) . '... [TRUNCATED]'
+                    : $body,
+                'timestamp' => now()->toISOString(),
+            ]);
+
+            return;
+        }
+
         $logger->debug('API Response', [
             'service' => $service,
             'integration_id' => $integrationId ?: null,
@@ -307,5 +395,56 @@ if (! function_exists('log_integration_webhook')) {
             'payload' => sanitizeData($payload),
             'timestamp' => now()->toISOString(),
         ]);
+    }
+}
+
+if (! function_exists('should_log_debug')) {
+    /**
+     * Check if debug logging should be enabled for a user
+     */
+    function should_log_debug(User $user): bool
+    {
+        return $user->hasDebugLoggingEnabled();
+    }
+}
+
+if (! function_exists('log_to_user')) {
+    /**
+     * Log a message to user's log channel
+     */
+    function log_to_user(User $user, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logToUser($user, $level, $message, $context);
+    }
+}
+
+if (! function_exists('log_to_group')) {
+    /**
+     * Log a message to integration group's log channel
+     */
+    function log_to_group(IntegrationGroup $group, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logToGroup($group, $level, $message, $context);
+    }
+}
+
+if (! function_exists('log_to_integration')) {
+    /**
+     * Log a message to integration instance's log channel
+     */
+    function log_to_integration(Integration $integration, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logToIntegration($integration, $level, $message, $context);
+    }
+}
+
+if (! function_exists('log_hierarchical')) {
+    /**
+     * Log a message hierarchically: integration → group → user
+     * Debug logs only go to integration (if enabled), info/warning/error cascade up
+     */
+    function log_hierarchical(Integration $integration, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logHierarchical($integration, $level, $message, $context);
     }
 }

@@ -77,6 +77,10 @@
             <label for="main-drawer" class="btn btn-ghost btn-sm lg:hidden" title="Menu" aria-label="Menu">
                 <x-icon name="o-bars-3" class="w-5 h-5" />
             </label>
+
+            {{-- Global Progress Indicator --}}
+            @livewire('global-progress-indicator')
+
             <x-button label="Search" icon="fab.searchengin" link="/search" class="btn-ghost btn-sm" responsive />
 
             {{-- User --}}
@@ -146,6 +150,7 @@
                     <x-menu-item title="Blocks" icon="fas.cubes" link="{{ route('admin.blocks.index') }}" :active="request()->routeIs('admin.blocks.*')"/>
                     <x-menu-item title="GoCardless" icon="fas.credit-card" link="{{ route('admin.gocardless.index') }}" :active="request()->routeIs('admin.gocardless.*')"/>
                     <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')"/>
+                    <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')"/>
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')"/>
                 </x-menu-sub>
             </x-menu>

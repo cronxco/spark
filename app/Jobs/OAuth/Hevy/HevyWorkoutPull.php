@@ -28,7 +28,10 @@ class HevyWorkoutPull extends BaseFetchJob
 
     protected function dispatchProcessingJobs(array $rawData): void
     {
-        if (empty($rawData['data'] ?? [])) {
+        // Normalize to check for workouts in either 'data' or 'workouts' key
+        $workouts = $rawData['data'] ?? $rawData['workouts'] ?? [];
+
+        if (empty($workouts)) {
             Log::info('Hevy: No workout data to process', [
                 'integration_id' => $this->integration->id,
             ]);
@@ -38,7 +41,7 @@ class HevyWorkoutPull extends BaseFetchJob
 
         Log::info('Hevy: Dispatching workout processing job', [
             'integration_id' => $this->integration->id,
-            'workout_count' => count($rawData['data']),
+            'workout_count' => count($workouts),
         ]);
 
         HevyWorkoutData::dispatch($this->integration, $rawData);

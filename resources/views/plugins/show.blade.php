@@ -248,6 +248,17 @@
             </div>
         </div>
 
+        <!-- Logs Section -->
+        @if ($group)
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title">Logs</h2>
+                    <p class="text-base-content/70 mb-4">View logs for all {{ $pluginClass::getDisplayName() }} integrations</p>
+                    <livewire:log-viewer type="group" :entity-id="$group->id" />
+                </div>
+            </div>
+        @endif
+
         <!-- Block Types Section -->
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">

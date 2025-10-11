@@ -22,6 +22,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Debug Logging Default
+    |--------------------------------------------------------------------------
+    |
+    | This option controls whether debug logging is enabled by default for
+    | all users. Users can override this setting in their profile settings.
+    |
+    */
+
+    'debug_logging_default' => env('APP_DEBUG_LOGGING_DEFAULT', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Deprecations Log Channel
     |--------------------------------------------------------------------------
     |

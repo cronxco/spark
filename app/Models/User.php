@@ -32,6 +32,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'settings',
     ];
 
     /**
@@ -96,6 +97,50 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if debug logging is enabled for this user
+     */
+    public function hasDebugLoggingEnabled(): bool
+    {
+        $settings = $this->settings ?? [];
+
+        // If user has explicitly set preference, use it
+        if (isset($settings['debug_logging_enabled'])) {
+            return (bool) $settings['debug_logging_enabled'];
+        }
+
+        // Otherwise fall back to environment variable (default true if not set)
+        return config('logging.debug_logging_default', true);
+    }
+
+    /**
+     * Enable debug logging for this user
+     */
+    public function enableDebugLogging(): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['debug_logging_enabled'] = true;
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Disable debug logging for this user
+     */
+    public function disableDebugLogging(): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['debug_logging_enabled'] = false;
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Get the first block of the user's UUID for log filenames
+     */
+    public function getUuidBlock(): string
+    {
+        return explode('-', $this->id)[0] ?? $this->id;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -105,6 +150,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'settings' => 'array',
         ];
     }
 }

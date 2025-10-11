@@ -116,4 +116,12 @@ class IntegrationGroup extends Model
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
+
+    /**
+     * Get the first block of the group's UUID for log filenames
+     */
+    public function getUuidBlock(): string
+    {
+        return explode('-', $this->id)[0] ?? $this->id;
+    }
 }
