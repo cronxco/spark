@@ -23,7 +23,6 @@ add('crontab:jobs', [
 ]);
 
 // Hosts
-
 host('prod')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
@@ -58,6 +57,19 @@ task('deploy', [
     'deploy:publish',
 ]);
 
+after('deploy:update_code', 'deploy:upload_version');
+task('deploy:upload_version', function () {
+    $localPath = 'config/version.yaml';
+    $remotePath = '{{release_path}}/config/version.yaml';
+    if (! file_exists($localPath)) {
+        writeln('<comment>⚠️ version.yaml not found locally, skipping upload.</comment>');
+
+        return;
+    }
+    writeln('<info>Uploading version.yaml to {{release_path}}</info>');
+    upload($localPath, $remotePath);
+});
+
 after('deploy:vendors', 'deploy:version:prepare');
 task('deploy:version:prepare', function () {
     run('sudo docker exec -t -w /srv/web/sites/spark/.dep/repo/ swag git config --global --add safe.directory /srv/web/sites/spark/.dep/repo');
@@ -88,6 +100,7 @@ task('version:set', function () {
     $ver = get('version');
     run("echo {$ver} > {{release_path}}/VERSION");
     runLocally("echo {$ver} > VERSION.txt");
+    run("echo {$ver} > {{release_path}}/public/VERSION.txt");
 });
 
 task('npm:run:prod', function () {
