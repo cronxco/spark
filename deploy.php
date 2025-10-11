@@ -59,14 +59,15 @@ task('deploy', [
 
 after('deploy:update_code', 'deploy:upload_version');
 task('deploy:upload_version', function () {
-    $localPath = 'config/version.yaml';
-    $remotePath = '{{release_path}}/config/version.yaml';
+    // Make path absolute based on deploy.php location
+    $localPath = __DIR__ . '/config/version.yml';
+    $remotePath = '{{release_path}}/config/version.yml';
     if (! file_exists($localPath)) {
-        writeln('<comment>⚠️ version.yaml not found locally, skipping upload.</comment>');
+        writeln("<comment>⚠️ version.yml not found locally at {$localPath}, skipping upload.</comment>");
 
         return;
     }
-    writeln('<info>Uploading version.yaml to {{release_path}}</info>');
+    writeln('<info>Uploading version.yml to {{release_path}}</info>');
     upload($localPath, $remotePath);
 });
 
