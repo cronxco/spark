@@ -171,10 +171,9 @@ class HierarchicalLoggingTest extends TestCase
         $date = now()->format('Y-m-d');
         $integrationPath = LoggingService::getIntegrationLogPath($this->integration, $date);
 
-        // Log file might not be created at all, or if it exists, shouldn't contain the message
-        if (file_exists($integrationPath)) {
-            $this->assertStringNotContainsString('Should not be logged', file_get_contents($integrationPath));
-        }
+        // When debug logging is disabled, the log file should not be created at all
+        // This ensures that sensitive debug information is not written to disk
+        $this->assertFileDoesNotExist($integrationPath, 'Debug log file should not be created when debug logging is disabled');
     }
 
     /** @test */
@@ -218,8 +217,8 @@ class HierarchicalLoggingTest extends TestCase
         $integrationUuidBlock = $this->integration->getUuidBlock();
 
         $this->assertStringContainsString("user_{$userUuidBlock}", $userPath);
-        $this->assertStringContainsString("group_{$groupUuidBlock}", $groupPath);
-        $this->assertStringContainsString("integration_{$integrationUuidBlock}", $integrationPath);
+        $this->assertStringContainsString("group_test_{$groupUuidBlock}", $groupPath);
+        $this->assertStringContainsString("integration_test_default_{$integrationUuidBlock}", $integrationPath);
 
         $this->assertFileExists($userPath);
         $this->assertFileExists($groupPath);

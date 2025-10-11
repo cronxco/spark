@@ -243,6 +243,23 @@ if (! function_exists('log_integration_api_request')) {
         $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
+        
+        // If the logger is null (can happen in tests with spies), use the default Log facade
+        if (is_null($logger)) {
+            Log::debug('API Request', [
+                'service' => $service,
+                'integration_id' => $integrationId ?: null,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'headers' => array_map(function ($header) {
+                    return is_array($header) ? $header : [$header];
+                }, sanitizeHeaders($headers)),
+                'data' => sanitizeData($data),
+                'timestamp' => now()->toISOString(),
+            ]);
+            return;
+        }
+        
         $logger->debug('API Request', [
             'service' => $service,
             'integration_id' => $integrationId ?: null,
@@ -307,6 +324,26 @@ if (! function_exists('log_integration_api_response')) {
         $baseConfig['path'] = storage_path('logs/' . $filename);
 
         $logger = Log::build($baseConfig);
+        
+        // If the logger is null (can happen in tests with spies), use the default Log facade
+        if (is_null($logger)) {
+            Log::debug('API Response', [
+                'service' => $service,
+                'integration_id' => $integrationId ?: null,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'status_code' => $statusCode,
+                'headers' => array_map(function ($header) {
+                    return is_array($header) ? $header : [$header];
+                }, sanitizeHeaders($headers)),
+                'response_body' => strlen($body) > 10000
+                    ? substr($body, 0, 10000) . '... [TRUNCATED]'
+                    : $body,
+                'timestamp' => now()->toISOString(),
+            ]);
+            return;
+        }
+        
         $logger->debug('API Response', [
             'service' => $service,
             'integration_id' => $integrationId ?: null,

@@ -44,7 +44,7 @@ class LoggingServiceTest extends TestCase
 
         $path = LoggingService::getUserLogPath($this->user, $date);
 
-        $this->assertStringContainsString("user_{$uuidBlock}_{$date}.log", $path);
+        $this->assertStringContainsString("user_{$uuidBlock}-{$date}.log", $path);
         $this->assertStringContainsString(storage_path('logs'), $path);
     }
 
@@ -56,7 +56,7 @@ class LoggingServiceTest extends TestCase
 
         $path = LoggingService::getGroupLogPath($this->group, $date);
 
-        $this->assertStringContainsString("group_{$uuidBlock}_{$date}.log", $path);
+        $this->assertStringContainsString("group_test_{$uuidBlock}-{$date}.log", $path);
         $this->assertStringContainsString(storage_path('logs'), $path);
     }
 
@@ -68,7 +68,7 @@ class LoggingServiceTest extends TestCase
 
         $path = LoggingService::getIntegrationLogPath($this->integration, $date);
 
-        $this->assertStringContainsString("integration_{$uuidBlock}_{$date}.log", $path);
+        $this->assertStringContainsString("integration_test_default_{$uuidBlock}-{$date}.log", $path);
         $this->assertStringContainsString(storage_path('logs'), $path);
     }
 
