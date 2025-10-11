@@ -115,54 +115,40 @@ class SlackEventsData extends BaseProcessingJob
 
         // Add channel-specific tags
         if (! empty($eventData['event_metadata']['channel'])) {
-            $event->syncTags([
-                'slack',
-                'online',
-                'channel_' . $eventData['event_metadata']['channel'],
-                $eventData['action'],
-            ]);
+            $event->attachTag('channel_' . $eventData['event_metadata']['channel'], 'slack_channel');
+            $event->attachTag($eventData['action'], 'slack_action');
         } else {
-            $event->syncTags([
-                'slack',
-                'online',
-                $eventData['action'],
-            ]);
+            $event->attachTag($eventData['action'], 'slack_action');
         }
     }
 
     private function addSlackTags(Event $event, array $eventData): void
     {
-        $tags = [
-            'slack',
-            'online',
-            $eventData['action'],
-        ];
+        $event->attachTag($eventData['action'], 'slack_action');
 
         // Add team tag if available
         if (! empty($eventData['event_metadata']['team'])) {
-            $tags[] = 'team_' . $eventData['event_metadata']['team'];
+            $event->attachTag('team_' . $eventData['event_metadata']['team'], 'slack_team');
         }
 
         // Add channel tag if available
         if (! empty($eventData['event_metadata']['channel'])) {
-            $tags[] = 'channel_' . $eventData['event_metadata']['channel'];
+            $event->attachTag('channel_' . $eventData['event_metadata']['channel'], 'slack_channel');
         }
 
         // Add subtype tag for messages
         if (! empty($eventData['event_metadata']['subtype'])) {
-            $tags[] = 'subtype_' . $eventData['event_metadata']['subtype'];
+            $event->attachTag('subtype_' . $eventData['event_metadata']['subtype'], 'slack_subtype');
         }
 
         // Add reaction tag if available
         if (! empty($eventData['event_metadata']['reaction'])) {
-            $tags[] = 'reaction_' . str_replace([':', '-'], '_', $eventData['event_metadata']['reaction']);
+            $event->attachTag('reaction_' . str_replace([':', '-'], '_', $eventData['event_metadata']['reaction']), 'slack_reaction');
         }
 
         // Add file type tag if available
         if (! empty($eventData['event_metadata']['file_type'])) {
-            $tags[] = 'file_' . $eventData['event_metadata']['file_type'];
+            $event->attachTag('file_' . $eventData['event_metadata']['file_type'], 'slack_file_type');
         }
-
-        $event->syncTags($tags);
     }
 }

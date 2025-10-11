@@ -343,7 +343,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ]);
 
             return $link;
-
         } catch (Throwable $e) {
             Log::error('Failed to create GoCardless OAuth URL', [
                 'group_id' => $group->id,
@@ -1236,20 +1235,14 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'updated' => $isStatusChange,
         ]);
 
-        // Add relevant tags based on transaction status
-        $tags = [
-            'money',
-            'transaction',
-            'bank',
-            'gocardless',
-            $category,
-        ];
+        // Populate category tag
+        $event->attachTag($category, 'transaction_category');
 
         // Add status-specific tags
         if ($status === 'pending') {
-            $tags[] = 'pending';
+            $event->attachTag('pending', 'transaction_status');
         } elseif ($status === 'booked') {
-            $tags[] = 'settled';
+            $event->attachTag('settled', 'transaction_status');
             // Remove pending tag if it exists (status transition)
             if ($isStatusChange && $existingEvent) {
                 $event->detachTag('pending');
@@ -1266,13 +1259,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if ($status === 'booked') {
             $txAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
             if ($txAmount < 0) {
-                $tags[] = 'debit';
+                $event->attachTag('debit', 'transaction_type');
             } else {
-                $tags[] = 'credit';
+                $event->attachTag('credit', 'transaction_type');
             }
         }
-
-        $event->syncTags($tags);
 
         // Add typed tags from structured additional data
         $additional = $tx['additionalDataStructured'] ?? null;
@@ -1288,7 +1279,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 $event->attachTag($identification, 'card_pan');
             }
         }
-
     }
 
     /**
@@ -1369,13 +1359,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Add tags
-        $event->syncTags([
-            'money',
-            'balance',
-            'bank',
-            'gocardless',
-            $balanceType,
-        ]);
+        $event->attachTag($balanceType, 'balance_type');
 
         // Add balance blocks for additional data
         $accountData = ['id' => $accountId]; // Create minimal account data for the block
@@ -1674,7 +1658,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
             // For other errors (rate limits, server errors), assume account exists to avoid false negatives
             return true;
-
         } catch (Exception $e) {
             // If validation fails due to network issues, assume account exists
             return true;
@@ -2128,7 +2111,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'booked_transactions_count' => $bookedCount,
                 'total_transactions_count' => $pendingCount + $bookedCount,
             ]);
-
         } catch (Throwable $e) {
             Log::error('GoCardless data sweep failed', [
                 'integration_id' => $integration->id,
@@ -2227,14 +2209,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'time' => $data['referenceDate'] ?? now(),
             ]
         );
-
-        // Add relevant tags
-        $block->syncTags([
-            'money',
-            'balance',
-            'bank',
-            'gocardless',
-        ]);
     }
 
     /**
@@ -2248,18 +2222,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         // Get counterparty name
         $counterparty = $transaction['creditorName'] ??
-                       $transaction['debtorName'] ??
-                       $transaction['remittanceInformationUnstructured'] ??
-                       'unknown';
+            $transaction['debtorName'] ??
+            $transaction['remittanceInformationUnstructured'] ??
+            'unknown';
 
         // Get transaction amount (absolute value for consistency)
         $amount = abs((float) ($transaction['transactionAmount']['amount'] ?? 0));
 
         // Create content-based hash that's consistent between pending and booked states
         $contentString = $date . '_' .
-                        Str::headline(Str::lower($counterparty)) . '_' .
-                        $amount . '_' .
-                        ($transaction['transactionAmount']['currency'] ?? 'EUR');
+            Str::headline(Str::lower($counterparty)) . '_' .
+            $amount . '_' .
+            ($transaction['transactionAmount']['currency'] ?? 'EUR');
 
         return 'gc_' . md5($contentString);
     }
@@ -2368,8 +2342,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $hour = $dateTime->hour;
         $minute = $dateTime->minute;
 
-        return
-            ($hour >= 2 && $hour <= 5 && $minute === 0) || // 2-5 AM with :00 minutes
+        return ($hour >= 2 && $hour <= 5 && $minute === 0) || // 2-5 AM with :00 minutes
             ($hour === 0 && $minute === 0) || // Midnight
             ($hour === 23 && $minute >= 55);   // Near midnight
     }
@@ -2818,10 +2791,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Look for an existing requisition for this institution and agreement
         if (isset($data['results']) && is_array($data['results'])) {
             foreach ($data['results'] as $requisition) {
-                if (isset($requisition['institution_id']) &&
+                if (
+                    isset($requisition['institution_id']) &&
                     $requisition['institution_id'] === $institutionId &&
                     isset($requisition['agreement']) &&
-                    $requisition['agreement'] === $agreementId) {
+                    $requisition['agreement'] === $agreementId
+                ) {
 
                     Log::info('Found existing GoCardless requisition for institution and agreement', [
                         'requisition_id' => $requisition['id'],

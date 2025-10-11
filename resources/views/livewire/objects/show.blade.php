@@ -693,7 +693,7 @@ new class extends Component {
         return 'o-cube'; // Default icon
     }
 
-    public function addTag(string $value): void
+    public function addTag(string $value, ?string $type = null): void
     {
         $name = trim((string) $value);
         if ($name === '') {
@@ -704,12 +704,39 @@ new class extends Component {
             return;
         }
 
-        $tag = Tag::findOrCreate($name);
+        // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
+        $detectedType = $type !== null ? trim($type) : null;
+        if ($detectedType === null) {
+            if (preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $m) === 1) {
+                $detectedType = strtolower($m[1]);
+                $name = trim($m[2]);
+            }
+        } else {
+            // Strip matching prefix from the visible value if present
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
+                $name = trim($m[1]);
+            }
+        }
+
+        // Default free-form tags to 'spark' unless they are emoji-only
+        if ($detectedType === null) {
+            $detectedType = preg_match('/^\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?(?:\\x{200D}\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?)*$/u', $name) === 1
+                ? 'emoji'
+                : 'spark';
+        }
+
+        $tag = Tag::findOrCreate($name, $detectedType);
+        // Ensure type persisted in case library returned an existing tag without the type set
+        if (($tag->type ?? null) !== $detectedType) {
+            $tag->type = $detectedType;
+            $tag->save();
+        }
+
         $this->object->attachTag($tag);
         $this->object->refresh()->loadMissing('tags');
     }
 
-    public function removeTag(string $value): void
+    public function removeTag(string $value, ?string $type = null): void
     {
         $name = trim((string) $value);
         if ($name === '') {
@@ -720,7 +747,28 @@ new class extends Component {
             return;
         }
 
-        $this->object->detachTag($name);
+        // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
+        $detectedType = $type !== null ? trim($type) : null;
+        if ($detectedType === null) {
+            if (preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $m) === 1) {
+                $detectedType = strtolower($m[1]);
+                $name = trim($m[2]);
+            }
+        } else {
+            // Strip matching prefix from the visible value if present
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
+                $name = trim($m[1]);
+            }
+        }
+
+        // Default free-form tags to 'spark' unless they are emoji-only
+        if ($detectedType === null) {
+            $detectedType = preg_match('/^\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?(?:\\x{200D}\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?)*$/u', $name) === 1
+                ? 'emoji'
+                : 'spark';
+        }
+
+        $this->object->detachTag($name, $detectedType);
         $this->object->refresh()->loadMissing('tags');
     }
 
@@ -816,7 +864,7 @@ new class extends Component {
                                 <h4 class="text-sm font-medium text-base-content/70 mb-2">Object Tags</h4>
                                 <div class="flex flex-wrap gap-2">
                                     @foreach ($this->object->tags as $tag)
-                                        <x-badge :value="$tag->name" class="badge-secondary" />
+                                        <x-spark-tag :tag="$tag" />
                                     @endforeach
                                 </div>
                             </div>

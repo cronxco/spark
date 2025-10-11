@@ -1617,37 +1617,37 @@ class MonzoPlugin extends OAuthPlugin
     {
         // Category tag
         if (! empty($tx['category'])) {
-            $event->attachTag((string) $tx['category']);
+            $event->attachTag((string) $tx['category'], 'transaction_category');
         }
         // Debit/Credit tag
         $amount = (int) ($tx['amount'] ?? 0);
-        $event->attachTag($amount < 0 ? 'debit' : 'credit');
+        $event->attachTag($amount < 0 ? 'debit' : 'credit', 'transaction_type');
         // Scheme tag
         if (! empty($tx['scheme'])) {
-            $event->attachTag((string) $tx['scheme']);
+            $event->attachTag((string) $tx['scheme'], 'transaction_scheme');
         }
         // Currency tag
         if (! empty($tx['local_currency'])) {
-            $event->attachTag((string) $tx['local_currency']);
+            $event->attachTag((string) $tx['local_currency'], 'transaction_currency');
         }
         // Merchant emoji/country/category
         if (! empty($tx['merchant']['emoji'])) {
-            $event->attachTag((string) $tx['merchant']['emoji']);
+            $event->attachTag((string) $tx['merchant']['emoji'], 'merchant_emoji');
         }
         if (! empty($tx['merchant']['address']['country'])) {
-            $event->attachTag((string) $tx['merchant']['address']['country']);
+            $event->attachTag((string) $tx['merchant']['address']['country'], 'merchant_country');
         }
         if (! empty($tx['merchant']['category'])) {
-            $event->attachTag((string) $tx['merchant']['category']);
+            $event->attachTag((string) $tx['merchant']['category'], 'merchant_category');
         }
         // Decline / settled
         if ((int) ($tx['declined'] ?? 0) === 1) {
-            $event->attachTag('declined');
+            $event->attachTag('declined', 'transaction_status');
             if (! empty($tx['decline_reason'])) {
-                $event->attachTag((string) $tx['decline_reason']);
+                $event->attachTag((string) $tx['decline_reason'], 'decline_reason');
             }
         } elseif ((int) ($tx['pending'] ?? 0) !== 1) {
-            $event->attachTag('settled');
+            $event->attachTag('settled', 'transaction_status');
         }
     }
 

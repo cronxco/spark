@@ -84,7 +84,6 @@ abstract class BaseProcessingJob implements ShouldQueue
 
             Log::info("Completed {$this->getJobType()} processing for integration {$this->integration->id} ({$this->serviceName})");
             $transaction->setStatus(SpanStatus::ok());
-
         } catch (Exception $e) {
             Log::error("Failed {$this->getJobType()} processing for integration {$this->integration->id} ({$this->serviceName})", [
                 'error' => $e->getMessage(),
@@ -219,17 +218,16 @@ abstract class BaseProcessingJob implements ShouldQueue
                                 if ($type) {
                                     $event->attachTag($name, (string) $type);
                                 } else {
-                                    $event->attachTag($name);
+                                    $event->attachTag($name, 'spark_tag');
                                 }
                             }
                         } elseif (is_string($tag) && $tag !== '') {
-                            $event->attachTag($tag);
+                            $event->attachTag($tag, 'spark_tag');
                         }
                     }
                 }
 
                 $events->push($event);
-
             } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
                 // Handle race condition where event was created between our check and create
                 Log::warning('Race condition detected - event already exists', [

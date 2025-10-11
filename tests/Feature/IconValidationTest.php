@@ -282,7 +282,7 @@ class IconValidationTest extends TestCase
                     if (preg_match('/^[mso]-[a-zA-Z0-9-]+$/', $match) &&
                         strlen($match) > 4 && // Must be longer than just "o-b" or "s-xs"
                         ! preg_match('/^[mso]-[a-z]$/', $match) && // Exclude single letters
-                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl)$/', $match) && // Exclude CSS-like classes
+                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl|boxed)$/', $match) && // Exclude CSS-like classes
                         ! preg_match('/^[mso]-[a-z]+-[0-9]+$/', $match) && // Exclude color classes like m-neutral-950, m-purple-500
                         ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match)) { // Exclude common CSS class patterns
                         $this->foundIcons[] = $match;

@@ -593,7 +593,7 @@ class AppleHealthPlugin extends WebhookPlugin
         if ($location) {
             $tags[] = [
                 'name' => (string) $location,
-                'type' => 'location',
+                'type' => 'workout_location',
             ];
         }
 
@@ -678,7 +678,7 @@ class AppleHealthPlugin extends WebhookPlugin
         if (array_key_exists('source', $point) && is_string($point['source']) && $point['source'] !== '') {
             $tags[] = [
                 'name' => (string) $point['source'],
-                'type' => 'data_source',
+                'type' => 'workout_data_source',
             ];
         }
 

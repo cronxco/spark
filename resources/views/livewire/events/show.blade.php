@@ -192,7 +192,7 @@ new class extends Component {
         $this->showSidebar = !$this->showSidebar;
     }
 
-    public function addTag(string $value): void
+    public function addTag(string $value, ?string $type = null): void
     {
         $name = trim((string) $value);
         if ($name === '') {
@@ -203,13 +203,40 @@ new class extends Component {
             return;
         }
 
-        $tag = Tag::findOrCreate($name);
+        // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
+        $detectedType = $type !== null ? trim($type) : null;
+        if ($detectedType === null) {
+            if (preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $m) === 1) {
+                $detectedType = strtolower($m[1]);
+                $name = trim($m[2]);
+            }
+        } else {
+            // Strip matching prefix from the visible value if present
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
+                $name = trim($m[1]);
+            }
+        }
+
+        // Default free-form tags to 'spark' unless they are emoji-only
+        if ($detectedType === null) {
+            $detectedType = preg_match('/^\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?(?:\\x{200D}\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?)*$/u', $name) === 1
+                ? 'emoji'
+                : 'spark';
+        }
+
+        $tag = Tag::findOrCreate($name, $detectedType);
+        // Ensure type persisted in case library returned an existing tag without the type set
+        if (($tag->type ?? null) !== $detectedType) {
+            $tag->type = $detectedType;
+            $tag->save();
+        }
+
         $this->event->attachTag($tag);
         $this->event->refresh()->loadMissing('tags');
-        Log::info('Tag added to event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
+        Log::info('Tag added to event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'type' => $detectedType, 'tags_now' => $this->event->tags->pluck('name')->all()]);
     }
 
-    public function removeTag(string $value): void
+    public function removeTag(string $value, ?string $type = null): void
     {
         $name = trim((string) $value);
         if ($name === '') {
@@ -220,9 +247,30 @@ new class extends Component {
             return;
         }
 
-        $this->event->detachTag($name);
+        // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
+        $detectedType = $type !== null ? trim($type) : null;
+        if ($detectedType === null) {
+            if (preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $m) === 1) {
+                $detectedType = strtolower($m[1]);
+                $name = trim($m[2]);
+            }
+        } else {
+            // Strip matching prefix from the visible value if present
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
+                $name = trim($m[1]);
+            }
+        }
+
+        // Default free-form tags to 'spark' unless they are emoji-only
+        if ($detectedType === null) {
+            $detectedType = preg_match('/^\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?(?:\\x{200D}\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?)*$/u', $name) === 1
+                ? 'emoji'
+                : 'spark';
+        }
+
+        $this->event->detachTag($name, $detectedType);
         $this->event->refresh()->loadMissing('tags');
-        Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'tags_now' => $this->event->tags->pluck('name')->all()]);
+        Log::info('Tag removed from event', ['event_id' => (string) $this->event->id, 'tag' => $name, 'type' => $detectedType, 'tags_now' => $this->event->tags->pluck('name')->all()]);
     }
 
     public function notifyCopied(string $what): void
@@ -356,7 +404,7 @@ new class extends Component {
                                 <div class="mt-4">
                                     <div class="flex flex-wrap gap-2">
                                         @foreach ($this->event->tags as $tag)
-                                            <x-badge :value="$tag->name" class="badge-sm" />
+                                            <x-spark-tag :tag="$tag" />
                                         @endforeach
                                     </div>
                                 </div>
@@ -605,7 +653,7 @@ new class extends Component {
                                         <span class="text-base-content/70">Tags:</span>
                                         <div class="flex flex-wrap gap-1 mt-1">
                                             @foreach ($this->event->actor->tags as $tag)
-                                                <x-badge :value="$tag->name" class="badge-xs" />
+                                                <x-spark-tag :tag="$tag" />
                                             @endforeach
                                         </div>
                                     </div>
@@ -662,7 +710,7 @@ new class extends Component {
                                         <span class="text-base-content/70">Tags:</span>
                                         <div class="flex flex-wrap gap-1 mt-1">
                                             @foreach ($this->event->target->tags as $tag)
-                                                <x-badge :value="$tag->name" class="badge-xs" />
+                                                <x-spark-tag :tag="$tag" />
                                             @endforeach
                                         </div>
                                     </div>

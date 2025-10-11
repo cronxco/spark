@@ -63,6 +63,6 @@ class RedditSavedDataTest extends TestCase
         $this->assertTrue($event->blocks()->count() >= 2); // image + url
 
         // Tag exists
-        $this->assertTrue($event->hasTag('reddit-subreddit:laravel'));
+        $this->assertTrue($event->hasTag('r/laravel', 'reddit_subreddit'));
     }
 }

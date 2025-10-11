@@ -146,7 +146,7 @@ class RedditSavedData extends BaseProcessingJob
                 'target' => $target,
                 'blocks' => $blocks,
                 'tags' => [
-                    'reddit-subreddit:' . ($data['subreddit'] ?? 'unknown'),
+                    'r/' . ($data['subreddit'] ?? 'unknown'),
                 ],
             ];
         }
@@ -158,7 +158,7 @@ class RedditSavedData extends BaseProcessingJob
         foreach ($created as $event) {
             $tags = $event->event_metadata['__tags'] ?? [];
             foreach ($tags as $tag) {
-                $event->attachTag($tag);
+                $event->attachTag($tag, 'reddit_subreddit');
             }
         }
     }
