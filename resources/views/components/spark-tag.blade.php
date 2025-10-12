@@ -34,16 +34,18 @@ $parts = explode(';;', $wrapped);
 $displayName = $parts[0] . '...';
 }
 
-// Determine badge color based on tag type
-// People tags are secondary, emojis are warning, transaction types/categories/statuses/schemes/currencies are accent, spark tags are primary, others are neutral
-$badgeClass = match($tagType) {
+// Determine popover color based on badge color
+$color = match($tagType) {
 'transaction_category', 'transaction_type', 'transaction_status', 'transaction_scheme',
-'transaction_currency', 'balance_type', 'card_pan', 'decline_reason', 'merchant_country', 'merchant_category', 'music_album', 'spotify_context' => 'badge-accent',
-'music_artist', 'person' => 'badge-secondary',
-'emoji', 'merchant_emoji' => 'badge-warning',
-'spark' => 'badge-primary',
-default => 'badge-neutral',
+'transaction_currency', 'balance_type', 'card_pan', 'decline_reason', 'merchant_country', 'merchant_category', 'music_album', 'spotify_context' => 'info',
+'music_artist', 'person' => 'secondary',
+'emoji', 'merchant_emoji' => 'warning',
+'spark' => 'primary',
+default => 'neutral',
 };
+
+// Determine badge color based on tag type
+$badgeClass = "badge-{$color}";
 
 if (!$fill) {
 $badgeClass .= ' badge-outline';
@@ -61,7 +63,7 @@ default => 'badge-sm',
 $badgeClass .= ' ' . $sizeClass;
 @endphp
 
-<x-popover class="inline-block">
+<x-popover class="inline-block bg-{{ $color }}">
     <x-slot:trigger>
         <x-badge class="{{ $badgeClass }}">
             <x-slot:value>
@@ -69,5 +71,5 @@ $badgeClass .= ' ' . $sizeClass;
             </x-slot:value>
         </x-badge>
     </x-slot:trigger>
-    <x-slot:content class="bg-secondary text-secondary-content text-center border-secondary/40">@if ($tagType && $tagSlug && $tagId)<a href="{{ route('tags.show', [$tagType, $tagSlug, $tagId]) }}"><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></a>@else<div><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></div>@endif</x-slot:content>
+    <x-slot:content class="bg-{{ $color }} text-{{ $color }}-content text-center border-{{ $color }}/40">@if ($tagType && $tagSlug && $tagId)<a href="{{ route('tags.show', [$tagType, $tagSlug, $tagId]) }}"><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></a>@else<div><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></div>@endif</x-slot:content>
 </x-popover>

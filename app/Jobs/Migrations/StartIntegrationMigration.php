@@ -166,6 +166,11 @@ class StartIntegrationMigration implements ShouldQueue
             'instance_type' => $type,
         ]);
 
+        // Track migration start time for statistics
+        $this->integration->update([
+            'configuration->migration_started_at' => now()->toIso8601String(),
+        ]);
+
         // Date-window paging going backwards. Default windows: 30 days (daily endpoints), 7 days (heartrate)
         $now = Carbon::now();
         if ($type === 'heartrate') {
@@ -214,6 +219,11 @@ class StartIntegrationMigration implements ShouldQueue
             'instance_type' => $this->integration->instance_type ?: 'listening',
         ]);
 
+        // Track migration start time for statistics
+        $this->integration->update([
+            'configuration->migration_started_at' => now()->toIso8601String(),
+        ]);
+
         $nowMs = (int) round(microtime(true) * 1000);
         $context = [
             'service' => 'spotify',
@@ -239,6 +249,11 @@ class StartIntegrationMigration implements ShouldQueue
         $this->updateProgress('configuring', 'Configuring GitHub migration...', 20, [
             'service' => 'github',
             'instance_type' => $this->integration->instance_type ?: 'activity',
+        ]);
+
+        // Track migration start time for statistics
+        $this->integration->update([
+            'configuration->migration_started_at' => now()->toIso8601String(),
         ]);
 
         $context = [
@@ -408,11 +423,15 @@ class StartIntegrationMigration implements ShouldQueue
 
         // Skip migration for task instances - they don't need backfill
         if ($instanceType === 'task') {
-            $this->updateProgress('skipped', 'Task instances do not require migration', 100, [
-                'service' => 'outline',
-                'instance_type' => $instanceType,
-                'reason' => 'Task instances do not perform data backfill',
-            ]);
+            // Mark as completed without sending notification
+            if ($this->progressRecord) {
+                $this->progressRecord->markCompleted([
+                    'service' => 'outline',
+                    'instance_type' => $instanceType,
+                    'skipped' => true,
+                    'reason' => 'Task instances do not perform data backfill',
+                ]);
+            }
 
             // Unpause immediately since we're not running a migration
             static::unpauseAfterMigration($this->integration);

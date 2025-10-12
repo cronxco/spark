@@ -5,6 +5,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\LoggingService;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -19,14 +20,77 @@ if (! function_exists('format_action_title')) {
         $headline = Str::headline($title);
 
         $minorWords = [
-            'and', 'as', 'but', 'for', 'if', 'nor', 'or', 'so', 'yet',
-            'a', 'an', 'the',
-            'about', 'above', 'across', 'after', 'against', 'along', 'among', 'around', 'at',
-            'before', 'behind', 'below', 'beneath', 'beside', 'besides', 'between', 'beyond', 'by',
-            'concerning', 'considering', 'despite', 'down', 'during', 'except', 'following', 'for', 'from',
-            'in', 'inside', 'into', 'like', 'near', 'of', 'off', 'on', 'onto', 'opposite', 'outside', 'over',
-            'past', 'per', 'plus', 'regarding', 'round', 'since', 'than', 'through', 'to', 'toward', 'under',
-            'underneath', 'unlike', 'until', 'up', 'upon', 'via', 'with', 'within', 'without',
+            'and',
+            'as',
+            'but',
+            'for',
+            'if',
+            'nor',
+            'or',
+            'so',
+            'yet',
+            'a',
+            'an',
+            'the',
+            'about',
+            'above',
+            'across',
+            'after',
+            'against',
+            'along',
+            'among',
+            'around',
+            'at',
+            'before',
+            'behind',
+            'below',
+            'beneath',
+            'beside',
+            'besides',
+            'between',
+            'beyond',
+            'by',
+            'concerning',
+            'considering',
+            'despite',
+            'down',
+            'during',
+            'except',
+            'following',
+            'for',
+            'from',
+            'in',
+            'inside',
+            'into',
+            'like',
+            'near',
+            'of',
+            'off',
+            'on',
+            'onto',
+            'opposite',
+            'outside',
+            'over',
+            'past',
+            'per',
+            'plus',
+            'regarding',
+            'round',
+            'since',
+            'than',
+            'through',
+            'to',
+            'toward',
+            'under',
+            'underneath',
+            'unlike',
+            'until',
+            'up',
+            'upon',
+            'via',
+            'with',
+            'within',
+            'without',
         ];
 
         $words = preg_split('/\s+/', trim($headline)) ?: [];
@@ -74,26 +138,109 @@ if (! function_exists('should_display_action_with_object')) {
     }
 }
 
+if (! function_exists('format_duration')) {
+    /**
+     * Format a duration in seconds into the most appropriate 2-part representation.
+     * Examples: 123min → "2h3m", 90s → "1m30s", 4000min → "2d21h", 45s → "45s"
+     *
+     * @param  float|int  $seconds  Duration in seconds
+     * @return string Formatted duration string
+     */
+    function format_duration(float|int $seconds): string
+    {
+        if ($seconds < 0) {
+            return '0s';
+        }
+
+        $seconds = (int) round($seconds);
+
+        // Less than 1 minute: show only seconds
+        if ($seconds < 60) {
+            return $seconds . 's';
+        }
+
+        // Less than 1 hour: show minutes and seconds
+        if ($seconds < 3600) {
+            $m = intdiv($seconds, 60);
+            $s = $seconds % 60;
+
+            return $s > 0 ? "{$m}m{$s}s" : "{$m}m";
+        }
+
+        // Less than 1 day: show hours and minutes
+        if ($seconds < 86400) {
+            $h = intdiv($seconds, 3600);
+            $m = intdiv($seconds % 3600, 60);
+
+            return $m > 0 ? "{$h}h{$m}m" : "{$h}h";
+        }
+
+        // 1 day or more: show days and hours
+        $d = intdiv($seconds, 86400);
+        $h = intdiv($seconds % 86400, 3600);
+
+        return $h > 0 ? "{$d}d{$h}h" : "{$d}d";
+    }
+}
+
 if (! function_exists('format_event_value_display')) {
     /**
-     * Format an event's value for display, handling mapped values correctly.
+     * Format an event's or block's value for display using plugin-defined formatters.
      *
-     * @param  mixed  $value  The event's formatted_value or value
-     * @param  string|null  $unit  The event's value_unit
+     * @param  mixed  $value  The formatted_value (after division by value_multiplier)
+     * @param  string|null  $unit  The value_unit
+     * @param  string|null  $service  The service identifier (e.g., 'oura', 'monzo')
+     * @param  string|null  $action  The action type (for events) or block_type (for blocks)
+     * @param  string|null  $typeKey  Either 'action' or 'block' to know which config to check
      * @return string The formatted value for display
      */
-    function format_event_value_display($value, ?string $unit): string
-    {
+    function format_event_value_display(
+        mixed $value,
+        ?string $unit,
+        ?string $service = null,
+        ?string $action = null,
+        ?string $typeKey = 'action'
+    ): string {
         if ($value === null) {
             return '';
         }
 
-        // Handle mapped values (stress_level, resilience_level, etc.)
-        // These should display just the mapped text without the unit
-        if (in_array($unit, ['stress_level', 'resilience_level'])) {
-            return (string) $value;
+        // Try to get custom formatter from plugin definition
+        if ($service && $action) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+            if ($pluginClass) {
+                // Get the appropriate type configuration
+                $types = $typeKey === 'block'
+                    ? $pluginClass::getBlockTypes()
+                    : $pluginClass::getActionTypes();
+
+                if (isset($types[$action]['value_formatter'])) {
+                    $formatter = $types[$action]['value_formatter'];
+
+                    // Render the Blade template with available context
+                    try {
+                        $rendered = Blade::render(
+                            $formatter,
+                            [
+                                'value' => $value,
+                                'unit' => $unit,
+                            ]
+                        );
+
+                        return trim($rendered);
+                    } catch (\Throwable $e) {
+                        // Log error and fall through to default formatting
+                        Log::warning('Failed to render value_formatter', [
+                            'service' => $service,
+                            'action' => $action,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
         }
 
+        // Default fallback: simple concatenation
         return (string) $value . ($unit ? (' ' . $unit) : '');
     }
 }

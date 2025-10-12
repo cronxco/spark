@@ -29,21 +29,24 @@ class StartProcessingIntegrationMigration implements ShouldQueue
 
     public function handle(): void
     {
+        $service = $this->integration->service;
+
         // Update progress to show processing phase has started
-        $this->updateProgress('processing', 'Processing migration data...', 70, [
-            'service' => 'monzo',
+        $this->updateProgress('processing', "Processing {$service} migration data...", 70, [
+            'service' => $service,
             'phase' => 'processing',
         ]);
 
         // Build one job per fetched window for accurate batch progress
         $jobs = [];
         $baseContext = [
-            'service' => 'monzo',
+            'service' => $service,
             'processing_phase' => true,
         ];
 
         // Transactions windows
-        $windows = (array) (Cache::get('monzo:migration:' . $this->integration->id . ':tx_windows') ?? []);
+        $cachePrefix = $service === 'gocardless' ? 'gocardless' : 'monzo';
+        $windows = (array) (Cache::get("{$cachePrefix}:migration:{$this->integration->id}:tx_windows") ?? []);
         foreach ($windows as $win) {
             $jobs[] = (new ProcessIntegrationPage($this->integration, [[
                 'kind' => 'transactions_window',
@@ -53,12 +56,14 @@ class StartProcessingIntegrationMigration implements ShouldQueue
                 ->onConnection('redis')->onQueue('migration');
         }
 
-        // Pots snapshot
-        $jobs[] = (new ProcessIntegrationPage($this->integration, [['kind' => 'pots_snapshot']], array_merge($baseContext, ['instance_type' => 'pots'])))
-            ->onConnection('redis')->onQueue('migration');
+        // Pots snapshot (Monzo only)
+        if ($service === 'monzo') {
+            $jobs[] = (new ProcessIntegrationPage($this->integration, [['kind' => 'pots_snapshot']], array_merge($baseContext, ['instance_type' => 'pots'])))
+                ->onConnection('redis')->onQueue('migration');
+        }
 
         // Balances snapshot using last fetched date if present
-        $lastDate = Cache::get('monzo:migration:' . $this->integration->id . ':balances_last_date');
+        $lastDate = Cache::get("{$cachePrefix}:migration:{$this->integration->id}:balances_last_date");
         if ($lastDate) {
             $jobs[] = (new ProcessIntegrationPage($this->integration, [[
                 'kind' => 'balance_snapshot',
@@ -68,16 +73,16 @@ class StartProcessingIntegrationMigration implements ShouldQueue
         }
 
         // Add completion job to the end of the batch
-        $jobs[] = new CompleteMigration($this->integration, 'monzo');
+        $jobs[] = new CompleteMigration($this->integration, $service);
 
         $this->updateProgress('processing_batch', 'Starting processing batch...', 75, [
-            'service' => 'monzo',
+            'service' => $service,
             'jobs_count' => count($jobs),
             'transaction_windows' => count($windows),
         ]);
 
         $batch = Bus::batch($jobs)
-            ->name('monzo_process_' . $this->integration->id)
+            ->name("{$service}_process_{$this->integration->id}")
             ->onConnection('redis')->onQueue('migration')
             ->dispatch();
 

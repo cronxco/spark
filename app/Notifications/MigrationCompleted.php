@@ -35,7 +35,7 @@ class MigrationCompleted extends SparkNotification
 
     public function getTitle(): string
     {
-        return 'Historical Data Import Complete';
+        return 'Historical Data Ready';
     }
 
     public function getMessage(): string
@@ -43,7 +43,7 @@ class MigrationCompleted extends SparkNotification
         $serviceName = ucfirst($this->integration->service);
         $stats = $this->getStatsMessage();
 
-        return "Your {$serviceName} historical data import has completed successfully{$stats}.";
+        return "Your historical {$serviceName} data is now available and ready to explore{$stats}.";
     }
 
     public function getActionUrl(): ?string
@@ -55,9 +55,9 @@ class MigrationCompleted extends SparkNotification
     {
         $serviceName = ucfirst($this->integration->service);
         $message = (new MailMessage)
-            ->subject("{$serviceName} Historical Data Import Complete")
+            ->subject("{$serviceName} Historical Data Ready")
             ->greeting("Hello {$notifiable->name}!")
-            ->line("Great news! Your {$serviceName} historical data import has completed successfully.");
+            ->line("Great news! Your historical {$serviceName} data has been imported and is ready to explore.");
 
         if ($this->details) {
             if (isset($this->details['events_imported'])) {
@@ -69,13 +69,13 @@ class MigrationCompleted extends SparkNotification
             }
 
             if (isset($this->details['duration'])) {
-                $message->line("**Duration:** {$this->details['duration']}");
+                $message->line("**Import completed in:** {$this->details['duration']}");
             }
         }
 
         return $message
-            ->action('View Integration', $this->getActionUrl())
-            ->line('Your data is now available to view and explore.');
+            ->action('Explore Your Data', $this->getActionUrl())
+            ->line('Your integration will continue to sync new data automatically.');
     }
 
     protected function getStatsMessage(): string

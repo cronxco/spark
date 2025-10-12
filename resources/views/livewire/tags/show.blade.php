@@ -139,7 +139,7 @@ new class extends Component {
                                                 @endif
                                                 @if ($event->value)
                                                     <span class="text-primary">
-                                                        ({{ format_event_value_display($event->formatted_value, $event->value_unit) }})
+                                                        ({!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!})
                                                     </span>
                                                 @endif
                                             </span>

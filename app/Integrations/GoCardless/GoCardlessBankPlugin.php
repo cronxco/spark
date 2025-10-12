@@ -150,6 +150,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'A bank transaction occurred',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'payment_to' => [
@@ -158,6 +159,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Money was sent from the account',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'payment_from' => [
@@ -166,6 +168,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Money was received into the account',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'had_balance' => [
@@ -174,6 +177,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
                 'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => true,
             ],
         ];
@@ -188,6 +192,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Details about a balance change transaction',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'balance_info' => [
@@ -196,6 +201,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Detailed balance information and metadata',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'transaction_status' => [

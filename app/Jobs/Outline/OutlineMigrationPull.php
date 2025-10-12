@@ -5,8 +5,11 @@ namespace App\Jobs\Outline;
 use App\Integrations\Outline\OutlineApi;
 use App\Jobs\Base\BaseFetchJob;
 use App\Models\ActionProgress;
+use App\Models\Event;
 use App\Models\Integration;
+use App\Notifications\MigrationCompleted;
 use App\Traits\MigrationPauser;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -126,12 +129,16 @@ class OutlineMigrationPull extends BaseFetchJob
                     'context' => $context,
                 ]);
             } else {
-                // Migration complete - update progress to 100% and mark complete
-                $this->updateProgress('completed', 'Outline migration completed successfully', 100, [
-                    'total_chunks' => ceil($this->offset / $this->limit) + 1,
-                    'total_documents_processed' => $this->offset,
-                    'context' => $context,
-                ]);
+                // Migration complete - mark progress as completed (sets completed_at timestamp)
+                if ($this->progressRecord) {
+                    $this->progressRecord->markCompleted([
+                        'total_chunks' => ceil($this->offset / $this->limit) + 1,
+                        'total_documents_processed' => $this->offset,
+                        'context' => $context,
+                        'service' => 'outline',
+                        'completed_at' => now()->toIso8601String(),
+                    ]);
+                }
 
                 // Update integration status
                 $this->integration->update([
@@ -141,6 +148,9 @@ class OutlineMigrationPull extends BaseFetchJob
 
                 // Unpause the integration now that migration is complete
                 static::unpauseAfterMigration($this->integration);
+
+                // Send completion notification
+                $this->sendCompletionNotification($this->offset);
 
                 Log::info('Outline migration completed', [
                     'integration_id' => $this->integration->id,
@@ -307,5 +317,85 @@ class OutlineMigrationPull extends BaseFetchJob
         if ($this->progressRecord) {
             $this->progressRecord->updateProgress($step, $message, $progress, $details);
         }
+    }
+
+    /**
+     * Send completion notification with migration statistics
+     */
+    private function sendCompletionNotification(int $totalDocuments): void
+    {
+        try {
+            $statistics = $this->gatherMigrationStatistics($totalDocuments);
+
+            $this->integration->user->notify(
+                new MigrationCompleted($this->integration, $statistics)
+            );
+
+            Log::info('Outline migration completion notification sent', [
+                'integration_id' => $this->integration->id,
+                'service' => 'outline',
+                'statistics' => $statistics,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to send Outline MigrationCompleted notification', [
+                'integration_id' => $this->integration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Gather statistics about the completed migration
+     */
+    private function gatherMigrationStatistics(int $totalDocuments): array
+    {
+        $statistics = [];
+
+        // Get migration start time from configuration
+        $migrationStartedAt = $this->integration->configuration['migration_started_at'] ?? null;
+
+        // Count events imported during this migration
+        if ($migrationStartedAt) {
+            $startTime = Carbon::parse($migrationStartedAt);
+            $eventsCount = Event::where('integration_id', $this->integration->id)
+                ->where('created_at', '>=', $startTime)
+                ->count();
+
+            if ($eventsCount > 0) {
+                $statistics['events_imported'] = $eventsCount;
+            }
+
+            // Calculate migration duration
+            $duration = $startTime->diffForHumans(now(), true);
+            $statistics['duration'] = $duration;
+        }
+
+        // Add total documents processed
+        if ($totalDocuments > 0) {
+            $statistics['documents_processed'] = $totalDocuments;
+        }
+
+        // Get date range of imported events
+        $oldestEvent = Event::where('integration_id', $this->integration->id)
+            ->orderBy('time', 'asc')
+            ->first();
+
+        $newestEvent = Event::where('integration_id', $this->integration->id)
+            ->orderBy('time', 'desc')
+            ->first();
+
+        if ($oldestEvent && $newestEvent) {
+            $oldestTime = Carbon::parse($oldestEvent->time);
+            $newestTime = Carbon::parse($newestEvent->time);
+
+            // Format as "Jan 2023 - Dec 2024" or just "Dec 2024" if same month/year
+            if ($oldestTime->format('Y-m') === $newestTime->format('Y-m')) {
+                $statistics['date_range'] = $newestTime->format('M Y');
+            } else {
+                $statistics['date_range'] = $oldestTime->format('M Y') . ' - ' . $newestTime->format('M Y');
+            }
+        }
+
+        return $statistics;
     }
 }

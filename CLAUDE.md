@@ -90,6 +90,42 @@ Each plugin defines:
 - **Object Types**: Entity types the integration manages (e.g., accounts, playlists)
 - **Instance Types**: Different integration modes (e.g., "account", "collection")
 
+**Value Formatters:**
+
+Action types and block types support custom value display formatting via the `value_formatter` field. This allows you to control how values are displayed in the UI using Laravel Blade templates.
+
+Common use cases:
+
+- **Word replacement**: Convert numeric codes to human-readable labels (e.g., resilience levels)
+- **Duration formatting**: Display seconds/minutes in human-friendly format using `format_duration()` helper
+- **Custom rounding**: Control decimal places for specific value types
+- **Unit formatting**: Add currency symbols or format units with HTML (e.g., superscripts)
+
+Example formatters:
+
+```php
+// Word replacement (conditional display)
+'value_formatter' => '@if($value == 5)Exceptional@elseif($value == 4)Strong@elseif($value == 3)Solid@elseif($value == 2)Adequate@elseif($value == 1)Limited@else{{ $value }}@endif'
+
+// Duration formatting (uses format_duration helper)
+'value_formatter' => '{{ format_duration($value) }}'
+
+// Currency formatting with symbol
+'value_formatter' => '£{{ number_format($value, 2) }}'
+```
+
+Available variables in formatter templates:
+
+- `$value`: The numeric value (after applying value_multiplier)
+- `$unit`: The value_unit string
+
+The `format_duration()` helper intelligently formats durations:
+
+- Less than 60s: shows seconds only (e.g., "45s")
+- Less than 1hr: shows minutes+seconds (e.g., "2m30s")
+- Less than 1 day: shows hours+minutes (e.g., "3h15m")
+- 1 day or more: shows days+hours (e.g., "2d5h")
+
 ### Data Model Hierarchy
 
 The data model follows a hierarchical structure:

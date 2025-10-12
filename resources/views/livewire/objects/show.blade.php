@@ -43,7 +43,7 @@ new class extends Component {
             })
             ->where(function ($q) {
                 $q->where('actor_id', $this->object->id)
-                  ->orWhere('target_id', $this->object->id);
+                    ->orWhere('target_id', $this->object->id);
             })
             ->orderBy('time', 'desc')
             ->limit(10)
@@ -782,142 +782,171 @@ new class extends Component {
 
 <div>
     @if ($this->object)
-        <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
-            <!-- Main Content Area -->
-            <div class="flex-1 space-y-4 lg:space-y-6">
-                <!-- Header -->
-                <x-header title="Object Details" separator>
-                    <x-slot:actions>
-                        <x-button
-                            wire:click="toggleSidebar"
-                            class="btn-ghost btn-sm"
-                            title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
-                            aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
-                        >
-                            <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
-                        </x-button>
-                    </x-slot:actions>
-                </x-header>
+    <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        <!-- Main Content Area -->
+        <div class="flex-1 space-y-4 lg:space-y-6">
+            <!-- Header -->
+            <x-header title="Object Details" separator>
+                <x-slot:actions>
+                    <x-button
+                        wire:click="toggleSidebar"
+                        class="btn-ghost btn-sm"
+                        title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}">
+                        <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
+                    </x-button>
+                </x-slot:actions>
+            </x-header>
 
-                            <!-- Object Overview Card -->
-                <x-card>
-                    <div class="flex flex-col sm:flex-row items-start gap-4">
-                        <!-- Object Icon -->
-                        <div class="flex-shrink-0 self-center sm:self-start">
-                            <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center">
-                                <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept) }}"
-                                       class="w-6 h-6 text-secondary" />
+            <!-- Object Overview Card -->
+            <x-card>
+                <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
+                    <!-- Object Icon -->
+                    <div class="flex-shrink-0 self-center sm:self-start">
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-secondary/10 flex items-center justify-center">
+                            <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept) }}"
+                                class="w-6 h-6 sm:w-8 sm:h-8 text-secondary" />
+                        </div>
+                    </div>
+
+                    <!-- Object Details -->
+                    <div class="flex-1">
+                        <div class="mb-4 text-center sm:text-left">
+                            <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 mb-2">
+                                <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content leading-tight">
+                                    {{ $this->object->title }}
+                                </h2>
                             </div>
                         </div>
 
-                    <!-- Object Info -->
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-3">
-                            <h2 class="text-xl font-semibold text-base-content">
-                                {{ $this->object->title }}
-                            </h2>
-                            @if ($this->object->type)
-                                <x-badge :value="$this->object->type" class="badge-secondary" />
-                            @endif
+                        <!-- Key Metadata -->
+                        <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text">
+                            <div class="flex items-center gap-2">
+                                <x-icon name="o-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                <span class="text-base-content/70">{{ $this->object->time->format('d/m/Y H:i') }} · {{ $this->object->time->diffForHumans() }}</span>
+                            </div>
+                            <span class="hidden sm:inline">·</span>
+                            <span class="sm:hidden w-full"></span>
                             @if ($this->object->concept)
-                                <x-badge :value="$this->object->concept" class="badge-accent" />
+                            <x-badge class="badge badge-outline">
+                                <x-slot:value>
+                                    <x-icon name="fas.lines-leaning" class="w-3 h-3 text-base-content/40" />
+                                    {{ str::Headline($this->object->concept) }}
+                                </x-slot:value>
+                            </x-badge>
+                            @endif
+                            @if ($this->object->type)
+                            <x-icon name="o-arrow-right" class="w-3 h-3 text-base-content/40" />
+                            <x-badge class="badge badge-outline">
+                                <x-slot:value>
+                                    <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
+                                    {{ str::Headline($this->object->type) }}
+                                </x-slot:value>
+                            </x-badge>
                             @endif
                         </div>
 
-                        @php $text = is_array($this->object->metadata ?? null) ? ($this->object->metadata['text'] ?? null) : null; @endphp
-                        @if ($text)
-                            <p class="text-base-content/70 mb-4">{{ $text }}</p>
+                        <!-- URLs -->
+                        @if ($this->object->url || $this->object->media_url)
+                        <div class="mt-4 lg:mt-6 p-3 lg:p-4 rounded-lg bg-base-300/50 border-2 border-info/20">
+                            <div class="flex flex-col sm:flex-row items-center justify-center gap-3 lg:gap-4">
+                                @if ($this->object->url)
+                                <a href="{{ $this->object->url }}" target="_blank"
+                                    class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors">
+                                    <x-icon name="o-link" class="w-4 h-4" />
+                                    <span>{{ $this->object->url }}</span>
+                                </a>
+                                @endif
+                                @if ($this->object->media_url)
+                                <a href="{{ $this->object->media_url }}" target="_blank"
+                                    class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors">
+                                    <x-icon name="o-photo" class="w-4 h-4" />
+                                    <span>{{ $this->object->media_url }}</span>
+                                </a>
+                                @endif
+                            </div>
+                        </div>
                         @endif
 
-                        <!-- Object Metadata -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 text-sm">
-                            @if ($this->object->time)
-                                <div class="flex items-center gap-2">
-                                    <x-icon name="o-clock" class="w-4 h-4 text-base-content/60" />
-                                    <span class="text-base-content/70">Time:</span>
-                                    <span class="font-medium">{{ $this->object->time->format('F j, Y g:i A') }}</span>
-                                </div>
-                            @endif
-                            @if ($this->object->url)
-                                <div class="flex items-center gap-2">
-                                    <x-icon name="o-link" class="w-4 h-4 text-base-content/60" />
-                                    <span class="text-base-content/70">URL:</span>
-                                    <a href="{{ $this->object->url }}" target="_blank" class="font-medium text-primary hover:underline">
-                                        View
-                                    </a>
-                                </div>
-                            @endif
-                            @if ($this->object->media_url)
-                                <div class="flex items-center gap-2">
-                                    <x-icon name="o-photo" class="w-4 h-4 text-base-content/60" />
-                                    <span class="text-base-content/70">Media:</span>
-                                    <a href="{{ $this->object->media_url }}" target="_blank" class="font-medium text-primary hover:underline">
-                                        View
-                                    </a>
-                                </div>
-                            @endif
-                        </div>
-
-                        <!-- Object Tags -->
+                        <!-- Tags -->
                         @if ($this->object->tags->isNotEmpty())
-                            <div class="mt-4">
-                                <h4 class="text-sm font-medium text-base-content/70 mb-2">Object Tags</h4>
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach ($this->object->tags as $tag)
-                                        <x-spark-tag :tag="$tag" />
-                                    @endforeach
-                                </div>
+                        <div class="mt-4">
+                            <div class="flex flex-wrap justify-center gap-2">
+                                @foreach ($this->object->tags as $tag)
+                                <x-spark-tag :tag="$tag" />
+                                @endforeach
                             </div>
+                        </div>
                         @endif
                     </div>
                 </div>
             </x-card>
 
             <!-- Related Events -->
-                                    @if ($this->getRelatedEvents()->isNotEmpty())
-                <x-card>
-                                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
-                            Related Events ({{ $this->getRelatedEvents()->count() }})
-                        </h3>
-                    <div class="space-y-3">
-                        @foreach ($this->getRelatedEvents() as $event)
-                            <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                                <a href="{{ route('events.show', $event->id) }}"
-                                   class="block hover:text-primary transition-colors">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <x-icon name="o-bolt" class="w-4 h-4 text-primary" />
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="mb-1">
-                                                <span class="font-medium">
-                                                    {{ $this->formatAction($event->action) }}
-                                                    @if (should_display_action_with_object($event->action, $event->service))
-                                                        @if ($event->target)
-                                                            to {{ $event->target->title }}
-                                                        @elseif ($event->actor)
-                                                            {{ $event->actor->title }}
-                                                        @endif
-                                                    @endif
-                                                    @if ($event->value)
-                                                        <span class="text-primary">
-                                                            ({{ format_event_value_display($event->formatted_value, $event->value_unit) }})
-                                                        </span>
-                                                    @endif
-                                                </span>
-                                            </div>
-                                            <div class="text-sm text-base-content/70">
-                                                {{ $event->time->format('M j, Y g:i A') }}
-                                            </div>
-                                        </div>
-                                        <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40" />
+            @if ($this->getRelatedEvents()->isNotEmpty())
+            <x-card>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
+                    Related Events ({{ $this->getRelatedEvents()->count() }})
+                </h3>
+                <div class="space-y-3">
+                    @foreach ($this->getRelatedEvents() as $event)
+                    <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                        <a href="{{ route('events.show', $event->id) }}"
+                            class="block hover:text-primary transition-colors">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                    <x-icon name="o-bolt" class="w-4 h-4 text-primary" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-start justify-between gap-2 mb-1">
+                                        <span class="font-medium">
+                                            {{ $this->formatAction($event->action) }}
+                                            @if (should_display_action_with_object($event->action, $event->service))
+                                            @if ($event->target)
+                                            <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
+                                            @elseif ($event->actor)
+                                            <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
+                                            @endif
+                                            @endif
+                                        </span>
+                                        @if ($event->value)
+                                        <span class="text-sm text-primary font-semibold flex-shrink-0">
+                                            {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                        </span>
+                                        @endif
                                     </div>
-                                </a>
+                                    <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                        <span>{{ $event->time->format('d/m/Y H:i') }}</span>
+                                        @if ($event->domain)
+                                        <span>·</span>
+                                        <x-badge :value="$event->domain" class="badge-xs badge-outline" />
+                                        @endif
+                                        <span>·</span>
+                                        @php
+                                        $eventPluginClass = \App\Integrations\PluginRegistry::getPlugin($event->service);
+                                        $eventAccentColor = $eventPluginClass ? $eventPluginClass::getAccentColor() : 'primary';
+                                        @endphp
+                                        <x-badge :value="$event->service" class="badge-xs badge-{{ $eventAccentColor }} badge-outline" />
+                                        @if ($event->integration)
+                                        <span>·</span>
+                                        <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
+                                        @endif
+                                        @if ($event->tags && count($event->tags) > 0)
+                                        <span>·</span>
+                                        @foreach ($event->tags as $tag)
+                                        <x-spark-tag :tag="$tag" size="xs" />
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                                <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
                             </div>
-                        @endforeach
+                        </a>
                     </div>
-                </x-card>
+                    @endforeach
+                </div>
+            </x-card>
             @endif
 
             <!-- Drawer for Technical Details -->
@@ -932,57 +961,57 @@ new class extends Component {
                             </div>
                         </x-slot:heading>
                         <x-slot:content>
-                        @php $activities = $this->getActivities(); @endphp
-                        @if ($activities->isEmpty())
+                            @php $activities = $this->getActivities(); @endphp
+                            @if ($activities->isEmpty())
                             <div class="text-sm text-base-content/70">No activity yet.</div>
-                        @else
+                            @else
                             @php
-                                $activities = $this->getActivities();
-                                $timeline = collect();
-                                if ($this->object?->created_at) {
-                                    $timeline->push((object) [
-                                        '__synthetic' => true,
-                                        'event' => 'created',
-                                        'created_at' => $this->object->created_at,
-                                        'properties' => [],
-                                        'description' => '',
-                                    ]);
-                                }
-                                foreach ($activities as $a) { $timeline->push($a); }
-                                $timeline = $timeline->sortByDesc(fn($a) => $a->created_at)->values();
+                            $activities = $this->getActivities();
+                            $timeline = collect();
+                            if ($this->object?->created_at) {
+                            $timeline->push((object) [
+                            '__synthetic' => true,
+                            'event' => 'created',
+                            'created_at' => $this->object->created_at,
+                            'properties' => [],
+                            'description' => '',
+                            ]);
+                            }
+                            foreach ($activities as $a) { $timeline->push($a); }
+                            $timeline = $timeline->sortByDesc(fn($a) => $a->created_at)->values();
                             @endphp
                             @foreach ($timeline as $activity)
-                                @php
-                                    $modelLabel = 'Object';
-                                    $event = strtolower((string) ($activity->event ?? ($activity->description ?? '')));
-                                    $title = in_array($event, ['created','updated','deleted','restored'])
-                                        ? $modelLabel . ' ' . ucfirst($event)
-                                        : ($event === 'comment' ? 'Comment' : ucfirst($event));
-                                    $subtitle = $activity->created_at?->format('M j, Y g:i A');
-                                    $props = is_array($activity->properties ?? null) ? $activity->properties : (object) ($activity->properties ?? []);
-                                    $changes = [];
-                                    $new = $props['attributes'] ?? [];
-                                    $old = $props['old'] ?? [];
-                                    foreach ($new as $k => $v) {
-                                        if ($k === 'updated_at') { continue; }
-                                        $before = $old[$k] ?? null;
-                                        $after = $v;
-                                        $changes[] = $k . ': ' . (is_scalar($before) ? (string) $before : json_encode($before)) . ' → ' . (is_scalar($after) ? (string) $after : json_encode($after));
-                                    }
-                                    if (($props['comment'] ?? null) !== null) {
-                                        $desc = (string) $props['comment'];
-                                    } else {
-                                        $desc = '';
-                                    }
-                                @endphp
-                                <x-timeline-item title="{{ $title }}" subtitle="{{ $subtitle }}" description="{{ $desc }}" />
-                                @if (!empty($new) || !empty($old))
-                                    <div class="mt-2 mb-4">
-                                        <x-change-details :new="$new" :old="$old" />
-                                    </div>
-                                @endif
+                            @php
+                            $modelLabel = 'Object';
+                            $event = strtolower((string) ($activity->event ?? ($activity->description ?? '')));
+                            $title = in_array($event, ['created','updated','deleted','restored'])
+                            ? $modelLabel . ' ' . ucfirst($event)
+                            : ($event === 'comment' ? 'Comment' : ucfirst($event));
+                            $subtitle = $activity->created_at?->format('d/m/Y H:i');
+                            $props = is_array($activity->properties ?? null) ? $activity->properties : (object) ($activity->properties ?? []);
+                            $changes = [];
+                            $new = $props['attributes'] ?? [];
+                            $old = $props['old'] ?? [];
+                            foreach ($new as $k => $v) {
+                            if ($k === 'updated_at') { continue; }
+                            $before = $old[$k] ?? null;
+                            $after = $v;
+                            $changes[] = $k . ': ' . (is_scalar($before) ? (string) $before : json_encode($before)) . ' → ' . (is_scalar($after) ? (string) $after : json_encode($after));
+                            }
+                            if (($props['comment'] ?? null) !== null) {
+                            $desc = (string) $props['comment'];
+                            } else {
+                            $desc = '';
+                            }
+                            @endphp
+                            <x-timeline-item title="{{ $title }}" subtitle="{{ $subtitle }}" description="{{ $desc }}" />
+                            @if (!empty($new) || !empty($old))
+                            <div class="mt-2 mb-4">
+                                <x-change-details :new="$new" :old="$old" />
+                            </div>
+                            @endif
                             @endforeach
-                        @endif
+                            @endif
                         </x-slot:content>
                     </x-collapse>
 
@@ -1008,41 +1037,52 @@ new class extends Component {
                         </h3>
                         <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
                             <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
-                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">{!! json_encode(\Spatie\Tags\Tag::query()->pluck('name')->map(fn($n)=>(string)$n)->unique()->values()->all()) !!}</script>
-                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">{!! json_encode($this->object->tags->pluck('name')->values()->all()) !!}</script>
+                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
+                                {
+                                    !!json_encode(\Spatie\ Tags\ Tag::query() - > pluck('name') - > map(fn($n) => (string) $n) - > unique() - > values() - > all()) !!
+                                }
+                            </script>
+                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">
+                                {
+                                    !!json_encode($this - > object - > tags - > pluck('name') - > values() - > all()) !!
+                                }
+                            </script>
                         </div>
                     </x-card>
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
-                        <x-collapse wire:model="objectMetaOpen">
-                            <x-slot:heading>
-                                <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
-                                    <div class="flex items-center gap-2">
-                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
-                                        Object Metadata
-                                    </div>
-                                    <script type="application/json" id="object-meta-json-{{ $this->object->id }}">{!! json_encode($this->object->metadata, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
-                                    <x-button
-                                        icon="o-clipboard"
-                                        class="btn-ghost btn-xs"
-                                        title="Copy JSON"
-                                        onclick="(function(){ var el=document.getElementById('object-meta-json-{{ $this->object->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Object metadata'); }); })()"
-                                    />
+                    <x-collapse wire:model="objectMetaOpen">
+                        <x-slot:heading>
+                            <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
+                                    Object Metadata
                                 </div>
-                            </x-slot:heading>
-                            <x-slot:content>
-                                <x-metadata-list :data="$this->object->metadata" />
-                            </x-slot:content>
-                        </x-collapse>
+                                <script type="application/json" id="object-meta-json-{{ $this->object->id }}">
+                                    {
+                                        !!json_encode($this - > object - > metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
+                                    }
+                                </script>
+                                <x-button
+                                    icon="o-clipboard"
+                                    class="btn-ghost btn-xs"
+                                    title="Copy JSON"
+                                    onclick="(function(){ var el=document.getElementById('object-meta-json-{{ $this->object->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Object metadata'); }); })()" />
+                            </div>
+                        </x-slot:heading>
+                        <x-slot:content>
+                            <x-metadata-list :data="$this->object->metadata" />
+                        </x-slot:content>
+                    </x-collapse>
                     @endif
                 </div>
             </x-drawer>
         </div>
-    @else
+        @else
         <div class="text-center py-8">
             <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
             <h3 class="text-lg font-semibold text-base-content mb-2">Object Not Found</h3>
             <p class="text-base-content/70">The requested object could not be found.</p>
         </div>
-    @endif
+        @endif
     </div>
 </div>

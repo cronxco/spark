@@ -3,10 +3,14 @@
 namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
+use App\Models\ActionProgress;
+use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Notifications\MigrationCompleted;
 use App\Traits\MigrationPauser;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -130,12 +134,8 @@ class FetchIntegrationPage implements ShouldQueue
 
         $items = $resp['items'] ?? [];
         if (empty($items)) {
-            // No more data; stop chain and unpause integration
-            static::unpauseAfterMigration($this->integration);
-            Log::info('Oura migration completed - no more data', [
-                'integration_id' => $this->integration->id,
-                'instance_type' => $type,
-            ]);
+            // No more data; complete migration
+            $this->completeMigration('oura');
 
             return;
         }
@@ -197,24 +197,36 @@ class FetchIntegrationPage implements ShouldQueue
         }
         $json = $resp->json();
         $items = $json['items'] ?? [];
+        $cursors = $json['cursors'] ?? [];
+        $next = $cursors['next'] ?? null;
+
+        Log::info('Spotify migration page fetched', [
+            'integration_id' => $this->integration->id,
+            'before_ms' => $beforeMs,
+            'items_count' => count($items),
+            'has_cursors' => ! empty($cursors),
+            'has_next' => $next !== null,
+            'cursors' => $cursors,
+        ]);
+
         if (empty($items)) {
-            // No more data; stop chain and unpause integration
-            static::unpauseAfterMigration($this->integration);
-            Log::info('Spotify migration completed - no more data', [
+            // No more data; complete migration
+            Log::info('Spotify migration completed - no more items', [
                 'integration_id' => $this->integration->id,
+                'before_ms' => $beforeMs,
             ]);
+            $this->completeMigration('spotify');
 
             return;
         }
 
         // Prefer API-provided cursors; fall back to min played_at
         $nextBefore = null;
-        $cursors = $json['cursors'] ?? [];
         if (! empty($cursors) && isset($cursors['before'])) {
             $nextBefore = (int) $cursors['before'];
         }
         if ($nextBefore === null) {
-            $minTsMs = $beforeMs;
+            $minTsMs = PHP_INT_MAX;
             foreach ($items as $it) {
                 $playedAt = $it['played_at'] ?? null;
                 if ($playedAt) {
@@ -224,15 +236,45 @@ class FetchIntegrationPage implements ShouldQueue
                     }
                 }
             }
-            $nextBefore = $minTsMs - 1;
+            // Only set nextBefore if we found valid timestamps
+            if ($minTsMs < PHP_INT_MAX) {
+                $nextBefore = $minTsMs - 1;
+            }
+        }
+
+        // If we couldn't determine a valid next cursor, stop
+        if ($nextBefore === null) {
+            Log::warning('Spotify migration - could not determine next cursor, stopping', [
+                'integration_id' => $this->integration->id,
+                'before_ms' => $beforeMs,
+                'items_count' => count($items),
+            ]);
+            $this->completeMigration('spotify');
+
+            return;
         }
 
         // Guard against non-progressing cursor
         if ($nextBefore >= $beforeMs) {
+            Log::warning('Spotify migration - cursor not progressing, stopping', [
+                'integration_id' => $this->integration->id,
+                'before_ms' => $beforeMs,
+                'next_before' => $nextBefore,
+            ]);
+            $this->completeMigration('spotify');
+
             return;
         }
+
         $nextContext = $this->context;
         $nextContext['cursor']['before_ms'] = $nextBefore;
+
+        Log::info('Spotify migration - scheduling next page', [
+            'integration_id' => $this->integration->id,
+            'current_before_ms' => $beforeMs,
+            'next_before_ms' => $nextBefore,
+            'items_processed' => count($items),
+        ]);
 
         Bus::chain([
             new ProcessIntegrationPage($this->integration, $items, $this->context),
@@ -250,11 +292,8 @@ class FetchIntegrationPage implements ShouldQueue
             $repositories = array_values(array_filter(array_map('trim', $repositories)));
         }
         if (empty($repositories)) {
-            // No repositories to migrate; unpause integration
-            static::unpauseAfterMigration($this->integration);
-            Log::info('GitHub migration completed - no repositories configured', [
-                'integration_id' => $this->integration->id,
-            ]);
+            // No repositories to migrate; complete migration
+            $this->completeMigration('github');
 
             return;
         }
@@ -262,12 +301,8 @@ class FetchIntegrationPage implements ShouldQueue
         $repoIndex = (int) ($cursor['repo_index'] ?? 0);
         $page = (int) ($cursor['page'] ?? 1);
         if (! isset($repositories[$repoIndex])) {
-            // Finished all repos; unpause integration
-            static::unpauseAfterMigration($this->integration);
-            Log::info('GitHub migration completed - finished all repositories', [
-                'integration_id' => $this->integration->id,
-                'total_repos' => count($repositories),
-            ]);
+            // Finished all repos; complete migration
+            $this->completeMigration('github');
 
             return;
         }
@@ -586,5 +621,104 @@ class FetchIntegrationPage implements ShouldQueue
         ]);
 
         return $group->access_token;
+    }
+
+    /**
+     * Complete migration: update progress, unpause, send notification
+     */
+    private function completeMigration(string $service): void
+    {
+        // Update progress to completed
+        $progressRecord = ActionProgress::getLatestProgress(
+            $this->integration->user_id,
+            'migration',
+            "integration_{$this->integration->id}"
+        );
+
+        if ($progressRecord) {
+            $progressRecord->markCompleted([
+                'service' => $service,
+                'completed_at' => now()->toIso8601String(),
+            ]);
+        }
+
+        // Unpause integration
+        static::unpauseAfterMigration($this->integration);
+
+        Log::info("{$service} migration completed - no more data", [
+            'integration_id' => $this->integration->id,
+            'service' => $service,
+        ]);
+
+        // Gather migration statistics and send completion notification
+        try {
+            $statistics = $this->gatherMigrationStatistics($service);
+
+            $this->integration->user->notify(
+                new MigrationCompleted($this->integration, $statistics)
+            );
+
+            Log::info("{$service} migration completion notification sent", [
+                'integration_id' => $this->integration->id,
+                'service' => $service,
+                'statistics' => $statistics,
+            ]);
+        } catch (Exception $e) {
+            Log::error("Failed to send {$service} MigrationCompleted notification", [
+                'integration_id' => $this->integration->id,
+                'service' => $service,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Gather statistics about the completed migration
+     */
+    private function gatherMigrationStatistics(string $service): array
+    {
+        $statistics = [];
+
+        // Get migration start time from configuration
+        $migrationStartedAt = $this->integration->configuration['migration_started_at'] ?? null;
+
+        // Count events imported during this migration
+        if ($migrationStartedAt) {
+            $startTime = Carbon::parse($migrationStartedAt);
+            $eventsCount = Event::where('integration_id', $this->integration->id)
+                ->where('created_at', '>=', $startTime)
+                ->count();
+
+            if ($eventsCount > 0) {
+                $statistics['events_imported'] = $eventsCount;
+            }
+
+            // Calculate migration duration
+            $duration = $startTime->diffForHumans(now(), true);
+            $statistics['duration'] = $duration;
+        }
+
+        // Get date range of imported events
+        $oldestEvent = Event::where('integration_id', $this->integration->id)
+            ->orderBy('time', 'asc')
+            ->first();
+
+        $newestEvent = Event::where('integration_id', $this->integration->id)
+            ->orderBy('time', 'desc')
+            ->first();
+
+        if ($oldestEvent && $newestEvent) {
+            $oldestTime = Carbon::parse($oldestEvent->time);
+            $newestTime = Carbon::parse($newestEvent->time);
+
+            // Format as "Jan 2023 - Dec 2024" or just "Dec 2024" if same month/year
+            if ($oldestTime->format('Y-m') === $newestTime->format('Y-m')) {
+                $statistics['date_range'] = $newestTime->format('M Y');
+            } else {
+                $statistics['date_range'] = $oldestTime->format('M Y') . ' - ' . $newestTime->format('M Y');
+            }
+        }
+
+        return $statistics;
     }
 }

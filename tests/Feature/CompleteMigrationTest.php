@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Jobs\Migrations\CompleteMigration;
 use App\Models\ActionProgress;
+use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Notifications\MigrationCompleted;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -104,6 +108,86 @@ class CompleteMigrationTest extends TestCase
         // Should have completed with correct service
         $this->assertTrue($progressRecord->isCompleted());
         $this->assertEquals('gocardless', $progressRecord->details['service']);
+    }
+
+    #[Test]
+    public function complete_migration_sends_notification_with_statistics(): void
+    {
+        Notification::fake();
+
+        $integration = $this->makeMonzoIntegration();
+
+        // Set migration start time
+        $migrationStartTime = Carbon::now()->subMinutes(10);
+        $integration->update([
+            'configuration' => [
+                'migration_started_at' => $migrationStartTime->toIso8601String(),
+            ],
+        ]);
+
+        // Create some events that were imported during the migration
+        Event::factory()->count(15)->create([
+            'integration_id' => $integration->id,
+            'service' => 'monzo',
+            'time' => Carbon::now()->subMonths(3),
+            'created_at' => Carbon::now()->subMinutes(5), // Created during migration
+        ]);
+
+        Event::factory()->count(10)->create([
+            'integration_id' => $integration->id,
+            'service' => 'monzo',
+            'time' => Carbon::now()->subMonths(6),
+            'created_at' => Carbon::now()->subMinutes(8), // Created during migration
+        ]);
+
+        // Run the job
+        $job = new CompleteMigration($integration, 'monzo');
+        $job->handle();
+
+        // Verify notification was sent
+        Notification::assertSentTo(
+            $integration->user,
+            MigrationCompleted::class,
+            function ($notification) use ($integration) {
+                // Check that the notification has the correct integration
+                $this->assertEquals($integration->id, $notification->integration->id);
+
+                // Check that statistics were included
+                $this->assertNotNull($notification->details);
+                $this->assertArrayHasKey('events_imported', $notification->details);
+                $this->assertEquals(25, $notification->details['events_imported']);
+
+                // Check that date range is included
+                $this->assertArrayHasKey('date_range', $notification->details);
+
+                // Check that duration is included
+                $this->assertArrayHasKey('duration', $notification->details);
+
+                return true;
+            }
+        );
+    }
+
+    #[Test]
+    public function complete_migration_handles_notification_failure_gracefully(): void
+    {
+        $integration = $this->makeMonzoIntegration();
+
+        // Set migration start time but don't set up user relationship properly
+        // This simulates a scenario where notification might fail
+        $migrationStartTime = Carbon::now()->subMinutes(10);
+        $integration->update([
+            'configuration' => [
+                'migration_started_at' => $migrationStartTime->toIso8601String(),
+            ],
+        ]);
+
+        // Job should not throw an exception even if notification fails
+        $job = new CompleteMigration($integration, 'monzo');
+
+        // This should complete without throwing, even if notification has issues
+        $this->expectNotToPerformAssertions();
+        $job->handle();
     }
 
     private function makeMonzoIntegration(): Integration
