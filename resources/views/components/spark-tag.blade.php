@@ -63,7 +63,7 @@ default => 'badge-sm',
 $badgeClass .= ' ' . $sizeClass;
 @endphp
 
-<x-popover class="inline-block bg-{{$color}}">
+<x-popover class="inline-block bg-{{ $color }}">
     <x-slot:trigger>
         <x-badge class="{{ $badgeClass }}">
             <x-slot:value>
@@ -71,5 +71,5 @@ $badgeClass .= ' ' . $sizeClass;
             </x-slot:value>
         </x-badge>
     </x-slot:trigger>
-    <x-slot:content class="bg-{{$color}} text-{{$color}}-content text-center border-{{$color}}/40">@if ($tagType && $tagSlug && $tagId)<a href="{{ route('tags.show', [$tagType, $tagSlug, $tagId]) }}"><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></a>@else<div><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></div>@endif</x-slot:content>
+    <x-slot:content class="bg-{{ $color }} text-{{ $color }}-content text-center border-{{ $color }}/40">@if ($tagType && $tagSlug && $tagId)<a href="{{ route('tags.show', [$tagType, $tagSlug, $tagId]) }}"><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></a>@else<div><x-fas-tags class="w-4 h-4 inline" /> {{ Str::headline($tagType ?? 'Tag') }}<br /><span class="font-bold text-base text-center">{{ $tagName }}</span></div>@endif</x-slot:content>
 </x-popover>
