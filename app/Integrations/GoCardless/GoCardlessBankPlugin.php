@@ -1298,8 +1298,22 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         $sourceId = 'balance_' . $accountId . '_' . $balanceReferenceDate;
 
-        // Create or update actor (bank account)
-        $accountObject = $this->upsertAccountObject($integration, $balance);
+        // Find the existing account object for this integration
+        $accountObject = EventObject::where('user_id', $integration->user_id)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->whereJsonContains('metadata->integration_id', $integration->id)
+            ->first();
+
+        if (! $accountObject) {
+            Log::warning('GoCardless: No account object found for integration when creating balance event', [
+                'integration_id' => $integration->id,
+                'integration_name' => $integration->name,
+                'account_id' => $accountId,
+            ]);
+
+            return;
+        }
 
         // Create day target once
         $dayObject = EventObject::firstOrCreate(
