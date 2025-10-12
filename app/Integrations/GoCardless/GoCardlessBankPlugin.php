@@ -1174,9 +1174,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Determine if this is a status change
         $isStatusChange = $existingEvent && $existingEvent->event_metadata['transaction_status'] !== $status;
 
+        // Get amount and convert to pence (multiply by 100)
+        $rawAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+        $amountInPence = (int) round($rawAmount * 100);
+
         // Determine action based on transaction amount and direction
-        $amount = (float) ($tx['transactionAmount']['amount'] ?? 0);
-        $action = $this->determineTransactionAction($amount, $status);
+        $action = $this->determineTransactionAction($rawAmount, $status);
 
         // Preserve the best available timestamp
         $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
@@ -1193,8 +1196,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'domain' => self::getDomain(),
             'service' => 'gocardless',
             'time' => $timestamp,
-            'value' => abs($amount),
+            'value' => abs($amountInPence),
             'value_unit' => $tx['transactionAmount']['currency'] ?? 'EUR',
+            'value_multiplier' => 100, // Convert from pence back to pounds when displaying
             'actor_id' => $actorObject->id, // Set directly (original simple design)
             'target_id' => $targetObject->id, // Set directly (original simple design)
             'event_metadata' => [
