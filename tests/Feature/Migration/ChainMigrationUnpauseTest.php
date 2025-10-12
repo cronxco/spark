@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Mockery;
 use Tests\TestCase;
 
@@ -44,6 +45,9 @@ class ChainMigrationUnpauseTest extends TestCase
             'configuration' => ['paused' => true], // Start paused during migration
         ]);
 
+        // Mock notifications to prevent actual sending
+        Notification::fake();
+
         // Mock all HTTP requests to prevent real API calls
         Http::fake([
             '*' => Http::response([
@@ -54,11 +58,11 @@ class ChainMigrationUnpauseTest extends TestCase
             ]),
         ]);
 
-        // Mock all log messages
+        // Mock all log messages (updated to match new completeMigration() method)
         Log::shouldReceive('info')
-            ->with('Oura migration completed - no more data', [
+            ->with('oura migration completed - no more data', [
                 'integration_id' => $integration->id,
-                'instance_type' => 'activity',
+                'service' => 'oura',
             ])
             ->once();
 
@@ -68,6 +72,10 @@ class ChainMigrationUnpauseTest extends TestCase
                 'service' => 'oura',
                 'instance_type' => 'activity',
             ])
+            ->once();
+
+        Log::shouldReceive('info')
+            ->with('oura migration completion notification sent', Mockery::any())
             ->once();
 
         // Mock any other potential log calls
@@ -122,6 +130,9 @@ class ChainMigrationUnpauseTest extends TestCase
             'configuration' => ['paused' => true], // Start paused during migration
         ]);
 
+        // Mock notifications to prevent actual sending
+        Notification::fake();
+
         // Mock all HTTP requests
         Http::fake([
             '*' => Http::response([
@@ -132,10 +143,11 @@ class ChainMigrationUnpauseTest extends TestCase
             ]),
         ]);
 
-        // Mock all log messages
+        // Mock all log messages (updated to match new completeMigration() method)
         Log::shouldReceive('info')
-            ->with('Spotify migration completed - no more data', [
+            ->with('spotify migration completed - no more data', [
                 'integration_id' => $integration->id,
+                'service' => 'spotify',
             ])
             ->once();
 
@@ -145,6 +157,10 @@ class ChainMigrationUnpauseTest extends TestCase
                 'service' => 'spotify',
                 'instance_type' => 'listening',
             ])
+            ->once();
+
+        Log::shouldReceive('info')
+            ->with('spotify migration completion notification sent', Mockery::any())
             ->once();
 
         // Mock any other potential log calls
@@ -199,15 +215,19 @@ class ChainMigrationUnpauseTest extends TestCase
             ],
         ]);
 
+        // Mock notifications to prevent actual sending
+        Notification::fake();
+
         // Mock all HTTP requests
         Http::fake([
             '*' => Http::response([], 200),
         ]);
 
-        // Mock all log messages
+        // Mock all log messages (updated to match new completeMigration() method)
         Log::shouldReceive('info')
-            ->with('GitHub migration completed - no repositories configured', [
+            ->with('github migration completed - no more data', [
                 'integration_id' => $integration->id,
+                'service' => 'github',
             ])
             ->once();
 
@@ -217,6 +237,10 @@ class ChainMigrationUnpauseTest extends TestCase
                 'service' => 'github',
                 'instance_type' => 'activity',
             ])
+            ->once();
+
+        Log::shouldReceive('info')
+            ->with('github migration completion notification sent', Mockery::any())
             ->once();
 
         // Mock any other potential log calls
@@ -272,16 +296,19 @@ class ChainMigrationUnpauseTest extends TestCase
             ],
         ]);
 
+        // Mock notifications to prevent actual sending
+        Notification::fake();
+
         // Mock all HTTP requests
         Http::fake([
             '*' => Http::response([], 200),
         ]);
 
-        // Mock all log messages
+        // Mock all log messages (updated to match new completeMigration() method)
         Log::shouldReceive('info')
-            ->with('GitHub migration completed - finished all repositories', [
+            ->with('github migration completed - no more data', [
                 'integration_id' => $integration->id,
-                'total_repos' => 2,
+                'service' => 'github',
             ])
             ->once();
 
@@ -291,6 +318,10 @@ class ChainMigrationUnpauseTest extends TestCase
                 'service' => 'github',
                 'instance_type' => 'activity',
             ])
+            ->once();
+
+        Log::shouldReceive('info')
+            ->with('github migration completion notification sent', Mockery::any())
             ->once();
 
         // Mock any other potential log calls

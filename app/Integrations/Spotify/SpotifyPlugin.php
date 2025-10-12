@@ -65,10 +65,10 @@ class SpotifyPlugin extends OAuthPlugin
             'update_frequency_minutes' => [
                 'type' => 'integer',
                 'label' => 'Update Frequency (minutes)',
-                'description' => 'How often to check for new tracks (minimum 1 minute, Spotify API rate limits apply)',
+                'description' => 'How often to check for new tracks (minimum 5 minutes, Spotify API rate limits apply)',
                 'required' => true,
-                'min' => 1,
-                'default' => 1,
+                'min' => 5,
+                'default' => 15,
             ],
             'auto_tag_genres' => [
                 'type' => 'array',

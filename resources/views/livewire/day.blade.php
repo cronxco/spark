@@ -899,33 +899,17 @@ $areAllGroupsExpanded = computed(function () {
                                     <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }}</span>
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    @if ($firstEvent->domain)
-                                    <x-badge class="badge-xs badge-outline">
-                                        <x-slot:value>
-                                            <x-icon name="fas.lines-leaning" class="w-3 h-3 text-base-content/40" />
-                                            {{ str::Headline($firstEvent->domain) }}
-                                        </x-slot:value>
-                                    </x-badge>
-                                    @endif
                                     <x-badge class="badge-xs badge-outline">
                                         <x-slot:value>
                                             <x-icon name="fas.bell-concierge" class="w-3 h-3 text-base-content/40" />
-                                            {{ str::Headline($firstEvent->service) }}
+                                            {{ str::Lower($firstEvent->service) }}
                                         </x-slot:value>
                                     </x-badge>
-                                    @if ($firstEvent->integration && (str::Headline($firstEvent->integration->instance_type) !== str::Headline($firstEvent->integration->name)))
-                                    <x-badge class="badge-xs badge-outline">
-                                        <x-slot:value>
-                                            <x-icon name="fas.font-awesome" class="w-3 h-3 text-base-content/40" />
-                                            {{ str::Headline($firstEvent->integration->instance_type) }}
-                                        </x-slot:value>
-                                    </x-badge>
-                                    @endif
                                     @if ($firstEvent->integration)
                                     <x-badge class="badge-xs badge-outline">
                                         <x-slot:value>
                                             <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
-                                            {{ str::Headline($firstEvent->integration->name) }}
+                                            {{ str::Lower($firstEvent->integration->name) }}
                                         </x-slot:value>
                                     </x-badge>
                                     @endif
@@ -975,7 +959,7 @@ $areAllGroupsExpanded = computed(function () {
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
                                     <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
-                                    {{ str::Headline($event->integration->name) }}
+                                    {{ str::Lower($event->integration->name) }}
                                 </x-slot:value>
                             </x-badge>
                             @endif
