@@ -1139,7 +1139,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         Log::info('GoCardless processTransactionItem: processing transaction', [
             'integration_id' => $integration->id,
-            'account_id' => $account['id'],
+            'account_id' => $account['id'] ?? $integration->configuration['account_id'] ?? 'unknown',
             'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
             'amount' => $tx['transactionAmount']['amount'] ?? 'unknown',
             'currency' => $tx['transactionAmount']['currency'] ?? 'unknown',
