@@ -13,15 +13,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Check out repository (with full history)
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0 # ✅ Required so git can see both commits in the range
 
       - name: Collect commit messages from this push
         id: commits
         run: |
-          # Collect all commit messages from this push range
-          commits=$(git log ${{ github.event.before }}..${{ github.sha }} --pretty=format:"%s%n%b")
-          # Use a unique delimiter for multiline output
+          BEFORE_SHA="${{ github.event.before }}"
+          AFTER_SHA="${{ github.sha }}"
+
+          # Handle first push or missing history gracefully
+          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "ℹ️  First push detected — collecting all commits on branch."
+            commits=$(git log --pretty=format:"%s%n%b")
+          else
+            echo "ℹ️  Collecting commits between $BEFORE_SHA and $AFTER_SHA."
+            # Use || true to avoid exit on range errors (e.g. rebases, force pushes)
+            commits=$(git log "$BEFORE_SHA".."$AFTER_SHA" --pretty=format:"%s%n%b" || true)
+          fi
+
           delimiter="$(openssl rand -hex 8)"
           {
             echo "messages<<${delimiter}"
@@ -42,9 +54,7 @@ jobs:
         run: |
           for issue_number in ${{ steps.extract.outputs.issues }}; do
             echo "🔍 Checking issue #$issue_number..."
-
-            # Get labels for the issue
-            labels=$(gh issue view "$issue_number" --json labels --jq '.labels[].name')
+            labels=$(gh issue view "$issue_number" --json labels --jq '.labels[].name' || echo "")
             if echo "$labels" | grep -qi '^dev$'; then
               echo "✅ Issue #$issue_number has 'dev' label — closing."
               gh issue close "$issue_number" --comment "Closed automatically after merge into 'dev'."
