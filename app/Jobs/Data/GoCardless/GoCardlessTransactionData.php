@@ -27,11 +27,15 @@ class GoCardlessTransactionData extends BaseProcessingJob
         $bookedTransactions = $transactionData['transactions']['booked'] ?? [];
         $pendingTransactions = $transactionData['transactions']['pending'] ?? [];
 
-        // Get account information from the transaction data
-        $account = $transactionData['account'] ?? [];
+        // Get account information from the transaction data and merge with integration config
+        $account = array_merge(
+            ['id' => $this->integration->configuration['account_id'] ?? null],
+            $transactionData['account'] ?? []
+        );
 
         Log::info('GoCardlessTransactionData: Processing transactions', [
             'integration_id' => $this->integration->id,
+            'account_id' => $account['id'],
             'pending_count' => count($pendingTransactions),
             'booked_count' => count($bookedTransactions),
         ]);
