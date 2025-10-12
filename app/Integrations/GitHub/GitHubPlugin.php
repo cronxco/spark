@@ -99,7 +99,6 @@ class GitHubPlugin extends OAuthPlugin
             'activity' => [
                 'label' => 'Activity',
                 'schema' => self::getConfigurationSchema(),
-                'mandatory' => true,
             ],
         ];
     }
@@ -480,7 +479,6 @@ class GitHubPlugin extends OAuthPlugin
 
                 $repositoryEvents = $this->fetchRepositoryEventsForPull($repo, $events, $integration);
                 $allRepositoryEvents[$repo] = $repositoryEvents;
-
             } catch (Exception $e) {
                 Log::error('GitHub Activity Pull: Failed to fetch events for repository', [
                     'integration_id' => $integration->id,

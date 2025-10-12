@@ -445,7 +445,7 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('o-arrow-down-circle', $notification->getIcon());
         $this->assertEquals('success', $notification->getColor());
         $this->assertFalse($notification->isPriority());
-        $this->assertStringContainsString('completed successfully', $notification->getMessage());
+        $this->assertStringContainsString('ready to explore', $notification->getMessage());
         $this->assertStringContainsString('1,500', $notification->getMessage());
     }
 
@@ -521,7 +521,7 @@ class NotificationSystemTest extends TestCase
         $this->assertStringContainsString('Hello ' . $this->user->name, $mailMessage->greeting);
         $this->assertStringContainsString('1,500', collect($mailMessage->introLines)->implode(' '));
         $this->assertStringContainsString('Jan 2023 - Dec 2024', collect($mailMessage->introLines)->implode(' '));
-        $this->assertEquals('View Integration', $mailMessage->actionText);
+        $this->assertEquals('Explore Your Data', $mailMessage->actionText);
     }
 
     /** @test */

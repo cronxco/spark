@@ -72,7 +72,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Sleep',
                 'description' => 'Sleep duration and quality data',
                 'display_with_object' => false,
-                'value_unit' => 'hours',
+                'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
                 'hidden' => false,
             ],
             'had_heart_rate' => [
@@ -88,7 +89,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Workout',
                 'description' => 'Workout activity data',
                 'display_with_object' => true,
-                'value_unit' => 'calories',
+                'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
                 'hidden' => false,
             ],
             'had_mindfulness_session' => [
@@ -96,7 +98,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Mindfulness Session',
                 'description' => 'Mindfulness or meditation session',
                 'display_with_object' => false,
-                'value_unit' => 'minutes',
+                'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
                 'hidden' => false,
             ],
             'had_oura_tag' => [
@@ -137,7 +140,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily stress level assessment',
                 'display_with_object' => false,
                 'value_unit' => 'stress_level',
-                'value_mapping' => 'stress_day_summary',
+                'value_formatter' => '@if($value == 3)Stressful@elseif($value == 2)Normal@elseif($value == 1)Restored@else{{ $value }}@endif',
                 'hidden' => false,
             ],
             'had_resilience_score' => [
@@ -146,7 +149,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily resilience level assessment',
                 'display_with_object' => false,
                 'value_unit' => 'resilience_level',
-                'value_mapping' => 'resilience_level',
+                'value_formatter' => '@if($value == 5)Exceptional@elseif($value == 4)Strong@elseif($value == 3)Solid@elseif($value == 2)Adequate@elseif($value == 1)Limited@else{{ $value }}@endif',
                 'hidden' => false,
             ],
             'had_spo2' => [
@@ -179,6 +182,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Enhanced tag with detailed information',
                 'display_with_object' => true,
                 'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
                 'hidden' => false,
             ],
             'had_sleep_recommendation' => [
@@ -195,6 +199,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Rest mode period duration',
                 'display_with_object' => true,
                 'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
                 'hidden' => false,
             ],
         ];
@@ -217,6 +222,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Sleep stage duration information',
                 'display_with_object' => true,
                 'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
                 'hidden' => false,
             ],
             'heart_rate' => [
@@ -840,19 +846,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $mapping = $mappings[$mappingKey]['mappings'];
 
         return $mapping[$value] ?? $mapping[null] ?? null;
-    }
-
-    public function mapValueForDisplay(string $mappingKey, ?float $numericValue): string
-    {
-        $mappings = static::getValueMappings();
-
-        if (! isset($mappings[$mappingKey]) || $numericValue === null) {
-            return 'No Data';
-        }
-
-        $displayMappings = $mappings[$mappingKey]['display_mappings'];
-
-        return $displayMappings[(int) $numericValue] ?? 'Unknown';
     }
 
     public function getBaseUrl(): string
@@ -2135,7 +2128,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'sleep_count' => count($sleepItems),
                 'readiness_count' => count($readinessItems),
             ]);
-
         } catch (Throwable $e) {
             Log::error('Oura data sweep failed', [
                 'integration_id' => $integration->id,
@@ -2211,10 +2203,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             // Extract account ID with proper fallback logic for Oura API response format
             // Oura personal_info endpoint returns: {"id": "...", "email": "...", ...}
             $accountId = Arr::get($info, 'id') ??           // Direct id field (current Oura API)
-                        Arr::get($info, 'data.0.user_id') ?? // Legacy nested format
-                        Arr::get($info, 'user_id') ??        // Legacy flat format
-                        Arr::get($info, 'data.0.email') ??   // Fallback to email in nested format
-                        Arr::get($info, 'email');            // Fallback to email in flat format
+                Arr::get($info, 'data.0.user_id') ?? // Legacy nested format
+                Arr::get($info, 'user_id') ??        // Legacy flat format
+                Arr::get($info, 'data.0.email') ??   // Fallback to email in nested format
+                Arr::get($info, 'email');            // Fallback to email in flat format
 
             if (! $accountId) {
                 Log::warning('Oura fetchAccountInfoForGroup: No account ID found in API response', [
@@ -2232,7 +2224,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'group_id' => $group->id,
                 'account_id' => $accountId,
             ]);
-
         } catch (Exception $e) {
             Log::error('Oura fetchAccountInfoForGroup failed', [
                 'group_id' => $group->id,
@@ -2395,7 +2386,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'percent',
                 'contributors_value_unit' => 'percent',
                 'details_fields' => [
-                    'steps', 'cal_total', 'equivalent_walking_distance', 'target_calories', 'non_wear_time',
+                    'steps',
+                    'cal_total',
+                    'equivalent_walking_distance',
+                    'target_calories',
+                    'non_wear_time',
                 ],
             ]);
         }
@@ -2439,7 +2434,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'contributors_value_unit' => 'percent',
             ]);
 
-            // NEW: Process non-numeric level
             if (isset($item['level'])) {
                 $this->createMappedValueEvent(
                     $integration,
@@ -2469,8 +2463,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'percent',
                 'contributors_value_unit' => 'percent',
             ]);
-
-            // NEW: Process non-numeric day_summary
             if (isset($item['day_summary'])) {
                 $this->createMappedValueEvent(
                     $integration,

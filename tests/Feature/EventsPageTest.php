@@ -78,6 +78,6 @@ class EventsPageTest extends TestCase
             ->get('/today');
 
         $response->assertStatus(200);
-        $response->assertSee('No events for this date');
+        $response->assertSee('No events found for this date');
     }
 }

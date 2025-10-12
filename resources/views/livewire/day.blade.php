@@ -45,8 +45,8 @@ state([
     'collapsedGroups' => [],
     // Polling mode: 'keep' (keep-alive) or 'visible'
     'pollMode' => 'visible',
-    // UI state: Day Note collapse (expanded by default)
-    'dayNoteOpen' => true,
+    // UI state: Day Note collapse (collapsed by default)
+    'dayNoteOpen' => false,
 ]);
 
 layout('components.layouts.app');
@@ -100,21 +100,21 @@ $events = computed(function () {
     if ($this->search) {
         $query->where(function ($q) {
             $q->where('action', 'like', "%{$this->search}%")
-              ->orWhere('domain', 'like', "%{$this->search}%")
-              ->orWhere('service', 'like', "%{$this->search}%")
-              ->orWhere('value_unit', 'like', "%{$this->search}%")
-              ->orWhereHas('actor', function ($actorQuery) {
-                  $actorQuery->where('title', 'like', "%{$this->search}%")
-                            ->orWhere('content', 'like', "%{$this->search}%")
-                            ->orWhere('concept', 'like', "%{$this->search}%")
-                            ->orWhere('type', 'like', "%{$this->search}%");
-              })
-              ->orWhereHas('target', function ($targetQuery) {
-                  $targetQuery->where('title', 'like', "%{$this->search}%")
-                            ->orWhere('content', 'like', "%{$this->search}%")
-                            ->orWhere('concept', 'like', "%{$this->search}%")
-                            ->orWhere('type', 'like', "%{$this->search}%");
-              });
+                ->orWhere('domain', 'like', "%{$this->search}%")
+                ->orWhere('service', 'like', "%{$this->search}%")
+                ->orWhere('value_unit', 'like', "%{$this->search}%")
+                ->orWhereHas('actor', function ($actorQuery) {
+                    $actorQuery->where('title', 'like', "%{$this->search}%")
+                        ->orWhere('content', 'like', "%{$this->search}%")
+                        ->orWhere('concept', 'like', "%{$this->search}%")
+                        ->orWhere('type', 'like', "%{$this->search}%");
+                })
+                ->orWhereHas('target', function ($targetQuery) {
+                    $targetQuery->where('title', 'like', "%{$this->search}%")
+                        ->orWhere('content', 'like', "%{$this->search}%")
+                        ->orWhere('concept', 'like', "%{$this->search}%")
+                        ->orWhere('type', 'like', "%{$this->search}%");
+                });
         });
     }
 
@@ -250,7 +250,6 @@ $saveDayNote = function (): void {
         OutlinePullTodayDayNote::dispatch($integration, (string) $this->date)->onQueue('pull');
 
         $this->dayNoteSavedAt = now()->toIso8601String();
-
     } catch (\Throwable $e) {
         // Swallow; UI can show failure later if needed
     } finally {
@@ -492,10 +491,24 @@ $isDurationUnit = function ($unit): bool {
     }
     $u = strtolower((string) $unit);
     $map = [
-        'ms', 'millisecond', 'milliseconds',
-        's', 'sec', 'secs', 'second', 'seconds',
-        'm', 'min', 'mins', 'minute', 'minutes',
-        'h', 'hr', 'hrs', 'hour', 'hours'
+        'ms',
+        'millisecond',
+        'milliseconds',
+        's',
+        'sec',
+        'secs',
+        'second',
+        'seconds',
+        'm',
+        'min',
+        'mins',
+        'minute',
+        'minutes',
+        'h',
+        'hr',
+        'hrs',
+        'hour',
+        'hours'
     ];
     return in_array($u, $map, true);
 };
@@ -530,9 +543,15 @@ $formatDurationShort = function ($value, $unit): string {
     $s = $total % 60;
 
     $parts = [];
-    if ($h > 0) { $parts[] = $h . 'h'; }
-    if ($m > 0 || $h > 0) { $parts[] = $m . 'm'; }
-    if ($h === 0) { $parts[] = $s . 's'; }
+    if ($h > 0) {
+        $parts[] = $h . 'h';
+    }
+    if ($m > 0 || $h > 0) {
+        $parts[] = $m . 'm';
+    }
+    if ($h === 0) {
+        $parts[] = $s . 's';
+    }
 
     return implode('', $parts);
 };
@@ -545,7 +564,7 @@ $formatValueDisplay = function ($event): string {
         return $this->formatDurationShort($value, $unit);
     }
 
-    return format_event_value_display($value, $unit);
+    return format_event_value_display($value, $unit, $event->service, $event->action, 'action');
 };
 
 $previousDay = function () {
@@ -741,8 +760,7 @@ $areAllGroupsExpanded = computed(function () {
                             type="date"
                             class="input input-sm"
                             wire:model.live.debounce.0ms="date"
-                            @change="$wire.call('navigateToDate')"
-                        />
+                            @change="$wire.call('navigateToDate')" />
                     </label>
                     <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">
                         <x-icon name="o-chevron-right" class="w-4 h-4" />
@@ -753,26 +771,25 @@ $areAllGroupsExpanded = computed(function () {
                     <x-input
                         wire:model.live.debounce.300ms="search"
                         placeholder="Search events..."
-                        class="w-full"
-                    />
+                        class="w-full" />
                 </div>
 
                 <div class="hidden sm:flex items-center gap-2">
-                        <!-- Expand/Collapse all (icon-only) -->
-                        <x-button
-                            class="btn-ghost btn-sm"
-                            wire:click="toggleAllGroups"
-                            aria-label="{{ $this->areAllGroupsExpanded ? 'Collapse all' : 'Expand all' }}">
-                            <x-icon name="{{ $this->areAllGroupsExpanded ? 'o-arrows-pointing-in' : 'o-arrows-pointing-out' }}" class="w-4 h-4" />
-                        </x-button>
-                        <!-- Polling mode toggle: keep-alive vs visible -->
-                        <x-button
-                            class="btn-ghost btn-sm"
-                            wire:click="togglePollMode"
-                            aria-label="{{ $this->pollMode === 'keep' ? 'Switch to visible polling' : 'Switch to keep-alive polling' }}"
-                            title="{{ $this->pollMode === 'keep' ? 'Polling: keep-alive' : 'Polling: visible' }}">
-                            <x-icon name="{{ $this->pollMode === 'keep' ? 'o-bolt' : 'o-eye' }}" class="w-4 h-4" />
-                        </x-button>
+                    <!-- Expand/Collapse all (icon-only) -->
+                    <x-button
+                        class="btn-ghost btn-sm"
+                        wire:click="toggleAllGroups"
+                        aria-label="{{ $this->areAllGroupsExpanded ? 'Collapse all' : 'Expand all' }}">
+                        <x-icon name="{{ $this->areAllGroupsExpanded ? 'o-arrows-pointing-in' : 'o-arrows-pointing-out' }}" class="w-4 h-4" />
+                    </x-button>
+                    <!-- Polling mode toggle: keep-alive vs visible -->
+                    <x-button
+                        class="btn-ghost btn-sm"
+                        wire:click="togglePollMode"
+                        aria-label="{{ $this->pollMode === 'keep' ? 'Switch to visible polling' : 'Switch to keep-alive polling' }}"
+                        title="{{ $this->pollMode === 'keep' ? 'Polling: keep-alive' : 'Polling: visible' }}">
+                        <x-icon name="{{ $this->pollMode === 'keep' ? 'o-bolt' : 'o-eye' }}" class="w-4 h-4" />
+                    </x-button>
                 </div>
             </div>
         </x-slot:actions>
@@ -783,26 +800,26 @@ $areAllGroupsExpanded = computed(function () {
         <x-collapse wire:model="dayNoteOpen" separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="o-book-open" />
+                    <x-icon name="o-calendar" />
                     <span>
-                        Day Note
+                        {{ \Carbon\Carbon::parse($this->date)->format('j F Y') }}
                         @if ($this->dayNoteSaving)
-                            - <span class="text-sm text-info">Saving…</span>
+                        - <span class="text-sm text-info">Saving…</span>
                         @elseif ($this->dayNoteSavedAt)
-                            - <span class="text-sm text-success">Saved</span>
+                        - <span class="text-sm text-success">Saved</span>
                         @endif
                     </span>
                 </div>
             </x-slot:heading>
             <x-slot:content>
                 @if ($this->dayNoteDocId)
-                    <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200">
-                        <div class="space-y-3">
-                            <x-markdown wire:model.live.debounce.800ms="dayNoteText" label="" :config="['maxHeight' => '200px', 'status' => 'false', 'sideBySideFullscreen' => 'false']" />
-                        </div>
-                    </x-card>
+                <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200">
+                    <div class="space-y-3">
+                        <x-markdown wire:model.live.debounce.800ms="dayNoteText" label="" :config="['maxHeight' => '200px', 'status' => 'false', 'sideBySideFullscreen' => 'false']" />
+                    </div>
+                </x-card>
                 @else
-                    <x-alert title="No Day Note found for this date" icon="o-calendar" />
+                <x-alert title="No Day Note found for this date" icon="o-book-open" />
                 @endif
             </x-slot:content>
         </x-collapse>
@@ -810,146 +827,176 @@ $areAllGroupsExpanded = computed(function () {
 
     <div class="space-y-6">
         @if ($this->events->isEmpty())
-            <x-card>
-                <div class="text-center py-8">
-                    <x-icon name="o-calendar" class="w-12 h-12 text-base-300 mx-auto mb-4" />
-                    <h3 class="text-lg font-semibold text-base-content mb-2">No events for this date</h3>
-                    <p class="text-base-content/70">Try another day using the arrows or date picker.</p>
-                </div>
-            </x-card>
+        <x-card>
+            <div class="text-center py-8">
+                <x-icon name="o-calendar" class="w-12 h-12 text-base-300 mx-auto mb-4" />
+                <h3 class="text-lg font-semibold text-base-content mb-2">No events found for this date</h3>
+            </div>
+        </x-card>
         @else
         <!-- Custom Vertical Timeline View -->
         @if ($this->pollMode === 'keep')
         <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
-        @else
-        <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.visible>
-        @endif
-            @php $previousHour = null; @endphp
+            @else
+            <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.visible>
+                @endif
+                @php $previousHour = null; @endphp
 
-            @foreach (($this->groupedEvents ?? []) as $eventGroup)
+                @foreach (($this->groupedEvents ?? []) as $eventGroup)
                 @php
-                    $first = $eventGroup['events'][0];
-                    $hour = $first->time->format('H');
-                    $showHourMarker = $previousHour !== $hour;
-                    $previousHour = $hour;
-                    $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? false);
+                $first = $eventGroup['events'][0];
+                $hour = $first->time->format('H');
+                $showHourMarker = $previousHour !== $hour;
+                $previousHour = $hour;
+                $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? false);
                 @endphp
 
-                        <!-- Hour marker inside spine -->
-                        @if ($showHourMarker)
-                            <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3 items-center py-1 select-none">
-                                <div class="relative h-8">
-                                    <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
-                                    <div class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center text-[10px] text-base-content/70">{{ $first->time->format('H') }}</div>
-                                </div>
-                                <div></div>
-                                <div></div>
-                            </div>
-                        @endif
-
-                        <!-- Group header -->
-                        <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3 {{ $isCollapsed ? 'py-1' : '' }}">
-                            <div class="relative">
-                                <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
-                                <button class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center hover:bg-base-200"
-                                        wire:click="toggleGroup(@js($eventGroup['key']))"
-                                        aria-expanded="{{ $isCollapsed ? 'false' : 'true' }}"
-                                        aria-label="Toggle group">
-                                    <x-icon name="{{ $this->getEventIcon($eventGroup['action'], $eventGroup['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($eventGroup['service']) }}" />
-                                </button>
-                            </div>
-                            <div class="{{ $isCollapsed ? 'py-3' : '' }}">
-                                <div class="min-w-0">
-                                    @if ($isCollapsed)
-                                        <div class="truncate">
-                                            <span class="font-semibold">{{ $eventGroup['formatted_action'] }}</span>
-                                            <span class="text-base-content/90">{{ ' ' . $eventGroup['count'] . ' ' . $eventGroup['object_type_plural'] }}</span>
-                                        </div>
-                                    @else
-                                        @php $firstEvent = $eventGroup['events'][0]; @endphp
-                                        <div class="py-2 px-2">
-                                            <a href="{{ route('events.show', $firstEvent->id) }}" class="font-semibold truncate block hover:text-primary transition-colors">
-                                                {{ $this->formatAction($firstEvent->action) }}
-                                                @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
-                                                    @if ($firstEvent->target)
-                                                        <span class="text-base-content/80">{{ ' ' . $firstEvent->target->title }}</span>
-                                                    @elseif ($firstEvent->actor)
-                                                        <span class="text-base-content/80">{{ ' ' . $firstEvent->actor->title }}</span>
-                                                    @endif
-                                                @endif
-                                            </a>
-                                            <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
-                                                <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }}</span>
-                                                <span class="hidden sm:inline">·</span>
-                                                <span class="sm:hidden w-full"></span>
-                                                @if ($firstEvent->domain)
-                                                    <x-badge :value="$firstEvent->domain" class="badge-xs badge-outline" />
-                                                @endif
-                                                <x-badge :value="$firstEvent->service" class="badge-xs {{ $this->getBadgeAccentForService($firstEvent->service) }} badge-outline" />
-                                                @if ($firstEvent->integration)
-                                                    <x-badge :value="$firstEvent->integration->name" class="badge-xs badge-outline" />
-                                                @endif
-                                                @if ($firstEvent->tags && count($firstEvent->tags) > 0)<span class="hidden sm:inline">·</span><span class="sm:hidden w-full"></span>@endif
-                                                @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" />@endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="{{ $isCollapsed ? 'py-3' : 'py-2' }} text-right pr-2">
-                                @if (! $isCollapsed)
-                                    @php $firstEvent = $eventGroup['events'][0]; @endphp
-                                    @if (! is_null($firstEvent->value))
-                                        <span class="text-sm {{ $this->valueColorClass($firstEvent) }}">{{ $this->formatValueDisplay($firstEvent) }}</span>
-                                    @endif
-                                @endif
-                            </div>
-                        </div>
-
-                        @if (! $isCollapsed)
-                            @php $eventsToShow = array_slice($eventGroup['events'], 1); @endphp
-                            @foreach ($eventsToShow as $event)
-                                <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3">
-                                    <div class="relative">
-                                        <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
-                                    </div>
-                                    <div class="py-2 px-2">
-                                        <a href="{{ route('events.show', $event->id) }}" class="font-semibold text-base-content block hover:text-primary transition-colors">
-                                            {{ $this->formatAction($event->action) }}
-                                            @if (should_display_action_with_object($event->action, $event->service))
-                                                @if ($event->target)
-                                                    <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
-                                                @elseif ($event->actor)
-                                                    <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
-                                                @endif
-                                            @endif
-                                        </a>
-                                        <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
-                                            <span title="{{ $event->time->toDayDateTimeString() }}">{{ $event->time->diffForHumans() }}</span>
-                                            <span class="hidden sm:inline">·</span>
-                                            <span class="sm:hidden w-full"></span>
-                                            @if ($event->domain)
-                                                <x-badge :value="$event->domain" class="badge-xs badge-outline" />
-                                            @endif
-                                            <x-badge :value="$event->service" class="badge-xs {{ $this->getBadgeAccentForService($event->service) }} badge-outline" />
-                                            @if ($event->integration)
-                                                <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
-                                            @endif
-                                            @if ($event->tags && count($event->tags) > 0)<span class="hidden sm:inline">·</span><span class="sm:hidden w-full"></span>@endif
-                                            @foreach ($event->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" />@endforeach
-                                        </div>
-                                    </div>
-                                    <div class="py-2 pr-2 text-right">
-                                        @if (! is_null($event->value))
-                                            <span class="text-sm {{ $this->valueColorClass($event) }}">{{ $this->formatValueDisplay($event) }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        @endif
-
-                    @endforeach
+                <!-- Hour marker inside spine -->
+                @if ($showHourMarker)
+                <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3 items-center py-1 select-none">
+                    <div class="relative h-8">
+                        <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
+                        <div class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center text-[10px] text-base-content/70">{{ $first->time->format('H') }}</div>
+                    </div>
+                    <div></div>
+                    <div></div>
                 </div>
                 @endif
+
+                <!-- Group header -->
+                <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3 {{ $isCollapsed ? 'py-1' : '' }}">
+                    <div class="relative">
+                        <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
+                        <button class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center hover:bg-base-200"
+                            wire:click="toggleGroup(@js($eventGroup['key']))"
+                            aria-expanded="{{ $isCollapsed ? 'false' : 'true' }}"
+                            aria-label="Toggle group">
+                            <x-icon name="{{ $this->getEventIcon($eventGroup['action'], $eventGroup['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($eventGroup['service']) }}" />
+                        </button>
+                    </div>
+                    <div class="{{ $isCollapsed ? 'py-3' : '' }}">
+                        <div class="min-w-0">
+                            @if ($isCollapsed)
+                            <div class="truncate">
+                                <span class="font-semibold">{{ $eventGroup['formatted_action'] }}</span>
+                                <span class="text-base-content/90">{{ ' ' . $eventGroup['count'] . ' ' . $eventGroup['object_type_plural'] }}</span>
+                            </div>
+                            @else
+                            @php $firstEvent = $eventGroup['events'][0]; @endphp
+                            <div class="py-2 px-2">
+                                <a href="{{ route('events.show', $firstEvent->id) }}" class="block hover:text-primary transition-colors">
+                                    <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
+                                    @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
+                                    @if ($firstEvent->target)
+                                    <span class="text-base-content/80 sm:inline block truncate font-bold">{{ ' ' . $firstEvent->target->title }}</span>
+                                    @elseif ($firstEvent->actor)
+                                    <span class="text-base-content/80 sm:inline block truncate font-bold">{{ ' ' . $firstEvent->actor->title }}</span>
+                                    @endif
+                                    @endif
+                                </a>
+                                <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
+                                    {{ $firstEvent->time->format(' H:i') }} ·
+                                    <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }}</span>
+                                    <span class="hidden sm:inline">·</span>
+                                    <span class="sm:hidden w-full"></span>
+                                    @if ($firstEvent->domain)
+                                    <x-badge class="badge-xs badge-outline">
+                                        <x-slot:value>
+                                            <x-icon name="fas.lines-leaning" class="w-3 h-3 text-base-content/40" />
+                                            {{ str::Headline($firstEvent->domain) }}
+                                        </x-slot:value>
+                                    </x-badge>
+                                    @endif
+                                    <x-badge class="badge-xs badge-outline">
+                                        <x-slot:value>
+                                            <x-icon name="fas.bell-concierge" class="w-3 h-3 text-base-content/40" />
+                                            {{ str::Headline($firstEvent->service) }}
+                                        </x-slot:value>
+                                    </x-badge>
+                                    @if ($firstEvent->integration && (str::Headline($firstEvent->integration->instance_type) !== str::Headline($firstEvent->integration->name)))
+                                    <x-badge class="badge-xs badge-outline">
+                                        <x-slot:value>
+                                            <x-icon name="fas.font-awesome" class="w-3 h-3 text-base-content/40" />
+                                            {{ str::Headline($firstEvent->integration->instance_type) }}
+                                        </x-slot:value>
+                                    </x-badge>
+                                    @endif
+                                    @if ($firstEvent->integration)
+                                    <x-badge class="badge-xs badge-outline">
+                                        <x-slot:value>
+                                            <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
+                                            {{ str::Headline($firstEvent->integration->name) }}
+                                        </x-slot:value>
+                                    </x-badge>
+                                    @endif
+                                    @if ($firstEvent->tags && count($firstEvent->tags) > 0)
+                                    <span class="hidden sm:inline">·</span>
+                                    <span class="sm:hidden w-full"></span>
+                                    @endif
+                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" fill />@endforeach
+                                </div>
+                            </div>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="{{ $isCollapsed ? 'py-3' : 'py-2' }} text-right pr-2">
+                        @if (! $isCollapsed)
+                        @php $firstEvent = $eventGroup['events'][0]; @endphp
+                        @if (! is_null($firstEvent->value))
+                        <span class="text-lg font-bold {{ $this->valueColorClass($firstEvent) }}">{!! $this->formatValueDisplay($firstEvent) !!}</span>
+                        @endif
+                        @endif
+                    </div>
+                </div>
+
+                @if (! $isCollapsed)
+                @php $eventsToShow = array_slice($eventGroup['events'], 1); @endphp
+                @foreach ($eventsToShow as $event)
+                <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3">
+                    <div class="relative">
+                        <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
+                    </div>
+                    <div class="py-2 px-2">
+                        <a href="{{ route('events.show', $event->id) }}" class="text-base-content block hover:text-primary transition-colors">
+                            <span class="font-medium">{{ $this->formatAction($event->action) }}</span>
+                            @if (should_display_action_with_object($event->action, $event->service))
+                            @if ($event->target)
+                            <span class="text-base-content/80 sm:inline block truncate font-medium">{{ ' ' . $event->target->title }}</span>
+                            @elseif ($event->actor)
+                            <span class="text-base-content/80 sm:inline block truncate font-medium">{{ ' ' . $event->actor->title }}</span>
+                            @endif
+                            @endif
+                        </a>
+                        <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
+                            <span title="{{ $event->time->toDayDateTimeString() }}">{{ $event->time->diffForHumans() }}</span>
+                            <span class="hidden sm:inline">·</span>
+                            <span class="sm:hidden w-full"></span>
+                            @if ($event->integration)
+                            <x-badge class="badge-xs badge-outline">
+                                <x-slot:value>
+                                    <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
+                                    {{ str::Headline($event->integration->name) }}
+                                </x-slot:value>
+                            </x-badge>
+                            @endif
+                            @if ($event->tags && count($event->tags) > 0)
+                            <span class="hidden sm:inline">·</span>
+                            <span class="sm:hidden w-full"></span>
+                            @endif
+                            @foreach ($event->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" />@endforeach
+                        </div>
+                    </div>
+                    <div class="py-2 pr-2 text-right">
+                        @if (! is_null($event->value))
+                        <span class="text-lg font-semibold {{ $this->valueColorClass($event) }}">{!! $this->formatValueDisplay($event) !!}</span>
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+                @endif
+
+                @endforeach
             </div>
-            </div>
+            @endif
+        </div>
+    </div>

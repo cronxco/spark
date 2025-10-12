@@ -142,6 +142,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => true,
             ],
             'salary_received_from' => [
@@ -150,6 +151,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Salary payment received from employer',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'declined_payment_to' => [
@@ -158,6 +160,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Card payment was declined',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'card_payment_to' => [
@@ -166,6 +169,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Payment made with Monzo card',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'card_refund_from' => [
@@ -174,6 +178,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Refund received on Monzo card',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'pot_transfer_to' => [
@@ -182,6 +187,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money transferred to a Monzo pot',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'pot_withdrawal_to' => [
@@ -190,6 +196,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money withdrawn from a Monzo pot',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'interest_repaid' => [
@@ -198,6 +205,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Interest payment made',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'interest_earned' => [
@@ -206,6 +214,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Interest received',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'monzo_flex_payment' => [
@@ -214,6 +223,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Payment made for Monzo Flex',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'monzo_flex_loan' => [
@@ -222,6 +232,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money borrowed via Monzo Flex',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'direct_debit_to' => [
@@ -230,6 +241,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Direct debit payment',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'direct_credit_from' => [
@@ -238,6 +250,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Direct credit received',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'monzo_me_to' => [
@@ -246,6 +259,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money sent via Monzo Me',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'monzo_me_from' => [
@@ -254,6 +268,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money received via Monzo Me',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'bank_transfer_to' => [
@@ -262,6 +277,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money sent via bank transfer',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'bank_transfer_from' => [
@@ -270,6 +286,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money received via bank transfer',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'fee_paid_for' => [
@@ -278,6 +295,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Fee charged by Monzo',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'fee_refunded_for' => [
@@ -286,6 +304,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Fee refunded by Monzo',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'other_debit_to' => [
@@ -294,6 +313,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Other outgoing transaction',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'other_credit_from' => [
@@ -302,6 +322,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Other incoming transaction',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
         ];
@@ -324,6 +345,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Amount spent today for this account',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'balance_change' => [
@@ -332,6 +354,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Change in balance since previous day',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'pot' => [
@@ -364,6 +387,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'External bank transfer details',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'transaction' => [
@@ -388,6 +412,7 @@ class MonzoPlugin extends OAuthPlugin
                 'description' => 'Money transfer to or from a Monzo pot',
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
         ];

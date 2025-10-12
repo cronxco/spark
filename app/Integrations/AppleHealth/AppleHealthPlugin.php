@@ -85,6 +85,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'A workout session completed by the user',
                 'display_with_object' => false,
                 'value_unit' => 'kcal',
+                'value_formatter' => '{{ round($value) }} kcal',
                 'hidden' => false,
             ],
             // Health Metrics
@@ -94,6 +95,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Environmental audio exposure measurement',
                 'display_with_object' => false,
                 'value_unit' => 'dB',
+                'value_formatter' => '{{ round($value) }} dB',
                 'hidden' => false,
             ],
             'had_heart_rate' => [
@@ -102,6 +104,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Heart rate measurement',
                 'display_with_object' => false,
                 'value_unit' => 'bpm',
+                'value_formatter' => '{{ round($value) }} bpm',
                 'hidden' => false,
             ],
             'had_walking_speed' => [
@@ -110,6 +113,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Walking speed measurement',
                 'display_with_object' => false,
                 'value_unit' => 'km/h',
+                'value_formatter' => '{{ number_format($value, 2) }} km/h',
                 'hidden' => false,
             ],
             'had_walking_heart_rate_average' => [
@@ -118,6 +122,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Average heart rate while walking',
                 'display_with_object' => false,
                 'value_unit' => 'bpm',
+                'value_formatter' => '{{ round($value) }} bpm',
                 'hidden' => false,
             ],
             'had_basal_energy_burned' => [
@@ -126,6 +131,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Basal energy expenditure measurement',
                 'display_with_object' => false,
                 'value_unit' => 'kcal',
+                'value_formatter' => '{{ round($value) }} kcal',
                 'hidden' => false,
             ],
             'had_resting_heart_rate' => [
@@ -134,6 +140,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Resting heart rate measurement',
                 'display_with_object' => false,
                 'value_unit' => 'bpm',
+                'value_formatter' => '{{ round($value) }} bpm',
                 'hidden' => false,
             ],
             'had_breathing_disturbances' => [
@@ -150,6 +157,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Speed going down stairs',
                 'display_with_object' => false,
                 'value_unit' => 'steps/s',
+                'value_formatter' => '{{ number_format($value, 2) }} steps/s',
                 'hidden' => false,
             ],
             'had_headphone_audio_exposure' => [
@@ -158,6 +166,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Audio exposure through headphones',
                 'display_with_object' => false,
                 'value_unit' => 'dB',
+                'value_formatter' => '{{ round($value) }} dB',
                 'hidden' => false,
             ],
             'had_active_energy' => [
@@ -166,6 +175,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Active energy burned measurement',
                 'display_with_object' => false,
                 'value_unit' => 'kcal',
+                'value_formatter' => '{{ round($value) }} kcal',
                 'hidden' => false,
             ],
             'had_flights_climbed' => [
@@ -174,6 +184,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Number of flights of stairs climbed',
                 'display_with_object' => false,
                 'value_unit' => 'flights',
+                'value_formatter' => '{{ round($value) }} flights',
                 'hidden' => false,
             ],
             'had_walking_step_length' => [
@@ -182,6 +193,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Average length of walking steps',
                 'display_with_object' => false,
                 'value_unit' => 'cm',
+                'value_formatter' => '{{ number_format($value, 1) }} cm',
                 'hidden' => false,
             ],
             'had_stair_speed_up' => [
@@ -190,6 +202,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Speed going up stairs',
                 'display_with_object' => false,
                 'value_unit' => 'steps/s',
+                'value_formatter' => '{{ number_format($value, 2) }} steps/s',
                 'hidden' => false,
             ],
             'had_walking_asymmetry_percentage' => [
@@ -198,6 +211,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Walking gait asymmetry measurement',
                 'display_with_object' => false,
                 'value_unit' => '%',
+                'value_formatter' => '{{ number_format($value, 1) }}%',
                 'hidden' => false,
             ],
             'had_apple_sleeping_wrist_temperature' => [
@@ -206,6 +220,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Wrist temperature during sleep',
                 'display_with_object' => false,
                 'value_unit' => '°C',
+                'value_formatter' => '{{ number_format($value, 1) }}°C',
                 'hidden' => false,
             ],
             'had_walking_double_support_percentage' => [
@@ -214,6 +229,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Percentage of walking cycle with both feet on ground',
                 'display_with_object' => false,
                 'value_unit' => '%',
+                'value_formatter' => '{{ number_format($value, 1) }}%',
                 'hidden' => false,
             ],
             'had_vo2_max' => [
@@ -222,6 +238,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Maximum oxygen consumption measurement',
                 'display_with_object' => false,
                 'value_unit' => 'mL/kg/min',
+                'value_formatter' => '{{ number_format($value, 1) }} ml·kg<sup>-1</sup>·min<sup>-1</sup>',
                 'hidden' => false,
             ],
             'had_respiratory_rate' => [
@@ -230,6 +247,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Breathing rate measurement',
                 'display_with_object' => false,
                 'value_unit' => 'breaths/min',
+                'value_formatter' => '{{ round($value) }} breaths/min',
                 'hidden' => false,
             ],
             'had_apple_exercise_time' => [
@@ -238,6 +256,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Exercise time tracked by Apple Watch',
                 'display_with_object' => false,
                 'value_unit' => 'min',
+                'value_formatter' => '{{ format_duration($value * 60) }}',
                 'hidden' => false,
             ],
             'had_time_in_daylight' => [
@@ -246,6 +265,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Time spent in daylight',
                 'display_with_object' => false,
                 'value_unit' => 'min',
+                'value_formatter' => '{{ format_duration($value * 60) }}',
                 'hidden' => false,
             ],
             'had_walking_running_distance' => [
@@ -254,6 +274,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Distance covered walking and running',
                 'display_with_object' => false,
                 'value_unit' => 'km',
+                'value_formatter' => '{{ number_format($value, 2) }} km',
                 'hidden' => false,
             ],
             'had_physical_effort' => [
@@ -270,6 +291,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Number of steps taken',
                 'display_with_object' => false,
                 'value_unit' => 'steps',
+                'value_formatter' => '{{ number_format($value, 0) }} steps',
                 'hidden' => false,
             ],
             'had_blood_oxygen_saturation' => [
@@ -278,6 +300,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Blood oxygen saturation level',
                 'display_with_object' => false,
                 'value_unit' => '%',
+                'value_formatter' => '{{ number_format($value, 1) }}%',
                 'hidden' => false,
             ],
             'had_heart_rate_variability' => [
@@ -286,6 +309,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Heart rate variability measurement',
                 'display_with_object' => false,
                 'value_unit' => 'ms',
+                'value_formatter' => '{{ round($value) }} ms',
                 'hidden' => false,
             ],
             'had_apple_stand_hour' => [
@@ -294,6 +318,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Stand hours tracked by Apple Watch',
                 'display_with_object' => false,
                 'value_unit' => 'hours',
+                'value_formatter' => '{{ round($value) }} hours',
                 'hidden' => false,
             ],
             'had_six_minute_walking_test_distance' => [
@@ -302,6 +327,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Distance covered in 6-minute walking test',
                 'display_with_object' => false,
                 'value_unit' => 'm',
+                'value_formatter' => '{{ number_format($value, 1) }} m',
                 'hidden' => false,
             ],
             'had_apple_stand_time' => [
@@ -310,6 +336,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'description' => 'Stand time tracked by Apple Watch',
                 'display_with_object' => false,
                 'value_unit' => 'min',
+                'value_formatter' => '{{ format_duration($value * 60) }}',
                 'hidden' => false,
             ],
         ];
