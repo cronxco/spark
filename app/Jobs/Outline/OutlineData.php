@@ -120,7 +120,9 @@ class OutlineData extends BaseProcessingJob
             // NOTE: Check for existing events at USER level, not integration level,
             // since the same Outline document can be processed by multiple integration instances
             // (e.g., "recent_daynotes", "recent_documents", "task - pin day note")
-            $existingEvent = Event::where('user_id', $this->integration->user_id)
+            $existingEvent = Event::whereHas('integration', function ($query) {
+                $query->where('user_id', $this->integration->user_id);
+            })
                 ->where('service', 'outline')
                 ->where('source_id', $sourceId)
                 ->whereNull('deleted_at')
