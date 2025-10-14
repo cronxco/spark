@@ -107,4 +107,9 @@ return [
         'poll_interval_minutes' => env('OUTLINE_POLL_INTERVAL_MINUTES', 15),
     ],
 
+    'karakeep' => [
+        'url' => env('KARAKEEP_URL'),
+        'access_token' => env('KARAKEEP_ACCESS_TOKEN'),
+    ],
+
 ];

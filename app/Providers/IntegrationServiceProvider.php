@@ -7,6 +7,7 @@ use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\Hevy\HevyPlugin;
+use App\Integrations\Karakeep\KarakeepPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Outline\OutlinePlugin;
@@ -37,6 +38,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(RedditPlugin::class);
         PluginRegistry::register(TaskPlugin::class);
         PluginRegistry::register(OutlinePlugin::class);
+        PluginRegistry::register(KarakeepPlugin::class);
     }
 
     /**

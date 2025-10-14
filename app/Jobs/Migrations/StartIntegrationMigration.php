@@ -102,6 +102,12 @@ class StartIntegrationMigration implements ShouldQueue
                 return;
             }
 
+            if ($service === 'karakeep') {
+                $this->startKarakeep();
+
+                return;
+            }
+
             $this->updateProgress('failed', 'Unsupported service', 0, [
                 'service' => $service,
                 'integration_id' => $this->integration->id,
@@ -493,6 +499,42 @@ class StartIntegrationMigration implements ShouldQueue
 
         // Unpause the integration when migration fails so it's not stuck
         static::unpauseAfterMigration($this->integration);
+    }
+
+    protected function startKarakeep(): void
+    {
+        $instanceType = $this->integration->instance_type ?: 'bookmarks';
+
+        $this->updateProgress('configuring', 'Configuring Karakeep migration...', 20, [
+            'service' => 'karakeep',
+            'instance_type' => $instanceType,
+        ]);
+
+        // Track migration start time for statistics
+        $this->integration->update([
+            'configuration->migration_started_at' => now()->toIso8601String(),
+        ]);
+
+        // Set up initial context with larger page size for migration
+        $context = [
+            'service' => 'karakeep',
+            'instance_type' => $instanceType,
+            'cursor' => [
+                'page' => 1,
+                'per_page' => 100, // Use maximum page size for migration
+            ],
+            'timebox_until' => $this->timeboxUntil?->toIso8601String(),
+        ];
+
+        $this->updateProgress('fetching', 'Starting Karakeep data fetch...', 30, [
+            'service' => 'karakeep',
+            'instance_type' => $instanceType,
+        ]);
+
+        // Dispatch the fetch job to begin migration
+        Bus::chain([
+            new FetchIntegrationPage($this->integration, $context),
+        ])->onConnection('redis')->onQueue('migration')->dispatch();
     }
 
     /**

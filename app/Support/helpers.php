@@ -6,6 +6,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\LoggingService;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -593,5 +594,90 @@ if (! function_exists('log_hierarchical')) {
     function log_hierarchical(Integration $integration, string $level, string $message, array $context = []): void
     {
         LoggingService::logHierarchical($integration, $level, $message, $context);
+    }
+}
+
+if (! function_exists('truncate_to_words')) {
+    /**
+     * Truncate text to a specified number of words
+     */
+    function truncate_to_words(string $text, int $wordLimit = 150): string
+    {
+        $words = str_word_count($text, 2);
+        if (count($words) <= $wordLimit) {
+            return $text;
+        }
+
+        $positions = array_keys($words);
+        $truncatePosition = $positions[$wordLimit] ?? strlen($text);
+
+        return substr($text, 0, $truncatePosition) . '...';
+    }
+}
+
+if (! function_exists('karakeep_add_bookmark')) {
+    /**
+     * Add a bookmark to Karakeep instance
+     * This function posts to Karakeep and returns immediately without triggering a sync.
+     * The bookmark will be synced on the next scheduled pull.
+     *
+     * @param  string  $url  The URL to bookmark
+     * @param  string|null  $title  Optional title for the bookmark
+     * @param  array  $tags  Optional array of tag names to apply
+     * @return array|null Returns bookmark data on success, null on failure
+     */
+    function karakeep_add_bookmark(string $url, ?string $title = null, array $tags = []): ?array
+    {
+        $karakeepUrl = config('services.karakeep.url');
+        $accessToken = config('services.karakeep.access_token');
+
+        if (! $karakeepUrl || ! $accessToken) {
+            Log::error('Karakeep configuration missing', [
+                'has_url' => ! empty($karakeepUrl),
+                'has_token' => ! empty($accessToken),
+            ]);
+
+            return null;
+        }
+
+        try {
+            $payload = ['url' => $url];
+
+            if ($title) {
+                $payload['title'] = $title;
+            }
+
+            if (! empty($tags)) {
+                $payload['tags'] = $tags;
+            }
+
+            $response = Http::withToken($accessToken)
+                ->post(rtrim($karakeepUrl, '/') . '/api/v1/bookmarks', $payload);
+
+            if ($response->successful()) {
+                Log::info('Successfully added bookmark to Karakeep', [
+                    'url' => $url,
+                    'title' => $title,
+                    'tags' => $tags,
+                ]);
+
+                return $response->json();
+            }
+
+            Log::error('Failed to add bookmark to Karakeep', [
+                'url' => $url,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Exception while adding bookmark to Karakeep', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

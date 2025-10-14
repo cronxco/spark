@@ -351,7 +351,7 @@ class PluginTypeValidationTest extends TestCase
         preg_match_all("/'type'\s*=>\s*['\"]([^'\"]+)['\"]/", $withoutTagArrays, $matches);
         if (! empty($matches[1])) {
             $filtered = array_filter($matches[1], function ($type) {
-                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
+                return ! in_array($type, ['array', 'integer', 'string', 'boolean', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
             });
             $objectTypes = array_merge($objectTypes, $filtered);
         }
@@ -360,7 +360,7 @@ class PluginTypeValidationTest extends TestCase
         preg_match_all('/"type"\s*=>\s*["\']([^"\']+)["\']/', $withoutTagArrays, $matches);
         if (! empty($matches[1])) {
             $filtered = array_filter($matches[1], function ($type) {
-                return ! in_array($type, ['array', 'integer', 'string', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
+                return ! in_array($type, ['array', 'integer', 'string', 'boolean', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
             });
             $objectTypes = array_merge($objectTypes, $filtered);
         }
