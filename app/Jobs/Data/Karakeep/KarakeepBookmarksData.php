@@ -57,6 +57,7 @@ class KarakeepBookmarksData extends BaseProcessingJob
 
         // Prepare context data to pass to individual bookmark jobs
         $contextData = [
+            'user' => $this->rawData['user'] ?? null,
             'tags' => $tagsMap,
             'lists' => $listsMap,
             'highlights' => $highlightsData,
