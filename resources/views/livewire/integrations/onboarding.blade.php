@@ -173,7 +173,10 @@ use Carbon\Carbon;
                                                 </label>
                                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                                                     <x-input label="Task Queue" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][task_queue]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.task_queue') }}" placeholder="pull" />
-                                                    <x-input label="Use Schedule (0/1)" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][use_schedule]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.use_schedule') }}" placeholder="1" />
+                                                    <div>
+                                                        <label class="block text-sm font-medium mb-1">Use Schedule</label>
+                                                        <x-toggle name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][use_schedule]" />
+                                                    </div>
                                                     <x-input label="Schedule Times (HH:mm)" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][schedule_times]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.schedule_times') }}" placeholder="00:05" />
                                                     <x-input label="Schedule Timezone" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][schedule_timezone]" value="{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.schedule_timezone') }}" placeholder="UTC" />
                                                     <x-textarea label="Task Payload (JSON)" rows="2" name="config[{{ $typeKey }}][preset_overrides][{{ $preset['key'] ?? $preset['name'] }}][task_payload]">{{ old('config.'.$typeKey.'.preset_overrides.'.($preset['key'] ?? $preset['name']).'.task_payload') }}</x-textarea>
@@ -216,7 +219,12 @@ use Carbon\Carbon;
                                     @if (!$shouldHideField)
                                     <div>
                                         <div class="mb-1 text-sm font-medium">{{ $config['label'] ?? ucfirst($field) }}</div>
-                                        @if (($config['type'] ?? 'string') === 'array' && isset($config['options']))
+                                        @if (($config['type'] ?? 'string') === 'boolean')
+                                            <x-toggle name="config[{{ $typeKey }}][{{ $field }}]" />
+                                            @error('config.'.$typeKey.'.'.$field)
+                                                <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                            @enderror
+                                        @elseif (($config['type'] ?? 'string') === 'array' && isset($config['options']))
                                             @foreach ($config['options'] as $value => $label)
                                                 <label class="flex items-center gap-2">
                                                     <input type="checkbox" name="config[{{ $typeKey }}][{{ $field }}][]" value="{{ $value }}" class="checkbox" @checked(in_array($value, old('config.'.$typeKey.'.'.$field, [])))>

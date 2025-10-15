@@ -97,15 +97,16 @@ class TaskPlugin extends ManualPlugin
                         'default' => 'pull',
                     ],
                     'paused' => [
-                        'type' => 'integer',
-                        'label' => 'Paused (0/1)',
+                        'type' => 'boolean',
+                        'label' => 'Paused',
                         'required' => false,
+                        'default' => false,
                     ],
                     'use_schedule' => [
-                        'type' => 'integer',
-                        'label' => 'Use schedule (0/1)',
+                        'type' => 'boolean',
+                        'label' => 'Use schedule',
                         'required' => false,
-                        'default' => 1,
+                        'default' => true,
                     ],
                     'schedule_times' => [
                         'type' => 'array',

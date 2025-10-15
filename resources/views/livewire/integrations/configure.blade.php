@@ -229,28 +229,27 @@ new class extends Component {
     }
 }; ?>
 
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <x-card title="{{ __('Configure Integration') }}" shadow>
+<div>
+    <x-header title="Configure Integration" subtitle="{{ $integration->name ?: $integration->service }}" separator />
+
+    <div class="max-w-4xl mx-auto">
+        <div class="card bg-base-200 shadow-sm">
+            <div class="card-body">
                 <!-- Integration Name Section -->
                 <div class="mb-6 p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Integration Name') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Give this integration instance a custom name') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model.live.debounce.500ms="name"
-                                placeholder="Enter integration name"
-                                class="w-64"
-                            />
-                            <x-button
-                                label="{{ __('Update Name') }}"
-                                wire:click="updateName"
-                                class="btn-primary"
-                            />
-                        </div>
+                    <h3 class="text-lg font-medium mb-2">{{ __('Integration Name') }}</h3>
+                    <p class="text-sm text-base-content/70 mb-4">{{ __('Give this integration instance a custom name') }}</p>
+                    <div class="flex items-center gap-2">
+                        <x-input
+                            wire:model.live.debounce.500ms="name"
+                            placeholder="Enter integration name"
+                            class="flex-1"
+                        />
+                        <x-button
+                            label="{{ __('Update Name') }}"
+                            wire:click="updateName"
+                            class="btn-primary"
+                        />
                     </div>
                 </div>
 
@@ -260,10 +259,8 @@ new class extends Component {
                 <form wire:submit="updateConfiguration" class="space-y-6">
                     <!-- Scheduling & Pause -->
                     <div class="p-4 bg-base-200 rounded-lg">
-                        <div class="mb-4">
-                            <h4 class="text-lg font-medium">{{ __('Scheduling') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Enable a fixed daily schedule or use frequency-based updates.') }}</p>
-                        </div>
+                        <h3 class="text-lg font-medium mb-2">{{ __('Scheduling') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">{{ __('Enable a fixed daily schedule or use frequency-based updates.') }}</p>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -315,15 +312,17 @@ new class extends Component {
                         @endphp
                         @if (!$shouldHideField)
                         <div class="p-4 bg-base-200 rounded-lg">
-                            <div class="mb-4">
-                                <h4 class="text-lg font-medium">{{ $config['label'] }}</h4>
-                                @if (isset($config['description']))
-                                    <p class="text-sm text-base-content/70">{{ $config['description'] }}</p>
-                                @endif
-                            </div>
+                            <h3 class="text-lg font-medium mb-2">{{ $config['label'] }}</h3>
+                            @if (isset($config['description']))
+                                <p class="text-sm text-base-content/70 mb-4">{{ $config['description'] }}</p>
+                            @endif
 
                             <div class="space-y-3">
-                                @if ($config['type'] === 'array' && isset($config['options']))
+                                @if ($config['type'] === 'boolean')
+                                    <x-toggle
+                                        wire:model="configuration.{{ $field }}"
+                                    />
+                                @elseif ($config['type'] === 'array' && isset($config['options']))
                                     @foreach ($config['options'] as $value => $label)
                                         <div class="flex items-center">
                                             <input
@@ -372,7 +371,7 @@ new class extends Component {
                         @endif
                     @endforeach
 
-                    <div class="flex justify-end space-x-3 pt-6 border-t border-base-300">
+                    <div class="flex justify-end gap-2 pt-6 border-t border-base-300">
                         <x-button
                             label="{{ __('Cancel') }}"
                             link="{{ route('integrations.index') }}"
@@ -386,6 +385,7 @@ new class extends Component {
                         />
                     </div>
                 </form>
-            </x-card>
+            </div>
         </div>
     </div>
+</div>

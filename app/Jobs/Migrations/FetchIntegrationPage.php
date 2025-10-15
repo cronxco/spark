@@ -99,6 +99,11 @@ class FetchIntegrationPage implements ShouldQueue
 
             return;
         }
+        if ($service === 'karakeep') {
+            $this->fetchKarakeep();
+
+            return;
+        }
     }
 
     protected function fetchOura(): void
@@ -550,6 +555,119 @@ class FetchIntegrationPage implements ShouldQueue
         $this->batch()?->add([
             (new FetchIntegrationPage($this->integration, $nextContext))->onConnection('redis')->onQueue('migration'),
         ]);
+    }
+
+    protected function fetchKarakeep(): void
+    {
+        $cursor = $this->context['cursor'] ?? ['page' => 1, 'per_page' => 100];
+        $page = (int) ($cursor['page'] ?? 1);
+        $perPage = (int) ($cursor['per_page'] ?? 100);
+
+        $group = $this->integration->group;
+        if (! $group) {
+            throw new RuntimeException('Karakeep integration group not found');
+        }
+
+        $apiUrl = $group->auth_metadata['api_url'] ?? config('services.karakeep.url');
+        $accessToken = $group->access_token ?? config('services.karakeep.access_token');
+
+        if (! $apiUrl || ! $accessToken) {
+            throw new RuntimeException('Karakeep API URL or access token not configured');
+        }
+
+        $baseUrl = rtrim($apiUrl, '/');
+
+        Log::info('Karakeep migration: Fetching page', [
+            'integration_id' => $this->integration->id,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+
+        // Fetch bookmarks for this page
+        $resp = Http::withToken($accessToken)
+            ->get($baseUrl . '/api/v1/bookmarks', [
+                'limit' => $perPage,
+                'offset' => ($page - 1) * $perPage,
+                'sort' => 'createdAt',
+                'order' => 'desc',
+            ]);
+
+        if ($resp->status() === 429) {
+            $retryAfter = (int) ($resp->header('Retry-After') ?? 30);
+            static::dispatch($this->integration, $this->context)
+                ->onConnection('redis')->onQueue('migration')
+                ->delay(now()->addSeconds(max(5, $retryAfter)));
+
+            return;
+        }
+
+        if (! $resp->successful()) {
+            throw new RuntimeException('Karakeep fetch failed: ' . $resp->status() . ' - ' . $resp->body());
+        }
+
+        $json = $resp->json();
+        $bookmarks = $json['bookmarks'] ?? [];
+        $total = (int) ($json['total'] ?? 0);
+
+        Log::info('Karakeep migration: Page fetched', [
+            'integration_id' => $this->integration->id,
+            'page' => $page,
+            'bookmarks_count' => count($bookmarks),
+            'total' => $total,
+        ]);
+
+        // If no bookmarks on this page, we're done
+        if (empty($bookmarks)) {
+            Log::info('Karakeep migration: No more bookmarks, completing', [
+                'integration_id' => $this->integration->id,
+                'page' => $page,
+            ]);
+            $this->completeMigration('karakeep');
+
+            return;
+        }
+
+        // Check if there are more pages
+        $hasMorePages = ($page * $perPage) < $total;
+
+        // Prepare data for processing (same structure as KarakeepBookmarksPull)
+        $rawData = [
+            'bookmarks' => $bookmarks,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+        ];
+
+        if ($hasMorePages) {
+            // Chain processing then next fetch
+            $nextContext = $this->context;
+            $nextContext['cursor']['page'] = $page + 1;
+
+            Log::info('Karakeep migration: Chaining next page', [
+                'integration_id' => $this->integration->id,
+                'current_page' => $page,
+                'next_page' => $page + 1,
+            ]);
+
+            Bus::chain([
+                new ProcessIntegrationPage($this->integration, $rawData, $this->context),
+                new FetchIntegrationPage($this->integration, $nextContext),
+            ])->onConnection('redis')->onQueue('migration')->dispatch();
+        } else {
+            // Last page - process then complete migration
+            Log::info('Karakeep migration: Last page, processing and completing', [
+                'integration_id' => $this->integration->id,
+                'page' => $page,
+            ]);
+
+            // Process the last page
+            ProcessIntegrationPage::dispatch($this->integration, $rawData, $this->context)
+                ->onConnection('redis')
+                ->onQueue('migration');
+
+            // Complete the migration (will be picked up after processing)
+            $this->completeMigration('karakeep');
+        }
     }
 
     private function gcCacheKey(string $suffix): string

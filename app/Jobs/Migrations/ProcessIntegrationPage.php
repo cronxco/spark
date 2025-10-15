@@ -3,6 +3,7 @@
 namespace App\Jobs\Migrations;
 
 use App\Integrations\PluginRegistry;
+use App\Jobs\Data\Karakeep\KarakeepBookmarksData;
 use App\Models\ActionProgress;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -527,6 +528,26 @@ class ProcessIntegrationPage implements ShouldQueue
                 return;
             }
 
+            if ($service === 'karakeep') {
+                $this->updateProgress('processing', 'Processing Karakeep migration data...', 60, [
+                    'service' => 'karakeep',
+                    'instance_type' => $instanceType,
+                    'bookmarks_count' => count($this->items['bookmarks'] ?? []),
+                ]);
+
+                // The items array contains the raw data from the Karakeep API
+                // We need to fetch additional data (tags, lists, highlights, user) to pass to KarakeepBookmarksData
+                $this->processKarakeepData($this->items);
+
+                $this->markCompleted([
+                    'service' => 'karakeep',
+                    'instance_type' => $instanceType,
+                    'bookmarks_processed' => count($this->items['bookmarks'] ?? []),
+                ]);
+
+                return;
+            }
+
             Log::info('ProcessIntegrationPage: unsupported service, skipping', [
                 'service' => $service,
             ]);
@@ -646,5 +667,92 @@ class ProcessIntegrationPage implements ShouldQueue
 
         // Fallback for other job types
         return "{$baseId}_{$instanceType}_" . substr(uniqid(), -8);
+    }
+
+    /**
+     * Process Karakeep migration data by fetching additional API data and dispatching processing job
+     */
+    private function processKarakeepData(array $rawData): void
+    {
+        $group = $this->integration->group;
+        if (! $group) {
+            Log::error('Karakeep migration: Integration group not found', [
+                'integration_id' => $this->integration->id,
+            ]);
+
+            return;
+        }
+
+        $apiUrl = $group->auth_metadata['api_url'] ?? config('services.karakeep.url');
+        $accessToken = $group->access_token ?? config('services.karakeep.access_token');
+
+        if (! $apiUrl || ! $accessToken) {
+            Log::error('Karakeep migration: API URL or access token not configured', [
+                'integration_id' => $this->integration->id,
+            ]);
+
+            return;
+        }
+
+        $baseUrl = rtrim($apiUrl, '/');
+        $config = $this->integration->configuration ?? [];
+        $syncHighlights = $config['sync_highlights'] ?? true;
+
+        Log::info('Karakeep migration: Fetching additional data', [
+            'integration_id' => $this->integration->id,
+            'bookmarks_count' => count($rawData['bookmarks'] ?? []),
+        ]);
+
+        // Fetch user info
+        $userResponse = Http::withToken($accessToken)
+            ->get($baseUrl . '/api/v1/users/me');
+
+        $userData = $userResponse->successful() ? $userResponse->json() : null;
+
+        // Fetch tags
+        $tagsResponse = Http::withToken($accessToken)
+            ->get($baseUrl . '/api/v1/tags');
+
+        $tagsData = $tagsResponse->successful() ? ($tagsResponse->json()['tags'] ?? []) : [];
+
+        // Fetch lists
+        $listsResponse = Http::withToken($accessToken)
+            ->get($baseUrl . '/api/v1/lists');
+
+        $listsData = $listsResponse->successful() ? ($listsResponse->json()['lists'] ?? []) : [];
+
+        // Fetch highlights if enabled
+        $highlightsData = [];
+        if ($syncHighlights) {
+            $highlightsResponse = Http::withToken($accessToken)
+                ->get($baseUrl . '/api/v1/highlights');
+
+            if ($highlightsResponse->successful()) {
+                $highlightsData = $highlightsResponse->json()['highlights'] ?? [];
+            }
+        }
+
+        // Prepare complete raw data structure matching KarakeepBookmarksPull
+        $completeRawData = [
+            'user' => $userData,
+            'bookmarks' => $rawData['bookmarks'] ?? [],
+            'tags' => $tagsData,
+            'lists' => $listsData,
+            'highlights' => $highlightsData,
+            'fetched_at' => now()->toISOString(),
+        ];
+
+        Log::info('Karakeep migration: Dispatching KarakeepBookmarksData', [
+            'integration_id' => $this->integration->id,
+            'bookmarks_count' => count($completeRawData['bookmarks']),
+            'tags_count' => count($completeRawData['tags']),
+            'lists_count' => count($completeRawData['lists']),
+            'highlights_count' => count($completeRawData['highlights']),
+        ]);
+
+        // Dispatch the data processing job
+        KarakeepBookmarksData::dispatch($this->integration, $completeRawData)
+            ->onConnection('redis')
+            ->onQueue('default');
     }
 }

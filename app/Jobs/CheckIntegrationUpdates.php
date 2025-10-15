@@ -8,6 +8,7 @@ use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
 use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
 use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
+use App\Jobs\OAuth\Karakeep\KarakeepBookmarksPull;
 use App\Jobs\OAuth\Monzo\MonzoAccountPull;
 use App\Jobs\OAuth\Monzo\MonzoBalancePull;
 use App\Jobs\OAuth\Monzo\MonzoPotPull;
@@ -218,6 +219,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             'oura' => $this->getOuraFetchJobs($integration),
             'hevy' => $this->getHevyFetchJobs($integration),
             'outline' => $this->getOutlineFetchJobs($integration),
+            'karakeep' => $this->getKarakeepFetchJobs($integration),
             // Add other services here as they are implemented
             default => [],
         };
@@ -328,6 +330,16 @@ class CheckIntegrationUpdates implements ShouldQueue
             'recent_documents' => [\App\Jobs\Outline\OutlinePullRecentDocuments::class],
             'pull' => [\App\Jobs\Outline\OutlinePull::class], // Legacy support
             default => [\App\Jobs\Outline\OutlinePullRecentDayNotes::class], // Fallback to recent daynotes
+        };
+    }
+
+    private function getKarakeepFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'bookmarks';
+
+        return match ($instanceType) {
+            'bookmarks' => [KarakeepBookmarksPull::class],
+            default => [],
         };
     }
 }
