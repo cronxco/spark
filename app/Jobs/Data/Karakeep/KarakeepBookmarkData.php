@@ -480,16 +480,22 @@ class KarakeepBookmarkData extends BaseProcessingJob
         }
 
         // Create metadata block for preview data
-        if (! empty($bookmark['description']) || ! empty($bookmark['imageUrl'])) {
+        $content = $bookmark['content'] ?? [];
+        $description = $bookmark['description'] ?? $content['description'] ?? null;
+        $imageUrl = $bookmark['imageUrl'] ?? $content['imageUrl'] ?? null;
+        $title = $bookmark['title'] ?? $content['title'] ?? null;
+        $url = $bookmark['url'] ?? $content['url'] ?? null;
+
+        if (! empty($description) || ! empty($imageUrl)) {
             Block::create([
                 'event_id' => $event->id,
                 'title' => 'Preview Card',
                 'block_type' => 'bookmark_metadata',
-                'url' => $bookmark['url'] ?? null,
-                'media_url' => $bookmark['imageUrl'] ?? null,
+                'url' => $url,
+                'media_url' => $imageUrl,
                 'metadata' => [
-                    'title' => $bookmark['title'] ?? null,
-                    'description' => $bookmark['description'] ?? null,
+                    'title' => $title,
+                    'description' => $description,
                 ],
             ]);
         }

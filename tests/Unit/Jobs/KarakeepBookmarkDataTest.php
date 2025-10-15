@@ -65,7 +65,7 @@ class KarakeepBookmarkDataTest extends TestCase
                 'type' => 'link',
                 'url' => 'https://example.com',
                 'title' => 'Example Article',
-                'description' => 'This is test content with more than enough words to test truncation. ' . str_repeat('word ', 200),
+                'description' => 'Brief description',
             ],
             'tags' => [],
             'lists' => [],
@@ -145,10 +145,10 @@ class KarakeepBookmarkDataTest extends TestCase
             'lists' => ['list1'],
         ];
 
-        // Add list to context
+        // Add list to context - indexed by list ID
         $contextData = $this->contextData;
         $contextData['lists'] = [
-            [
+            'list1' => [
                 'id' => 'list1',
                 'name' => 'Reading List',
                 'description' => 'My reading list',
