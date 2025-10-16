@@ -1302,22 +1302,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         $sourceId = 'balance_' . $accountId . '_' . $balanceReferenceDate;
 
-        // Find the existing account object for this integration
-        $accountObject = EventObject::where('user_id', $integration->user_id)
-            ->where('concept', 'account')
-            ->where('type', 'bank_account')
-            ->whereJsonContains('metadata->integration_id', $integration->id)
-            ->first();
+        // Ensure account object exists by upserting with minimal data
+        // This matches Monzo's approach of inline upsert to guarantee the object exists
+        $accountData = ['id' => $accountId];
+        $accountObject = $this->upsertAccountObject($integration, $accountData);
 
-        if (! $accountObject) {
-            Log::warning('GoCardless: No account object found for integration when creating balance event', [
-                'integration_id' => $integration->id,
-                'integration_name' => $integration->name,
-                'account_id' => $accountId,
-            ]);
-
-            return;
-        }
+        Log::info('GoCardless: Creating balance event', [
+            'integration_id' => $integration->id,
+            'account_id' => $accountId,
+            'account_object_id' => $accountObject->id,
+            'balance_type' => $balanceType,
+            'reference_date' => $balanceReferenceDate,
+        ]);
 
         // Create day target once
         $dayObject = EventObject::firstOrCreate(
@@ -1395,63 +1391,86 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     public function upsertAccountObject(Integration $integration, array $account): EventObject
     {
+        $accountId = $account['id'] ?? 'unknown';
+
+        // First, try to find an existing account object by account_id in metadata
+        // This prevents creating duplicate objects with placeholder names
+        $existingObject = EventObject::where('user_id', $integration->user_id)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->where(function ($query) use ($accountId, $integration) {
+                // Search by account_id in metadata OR by onboarding integration ID
+                $query->whereJsonContains('metadata->account_id', $accountId)
+                    ->orWhereJsonContains('metadata->integration_id', 'onboarding_' . $integration->group_id . '_' . $accountId);
+            })
+            ->first();
+
+        // Check if we have complete account data (not just minimal stub data)
+        $hasCompleteData = isset($account['details']) || isset($account['ownerName']) || isset($account['cashAccountType']);
+
+        if ($existingObject && ! $hasCompleteData) {
+            // We have an existing object but only minimal data - return existing without updating
+            Log::info('GoCardless: Found existing account object, returning without update (minimal data)', [
+                'account_id' => $accountId,
+                'existing_title' => $existingObject->title,
+                'integration_id' => $integration->id,
+            ]);
+
+            return $existingObject;
+        }
+
         // Determine account type based on GoCardless data
         $accountType = $this->mapCashAccountType($account['cashAccountType'] ?? null);
 
         // Generate a proper account name
         $accountName = $this->generateAccountName($account);
 
-        // First, try to find an existing onboarding-created account object
-        $accountId = $account['id'] ?? 'unknown';
-        $onboardingIntegrationId = 'onboarding_' . $integration->group_id . '_' . $accountId;
-
-        $existingObject = EventObject::where('user_id', $integration->user_id)
-            ->where('concept', 'account')
-            ->where('type', 'bank_account')
-            ->where('title', $accountName)
-            ->whereJsonContains('metadata->integration_id', $onboardingIntegrationId)
-            ->first();
+        $metadata = [
+            'integration_id' => $integration->id,
+            'account_id' => $accountId,
+            'name' => $accountName,
+            'provider' => $this->deriveProviderName($integration->group, $account),
+            'account_type' => $accountType,
+            'currency' => $account['currency'] ?? 'GBP',
+            'account_number' => $this->deriveAccountNumber($account),
+            'raw' => $account,
+        ];
 
         if ($existingObject) {
-            Log::info('GoCardless: Found existing onboarding account object, updating with integration ID', [
+            // Update existing object with complete data
+            Log::info('GoCardless: Found existing account object, updating with complete data', [
                 'account_id' => $accountId,
-                'existing_integration_id' => $existingObject->metadata['integration_id'] ?? null,
-                'new_integration_id' => $integration->id,
+                'old_title' => $existingObject->title,
+                'new_title' => $accountName,
+                'integration_id' => $integration->id,
             ]);
 
-            // Update the integration ID to point to the real integration
             $existingObject->update([
-                'metadata->integration_id' => $integration->id,
-                'metadata->onboarding_created' => false, // Remove onboarding flag
+                'title' => $accountName,
+                'content' => json_encode($account),
+                'metadata' => $metadata,
             ]);
 
             return $existingObject;
         }
 
-        // No existing onboarding object found, create new one
-        return EventObject::updateOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'account',
-                'type' => 'bank_account',
-                'title' => $accountName,
-            ],
-            [
-                'user_id' => $integration->user_id,
-                'content' => json_encode($account),
-                'url' => null,
-                'image_url' => null,
-                'metadata' => [
-                    'integration_id' => $integration->id,
-                    'name' => $accountName,
-                    'provider' => $this->deriveProviderName($integration->group, $account),
-                    'account_type' => $accountType,
-                    'currency' => $account['currency'] ?? 'GBP',
-                    'account_number' => $this->deriveAccountNumber($account),
-                    'raw' => $account,
-                ],
-            ]
-        );
+        // No existing object found, create new one
+        Log::info('GoCardless: Creating new account object', [
+            'account_id' => $accountId,
+            'title' => $accountName,
+            'integration_id' => $integration->id,
+        ]);
+
+        return EventObject::create([
+            'user_id' => $integration->user_id,
+            'concept' => 'account',
+            'type' => 'bank_account',
+            'title' => $accountName,
+            'content' => json_encode($account),
+            'url' => null,
+            'image_url' => null,
+            'metadata' => $metadata,
+        ]);
     }
 
     /**
@@ -1964,7 +1983,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'balance_currency' => $balance['balanceAmount']['currency'] ?? 'unknown',
                     ]);
 
-                    $this->createBalanceEvent($integration, $account, $balance);
+                    $this->createBalanceEvent($integration, $balance);
                     break; // Use the first preferred balance type
                 }
             }
