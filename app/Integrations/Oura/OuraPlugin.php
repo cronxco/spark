@@ -116,6 +116,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily readiness score assessment',
                 'display_with_object' => false,
                 'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_sleep_score' => [
@@ -124,6 +125,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily sleep quality score assessment',
                 'display_with_object' => false,
                 'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_activity_score' => [
@@ -132,6 +134,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily activity score assessment',
                 'display_with_object' => false,
                 'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_stress_score' => [
@@ -140,7 +143,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily stress level assessment',
                 'display_with_object' => false,
                 'value_unit' => 'stress_level',
-                'value_formatter' => '@if($value == 3)Stressful@elseif($value == 2)Normal@elseif($value == 1)Restored@else{{ $value }}@endif',
+                'value_formatter' => '@if($value == 3) Stressful @elseif($value == 2) Normal @elseif($value == 1) Restored @else {{ $value }}@endif',
                 'hidden' => false,
             ],
             'had_resilience_score' => [
@@ -158,6 +161,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Blood oxygen saturation level',
                 'display_with_object' => false,
                 'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_cardiovascular_age' => [
@@ -239,6 +243,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Individual components contributing to daily scores',
                 'display_with_object' => true,
                 'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'workout_metrics' => [

@@ -230,101 +230,149 @@ new class extends Component {
 }; ?>
 
 <div>
-    <x-header title="Configure Integration" subtitle="{{ $integration->name ?: $integration->service }}" separator />
+    <x-header title="Configure Integration" subtitle="{{ $integration->name ?: $integration->service }}" separator>
+        <x-slot:actions>
+            <!-- Desktop: Full buttons -->
+            <div class="hidden sm:flex gap-2">
+                <x-button
+                    label="{{ __('Cancel') }}"
+                    link="{{ route('integrations.index') }}"
+                    class="btn-outline"
+                />
+                <x-button
+                    label="{{ __('Save Configuration') }}"
+                    wire:click="updateConfiguration"
+                    class="btn-primary"
+                />
+            </div>
 
-    <div class="max-w-4xl mx-auto">
-        <div class="card bg-base-200 shadow-sm">
+            <!-- Mobile: Dropdown -->
+            <div class="sm:hidden">
+                <x-dropdown>
+                    <x-slot:trigger>
+                        <x-button class="btn-ghost btn-sm">
+                            <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                        </x-button>
+                    </x-slot:trigger>
+                    <x-menu-item title="Save" icon="o-check" wire:click="updateConfiguration" />
+                    <x-menu-item title="Cancel" icon="o-x-mark" link="{{ route('integrations.index') }}" />
+                </x-dropdown>
+            </div>
+        </x-slot:actions>
+    </x-header>
+
+    <div class="max-w-4xl mx-auto space-y-4 lg:space-y-6">
+        <!-- Integration Name Section -->
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <!-- Integration Name Section -->
-                <div class="mb-6 p-4 bg-base-200 rounded-lg">
-                    <h3 class="text-lg font-medium mb-2">{{ __('Integration Name') }}</h3>
-                    <p class="text-sm text-base-content/70 mb-4">{{ __('Give this integration instance a custom name') }}</p>
-                    <div class="flex items-center gap-2">
-                        <x-input
-                            wire:model.live.debounce.500ms="name"
-                            placeholder="Enter integration name"
-                            class="flex-1"
-                        />
-                        <x-button
-                            label="{{ __('Update Name') }}"
-                            wire:click="updateName"
-                            class="btn-primary"
-                        />
+                <h3 class="text-lg font-semibold mb-2">{{ __('Integration Name') }}</h3>
+                <p class="text-sm text-base-content/70 mb-4">{{ __('Give this integration instance a custom name') }}</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <x-input
+                        wire:model.live.debounce.500ms="name"
+                        placeholder="Enter integration name"
+                        class="flex-1"
+                    />
+                    <x-button
+                        label="{{ __('Update Name') }}"
+                        wire:click="updateName"
+                        class="btn-outline"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Form -->
+        <form wire:submit="updateConfiguration" class="space-y-4 lg:space-y-6">
+            <!-- Scheduling & Pause -->
+            <div class="card bg-base-200 shadow">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-2">{{ __('Scheduling') }}</h3>
+                    <p class="text-sm text-base-content/70 mb-4">{{ __('Enable a fixed daily schedule or use frequency-based updates') }}</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('Use schedule instead of frequency') }}</span>
+                            </label>
+                            <input type="checkbox" wire:model="configuration.use_schedule" class="toggle toggle-primary" />
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('Paused') }}</span>
+                            </label>
+                            <input type="checkbox" wire:model="configuration.paused" class="toggle toggle-primary" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('Schedule Times') }}</span>
+                            </label>
+                            <input
+                                type="text"
+                                wire:model="configuration.schedule_times"
+                                placeholder="04:10 10:10 16:10 22:10"
+                                class="input input-bordered w-full"
+                            />
+                            <label class="label">
+                                <span class="label-text-alt text-base-content/70">HH:mm, comma or space separated</span>
+                            </label>
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('Schedule Timezone') }}</span>
+                            </label>
+                            <input
+                                type="text"
+                                wire:model="configuration.schedule_timezone"
+                                placeholder="UTC"
+                                class="input input-bordered w-full"
+                            />
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('Fallback Frequency (minutes)') }}</span>
+                            </label>
+                            <input
+                                type="number"
+                                wire:model="configuration.update_frequency_minutes"
+                                placeholder="60"
+                                min="1"
+                                class="input input-bordered w-full"
+                            />
+                        </div>
                     </div>
                 </div>
+            </div>
 
+            @foreach ($schema as $field => $config)
+                @php
+                    $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration->service);
+                    $isWebhook = $pluginClass && $pluginClass::getServiceType() === 'webhook';
+                    $shouldHideField = $isWebhook && $field === 'update_frequency_minutes';
+                @endphp
+                @if (!$shouldHideField)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-2">{{ $config['label'] }}</h3>
+                        @if (isset($config['description']))
+                            <p class="text-sm text-base-content/70 mb-4">{{ $config['description'] }}</p>
+                        @endif
 
-
-                <!-- Configuration Form -->
-                <form wire:submit="updateConfiguration" class="space-y-6">
-                    <!-- Scheduling & Pause -->
-                    <div class="p-4 bg-base-200 rounded-lg">
-                        <h3 class="text-lg font-medium mb-2">{{ __('Scheduling') }}</h3>
-                        <p class="text-sm text-base-content/70 mb-4">{{ __('Enable a fixed daily schedule or use frequency-based updates.') }}</p>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <x-toggle
-                                    label="{{ __('Use schedule instead of frequency') }}"
-                                    wire:model="configuration.use_schedule"
-                                />
-                            </div>
-                            <div>
-                                <x-toggle
-                                    label="{{ __('Paused') }}"
-                                    wire:model="configuration.paused"
-                                />
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4" x-data>
-                            <div>
-                                <x-input
-                                    label="{{ __('Schedule Times (HH:mm, comma or space separated)') }}"
-                                    placeholder="04:10 10:10 16:10 22:10"
-                                    wire:model="configuration.schedule_times"
-                                />
-                            </div>
-                            <div>
-                                <x-input
-                                    label="{{ __('Schedule Timezone') }}"
-                                    placeholder="UTC"
-                                    wire:model="configuration.schedule_timezone"
-                                />
-                            </div>
-                            <div>
-                                <x-input
-                                    type="number"
-                                    label="{{ __('Fallback Frequency (minutes)') }}"
-                                    placeholder="60"
-                                    wire:model="configuration.update_frequency_minutes"
-                                    min="1"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    @foreach ($schema as $field => $config)
-                        @php
-                            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($integration->service);
-                            $isWebhook = $pluginClass && $pluginClass::getServiceType() === 'webhook';
-                            $shouldHideField = $isWebhook && $field === 'update_frequency_minutes';
-                        @endphp
-                        @if (!$shouldHideField)
-                        <div class="p-4 bg-base-200 rounded-lg">
-                            <h3 class="text-lg font-medium mb-2">{{ $config['label'] }}</h3>
-                            @if (isset($config['description']))
-                                <p class="text-sm text-base-content/70 mb-4">{{ $config['description'] }}</p>
-                            @endif
-
-                            <div class="space-y-3">
-                                @if ($config['type'] === 'boolean')
-                                    <x-toggle
-                                        wire:model="configuration.{{ $field }}"
-                                    />
-                                @elseif ($config['type'] === 'array' && isset($config['options']))
-                                    @foreach ($config['options'] as $value => $label)
-                                        <div class="flex items-center">
+                        <div class="space-y-3">
+                            @if ($config['type'] === 'boolean')
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">{{ $config['label'] }}</span>
+                                    </label>
+                                    <input type="checkbox" wire:model="configuration.{{ $field }}" class="toggle toggle-primary" />
+                                </div>
+                            @elseif ($config['type'] === 'array' && isset($config['options']))
+                                @foreach ($config['options'] as $value => $label)
+                                    <div class="form-control">
+                                        <label class="label cursor-pointer justify-start gap-2">
                                             <input
                                                 type="checkbox"
                                                 id="{{ $field }}_{{ $value }}"
@@ -332,60 +380,85 @@ new class extends Component {
                                                 @checked(in_array($value, $configuration[$field] ?? []))
                                                 class="checkbox"
                                             />
-                                            <label for="{{ $field }}_{{ $value }}" class="ml-2 text-sm">
-                                                {{ $label }}
-                                            </label>
-                                        </div>
-                                    @endforeach
-                                @elseif ($config['type'] === 'array')
-                                    <x-textarea
+                                            <span class="label-text">{{ $label }}</span>
+                                        </label>
+                                    </div>
+                                @endforeach
+                            @elseif ($config['type'] === 'array')
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">Values</span>
+                                    </label>
+                                    <textarea
                                         wire:model="configuration.{{ $field }}"
                                         rows="3"
                                         placeholder="Enter values separated by commas"
-                                    />
-                                @elseif ($config['type'] === 'string' && ($config['options'] ?? null))
-                                    <select class="select select-bordered" wire:model="configuration.{{ $field }}">
+                                        class="textarea textarea-bordered w-full"
+                                    ></textarea>
+                                </div>
+                            @elseif ($config['type'] === 'string' && ($config['options'] ?? null))
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">Select option</span>
+                                    </label>
+                                    <select class="select select-bordered w-full" wire:model="configuration.{{ $field }}">
                                         @foreach (($config['options'] ?? []) as $value => $label)
                                             <option value="{{ $value }}">{{ $label }}</option>
                                         @endforeach
                                     </select>
-                                @elseif ($config['type'] === 'string')
-                                    <x-input
+                                </div>
+                            @elseif ($config['type'] === 'string')
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">Value</span>
+                                    </label>
+                                    <input
+                                        type="text"
                                         wire:model="configuration.{{ $field }}"
                                         placeholder="Enter {{ strtolower($config['label']) }}"
+                                        class="input input-bordered w-full"
                                     />
-                                @elseif ($config['type'] === 'integer')
-                                    <x-input
+                                </div>
+                            @elseif ($config['type'] === 'integer')
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">Value</span>
+                                    </label>
+                                    <input
                                         type="number"
                                         wire:model="configuration.{{ $field }}"
                                         min="{{ $config['min'] ?? 1 }}"
                                         placeholder="Enter {{ strtolower($config['label']) }}"
+                                        class="input input-bordered w-full"
                                     />
-                                @endif
+                                </div>
+                            @endif
 
-                                @error("configuration.{$field}")
-                                    <p class="text-sm text-error">{{ $message }}</p>
-                                @enderror
-                            </div>
+                            @error("configuration.{$field}")
+                                <p class="text-sm text-error mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
-                        @endif
-                    @endforeach
-
-                    <div class="flex justify-end gap-2 pt-6 border-t border-base-300">
-                        <x-button
-                            label="{{ __('Cancel') }}"
-                            link="{{ route('integrations.index') }}"
-                            class="btn-outline"
-                        />
-
-                        <x-button
-                            label="{{ __('Save Configuration') }}"
-                            type="submit"
-                            class="btn-primary"
-                        />
                     </div>
-                </form>
+                </div>
+                @endif
+            @endforeach
+
+            <!-- Mobile: Show action buttons at bottom -->
+            <div class="sm:hidden flex flex-col gap-2">
+                <x-button
+                    label="{{ __('Save Configuration') }}"
+                    type="submit"
+                    class="btn-primary w-full"
+                />
+                <x-button
+                    label="{{ __('Cancel') }}"
+                    link="{{ route('integrations.index') }}"
+                    class="btn-outline w-full"
+                />
             </div>
-        </div>
+        </form>
     </div>
+
+    <!-- Toast notifications -->
+    <x-toast position="toast-top toast-end" />
 </div>

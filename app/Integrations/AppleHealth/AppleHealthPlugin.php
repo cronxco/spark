@@ -210,8 +210,8 @@ class AppleHealthPlugin extends WebhookPlugin
                 'display_name' => 'Had Walking Asymmetry Percentage',
                 'description' => 'Walking gait asymmetry measurement',
                 'display_with_object' => false,
-                'value_unit' => '%',
-                'value_formatter' => '{{ number_format($value, 1) }}%',
+                'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_apple_sleeping_wrist_temperature' => [
@@ -228,8 +228,8 @@ class AppleHealthPlugin extends WebhookPlugin
                 'display_name' => 'Had Walking Double Support Percentage',
                 'description' => 'Percentage of walking cycle with both feet on ground',
                 'display_with_object' => false,
-                'value_unit' => '%',
-                'value_formatter' => '{{ number_format($value, 1) }}%',
+                'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_vo2_max' => [
@@ -299,8 +299,8 @@ class AppleHealthPlugin extends WebhookPlugin
                 'display_name' => 'Had Blood Oxygen Saturation',
                 'description' => 'Blood oxygen saturation level',
                 'display_with_object' => false,
-                'value_unit' => '%',
-                'value_formatter' => '{{ number_format($value, 1) }}%',
+                'value_unit' => 'percent',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
             'had_heart_rate_variability' => [

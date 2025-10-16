@@ -40,76 +40,77 @@ new class extends Component {
     }
 }; ?>
 
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <x-card title="{{ __('Update Password') }}" shadow>
-            <div class="space-y-6">
-                <!-- Current Password Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Current Password') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Enter your current password to verify your identity') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model="current_password"
-                                type="password"
-                                placeholder="Enter current password"
-                                class="w-64"
-                                required
-                                autocomplete="current-password"
-                            />
-                        </div>
-                    </div>
-                </div>
+<div>
+    <x-header title="{{ __('Update Password') }}" subtitle="{{ __('Ensure your account is using a strong password') }}" separator />
 
-                <!-- New Password Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('New Password') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Enter your new password') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model="password"
-                                type="password"
-                                placeholder="Enter new password"
-                                class="w-64"
-                                required
-                                autocomplete="new-password"
-                            />
-                        </div>
-                    </div>
-                </div>
+    <div class="space-y-4 lg:space-y-6">
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Change Password') }}</h3>
 
-                <!-- Confirm Password Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Confirm Password') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Confirm your new password') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model="password_confirmation"
-                                type="password"
-                                placeholder="Confirm new password"
-                                class="w-64"
-                                required
-                                autocomplete="new-password"
-                            />
-                            <x-button
-                                label="{{ __('Update Password') }}"
-                                wire:click="updatePassword"
-                                class="btn-primary"
-                                spinner="updatePassword"
-                            />
-                        </div>
-                    </div>
-                </div>
+            <!-- Current Password -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Current Password') }}</span>
+                </label>
+                <input
+                    wire:model="current_password"
+                    type="password"
+                    placeholder="Enter current password"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="current-password"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Enter your current password to verify your identity') }}</span>
+                </label>
             </div>
-        </x-card>
+
+            <!-- New Password -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('New Password') }}</span>
+                </label>
+                <input
+                    wire:model="password"
+                    type="password"
+                    placeholder="Enter new password"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="new-password"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Enter your new password') }}</span>
+                </label>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Confirm Password') }}</span>
+                </label>
+                <input
+                    wire:model="password_confirmation"
+                    type="password"
+                    placeholder="Confirm new password"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="new-password"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Confirm your new password') }}</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end mt-4">
+                <x-button
+                    label="{{ __('Update Password') }}"
+                    wire:click="updatePassword"
+                    class="btn-primary"
+                    spinner="updatePassword"
+                />
+            </div>
+        </div>
+    </div>
     </div>
 </div>

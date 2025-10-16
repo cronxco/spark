@@ -1,18 +1,19 @@
 <?php
 
-use Spatie\Activitylog\Models\Activity;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
-use Illuminate\Support\Str;
+use Spatie\Activitylog\Models\Activity;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
-    use WithPagination, Toast;
+new class extends Component
+{
+    use Toast, WithPagination;
 
     public string $search = '';
     public string $logNameFilter = '';
@@ -73,9 +74,9 @@ new class extends Component {
             $query->where(function ($q) use ($searchTerm) {
                 // Use LOWER() functions to utilize the expression indexes
                 $q->whereRaw('LOWER(description) LIKE ?', ['%' . $searchTerm . '%'])
-                  ->orWhereRaw('LOWER(log_name) LIKE ?', ['%' . $searchTerm . '%'])
-                  ->orWhereRaw('LOWER(event) LIKE ?', ['%' . $searchTerm . '%'])
-                  ->orWhereRaw('LOWER(subject_type) LIKE ?', ['%' . $searchTerm . '%']);
+                    ->orWhereRaw('LOWER(log_name) LIKE ?', ['%' . $searchTerm . '%'])
+                    ->orWhereRaw('LOWER(event) LIKE ?', ['%' . $searchTerm . '%'])
+                    ->orWhereRaw('LOWER(subject_type) LIKE ?', ['%' . $searchTerm . '%']);
             });
         }
 
@@ -125,23 +126,25 @@ new class extends Component {
 
     public function prettifyEvent(?string $event): string
     {
-        if (!$event) {
+        if (! $event) {
             return '-';
         }
+
         return Str::title(str_replace('_', ' ', $event));
     }
 
     public function prettifySubjectType(?string $subjectType): string
     {
-        if (!$subjectType) {
+        if (! $subjectType) {
             return '-';
         }
+
         return Str::afterLast($subjectType, '\\');
     }
 
     public function getSubjectTitle($activity): string
     {
-        if (!$activity->subject) {
+        if (! $activity->subject) {
             return 'Deleted Object';
         }
 
@@ -163,7 +166,7 @@ new class extends Component {
 
     public function getSubjectUrl($activity): ?string
     {
-        if (!$activity->subject) {
+        if (! $activity->subject) {
             return null;
         }
 
@@ -184,7 +187,7 @@ new class extends Component {
 
     public function formatProperties($properties): string
     {
-        if (!$properties) {
+        if (! $properties) {
             return '-';
         }
 
@@ -222,7 +225,7 @@ new class extends Component {
 
     public function getFormattedProperties($properties): array
     {
-        if (!$properties) {
+        if (! $properties) {
             return [];
         }
 
@@ -234,6 +237,7 @@ new class extends Component {
         // If it's a string, try to decode it
         if (is_string($properties)) {
             $decoded = json_decode($properties, true);
+
             return is_array($decoded) ? $decoded : [];
         }
 
@@ -261,91 +265,81 @@ new class extends Component {
     <x-header title="Activity Log" subtitle="View and monitor system activity" separator>
     </x-header>
 
-    <div class="flex flex-col gap-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Search and Filters -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <!-- Search -->
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Search</span>
                         </label>
-                        <div class="join w-full">
-                            <input
-                                type="text"
-                                class="input input-bordered join-item flex-1"
-                                placeholder="Search by description, log name, event, or subject type..."
-                                wire:model.live.debounce.300ms="search"
-                            />
-                            @if ($search)
-                                <button class="btn btn-outline join-item" wire:click="clearFilters">
-                                    <x-icon name="o-x-mark" class="w-4 h-4" />
-                                </button>
-                            @endif
-                        </div>
+                        <input
+                            type="text"
+                            class="input input-bordered w-full"
+                            placeholder="Search activity..."
+                            wire:model.live.debounce.300ms="search"
+                        />
                     </div>
 
-                    <!-- Filters -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Log Name Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Log Name</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="logNameFilter">
-                                <option value="">All Log Names</option>
-                                @foreach ($this->getUniqueLogNames() as $logName)
-                                    <option value="{{ $logName }}">{{ $logName }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Event Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Event</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="eventFilter">
-                                <option value="">All Events</option>
-                                @foreach ($this->getUniqueEvents() as $event)
-                                    <option value="{{ $event }}">{{ $this->prettifyEvent($event) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Subject Type Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Subject Type</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="subjectTypeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueSubjectTypes() as $subjectType)
-                                    <option value="{{ $subjectType }}">{{ $this->prettifySubjectType($subjectType) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <!-- Log Name Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Log Name</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="logNameFilter">
+                            <option value="">All Log Names</option>
+                            @foreach ($this->getUniqueLogNames() as $logName)
+                                <option value="{{ $logName }}">{{ $logName }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <!-- Clear Filters Button -->
-                    @if ($logNameFilter || $eventFilter || $subjectTypeFilter)
-                        <div class="flex justify-end">
-                            <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4 mr-1" />
-                                Clear Filters
-                            </button>
-                        </div>
-                    @endif
+                    <!-- Event Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Event</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="eventFilter">
+                            <option value="">All Events</option>
+                            @foreach ($this->getUniqueEvents() as $event)
+                                <option value="{{ $event }}">{{ $this->prettifyEvent($event) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Subject Type Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Subject Type</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="subjectTypeFilter">
+                            <option value="">All Types</option>
+                            @foreach ($this->getUniqueSubjectTypes() as $subjectType)
+                                <option value="{{ $subjectType }}">{{ $this->prettifySubjectType($subjectType) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
+                    <div class="flex justify-end mt-4">
+                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
+                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            Clear Filters
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
         <!-- Activities Table -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <div class="overflow-x-auto">
-                    <table class="table table-zebra">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -359,31 +353,31 @@ new class extends Component {
                         </thead>
                         <tbody>
                             @forelse ($this->getActivities() as $activity)
-                                <tr>
+                                <tr class="hover">
                                     <td>
                                         <button
                                             wire:click="showActivityDetails('{{ $activity->id }}')"
-                                            class="font-mono text-xs link link-primary hover:link-accent"
+                                            class="font-mono text-xs link"
                                             title="{{ $activity->id }} - Click to view details"
                                         >
                                             {{ $this->truncateId($activity->id) }}
                                         </button>
                                     </td>
                                     <td>
-                                        <span class="badge badge-outline">{{ $activity->log_name ?? 'default' }}</span>
+                                        <span class="text-sm">{{ $activity->log_name ?? 'default' }}</span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-neutral">{{ $this->prettifyEvent($activity->event) }}</span>
+                                        <span class="text-sm">{{ $this->prettifyEvent($activity->event) }}</span>
                                     </td>
                                     <td>
                                         @if ($this->getSubjectUrl($activity))
-                                            <a href="{{ $this->getSubjectUrl($activity) }}" class="link link-primary font-medium">
+                                            <a href="{{ $this->getSubjectUrl($activity) }}" class="link font-medium">
                                                 {{ Str::limit($this->getSubjectTitle($activity), 30) }}
                                             </a>
                                         @else
-                                            <span class="text-gray-500">{{ Str::limit($this->getSubjectTitle($activity), 30) }}</span>
+                                            <span class="text-base-content/70">{{ Str::limit($this->getSubjectTitle($activity), 30) }}</span>
                                         @endif
-                                        <div class="text-xs text-gray-500">{{ $this->prettifySubjectType($activity->subject_type) }}</div>
+                                        <div class="text-xs text-base-content/70">{{ $this->prettifySubjectType($activity->subject_type) }}</div>
                                     </td>
                                     <td>
                                         <span class="text-xs">{{ Str::limit($this->formatProperties($activity->properties), 40) }}</span>
@@ -392,7 +386,7 @@ new class extends Component {
                                         @if ($activity->causer)
                                             <span class="text-sm">{{ $activity->causer->name ?? $activity->causer->email ?? 'System' }}</span>
                                         @else
-                                            <span class="text-gray-500">System</span>
+                                            <span class="text-base-content/70">System</span>
                                         @endif
                                     </td>
                                     <td>
@@ -401,12 +395,18 @@ new class extends Component {
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-8">
-                                        <div class="text-gray-500">
+                                    <td colspan="7" class="text-center py-12">
+                                        <div>
+                                            <x-icon name="o-list-bullet" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                                            <p class="font-medium text-base-content mb-2">
+                                                @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
+                                                    No activities found
+                                                @else
+                                                    No activities found
+                                                @endif
+                                            </p>
                                             @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
-                                                No activities found matching your criteria.
-                                            @else
-                                                No activities found.
+                                                <p class="text-sm text-base-content/70">Try adjusting your filters or search terms</p>
                                             @endif
                                         </div>
                                     </td>
@@ -440,7 +440,7 @@ new class extends Component {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="card bg-base-200">
                             <div class="card-body">
-                                <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide">Basic Information</h4>
+                                <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide">Basic Information</h4>
                                 <div class="space-y-2 mt-2">
                                     <div class="flex justify-between">
                                         <span class="text-sm font-medium">ID:</span>
@@ -448,11 +448,11 @@ new class extends Component {
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-sm font-medium">Log Name:</span>
-                                        <span class="badge badge-outline">{{ $selectedActivity->log_name ?? 'default' }}</span>
+                                        <span class="text-sm">{{ $selectedActivity->log_name ?? 'default' }}</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-sm font-medium">Event:</span>
-                                        <span class="badge badge-neutral">{{ $this->prettifyEvent($selectedActivity->event) }}</span>
+                                        <span class="text-sm">{{ $this->prettifyEvent($selectedActivity->event) }}</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-sm font-medium">Created:</span>
@@ -464,21 +464,21 @@ new class extends Component {
 
                         <div class="card bg-base-200">
                             <div class="card-body">
-                                <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide">Subject & Causer</h4>
+                                <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide">Subject & Causer</h4>
                                 <div class="space-y-2 mt-2">
                                     <div>
                                         <span class="text-sm font-medium">Subject:</span>
                                         <div class="mt-1">
                                             @if ($this->getSubjectUrl($selectedActivity))
-                                                <a href="{{ $this->getSubjectUrl($selectedActivity) }}" class="link link-primary font-medium" target="_blank">
+                                                <a href="{{ $this->getSubjectUrl($selectedActivity) }}" class="link font-medium" target="_blank">
                                                     {{ $this->getSubjectTitle($selectedActivity) }}
                                                 </a>
                                             @else
-                                                <span class="text-gray-500">{{ $this->getSubjectTitle($selectedActivity) }}</span>
+                                                <span class="text-base-content/70">{{ $this->getSubjectTitle($selectedActivity) }}</span>
                                             @endif
-                                            <div class="text-xs text-gray-500">{{ $this->prettifySubjectType($selectedActivity->subject_type) }}</div>
+                                            <div class="text-xs text-base-content/70">{{ $this->prettifySubjectType($selectedActivity->subject_type) }}</div>
                                             @if ($selectedActivity->subject_id)
-                                                <div class="text-xs text-gray-500 font-mono">ID: {{ $selectedActivity->subject_id }}</div>
+                                                <div class="text-xs text-base-content/70 font-mono">ID: {{ $selectedActivity->subject_id }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -488,10 +488,10 @@ new class extends Component {
                                             @if ($selectedActivity->causer)
                                                 <span class="text-sm">{{ $selectedActivity->causer->name ?? $selectedActivity->causer->email ?? 'Unknown User' }}</span>
                                                 @if ($selectedActivity->causer_id)
-                                                    <div class="text-xs text-gray-500 font-mono">ID: {{ $selectedActivity->causer_id }}</div>
+                                                    <div class="text-xs text-base-content/70 font-mono">ID: {{ $selectedActivity->causer_id }}</div>
                                                 @endif
                                             @else
-                                                <span class="text-gray-500">System</span>
+                                                <span class="text-base-content/70">System</span>
                                             @endif
                                         </div>
                                     </div>
@@ -512,7 +512,7 @@ new class extends Component {
                         @if (!empty($newData) || !empty($oldData))
                             <div class="card bg-base-200">
                                 <div class="card-body">
-                                    <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide flex items-center gap-2">
+                                    <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide flex items-center gap-2">
                                         <x-icon name="o-arrow-path" class="w-4 h-4" />
                                         Changes
                                     </h4>
@@ -526,7 +526,7 @@ new class extends Component {
                         @if ($comment)
                             <div class="card bg-base-200">
                                 <div class="card-body">
-                                    <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide flex items-center gap-2">
+                                    <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide flex items-center gap-2">
                                         <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
                                         Comment
                                     </h4>
@@ -540,7 +540,7 @@ new class extends Component {
                         @if (!empty($properties) && (empty($newData) && empty($oldData) && !$comment))
                             <div class="card bg-base-200">
                                 <div class="card-body">
-                                    <h4 class="font-semibold text-sm text-gray-600 uppercase tracking-wide flex items-center gap-2">
+                                    <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide flex items-center gap-2">
                                         <x-icon name="o-document-text" class="w-4 h-4" />
                                         Raw Properties
                                     </h4>

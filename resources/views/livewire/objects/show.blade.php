@@ -799,13 +799,13 @@ new class extends Component {
             </x-header>
 
             <!-- Object Overview Card -->
-            <x-card>
+            <x-card class="bg-base-200 shadow">
                 <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
                     <!-- Object Icon -->
                     <div class="flex-shrink-0 self-center sm:self-start">
-                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-secondary/10 flex items-center justify-center">
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-base-200 flex items-center justify-center">
                             <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept) }}"
-                                class="w-6 h-6 sm:w-8 sm:h-8 text-secondary" />
+                                class="w-6 h-6 sm:w-8 sm:h-8" />
                         </div>
                     </div>
 
@@ -884,9 +884,9 @@ new class extends Component {
 
             <!-- Related Events -->
             @if ($this->getRelatedEvents()->isNotEmpty())
-            <x-card>
+            <x-card class="bg-base-200 shadow">
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
+                    <x-icon name="o-bolt" class="w-5 h-5" />
                     Related Events ({{ $this->getRelatedEvents()->count() }})
                 </h3>
                 <div class="space-y-3">
@@ -895,8 +895,8 @@ new class extends Component {
                         <a href="{{ route('events.show', $event->id) }}"
                             class="block hover:text-primary transition-colors">
                             <div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                    <x-icon name="o-bolt" class="w-4 h-4 text-primary" />
+                                <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0 mt-1">
+                                    <x-icon name="o-bolt" class="w-4 h-4" />
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-start justify-between gap-2 mb-1">
@@ -911,7 +911,7 @@ new class extends Component {
                                             @endif
                                         </span>
                                         @if ($event->value)
-                                        <span class="text-sm text-primary font-semibold flex-shrink-0">
+                                        <span class="text-sm font-semibold flex-shrink-0">
                                             {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
                                         </span>
                                         @endif
@@ -923,11 +923,7 @@ new class extends Component {
                                         <x-badge :value="$event->domain" class="badge-xs badge-outline" />
                                         @endif
                                         <span>·</span>
-                                        @php
-                                        $eventPluginClass = \App\Integrations\PluginRegistry::getPlugin($event->service);
-                                        $eventAccentColor = $eventPluginClass ? $eventPluginClass::getAccentColor() : 'primary';
-                                        @endphp
-                                        <x-badge :value="$event->service" class="badge-xs badge-{{ $eventAccentColor }} badge-outline" />
+                                        <x-badge :value="$event->service" class="badge-xs badge-outline" />
                                         @if ($event->integration)
                                         <span>·</span>
                                         <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
@@ -956,7 +952,7 @@ new class extends Component {
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
                             <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-clock" class="w-5 h-5 text-primary" />
+                                <x-icon name="o-clock" class="w-5 h-5" />
                                 Activity
                             </div>
                         </x-slot:heading>
@@ -1016,9 +1012,9 @@ new class extends Component {
                     </x-collapse>
 
                     <!-- Add Comment -->
-                    <x-card>
+                    <x-card class="bg-base-100 shadow">
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-5 h-5 text-primary" />
+                            <x-icon name="o-chat-bubble-left" class="w-5 h-5" />
                             Comment
                         </h3>
                         <x-form wire:submit="addComment">
@@ -1030,9 +1026,9 @@ new class extends Component {
                     </x-card>
 
                     <!-- Tags Manager -->
-                    <x-card>
+                    <x-card class="bg-base-100 shadow">
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-tag" class="w-5 h-5 text-primary" />
+                            <x-icon name="o-tag" class="w-5 h-5" />
                             Tags
                         </h3>
                         <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
@@ -1054,7 +1050,7 @@ new class extends Component {
                         <x-slot:heading>
                             <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
+                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5" />
                                     Object Metadata
                                 </div>
                                 <script type="application/json" id="object-meta-json-{{ $this->object->id }}">
@@ -1078,9 +1074,9 @@ new class extends Component {
             </x-drawer>
         </div>
         @else
-        <div class="text-center py-8">
-            <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
-            <h3 class="text-lg font-semibold text-base-content mb-2">Object Not Found</h3>
+        <div class="text-center py-12">
+            <x-icon name="o-exclamation-triangle" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
+            <h3 class="text-lg font-medium text-base-content mb-2">Object Not Found</h3>
             <p class="text-base-content/70">The requested object could not be found.</p>
         </div>
         @endif

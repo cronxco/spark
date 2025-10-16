@@ -162,7 +162,7 @@
         </x-slot:sidebar>
 
         {{-- The `$slot` goes here --}}
-        <x-slot:content>
+        <x-slot:content class="bg-base-100">
             {{ $slot }}
         </x-slot:content>
 

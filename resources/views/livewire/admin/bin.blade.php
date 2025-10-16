@@ -1,22 +1,24 @@
 <?php
 
 use App\Jobs\DeleteBinItemsBatch;
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
-use App\Models\Block;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
-use Illuminate\Support\Str;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
-    use WithPagination, Toast;
+new class extends Component
+{
+    use Toast, WithPagination;
 
     public string $search = '';
     public string $typeFilter = '';
@@ -75,6 +77,7 @@ new class extends Component {
     {
         if (empty($this->selectedItems)) {
             $this->error('No items selected for restoration.');
+
             return;
         }
 
@@ -142,6 +145,7 @@ new class extends Component {
     {
         if (empty($this->selectedItems)) {
             $this->error('No items selected for deletion.');
+
             return;
         }
 
@@ -211,7 +215,7 @@ new class extends Component {
                     ->orWhere('target_id', $object->id)
                     ->exists();
 
-                if (!$isReferenced) {
+                if (! $isReferenced) {
                     $object->forceDelete();
                     $deletedCount++;
                 }
@@ -223,38 +227,6 @@ new class extends Component {
 
         $this->success("Permanently deleted {$deletedCount} item(s).");
         $this->resetPage();
-    }
-
-    private function getItemType($item): string
-    {
-        if ($item instanceof Event) return 'event';
-        if ($item instanceof EventObject) return 'object';
-        if ($item instanceof Block) return 'block';
-        if ($item instanceof Integration) return 'integration';
-        if ($item instanceof IntegrationGroup) return 'integration_group';
-
-        throw new InvalidArgumentException('Unknown item type');
-    }
-
-    private function findDeletedItem(string $itemId)
-    {
-        // Try to find the item in each model's trashed records
-        $models = [
-            'event' => Event::onlyTrashed(),
-            'object' => EventObject::onlyTrashed(),
-            'block' => Block::onlyTrashed(),
-            'integration' => Integration::onlyTrashed(),
-            'integration_group' => IntegrationGroup::onlyTrashed(),
-        ];
-
-        foreach ($models as $type => $query) {
-            $item = $query->where('id', $itemId)->first();
-            if ($item) {
-                return $item;
-            }
-        }
-
-        return null;
     }
 
     public function getDeletedItems()
@@ -296,6 +268,71 @@ new class extends Component {
         );
     }
 
+    public function getUniqueTypes()
+    {
+        return ['event', 'object', 'block', 'integration', 'integration_group'];
+    }
+
+    public function deleteAll(): void
+    {
+        // Dispatch the job to permanently delete all soft-deleted items
+        DeleteBinItemsBatch::dispatch(Auth::id());
+
+        $this->success('Deletion process started. All items will be permanently deleted.');
+    }
+
+    public function truncateId(string $id): string
+    {
+        return Str::limit($id, 8, '');
+    }
+
+    public function formatDate($date): string
+    {
+        return $date ? $date->format('M j, Y g:i A') : 'Never';
+    }
+
+    private function getItemType($item): string
+    {
+        if ($item instanceof Event) {
+            return 'event';
+        }
+        if ($item instanceof EventObject) {
+            return 'object';
+        }
+        if ($item instanceof Block) {
+            return 'block';
+        }
+        if ($item instanceof Integration) {
+            return 'integration';
+        }
+        if ($item instanceof IntegrationGroup) {
+            return 'integration_group';
+        }
+
+        throw new InvalidArgumentException('Unknown item type');
+    }
+
+    private function findDeletedItem(string $itemId)
+    {
+        // Try to find the item in each model's trashed records
+        $models = [
+            'event' => Event::onlyTrashed(),
+            'object' => EventObject::onlyTrashed(),
+            'block' => Block::onlyTrashed(),
+            'integration' => Integration::onlyTrashed(),
+            'integration_group' => IntegrationGroup::onlyTrashed(),
+        ];
+
+        foreach ($models as $type => $query) {
+            $item = $query->where('id', $itemId)->first();
+            if ($item) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
     private function buildOptimizedQueries()
     {
         $userId = Auth::id();
@@ -304,15 +341,15 @@ new class extends Component {
 
         // Events query
         $eventsQuery = Event::onlyTrashed()
-            ->whereHas('integration', fn($q) => $q->where('user_id', $userId))
+            ->whereHas('integration', fn ($q) => $q->where('user_id', $userId))
             ->with(['target:id,title', 'integration:id,user_id'])
             ->orderBy('deleted_at', 'desc');
 
         if ($this->search) {
             $eventsQuery->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                  ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+                    ->orWhere('action', 'ilike', '%' . $this->search . '%')
+                    ->orWhereHas('target', fn ($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
             });
         }
         $queries['event'] = $eventsQuery;
@@ -325,22 +362,22 @@ new class extends Component {
         if ($this->search) {
             $objectsQuery->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('concept', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('concept', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('type', 'ilike', '%' . $this->search . '%');
             });
         }
         $queries['object'] = $objectsQuery;
 
         // Blocks query
         $blocksQuery = Block::onlyTrashed()
-            ->whereHas('event.integration', fn($q) => $q->where('user_id', $userId))
+            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
             ->with(['event:id,integration_id'])
             ->orderBy('deleted_at', 'desc');
 
         if ($this->search) {
             $blocksQuery->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('block_type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('block_type', 'ilike', '%' . $this->search . '%');
             });
         }
         $queries['block'] = $blocksQuery;
@@ -353,8 +390,8 @@ new class extends Component {
         if ($this->search) {
             $integrationsQuery->where(function ($q) {
                 $q->where('name', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('instance_type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('service', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('instance_type', 'ilike', '%' . $this->search . '%');
             });
         }
         $queries['integration'] = $integrationsQuery;
@@ -367,7 +404,7 @@ new class extends Component {
         if ($this->search) {
             $integrationGroupsQuery->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('account_id', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('account_id', 'ilike', '%' . $this->search . '%');
             });
         }
         $queries['integration_group'] = $integrationGroupsQuery;
@@ -381,6 +418,7 @@ new class extends Component {
         foreach ($queries as $type => $query) {
             $counts[$type] = $query->count();
         }
+
         return $counts;
     }
 
@@ -392,13 +430,16 @@ new class extends Component {
 
         // Get items from each query in deleted_at desc order
         foreach ($queries as $type => $query) {
-            if ($remaining <= 0) break;
+            if ($remaining <= 0) {
+                break;
+            }
 
             $count = $query->count();
 
             if ($currentOffset >= $count) {
                 // Skip this entire query
                 $currentOffset -= $count;
+
                 continue;
             }
 
@@ -422,13 +463,13 @@ new class extends Component {
 
     private function getDeletedItemsByType($type)
     {
-        $query = match($type) {
+        $query = match ($type) {
             'event' => Event::onlyTrashed()
-                ->whereHas('integration', fn($q) => $q->where('user_id', Auth::id()))
+                ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
                 ->with(['target:id,title', 'integration:id,user_id']),
             'object' => EventObject::onlyTrashed()->where('user_id', Auth::id()),
             'block' => Block::onlyTrashed()
-                ->whereHas('event.integration', fn($q) => $q->where('user_id', Auth::id()))
+                ->whereHas('event.integration', fn ($q) => $q->where('user_id', Auth::id()))
                 ->with(['event:id,integration_id']),
             'integration' => Integration::onlyTrashed()->where('user_id', Auth::id()),
             'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', Auth::id()),
@@ -453,36 +494,36 @@ new class extends Component {
 
     private function applySearchToQuery($query, $type)
     {
-        return match($type) {
+        return match ($type) {
             'event' => $query->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                  ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+                    ->orWhere('action', 'ilike', '%' . $this->search . '%')
+                    ->orWhereHas('target', fn ($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
             }),
             'object' => $query->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('concept', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('concept', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('type', 'ilike', '%' . $this->search . '%');
             }),
             'block' => $query->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('block_type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('block_type', 'ilike', '%' . $this->search . '%');
             }),
             'integration' => $query->where(function ($q) {
                 $q->where('name', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('instance_type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('service', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('instance_type', 'ilike', '%' . $this->search . '%');
             }),
             'integration_group' => $query->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('account_id', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('account_id', 'ilike', '%' . $this->search . '%');
             }),
         };
     }
 
     private function formatItemForDisplay($item, $type)
     {
-        return (object) match($type) {
+        return (object) match ($type) {
             'event' => [
                 'id' => $item->id,
                 'type' => 'event',
@@ -530,29 +571,6 @@ new class extends Component {
             ],
         };
     }
-
-    public function getUniqueTypes()
-    {
-        return ['event', 'object', 'block', 'integration', 'integration_group'];
-    }
-
-    public function deleteAll(): void
-    {
-        // Dispatch the job to permanently delete all soft-deleted items
-        DeleteBinItemsBatch::dispatch(Auth::id());
-
-        $this->success('Deletion process started. All items will be permanently deleted.');
-    }
-
-    public function truncateId(string $id): string
-    {
-        return Str::limit($id, 8, '');
-    }
-
-    public function formatDate($date): string
-    {
-        return $date ? $date->format('M j, Y g:i A') : 'Never';
-    }
 };
 
 ?>
@@ -583,21 +601,29 @@ new class extends Component {
         </x-slot:actions>
     </x-header>
 
-    <div class="flex flex-col gap-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Search and Filters -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <div class="flex flex-col lg:flex-row gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Search -->
-                    <div class="flex-1">
-                        <x-input
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Search</span>
+                        </label>
+                        <input
+                            type="text"
                             wire:model.live.debounce.300ms="search"
                             placeholder="Search deleted items..."
-                            icon="o-magnifying-glass" />
+                            class="input input-bordered w-full"
+                        />
                     </div>
 
                     <!-- Type Filter -->
-                    <div class="w-full lg:w-48">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Type</span>
+                        </label>
                         <select class="select select-bordered w-full" wire:model.live="typeFilter">
                             <option value="">All Types</option>
                             @foreach ($this->getUniqueTypes() as $type)
@@ -606,22 +632,25 @@ new class extends Component {
                         </select>
                     </div>
 
-                    <!-- Clear Filters -->
-                    <div class="flex items-center">
+                </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $typeFilter)
+                    <div class="flex justify-end mt-4">
                         <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4 mr-1" />
-                            Clear
+                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            Clear Filters
                         </button>
                     </div>
-                </div>
+                @endif
             </div>
         </div>
 
         <!-- Items Table -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <div class="overflow-x-auto">
-                    <table class="table table-zebra">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>
@@ -641,7 +670,7 @@ new class extends Component {
                         </thead>
                         <tbody>
                             @forelse ($this->getDeletedItems() as $item)
-                                <tr>
+                                <tr class="hover">
                                     <td>
                                         <label class="cursor-pointer">
                                             <input type="checkbox" class="checkbox checkbox-sm"
@@ -665,10 +694,10 @@ new class extends Component {
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-8 text-base-content/60">
-                                        <div class="flex flex-col items-center gap-2">
-                                            <x-icon name="o-trash" class="w-8 h-8" />
-                                            <span>No deleted items found</span>
+                                    <td colspan="7" class="text-center py-12">
+                                        <div class="flex flex-col items-center gap-4">
+                                            <x-icon name="o-trash" class="w-16 h-16 text-base-content/70" />
+                                            <span class="font-medium text-base-content">No deleted items found</span>
                                         </div>
                                     </td>
                                 </tr>

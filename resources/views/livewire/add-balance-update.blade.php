@@ -19,7 +19,7 @@
         </div>
 
         <!-- Form -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow-sm">
             <div class="card-body">
                 <form wire:submit="save">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

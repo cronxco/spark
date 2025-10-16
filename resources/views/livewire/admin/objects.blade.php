@@ -3,16 +3,18 @@
 use App\Models\EventObject;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
-use Illuminate\Support\Str;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
-    use WithPagination, Toast;
+new class extends Component
+{
+    use Toast, WithPagination;
 
     public string $search = '';
     public string $conceptFilter = '';
@@ -66,7 +68,7 @@ new class extends Component {
     public function toggleObjectSelection(string $objectId): void
     {
         if (in_array($objectId, $this->selectedObjects)) {
-            $this->selectedObjects = array_filter($this->selectedObjects, fn($id) => $id !== $objectId);
+            $this->selectedObjects = array_filter($this->selectedObjects, fn ($id) => $id !== $objectId);
         } else {
             $this->selectedObjects[] = $objectId;
         }
@@ -79,6 +81,7 @@ new class extends Component {
     {
         if (empty($this->selectedObjects)) {
             $this->error('No objects selected for deletion.');
+
             return;
         }
 
@@ -108,9 +111,9 @@ new class extends Component {
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('content', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('concept', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('type', 'ilike', '%' . $this->search . '%');
+                    ->orWhere('content', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('concept', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('type', 'ilike', '%' . $this->search . '%');
             });
         }
 
@@ -180,78 +183,68 @@ new class extends Component {
         </x-slot:actions>
     </x-header>
 
-    <div class="flex flex-col gap-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Search and Filters -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Search -->
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Search</span>
                         </label>
-                        <div class="join w-full">
-                            <input
-                                type="text"
-                                class="input input-bordered join-item flex-1"
-                                placeholder="Search by title, content, concept, or type..."
-                                wire:model.live.debounce.300ms="search"
-                            />
-                            @if ($search)
-                                <button class="btn btn-outline join-item" wire:click="clearFilters">
-                                    <x-icon name="o-x-mark" class="w-4 h-4" />
-                                </button>
-                            @endif
-                        </div>
+                        <input
+                            type="text"
+                            class="input input-bordered w-full"
+                            placeholder="Search objects..."
+                            wire:model.live.debounce.300ms="search"
+                        />
                     </div>
 
-                    <!-- Filters -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Concept Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Concept</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="conceptFilter">
-                                <option value="">All Concepts</option>
-                                @foreach ($this->getUniqueConcepts() as $concept)
-                                    <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Type Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Type</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="typeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueTypes() as $type)
-                                    <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <!-- Concept Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Concept</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="conceptFilter">
+                            <option value="">All Concepts</option>
+                            @foreach ($this->getUniqueConcepts() as $concept)
+                                <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <!-- Clear Filters Button -->
-                    @if ($conceptFilter || $typeFilter)
-                        <div class="flex justify-end">
-                            <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4 mr-1" />
-                                Clear Filters
-                            </button>
-                        </div>
-                    @endif
+                    <!-- Type Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Type</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="typeFilter">
+                            <option value="">All Types</option>
+                            @foreach ($this->getUniqueTypes() as $type)
+                                <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $conceptFilter || $typeFilter)
+                    <div class="flex justify-end mt-4">
+                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
+                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            Clear Filters
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
         <!-- Objects Table -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <div class="overflow-x-auto">
-                    <table class="table table-zebra">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>
@@ -270,7 +263,7 @@ new class extends Component {
                         </thead>
                         <tbody>
                             @forelse ($this->getObjects() as $object)
-                                <tr>
+                                <tr class="hover">
                                     <td>
                                         <x-checkbox
                                             wire:model.live="selectedObjects"
@@ -279,7 +272,7 @@ new class extends Component {
                                         />
                                     </td>
                                     <td>
-                                        <a href="{{ route('objects.show', $object->id) }}" class="link link-primary font-mono text-xs" title="{{ $object->id }}">
+                                        <a href="{{ route('objects.show', $object->id) }}" class="link font-mono text-xs" title="{{ $object->id }}">
                                             {{ $this->truncateId($object->id) }}
                                         </a>
                                     </td>
@@ -287,7 +280,7 @@ new class extends Component {
                                         <div class="font-medium">{{ $object->title }}</div>
                                         @if ($object->url)
                                             <div class="text-sm text-base-content/70">
-                                                <a href="{{ $object->url }}" target="_blank" class="link link-primary">
+                                                <a href="{{ $object->url }}" target="_blank" class="link">
                                                     <x-icon name="o-link" class="w-3 h-3 inline mr-1" />
                                                     Link
                                                 </a>
@@ -295,17 +288,13 @@ new class extends Component {
                                         @endif
                                     </td>
                                     <td>
-                                        <span class="badge badge-outline">
-                                            {{ $this->formatConcept($object->concept) }}
-                                        </span>
+                                        <span class="text-sm">{{ $this->formatConcept($object->concept) }}</span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-secondary badge-outline">
-                                            {{ $this->formatType($object->type) }}
-                                        </span>
+                                        <span class="text-sm">{{ $this->formatType($object->type) }}</span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-neutral">{{ $object->actor_events_count + $object->target_events_count }}</span>
+                                        <span class="text-sm text-base-content/70">{{ $object->actor_events_count + $object->target_events_count }}</span>
                                     </td>
                                     <td>
                                         <div class="text-sm">
@@ -318,12 +307,12 @@ new class extends Component {
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-8">
-                                        <div class="text-base-content/50">
-                                            <x-icon name="o-document-text" class="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                            <p>No objects found</p>
+                                    <td colspan="7" class="text-center py-12">
+                                        <div>
+                                            <x-icon name="o-document-text" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                                            <p class="font-medium text-base-content mb-2">No objects found</p>
                                             @if ($search || $conceptFilter || $typeFilter)
-                                                <p class="text-sm">Try adjusting your search or filters</p>
+                                                <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
                                             @endif
                                         </div>
                                     </td>

@@ -425,7 +425,7 @@ new class extends Component {
     <div class="flex flex-col gap-6">
 
         <!-- Integrations List -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow-sm">
             <div class="card-body">
                 @if (count($integrations) === 0)
                     <div class="text-center py-12">

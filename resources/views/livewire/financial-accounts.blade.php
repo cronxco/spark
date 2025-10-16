@@ -1,85 +1,96 @@
 <div>
-    <div class="flex flex-col gap-6">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-base-content">Money</h1>
-                <p class="text-base-content/70">Manage your financial accounts and track balances</p>
+    <x-header title="Money" subtitle="Manage your financial accounts and track balances" separator>
+        <x-slot:actions>
+            <!-- Mobile actions dropdown -->
+            <div class="sm:hidden">
+                <x-dropdown position="dropdown-end">
+                    <x-slot:trigger>
+                        <x-button class="btn-ghost btn-sm" aria-label="Actions" title="Actions">
+                            <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                        </x-button>
+                    </x-slot:trigger>
+                    <x-menu-item title="Add Account" icon="o-plus" link="{{ route('money.create') }}" />
+                    <x-menu-item title="Add Balance Update" icon="o-banknotes" link="{{ route('balance-updates.create') }}" />
+                </x-dropdown>
             </div>
-            <div class="flex gap-2">
-                <a href="{{ route('money.create') }}" class="btn btn-primary">
+
+            <!-- Desktop buttons -->
+            <div class="hidden sm:flex gap-2">
+                <x-button
+                    link="{{ route('money.create') }}"
+                    class="btn-primary"
+                >
                     <x-icon name="o-plus" class="w-4 h-4" />
-                    <span class="hidden sm:inline">Add Account</span>
-                </a>
-                <a href="{{ route('balance-updates.create') }}" class="btn btn-secondary">
+                    Add Account
+                </x-button>
+                <x-button
+                    link="{{ route('balance-updates.create') }}"
+                    class="btn-outline"
+                >
                     <x-icon name="o-banknotes" class="w-4 h-4" />
-                    <span class="hidden sm:inline">Add Balance Update</span>
-                </a>
+                    Add Balance Update
+                </x-button>
             </div>
-        </div>
+        </x-slot:actions>
+    </x-header>
 
-        <!-- Filters -->
-        <div class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                <div class="lg:hidden">
-                    <x-collapse separator class="bg-base-200">
-                        <x-slot:heading>Filters</x-slot:heading>
-                        <x-slot:content>
-                            <div class="flex flex-col gap-4">
-                                <!-- Search -->
-                                <div class="form-control flex-1">
-                                    <label class="label">
-                                        <span class="label-text">Search</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        wire:model.live.debounce.300ms="search"
-                                        placeholder="Search accounts, providers, or account numbers..."
-                                        class="input input-bordered w-full"
-                                    />
-                                </div>
-
-                                <!-- Account Type Filter -->
-                                <div class="form-control">
-                                    <label class="label">
-                                        <span class="label-text">Account Type</span>
-                                    </label>
-                                    <select wire:model.live="accountTypeFilter" class="select select-bordered">
-                                        <option value="">All Types</option>
-                                        @foreach ($accountTypes as $type => $label)
-                                            <option value="{{ $type }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <!-- Provider Filter -->
-                                <div class="form-control">
-                                    <label class="label">
-                                        <span class="label-text">Provider</span>
-                                    </label>
-                                    <select wire:model.live="providerFilter" class="select select-bordered">
-                                        <option value="">All Providers</option>
-                                        @foreach ($providers as $provider)
-                                            <option value="{{ $provider }}">{{ $provider }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <!-- Clear Filters -->
-                                <div class="form-control">
-                                    <label class="label">
-                                        <span class="label-text">&nbsp;</span>
-                                    </label>
-                                    <button wire:click="clearFilters" class="btn btn-outline">
-                                        Clear Filters
-                                    </button>
-                                </div>
-                            </div>
-                        </x-slot:content>
-                    </x-collapse>
+    <!-- Filters -->
+    <div class="hidden lg:flex card bg-base-200 shadow-sm mb-6">
+        <div class="card-body">
+            <div class="hidden lg:flex lg:flex-row gap-4">
+                <!-- Search -->
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">Search</span>
+                    </label>
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="search"
+                        placeholder="Search accounts, providers, or account numbers..."
+                        class="input input-bordered w-full"
+                    />
                 </div>
 
-                <div class="hidden lg:flex lg:flex-row gap-4">
+                <!-- Account Type Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Account Type</span>
+                    </label>
+                    <select wire:model.live="accountTypeFilter" class="select select-bordered">
+                        <option value="">All Types</option>
+                        @foreach ($accountTypes as $type => $label)
+                            <option value="{{ $type }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Provider Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Provider</span>
+                    </label>
+                    <select wire:model.live="providerFilter" class="select select-bordered">
+                        <option value="">All Providers</option>
+                        @foreach ($providers as $provider)
+                            <option value="{{ $provider }}">{{ $provider }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Clear Filters -->
+                <div class="flex flex-col justify-end">
+                    <button wire:click="clearFilters" class="btn btn-outline h-12">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="lg:hidden">
+        <x-collapse separator class="bg-base-200 mb-4">
+            <x-slot:heading>Filters</x-slot:heading>
+            <x-slot:content>
+                <div class="flex flex-col gap-4">
                     <!-- Search -->
                     <div class="form-control flex-1">
                         <label class="label">
@@ -129,123 +140,124 @@
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </x-slot:content>
+        </x-collapse>
+    </div>
 
-        <!-- Accounts List -->
-        <div class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                @if ($accounts->count() > 0)
-                    <div class="overflow-x-auto">
-                        <table class="table table-zebra">
-                            <thead>
+    <!-- Accounts List -->
+    <div class="card bg-base-200 shadow-sm">
+        <div class="card-body">
+            @if ($accounts->count() > 0)
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Type</th>
+                                <th>Provider</th>
+                                <th>Current Balance</th>
+                                <th>Currency</th>
+                                <th>Interest Rate</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($accounts as $account)
+                                @php
+                                    $metadata = $account->metadata;
+                                    $accountType = $metadata['account_type'] ?? '';
+                                    $provider = $metadata['provider'] ?? '';
+                                    $accountNumber = $metadata['account_number'] ?? null;
+                                    $sortCode = $metadata['sort_code'] ?? null;
+                                    $currency = $metadata['currency'] ?? 'GBP';
+                                    $interestRate = $metadata['interest_rate'] ?? null;
+                                    $startDate = $metadata['start_date'] ?? null;
+
+                                    // Get account type label
+                                    $accountTypeLabels = [
+                                        'current_account' => 'Current Account',
+                                        'savings_account' => 'Savings Account',
+                                        'mortgage' => 'Mortgage',
+                                        'investment_account' => 'Investment Account',
+                                        'credit_card' => 'Credit Card',
+                                        'loan' => 'Loan',
+                                        'pension' => 'Pension',
+                                        'other' => 'Other',
+                                    ];
+                                    $accountTypeLabel = $accountTypeLabels[$accountType] ?? $accountType;
+
+                                    // Get currency symbol
+                                    $currencySymbols = [
+                                        'GBP' => '£',
+                                        'USD' => '$',
+                                        'EUR' => '€',
+                                    ];
+                                    $currencySymbol = $currencySymbols[$currency] ?? $currency;
+
+                                    // Get current balance from latest event
+                                    $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                    $latestBalance = $plugin->getLatestBalance($account);
+                                    $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? null : null;
+                                @endphp
                                 <tr>
-                                    <th>Account</th>
-                                    <th>Type</th>
-                                    <th>Provider</th>
-                                    <th>Current Balance</th>
-                                    <th>Currency</th>
-                                    <th>Interest Rate</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($accounts as $account)
-                                    @php
-                                        $metadata = $account->metadata;
-                                        $accountType = $metadata['account_type'] ?? '';
-                                        $provider = $metadata['provider'] ?? '';
-                                        $accountNumber = $metadata['account_number'] ?? null;
-                                        $sortCode = $metadata['sort_code'] ?? null;
-                                        $currency = $metadata['currency'] ?? 'GBP';
-                                        $interestRate = $metadata['interest_rate'] ?? null;
-                                        $startDate = $metadata['start_date'] ?? null;
-
-                                        // Get account type label
-                                        $accountTypeLabels = [
-                                            'current_account' => 'Current Account',
-                                            'savings_account' => 'Savings Account',
-                                            'mortgage' => 'Mortgage',
-                                            'investment_account' => 'Investment Account',
-                                            'credit_card' => 'Credit Card',
-                                            'loan' => 'Loan',
-                                            'pension' => 'Pension',
-                                            'other' => 'Other',
-                                        ];
-                                        $accountTypeLabel = $accountTypeLabels[$accountType] ?? $accountType;
-
-                                        // Get currency symbol
-                                        $currencySymbols = [
-                                            'GBP' => '£',
-                                            'USD' => '$',
-                                            'EUR' => '€',
-                                        ];
-                                        $currencySymbol = $currencySymbols[$currency] ?? $currency;
-
-                                        // Get current balance from latest event
-                                        $plugin = new \App\Integrations\Financial\FinancialPlugin();
-                                        $latestBalance = $plugin->getLatestBalance($account);
-                                        $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? null : null;
-                                    @endphp
-                                    <tr>
-                                        <td>
-                                            <div>
-                                                <div class="font-medium">{{ $metadata['name'] ?? 'Unnamed Account' }}</div>
-                                                @if ($accountNumber)
-                                                    <div class="text-sm text-base-content/70">
-                                                        {{ $accountNumber }}
-                                                        @if ($sortCode)
-                                                            ({{ $sortCode }})
-                                                        @endif
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-outline">
-                                                {{ $accountTypeLabel }}
+                                    <td>
+                                        <div>
+                                            <div class="font-medium">{{ $metadata['name'] ?? 'Unnamed Account' }}</div>
+                                            @if ($accountNumber)
+                                                <div class="text-sm text-base-content/70">
+                                                    {{ $accountNumber }}
+                                                    @if ($sortCode)
+                                                        ({{ $sortCode }})
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-outline">
+                                            {{ $accountTypeLabel }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $provider }}</td>
+                                    <td>
+                                        @if ($currentBalance !== null)
+                                            <span class="font-mono font-medium">
+                                                {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
                                             </span>
-                                        </td>
-                                        <td>{{ $provider }}</td>
-                                        <td>
-                                            @if ($currentBalance !== null)
-                                                <span class="font-mono font-medium">
-                                                    {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
-                                                </span>
-                                            @else
-                                                <span class="text-base-content/50">No balance</span>
-                                            @endif
-                                        </td>
-                                        <td>{{ $currency }}</td>
-                                        <td>
-                                            @if ($interestRate)
-                                                <span class="text-success font-medium">
-                                                    {{ number_format($interestRate, 2) }}%
-                                                </span>
-                                            @else
-                                                <span class="text-base-content/50">-</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <div class="flex gap-2">
-                                                <a
-                                                    href="{{ route('money.show', $account) }}"
-                                                    class="btn btn-sm btn-outline"
-                                                >
-                                                    <x-icon name="o-eye" class="w-4 h-4" />
-                                                    View
-                                                </a>
-                                                <button
-                                                    wire:click="deleteAccount('{{ $account->id }}')"
-                                                    wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
-                                                    class="btn btn-sm btn-error btn-outline"
-                                                >
-                                                    <x-icon name="o-trash" class="w-4 h-4" />
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                        @else
+                                            <span class="text-base-content/50">No balance</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $currency }}</td>
+                                    <td>
+                                        @if ($interestRate)
+                                            <span class="text-success font-medium">
+                                                {{ number_format($interestRate, 2) }}%
+                                            </span>
+                                        @else
+                                            <span class="text-base-content/50">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div class="flex gap-2">
+                                            <a
+                                                href="{{ route('money.show', $account) }}"
+                                                class="btn btn-sm btn-outline"
+                                            >
+                                                <x-icon name="o-eye" class="w-4 h-4" />
+                                                View
+                                            </a>
+                                            <button
+                                                wire:click="deleteAccount('{{ $account->id }}')"
+                                                wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
+                                                class="btn btn-sm btn-error btn-outline"
+                                            >
+                                                <x-icon name="o-trash" class="w-4 h-4" />
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
                                 @endforeach
                             </tbody>
                         </table>
@@ -297,7 +309,6 @@
                 @endif
             </div>
         </div>
-    </div>
 
     <!-- Toast notifications -->
     <x-toast position="toast-top toast-end" />

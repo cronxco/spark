@@ -1,6 +1,6 @@
 <div class="space-y-4">
     <!-- Header with controls -->
-    <div class="card bg-base-100 shadow-sm">
+    <div class="card bg-base-200 shadow-sm">
         <div class="card-body">
             <div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div class="flex-1 space-y-4 w-full lg:w-auto">
@@ -60,7 +60,7 @@
     </div>
 
     <!-- Log entries -->
-    <div class="card bg-base-100 shadow-sm">
+    <div class="card bg-base-200 shadow-sm">
         <div class="card-body p-0">
             @if (count($logLines) > 0)
                 <div class="overflow-x-auto">

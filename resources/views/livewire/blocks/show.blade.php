@@ -111,13 +111,13 @@ new class extends Component {
             </x-header>
 
             <!-- Block Overview Card -->
-            <x-card>
+            <x-card class="bg-base-200 shadow">
                 <div class="flex flex-col sm:flex-row items-start gap-4">
                     <!-- Block Icon -->
                     <div class="flex-shrink-0 self-center sm:self-start">
-                        <div class="w-12 h-12 rounded-full bg-info/10 flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-base-200 flex items-center justify-center">
                             <x-icon name="{{ $this->getBlockIcon($this->block->block_type, $this->block->event?->service) }}"
-                                   class="w-6 h-6 text-info" />
+                                   class="w-6 h-6" />
                         </div>
                     </div>
 
@@ -130,7 +130,7 @@ new class extends Component {
                                 </h2>
 
                                 @if ($this->block->value)
-                                    <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary flex-shrink-0">
+                                    <div class="text-2xl sm:text-3xl lg:text-4xl font-bold flex-shrink-0">
                                         {!! format_event_value_display($this->block->formatted_value, $this->block->value_unit, $this->block->event?->service, $this->block->block_type, 'block') !!}
                                     </div>
                                 @endif
@@ -157,7 +157,7 @@ new class extends Component {
                                 <div class="flex items-center gap-2">
                                     <x-icon name="o-link" class="w-4 h-4 text-base-content/60" />
                                     <span class="text-base-content/70">URL:</span>
-                                    <a href="{{ $this->block->url }}" target="_blank" class="font-medium text-primary hover:underline">
+                                    <a href="{{ $this->block->url }}" target="_blank" class="font-medium hover:underline">
                                         View
                                     </a>
                                 </div>
@@ -166,7 +166,7 @@ new class extends Component {
                                 <div class="flex items-center gap-2">
                                     <x-icon name="o-photo" class="w-4 h-4 text-base-content/60" />
                                     <span class="text-base-content/70">Media:</span>
-                                    <a href="{{ $this->block->media_url }}" target="_blank" class="font-medium text-primary hover:underline">
+                                    <a href="{{ $this->block->media_url }}" target="_blank" class="font-medium hover:underline">
                                         View
                                     </a>
                                 </div>
@@ -178,17 +178,17 @@ new class extends Component {
 
             <!-- Related Event -->
             @if ($this->block->event)
-                <x-card>
+                <x-card class="bg-base-200 shadow">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
+                        <x-icon name="o-bolt" class="w-5 h-5" />
                         Related Event
                     </h3>
                     <div class="border border-base-300 rounded-lg p-4 hover:bg-base-50 transition-colors">
                         <a href="{{ route('events.show', $this->block->event->id) }}"
                            class="block hover:text-primary transition-colors">
                             <div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                    <x-icon name="o-bolt" class="w-4 h-4 text-primary" />
+                                <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0 mt-1">
+                                    <x-icon name="o-bolt" class="w-4 h-4" />
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-start justify-between gap-2 mb-1">
@@ -203,7 +203,7 @@ new class extends Component {
                                             @endif
                                         </span>
                                         @if ($this->block->event->value)
-                                            <span class="text-sm text-primary font-semibold flex-shrink-0">
+                                            <span class="text-sm font-semibold flex-shrink-0">
                                                 {!! format_event_value_display($this->block->event->formatted_value, $this->block->event->value_unit, $this->block->event->service, $this->block->event->action, 'action') !!}
                                             </span>
                                         @endif
@@ -215,11 +215,7 @@ new class extends Component {
                                             <x-badge :value="$this->block->event->domain" class="badge-xs badge-outline" />
                                         @endif
                                         <span>·</span>
-                                        @php
-                                            $blockPluginClass = \App\Integrations\PluginRegistry::getPlugin($this->block->event->service);
-                                            $blockAccentColor = $blockPluginClass ? $blockPluginClass::getAccentColor() : 'primary';
-                                        @endphp
-                                        <x-badge :value="$this->block->event->service" class="badge-xs badge-{{ $blockAccentColor }} badge-outline" />
+                                        <x-badge :value="$this->block->event->service" class="badge-xs badge-outline" />
                                         @if ($this->block->event->integration)
                                             <span>·</span>
                                             <x-badge :value="$this->block->event->integration->name" class="badge-xs badge-outline" />
@@ -242,7 +238,7 @@ new class extends Component {
                             <x-slot:heading>
                                 <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
                                     <div class="flex items-center gap-2">
-                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-info" />
+                                        <x-icon name="o-cog-6-tooth" class="w-5 h-5" />
                                         Block Metadata
                                     </div>
                                     <script type="application/json" id="block-meta-json-{{ $this->block->id }}">{!! json_encode($meta, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
@@ -264,7 +260,7 @@ new class extends Component {
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
                             <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-clock" class="w-5 h-5 text-primary" />
+                                <x-icon name="o-clock" class="w-5 h-5" />
                                 Activity
                             </div>
                         </x-slot:heading>
@@ -324,9 +320,9 @@ new class extends Component {
                     </x-collapse>
 
                     <!-- Add Comment -->
-                    <x-card>
+                    <x-card class="bg-base-100 shadow">
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-5 h-5 text-primary" />
+                            <x-icon name="o-chat-bubble-left" class="w-5 h-5" />
                             Comment
                         </h3>
                         <x-form wire:submit="addComment">
@@ -340,22 +336,22 @@ new class extends Component {
             </x-drawer>
 
             <!-- Linked Blocks -->
-                                    @if ($this->getRelatedBlocks()->isNotEmpty())
-                <x-card class="bg-base-200/50 border-2 border-info/20">
-                                            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
-                            Linked Blocks ({{ $this->getRelatedBlocks()->count() }})
-                        </h3>
+            @if ($this->getRelatedBlocks()->isNotEmpty())
+                <x-card class="bg-base-200 shadow">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-squares-2x2" class="w-5 h-5" />
+                        Linked Blocks ({{ $this->getRelatedBlocks()->count() }})
+                    </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         @foreach ($this->getRelatedBlocks() as $relatedBlock)
-                            <div class="border-2 border-info/30 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors shadow-sm">
+                            <div class="border border-base-300 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
                                 <div class="flex items-start justify-between gap-3 mb-2">
                                     <a href="{{ route('blocks.show', $relatedBlock->id) }}"
                                        class="font-semibold text-base-content hover:text-primary transition-colors text-base flex-1">
                                         {{ $relatedBlock->title }}
                                     </a>
                                     @if ($relatedBlock->value)
-                                        <span class="text-lg font-bold text-primary flex-shrink-0">{!! format_event_value_display($relatedBlock->formatted_value, $relatedBlock->value_unit, $this->block->event?->service, $relatedBlock->block_type, 'block') !!}</span>
+                                        <span class="text-lg font-bold flex-shrink-0">{!! format_event_value_display($relatedBlock->formatted_value, $relatedBlock->value_unit, $this->block->event?->service, $relatedBlock->block_type, 'block') !!}</span>
                                     @endif
                                 </div>
                                 @php $relMeta = is_array($relatedBlock->metadata ?? null) ? $relatedBlock->metadata : []; @endphp
@@ -374,7 +370,7 @@ new class extends Component {
                                     @if ($relatedBlock->url)
                                         <div class="flex items-center gap-1">
                                             <x-icon name="o-link" class="w-3 h-3" />
-                                            <a href="{{ $relatedBlock->url }}" target="_blank" class="text-primary hover:underline">
+                                            <a href="{{ $relatedBlock->url }}" target="_blank" class="hover:underline">
                                                 View
                                             </a>
                                         </div>
@@ -387,11 +383,11 @@ new class extends Component {
             @endif
         </div>
     @else
-        <div class="text-center py-8">
-            <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
-            <h3 class="text-lg font-semibold text-base-content mb-2">Block Not Found</h3>
-            <p class="text-base-content/70">The requested block could not be found.</p>
-            <x-button href="{{ route('events.index') }}" class="mt-4">
+        <div class="text-center py-12">
+            <x-icon name="o-exclamation-triangle" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
+            <h3 class="text-lg font-medium text-base-content mb-2">Block Not Found</h3>
+            <p class="text-base-content/70 mb-6">The requested block could not be found.</p>
+            <x-button href="{{ route('events.index') }}" class="btn-primary">
                 Back to Events
             </x-button>
         </div>

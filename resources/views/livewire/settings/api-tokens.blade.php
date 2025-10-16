@@ -99,117 +99,122 @@ new class extends Component {
     }
 }; ?>
 
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <x-card title="{{ __('API Tokens') }}" shadow>
-            <div class="space-y-6">
-                <!-- Create New Token -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Create New Token') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Create a new API token to access the API') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model="tokenName"
-                                placeholder="Enter token name"
-                                class="w-64"
-                                required
-                                autocomplete="off"
-                            />
-                            <x-button
-                                label="{{ __('Create Token') }}"
-                                wire:click="createToken"
-                                class="btn-primary"
-                                spinner="createToken"
-                            />
-                        </div>
-                    </div>
+<div>
+    <x-header title="{{ __('API Tokens') }}" subtitle="{{ __('Manage API tokens for your account') }}" separator />
+
+    <div class="space-y-4 lg:space-y-6">
+    <!-- Create Token Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Create New Token') }}</h3>
+            <p class="text-sm text-base-content/70 mb-4">{{ __('Create a new API token to access the API') }}</p>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Token Name') }}</span>
+                </label>
+                <input
+                    wire:model="tokenName"
+                    type="text"
+                    placeholder="Enter token name"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="off"
+                />
+            </div>
+
+            <div class="flex justify-end mt-4">
+                <x-button
+                    label="{{ __('Create Token') }}"
+                    wire:click="createToken"
+                    class="btn-primary"
+                    spinner="createToken"
+                />
+            </div>
+        </div>
+    </div>
+
+    <!-- New Token Display -->
+    @if ($showNewToken)
+        <div class="card bg-success/10 border border-success/20">
+            <div class="card-body">
+                <h3 class="text-lg font-semibold text-success mb-2">{{ __('Token Created Successfully') }}</h3>
+                <p class="text-sm text-base-content/70 mb-4">{{ __('Please copy your new API token. For your security, it won\'t be shown again.') }}</p>
+
+                <div class="form-control">
+                    <input
+                        type="text"
+                        value="{{ $newToken }}"
+                        readonly
+                        class="input input-bordered w-full font-mono text-sm"
+                    />
                 </div>
 
-                <!-- New Token Display -->
-                @if ($showNewToken)
-                    <div class="p-4 bg-success/10 border border-success/20 rounded-lg">
-                        <div class="flex items-center justify-between mb-4">
-                            <div>
-                                <h4 class="text-lg font-medium text-success">{{ __('Token Created Successfully') }}</h4>
-                                <p class="text-sm text-base-content/70">{{ __('Please copy your new API token. For your security, it won\'t be shown again.') }}</p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <input
-                                    type="text"
-                                    value="{{ $newToken }}"
-                                    readonly
-                                    class="input input-bordered w-64 font-mono text-sm"
-                                />
-                                <x-button
-                                    label="{{ __('Copy') }}"
-                                    class="btn-success"
-                                    onclick="navigator.clipboard.writeText('{{ $newToken }}').then(() => { $wire.copyToken(); })"
-                                />
-                                <x-button
-                                    label="{{ __('Close') }}"
-                                    class="btn-outline"
-                                    wire:click="hideNewToken"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <!-- Existing Tokens -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="mb-4">
-                        <h4 class="text-lg font-medium">{{ __('Your API Tokens') }}</h4>
-                        <p class="text-sm text-base-content/70">{{ __('Manage your existing API tokens') }}</p>
-                    </div>
-
-                    @if (count($tokens) > 0)
-                        <div class="overflow-x-auto">
-                            <table class="table table-zebra">
-                                <thead>
-                                    <tr>
-                                        <th>{{ __('Name') }}</th>
-                                        <th>{{ __('Created') }}</th>
-                                        <th>{{ __('Last Used') }}</th>
-                                        <th class="text-right">{{ __('Actions') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($tokens as $token)
-                                        <tr>
-                                            <td class="font-medium">{{ $token['name'] }}</td>
-                                            <td>{{ \Carbon\Carbon::parse($token['created_at'])->format('M j, Y g:i A') }}</td>
-                                            <td>
-                                                @if ($token['last_used_at'])
-                                                    {{ \Carbon\Carbon::parse($token['last_used_at'])->format('M j, Y g:i A') }}
-                                                @else
-                                                    <span class="text-base-content/50">{{ __('Never') }}</span>
-                                                @endif
-                                            </td>
-                                            <td class="text-right">
-                                                <x-button
-                                                    label="{{ __('Revoke') }}"
-                                                    class="btn-sm btn-error"
-                                                    wire:click="revokeToken({{ $token['id'] }})"
-                                                    wire:confirm="{{ __('Are you sure you want to revoke this token?') }}"
-                                                />
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <div class="text-center py-8">
-                            <x-icon name="o-document-text" class="w-12 h-12 mx-auto text-base-content/30" />
-                            <h3 class="mt-2 text-sm font-medium">{{ __('No tokens') }}</h3>
-                            <p class="mt-1 text-sm text-base-content/70">{{ __('Get started by creating a new API token.') }}</p>
-                        </div>
-                    @endif
+                <div class="flex justify-end gap-2 mt-4">
+                    <x-button
+                        label="{{ __('Copy') }}"
+                        class="btn-success"
+                        onclick="navigator.clipboard.writeText('{{ $newToken }}').then(() => { $wire.copyToken(); })"
+                    />
+                    <x-button
+                        label="{{ __('Close') }}"
+                        class="btn-outline"
+                        wire:click="hideNewToken"
+                    />
                 </div>
             </div>
-        </x-card>
+        </div>
+    @endif
+
+    <!-- Token List Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Your Tokens') }}</h3>
+
+            @if (count($tokens) > 0)
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>{{ __('Name') }}</th>
+                                <th>{{ __('Created') }}</th>
+                                <th>{{ __('Last Used') }}</th>
+                                <th class="text-right">{{ __('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($tokens as $token)
+                                <tr>
+                                    <td class="font-medium">{{ $token['name'] }}</td>
+                                    <td>{{ \Carbon\Carbon::parse($token['created_at'])->format('M j, Y g:i A') }}</td>
+                                    <td>
+                                        @if ($token['last_used_at'])
+                                            {{ \Carbon\Carbon::parse($token['last_used_at'])->format('M j, Y g:i A') }}
+                                        @else
+                                            <span class="text-base-content/50">{{ __('Never') }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-right">
+                                        <x-button
+                                            label="{{ __('Revoke') }}"
+                                            class="btn-sm btn-error"
+                                            wire:click="revokeToken({{ $token['id'] }})"
+                                            wire:confirm="{{ __('Are you sure you want to revoke this token?') }}"
+                                        />
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="text-center py-8">
+                    <x-icon name="o-document-text" class="w-12 h-12 mx-auto text-base-content/30" />
+                    <h3 class="mt-2 text-sm font-medium">{{ __('No tokens') }}</h3>
+                    <p class="mt-1 text-sm text-base-content/70">{{ __('Get started by creating a new API token.') }}</p>
+                </div>
+            @endif
+        </div>
+    </div>
     </div>
 </div> 

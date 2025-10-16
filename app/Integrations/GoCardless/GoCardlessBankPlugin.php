@@ -133,7 +133,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     public static function getDomain(): string
     {
-        return 'media';
+        return 'money';
     }
 
     public static function supportsMigration(): bool

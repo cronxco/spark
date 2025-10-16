@@ -13,6 +13,8 @@ use Livewire\Component;
 class FinancialAccountShow extends Component
 {
     public EventObject $account;
+    public bool $showSidebar = false;
+    public bool $metadataOpen = false;
 
     public function mount(EventObject $account): void
     {
@@ -20,6 +22,11 @@ class FinancialAccountShow extends Component
         if ($account->user_id !== Auth::id()) {
             abort(403);
         }
+    }
+
+    public function toggleSidebar(): void
+    {
+        $this->showSidebar = ! $this->showSidebar;
     }
 
     public function render(): View

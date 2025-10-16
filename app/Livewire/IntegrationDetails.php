@@ -12,6 +12,9 @@ use Livewire\Component;
 class IntegrationDetails extends Component
 {
     public Integration $integration;
+    public bool $showSidebar = false;
+    public bool $logsOpen = false;
+    public bool $configOpen = true;
 
     public function mount(Integration $integration)
     {
@@ -20,6 +23,11 @@ class IntegrationDetails extends Component
         }
 
         $this->integration = $integration->load('group');
+    }
+
+    public function toggleSidebar(): void
+    {
+        $this->showSidebar = ! $this->showSidebar;
     }
 
     public function getPluginClass()
