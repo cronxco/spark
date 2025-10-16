@@ -492,14 +492,14 @@ new class extends Component {
 
             <!-- Related Events -->
             @if ($this->getRelatedEvents()->isNotEmpty())
-            <x-card>
+            <x-card class="bg-base-200 shadow">
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
                     <x-icon name="o-arrow-path" class="w-5 h-5 text-warning" />
                     Related Events
                 </h3>
                 <div class="space-y-3">
                     @foreach ($this->getRelatedEvents() as $relatedEvent)
-                    <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                    <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
                         <a href="{{ route('events.show', $relatedEvent->id) }}"
                             class="block hover:text-primary transition-colors">
                             <div class="flex items-start gap-3">
@@ -529,17 +529,23 @@ new class extends Component {
                                         <span>{{ $relatedEvent->time->format('d/m/Y H:i') }}</span>
                                         @if ($relatedEvent->domain)
                                         <span>·</span>
-                                        <x-badge :value="$relatedEvent->domain" class="badge-xs badge-outline" />
+                                        <x-badge class="badge-xs badge-outline">
+                                            <x-slot:value>
+                                                {{ Str::lower($relatedEvent->domain) }}
+                                            </x-slot:value>
+                                        </x-badge>
                                         @endif
-                                        <span>·</span>
-                                        @php
-                                        $relatedPluginClass = \App\Integrations\PluginRegistry::getPlugin($relatedEvent->service);
-                                        $relatedAccentColor = $relatedPluginClass ? $relatedPluginClass::getAccentColor() : 'primary';
-                                        @endphp
-                                        <x-badge :value="$relatedEvent->service" class="badge-xs badge-{{ $relatedAccentColor }} badge-outline" />
+                                        <x-badge class="badge-xs badge-outline">
+                                            <x-slot:value>
+                                                {{ Str::lower($relatedEvent->service) }}
+                                            </x-slot:value>
+                                        </x-badge>
                                         @if ($relatedEvent->integration)
-                                        <span>·</span>
-                                        <x-badge :value="$relatedEvent->integration->name" class="badge-xs badge-outline" />
+                                        <x-badge class="badge-xs badge-outline">
+                                            <x-slot:value>
+                                                {{ Str::lower($relatedEvent->integration->name) }}
+                                            </x-slot:value>
+                                        </x-badge>
                                         @endif
                                         @if ($relatedEvent->tags && count($relatedEvent->tags) > 0)
                                         <span>·</span>

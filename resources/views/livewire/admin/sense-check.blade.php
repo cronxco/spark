@@ -1,20 +1,20 @@
 <?php
 
 use App\Integrations\PluginRegistry;
-use App\Models\Event;
 use App\Models\Block;
+use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Models\IntegrationGroup;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
+new class extends Component
+{
     use Toast;
 
     /** @var array<string, array<string, mixed>> */
@@ -50,63 +50,7 @@ new class extends Component {
 
     public function toggle(string $key): void
     {
-        $this->collapse[$key] = !($this->collapse[$key] ?? false);
-    }
-
-    private function loadData(): void
-    {
-        // Plugin action types keyed by service
-        $this->pluginActionTypes = PluginRegistry::getAllPlugins()
-            ->mapWithKeys(function (string $pluginClass) {
-                $service = $pluginClass::getIdentifier();
-                return [
-                    $service => $pluginClass::getActionTypes(),
-                ];
-            })
-            ->toArray();
-
-        // DB actions grouped by service
-        $actions = Event::query()
-            ->select('service', 'action')
-            ->distinct()
-            ->get()
-            ->groupBy('service')
-            ->map(fn (Collection $rows) => $rows->pluck('action')->filter()->unique()->values()->all());
-
-        $this->dbActionsByService = $actions->toArray();
-
-        // DB block types grouped by service (via events)
-        $blockTypes = Block::query()
-            ->select('events.service', 'blocks.block_type')
-            ->join('events', 'events.id', '=', 'blocks.event_id')
-            ->whereNotNull('blocks.block_type')
-            ->distinct()
-            ->get()
-            ->groupBy('service')
-            ->map(fn (Collection $rows) => $rows->pluck('block_type')->filter()->unique()->values()->all());
-
-        $this->dbBlockTypesByService = $blockTypes->toArray();
-
-        // DB object types (actor/target) grouped by service (via events)
-        $actorTypes = Event::query()
-            ->select('events.service', 'ao.type as object_type')
-            ->leftJoin('objects as ao', 'ao.id', '=', 'events.actor_id')
-            ->whereNotNull('ao.type')
-            ->distinct()
-            ->get();
-
-        $targetTypes = Event::query()
-            ->select('events.service', 'to.type as object_type')
-            ->leftJoin('objects as to', 'to.id', '=', 'events.target_id')
-            ->whereNotNull('to.type')
-            ->distinct()
-            ->get();
-
-        $objectTypes = $actorTypes->concat($targetTypes)
-            ->groupBy('service')
-            ->map(fn (Collection $rows) => $rows->pluck('object_type')->filter()->unique()->values()->all());
-
-        $this->dbObjectTypesByService = $objectTypes->toArray();
+        $this->collapse[$key] = ! ($this->collapse[$key] ?? false);
     }
 
     /**
@@ -118,13 +62,14 @@ new class extends Component {
         foreach ($this->dbActionsByService as $service => $actions) {
             $defined = array_keys($this->pluginActionTypes[$service] ?? []);
             $missing = array_values(array_diff($actions, $defined));
-            if (!empty($missing)) {
+            if (! empty($missing)) {
                 $results[] = [
                     'service' => $service,
                     'actions' => $missing,
                 ];
             }
         }
+
         return $results;
     }
 
@@ -135,6 +80,7 @@ new class extends Component {
     {
         $servicesInDb = array_keys($this->dbActionsByService);
         $servicesInPlugins = PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()->all();
+
         return array_values(array_diff($servicesInDb, $servicesInPlugins));
     }
 
@@ -148,13 +94,14 @@ new class extends Component {
             $pluginClass = PluginRegistry::getPlugin($service);
             $defined = $pluginClass ? array_keys($pluginClass::getBlockTypes()) : [];
             $missing = array_values(array_diff($blockTypes, $defined));
-            if (!empty($missing)) {
+            if (! empty($missing)) {
                 $results[] = [
                     'service' => $service,
                     'block_types' => $missing,
                 ];
             }
         }
+
         return $results;
     }
 
@@ -168,13 +115,14 @@ new class extends Component {
             $pluginClass = PluginRegistry::getPlugin($service);
             $defined = $pluginClass ? array_keys($pluginClass::getObjectTypes()) : [];
             $missing = array_values(array_diff($objectTypes, $defined));
-            if (!empty($missing)) {
+            if (! empty($missing)) {
                 $results[] = [
                     'service' => $service,
                     'object_types' => $missing,
                 ];
             }
         }
+
         return $results;
     }
 
@@ -184,6 +132,7 @@ new class extends Component {
     public function getOrphanedEventsProperty(): array
     {
         $orphanedEvents = Event::whereDoesntHave('integration')->limit(100)->get();
+
         return [
             'count' => $orphanedEvents->count(),
             'sample_ids' => $orphanedEvents->pluck('id')->take(10)->toArray(),
@@ -196,6 +145,7 @@ new class extends Component {
     public function getOrphanedBlocksProperty(): array
     {
         $orphanedBlocks = Block::whereDoesntHave('event')->limit(100)->get();
+
         return [
             'count' => $orphanedBlocks->count(),
             'sample_ids' => $orphanedBlocks->pluck('id')->take(10)->toArray(),
@@ -211,6 +161,7 @@ new class extends Component {
             ->whereDoesntHave('targetEvents')
             ->limit(100)
             ->get();
+
         return [
             'count' => $orphanedObjects->count(),
             'sample_ids' => $orphanedObjects->pluck('id')->take(10)->toArray(),
@@ -227,7 +178,7 @@ new class extends Component {
         // Integrations with unknown services
         $unknownServices = Integration::whereNotIn(
             'service',
-            PluginRegistry::getAllPlugins()->map(fn($c) => $c::getIdentifier())->values()
+            PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
         )->get();
 
         if ($unknownServices->count() > 0) {
@@ -266,24 +217,24 @@ new class extends Component {
 
             try {
                 // Check required methods exist and return valid data
-                if (!method_exists($pluginClass, 'getActionTypes') || empty($pluginClass::getActionTypes())) {
+                if (! method_exists($pluginClass, 'getActionTypes') || empty($pluginClass::getActionTypes())) {
                     $pluginIssues[] = 'No action types defined';
                 }
 
-                if (!method_exists($pluginClass, 'getIcon') || empty($pluginClass::getIcon())) {
+                if (! method_exists($pluginClass, 'getIcon') || empty($pluginClass::getIcon())) {
                     $pluginIssues[] = 'Missing or empty icon';
                 }
 
-                if (!method_exists($pluginClass, 'getDomain')) {
+                if (! method_exists($pluginClass, 'getDomain')) {
                     $pluginIssues[] = 'Missing getDomain method';
                 } else {
                     $domain = $pluginClass::getDomain();
-                    if (!in_array($domain, PluginRegistry::getValidDomains())) {
+                    if (! in_array($domain, PluginRegistry::getValidDomains())) {
                         $pluginIssues[] = "Invalid domain: {$domain}";
                     }
                 }
 
-                if (!method_exists($pluginClass, 'getAccentColor')) {
+                if (! method_exists($pluginClass, 'getAccentColor')) {
                     $pluginIssues[] = 'Missing getAccentColor method';
                 }
 
@@ -291,7 +242,7 @@ new class extends Component {
                 $pluginIssues[] = 'Exception during validation: ' . $e->getMessage();
             }
 
-            if (!empty($pluginIssues)) {
+            if (! empty($pluginIssues)) {
                 $issues[] = [
                     'plugin' => $identifier,
                     'issues' => $pluginIssues,
@@ -328,10 +279,10 @@ new class extends Component {
         }
 
         // Blocks without titles
-        $noTitle = Block::where(function($q) {
+        $noTitle = Block::where(function ($q) {
             $q->whereNull('title')
-              ->orWhere('title', '')
-              ->orWhere('title', 'like', '%null%');
+                ->orWhere('title', '')
+                ->orWhere('title', 'like', '%null%');
         })->count();
         if ($noTitle > 0) {
             $issues[] = [
@@ -360,6 +311,7 @@ new class extends Component {
 
     /**
      * Get all sense check sections organized with issues first, then clean sections
+     *
      * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool}>
      */
     public function getSenseCheckSectionsProperty(): array
@@ -432,20 +384,78 @@ new class extends Component {
         // Sort: sections with issues first, then clean sections
         usort($sections, function ($a, $b) {
             // First, sort by whether they have issues (issues first)
-            if ($a['has_issues'] && !$b['has_issues']) {
+            if ($a['has_issues'] && ! $b['has_issues']) {
                 return -1;
             }
-            if (!$a['has_issues'] && $b['has_issues']) {
+            if (! $a['has_issues'] && $b['has_issues']) {
                 return 1;
             }
             // Within same issue status, sort by issue count (desc) or alphabetically
             if ($a['has_issues'] && $b['has_issues']) {
                 return $b['issue_count'] <=> $a['issue_count'];
             }
+
             return strcmp($a['title'], $b['title']);
         });
 
         return $sections;
+    }
+
+    private function loadData(): void
+    {
+        // Plugin action types keyed by service
+        $this->pluginActionTypes = PluginRegistry::getAllPlugins()
+            ->mapWithKeys(function (string $pluginClass) {
+                $service = $pluginClass::getIdentifier();
+
+                return [
+                    $service => $pluginClass::getActionTypes(),
+                ];
+            })
+            ->toArray();
+
+        // DB actions grouped by service
+        $actions = Event::query()
+            ->select('service', 'action')
+            ->distinct()
+            ->get()
+            ->groupBy('service')
+            ->map(fn (Collection $rows) => $rows->pluck('action')->filter()->unique()->values()->all());
+
+        $this->dbActionsByService = $actions->toArray();
+
+        // DB block types grouped by service (via events)
+        $blockTypes = Block::query()
+            ->select('events.service', 'blocks.block_type')
+            ->join('events', 'events.id', '=', 'blocks.event_id')
+            ->whereNotNull('blocks.block_type')
+            ->distinct()
+            ->get()
+            ->groupBy('service')
+            ->map(fn (Collection $rows) => $rows->pluck('block_type')->filter()->unique()->values()->all());
+
+        $this->dbBlockTypesByService = $blockTypes->toArray();
+
+        // DB object types (actor/target) grouped by service (via events)
+        $actorTypes = Event::query()
+            ->select('events.service', 'ao.type as object_type')
+            ->leftJoin('objects as ao', 'ao.id', '=', 'events.actor_id')
+            ->whereNotNull('ao.type')
+            ->distinct()
+            ->get();
+
+        $targetTypes = Event::query()
+            ->select('events.service', 'to.type as object_type')
+            ->leftJoin('objects as to', 'to.id', '=', 'events.target_id')
+            ->whereNotNull('to.type')
+            ->distinct()
+            ->get();
+
+        $objectTypes = $actorTypes->concat($targetTypes)
+            ->groupBy('service')
+            ->map(fn (Collection $rows) => $rows->pluck('object_type')->filter()->unique()->values()->all());
+
+        $this->dbObjectTypesByService = $objectTypes->toArray();
     }
 }; ?>
 

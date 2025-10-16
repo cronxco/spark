@@ -3,16 +3,18 @@
 use App\Models\Block;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
-use Illuminate\Support\Str;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
-    use WithPagination, Toast;
+new class extends Component
+{
+    use Toast, WithPagination;
 
     public string $search = '';
     public string $blockTypeFilter = '';
@@ -66,7 +68,7 @@ new class extends Component {
     public function toggleBlockSelection(string $blockId): void
     {
         if (in_array($blockId, $this->selectedBlocks)) {
-            $this->selectedBlocks = array_filter($this->selectedBlocks, fn($id) => $id !== $blockId);
+            $this->selectedBlocks = array_filter($this->selectedBlocks, fn ($id) => $id !== $blockId);
         } else {
             $this->selectedBlocks[] = $blockId;
         }
@@ -79,6 +81,7 @@ new class extends Component {
     {
         if (empty($this->selectedBlocks)) {
             $this->error('No blocks selected for deletion.');
+
             return;
         }
 
@@ -110,10 +113,10 @@ new class extends Component {
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('block_type', 'ilike', '%' . $this->search . '%')
-                  ->orWhereHas('event', function ($eventQuery) {
-                      $eventQuery->where('service', 'ilike', '%' . $this->search . '%');
-                  });
+                    ->orWhere('block_type', 'ilike', '%' . $this->search . '%')
+                    ->orWhereHas('event', function ($eventQuery) {
+                        $eventQuery->where('service', 'ilike', '%' . $this->search . '%');
+                    });
             });
         }
 
@@ -144,11 +147,11 @@ new class extends Component {
         return Block::whereHas('event.integration', function ($q) {
             $q->where('user_id', Auth::id());
         })->join('events', 'events.id', '=', 'blocks.event_id')
-          ->distinct()
-          ->pluck('events.service')
-          ->filter()
-          ->sort()
-          ->values();
+            ->distinct()
+            ->pluck('events.service')
+            ->filter()
+            ->sort()
+            ->values();
     }
 
     public function truncateId(string $id): string
@@ -177,9 +180,10 @@ new class extends Component {
 
     public function prettifyBlockType(?string $blockType): string
     {
-        if (!$blockType) {
+        if (! $blockType) {
             return 'N/A';
         }
+
         return Str::title(str_replace('_', ' ', $blockType));
     }
 };
@@ -201,82 +205,71 @@ new class extends Component {
         </x-slot:actions>
     </x-header>
 
-    <div class="flex flex-col gap-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Search and Filters -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Search -->
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Search</span>
                         </label>
-                        <div class="join w-full">
-                            <input
-                                type="text"
-                                class="input input-bordered join-item flex-1"
-                                placeholder="Search by title, block type, or service..."
-                                wire:model.live.debounce.300ms="search"
-                            />
-                            @if ($search)
-                                <button class="btn btn-ghost join-item" wire:click="$set('search', '')">
-                                    <x-icon name="o-x-mark" class="w-4 h-4" />
-                                </button>
-                            @endif
-                        </div>
+                        <input
+                            type="text"
+                            class="input input-bordered w-full"
+                            placeholder="Search blocks..."
+                            wire:model.live.debounce.300ms="search"
+                        />
                     </div>
 
-                    <!-- Filters Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Block Type Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Block Type</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="blockTypeFilter">
-                                <option value="">All Block Types</option>
-                                @foreach ($this->getUniqueBlockTypes() as $type)
-                                    <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <!-- Block Type Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Block Type</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="blockTypeFilter">
+                            <option value="">All Block Types</option>
+                            @foreach ($this->getUniqueBlockTypes() as $type)
+                                <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
 
-                        <!-- Service Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Service</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="serviceFilter">
-                                <option value="">All Services</option>
-                                @foreach ($this->getUniqueServices() as $service)
-                                    <option value="{{ $service }}">{{ ucfirst($service) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Clear Filters -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">&nbsp;</span>
-                            </label>
-                            <button class="btn btn-outline" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4 mr-2" />
-                                Clear Filters
-                            </button>
-                        </div>
+                    <!-- Service Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Service</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="serviceFilter">
+                            <option value="">All Services</option>
+                            @foreach ($this->getUniqueServices() as $service)
+                                <option value="{{ $service }}">{{ ucfirst($service) }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $blockTypeFilter || $serviceFilter)
+                    <div class="flex justify-end mt-4">
+                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
+                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            Clear Filters
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
         <!-- Results -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
                 @if ($this->getBlocks()->isEmpty())
                     <div class="text-center py-12">
-                        <x-icon name="o-cube-transparent" class="w-16 h-16 mx-auto text-base-300 mb-4" />
-                        <h3 class="text-lg font-semibold mb-2">No blocks found</h3>
-                        <p class="text-base-content/60">
+                        <x-icon name="o-cube-transparent" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <h3 class="text-lg font-medium mb-4">No blocks found</h3>
+                        <p class="text-base-content/70">
                             @if ($search || $blockTypeFilter || $serviceFilter)
                                 Try adjusting your filters to find blocks.
                             @else
@@ -342,7 +335,7 @@ new class extends Component {
                                         </td>
                                         <td>
                                             @if ($block->block_type)
-                                                <span class="badge badge-outline">{{ $this->prettifyBlockType($block->block_type) }}</span>
+                                                <span class="text-sm">{{ $this->prettifyBlockType($block->block_type) }}</span>
                                             @else
                                                 <span class="text-base-content/50">N/A</span>
                                             @endif
@@ -354,14 +347,14 @@ new class extends Component {
                                         </td>
                                         <td>
                                             @if ($block->event)
-                                                <span class="badge badge-primary badge-outline">{{ $block->event->service }}</span>
+                                                <span class="text-sm">{{ $block->event->service }}</span>
                                             @else
                                                 <span class="text-base-content/50">N/A</span>
                                             @endif
                                         </td>
                                         <td>
                                             @if ($block->event)
-                                                <a href="{{ route('events.show', $block->event) }}" class="link link-primary">
+                                                <a href="{{ route('events.show', $block->event) }}" class="link">
                                                     <code class="text-xs">{{ $this->truncateId($block->event->id) }}</code>
                                                 </a>
                                             @else

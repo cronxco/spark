@@ -34,7 +34,7 @@ class ApiTokenUITest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Create New Token');
-        $response->assertSee('Your API Tokens');
+        $response->assertSee('Your Tokens');
         $response->assertSee('Name');
         $response->assertSee('Create Token');
     }

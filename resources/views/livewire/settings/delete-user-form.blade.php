@@ -26,14 +26,14 @@ new class extends Component {
     }
 }; ?>
 
-<div class="space-y-6">
+<div class="space-y-4">
     <div class="space-y-2">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">{{ __('Delete account') }}</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('Delete your account and all of its resources') }}</p>
+        <h2 class="text-xl font-semibold text-base-content">{{ __('Delete Account') }}</h2>
+        <p class="text-sm text-base-content/70">{{ __('Delete your account and all of its resources') }}</p>
     </div>
 
     <x-button
-        label="{{ __('Delete account') }}"
+        label="{{ __('Delete Account') }}"
         class="btn-error"
         wire:click="$set('showDeleteModal', true)"
     />
@@ -48,7 +48,7 @@ new class extends Component {
                     class="btn-outline"
                     wire:click="$set('showDeleteModal', false)"
                 />
-                <x-button label="{{ __('Delete account') }}" type="submit" class="btn-error" spinner="deleteUser" />
+                <x-button label="{{ __('Delete Account') }}" type="submit" class="btn-error" spinner="deleteUser" />
             </x-slot:actions>
         </x-form>
     </x-modal>

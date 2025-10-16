@@ -103,184 +103,191 @@ new class extends Component {
     }
 }; ?>
 
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <x-card title="{{ __('Notification Preferences') }}" shadow>
-            <div class="space-y-6">
-                <!-- Email Notifications Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <h4 class="text-lg font-medium mb-4">{{ __('Email Notifications') }}</h4>
-                    <p class="text-sm text-base-content/70 mb-4">
-                        {{ __('Choose which notifications you want to receive via email') }}
-                    </p>
+<div>
+    <x-header title="{{ __('Notification Preferences') }}" subtitle="{{ __('Manage how you receive notifications') }}" separator />
 
-                    <div class="space-y-3">
-                        @foreach ($notificationTypes as $type => $config)
-                            <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                                <div>
-                                    <div class="font-medium text-sm">{{ $config['label'] }}</div>
-                                    <div class="text-xs text-base-content/60">{{ $config['description'] }}</div>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    class="toggle toggle-primary"
-                                    wire:model="emailEnabled.{{ $type }}"
-                                    @if (in_array($type, ['integration_failed', 'integration_authentication_failed', 'migration_failed', 'system_maintenance'])) disabled checked @endif
-                                />
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
+    <div class="space-y-4 lg:space-y-6">
+    <!-- Email Notifications Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Email Notifications') }}</h3>
+            <p class="text-sm text-base-content/70 mb-4">
+                {{ __('Choose which notifications you want to receive via email') }}
+            </p>
 
-                <!-- Work Hours Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
+            <div class="space-y-3">
+                @foreach ($notificationTypes as $type => $config)
+                    <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
                         <div>
-                            <h4 class="text-lg font-medium">{{ __('Work Hours') }}</h4>
-                            <p class="text-sm text-base-content/70">
-                                {{ __('Define your work hours for delayed email notifications') }}
-                            </p>
+                            <div class="font-medium text-sm">{{ $config['label'] }}</div>
+                            <div class="text-xs text-base-content/60">{{ $config['description'] }}</div>
                         </div>
                         <input
                             type="checkbox"
                             class="toggle toggle-primary"
-                            wire:model.live="workHoursEnabled"
+                            wire:model="emailEnabled.{{ $type }}"
+                            @if (in_array($type, ['integration_failed', 'integration_authentication_failed', 'migration_failed', 'system_maintenance'])) disabled checked @endif
                         />
                     </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
 
-                    @if ($workHoursEnabled)
-                        <div class="space-y-4 mt-4 p-4 bg-base-100 rounded-lg">
-                            <div>
-                                <label class="label">
-                                    <span class="label-text">Timezone</span>
-                                </label>
-                                <select wire:model="workHoursTimezone" class="select select-bordered w-full">
-                                    @foreach ($timezones as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
+    <!-- Work Hours Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Work Hours') }}</h3>
+            <p class="text-sm text-base-content/70 mb-4">
+                {{ __('Define your work hours for delayed email notifications') }}
+            </p>
 
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
+            <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
+                <div>
+                    <div class="font-medium text-sm">{{ __('Enable Work Hours') }}</div>
+                    <div class="text-xs text-base-content/60">{{ __('Restrict notifications to specific hours') }}</div>
+                </div>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    wire:model.live="workHoursEnabled"
+                />
+            </div>
+
+            @if ($workHoursEnabled)
+                <div class="space-y-4 mt-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">{{ __('Timezone') }}</span>
+                        </label>
+                        <select wire:model="workHoursTimezone" class="select select-bordered w-full">
+                            @foreach ($timezones as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('Start Time') }}</span>
+                            </label>
+                            <input
+                                type="time"
+                                wire:model="workHoursStart"
+                                class="input input-bordered w-full"
+                            />
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">{{ __('End Time') }}</span>
+                            </label>
+                            <input
+                                type="time"
+                                wire:model="workHoursEnd"
+                                class="input input-bordered w-full"
+                            />
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    <!-- Delayed Sending Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Email Delivery Timing') }}</h3>
+            <p class="text-sm text-base-content/70 mb-4">
+                {{ __('Control when non-urgent email notifications are sent') }}
+            </p>
+
+            <div class="space-y-4">
+                <div class="form-control">
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input
+                            type="radio"
+                            name="delayed_sending_mode"
+                            class="radio radio-primary"
+                            value="immediate"
+                            wire:model="delayedSendingMode"
+                        />
+                        <div>
+                            <span class="label-text font-medium">{{ __('Immediate') }}</span>
+                            <p class="text-xs text-base-content/60">{{ __('Send all notifications immediately') }}</p>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input
+                            type="radio"
+                            name="delayed_sending_mode"
+                            class="radio radio-primary"
+                            value="work_hours"
+                            wire:model="delayedSendingMode"
+                            @if (!$workHoursEnabled) disabled @endif
+                        />
+                        <div>
+                            <span class="label-text font-medium">{{ __('During Work Hours Only') }}</span>
+                            <p class="text-xs text-base-content/60">
+                                {{ __('Delay non-urgent notifications until your work hours') }}
+                                @if (!$workHoursEnabled)
+                                    <span class="text-warning">({{ __('Enable work hours first') }})</span>
+                                @endif
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input
+                            type="radio"
+                            name="delayed_sending_mode"
+                            class="radio radio-primary"
+                            value="daily_digest"
+                            wire:model.live="delayedSendingMode"
+                        />
+                        <div class="flex-1">
+                            <span class="label-text font-medium">{{ __('Daily Digest') }}</span>
+                            <p class="text-xs text-base-content/60">{{ __('Group notifications into a single daily email') }}</p>
+
+                            @if ($delayedSendingMode === 'daily_digest')
+                                <div class="form-control mt-3">
                                     <label class="label">
-                                        <span class="label-text">Start Time</span>
+                                        <span class="label-text text-xs">{{ __('Digest Time') }}</span>
                                     </label>
                                     <input
                                         type="time"
-                                        wire:model="workHoursStart"
-                                        class="input input-bordered w-full"
+                                        wire:model="digestTime"
+                                        class="input input-bordered input-sm w-32"
                                     />
                                 </div>
-                                <div>
-                                    <label class="label">
-                                        <span class="label-text">End Time</span>
-                                    </label>
-                                    <input
-                                        type="time"
-                                        wire:model="workHoursEnd"
-                                        class="input input-bordered w-full"
-                                    />
-                                </div>
-                            </div>
+                            @endif
                         </div>
-                    @endif
-                </div>
-
-                <!-- Delayed Sending Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <h4 class="text-lg font-medium mb-4">{{ __('Email Delivery Timing') }}</h4>
-                    <p class="text-sm text-base-content/70 mb-4">
-                        {{ __('Control when non-urgent email notifications are sent') }}
-                    </p>
-
-                    <div class="space-y-3">
-                        <div class="form-control">
-                            <label class="label cursor-pointer justify-start gap-3">
-                                <input
-                                    type="radio"
-                                    name="delayed_sending_mode"
-                                    class="radio radio-primary"
-                                    value="immediate"
-                                    wire:model="delayedSendingMode"
-                                />
-                                <div>
-                                    <span class="label-text font-medium">Immediate</span>
-                                    <p class="text-xs text-base-content/60">Send all notifications immediately</p>
-                                </div>
-                            </label>
-                        </div>
-
-                        <div class="form-control">
-                            <label class="label cursor-pointer justify-start gap-3">
-                                <input
-                                    type="radio"
-                                    name="delayed_sending_mode"
-                                    class="radio radio-primary"
-                                    value="work_hours"
-                                    wire:model="delayedSendingMode"
-                                    @if (!$workHoursEnabled) disabled @endif
-                                />
-                                <div>
-                                    <span class="label-text font-medium">During Work Hours Only</span>
-                                    <p class="text-xs text-base-content/60">
-                                        Delay non-urgent notifications until your work hours
-                                        @if (!$workHoursEnabled)
-                                            <span class="text-warning">(Enable work hours first)</span>
-                                        @endif
-                                    </p>
-                                </div>
-                            </label>
-                        </div>
-
-                        <div class="form-control">
-                            <label class="label cursor-pointer justify-start gap-3">
-                                <input
-                                    type="radio"
-                                    name="delayed_sending_mode"
-                                    class="radio radio-primary"
-                                    value="daily_digest"
-                                    wire:model.live="delayedSendingMode"
-                                />
-                                <div class="flex-1">
-                                    <span class="label-text font-medium">Daily Digest</span>
-                                    <p class="text-xs text-base-content/60">Group notifications into a single daily email</p>
-
-                                    @if ($delayedSendingMode === 'daily_digest')
-                                        <div class="mt-2">
-                                            <label class="label">
-                                                <span class="label-text text-xs">Digest Time</span>
-                                            </label>
-                                            <input
-                                                type="time"
-                                                wire:model="digestTime"
-                                                class="input input-bordered input-sm w-32"
-                                            />
-                                        </div>
-                                    @endif
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-info mt-4">
-                        <x-icon name="o-information-circle" class="w-5 h-5" />
-                        <span class="text-xs">
-                            Priority notifications (failures, system maintenance) are always sent immediately regardless of these settings.
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Save Button -->
-                <div class="flex justify-end">
-                    <x-button
-                        label="{{ __('Save Preferences') }}"
-                        wire:click="savePreferences"
-                        class="btn-primary"
-                        spinner="savePreferences"
-                    />
+                    </label>
                 </div>
             </div>
-        </x-card>
+
+            <div class="alert alert-info mt-4">
+                <x-icon name="o-information-circle" class="w-5 h-5" />
+                <span class="text-xs">
+                    {{ __('Priority notifications (failures, system maintenance) are always sent immediately regardless of these settings.') }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end">
+            <x-button
+                label="{{ __('Save Preferences') }}"
+                wire:click="savePreferences"
+                class="btn-primary"
+                spinner="savePreferences"
+            />
+        </div>
     </div>
 </div>

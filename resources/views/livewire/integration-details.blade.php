@@ -1,291 +1,272 @@
-<div class="flex flex-col gap-6">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-base-content">{{ $integration->name ?: $integration->service }}</h1>
-                <p class="text-base-content/70">{{ $integration->service }} integration</p>
-            </div>
-            <div class="flex gap-2">
-                <a href="{{ route('updates.index') }}" class="btn btn-outline">
-                    <x-icon name="o-arrow-left" class="w-4 h-4" />
-                    Back to Updates
-                </a>
-            </div>
-        </div>
-
-        <!-- Integration Info -->
-        <div class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 rounded-lg flex items-center justify-center text-2xl bg-primary text-primary-content">
-                        <x-icon name="o-cog" class="w-8 h-8" />
+<div>
+    <!-- Two-column layout: main content + drawer -->
+    <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        <!-- Main Content Area -->
+        <div class="flex-1 space-y-4 lg:space-y-6">
+            <!-- Header -->
+            <x-header title="{{ $integration->name ?: $integration->service }}" subtitle="{{ $integration->service }} integration" separator>
+                <x-slot:actions>
+                    <!-- Desktop: Full buttons -->
+                    <div class="hidden sm:flex gap-2">
+                        <x-button
+                            label="Configure"
+                            link="{{ route('integrations.configure', $integration->id) }}"
+                            class="btn-outline"
+                            icon="o-cog-6-tooth"
+                        />
+                        <x-button
+                            wire:click="toggleSidebar"
+                            class="btn-ghost btn-sm">
+                            <x-icon name="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-5 h-5" />
+                        </x-button>
                     </div>
+
+                    <!-- Mobile: Dropdown -->
+                    <div class="sm:hidden">
+                        <x-dropdown>
+                            <x-slot:trigger>
+                                <x-button class="btn-ghost btn-sm">
+                                    <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                                </x-button>
+                            </x-slot:trigger>
+                            <x-menu-item title="Configure" icon="o-cog-6-tooth" link="{{ route('integrations.configure', $integration->id) }}" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" wire:click="toggleSidebar" />
+                        </x-dropdown>
+                    </div>
+                </x-slot:actions>
+            </x-header>
+
+            <!-- Primary Hero Card -->
+            <x-card>
+                <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
+                    <!-- Large integration icon -->
+                    <div class="flex-shrink-0 self-center sm:self-start">
+                        @php
+                            $pluginClass = $this->getPluginClass();
+                            $icon = $pluginClass ? $pluginClass::getIcon() : 'o-link';
+                        @endphp
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                            <x-icon name="{{ $icon }}" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+                        </div>
+                    </div>
+
+                    <!-- Main content -->
                     <div class="flex-1">
-                        <div class="flex items-center gap-4">
-                            <span class="badge badge-primary">{{ $integration->instance_type }}</span>
-                            <span class="badge badge-outline">{{ $integration->account_id }}</span>
-                            @if ($integration->getUpdateFrequencyMinutes())
-    <span class="badge badge-secondary">Updates every {{ $integration->getUpdateFrequencyMinutes() }} minutes</span>
-@endif
+                        <div class="mb-4 text-center sm:text-left">
+                            <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2">
+                                {{ $integration->name ?: $integration->service }}
+                            </h2>
+                            <div class="text-sm text-base-content/70">
+                                {{ $integration->instance_type }}
+                            </div>
                         </div>
+
+                        <!-- Key metadata -->
+                        <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-sm">
+                            @if ($integration->last_successful_update_at)
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-clock" class="w-4 h-4 text-base-content/60" />
+                                    <span class="text-base-content/70">Last update: {{ $integration->last_successful_update_at->diffForHumans() }}</span>
+                                </div>
+                            @else
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 text-warning" />
+                                    <span class="text-warning">Never updated</span>
+                                </div>
+                            @endif
+
+                            @if ($integration->needsUpdate())
+                                <x-badge value="Needs update" class="badge-warning" />
+                            @endif
+
+                            @if ($integration->isPaused())
+                                <x-badge value="Paused" class="badge-neutral" />
+                            @endif
+                        </div>
+
+                        <!-- Update schedule info -->
+                        @if ($integration->getNextUpdateTime())
+                            <div class="mt-4 p-3 lg:p-4 rounded-lg bg-base-300/50 border border-base-300">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <x-icon name="o-arrow-path" class="w-4 h-4 text-base-content/60" />
+                                    <span class="text-base-content/70">Next update: {{ $integration->getNextUpdateTime()->diffForHumans() }}</span>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
-            </div>
-        </div>
+            </x-card>
 
-        <!-- Logs Section -->
-        <div class="card bg-base-100 shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title">Logs</h2>
-                <p class="text-base-content/70 mb-4">View logs for this integration instance</p>
-                <livewire:log-viewer type="integration" :entity-id="$integration->id" />
-            </div>
-        </div>
-
-        @if ($this->getPluginClass())
-            <!-- Action Types Section -->
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">Action Types</h2>
-                    @if ($this->getActionTypes()->count() > 0)
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            @foreach ($this->getActionTypes() as $actionType)
-                                <div class="card bg-base-200 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="flex items-center gap-3 mb-4">
-                                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
-                                                <x-icon name="{{ $actionType['action']['icon'] }}" class="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium text-base-content">{{ $actionType['action']['display_name'] }}</h3>
-                                                <p class="text-sm text-base-content/70">{{ $actionType['action']['description'] }}</p>
-                                            </div>
-                                        </div>
-
-                                        <div class="stats stats-horizontal shadow mb-4">
-                                            <div class="stat">
-                                                <div class="stat-title text-xs">Total</div>
-                                                <div class="stat-value text-2xl">{{ $actionType['count'] }}</div>
-                                            </div>
-                                            @if ($actionType['newest'])
-                                                <div class="stat">
-                                                    <div class="stat-title text-xs">Newest</div>
-                                                    <div class="stat-value text-sm">{{ $actionType['newest']->created_at->diffForHumans() }}</div>
-                                                </div>
-                                            @endif
-                                        </div>
-
-                                        @if ($actionType['recent']->count() > 0)
-                                            <div class="space-y-2">
-                                                <h4 class="font-medium text-sm text-base-content">Recent {{ $actionType['action']['display_name'] }}:</h4>
-                                                <div class="overflow-x-auto">
-                                                    <table class="table table-xs">
-                                                        <tbody>
-                                                            @foreach ($actionType['recent'] as $event)
-                                                                <tr>
-                                                                    <td class="text-sm">{{ $event->target?->title ?: $event->action }}</td>
-                                                                    <td class="text-sm text-base-content/70">
-                                                                        <a href="{{ route('events.show', $event->id) }}" class="link link-hover">
-                                                                            {{ $event->created_at->diffForHumans() }}
-                                                                        </a>
-                                                                    </td>
-                                                                </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        @else
-                                            <div class="text-center py-4">
-                                                <p class="text-sm text-base-content/70">No {{ $actionType['action']['display_name'] }} recorded yet</p>
-                                            </div>
-                                        @endif
-
-                                        @if ($actionType['action']['value_unit'])
-                                            <div class="mt-4 flex gap-2">
-                                                <span class="badge badge-outline">Unit: {{ $actionType['action']['value_unit'] }}</span>
-                                                @if ($actionType['action']['display_with_object'])
-                                                    <span class="badge badge-outline">With Object</span>
-                                                @else
-                                                    <span class="badge badge-outline">Value Only</span>
-                                                @endif
-                                            </div>
+            @if ($this->getPluginClass())
+                <!-- Action Types Overview -->
+                @if ($this->getActionTypes()->count() > 0)
+                <x-card class="bg-base-200 shadow">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
+                        Action Types
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach ($this->getActionTypes() as $actionType)
+                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    <x-icon name="{{ $actionType['action']['icon'] }}" class="w-4 h-4 text-primary" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-base truncate">{{ $actionType['action']['display_name'] }}</div>
+                                    <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                        <span class="text-lg font-bold text-primary">{{ $actionType['count'] }}</span>
+                                        @if ($actionType['newest'])
+                                        <span class="text-xs">{{ $actionType['newest']->created_at->diffForHumans() }}</span>
                                         @endif
                                     </div>
                                 </div>
-                            @endforeach
+                            </div>
                         </div>
-                    @else
-                        <div class="text-center py-8">
-                            <x-icon name="o-exclamation-triangle" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-                            <h3 class="text-lg font-medium text-base-content mb-2">No Action Types Defined</h3>
-                            <p class="text-base-content/70">This plugin doesn't define any action types.</p>
-                        </div>
-                    @endif
-                </div>
-            </div>
+                        @endforeach
+                    </div>
+                </x-card>
+                @endif
 
-            <!-- Object Types Section -->
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">Object Types</h2>
-                    @if ($this->getObjectTypes()->count() > 0)
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            @foreach ($this->getObjectTypes() as $objectType)
-                                <div class="card bg-base-200 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="flex items-center gap-3 mb-4">
-                                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
-                                                <x-icon name="{{ $objectType['object']['icon'] }}" class="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium text-base-content">{{ $objectType['object']['display_name'] }}</h3>
-                                                <p class="text-sm text-base-content/70">{{ $objectType['object']['description'] }}</p>
-                                            </div>
-                                        </div>
-
-                                        <div class="stats stats-horizontal shadow mb-4">
-                                            <div class="stat">
-                                                <div class="stat-title text-xs">Total</div>
-                                                <div class="stat-value text-2xl">{{ $objectType['count'] }}</div>
-                                            </div>
-                                            @if ($objectType['newest'])
-                                                <div class="stat">
-                                                    <div class="stat-title text-xs">Newest</div>
-                                                    <div class="stat-value text-sm">{{ $objectType['newest']->created_at->diffForHumans() }}</div>
-                                                </div>
-                                            @endif
-                                        </div>
-
-                                        @if ($objectType['recent']->count() > 0)
-                                            <div class="space-y-2">
-                                                <h4 class="font-medium text-sm text-base-content">Recent {{ $objectType['object']['display_name'] }}:</h4>
-                                                <div class="overflow-x-auto">
-                                                    <table class="table table-xs">
-                                                        <tbody>
-                                                            @foreach ($objectType['recent'] as $objectItem)
-                                                                <tr>
-                                                                    <td class="text-sm">{{ $objectItem->title ?: $objectItem->concept }}</td>
-                                                                    <td class="text-sm text-base-content/70">
-                                                                        <a href="{{ route('objects.show', $objectItem->id) }}" class="link link-hover">
-                                                                            {{ $objectItem->created_at->diffForHumans() }}
-                                                                        </a>
-                                                                    </td>
-                                                                </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        @else
-                                            <div class="text-center py-4">
-                                                <p class="text-sm text-base-content/70">No {{ $objectType['object']['display_name'] }} recorded yet</p>
-                                            </div>
+                <!-- Object Types Overview -->
+                @if ($this->getObjectTypes()->count() > 0)
+                <x-card class="bg-base-200 shadow">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                        Object Types
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach ($this->getObjectTypes() as $objectType)
+                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
+                                    <x-icon name="{{ $objectType['object']['icon'] }}" class="w-4 h-4 text-info" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-base truncate">{{ $objectType['object']['display_name'] }}</div>
+                                    <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                        <span class="text-lg font-bold text-info">{{ $objectType['count'] }}</span>
+                                        @if ($objectType['newest'])
+                                        <span class="text-xs">{{ $objectType['newest']->created_at->diffForHumans() }}</span>
                                         @endif
                                     </div>
                                 </div>
-                            @endforeach
+                            </div>
                         </div>
-                    @else
-                        <div class="text-center py-8">
-                            <x-icon name="o-exclamation-triangle" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-                            <h3 class="text-lg font-medium text-base-content mb-2">No Object Types Defined</h3>
-                            <p class="text-base-content/70">This plugin doesn't define any object types.</p>
-                        </div>
-                    @endif
-                </div>
-            </div>
+                        @endforeach
+                    </div>
+                </x-card>
+                @endif
 
-            <!-- Block Types Section -->
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title">Block Types</h2>
-                    @if ($this->getBlockTypes()->count() > 0)
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            @foreach ($this->getBlockTypes() as $blockType)
-                                <div class="card bg-base-200 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="flex items-center gap-3 mb-4">
-                                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-content">
-                                                <x-icon name="{{ $blockType['block']['icon'] }}" class="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium text-base-content">{{ $blockType['block']['display_name'] }}</h3>
-                                                <p class="text-sm text-base-content/70">{{ $blockType['block']['description'] }}</p>
-                                            </div>
-                                        </div>
-
-                                        <div class="stats stats-horizontal shadow mb-4">
-                                            <div class="stat">
-                                                <div class="stat-title text-xs">Total</div>
-                                                <div class="stat-value text-2xl">{{ $blockType['count'] }}</div>
-                                            </div>
-                                            @if ($blockType['newest'])
-                                                <div class="stat">
-                                                    <div class="stat-title text-xs">Newest</div>
-                                                    <div class="stat-value text-sm">{{ $blockType['newest']->created_at->diffForHumans() }}</div>
-                                                </div>
-                                            @endif
-                                        </div>
-
-                                        @if ($blockType['recent']->count() > 0)
-                                            <div class="space-y-2">
-                                                <h4 class="font-medium text-sm text-base-content">Recent {{ $blockType['block']['display_name'] }}:</h4>
-                                                <div class="overflow-x-auto">
-                                                    <table class="table table-xs">
-                                                        <tbody>
-                                                            @foreach ($blockType['recent'] as $blockItem)
-                                                                <tr>
-                                                                    <td class="text-sm">{{ $blockItem->title ?: ($blockItem->block_type ?: 'Block') }}</td>
-                                                                    <td class="text-sm text-base-content/70">
-                                                                        <a href="{{ route('blocks.show', $blockItem->id) }}" class="link link-hover">
-                                                                            {{ $blockItem->created_at->diffForHumans() }}
-                                                                        </a>
-                                                                    </td>
-                                                                </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        @else
-                                            <div class="text-center py-4">
-                                                <p class="text-sm text-base-content/70">No {{ $blockType['block']['display_name'] }} recorded yet</p>
-                                            </div>
-                                        @endif
-
-                                        @if ($blockType['block']['value_unit'])
-                                            <div class="mt-4 flex gap-2">
-                                                <span class="badge badge-outline">Unit: {{ $blockType['block']['value_unit'] }}</span>
-                                                @if ($blockType['block']['display_with_object'])
-                                                    <span class="badge badge-outline">With Object</span>
-                                                @else
-                                                    <span class="badge badge-outline">Value Only</span>
-                                                @endif
-                                            </div>
+                <!-- Block Types Overview -->
+                @if ($this->getBlockTypes()->count() > 0)
+                <x-card class="bg-base-200 shadow">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-cube" class="w-5 h-5 text-success" />
+                        Block Types
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach ($this->getBlockTypes() as $blockType)
+                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                                    <x-icon name="{{ $blockType['block']['icon'] }}" class="w-4 h-4 text-success" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-base truncate">{{ $blockType['block']['display_name'] }}</div>
+                                    <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                        <span class="text-lg font-bold text-success">{{ $blockType['count'] }}</span>
+                                        @if ($blockType['newest'])
+                                        <span class="text-xs">{{ $blockType['newest']->created_at->diffForHumans() }}</span>
                                         @endif
                                     </div>
                                 </div>
-                            @endforeach
+                            </div>
                         </div>
-                    @else
-                        <div class="text-center py-8">
-                            <x-icon name="o-exclamation-triangle" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-                            <h3 class="text-lg font-medium text-base-content mb-2">No Block Types Defined</h3>
-                            <p class="text-base-content/70">This plugin doesn't define any block types.</p>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        @else
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
+                        @endforeach
+                    </div>
+                </x-card>
+                @endif
+            @else
+                <!-- No plugin configuration -->
+                <x-card class="bg-base-200 shadow">
                     <div class="text-center py-8">
                         <x-icon name="o-exclamation-triangle" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">Plugin Configuration Not Found</h3>
                         <p class="text-base-content/70">Plugin configuration not found for this integration.</p>
                     </div>
-                </div>
+                </x-card>
+            @endif
+        </div>
+
+        <!-- Drawer for Technical Details -->
+        <x-drawer wire:model="showSidebar" right title="Integration Details" separator with-close-button class="w-11/12 lg:w-1/3">
+            <div class="space-y-4 lg:space-y-6">
+                <!-- Configuration Preview -->
+                <x-collapse wire:model="configOpen">
+                    <x-slot:heading>
+                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
+                            <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-primary" />
+                            Configuration
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        <div class="space-y-3 text-sm">
+                            @if ($integration->getUpdateFrequencyMinutes())
+                            <div>
+                                <span class="text-base-content/70">Update Frequency:</span>
+                                <span class="font-medium">{{ $integration->getUpdateFrequencyMinutes() }} minutes</span>
+                            </div>
+                            @endif
+
+                            @if ($integration->useSchedule())
+                            <div>
+                                <span class="text-base-content/70">Schedule Times:</span>
+                                <span class="font-medium">{{ implode(', ', $integration->getScheduleTimes()) }}</span>
+                            </div>
+                            <div>
+                                <span class="text-base-content/70">Timezone:</span>
+                                <span class="font-medium">{{ $integration->getScheduleTimezone() }}</span>
+                            </div>
+                            @endif
+
+                            <div>
+                                <span class="text-base-content/70">Status:</span>
+                                <span class="font-medium">{{ $integration->isPaused() ? 'Paused' : 'Active' }}</span>
+                            </div>
+
+                            @if ($integration->account_id)
+                            <div>
+                                <span class="text-base-content/70">Account ID:</span>
+                                <span class="font-mono text-xs">{{ $integration->account_id }}</span>
+                            </div>
+                            @endif
+                        </div>
+
+                        <div class="mt-4">
+                            <x-button
+                                label="Edit Configuration"
+                                link="{{ route('integrations.configure', $integration->id) }}"
+                                class="btn-outline btn-sm w-full"
+                                icon="o-pencil"
+                            />
+                        </div>
+                    </x-slot:content>
+                </x-collapse>
+
+                <!-- Logs Section -->
+                <x-collapse wire:model="logsOpen">
+                    <x-slot:heading>
+                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
+                            <x-icon name="o-document-text" class="w-5 h-5 text-primary" />
+                            Logs
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        <livewire:log-viewer type="integration" :entity-id="$integration->id" />
+                    </x-slot:content>
+                </x-collapse>
             </div>
-        @endif
+        </x-drawer>
+    </div>
 </div>

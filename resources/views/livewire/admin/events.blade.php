@@ -218,91 +218,81 @@ new class extends Component {
         </x-slot:actions>
     </x-header>
 
-    <div class="flex flex-col gap-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Search and Filters -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <!-- Search -->
-                    <div class="form-control">
+                    <div class="form-control md:col-span-1">
                         <label class="label">
                             <span class="label-text">Search</span>
                         </label>
-                        <div class="join w-full">
-                            <input
-                                type="text"
-                                class="input input-bordered join-item flex-1"
-                                placeholder="Search by service, domain, action, or object titles..."
-                                wire:model.live.debounce.300ms="search"
-                            />
-                            @if ($search)
-                                <button class="btn btn-outline join-item" wire:click="clearFilters">
-                                    <x-icon name="o-x-mark" class="w-4 h-4" />
-                                </button>
-                            @endif
-                        </div>
+                        <input
+                            type="text"
+                            class="input input-bordered w-full"
+                            placeholder="Search events..."
+                            wire:model.live.debounce.300ms="search"
+                        />
                     </div>
 
-                    <!-- Filters -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Service Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Service</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="serviceFilter">
-                                <option value="">All Services</option>
-                                @foreach ($this->getUniqueServices() as $service)
-                                    <option value="{{ $service }}">{{ $service }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Domain Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Domain</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="domainFilter">
-                                <option value="">All Domains</option>
-                                @foreach ($this->getUniqueDomains() as $domain)
-                                    <option value="{{ $domain }}">{{ $domain }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Action Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Action</span>
-                            </label>
-                            <select class="select select-bordered" wire:model.live="actionFilter">
-                                <option value="">All Actions</option>
-                                @foreach ($this->getUniqueActions() as $action)
-                                    <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <!-- Service Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Service</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="serviceFilter">
+                            <option value="">All Services</option>
+                            @foreach ($this->getUniqueServices() as $service)
+                                <option value="{{ $service }}">{{ $service }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <!-- Clear Filters Button -->
-                    @if ($serviceFilter || $domainFilter || $actionFilter)
-                        <div class="flex justify-end">
-                            <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4 mr-1" />
-                                Clear Filters
-                            </button>
-                        </div>
-                    @endif
+                    <!-- Domain Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Domain</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="domainFilter">
+                            <option value="">All Domains</option>
+                            @foreach ($this->getUniqueDomains() as $domain)
+                                <option value="{{ $domain }}">{{ $domain }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Action Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Action</span>
+                        </label>
+                        <select class="select select-bordered w-full" wire:model.live="actionFilter">
+                            <option value="">All Actions</option>
+                            @foreach ($this->getUniqueActions() as $action)
+                                <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $serviceFilter || $domainFilter || $actionFilter)
+                    <div class="flex justify-end mt-4">
+                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
+                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            Clear Filters
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
         <!-- Events Table -->
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <div class="overflow-x-auto">
-                    <table class="table table-zebra">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>
@@ -324,7 +314,7 @@ new class extends Component {
                         </thead>
                         <tbody>
                             @forelse ($this->getEvents() as $event)
-                                <tr>
+                                <tr class="hover">
                                     <td>
                                         <label class="cursor-pointer">
                                             <input type="checkbox" class="checkbox checkbox-sm"
@@ -339,24 +329,24 @@ new class extends Component {
                                         </a>
                                     </td>
                                     <td>
-                                        <span class="badge badge-outline">{{ $event->service }}</span>
+                                        <span class="text-sm">{{ $event->service }}</span>
                                     </td>
-                                    <td>{{ $event->domain }}</td>
-                                    <td>{{ $this->prettifyAction($event->action) }}</td>
+                                    <td><span class="text-sm">{{ $event->domain }}</span></td>
+                                    <td><span class="text-sm">{{ $this->prettifyAction($event->action) }}</span></td>
                                     <td>
                                         @if ($event->target)
-                                            <a href="{{ route('objects.show', $event->target->id) }}" class="link link-primary font-medium">
+                                            <a href="{{ route('objects.show', $event->target->id) }}" class="link link-primary">
                                                 {{ Str::limit($event->target->title, 30) }}
                                             </a>
                                         @else
-                                            <span class="text-gray-500">-</span>
+                                            <span class="text-base-content/50">-</span>
                                         @endif
                                     </td>
                                     <td>
-                                        {{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}
+                                        <span class="text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-neutral">{{ $event->blocks_count ?? $event->blocks->count() }}</span>
+                                        <span class="text-sm text-base-content/70">{{ $event->blocks_count ?? $event->blocks->count() }}</span>
                                     </td>
                                     <td>
                                         <span class="text-sm">{{ $event->time->format('M j, Y g:i A') }}</span>
@@ -365,7 +355,7 @@ new class extends Component {
                             @empty
                                 <tr>
                                     <td colspan="9" class="text-center py-8">
-                                        <div class="text-gray-500">
+                                        <div class="text-base-content/70">
                                             @if ($search || $serviceFilter || $domainFilter || $actionFilter)
                                                 No events found matching your criteria.
                                             @else

@@ -132,25 +132,38 @@ new class extends Component {
     }
 }; ?>
 
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <x-card title="{{ __('Browser Sessions') }}" shadow>
-            <div class="space-y-6">
-                <div class="text-sm text-base-content/70">
-                    {{ __('Manage and logout active sessions on other browsers and devices.') }}
-                </div>
+<div>
+    <x-header title="{{ __('Browser Sessions') }}" subtitle="{{ __('Manage and log out your active sessions on other browsers and devices') }}" separator>
+        <x-slot:actions>
+            @if (count($sessions) > 1)
+                <x-button
+                    label="{{ __('Revoke All Others') }}"
+                    wire:click="revokeOtherSessions"
+                    class="btn-error btn-sm"
+                    spinner="revokeOtherSessions"
+                    confirm="{{ __('Are you sure you want to revoke all other sessions? This will log you out of all other devices.') }}"
+                />
+            @endif
+        </x-slot:actions>
+    </x-header>
 
-                @if (count($sessions) === 0)
-                    <div class="text-center py-8">
-                        <div class="text-base-content/50">
-                            <i class="fas fa-desktop text-4xl mb-4"></i>
-                            <p>{{ __('No active sessions found.') }}</p>
-                        </div>
+    <div class="space-y-4 lg:space-y-6">
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Active Sessions') }}</h3>
+
+            @if (count($sessions) === 0)
+                <div class="text-center py-8">
+                    <div class="text-base-content/50">
+                        <i class="fas fa-desktop text-4xl mb-4"></i>
+                        <p>{{ __('No active sessions found.') }}</p>
                     </div>
-                @else
-                    <div class="space-y-4">
-                        @foreach ($sessions as $session)
-                            <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+                </div>
+            @else
+                <div class="space-y-3">
+                    @foreach ($sessions as $session)
+                        <div class="border border-base-300 bg-base-100 rounded-lg p-4 @if ($session['is_current']) border-2 border-primary/20 @endif">
+                            <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-4">
                                     <div class="flex-shrink-0">
                                         @if ($session['device']['is_mobile'])
@@ -163,8 +176,8 @@ new class extends Component {
                                     </div>
 
                                     <div class="flex-1 min-w-0">
-                                        <div class="flex items-center space-x-2">
-                                            <h4 class="text-lg font-medium truncate">
+                                        <div class="flex items-center space-x-2 mb-1">
+                                            <h4 class="font-medium truncate">
                                                 {{ $session['device_name'] }}
                                             </h4>
                                             @if ($session['is_current'])
@@ -192,36 +205,16 @@ new class extends Component {
                                             wire:click="revokeSession('{{ $session['id'] }}')"
                                             class="btn-outline btn-error btn-sm"
                                             spinner="revokeSession('{{ $session['id'] }}')"
-                                            confirm="Are you sure you want to revoke this session?"
+                                            confirm="{{ __('Are you sure you want to revoke this session?') }}"
                                         />
                                     </div>
                                 @endif
                             </div>
-                        @endforeach
-                    </div>
-
-                    @if (count($sessions) > 1)
-                        <div class="pt-6 border-t border-base-300">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h4 class="text-lg font-medium">{{ __('Other Sessions') }}</h4>
-                                    <p class="text-sm text-base-content/70">
-                                        {{ __('Revoke all other browser sessions across all of your devices.') }}
-                                    </p>
-                                </div>
-
-                                <x-button
-                                    label="{{ __('Revoke All Other Sessions') }}"
-                                    wire:click="revokeOtherSessions"
-                                    class="btn-outline btn-error"
-                                    spinner="revokeOtherSessions"
-                                    confirm="Are you sure you want to revoke all other sessions? This will log you out of all other devices."
-                                />
-                            </div>
                         </div>
-                    @endif
-                @endif
-            </div>
-        </x-card>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    </div>
     </div>
 </div>

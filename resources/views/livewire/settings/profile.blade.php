@@ -90,106 +90,112 @@ new class extends Component {
     }
 }; ?>
 
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <x-card title="{{ __('Profile Settings') }}" shadow>
-            <div class="space-y-6">
-                <!-- Name Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Name') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Update your display name') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model="name"
-                                placeholder="Enter your name"
-                                class="w-64"
-                                required
-                                autofocus
-                                autocomplete="name"
-                            />
-                            <x-button
-                                label="{{ __('Update Name') }}"
-                                wire:click="updateProfileInformation"
-                                class="btn-primary"
-                                spinner="updateProfileInformation"
-                            />
-                        </div>
-                    </div>
-                </div>
+<div>
+    <x-header title="{{ __('Profile Settings') }}" subtitle="{{ __('Manage your account profile and preferences') }}" separator />
 
-                <!-- Email Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Email Address') }}</h4>
-                            <p class="text-sm text-base-content/70">{{ __('Update your email address') }}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <x-input
-                                wire:model="email"
-                                type="email"
-                                placeholder="Enter your email"
-                                class="w-64"
-                                required
-                                autocomplete="email"
-                            />
-                            <x-button
-                                label="{{ __('Update Email') }}"
-                                wire:click="updateProfileInformation"
-                                class="btn-primary"
-                                spinner="updateProfileInformation"
-                            />
-                        </div>
-                    </div>
-                </div>
+    <div class="space-y-4 lg:space-y-6">
+    <!-- Profile Information Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Profile Information') }}</h3>
 
-                @if (auth()->user() instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && !auth()->user()->hasVerifiedEmail())
-                    <div class="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h4 class="text-lg font-medium text-warning">{{ __('Email Verification') }}</h4>
-                                <p class="text-sm text-base-content/70">{{ __('Your email address is unverified.') }}</p>
-                            </div>
-                            <x-button
-                                label="{{ __('Resend Verification') }}"
-                                wire:click="resendVerificationNotification"
-                                class="btn-warning"
-                            />
-                        </div>
-                    </div>
-                @endif
+            <!-- Name Field -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Name') }}</span>
+                </label>
+                <input
+                    wire:model="name"
+                    type="text"
+                    placeholder="Enter your name"
+                    class="input input-bordered w-full"
+                    required
+                    autofocus
+                    autocomplete="name"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Update your display name') }}</span>
+                </label>
+            </div>
 
-                <!-- Debug Logging Section -->
-                <div class="p-4 bg-base-200 rounded-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="text-lg font-medium">{{ __('Debug Logging') }}</h4>
-                            <p class="text-sm text-base-content/70">
-                                {{ __('Enable detailed logging for integration API calls and debugging') }}
-                            </p>
-                            <p class="text-xs text-base-content/60 mt-1">
-                                When enabled, all API requests and responses will be logged to help troubleshoot integration issues.
-                                These logs are automatically deleted after 7 days.
-                            </p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                class="toggle toggle-primary"
-                                wire:model.live="debugLoggingEnabled"
-                                wire:change="toggleDebugLogging"
-                            />
-                        </div>
-                    </div>
-                </div>
+            <!-- Email Field -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Email Address') }}</span>
+                </label>
+                <input
+                    wire:model="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="email"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Update your email address') }}</span>
+                </label>
+            </div>
 
-                <div class="pt-6 border-t border-base-300">
-                    <livewire:settings.delete-user-form />
+            <div class="flex justify-end mt-4">
+                <x-button
+                    label="{{ __('Update Profile') }}"
+                    wire:click="updateProfileInformation"
+                    class="btn-primary"
+                    spinner="updateProfileInformation"
+                />
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Verification Card -->
+    @if (auth()->user() instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && !auth()->user()->hasVerifiedEmail())
+        <div class="card bg-warning/10 border border-warning/20">
+            <div class="card-body">
+                <h3 class="text-lg font-semibold text-warning mb-2">{{ __('Email Verification') }}</h3>
+                <p class="text-sm text-base-content/70 mb-4">{{ __('Your email address is unverified.') }}</p>
+
+                <div class="flex justify-end">
+                    <x-button
+                        label="{{ __('Resend Verification') }}"
+                        wire:click="resendVerificationNotification"
+                        class="btn-warning"
+                    />
                 </div>
             </div>
-        </x-card>
+        </div>
+    @endif
+
+    <!-- Debug Logging Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Debug Logging') }}</h3>
+            <p class="text-sm text-base-content/70 mb-4">
+                {{ __('Enable detailed logging for integration API calls and debugging') }}
+            </p>
+            <p class="text-xs text-base-content/60 mb-4">
+                When enabled, all API requests and responses will be logged to help troubleshoot integration issues.
+                These logs are automatically deleted after 7 days.
+            </p>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Enable Debug Logging') }}</span>
+                </label>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    wire:model.live="debugLoggingEnabled"
+                    wire:change="toggleDebugLogging"
+                />
+            </div>
+        </div>
+    </div>
+
+        <!-- Delete Account Section -->
+        <div class="card bg-base-200 shadow">
+            <div class="card-body">
+                <livewire:settings.delete-user-form />
+            </div>
+        </div>
     </div>
 </div>

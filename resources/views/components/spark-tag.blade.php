@@ -37,11 +37,11 @@ $displayName = $parts[0] . '...';
 // Determine popover color based on badge color
 $color = match($tagType) {
 'transaction_category', 'transaction_type', 'transaction_status', 'transaction_scheme',
-'transaction_currency', 'balance_type', 'card_pan', 'decline_reason', 'merchant_country', 'merchant_category', 'music_album', 'spotify_context' => 'info',
+'transaction_currency', 'balance_type', 'card_pan', 'decline_reason', 'merchant_country', 'merchant_category', 'music_album', 'spotify_context', 'karakeep' => 'info',
 'music_artist', 'person' => 'secondary',
 'emoji', 'merchant_emoji' => 'warning',
 'spark' => 'primary',
-default => 'neutral',
+default => 'info',
 };
 
 // Determine badge color based on tag type

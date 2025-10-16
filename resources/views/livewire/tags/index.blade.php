@@ -134,20 +134,24 @@ new class extends Component {
 ?>
 
 <div>
-    <x-header title="Tags" separator>
-        <x-slot:subtitle>
-            Browse and manage all tags across events and objects
-        </x-slot:subtitle>
-    </x-header>
+    <x-header title="Tags" subtitle="Browse and manage all tags across events and objects" separator />
 
     <!-- Search -->
-    <x-card class="mb-6">
-        <x-input
-            wire:model.live.debounce.300ms="searchQuery"
-            placeholder="Search tags by name or type..."
-            icon="o-magnifying-glass"
-        />
-    </x-card>
+    <div class="card bg-base-200 shadow mb-6">
+        <div class="card-body">
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">Search</span>
+                </label>
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="searchQuery"
+                    placeholder="Search tags by name or type..."
+                    class="input input-bordered w-full"
+                />
+            </div>
+        </div>
+    </div>
 
     @if (empty($tagsByType))
         <x-card>
@@ -180,7 +184,7 @@ new class extends Component {
                     </x-slot:heading>
                     <x-slot:content>
                         <div class="overflow-x-auto">
-                            <table class="table table-zebra">
+                            <table class="table">
                                 <thead>
                                     <tr>
                                         <th>Tag</th>
@@ -199,13 +203,13 @@ new class extends Component {
                                                 </div>
                                             </td>
                                             <td class="text-center">
-                                                <x-badge :value="$tag->events_count" class="badge-sm badge-ghost" />
+                                                <span class="text-sm text-base-content/70">{{ $tag->events_count }}</span>
                                             </td>
                                             <td class="text-center">
-                                                <x-badge :value="$tag->objects_count" class="badge-sm badge-ghost" />
+                                                <span class="text-sm text-base-content/70">{{ $tag->objects_count }}</span>
                                             </td>
                                             <td class="text-center">
-                                                <x-badge :value="$tag->total_count" class="badge-sm badge-primary" />
+                                                <span class="text-sm font-medium">{{ $tag->total_count }}</span>
                                             </td>
                                             <td class="text-right">
                                                 @if ($tag->slug)

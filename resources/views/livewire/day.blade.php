@@ -813,7 +813,7 @@ $areAllGroupsExpanded = computed(function () {
             </x-slot:heading>
             <x-slot:content>
                 @if ($this->dayNoteDocId)
-                <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200">
+                <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200 shadow">
                     <div class="space-y-3">
                         <x-markdown wire:model.live.debounce.800ms="dayNoteText" label="" :config="['maxHeight' => '200px', 'status' => 'false', 'sideBySideFullscreen' => 'false']" />
                     </div>
@@ -827,9 +827,9 @@ $areAllGroupsExpanded = computed(function () {
 
     <div class="space-y-6">
         @if ($this->events->isEmpty())
-        <x-card>
+        <x-card class="bg-base-200 shadow">
             <div class="text-center py-8">
-                <x-icon name="o-calendar" class="w-12 h-12 text-base-300 mx-auto mb-4" />
+                <x-icon name="o-calendar" class="w-12 h-12 text-base-content mx-auto mb-4" />
                 <h3 class="text-lg font-semibold text-base-content mb-2">No events found for this date</h3>
             </div>
         </x-card>
