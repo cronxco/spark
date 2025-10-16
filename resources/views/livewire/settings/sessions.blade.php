@@ -162,7 +162,7 @@ new class extends Component {
             @else
                 <div class="space-y-3">
                     @foreach ($sessions as $session)
-                        <div class="border border-base-300 bg-base-100 rounded-lg p-4 @if($session['is_current']) border-2 border-primary/20 @endif">
+                        <div class="border border-base-300 bg-base-100 rounded-lg p-4 @if ($session['is_current']) border-2 border-primary/20 @endif">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-4">
                                     <div class="flex-shrink-0">

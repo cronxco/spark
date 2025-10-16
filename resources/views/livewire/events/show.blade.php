@@ -531,19 +531,19 @@ new class extends Component {
                                         <span>·</span>
                                         <x-badge class="badge-xs badge-outline">
                                             <x-slot:value>
-                                                {{Str::lower($relatedEvent->domain)}}
+                                                {{ Str::lower($relatedEvent->domain) }}
                                             </x-slot:value>
                                         </x-badge>
                                         @endif
                                         <x-badge class="badge-xs badge-outline">
                                             <x-slot:value>
-                                                {{Str::lower($relatedEvent->service)}}
+                                                {{ Str::lower($relatedEvent->service) }}
                                             </x-slot:value>
                                         </x-badge>
                                         @if ($relatedEvent->integration)
                                         <x-badge class="badge-xs badge-outline">
                                             <x-slot:value>
-                                                {{Str::lower($relatedEvent->integration->name)}}
+                                                {{ Str::lower($relatedEvent->integration->name) }}
                                             </x-slot:value>
                                         </x-badge>
                                         @endif
