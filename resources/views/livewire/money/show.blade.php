@@ -102,7 +102,11 @@
                                     @endif
                                 </div>
                                 <div class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 {{ $displayBalance < 0 ? 'text-error' : '' }}">
-                                    {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
+                                    @if ($displayBalance < 0)
+                                        -{{ $currencySymbol }}{{ number_format(abs($displayBalance), 2) }}
+                                    @else
+                                        {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
+                                    @endif
                                 </div>
                                 @if ($latestBalance)
                                     <div class="text-sm text-base-content/70">
@@ -189,7 +193,11 @@
                                             <td>
                                                 @if ($eventDisplayBalance !== null)
                                                     <span class="font-mono font-medium text-lg {{ $eventDisplayBalance < 0 ? 'text-error' : '' }}">
-                                                        {{ $currencySymbol }}{{ number_format($eventDisplayBalance, 2) }}
+                                                        @if ($eventDisplayBalance < 0)
+                                                            -{{ $currencySymbol }}{{ number_format(abs($eventDisplayBalance), 2) }}
+                                                        @else
+                                                            {{ $currencySymbol }}{{ number_format($eventDisplayBalance, 2) }}
+                                                        @endif
                                                     </span>
                                                 @else
                                                     <span class="text-base-content/50">-</span>
