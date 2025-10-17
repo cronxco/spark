@@ -319,7 +319,11 @@
                                         <td>
                                             @if ($displayBalance !== null)
                                                 <span class="font-mono font-medium {{ $displayBalance < 0 ? 'text-error' : '' }}">
-                                                    {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
+                                                    @if ($displayBalance < 0)
+                                                        -{{ $currencySymbol }}{{ number_format(abs($displayBalance), 2) }}
+                                                    @else
+                                                        {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
+                                                    @endif
                                                 </span>
                                             @else
                                                 <span class="text-base-content/50">No balance</span>
