@@ -1445,7 +1445,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Generate a proper account name
         $accountName = $this->generateAccountName($account);
 
-        $metadata = [
+        $newMetadata = [
             'integration_id' => $integration->id,
             'account_id' => $accountId,
             'name' => $accountName,
@@ -1457,16 +1457,59 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ];
 
         if ($existingObject) {
+            // Preserve user-edited fields when updating from API
+            $existingMetadata = $existingObject->metadata ?? [];
+
+            // Fields that user can edit and should be preserved
+            $preservedFields = [
+                'sort_code',
+                'interest_rate',
+                'start_date',
+                'is_negative_balance',
+            ];
+
+            // Merge: start with new metadata, then preserve user-edited fields if they exist
+            $metadata = $newMetadata;
+            foreach ($preservedFields as $field) {
+                if (isset($existingMetadata[$field])) {
+                    $metadata[$field] = $existingMetadata[$field];
+                }
+            }
+
+            // If user has customized the name, provider, or account_type, preserve it
+            // Check if name differs from the API-derived name in raw metadata
+            if (isset($existingMetadata['name']) && $existingMetadata['name'] !== ($this->generateAccountName($existingMetadata['raw'] ?? []))) {
+                $metadata['name'] = $existingMetadata['name'];
+            }
+            if (isset($existingMetadata['provider']) && $existingMetadata['provider'] !== $this->deriveProviderName($integration->group, $existingMetadata['raw'] ?? [])) {
+                $metadata['provider'] = $existingMetadata['provider'];
+            }
+            // Preserve account_type if it differs from what the API would set
+            if (isset($existingMetadata['account_type']) && $existingMetadata['account_type'] !== $accountType) {
+                $metadata['account_type'] = $existingMetadata['account_type'];
+            }
+
+            // Preserve account_number if user has customized it
+            $apiDerivedNumber = $this->deriveAccountNumber($account);
+            if (isset($existingMetadata['account_number']) && $existingMetadata['account_number'] !== $apiDerivedNumber) {
+                $metadata['account_number'] = $existingMetadata['account_number'];
+            }
+
+            // Use custom title if it was changed from the default
+            $updateTitle = ($existingObject->title === $this->generateAccountName($existingMetadata['raw'] ?? []))
+                ? $metadata['name']
+                : $existingObject->title;
+
             // Update existing object with complete data
             Log::info('GoCardless: Found existing account object, updating with complete data', [
                 'account_id' => $accountId,
                 'old_title' => $existingObject->title,
-                'new_title' => $accountName,
+                'new_title' => $updateTitle,
                 'integration_id' => $integration->id,
             ]);
 
             $existingObject->update([
-                'title' => $accountName,
+                'title' => $updateTitle,
                 'content' => json_encode($account),
                 'metadata' => $metadata,
             ]);
