@@ -754,20 +754,60 @@ class MonzoPlugin extends OAuthPlugin
 
         // If found, update it; otherwise create new
         if ($potObject) {
+            // Preserve user-edited fields when updating from API
+            $existingMetadata = $potObject->metadata ?? [];
+            $potName = $pot['name'] ?? 'Pot';
+
+            // Fields that user can edit and should be preserved
+            $preservedFields = [
+                'account_number',
+                'sort_code',
+                'interest_rate',
+                'start_date',
+                'is_negative_balance',
+            ];
+
+            // Build new metadata
+            $newMetadata = [
+                'name' => $potName,
+                'provider' => 'Monzo',
+                'account_type' => 'savings_account',
+                'pot_id' => $potId,
+                'deleted' => $isDeleted,
+                'currency' => 'GBP',
+            ];
+
+            // Preserve user-edited fields
+            foreach ($preservedFields as $field) {
+                if (isset($existingMetadata[$field])) {
+                    $newMetadata[$field] = $existingMetadata[$field];
+                }
+            }
+
+            // If user has customized the name, provider, or account_type, preserve it
+            if (isset($existingMetadata['name']) && $existingMetadata['name'] !== ($pot['name'] ?? null)) {
+                $newMetadata['name'] = $existingMetadata['name'];
+            }
+            if (isset($existingMetadata['provider']) && $existingMetadata['provider'] !== 'Monzo') {
+                $newMetadata['provider'] = $existingMetadata['provider'];
+            }
+            // Preserve account_type if it differs from default savings_account
+            if (isset($existingMetadata['account_type']) && $existingMetadata['account_type'] !== 'savings_account') {
+                $newMetadata['account_type'] = $existingMetadata['account_type'];
+            }
+
+            // Use custom title if it was changed from the default
+            $updateTitle = ($potObject->title === ($pot['name'] ?? 'Pot'))
+                ? $newMetadata['name']
+                : $potObject->title;
+
             $potObject->update([
                 'type' => $accountType,
-                'title' => $pot['name'] ?? 'Pot',
+                'title' => $updateTitle,
                 'integration_id' => $master->id,
                 'time' => $pot['created'] ?? now(),
                 'content' => (string) ($pot['balance'] ?? 0),
-                'metadata' => [
-                    'name' => $pot['name'] ?? 'Pot',
-                    'provider' => 'Monzo',
-                    'account_type' => 'savings_account',
-                    'pot_id' => $potId,
-                    'deleted' => $isDeleted,
-                    'currency' => 'GBP',
-                ],
+                'metadata' => $newMetadata,
                 'url' => null,
                 'media_url' => null,
             ]);
@@ -822,7 +862,7 @@ class MonzoPlugin extends OAuthPlugin
         $master = $this->resolveMasterIntegration($integration);
         $accountId = $account['id'] ?? null;
 
-        $metadata = [
+        $newMetadata = [
             'name' => $title,
             'provider' => 'Monzo',
             'account_type' => $accountType,
@@ -847,9 +887,48 @@ class MonzoPlugin extends OAuthPlugin
             $hasCompleteData = count($account) > 2 || isset($account['created']) || isset($account['product_type']);
 
             if ($hasCompleteData) {
+                // Preserve user-edited fields when updating from API
+                $existingMetadata = $accountObject->metadata ?? [];
+
+                // Fields that user can edit and should be preserved
+                $preservedFields = [
+                    'account_number',
+                    'sort_code',
+                    'interest_rate',
+                    'start_date',
+                    'is_negative_balance',
+                ];
+
+                // Merge: start with new metadata, then preserve user-edited fields if they exist
+                $metadata = $newMetadata;
+                foreach ($preservedFields as $field) {
+                    if (isset($existingMetadata[$field])) {
+                        $metadata[$field] = $existingMetadata[$field];
+                    }
+                }
+
+                // If user has customized the name, provider, or account_type, preserve it
+                if (isset($existingMetadata['name']) && $existingMetadata['name'] !== ($existingMetadata['raw']['name'] ?? null)) {
+                    $metadata['name'] = $existingMetadata['name'];
+                }
+                if (isset($existingMetadata['provider']) && $existingMetadata['provider'] !== 'Monzo') {
+                    $metadata['provider'] = $existingMetadata['provider'];
+                }
+                // Preserve account_type if it differs from what the API would set
+                if (isset($existingMetadata['account_type']) && $existingMetadata['account_type'] !== $accountType) {
+                    $metadata['account_type'] = $existingMetadata['account_type'];
+                }
+
+                // Use custom title if it was changed from the default
+                $defaultTitle = $title;
+                $currentTitle = $accountObject->title;
+                $updateTitle = ($currentTitle === $defaultTitle || $currentTitle === ($existingMetadata['name'] ?? null))
+                    ? $metadata['name']
+                    : $currentTitle;
+
                 // We have full account data from the API, safe to update
                 $accountObject->update([
-                    'title' => $title,
+                    'title' => $updateTitle,
                     'metadata' => $metadata,
                 ]);
             }
@@ -867,7 +946,7 @@ class MonzoPlugin extends OAuthPlugin
             'integration_id' => $master->id,
             'time' => now(),
             'content' => null,
-            'metadata' => $metadata,
+            'metadata' => $newMetadata,
         ]);
     }
 
