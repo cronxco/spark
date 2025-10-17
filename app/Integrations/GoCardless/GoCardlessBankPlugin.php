@@ -186,6 +186,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
     public static function getBlockTypes(): array
     {
         return [
+            'balance_snapshot' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Account Balance',
+                'description' => 'Current account balance snapshot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
             'balance_change' => [
                 'icon' => 'o-arrow-trending-up',
                 'display_name' => 'Balance Change',
@@ -1381,9 +1390,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Add tags
         $event->attachTag($balanceType, 'balance_type');
 
-        // Add balance blocks for additional data
-        $accountData = ['id' => $accountId]; // Create minimal account data for the block
-        $this->createBalanceBlock($integration, $accountData, $balance, $balanceReferenceDate);
+        // Add balance block for snapshot using event's createBlock method
+        $event->createBlock([
+            'time' => $balance['referenceDate'] ?? now(),
+            'block_type' => 'balance_snapshot',
+            'title' => 'Account Balance',
+            'value' => $encodedValue,
+            'value_multiplier' => $valueMultiplier,
+            'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
+            'metadata' => [
+                'balance_type' => $balanceType,
+                'reference_date' => $balanceReferenceDate,
+                'last_change_date_time' => $balance['lastChangeDateTime'] ?? null,
+            ],
+        ]);
     }
 
     /**
@@ -2232,29 +2252,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
-     * Create balance block
-     */
-    protected function createBalanceBlock(Integration $integration, array $account, array $data, string $balanceReferenceDate): void
-    {
-        $block = Block::updateOrCreate(
-            [
-                'integration_id' => $integration->id,
-                'source_id' => 'balance_' . $account['id'] . '_' . $balanceReferenceDate,
-            ],
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'money_bank_balance',
-                'type' => 'balance_snapshot',
-                'title' => 'Account Balance: ' . ($data['balanceAmount']['amount'] ?? 0) . ' ' . ($data['balanceAmount']['currency'] ?? 'EUR'),
-                'content' => json_encode($data),
-                'url' => null,
-                'image_url' => null,
-                'time' => $data['referenceDate'] ?? now(),
-            ]
-        );
-    }
-
-    /**
      * Generate consistent transaction ID based on transaction content
      * This ensures pending and booked versions of the same transaction have identical IDs
      */
@@ -2441,7 +2438,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Use onboarding-specific integration ID to avoid conflicts
-        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . ($account['id'] ?? 'unknown');
+        $accountId = $account['id'] ?? 'unknown';
+        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . $accountId;
 
         return EventObject::updateOrCreate(
             [
@@ -2456,6 +2454,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'image_url' => null,
                 'metadata' => [
                     'integration_id' => $onboardingIntegrationId, // Store integration_id in metadata
+                    'account_id' => $accountId, // Store account_id for lookups
                     'name' => $accountName,
                     'provider' => $this->deriveProviderName($group, $account),
                     'account_type' => $accountType,
@@ -2471,7 +2470,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Map ISO 20022 ExternalCashAccountType1Code and common strings to internal types
      */
-    protected function mapCashAccountType(?string $cashAccountType): string
+    public function mapCashAccountType(?string $cashAccountType): string
     {
         if ($cashAccountType === null) {
             return 'other';
@@ -2516,7 +2515,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
      * - BBAN (as-is)
      * - resourceId (last 8 chars)
      */
-    protected function deriveAccountNumber(array $data): ?string
+    public function deriveAccountNumber(array $data): ?string
     {
         // IBAN may appear at top-level or nested under account fields
         $iban = $data['iban']
@@ -2557,7 +2556,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
      * Prefer human-readable institution name from group metadata,
      * then payload institution_id, else fallback to "GoCardless".
      */
-    protected function deriveProviderName(?IntegrationGroup $group, array $payload): string
+    public function deriveProviderName(?IntegrationGroup $group, array $payload): string
     {
         if ($group && is_array($group->auth_metadata)) {
             $name = $group->auth_metadata['gocardless_institution_name'] ?? null;
@@ -3010,7 +3009,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Get account details with caching
      */
-    protected function getAccount(string $accountId): ?array
+    public function getAccount(string $accountId): ?array
     {
         $cacheKey = "gocardless_account_details_{$accountId}";
 
