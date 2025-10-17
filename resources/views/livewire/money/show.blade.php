@@ -26,6 +26,12 @@
                                 Add Balance Update
                             </x-button>
                         @endif
+                        @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
+                            <x-button wire:click="openEditModal" class="btn-outline">
+                                <x-icon name="o-pencil" class="w-4 h-4" />
+                                Edit Account
+                            </x-button>
+                        @endif
                         <x-button link="{{ route('money') }}" class="btn-outline">
                             <x-icon name="o-arrow-left" class="w-4 h-4" />
                             Back
@@ -45,6 +51,9 @@
                             </x-slot:trigger>
                             @if ($account->type === 'manual_account')
                                 <x-menu-item title="Add Balance Update" icon="o-banknotes" link="{{ route('balance-updates.create.for-account', $account->id) }}" />
+                            @endif
+                            @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
+                                <x-menu-item title="Edit Account" icon="o-pencil" wire:click="openEditModal" />
                             @endif
                             <x-menu-item title="Back to Accounts" icon="o-arrow-left" link="{{ route('money') }}" />
                             <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" wire:click="toggleSidebar" />
@@ -83,11 +92,17 @@
                         </div>
 
                         <!-- Current Balance Display -->
-                        @if ($currentBalance !== null)
+                        @if ($displayBalance !== null)
                             <div class="p-4 lg:p-6 rounded-lg bg-base-300/50 border border-base-300 text-center sm:text-left">
-                                <div class="text-sm text-base-content/70 mb-2">Current Balance</div>
-                                <div class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
-                                    {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
+                                <div class="text-sm text-base-content/70 mb-2">
+                                    @if ($isNegativeBalance)
+                                        Current Debt
+                                    @else
+                                        Current Balance
+                                    @endif
+                                </div>
+                                <div class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 {{ $displayBalance < 0 ? 'text-error' : '' }}">
+                                    {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
                                 </div>
                                 @if ($latestBalance)
                                     <div class="text-sm text-base-content/70">
@@ -150,6 +165,13 @@
                                                 $balance = $event->formatted_value;
                                             }
 
+                                            // For negative balance accounts, invert the sign for display
+                                            if ($isNegativeBalance && $balance !== null) {
+                                                $eventDisplayBalance = -$balance;
+                                            } else {
+                                                $eventDisplayBalance = $balance;
+                                            }
+
                                             $notes = $event->event_metadata['notes'] ?? null;
 
                                             // For Monzo accounts, show spent today info
@@ -165,9 +187,9 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                @if ($balance !== null)
-                                                    <span class="font-mono font-medium text-lg">
-                                                        {{ $currencySymbol }}{{ number_format($balance, 2) }}
+                                                @if ($eventDisplayBalance !== null)
+                                                    <span class="font-mono font-medium text-lg {{ $eventDisplayBalance < 0 ? 'text-error' : '' }}">
+                                                        {{ $currencySymbol }}{{ number_format($eventDisplayBalance, 2) }}
                                                     </span>
                                                 @else
                                                     <span class="text-base-content/50">-</span>
@@ -205,6 +227,13 @@
                 </div>
             </div>
         </div>
+
+        <!-- Edit Account Modal -->
+        @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
+            <x-modal wire:model="showEditModal" title="Edit Account" subtitle="Update your account details and metadata" separator>
+                <livewire:edit-financial-account :account="$account" :key="'edit-account-' . $account->id" />
+            </x-modal>
+        @endif
 
         <!-- Drawer for Account Details -->
         <x-drawer wire:model="showSidebar" right title="Account Details" separator with-close-button class="w-11/12 lg:w-1/3">
@@ -256,6 +285,19 @@
                         <div>
                             <span class="text-base-content/70">Start Date:</span>
                             <span class="font-medium">{{ \Carbon\Carbon::parse($startDate)->format('M j, Y') }}</span>
+                        </div>
+                        @endif
+
+                        @if ($account->type === 'manual_account')
+                        <div>
+                            <span class="text-base-content/70">Balance Type:</span>
+                            <span class="font-medium">
+                                @if ($isNegativeBalance)
+                                    <span class="text-error">Debt Account</span>
+                                @else
+                                    Asset Account
+                                @endif
+                            </span>
                         </div>
                         @endif
 

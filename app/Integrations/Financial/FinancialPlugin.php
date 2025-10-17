@@ -89,6 +89,13 @@ class FinancialPlugin extends ManualPlugin
                 'description' => 'When you opened this account (optional)',
                 'required' => false,
             ],
+            'is_negative_balance' => [
+                'type' => 'boolean',
+                'label' => 'Negative Balance Account',
+                'description' => 'Enable for accounts where higher balances are worse (credit cards, loans, mortgages)',
+                'required' => false,
+                'default' => false,
+            ],
         ];
     }
 
@@ -194,6 +201,7 @@ class FinancialPlugin extends ManualPlugin
             'currency' => $accountData['currency'] ?? 'GBP',
             'interest_rate' => $accountData['interest_rate'] ?? null,
             'start_date' => $accountData['start_date'] ?? null,
+            'is_negative_balance' => $accountData['is_negative_balance'] ?? false,
             'integration_id' => $integration->id,
             'raw' => $accountData,
         ];

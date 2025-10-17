@@ -27,6 +27,8 @@ class CreateFinancialAccount extends Component
 
     public ?string $startDate = null;
 
+    public bool $isNegativeBalance = false;
+
     protected $rules = [
         'name' => 'required|string|max:255',
         'accountType' => 'required|string|in:current_account,savings_account,mortgage,investment_account,credit_card,loan,pension,other',
@@ -36,11 +38,19 @@ class CreateFinancialAccount extends Component
         'currency' => 'required|string|in:GBP,USD,EUR',
         'interestRate' => 'nullable|numeric|min:0|max:100',
         'startDate' => 'nullable|date',
+        'isNegativeBalance' => 'boolean',
     ];
 
     public function mount(): void
     {
         $this->currency = 'GBP';
+    }
+
+    public function updatedAccountType($value): void
+    {
+        // Automatically set isNegativeBalance based on account type
+        $negativeBalanceTypes = ['credit_card', 'loan', 'mortgage'];
+        $this->isNegativeBalance = in_array($value, $negativeBalanceTypes);
     }
 
     public function save(): void
@@ -72,6 +82,7 @@ class CreateFinancialAccount extends Component
                 'currency' => $this->currency,
                 'interest_rate' => $this->interestRate,
                 'start_date' => $this->startDate,
+                'is_negative_balance' => $this->isNegativeBalance,
             ],
         ]);
 
@@ -86,6 +97,7 @@ class CreateFinancialAccount extends Component
             'currency' => $this->currency,
             'interest_rate' => $this->interestRate,
             'start_date' => $this->startDate,
+            'is_negative_balance' => $this->isNegativeBalance,
         ];
 
         $plugin->upsertAccountObject($integration, $accountData);

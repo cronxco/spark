@@ -114,7 +114,7 @@ class IntegrationGroup extends Model
             ->logFillable()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->dontLogIfAttributesChangedOnly(['updated_at']);
+            ->dontLogIfAttributesChangedOnly(['updated_at', 'access_token', 'refresh_token', 'expiry']);
     }
 
     /**
