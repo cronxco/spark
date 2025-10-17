@@ -186,6 +186,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
     public static function getBlockTypes(): array
     {
         return [
+            'balance_snapshot' => [
+                'icon' => 'o-currency-pound',
+                'display_name' => 'Account Balance',
+                'description' => 'Current account balance snapshot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
             'balance_change' => [
                 'icon' => 'o-arrow-trending-up',
                 'display_name' => 'Balance Change',
@@ -1381,9 +1390,20 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Add tags
         $event->attachTag($balanceType, 'balance_type');
 
-        // Add balance blocks for additional data
-        $accountData = ['id' => $accountId]; // Create minimal account data for the block
-        $this->createBalanceBlock($integration, $accountData, $balance, $balanceReferenceDate);
+        // Add balance block for snapshot using event's createBlock method
+        $event->createBlock([
+            'time' => $balance['referenceDate'] ?? now(),
+            'block_type' => 'balance_snapshot',
+            'title' => 'Account Balance',
+            'value' => $encodedValue,
+            'value_multiplier' => $valueMultiplier,
+            'value_unit' => $balance['balanceAmount']['currency'] ?? 'EUR',
+            'metadata' => [
+                'balance_type' => $balanceType,
+                'reference_date' => $balanceReferenceDate,
+                'last_change_date_time' => $balance['lastChangeDateTime'] ?? null,
+            ],
+        ]);
     }
 
     /**
@@ -1885,6 +1905,212 @@ class GoCardlessBankPlugin extends OAuthPlugin
         return $data;
     }
 
+    /**
+     * Map ISO 20022 ExternalCashAccountType1Code and common strings to internal types
+     */
+    public function mapCashAccountType(?string $cashAccountType): string
+    {
+        if ($cashAccountType === null) {
+            return 'other';
+        }
+
+        $code = strtoupper($cashAccountType);
+
+        // ISO 20022 codes (reference: https://dz-privatbank-xs2a.pass-consulting.com/apidocs/json_ExternalCashAccountType1Code.html)
+        $isoMapping = [
+            'CACC' => 'current_account', // Current account
+            'TRAN' => 'current_account', // Transacting account
+            'SVGS' => 'savings_account', // Savings
+            'LLSV' => 'savings_account', // Limited liquidity savings
+            'ONDP' => 'savings_account', // Overnight deposit
+            'CHAR' => 'credit_card', // Charge Card
+            'LOAN' => 'loan',            // Loan
+            'ODFT' => 'loan',            // Overdraft treated as loan category internally
+            'MOMA' => 'investment_account', // Money market
+            'MGLD' => 'investment_account', // Marginal lending
+            'TRAS' => 'investment_account', // Cash trading
+        ];
+
+        if (isset($isoMapping[$code])) {
+            return $isoMapping[$code];
+        }
+
+        // Fallback for common descriptive values occasionally returned
+        return match ($cashAccountType) {
+            'CurrentAccount' => 'current_account',
+            'SavingsAccount' => 'savings_account',
+            'CreditCard' => 'credit_card',
+            'InvestmentAccount' => 'investment_account',
+            'LoanAccount' => 'loan',
+            default => 'other',
+        };
+    }
+
+    /**
+     * Derive a user-friendly account number with fallbacks:
+     * - IBAN (last 8 chars, spaces removed)
+     * - maskedPan (as-is)
+     * - BBAN (as-is)
+     * - resourceId (last 8 chars)
+     */
+    public function deriveAccountNumber(array $data): ?string
+    {
+        // IBAN may appear at top-level or nested under account fields
+        $iban = $data['iban']
+            ?? ($data['debtorAccount']['iban'] ?? null)
+            ?? ($data['creditorAccount']['iban'] ?? null);
+        if ($iban) {
+            $clean = str_replace(' ', '', $iban);
+
+            return substr($clean, -8);
+        }
+
+        // maskedPan may be present for card accounts
+        $maskedPan = $data['maskedPan']
+            ?? ($data['debtorAccount']['maskedPan'] ?? null)
+            ?? ($data['creditorAccount']['maskedPan'] ?? null);
+        if ($maskedPan) {
+            return $maskedPan;
+        }
+
+        // BBAN may be present
+        $bban = $data['bban']
+            ?? ($data['debtorAccount']['bban'] ?? null)
+            ?? ($data['creditorAccount']['bban'] ?? null);
+        if ($bban) {
+            return $bban;
+        }
+
+        // Fallback to resourceId (truncate to last 8 chars)
+        $resourceId = $data['resourceId'] ?? ($data['id'] ?? null);
+        if ($resourceId) {
+            return substr((string) $resourceId, -8);
+        }
+
+        return null;
+    }
+
+    /**
+     * Prefer human-readable institution name from group metadata,
+     * then payload institution_id, else fallback to "GoCardless".
+     */
+    public function deriveProviderName(?IntegrationGroup $group, array $payload): string
+    {
+        if ($group && is_array($group->auth_metadata)) {
+            $name = $group->auth_metadata['gocardless_institution_name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+
+            // As a secondary option, some UIs might store institution display name under a generic key
+            $alt = $group->auth_metadata['institution_name'] ?? null;
+            if (is_string($alt) && $alt !== '') {
+                return $alt;
+            }
+        }
+
+        // If payload carries an institution name, use it
+        if (! empty($payload['institution_name']) && is_string($payload['institution_name'])) {
+            return (string) $payload['institution_name'];
+        }
+
+        // If we only have an id, return it for now (still better than generic)
+        if (! empty($payload['institution_id']) && is_string($payload['institution_id'])) {
+            return (string) $payload['institution_id'];
+        }
+
+        return 'GoCardless';
+    }
+
+    /**
+     * Get account details with caching
+     */
+    public function getAccount(string $accountId): ?array
+    {
+        $cacheKey = "gocardless_account_details_{$accountId}";
+
+        // Check if data is in cache first
+        if (Cache::has($cacheKey)) {
+            // Track cache hit
+            $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', true);
+            Log::info('GoCardless getAccount: using cached data', [
+                'account_id' => $accountId,
+                'cache_key' => $cacheKey,
+            ]);
+        }
+
+        return Cache::remember($cacheKey, self::ACCOUNT_DETAILS_CACHE_TTL, function () use ($accountId) {
+            Log::info('GoCardless getAccount: fetching from API (not cached)', [
+                'account_id' => $accountId,
+            ]);
+
+            // Log the API request
+            $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/details/', [
+                'Authorization' => '[REDACTED]',
+            ]);
+
+            $startTime = microtime(true);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
+            $responseTime = (int) ((microtime(true) - $startTime) * 1000); // Convert to milliseconds
+
+            // Log the API response
+            $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/details/', $response->status(), $response->body(), $response->headers());
+
+            // Track API call for monitoring
+            $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', false, $responseTime);
+
+            if (! $response->successful()) {
+                $errorData = $response->json();
+                $isRateLimited = $response->status() === 429;
+
+                if ($isRateLimited) {
+                    Log::warning('GoCardless API rate limit exceeded for account details', [
+                        'account_id' => $accountId,
+                        'status' => $response->status(),
+                        'rate_limit_detail' => $errorData['detail'] ?? 'unknown',
+                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
+                    ]);
+
+                    // Return a fallback account structure when rate limited
+                    return [
+                        'id' => $accountId,
+                        'details' => 'Account ' . substr($accountId, 0, 8),
+                        'currency' => 'Unknown',
+                        'cashAccountType' => 'Unknown',
+                        'ownerName' => 'Unknown',
+                        'status' => 'rate_limited',
+                        'rate_limit_error' => $errorData['detail'] ?? 'Rate limit exceeded',
+                    ];
+                } else {
+                    Log::error('Failed to get account details', [
+                        'account_id' => $accountId,
+                        'status' => $response->status(),
+                        'response' => $response->body(),
+                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
+                    ]);
+
+                    return null;
+                }
+            }
+
+            $responseData = $response->json();
+            // The API returns {"account": {...}}, so extract the account data
+            $accountData = $responseData['account'] ?? $responseData;
+
+            // Ensure the account data always has an 'id' key
+            $accountData['id'] = $accountId;
+
+            Log::info('GoCardless getAccount response', [
+                'account_id' => $accountId,
+                'account_data' => $accountData,
+            ]);
+
+            return $accountData;
+        });
+    }
+
     protected function getRequiredScopes(): string
     {
         // Not applicable for GoCardless Bank Account Data API
@@ -2232,29 +2458,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
     }
 
     /**
-     * Create balance block
-     */
-    protected function createBalanceBlock(Integration $integration, array $account, array $data, string $balanceReferenceDate): void
-    {
-        $block = Block::updateOrCreate(
-            [
-                'integration_id' => $integration->id,
-                'source_id' => 'balance_' . $account['id'] . '_' . $balanceReferenceDate,
-            ],
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'money_bank_balance',
-                'type' => 'balance_snapshot',
-                'title' => 'Account Balance: ' . ($data['balanceAmount']['amount'] ?? 0) . ' ' . ($data['balanceAmount']['currency'] ?? 'EUR'),
-                'content' => json_encode($data),
-                'url' => null,
-                'image_url' => null,
-                'time' => $data['referenceDate'] ?? now(),
-            ]
-        );
-    }
-
-    /**
      * Generate consistent transaction ID based on transaction content
      * This ensures pending and booked versions of the same transaction have identical IDs
      */
@@ -2441,7 +2644,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Use onboarding-specific integration ID to avoid conflicts
-        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . ($account['id'] ?? 'unknown');
+        $accountId = $account['id'] ?? 'unknown';
+        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . $accountId;
 
         return EventObject::updateOrCreate(
             [
@@ -2456,6 +2660,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'image_url' => null,
                 'metadata' => [
                     'integration_id' => $onboardingIntegrationId, // Store integration_id in metadata
+                    'account_id' => $accountId, // Store account_id for lookups
                     'name' => $accountName,
                     'provider' => $this->deriveProviderName($group, $account),
                     'account_type' => $accountType,
@@ -2466,123 +2671,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 ],
             ]
         );
-    }
-
-    /**
-     * Map ISO 20022 ExternalCashAccountType1Code and common strings to internal types
-     */
-    protected function mapCashAccountType(?string $cashAccountType): string
-    {
-        if ($cashAccountType === null) {
-            return 'other';
-        }
-
-        $code = strtoupper($cashAccountType);
-
-        // ISO 20022 codes (reference: https://dz-privatbank-xs2a.pass-consulting.com/apidocs/json_ExternalCashAccountType1Code.html)
-        $isoMapping = [
-            'CACC' => 'current_account', // Current account
-            'TRAN' => 'current_account', // Transacting account
-            'SVGS' => 'savings_account', // Savings
-            'LLSV' => 'savings_account', // Limited liquidity savings
-            'ONDP' => 'savings_account', // Overnight deposit
-            'CHAR' => 'credit_card', // Charge Card
-            'LOAN' => 'loan',            // Loan
-            'ODFT' => 'loan',            // Overdraft treated as loan category internally
-            'MOMA' => 'investment_account', // Money market
-            'MGLD' => 'investment_account', // Marginal lending
-            'TRAS' => 'investment_account', // Cash trading
-        ];
-
-        if (isset($isoMapping[$code])) {
-            return $isoMapping[$code];
-        }
-
-        // Fallback for common descriptive values occasionally returned
-        return match ($cashAccountType) {
-            'CurrentAccount' => 'current_account',
-            'SavingsAccount' => 'savings_account',
-            'CreditCard' => 'credit_card',
-            'InvestmentAccount' => 'investment_account',
-            'LoanAccount' => 'loan',
-            default => 'other',
-        };
-    }
-
-    /**
-     * Derive a user-friendly account number with fallbacks:
-     * - IBAN (last 8 chars, spaces removed)
-     * - maskedPan (as-is)
-     * - BBAN (as-is)
-     * - resourceId (last 8 chars)
-     */
-    protected function deriveAccountNumber(array $data): ?string
-    {
-        // IBAN may appear at top-level or nested under account fields
-        $iban = $data['iban']
-            ?? ($data['debtorAccount']['iban'] ?? null)
-            ?? ($data['creditorAccount']['iban'] ?? null);
-        if ($iban) {
-            $clean = str_replace(' ', '', $iban);
-
-            return substr($clean, -8);
-        }
-
-        // maskedPan may be present for card accounts
-        $maskedPan = $data['maskedPan']
-            ?? ($data['debtorAccount']['maskedPan'] ?? null)
-            ?? ($data['creditorAccount']['maskedPan'] ?? null);
-        if ($maskedPan) {
-            return $maskedPan;
-        }
-
-        // BBAN may be present
-        $bban = $data['bban']
-            ?? ($data['debtorAccount']['bban'] ?? null)
-            ?? ($data['creditorAccount']['bban'] ?? null);
-        if ($bban) {
-            return $bban;
-        }
-
-        // Fallback to resourceId (truncate to last 8 chars)
-        $resourceId = $data['resourceId'] ?? ($data['id'] ?? null);
-        if ($resourceId) {
-            return substr((string) $resourceId, -8);
-        }
-
-        return null;
-    }
-
-    /**
-     * Prefer human-readable institution name from group metadata,
-     * then payload institution_id, else fallback to "GoCardless".
-     */
-    protected function deriveProviderName(?IntegrationGroup $group, array $payload): string
-    {
-        if ($group && is_array($group->auth_metadata)) {
-            $name = $group->auth_metadata['gocardless_institution_name'] ?? null;
-            if (is_string($name) && $name !== '') {
-                return $name;
-            }
-
-            // As a secondary option, some UIs might store institution display name under a generic key
-            $alt = $group->auth_metadata['institution_name'] ?? null;
-            if (is_string($alt) && $alt !== '') {
-                return $alt;
-            }
-        }
-
-        // If payload carries an institution name, use it
-        if (! empty($payload['institution_name']) && is_string($payload['institution_name'])) {
-            return (string) $payload['institution_name'];
-        }
-
-        // If we only have an id, return it for now (still better than generic)
-        if (! empty($payload['institution_id']) && is_string($payload['institution_id'])) {
-            return (string) $payload['institution_id'];
-        }
-
-        return 'GoCardless';
     }
 
     /**
@@ -3005,95 +3093,6 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'requisition_id' => $requisitionId,
             'cache_key' => $cacheKey,
         ]);
-    }
-
-    /**
-     * Get account details with caching
-     */
-    protected function getAccount(string $accountId): ?array
-    {
-        $cacheKey = "gocardless_account_details_{$accountId}";
-
-        // Check if data is in cache first
-        if (Cache::has($cacheKey)) {
-            // Track cache hit
-            $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', true);
-            Log::info('GoCardless getAccount: using cached data', [
-                'account_id' => $accountId,
-                'cache_key' => $cacheKey,
-            ]);
-        }
-
-        return Cache::remember($cacheKey, self::ACCOUNT_DETAILS_CACHE_TTL, function () use ($accountId) {
-            Log::info('GoCardless getAccount: fetching from API (not cached)', [
-                'account_id' => $accountId,
-            ]);
-
-            // Log the API request
-            $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/details/', [
-                'Authorization' => '[REDACTED]',
-            ]);
-
-            $startTime = microtime(true);
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
-            $responseTime = (int) ((microtime(true) - $startTime) * 1000); // Convert to milliseconds
-
-            // Log the API response
-            $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/details/', $response->status(), $response->body(), $response->headers());
-
-            // Track API call for monitoring
-            $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', false, $responseTime);
-
-            if (! $response->successful()) {
-                $errorData = $response->json();
-                $isRateLimited = $response->status() === 429;
-
-                if ($isRateLimited) {
-                    Log::warning('GoCardless API rate limit exceeded for account details', [
-                        'account_id' => $accountId,
-                        'status' => $response->status(),
-                        'rate_limit_detail' => $errorData['detail'] ?? 'unknown',
-                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
-                    ]);
-
-                    // Return a fallback account structure when rate limited
-                    return [
-                        'id' => $accountId,
-                        'details' => 'Account ' . substr($accountId, 0, 8),
-                        'currency' => 'Unknown',
-                        'cashAccountType' => 'Unknown',
-                        'ownerName' => 'Unknown',
-                        'status' => 'rate_limited',
-                        'rate_limit_error' => $errorData['detail'] ?? 'Rate limit exceeded',
-                    ];
-                } else {
-                    Log::error('Failed to get account details', [
-                        'account_id' => $accountId,
-                        'status' => $response->status(),
-                        'response' => $response->body(),
-                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
-                    ]);
-
-                    return null;
-                }
-            }
-
-            $responseData = $response->json();
-            // The API returns {"account": {...}}, so extract the account data
-            $accountData = $responseData['account'] ?? $responseData;
-
-            // Ensure the account data always has an 'id' key
-            $accountData['id'] = $accountId;
-
-            Log::info('GoCardless getAccount response', [
-                'account_id' => $accountId,
-                'account_data' => $accountData,
-            ]);
-
-            return $accountData;
-        });
     }
 
     /**
