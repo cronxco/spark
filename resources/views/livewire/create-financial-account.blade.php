@@ -145,7 +145,7 @@
                         </div>
 
                         <!-- Start Date -->
-                        <div class="form-control md:col-span-2">
+                        <div class="form-control">
                             <label class="label">
                                 <span class="label-text">Start Date</span>
                             </label>
@@ -159,6 +159,30 @@
                                     <span class="label-text-alt text-error">{{ $message }}</span>
                                 </label>
                             @enderror
+                        </div>
+
+                        <!-- Negative Balance Toggle -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Negative Balance Account</span>
+                            </label>
+                            <div class="form-control">
+                                <label class="label cursor-pointer justify-start gap-4">
+                                    <input type="checkbox" wire:model.live="isNegativeBalance" class="toggle toggle-primary" />
+                                    <span class="label-text">
+                                        @if ($isNegativeBalance)
+                                            Higher balance = more debt
+                                        @else
+                                            Higher balance = more money
+                                        @endif
+                                    </span>
+                                </label>
+                            </div>
+                            <label class="label">
+                                <span class="label-text-alt text-base-content/70">
+                                    Enable for credit cards, loans, and mortgages where a higher balance means more debt
+                                </span>
+                            </label>
                         </div>
                     </div>
 

@@ -253,6 +253,16 @@
                                         } else {
                                             $currentBalance = null;
                                         }
+
+                                        // Check if this is a negative balance account (debt)
+                                        $isNegativeBalance = $metadata['is_negative_balance'] ?? false;
+
+                                        // For negative balance accounts, invert the sign for display
+                                        if ($isNegativeBalance && $currentBalance !== null) {
+                                            $displayBalance = -$currentBalance;
+                                        } else {
+                                            $displayBalance = $currentBalance;
+                                        }
                                     @endphp
                                     <tr>
                                         <td>
@@ -307,9 +317,9 @@
                                             <span class="text-sm text-base-content/70">{{ $service }}</span>
                                         </td>
                                         <td>
-                                            @if ($currentBalance !== null)
-                                                <span class="font-mono font-medium">
-                                                    {{ $currencySymbol }}{{ number_format($currentBalance, 2) }}
+                                            @if ($displayBalance !== null)
+                                                <span class="font-mono font-medium {{ $displayBalance < 0 ? 'text-error' : '' }}">
+                                                    {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
                                                 </span>
                                             @else
                                                 <span class="text-base-content/50">No balance</span>

@@ -428,7 +428,7 @@ class Integration extends Model
             ->logFillable()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->dontLogIfAttributesChangedOnly(['updated_at', 'last_triggered_at']);
+            ->dontLogIfAttributesChangedOnly(['updated_at', 'last_triggered_at', 'last_successful_update_at']);
     }
 
     /**

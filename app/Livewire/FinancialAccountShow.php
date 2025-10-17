@@ -15,6 +15,7 @@ class FinancialAccountShow extends Component
     public EventObject $account;
     public bool $showSidebar = false;
     public bool $metadataOpen = false;
+    public bool $showEditModal = false;
 
     public function mount(EventObject $account): void
     {
@@ -27,6 +28,16 @@ class FinancialAccountShow extends Component
     public function toggleSidebar(): void
     {
         $this->showSidebar = ! $this->showSidebar;
+    }
+
+    public function openEditModal(): void
+    {
+        $this->showEditModal = true;
+    }
+
+    public function closeEditModal(): void
+    {
+        $this->showEditModal = false;
     }
 
     public function render(): View
@@ -81,6 +92,16 @@ class FinancialAccountShow extends Component
             $currentBalance = null;
         }
 
+        // Check if this is a negative balance account (debt)
+        $isNegativeBalance = $metadata['is_negative_balance'] ?? false;
+
+        // For negative balance accounts, invert the sign for display
+        if ($isNegativeBalance && $currentBalance !== null) {
+            $displayBalance = -$currentBalance;
+        } else {
+            $displayBalance = $currentBalance;
+        }
+
         // Get balance history
         $balanceEvents = $plugin->getBalanceEvents($this->account);
 
@@ -95,8 +116,18 @@ class FinancialAccountShow extends Component
             'interestRate' => $interestRate,
             'startDate' => $startDate,
             'currentBalance' => $currentBalance,
+            'displayBalance' => $displayBalance,
+            'isNegativeBalance' => $isNegativeBalance,
             'latestBalance' => $latestBalance,
             'balanceEvents' => $balanceEvents,
         ]);
+    }
+
+    protected function getListeners(): array
+    {
+        return [
+            'close-modal' => 'closeEditModal',
+            'account-updated' => '$refresh',
+        ];
     }
 }
