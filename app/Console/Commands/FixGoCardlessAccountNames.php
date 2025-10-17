@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -52,8 +53,9 @@ class FixGoCardlessAccountNames extends Command
             $accountId = $account->metadata['account_id'] ?? null;
 
             if (! $integrationId) {
-                $this->error("  ❌ No integration_id found in metadata, skipping");
+                $this->error('  ❌ No integration_id found in metadata, skipping');
                 $failed++;
+
                 continue;
             }
 
@@ -66,7 +68,7 @@ class FixGoCardlessAccountNames extends Command
                     $groupId = $parts[1];
                     $extractedAccountId = implode('_', array_slice($parts, 2));
 
-                    $this->line("  📋 Onboarding object detected");
+                    $this->line('  📋 Onboarding object detected');
                     $this->line("  🔑 Extracted account_id: {$extractedAccountId}");
 
                     // Find the real integration for this group
@@ -77,13 +79,15 @@ class FixGoCardlessAccountNames extends Command
                     if (! $integration) {
                         $this->error("  ❌ No integration found for group {$groupId}, skipping");
                         $failed++;
+
                         continue;
                     }
 
                     $accountId = $extractedAccountId;
                 } else {
-                    $this->error("  ❌ Invalid onboarding integration ID format, skipping");
+                    $this->error('  ❌ Invalid onboarding integration ID format, skipping');
                     $failed++;
+
                     continue;
                 }
             } else {
@@ -93,6 +97,7 @@ class FixGoCardlessAccountNames extends Command
                 if (! $integration) {
                     $this->error("  ❌ Integration {$integrationId} not found, skipping");
                     $failed++;
+
                     continue;
                 }
             }
@@ -104,8 +109,9 @@ class FixGoCardlessAccountNames extends Command
             }
 
             if (! $accountId) {
-                $this->error("  ❌ No account_id available, skipping");
+                $this->error('  ❌ No account_id available, skipping');
                 $failed++;
+
                 continue;
             }
 
@@ -145,7 +151,7 @@ class FixGoCardlessAccountNames extends Command
                         $account->delete();
                     });
 
-                    $this->info("  ✅ Merged placeholder into existing account and deleted placeholder");
+                    $this->info('  ✅ Merged placeholder into existing account and deleted placeholder');
 
                     Log::info('Merged GoCardless duplicate account objects', [
                         'placeholder_id' => $account->id,
@@ -164,15 +170,16 @@ class FixGoCardlessAccountNames extends Command
                 }
             } else {
                 // No existing good account found, fix this one in place
-                $this->line("  🔄 No existing proper account found, fetching details from GoCardless...");
+                $this->line('  🔄 No existing proper account found, fetching details from GoCardless...');
 
                 try {
                     $plugin = new GoCardlessBankPlugin;
                     $accountDetails = $plugin->getAccount($accountId);
 
                     if (! $accountDetails) {
-                        $this->error("  ❌ Failed to fetch account details from GoCardless API");
+                        $this->error('  ❌ Failed to fetch account details from GoCardless API');
                         $failed++;
+
                         continue;
                     }
 
@@ -217,7 +224,7 @@ class FixGoCardlessAccountNames extends Command
                         $this->info("  ✅ Would fix in place: {$account->title} → {$properName}");
                         $fixed++;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $this->error("  ❌ Error: {$e->getMessage()}");
                     $failed++;
                 }
@@ -229,14 +236,14 @@ class FixGoCardlessAccountNames extends Command
         $this->newLine();
 
         if ($dryRun) {
-            $this->info("📊 Summary (DRY RUN):");
+            $this->info('📊 Summary (DRY RUN):');
             $this->info("  Would fix in place: {$fixed}");
             $this->info("  Would merge duplicates: {$merged}");
             $this->info("  Would fail: {$failed}");
             $this->newLine();
-            $this->info("Run without --dry-run to apply changes");
+            $this->info('Run without --dry-run to apply changes');
         } else {
-            $this->info("📊 Summary:");
+            $this->info('📊 Summary:');
             $this->info("  ✅ Fixed in place: {$fixed}");
             $this->info("  🔗 Merged duplicates: {$merged}");
             $this->info("  ❌ Failed: {$failed}");
