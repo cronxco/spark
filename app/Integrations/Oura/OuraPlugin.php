@@ -2553,7 +2553,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         // Aggregate to one event per day with a few summary blocks
-        $byDay = collect($items)->groupBy(fn($p) => Str::substr($p['timestamp'] ?? $p['start_datetime'] ?? '', 0, 10));
+        $byDay = collect($items)->groupBy(fn ($p) => Str::substr($p['timestamp'] ?? $p['start_datetime'] ?? '', 0, 10));
         foreach ($byDay as $day => $points) {
             $min = (int) collect($points)->min('bpm');
             $max = (int) collect($points)->max('bpm');
