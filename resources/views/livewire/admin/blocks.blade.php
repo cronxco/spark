@@ -20,13 +20,15 @@ new class extends Component
     public string $blockTypeFilter = '';
     public string $serviceFilter = '';
     public array $selectedBlocks = [];
-    public bool $selectAll = false;
     public int $perPage = 25;
+    public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
     protected $queryString = [
         'search' => ['except' => ''],
         'blockTypeFilter' => ['except' => ''],
         'serviceFilter' => ['except' => ''],
+        'sortBy' => ['except' => ['column' => 'time', 'direction' => 'desc']],
+        'perPage' => ['except' => 25],
         'page' => ['except' => 1],
     ];
 
@@ -56,25 +58,17 @@ new class extends Component
         $this->resetPage();
     }
 
-    public function toggleSelectAll(): void
+    public function headers(): array
     {
-        if ($this->selectAll) {
-            $this->selectedBlocks = $this->getBlocks()->pluck('id')->toArray();
-        } else {
-            $this->selectedBlocks = [];
-        }
-    }
-
-    public function toggleBlockSelection(string $blockId): void
-    {
-        if (in_array($blockId, $this->selectedBlocks)) {
-            $this->selectedBlocks = array_filter($this->selectedBlocks, fn ($id) => $id !== $blockId);
-        } else {
-            $this->selectedBlocks[] = $blockId;
-        }
-
-        // Update select all checkbox state
-        $this->selectAll = count($this->selectedBlocks) === $this->getBlocks()->count();
+        return [
+            ['key' => 'id', 'label' => 'ID', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'title', 'label' => 'Title', 'sortable' => true],
+            ['key' => 'block_type', 'label' => 'Block Type', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'value', 'label' => 'Value', 'sortable' => true],
+            ['key' => 'service', 'label' => 'Service', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'event_id', 'label' => 'Event', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'time', 'label' => 'Time', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+        ];
     }
 
     public function bulkDelete(): void
@@ -95,7 +89,6 @@ new class extends Component
             $this->success("Successfully deleted {$count} block(s).");
 
             $this->selectedBlocks = [];
-            $this->selectAll = false;
             $this->resetPage();
         } catch (\Exception $e) {
             $this->error('Failed to delete blocks: ' . $e->getMessage());
@@ -132,7 +125,12 @@ new class extends Component
             });
         }
 
-        return $query->orderBy('time', 'desc')->paginate($this->perPage);
+        // Apply sorting
+        $sortColumn = $this->sortBy['column'] ?? 'time';
+        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $query->orderBy($sortColumn, $sortDirection);
+
+        return $query->paginate($this->perPage);
     }
 
     public function getUniqueBlockTypes()
@@ -195,21 +193,88 @@ new class extends Component
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedBlocks) > 0)
-                    <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                            onclick="return confirm('Are you sure you want to delete {{ count($selectedBlocks) }} block(s)? This action cannot be undone.')">
-                        <x-icon name="o-trash" class="w-4 h-4 mr-1" />
-                        Delete Selected ({{ count($selectedBlocks) }})
-                    </button>
+                <button class="btn btn-error btn-sm" wire:click="bulkDelete"
+                    onclick="return confirm('Are you sure you want to delete {{ count($selectedBlocks) }} block(s)? This action cannot be undone.')">
+                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    Delete Selected ({{ count($selectedBlocks) }})
+                </button>
                 @endif
             </div>
         </x-slot:actions>
     </x-header>
 
-    <div class="space-y-4 lg:space-y-6">
-        <!-- Search and Filters -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Desktop Filters -->
+    <div class="hidden lg:block card bg-base-200 shadow mb-6">
+        <div class="card-body">
+            <div class="flex flex-row gap-4">
+                <!-- Search -->
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">Search</span>
+                    </label>
+                    <input
+                        type="text"
+                        class="input input-bordered w-full"
+                        placeholder="Search blocks..."
+                        wire:model.live.debounce.300ms="search" />
+                </div>
+
+                <!-- Block Type Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Block Type</span>
+                    </label>
+                    <select class="select select-bordered w-full" wire:model.live="blockTypeFilter">
+                        <option value="">All Block Types</option>
+                        @foreach ($this->getUniqueBlockTypes() as $type)
+                        <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Service Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Service</span>
+                    </label>
+                    <select class="select select-bordered w-full" wire:model.live="serviceFilter">
+                        <option value="">All Services</option>
+                        @foreach ($this->getUniqueServices() as $service)
+                        <option value="{{ $service }}">{{ ucfirst($service) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $blockTypeFilter || $serviceFilter)
+                <div class="form-control content-end">
+                    <label class="label">
+                        <span class="label-text">&nbsp;</span>
+                    </label>
+                    <button class="btn btn-outline" wire:click="clearFilters">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        Clear
+                    </button>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Filters -->
+    <div class="lg:hidden mb-4">
+        <x-collapse separator class="bg-base-200">
+            <x-slot:heading>
+                <div class="flex items-center gap-2">
+                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    Filters
+                    @if ($search || $blockTypeFilter || $serviceFilter)
+                    <x-badge value="Active" class="badge-primary badge-xs" />
+                    @endif
+                </div>
+            </x-slot:heading>
+            <x-slot:content>
+                <div class="flex flex-col gap-4">
                     <!-- Search -->
                     <div class="form-control">
                         <label class="label">
@@ -219,8 +284,7 @@ new class extends Component
                             type="text"
                             class="input input-bordered w-full"
                             placeholder="Search blocks..."
-                            wire:model.live.debounce.300ms="search"
-                        />
+                            wire:model.live.debounce.300ms="search" />
                     </div>
 
                     <!-- Block Type Filter -->
@@ -231,7 +295,7 @@ new class extends Component
                         <select class="select select-bordered w-full" wire:model.live="blockTypeFilter">
                             <option value="">All Block Types</option>
                             @foreach ($this->getUniqueBlockTypes() as $type)
-                                <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
+                            <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -244,147 +308,95 @@ new class extends Component
                         <select class="select select-bordered w-full" wire:model.live="serviceFilter">
                             <option value="">All Services</option>
                             @foreach ($this->getUniqueServices() as $service)
-                                <option value="{{ $service }}">{{ ucfirst($service) }}</option>
+                            <option value="{{ $service }}">{{ ucfirst($service) }}</option>
                             @endforeach
                         </select>
                     </div>
+
+                    <!-- Clear Filters Button -->
+                    @if ($search || $blockTypeFilter || $serviceFilter)
+                    <button class="btn btn-outline" wire:click="clearFilters">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        Clear Filters
+                    </button>
+                    @endif
                 </div>
+            </x-slot:content>
+        </x-collapse>
+    </div>
 
-                <!-- Clear Filters Button -->
-                @if ($search || $blockTypeFilter || $serviceFilter)
-                    <div class="flex justify-end mt-4">
-                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
-                    </div>
-                @endif
-            </div>
-        </div>
+    <!-- Blocks Table -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <x-table
+                :headers="$this->headers()"
+                :rows="$this->getBlocks()"
+                :sort-by="$sortBy"
+                :link="route('blocks.show', ['block' => '[id]'])"
+                with-pagination
+                per-page=" perPage"
+                :per-page-values="[10, 25, 50, 100]"
+                selectable
+                selectable-key="id"
+                wire:model.live="selectedBlocks"
+                class="[&_table]:!static [&_td]:!static">
 
-        <!-- Results -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                @if ($this->getBlocks()->isEmpty())
-                    <div class="text-center py-12">
-                        <x-icon name="o-cube-transparent" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-                        <h3 class="text-lg font-medium mb-4">No blocks found</h3>
-                        <p class="text-base-content/70">
-                            @if ($search || $blockTypeFilter || $serviceFilter)
-                                Try adjusting your filters to find blocks.
-                            @else
-                                Your blocks will appear here once they're created.
-                            @endif
-                        </p>
-                    </div>
+                @scope('cell_id', $block)
+                <code class="text-xs hidden md:inline">{{ $this->truncateId($block->id) }}</code>
+                @endscope
+
+                @scope('cell_title', $block)
+                <x-uk-date :date="$block->time" class="sm:hidden" />
+                <br />
+                <div class="font-medium">{{ $block->title ?: 'N/A' }}</div>
+                @endscope
+
+                @scope('cell_block_type', $block)
+                @if ($block->block_type)
+                <span class="text-sm">{{ $this->prettifyBlockType($block->block_type) }}</span>
                 @else
-                    <!-- Results header -->
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-4">
-                            <label class="label cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    class="checkbox"
-                                    wire:model="selectAll"
-                                    wire:change="toggleSelectAll"
-                                />
-                                <span class="label-text ml-2">Select all</span>
-                            </label>
-                            <span class="text-sm text-base-content/60">
-                                {{ $this->getBlocks()->total() }} total blocks
-                            </span>
-                        </div>
-                        <div class="text-sm text-base-content/60">
-                            Page {{ $this->getBlocks()->currentPage() }} of {{ $this->getBlocks()->lastPage() }}
-                        </div>
-                    </div>
-
-                    <!-- Table -->
-                    <div class="overflow-x-auto">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>ID</th>
-                                    <th>Title</th>
-                                    <th>Block Type</th>
-                                    <th>Value</th>
-                                    <th>Service</th>
-                                    <th>Event ID</th>
-                                    <th>Time</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($this->getBlocks() as $block)
-                                    <tr class="hover">
-                                        <td>
-                                            <input
-                                                type="checkbox"
-                                                class="checkbox"
-                                                value="{{ $block->id }}"
-                                                wire:model="selectedBlocks"
-                                                wire:change="toggleBlockSelection('{{ $block->id }}')"
-                                            />
-                                        </td>
-                                        <td>
-                                            <code class="text-xs">{{ $this->truncateId($block->id) }}</code>
-                                        </td>
-                                        <td>
-                                            <div class="font-medium">{{ $block->title ?: 'N/A' }}</div>
-                                        </td>
-                                        <td>
-                                            @if ($block->block_type)
-                                                <span class="text-sm">{{ $this->prettifyBlockType($block->block_type) }}</span>
-                                            @else
-                                                <span class="text-base-content/50">N/A</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <span class="font-mono text-sm">
-                                                {{ $this->formatValue($block->value, $block->value_multiplier, $block->value_unit) }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            @if ($block->event)
-                                                <span class="text-sm">{{ $block->event->service }}</span>
-                                            @else
-                                                <span class="text-base-content/50">N/A</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if ($block->event)
-                                                <a href="{{ route('events.show', $block->event) }}" class="link">
-                                                    <code class="text-xs">{{ $this->truncateId($block->event->id) }}</code>
-                                                </a>
-                                            @else
-                                                <span class="text-error">Missing Event</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <span class="text-sm" title="{{ $block->time?->toDayDateTimeString() }}">
-                                                {{ $block->time?->diffForHumans() ?: 'N/A' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="flex items-center gap-1">
-                                                <a href="{{ route('blocks.show', $block) }}" class="btn btn-ghost btn-xs">
-                                                    <x-icon name="o-eye" class="w-3 h-3" />
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div class="mt-4">
-                        {{ $this->getBlocks()->links() }}
-                    </div>
+                <span class="text-base-content/50">N/A</span>
                 @endif
-            </div>
+                @endscope
+
+                @scope('cell_value', $block)
+                <span class="font-mono text-sm">
+                    {{ $this->formatValue($block->value, $block->value_multiplier, $block->value_unit) }}
+                </span>
+                @endscope
+
+                @scope('cell_service', $block)
+                @if ($block->event)
+                <span class="text-sm">{{ $block->event->service }}</span>
+                @else
+                <span class="text-base-content/50">N/A</span>
+                @endif
+                @endscope
+
+                @scope('cell_event_id', $block)
+                @if ($block->event)
+                <a href="{{ route('events.show', $block->event) }}" class="link">
+                    <code class="text-xs">{{ $this->truncateId($block->event->id) }}</code>
+                </a>
+                @else
+                <span class="text-error">Missing Event</span>
+                @endif
+                @endscope
+
+                @scope('cell_time', $block)
+                <x-uk-date :date="$block->time" />
+                @endscope
+
+                <x-slot:empty>
+                    <div class="text-center py-12">
+                        <x-icon name="o-squares-2x2" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                        <p class="font-medium text-base-content mb-2">No blocks found</p>
+                        @if ($search || $blockTypeFilter || $serviceFilter)
+                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
+                        @endif
+                    </div>
+                </x-slot:empty>
+            </x-table>
         </div>
     </div>
 </div>

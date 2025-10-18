@@ -20,13 +20,15 @@ new class extends Component
     public string $conceptFilter = '';
     public string $typeFilter = '';
     public array $selectedObjects = [];
-    public bool $selectAll = false;
     public int $perPage = 25;
+    public array $sortBy = ['column' => 'created_at', 'direction' => 'desc'];
 
     protected $queryString = [
         'search' => ['except' => ''],
         'conceptFilter' => ['except' => ''],
         'typeFilter' => ['except' => ''],
+        'sortBy' => ['except' => ['column' => 'created_at', 'direction' => 'desc']],
+        'perPage' => ['except' => 25],
         'page' => ['except' => 1],
     ];
 
@@ -56,25 +58,16 @@ new class extends Component
         $this->resetPage();
     }
 
-    public function toggleSelectAll(): void
+    public function headers(): array
     {
-        if ($this->selectAll) {
-            $this->selectedObjects = $this->getObjects()->pluck('id')->toArray();
-        } else {
-            $this->selectedObjects = [];
-        }
-    }
-
-    public function toggleObjectSelection(string $objectId): void
-    {
-        if (in_array($objectId, $this->selectedObjects)) {
-            $this->selectedObjects = array_filter($this->selectedObjects, fn ($id) => $id !== $objectId);
-        } else {
-            $this->selectedObjects[] = $objectId;
-        }
-
-        // Update select all checkbox state
-        $this->selectAll = count($this->selectedObjects) === $this->getObjects()->count();
+        return [
+            ['key' => 'id', 'label' => 'ID', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'title', 'label' => 'Title', 'sortable' => true],
+            ['key' => 'concept', 'label' => 'Concept', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'type', 'label' => 'Type', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'events', 'label' => 'Events', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'created_at', 'label' => 'Time', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+        ];
     }
 
     public function bulkDelete(): void
@@ -95,7 +88,6 @@ new class extends Component
             $this->success("Successfully deleted {$count} object(s).");
 
             $this->selectedObjects = [];
-            $this->selectAll = false;
             $this->resetPage();
         } catch (\Exception $e) {
             $this->error('Failed to delete objects: ' . $e->getMessage());
@@ -127,7 +119,12 @@ new class extends Component
             $query->where('type', $this->typeFilter);
         }
 
-        return $query->orderBy('time', 'desc')->paginate($this->perPage);
+        // Apply sorting
+        $sortColumn = $this->sortBy['column'] ?? 'created_at';
+        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $query->orderBy($sortColumn, $sortDirection);
+
+        return $query->paginate($this->perPage);
     }
 
     public function getUniqueConcepts()
@@ -173,21 +170,88 @@ new class extends Component
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedObjects) > 0)
-                    <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                            onclick="return confirm('Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.')">
-                        <x-icon name="o-trash" class="w-4 h-4 mr-1" />
-                        Delete Selected ({{ count($selectedObjects) }})
-                    </button>
+                <button class="btn btn-error btn-sm" wire:click="bulkDelete"
+                    onclick="return confirm('Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.')">
+                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    Delete Selected ({{ count($selectedObjects) }})
+                </button>
                 @endif
             </div>
         </x-slot:actions>
     </x-header>
 
-    <div class="space-y-4 lg:space-y-6">
-        <!-- Search and Filters -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Desktop Filters -->
+    <div class="hidden lg:block card bg-base-200 shadow mb-6">
+        <div class="card-body">
+            <div class="flex flex-row gap-4">
+                <!-- Search -->
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">Search</span>
+                    </label>
+                    <input
+                        type="text"
+                        class="input input-bordered w-full"
+                        placeholder="Search objects..."
+                        wire:model.live.debounce.300ms="search" />
+                </div>
+
+                <!-- Concept Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Concept</span>
+                    </label>
+                    <select class="select select-bordered w-full" wire:model.live="conceptFilter">
+                        <option value="">All Concepts</option>
+                        @foreach ($this->getUniqueConcepts() as $concept)
+                        <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Type Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Type</span>
+                    </label>
+                    <select class="select select-bordered w-full" wire:model.live="typeFilter">
+                        <option value="">All Types</option>
+                        @foreach ($this->getUniqueTypes() as $type)
+                        <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $conceptFilter || $typeFilter)
+                <div class="form-control content-end">
+                    <label class="label">
+                        <span class="label-text">&nbsp;</span>
+                    </label>
+                    <button class="btn btn-outline" wire:click="clearFilters">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        Clear
+                    </button>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Filters -->
+    <div class="lg:hidden mb-4">
+        <x-collapse separator class="bg-base-200">
+            <x-slot:heading>
+                <div class="flex items-center gap-2">
+                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    Filters
+                    @if ($search || $conceptFilter || $typeFilter)
+                    <x-badge value="Active" class="badge-primary badge-xs" />
+                    @endif
+                </div>
+            </x-slot:heading>
+            <x-slot:content>
+                <div class="flex flex-col gap-4">
                     <!-- Search -->
                     <div class="form-control">
                         <label class="label">
@@ -197,8 +261,7 @@ new class extends Component
                             type="text"
                             class="input input-bordered w-full"
                             placeholder="Search objects..."
-                            wire:model.live.debounce.300ms="search"
-                        />
+                            wire:model.live.debounce.300ms="search" />
                     </div>
 
                     <!-- Concept Filter -->
@@ -209,7 +272,7 @@ new class extends Component
                         <select class="select select-bordered w-full" wire:model.live="conceptFilter">
                             <option value="">All Concepts</option>
                             @foreach ($this->getUniqueConcepts() as $concept)
-                                <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
+                            <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -222,113 +285,84 @@ new class extends Component
                         <select class="select select-bordered w-full" wire:model.live="typeFilter">
                             <option value="">All Types</option>
                             @foreach ($this->getUniqueTypes() as $type)
-                                <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
+                            <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
                             @endforeach
                         </select>
                     </div>
+
+                    <!-- Clear Filters Button -->
+                    @if ($search || $conceptFilter || $typeFilter)
+                    <button class="btn btn-outline" wire:click="clearFilters">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        Clear Filters
+                    </button>
+                    @endif
                 </div>
+            </x-slot:content>
+        </x-collapse>
+    </div>
 
-                <!-- Clear Filters Button -->
-                @if ($search || $conceptFilter || $typeFilter)
-                    <div class="flex justify-end mt-4">
-                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
+    <!-- Objects Table -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <x-table
+                :headers="$this->headers()"
+                :rows="$this->getObjects()"
+                :sort-by="$sortBy"
+                with-pagination
+                per-page="perPage"
+                :per-page-values="[10, 25, 50, 100]"
+                selectable
+                selectable-key="id"
+                wire:model.live="selectedObjects"
+                class="[&_table]:!static [&_td]:!static">
+
+                @scope('cell_id', $object)
+                <a href="{{ route('objects.show', $object->id) }}" class="link font-mono text-xs hidden md:inline" title="{{ $object->id }}">
+                    {{ $this->truncateId($object->id) }}
+                </a>
+                @endscope
+
+                @scope('cell_title', $object)
+                <div>
+                    <x-uk-date :date="$object->time" class="sm:hidden" />
+                    <div class="font-medium">{{ $object->title }}</div>
+                    @if ($object->url)
+                    <div class="text-sm text-base-content/70 text-clip">
+                        <a href="{{ $object->url }}" target="_blank" class="link">
+                            {{ get_domain_from_url($object->url) }}
+                        </a>
                     </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- Objects Table -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="overflow-x-auto">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>
-                                    <x-checkbox
-                                        wire:model.live="selectAll"
-                                        wire:click="toggleSelectAll"
-                                    />
-                                </th>
-                                <th>ID</th>
-                                <th>Title</th>
-                                <th>Concept</th>
-                                <th>Type</th>
-                                <th>Events</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($this->getObjects() as $object)
-                                <tr class="hover">
-                                    <td>
-                                        <x-checkbox
-                                            wire:model.live="selectedObjects"
-                                            value="{{ $object->id }}"
-                                            wire:click="toggleObjectSelection('{{ $object->id }}')"
-                                        />
-                                    </td>
-                                    <td>
-                                        <a href="{{ route('objects.show', $object->id) }}" class="link font-mono text-xs" title="{{ $object->id }}">
-                                            {{ $this->truncateId($object->id) }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <div class="font-medium">{{ $object->title }}</div>
-                                        @if ($object->url)
-                                            <div class="text-sm text-base-content/70">
-                                                <a href="{{ $object->url }}" target="_blank" class="link">
-                                                    <x-icon name="o-link" class="w-3 h-3 inline mr-1" />
-                                                    Link
-                                                </a>
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <span class="text-sm">{{ $this->formatConcept($object->concept) }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm">{{ $this->formatType($object->type) }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm text-base-content/70">{{ $object->actor_events_count + $object->target_events_count }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="text-sm">
-                                            {{ $object->time->format('M j, Y') }}
-                                        </div>
-                                        <div class="text-xs text-base-content/70">
-                                            {{ $object->time->format('g:i A') }}
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center py-12">
-                                        <div>
-                                            <x-icon name="o-document-text" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
-                                            <p class="font-medium text-base-content mb-2">No objects found</p>
-                                            @if ($search || $conceptFilter || $typeFilter)
-                                                <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                    @endif
                 </div>
+                @endscope
 
-                <!-- Pagination -->
-                @if ($this->getObjects()->hasPages())
-                    <div class="p-4 border-t">
-                        {{ $this->getObjects()->links() }}
+                @scope('cell_concept', $object)
+                <span class="text-sm">{{ $this->formatConcept($object->concept) }}</span>
+                @endscope
+
+                @scope('cell_type', $object)
+                <span class="text-sm">{{ $this->formatType($object->type) }}</span>
+                @endscope
+
+                @scope('cell_events', $object)
+                <span class="text-sm text-base-content/70">{{ $object->actor_events_count + $object->target_events_count }}</span>
+                @endscope
+
+                @scope('cell_created_at', $object)
+                <x-uk-date :date="$object->time" />
+                @endscope
+
+                <x-slot:empty>
+                    <div class="text-center py-12">
+                        <x-icon name="o-cube-transparent" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                        <p class="font-medium text-base-content mb-2">No objects found</p>
+                        @if ($search || $conceptFilter || $typeFilter)
+                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
+                        @endif
                     </div>
-                @endif
-            </div>
+                </x-slot:empty>
+            </x-table>
         </div>
     </div>
 </div>

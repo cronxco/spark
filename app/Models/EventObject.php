@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -102,5 +103,74 @@ class EventObject extends Model
     public function events()
     {
         return $this->actorEvents()->union($this->targetEvents());
+    }
+
+    /**
+     * Override attachTags to log activity
+     */
+    public function attachTags(array|ArrayAccess|\Spatie\Tags\Tag $tags, ?string $type = null): static
+    {
+        $className = static::getTagClassName();
+
+        $tagObjects = collect($className::findOrCreate($tags, $type));
+
+        // Get currently attached tag IDs before syncing
+        $existingTagIds = $this->tags()->pluck('id')->toArray();
+
+        $this->tags()->syncWithoutDetaching($tagObjects->pluck('id')->toArray());
+
+        // Log only newly attached tags
+        foreach ($tagObjects as $tag) {
+            if (! in_array($tag->id, $existingTagIds)) {
+                $this->logTagActivity($tag, null, 'added');
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Override detachTags to log activity
+     */
+    public function detachTags(array|ArrayAccess $tags, ?string $type = null): static
+    {
+        $tags = static::convertToTags($tags, $type);
+
+        collect($tags)
+            ->filter()
+            ->each(function (\Spatie\Tags\Tag $tag) {
+                $this->tags()->detach($tag);
+                // Log the tag removal
+                $this->logTagActivity($tag, null, 'removed');
+            });
+
+        return $this;
+    }
+
+    /**
+     * Log tag activity to the activity log
+     */
+    private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
+    {
+        // Determine tag name and type
+        if ($tag instanceof \Spatie\Tags\Tag) {
+            $tagName = $tag->name;
+            $tagType = $tag->type;
+        } else {
+            $tagName = $tag;
+            $tagType = $type;
+        }
+
+        // Format tag label
+        $tagLabel = $tagType && $tagType !== 'spark' && $tagType !== 'emoji'
+            ? "{$tagType}:{$tagName}"
+            : $tagName;
+
+        // Log to activity log
+        activity('changelog')
+            ->performedOn($this)
+            ->event("tag_{$action}")
+            ->withProperties(['tag' => $tagLabel, 'tag_name' => $tagName, 'tag_type' => $tagType])
+            ->log("{$action} tag \"{$tagLabel}\"");
     }
 }

@@ -38,6 +38,14 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
     }
 
     /**
+     * OAuth integrations use polling, not staleness checking
+     */
+    public static function getTimeUntilStaleMinutes(): ?int
+    {
+        return null;
+    }
+
+    /**
      * Back-compat: old method signature created an instance immediately.
      * We now create a group first. This helper returns a placeholder instance
      * bound to the group so existing flows that expect an Integration still work

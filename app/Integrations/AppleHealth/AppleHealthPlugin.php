@@ -23,7 +23,7 @@ class AppleHealthPlugin extends WebhookPlugin
 
     public static function getDescription(): string
     {
-        return 'Receive Apple Health exports via webhook. Supports separate instances for workouts and metrics. Workouts are captured with granular blocks.';
+        return 'Sync workouts and health metrics from Apple Health.';
     }
 
     public static function getConfigurationSchema(): array

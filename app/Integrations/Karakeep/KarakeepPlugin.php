@@ -15,6 +15,14 @@ class KarakeepPlugin extends ManualPlugin
         return 'apikey';
     }
 
+    /**
+     * API key integrations use polling, not staleness checking
+     */
+    public static function getTimeUntilStaleMinutes(): ?int
+    {
+        return null;
+    }
+
     public static function getIdentifier(): string
     {
         return 'karakeep';
@@ -27,7 +35,7 @@ class KarakeepPlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Sync bookmarks from your Karakeep instance with AI summaries, tags, and highlights.';
+        return 'Sync bookmarks from Karakeep.';
     }
 
     public static function getGroupConfigurationSchema(): array
@@ -71,19 +79,6 @@ class KarakeepPlugin extends ManualPlugin
                 'default' => 50,
                 'description' => 'Number of bookmarks to fetch per sync (10-100)',
             ],
-            'sync_highlights' => [
-                'type' => 'boolean',
-                'label' => 'Sync Highlights',
-                'required' => false,
-                'default' => true,
-                'description' => 'Include bookmark highlights as blocks',
-            ],
-            'paused' => [
-                'type' => 'boolean',
-                'label' => 'Paused',
-                'required' => false,
-                'default' => false,
-            ],
         ];
     }
 
@@ -121,7 +116,7 @@ class KarakeepPlugin extends ManualPlugin
     public static function getActionTypes(): array
     {
         return [
-            'saved_bookmark' => [
+            'bookmarked' => [
                 'icon' => 'o-bookmark',
                 'display_name' => 'Saved Bookmark',
                 'description' => 'A bookmark was saved',

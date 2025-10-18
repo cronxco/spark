@@ -87,7 +87,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertEquals('bookmark1', $bookmarkObject->metadata['karakeep_id']);
 
         // Check event was created
-        $event = Event::where('action', 'saved_bookmark')->first();
+        $event = Event::where('action', 'bookmarked')->first();
         $this->assertNotNull($event);
         $this->assertEquals($this->integration->id, $event->integration_id);
         $this->assertEquals($userObject->id, $event->actor_id);
@@ -210,7 +210,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $job = new KarakeepBookmarkData($this->integration, $bookmark, $contextData);
         $job->handle();
 
-        $event = Event::where('action', 'saved_bookmark')->first();
+        $event = Event::where('action', 'bookmarked')->first();
         $this->assertNotNull($event);
 
         // Check highlight block was created
@@ -243,7 +243,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $job = new KarakeepBookmarkData($this->integration, $bookmark, $this->contextData);
         $job->handle();
 
-        $event = Event::where('action', 'saved_bookmark')->first();
+        $event = Event::where('action', 'bookmarked')->first();
         $this->assertNotNull($event);
 
         // Check summary block
@@ -280,14 +280,14 @@ class KarakeepBookmarkDataTest extends TestCase
         $job1 = new KarakeepBookmarkData($this->integration, $bookmark, $this->contextData);
         $job1->handle();
 
-        $eventCount = Event::where('action', 'saved_bookmark')->count();
+        $eventCount = Event::where('action', 'bookmarked')->count();
         $this->assertEquals(1, $eventCount);
 
         // Process again - should not create duplicate
         $job2 = new KarakeepBookmarkData($this->integration, $bookmark, $this->contextData);
         $job2->handle();
 
-        $eventCountAfter = Event::where('action', 'saved_bookmark')->count();
+        $eventCountAfter = Event::where('action', 'bookmarked')->count();
         $this->assertEquals(1, $eventCountAfter);
     }
 

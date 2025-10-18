@@ -24,7 +24,7 @@ class TaskPlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Run scheduled jobs or artisan commands not tied to a specific external service.';
+        return 'Run scheduled tasks.';
     }
 
     public static function getIcon(): string

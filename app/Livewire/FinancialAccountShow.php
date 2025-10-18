@@ -8,14 +8,19 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Title('Account Details')]
 class FinancialAccountShow extends Component
 {
+    use WithPagination;
+
     public EventObject $account;
     public bool $showSidebar = false;
     public bool $metadataOpen = false;
     public bool $showEditModal = false;
+    public int $perPage = 25;
+    public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
     public function mount(EventObject $account): void
     {
@@ -38,6 +43,15 @@ class FinancialAccountShow extends Component
     public function closeEditModal(): void
     {
         $this->showEditModal = false;
+    }
+
+    public function headers(): array
+    {
+        return [
+            ['key' => 'time', 'label' => 'Date', 'sortable' => true],
+            ['key' => 'balance', 'label' => 'Balance', 'sortable' => false],
+            ['key' => 'notes', 'label' => 'Notes', 'sortable' => false],
+        ];
     }
 
     public function render(): View
@@ -102,8 +116,15 @@ class FinancialAccountShow extends Component
             $displayBalance = $currentBalance;
         }
 
-        // Get balance history
-        $balanceEvents = $plugin->getBalanceEvents($this->account);
+        // Get balance history with pagination
+        $balanceEventsQuery = $plugin->getBalanceEventsQuery($this->account);
+
+        // Apply sorting
+        $sortColumn = $this->sortBy['column'] ?? 'time';
+        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $balanceEventsQuery->orderBy($sortColumn, $sortDirection);
+
+        $balanceEvents = $balanceEventsQuery->paginate($this->perPage);
 
         return view('livewire.money.show', [
             'metadata' => $metadata,

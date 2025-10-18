@@ -58,7 +58,7 @@ class GitHubPlugin extends OAuthPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect your GitHub account to track repository activity';
+        return 'Track GitHub repository activity';
     }
 
     public static function getConfigurationSchema(): array

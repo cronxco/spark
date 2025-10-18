@@ -948,6 +948,27 @@ new class extends Component {
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Object Details" with-close-button separator class="w-11/12 lg:w-1/3">
                 <div class="space-y-4 lg:space-y-6">
+                    <!-- Tags Manager -->
+                    <x-card class="bg-base-100 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-tag" class="w-5 h-5" />
+                            Tags
+                        </h3>
+                        <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
+                            <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
+                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
+                                {
+                                    !!json_encode(\Spatie\ Tags\ Tag::query() - > pluck('name') - > map(fn($n) => (string) $n) - > unique() - > values() - > all()) !!
+                                }
+                            </script>
+                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">
+                                {
+                                    !!json_encode($this - > object - > tags - > pluck('name') - > values() - > all()) !!
+                                }
+                            </script>
+                        </div>
+                    </x-card>
+
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
@@ -1025,26 +1046,6 @@ new class extends Component {
                         </x-form>
                     </x-card>
 
-                    <!-- Tags Manager -->
-                    <x-card class="bg-base-100 shadow">
-                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-tag" class="w-5 h-5" />
-                            Tags
-                        </h3>
-                        <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
-                            <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
-                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
-                                {
-                                    !!json_encode(\Spatie\ Tags\ Tag::query() - > pluck('name') - > map(fn($n) => (string) $n) - > unique() - > values() - > all()) !!
-                                }
-                            </script>
-                            <script type="application/json" id="tag-initial-{{ $this->object->id }}">
-                                {
-                                    !!json_encode($this - > object - > tags - > pluck('name') - > values() - > all()) !!
-                                }
-                            </script>
-                        </div>
-                    </x-card>
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
                     <x-collapse wire:model="objectMetaOpen">
                         <x-slot:heading>

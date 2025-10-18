@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Tags\Tag;
 use Tests\TestCase;
 
@@ -159,6 +160,210 @@ class TagManagerComponentTest extends TestCase
 
         $event->refresh();
         $this->assertCount(0, $event->tags);
+    }
+
+    #[Test]
+    public function it_logs_tag_addition_to_activity_log(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $event = $this->createEventFor($user);
+        $this->actingAs($user);
+
+        $component = Volt::test('tag-manager', [
+            'modelClass' => Event::class,
+            'modelId' => (string) $event->id,
+        ]);
+
+        $component->call('addTag', 'important');
+
+        $activity = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_added')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertStringContainsString('added tag "important"', $activity->description);
+        $this->assertEquals('important', $activity->properties->get('tag_name'));
+        $this->assertEquals('spark', $activity->properties->get('tag_type'));
+    }
+
+    #[Test]
+    public function it_logs_typed_tag_addition_to_activity_log(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $event = $this->createEventFor($user);
+        $this->actingAs($user);
+
+        $component = Volt::test('tag-manager', [
+            'modelClass' => Event::class,
+            'modelId' => (string) $event->id,
+        ]);
+
+        $component->call('addTag', 'topic:Laravel');
+
+        $activity = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_added')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertStringContainsString('added tag "topic:Laravel"', $activity->description);
+        $this->assertEquals('Laravel', $activity->properties->get('tag_name'));
+        $this->assertEquals('topic', $activity->properties->get('tag_type'));
+    }
+
+    #[Test]
+    public function it_logs_tag_removal_to_activity_log(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $event = $this->createEventFor($user);
+        $this->actingAs($user);
+
+        $event->attachTag(Tag::findOrCreate('important', 'spark'));
+        $event->refresh();
+
+        $component = Volt::test('tag-manager', [
+            'modelClass' => Event::class,
+            'modelId' => (string) $event->id,
+        ]);
+
+        $component->call('removeTag', 'important', 'spark');
+
+        $activity = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_removed')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertStringContainsString('removed tag "important"', $activity->description);
+        $this->assertEquals('important', $activity->properties->get('tag_name'));
+        $this->assertEquals('spark', $activity->properties->get('tag_type'));
+    }
+
+    #[Test]
+    public function it_logs_activity_for_event_objects_too(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $eventObject = EventObject::factory()->create(['user_id' => $user->id]);
+        $this->actingAs($user);
+
+        $component = Volt::test('tag-manager', [
+            'modelClass' => EventObject::class,
+            'modelId' => (string) $eventObject->id,
+        ]);
+
+        $component->call('addTag', 'project:MyApp');
+
+        $activity = Activity::query()
+            ->where('subject_type', EventObject::class)
+            ->where('subject_id', $eventObject->id)
+            ->where('event', 'tag_added')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertStringContainsString('added tag "project:MyApp"', $activity->description);
+        $this->assertEquals('MyApp', $activity->properties->get('tag_name'));
+        $this->assertEquals('project', $activity->properties->get('tag_type'));
+    }
+
+    #[Test]
+    public function it_logs_activity_when_tags_attached_directly_on_model(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $event = $this->createEventFor($user);
+        $this->actingAs($user);
+
+        // Attach tag directly on the model (not through component)
+        $tag = Tag::findOrCreate('urgent', 'priority');
+        $event->attachTag($tag);
+
+        $activity = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_added')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertStringContainsString('added tag "priority:urgent"', $activity->description);
+        $this->assertEquals('urgent', $activity->properties->get('tag_name'));
+        $this->assertEquals('priority', $activity->properties->get('tag_type'));
+    }
+
+    #[Test]
+    public function it_logs_activity_when_tags_detached_directly_on_model(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $event = $this->createEventFor($user);
+        $this->actingAs($user);
+
+        // Attach and then detach tag directly on the model
+        $tag = Tag::findOrCreate('urgent', 'priority');
+        $event->attachTag($tag);
+
+        // Clear previous activity logs for cleaner test
+        Activity::query()->delete();
+
+        $event->detachTag($tag);
+
+        $activity = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_removed')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertStringContainsString('removed tag "priority:urgent"', $activity->description);
+        $this->assertEquals('urgent', $activity->properties->get('tag_name'));
+        $this->assertEquals('priority', $activity->properties->get('tag_type'));
+    }
+
+    #[Test]
+    public function it_does_not_log_activity_when_attaching_already_attached_tag(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        $event = $this->createEventFor($user);
+        $this->actingAs($user);
+
+        // Attach a tag for the first time
+        $tag = Tag::findOrCreate('important', 'spark');
+        $event->attachTag($tag);
+
+        // Verify the first attachment was logged
+        $initialActivityCount = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_added')
+            ->count();
+
+        $this->assertEquals(1, $initialActivityCount);
+
+        // Attach the same tag again
+        $event->attachTag($tag);
+
+        // Verify no additional activity was logged
+        $finalActivityCount = Activity::query()
+            ->where('subject_type', Event::class)
+            ->where('subject_id', $event->id)
+            ->where('event', 'tag_added')
+            ->count();
+
+        $this->assertEquals(1, $finalActivityCount, 'Re-attaching an existing tag should not create duplicate activity logs');
     }
 
     private function createEventFor(User $user): Event

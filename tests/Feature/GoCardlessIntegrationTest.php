@@ -23,7 +23,7 @@ class GoCardlessIntegrationTest extends TestCase
 
         $this->assertEquals('gocardless', GoCardlessBankPlugin::getIdentifier());
         $this->assertEquals('GoCardless Bank', GoCardlessBankPlugin::getDisplayName());
-        $this->assertStringContainsString('GoCardless Bank Account Data API', GoCardlessBankPlugin::getDescription());
+        $this->assertEquals('Connect bank accounts to sync transactions and balances.', GoCardlessBankPlugin::getDescription());
 
         $schema = GoCardlessBankPlugin::getConfigurationSchema();
         $this->assertArrayHasKey('update_frequency_minutes', $schema);

@@ -56,7 +56,7 @@ class SpotifyPlugin extends OAuthPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect your Spotify account to track your listening activity and create events for each track you play';
+        return 'Sync listening history from Spotify.';
     }
 
     public static function getConfigurationSchema(): array
@@ -71,28 +71,19 @@ class SpotifyPlugin extends OAuthPlugin
                 'default' => 15,
             ],
             'auto_tag_genres' => [
-                'type' => 'array',
+                'type' => 'boolean',
                 'label' => 'Auto-tag by Genre',
                 'description' => 'Automatically tag events with track genres',
-                'options' => [
-                    'enabled' => 'Enable genre tagging',
-                ],
             ],
             'auto_tag_artists' => [
-                'type' => 'array',
+                'type' => 'boolean',
                 'label' => 'Auto-tag by Artist',
                 'description' => 'Automatically tag events with artist names',
-                'options' => [
-                    'enabled' => 'Enable artist tagging',
-                ],
             ],
             'include_album_art' => [
-                'type' => 'array',
+                'type' => 'boolean',
                 'label' => 'Include Album Art',
                 'description' => 'Create blocks with album artwork',
-                'options' => [
-                    'enabled' => 'Include album artwork',
-                ],
             ],
         ];
     }

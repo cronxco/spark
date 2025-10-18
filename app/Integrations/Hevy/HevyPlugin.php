@@ -41,7 +41,7 @@ class HevyPlugin implements IntegrationPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect your Hevy account to import workouts. Each exercise set is represented as a block for detailed analysis.';
+        return 'Sync workouts from Hevy.';
     }
 
     public static function getConfigurationSchema(): array
@@ -173,6 +173,14 @@ class HevyPlugin implements IntegrationPlugin
     public static function getServiceType(): string
     {
         return 'apikey';
+    }
+
+    /**
+     * API key integrations use polling, not staleness checking
+     */
+    public static function getTimeUntilStaleMinutes(): ?int
+    {
+        return null;
     }
 
     public function initializeGroup(\App\Models\User $user): IntegrationGroup
@@ -605,7 +613,6 @@ class HevyPlugin implements IntegrationPlugin
                 'integration_id' => $integration->id,
                 'workouts_count' => $processedCount,
             ]);
-
         } catch (Throwable $e) {
             Log::error('Hevy data sweep failed', [
                 'integration_id' => $integration->id,

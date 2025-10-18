@@ -57,7 +57,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
             $listsMap = $this->contextData['lists'] ?? [];
             $highlightsMap = $this->contextData['highlights'] ?? [];
 
-            // Process saved_bookmark event
+            // Process bookmarked event
             $this->processSavedBookmark($bookmark, $tagsMap, $highlightsMap);
 
             // Process added_to_list events for each list this bookmark is in
@@ -91,7 +91,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         // Create or update the bookmark object
         $bookmarkObject = $this->upsertBookmarkObject($bookmark, $tagsMap);
 
-        // Create the saved_bookmark event
+        // Create the bookmarked event
         $createdAt = isset($bookmark['createdAt']) ? Carbon::parse($bookmark['createdAt']) : now();
         $sourceId = "karakeep_bookmark_{$bookmarkId}";
 
@@ -117,7 +117,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
             'actor_id' => $userObject->id,
             'service' => 'karakeep',
             'domain' => 'knowledge',
-            'action' => 'saved_bookmark',
+            'action' => 'bookmarked',
             'value' => null,
             'value_multiplier' => null,
             'value_unit' => null,
@@ -136,7 +136,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         // Create blocks for the event
         $this->createEventBlocks($event, $bookmark, $highlightsMap);
 
-        Log::debug('Created Karakeep saved_bookmark event', [
+        Log::debug('Created Karakeep bookmarked event', [
             'event_id' => $event->id,
             'bookmark_id' => $bookmarkId,
         ]);
@@ -466,11 +466,13 @@ class KarakeepBookmarkData extends BaseProcessingJob
     protected function createEventBlocks(Event $event, array $bookmark, array $highlightsMap): void
     {
         $bookmarkId = $bookmark['id'] ?? null;
+        $createdAt = isset($bookmark['createdAt']) ? Carbon::parse($bookmark['createdAt']) : now();
 
         // Create AI summary block if available
         if (! empty($bookmark['summary'])) {
             Block::create([
                 'event_id' => $event->id,
+                'time' => $createdAt,
                 'title' => 'AI Summary',
                 'block_type' => 'bookmark_summary',
                 'metadata' => [
@@ -489,6 +491,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         if (! empty($description) || ! empty($imageUrl)) {
             Block::create([
                 'event_id' => $event->id,
+                'time' => $createdAt,
                 'title' => 'Preview Card',
                 'block_type' => 'bookmark_metadata',
                 'url' => $url,
@@ -506,8 +509,12 @@ class KarakeepBookmarkData extends BaseProcessingJob
                 $highlightText = $highlight['text'] ?? '';
                 $truncatedText = strlen($highlightText) > 50 ? substr($highlightText, 0, 50) . '...' : $highlightText;
 
+                // Use highlight's creation time if available, otherwise fall back to bookmark's creation time
+                $highlightTime = isset($highlight['createdAt']) ? Carbon::parse($highlight['createdAt']) : $createdAt;
+
                 Block::create([
                     'event_id' => $event->id,
+                    'time' => $highlightTime,
                     'title' => 'Highlight: ' . $truncatedText,
                     'block_type' => 'bookmark_highlight',
                     'metadata' => [

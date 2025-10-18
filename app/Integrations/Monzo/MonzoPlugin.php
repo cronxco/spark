@@ -55,7 +55,7 @@ class MonzoPlugin extends OAuthPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect your Monzo bank account to pull transactions, pots, and balances.';
+        return 'Connect your Monzo bank account to sync transactions and balances.';
     }
 
     public static function getConfigurationSchema($instanceType = null): array
