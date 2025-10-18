@@ -836,13 +836,13 @@ $areAllGroupsExpanded = computed(function () {
         @else
         <!-- Custom Vertical Timeline View -->
         @if ($this->pollMode === 'keep')
-        <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
-            @else
+            <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
+        @else
             <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.visible>
-                @endif
-                @php $previousHour = null; @endphp
+        @endif
+            @php $previousHour = null; @endphp
 
-                @foreach (($this->groupedEvents ?? []) as $eventGroup)
+            @foreach (($this->groupedEvents ?? []) as $eventGroup)
                 @php
                 $first = $eventGroup['events'][0];
                 $hour = $first->time->format('H');
