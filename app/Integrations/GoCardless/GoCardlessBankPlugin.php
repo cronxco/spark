@@ -1567,7 +1567,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'content' => json_encode($account),
             'url' => null,
             'image_url' => null,
-            'metadata' => $metadata,
+            'metadata' => $newMetadata,
         ]);
     }
 
