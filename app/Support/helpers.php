@@ -224,7 +224,7 @@ if (! function_exists('format_event_value_display')) {
                             $formatter,
                             [
                                 'value' => $value,
-                                'unit' => $unit,
+                                'unit' => $unit ?? '',
                             ]
                         );
 
@@ -235,6 +235,7 @@ if (! function_exists('format_event_value_display')) {
                             'service' => $service,
                             'action' => $action,
                             'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
                         ]);
                     }
                 }
