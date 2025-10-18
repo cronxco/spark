@@ -188,7 +188,7 @@ new class extends Component {
 
 <div>
     {{-- Always show the notification bell, with polling when there are active operations --}}
-    <div class="dropdown sm:dropdown-end"
+    <div x-data="{ open: false }" @click.outside="open = false" class="relative"
         @if ($activeProgresses->isNotEmpty()) wire:poll.3s="checkProgress" @elseif ($unreadNotifications->isNotEmpty()) wire:poll.30s="loadNotifications" @endif>
 
         <button class="btn btn-ghost btn-sm gap-2 sm:hidden" wire:click="openMobileModal">
@@ -227,7 +227,7 @@ new class extends Component {
             </div>
         </button>
 
-        <label tabindex="0" class="btn btn-ghost btn-sm gap-2 hidden sm:flex cursor-pointer">
+        <button @click="open = !open" class="btn btn-ghost btn-sm gap-2 hidden sm:flex">
             <div class="indicator">
                 @if ($activeProgresses->isNotEmpty())
                 <span class="indicator-item badge badge-primary badge-xs">
@@ -261,10 +261,13 @@ new class extends Component {
                 <x-icon name="o-bell" class="w-4 h-4" />
                 @endif
             </div>
-        </label>
+        </button>
 
         {{-- Desktop dropdown --}}
-        <div class="hidden sm:block dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto">
+        <div x-show="open"
+             x-transition
+             class="hidden sm:block absolute right-0 top-full z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto"
+             style="display: none;">
             @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
             <div class="card-body">
                 <h3 class="font-semibold text-sm mb-3">Updates</h3>
