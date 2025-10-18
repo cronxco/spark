@@ -81,7 +81,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Heart Rate',
                 'description' => 'Heart rate measurement data',
                 'display_with_object' => false,
-                'value_formatter' => '{{ round($value) <span class="text-[0.875em]">bpm</span> }}',
+                'value_formatter' => '{{ round($value) }} <span class="text-[0.875em]">bpm</span>',
                 'value_unit' => 'bpm',
                 'hidden' => false,
             ],
@@ -2553,7 +2553,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         // Aggregate to one event per day with a few summary blocks
-        $byDay = collect($items)->groupBy(fn ($p) => Str::substr($p['timestamp'] ?? $p['start_datetime'] ?? '', 0, 10));
+        $byDay = collect($items)->groupBy(fn($p) => Str::substr($p['timestamp'] ?? $p['start_datetime'] ?? '', 0, 10));
         foreach ($byDay as $day => $points) {
             $min = (int) collect($points)->min('bpm');
             $max = (int) collect($points)->max('bpm');
