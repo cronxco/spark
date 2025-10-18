@@ -227,7 +227,7 @@ new class extends Component {
             </div>
         </button>
 
-        <label tabindex="0" class="btn btn-ghost btn-sm gap-2 hidden sm:flex">
+        <label tabindex="0" class="btn btn-ghost btn-sm gap-2 hidden sm:flex cursor-pointer">
             <div class="indicator">
                 @if ($activeProgresses->isNotEmpty())
                 <span class="indicator-item badge badge-primary badge-xs">
@@ -263,10 +263,9 @@ new class extends Component {
             </div>
         </label>
 
-        @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
-
         {{-- Desktop dropdown --}}
-        <div tabindex="0" class="hidden sm:block dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto">
+        <div class="hidden sm:block dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto">
+            @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
             <div class="card-body">
                 <h3 class="font-semibold text-sm mb-3">Updates</h3>
 
@@ -423,113 +422,112 @@ new class extends Component {
                     @endforeach
                 </div>
                 @endif
-            </div>
-        </div>
-        @else
-        {{-- Recently Completed (last 1 minute) --}}
-        @if ($recentlyCompleted->isNotEmpty())
-        @if ($activeProgresses->isNotEmpty())
-        <div class="divider my-2 text-xs">Recently Completed</div>
-        @endif
 
-        <div class="space-y-2 mb-4">
-            @foreach ($recentlyCompleted as $progress)
-            <div class="card bg-base-100 border @if ($progress->isFailed()) border-error/20 @else border-success/20 @endif">
-                <div class="card-body p-3">
-                    <div class="flex items-start gap-2">
-                        @if ($progress->isFailed())
-                        <x-icon name="o-x-circle" class="w-4 h-4 mt-0.5 text-error" />
-                        @else
-                        <x-icon name="o-check-circle" class="w-4 h-4 mt-0.5 text-success" />
-                        @endif
+                {{-- Recently Completed (last 1 minute) --}}
+                @if ($recentlyCompleted->isNotEmpty())
+                @if ($activeProgresses->isNotEmpty() || $unreadNotifications->isNotEmpty())
+                <div class="divider my-2 text-xs">Recently Completed</div>
+                @endif
 
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center justify-between gap-2">
-                                <div class="font-semibold text-sm">
-                                    {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                </div>
-                                <div class="text-xs text-base-content/50">
-                                    {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
-                                </div>
-                            </div>
-
-                            <div class="text-xs @if ($progress->isFailed()) text-error @else text-success @endif">
+                <div class="space-y-2 mb-4">
+                    @foreach ($recentlyCompleted as $progress)
+                    <div class="card bg-base-100 border @if ($progress->isFailed()) border-error/20 @else border-success/20 @endif">
+                        <div class="card-body p-3">
+                            <div class="flex items-start gap-2">
                                 @if ($progress->isFailed())
-                                Failed: {{ $progress->error_message ?? $progress->message }}
+                                <x-icon name="o-x-circle" class="w-4 h-4 mt-0.5 text-error" />
                                 @else
-                                {{ $progress->message }}
+                                <x-icon name="o-check-circle" class="w-4 h-4 mt-0.5 text-success" />
                                 @endif
-                            </div>
 
-                            @if ($progress->details && count($progress->details) > 0)
-                            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                @foreach ($progress->details as $key => $value)
-                                @if (is_numeric($value))
-                                <div class="flex justify-between">
-                                    <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
-                                    <span class="font-semibold">{{ number_format($value) }}</span>
-                                </div>
-                                @endif
-                                @endforeach
-                            </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-            @endforeach
-        </div>
-        @endif
-
-        {{-- Recent History (1-5 minutes ago) - Collapsible --}}
-        @if ($recentHistory->isNotEmpty())
-        <div x-data="{ open: @entangle('showHistory') }">
-            <button @click="open = !open"
-                class="flex items-center justify-between w-full text-xs text-base-content/70 hover:text-base-content py-2 px-1">
-                <span>Recent History ({{ $recentHistory->count() }})</span>
-                <x-icon name="o-chevron-down" class="w-3 h-3 transition-transform" ::class="open && 'rotate-180'" />
-            </button>
-
-            <div x-show="open"
-                x-collapse
-                class="space-y-2">
-                @foreach ($recentHistory as $progress)
-                <div class="card bg-base-100/50 border border-base-300/50">
-                    <div class="card-body p-2">
-                        <div class="flex items-start gap-2">
-                            @if ($progress->isFailed())
-                            <x-icon name="o-x-circle" class="w-3.5 h-3.5 mt-0.5 text-error/70" />
-                            @else
-                            <x-icon name="o-check-circle" class="w-3.5 h-3.5 mt-0.5 text-success/70" />
-                            @endif
-
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="text-xs font-medium">
-                                        {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="font-semibold text-sm">
+                                            {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
+                                        </div>
+                                        <div class="text-xs text-base-content/50">
+                                            {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
+                                        </div>
                                     </div>
-                                    <div class="text-xs text-base-content/40">
-                                        {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
-                                    </div>
-                                </div>
 
-                                <div class="text-xs text-base-content/60 truncate">
-                                    @if ($progress->isFailed())
-                                    {{ $progress->error_message ?? $progress->message }}
-                                    @else
-                                    {{ $progress->message }}
+                                    <div class="text-xs @if ($progress->isFailed()) text-error @else text-success @endif">
+                                        @if ($progress->isFailed())
+                                        Failed: {{ $progress->error_message ?? $progress->message }}
+                                        @else
+                                        {{ $progress->message }}
+                                        @endif
+                                    </div>
+
+                                    @if ($progress->details && count($progress->details) > 0)
+                                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
+                                        @foreach ($progress->details as $key => $value)
+                                        @if (is_numeric($value))
+                                        <div class="flex justify-between">
+                                            <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
+                                            <span class="font-semibold">{{ number_format($value) }}</span>
+                                        </div>
+                                        @endif
+                                        @endforeach
+                                    </div>
                                     @endif
                                 </div>
                             </div>
                         </div>
                     </div>
+                    @endforeach
                 </div>
-                @endforeach
+                @endif
+
+                {{-- Recent History (1-5 minutes ago) - Collapsible --}}
+                @if ($recentHistory->isNotEmpty())
+                <div x-data="{ open: @entangle('showHistory') }">
+                    <button @click="open = !open"
+                        class="flex items-center justify-between w-full text-xs text-base-content/70 hover:text-base-content py-2 px-1">
+                        <span>Recent History ({{ $recentHistory->count() }})</span>
+                        <x-icon name="o-chevron-down" class="w-3 h-3 transition-transform" ::class="open && 'rotate-180'" />
+                    </button>
+
+                    <div x-show="open"
+                        x-collapse
+                        class="space-y-2">
+                        @foreach ($recentHistory as $progress)
+                        <div class="card bg-base-100/50 border border-base-300/50">
+                            <div class="card-body p-2">
+                                <div class="flex items-start gap-2">
+                                    @if ($progress->isFailed())
+                                    <x-icon name="o-x-circle" class="w-3.5 h-3.5 mt-0.5 text-error/70" />
+                                    @else
+                                    <x-icon name="o-check-circle" class="w-3.5 h-3.5 mt-0.5 text-success/70" />
+                                    @endif
+
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="text-xs font-medium">
+                                                {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
+                                            </div>
+                                            <div class="text-xs text-base-content/40">
+                                                {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
+                                            </div>
+                                        </div>
+
+                                        <div class="text-xs text-base-content/60 truncate">
+                                            @if ($progress->isFailed())
+                                            {{ $progress->error_message ?? $progress->message }}
+                                            @else
+                                            {{ $progress->message }}
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
             </div>
-        </div>
-        @endif
-        {{-- Show empty state when dropdown is opened with no items --}}
-        <div tabindex="0" class="hidden sm:block dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3">
+            @else
+            {{-- Empty state --}}
             <div class="card-body">
                 <div class="flex flex-col items-center justify-center py-8 text-center">
                     <x-icon name="o-bell-slash" class="w-12 h-12 text-base-content/30 mb-3" />
@@ -537,8 +535,8 @@ new class extends Component {
                     <p class="text-xs text-base-content/40 mt-1">You're all caught up!</p>
                 </div>
             </div>
+            @endif
         </div>
-        @endif
     </div>
 
     {{-- Mobile drawer --}}
