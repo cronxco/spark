@@ -81,7 +81,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Heart Rate',
                 'description' => 'Heart rate measurement data',
                 'display_with_object' => false,
-                'value_formatter' => '{{ round($value) <span class="text-[0.875em]">bpm</span> }}',
+                'value_formatter' => '{{ round($value) }} <span class="text-[0.875em]">bpm</span>',
                 'value_unit' => 'bpm',
                 'hidden' => false,
             ],
