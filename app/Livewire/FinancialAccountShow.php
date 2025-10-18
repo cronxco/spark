@@ -54,6 +54,23 @@ class FinancialAccountShow extends Component
         ];
     }
 
+    public function getIsNegativeBalanceProperty(): bool
+    {
+        return $this->account->metadata['is_negative_balance'] ?? false;
+    }
+
+    public function getCurrencySymbolProperty(): string
+    {
+        $currency = $this->account->metadata['currency'] ?? 'GBP';
+        $currencySymbols = [
+            'GBP' => '£',
+            'USD' => '$',
+            'EUR' => '€',
+        ];
+
+        return $currencySymbols[$currency] ?? $currency;
+    }
+
     public function render(): View
     {
         $plugin = new FinancialPlugin;
@@ -106,11 +123,8 @@ class FinancialAccountShow extends Component
             $currentBalance = null;
         }
 
-        // Check if this is a negative balance account (debt)
-        $isNegativeBalance = $metadata['is_negative_balance'] ?? false;
-
         // For negative balance accounts, invert the sign for display
-        if ($isNegativeBalance && $currentBalance !== null) {
+        if ($this->isNegativeBalance && $currentBalance !== null) {
             $displayBalance = -$currentBalance;
         } else {
             $displayBalance = $currentBalance;
@@ -138,7 +152,6 @@ class FinancialAccountShow extends Component
             'startDate' => $startDate,
             'currentBalance' => $currentBalance,
             'displayBalance' => $displayBalance,
-            'isNegativeBalance' => $isNegativeBalance,
             'latestBalance' => $latestBalance,
             'balanceEvents' => $balanceEvents,
         ]);
