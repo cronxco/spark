@@ -291,16 +291,18 @@ new class extends Component {
                     <p class="text-sm text-base-content/70 mb-4">{{ __('Enable a fixed daily schedule or use frequency-based updates') }}</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">{{ __('Use schedule instead of frequency') }}</span>
-                            </label>
+                        <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">{{ __('Use Schedule') }}</div>
+                                <div class="text-xs text-base-content/60">{{ __('Use fixed daily schedule instead of frequency') }}</div>
+                            </div>
                             <input type="checkbox" wire:model="configuration.use_schedule" class="toggle toggle-primary" />
                         </div>
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">{{ __('Paused') }}</span>
-                            </label>
+                        <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">{{ __('Paused') }}</div>
+                                <div class="text-xs text-base-content/60">{{ __('Temporarily disable this integration') }}</div>
+                            </div>
                             <input type="checkbox" wire:model="configuration.paused" class="toggle toggle-primary" />
                         </div>
                     </div>
@@ -363,10 +365,13 @@ new class extends Component {
 
                         <div class="space-y-3">
                             @if ($config['type'] === 'boolean')
-                                <div class="form-control">
-                                    <label class="label">
-                                        <span class="label-text">{{ $config['label'] }}</span>
-                                    </label>
+                                <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
+                                    <div>
+                                        <div class="font-medium text-sm">{{ $config['label'] }}</div>
+                                        @if (isset($config['description']))
+                                            <div class="text-xs text-base-content/60">{{ $config['description'] }}</div>
+                                        @endif
+                                    </div>
                                     <input type="checkbox" wire:model="configuration.{{ $field }}" class="toggle toggle-primary" />
                                 </div>
                             @elseif ($config['type'] === 'array' && isset($config['options']))

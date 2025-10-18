@@ -6,6 +6,7 @@ use App\Integrations\Financial\FinancialPlugin;
 use App\Models\Event;
 use App\Models\EventObject;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -24,11 +25,17 @@ class FinancialAccounts extends Component
 
     public bool $showArchivedPots = false;
 
+    public array $sortBy = ['column' => 'title', 'direction' => 'asc'];
+
+    public int $perPage = 25;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'accountTypeFilter' => ['except' => ''],
         'providerFilter' => ['except' => ''],
         'showArchivedPots' => ['except' => false],
+        'sortBy' => ['except' => ['column' => 'title', 'direction' => 'asc']],
+        'perPage' => ['except' => 25],
     ];
 
     public function updatedSearch(): void
@@ -50,6 +57,21 @@ class FinancialAccounts extends Component
     {
         $this->reset(['search', 'accountTypeFilter', 'providerFilter', 'showArchivedPots']);
         $this->resetPage();
+    }
+
+    public function headers(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'id', 'class' => 'hidden'],
+            ['key' => 'type', 'label' => 'Type', 'class' => 'hidden'],
+            ['key' => 'title', 'label' => 'Account', 'sortable' => true],
+            ['key' => 'type', 'label' => 'Type', 'sortable' => true],
+            ['key' => 'service', 'label' => 'Service', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'balance', 'label' => 'Balance', 'sortable' => true],
+            ['key' => 'currency', 'label' => 'Currency', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'interest_rate', 'label' => 'Interest Rate', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'actions', 'label' => 'actions', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+        ];
     }
 
     public function deleteAccount(EventObject $account): void
@@ -110,8 +132,8 @@ class FinancialAccounts extends Component
                 $metadata = $account->metadata;
 
                 return str_contains(strtolower($metadata['name'] ?? ''), strtolower($this->search)) ||
-                       str_contains(strtolower($metadata['provider'] ?? ''), strtolower($this->search)) ||
-                       str_contains(strtolower($metadata['account_number'] ?? ''), strtolower($this->search));
+                    str_contains(strtolower($metadata['provider'] ?? ''), strtolower($this->search)) ||
+                    str_contains(strtolower($metadata['account_number'] ?? ''), strtolower($this->search));
             });
         }
 
@@ -126,6 +148,9 @@ class FinancialAccounts extends Component
                 return ($account->metadata['provider'] ?? '') === $this->providerFilter;
             });
         }
+
+        // Apply sorting
+        $accounts = $this->applySorting($accounts);
 
         // Get unique account types and providers for filters
         // Use the same account set that's being displayed for consistent filtering
@@ -155,30 +180,54 @@ class FinancialAccounts extends Component
             ->unique()
             ->sort();
 
-        // Implement manual pagination
-        $perPage = 10;
+        // Implement manual pagination using LengthAwarePaginator
         $currentPage = $this->getPage();
         $total = $accounts->count();
-        $offset = ($currentPage - 1) * $perPage;
-        $paginatedAccounts = $accounts->slice($offset, $perPage);
+        $offset = ($currentPage - 1) * $this->perPage;
+        $paginatedItems = $accounts->slice($offset, $this->perPage)->values();
 
-        // Create pagination data for the view
-        $paginationData = [
-            'perPage' => $perPage,
-            'currentPage' => $currentPage,
-            'total' => $total,
-            'offset' => $offset,
-            'lastPage' => ceil($total / $perPage),
-            'hasMorePages' => $currentPage < ceil($total / $perPage),
-            'hasPages' => $total > $perPage,
-        ];
+        // Create a LengthAwarePaginator instance
+        $paginatedAccounts = new LengthAwarePaginator(
+            $paginatedItems,
+            $total,
+            $this->perPage,
+            $currentPage,
+            [
+                'path' => request()->url(),
+                'pageName' => 'page',
+            ]
+        );
 
         return view('livewire.money.index', [
             'accounts' => $paginatedAccounts,
             'accountTypes' => $accountTypes,
             'providers' => $providers,
-            'pagination' => $paginationData,
         ]);
+    }
+
+    private function applySorting($accounts)
+    {
+        $sortColumn = $this->sortBy['column'] ?? 'title';
+        $sortDirection = $this->sortBy['direction'] ?? 'asc';
+
+        return $accounts->sortBy(function ($account) use ($sortColumn) {
+            return match ($sortColumn) {
+                'title' => strtolower($account->title),
+                'type' => strtolower($account->metadata['account_type'] ?? ''),
+                'provider' => strtolower($account->metadata['provider'] ?? ''),
+                'service' => strtolower(match ($account->type) {
+                    'manual_account' => 'Manual',
+                    'monzo_account' => 'Monzo',
+                    'monzo_pot' => 'Monzo',
+                    'monzo_archived_pot' => 'Monzo',
+                    'bank_account' => $account->metadata['provider'] ?? 'Bank',
+                    default => $account->type,
+                }),
+                'balance' => $this->getFormattedBalance($account) ?? 0,
+                'currency' => strtolower($account->metadata['currency'] ?? ''),
+                default => strtolower($account->title),
+            };
+        }, SORT_REGULAR, $sortDirection === 'desc')->values();
     }
 
     private function getAccountTypeLabel(string $type): string

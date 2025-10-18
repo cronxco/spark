@@ -22,7 +22,7 @@ class SlackPlugin extends WebhookPlugin
 
     public static function getDescription(): string
     {
-        return 'Receive Slack events via webhook';
+        return 'Sync events from Slack.';
     }
 
     public static function getConfigurationSchema(): array

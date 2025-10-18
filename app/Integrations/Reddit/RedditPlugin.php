@@ -50,7 +50,7 @@ class RedditPlugin extends OAuthPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect your Reddit account to import saved posts and comments as events with rich blocks (images and links).';
+        return 'Sync saved posts from Reddit.';
     }
 
     public static function getConfigurationSchema(): array

@@ -58,7 +58,7 @@ class IntegrationPluginTest extends TestCase
     {
         $this->assertEquals('github', GitHubPlugin::getIdentifier());
         $this->assertEquals('GitHub', GitHubPlugin::getDisplayName());
-        $this->assertEquals('Connect your GitHub account to track repository activity', GitHubPlugin::getDescription());
+        $this->assertEquals('Track GitHub repository activity', GitHubPlugin::getDescription());
         $this->assertEquals('oauth', GitHubPlugin::getServiceType());
     }
 

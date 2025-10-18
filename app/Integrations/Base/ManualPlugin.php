@@ -21,6 +21,15 @@ abstract class ManualPlugin implements IntegrationPlugin
         return false;
     }
 
+    /**
+     * Default stale time for manual integrations: 30 days
+     * Override in child classes to customize
+     */
+    public static function getTimeUntilStaleMinutes(): ?int
+    {
+        return 30 * 24 * 60; // 30 days
+    }
+
     public function initializeGroup(User $user): IntegrationGroup
     {
         return IntegrationGroup::create([

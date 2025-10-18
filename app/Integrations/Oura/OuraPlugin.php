@@ -81,6 +81,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Heart Rate',
                 'description' => 'Heart rate measurement data',
                 'display_with_object' => false,
+                'value_formatter' => '{{ round($value) <span class="text-[0.875em]">bpm</span> }}',
                 'value_unit' => 'bpm',
                 'hidden' => false,
             ],
@@ -143,7 +144,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily stress level assessment',
                 'display_with_object' => false,
                 'value_unit' => 'stress_level',
-                'value_formatter' => '@if($value == 3) Stressful @elseif($value == 2) Normal @elseif($value == 1) Restored @else {{ $value }}@endif',
+                'value_formatter' => '{{ match($value) { 3 => "Stressful", 2 => "Normal", 1 => "Restored", default => $value } }}',
                 'hidden' => false,
             ],
             'had_resilience_score' => [
@@ -152,7 +153,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Daily resilience level assessment',
                 'display_with_object' => false,
                 'value_unit' => 'resilience_level',
-                'value_formatter' => '@if($value == 5)Exceptional@elseif($value == 4)Strong@elseif($value == 3)Solid@elseif($value == 2)Adequate@elseif($value == 1)Limited@else{{ $value }}@endif',
+                'value_formatter' => '{{ match($value) { 5 => "Exceptional", 4 => "Strong", 3 => "Solid", 2 => "Adequate", 1 => "Limited", default => $value } }}',
                 'hidden' => false,
             ],
             'had_spo2' => [
@@ -169,6 +170,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Cardiovascular Age',
                 'description' => 'Estimated cardiovascular age',
                 'display_with_object' => false,
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">years</span>',
                 'value_unit' => 'years',
                 'hidden' => false,
             ],
@@ -178,6 +180,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'description' => 'Maximum oxygen consumption rate',
                 'display_with_object' => false,
                 'value_unit' => 'ml/kg/min',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">ml</span>',
                 'hidden' => false,
             ],
             'had_enhanced_tag' => [
@@ -702,7 +705,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
     public static function getDescription(): string
     {
-        return 'Connect your Oura Ring to track daily activity, sleep, readiness, resilience, stress, workouts, sessions, tags, and time-series metrics like heart rate and SpO2.';
+        return 'Sync health metrics from Oura.';
     }
 
     public static function getValueMappings(): array

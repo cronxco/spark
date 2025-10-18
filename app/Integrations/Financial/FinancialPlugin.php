@@ -22,7 +22,7 @@ class FinancialPlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Manually track your accounts including mortgages, savings, investments, and current accounts.';
+        return 'Manually track your accounts and balances.';
     }
 
     public static function getConfigurationSchema(): array
@@ -321,11 +321,19 @@ class FinancialPlugin extends ManualPlugin
      */
     public function getBalanceEvents(EventObject $accountObject): \Illuminate\Database\Eloquent\Collection
     {
-        return Event::where('actor_id', $accountObject->id)
-            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
-            ->where('action', 'had_balance')
+        return $this->getBalanceEventsQuery($accountObject)
             ->orderBy('time', 'desc')
             ->get();
+    }
+
+    /**
+     * Get balance events query for a specific account (for pagination)
+     */
+    public function getBalanceEventsQuery(EventObject $accountObject): \Illuminate\Database\Eloquent\Builder
+    {
+        return Event::where('actor_id', $accountObject->id)
+            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
+            ->where('action', 'had_balance');
     }
 
     /**

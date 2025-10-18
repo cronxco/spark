@@ -884,13 +884,13 @@ $areAllGroupsExpanded = computed(function () {
                             @else
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
                             <div class="py-2 px-2">
-                                <a href="{{ route('events.show', $firstEvent->id) }}" class="block hover:text-primary transition-colors">
+                                <a href="{{ route('events.show', $firstEvent->id) }}" class="block hover:text-primary transition-colors min-w-0">
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                     @if ($firstEvent->target)
-                                    <span class="text-base-content/80 sm:inline block truncate font-bold">{{ ' ' . $firstEvent->target->title }}</span>
+                                    <span class="text-base-content/80 block truncate font-bold min-w-0">{{ ' ' . $firstEvent->target->title }}</span>
                                     @elseif ($firstEvent->actor)
-                                    <span class="text-base-content/80 sm:inline block truncate font-bold">{{ ' ' . $firstEvent->actor->title }}</span>
+                                    <span class="text-base-content/80 block truncate font-bold min-w-0">{{ ' ' . $firstEvent->actor->title }}</span>
                                     @endif
                                     @endif
                                 </a>
@@ -941,13 +941,13 @@ $areAllGroupsExpanded = computed(function () {
                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                     </div>
                     <div class="py-2 px-2">
-                        <a href="{{ route('events.show', $event->id) }}" class="text-base-content block hover:text-primary transition-colors">
+                        <a href="{{ route('events.show', $event->id) }}" class="text-base-content block hover:text-primary transition-colors min-w-0">
                             <span class="font-medium">{{ $this->formatAction($event->action) }}</span>
                             @if (should_display_action_with_object($event->action, $event->service))
                             @if ($event->target)
-                            <span class="text-base-content/80 sm:inline block truncate font-medium">{{ ' ' . $event->target->title }}</span>
+                            <span class="text-base-content/80 block truncate font-medium min-w-0">{{ ' ' . $event->target->title }}</span>
                             @elseif ($event->actor)
-                            <span class="text-base-content/80 sm:inline block truncate font-medium">{{ ' ' . $event->actor->title }}</span>
+                            <span class="text-base-content/80 block truncate font-medium min-w-0">{{ ' ' . $event->actor->title }}</span>
                             @endif
                             @endif
                         </a>

@@ -71,10 +71,10 @@ Via the UI:
 
 ### Action Types
 
-| Action           | Description                         | Actor    | Target   |
-| ---------------- | ----------------------------------- | -------- | -------- |
-| `saved_bookmark` | When a bookmark was saved/created   | User     | Bookmark |
-| `added_to_list`  | When a bookmark was added to a list | Bookmark | List     |
+| Action          | Description                         | Actor    | Target   |
+| --------------- | ----------------------------------- | -------- | -------- |
+| `bookmarked`    | When a bookmark was saved/created   | User     | Bookmark |
+| `added_to_list` | When a bookmark was added to a list | Bookmark | List     |
 
 ### Block Types
 
@@ -233,7 +233,7 @@ Processing job that transforms API data into Spark entities:
 
 - Creates user, bookmark, and list objects
 - Applies tags to objects and events
-- Creates `saved_bookmark` events with blocks
+- Creates `bookmarked` events with blocks
 - Creates `added_to_list` events for list memberships
 - Handles content truncation (summary + 150 words)
 

@@ -172,15 +172,15 @@ new class extends Component {
             <p class="text-sm text-base-content/70 mb-4">
                 {{ __('Enable detailed logging for integration API calls and debugging') }}
             </p>
-            <p class="text-xs text-base-content/60 mb-4">
-                When enabled, all API requests and responses will be logged to help troubleshoot integration issues.
-                These logs are automatically deleted after 7 days.
-            </p>
 
-            <div class="form-control">
-                <label class="label">
-                    <span class="label-text">{{ __('Enable Debug Logging') }}</span>
-                </label>
+            <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
+                <div>
+                    <div class="font-medium text-sm">{{ __('Enable Debug Logging') }}</div>
+                    <div class="text-xs text-base-content/60">
+                        When enabled, all API requests and responses will be logged to help troubleshoot integration issues.
+                        These logs are automatically deleted after 7 days.
+                    </div>
+                </div>
                 <input
                     type="checkbox"
                     class="toggle toggle-primary"

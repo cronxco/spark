@@ -189,6 +189,13 @@ new class extends Component {
                 // leave sweep values null on error
             }
 
+            // Get last event time for webhook/manual integrations
+            $lastEventTime = null;
+            $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration->service);
+            if ($pluginClass && in_array($pluginClass::getServiceType(), ['webhook', 'manual'])) {
+                $lastEventTime = $integration->getLastEventTime();
+            }
+
             return [
                 'id' => $integration->id,
                 'name' => $integration->name ?: $integration->service,
@@ -198,6 +205,7 @@ new class extends Component {
                 'update_frequency_minutes' => $integration->getUpdateFrequencyMinutes(),
                 'last_triggered_at' => $integration->last_triggered_at ? $integration->last_triggered_at->toISOString() : null,
                 'last_successful_update_at' => $integration->last_successful_update_at ? $integration->last_successful_update_at->toISOString() : null,
+                'last_event_time' => $lastEventTime ? $lastEventTime->toISOString() : null,
                 'needs_update' => $integration->needsUpdate(),
                 'next_update_time' => $integration->getNextUpdateTime() ? $integration->getNextUpdateTime()->toISOString() : null,
                 'is_processing' => $integration->isProcessing(),
@@ -746,8 +754,8 @@ new class extends Component {
                                                     @endif
                                                 </div>
                                                 <div class="text-base-content/70">
-                                                    @if ($integration['last_successful_update_at'])
-                                                        {{ \Carbon\Carbon::parse($integration['last_successful_update_at'])->diffForHumans() }}
+                                                    @if ($integration['last_event_time'])
+                                                        {{ \Carbon\Carbon::parse($integration['last_event_time'])->diffForHumans() }}
                                                     @else
                                                         <span class="text-warning">
                                                             @if ($isWebhook)
@@ -764,9 +772,17 @@ new class extends Component {
                                                 <div class="font-medium mb-1">{{ __('Status') }}</div>
                                                 <div class="text-base-content/70">
                                                     @if ($isWebhook)
-                                                        <span class="text-info">{{ __('Waiting for webhook events') }}</span>
+                                                        @if ($integration['needs_update'] || $integration['status'] === 'needs_update')
+                                                            <span class="text-error">{{ __('No recent data (may be stale)') }}</span>
+                                                        @else
+                                                            <span class="text-info">{{ __('Waiting for webhook events') }}</span>
+                                                        @endif
                                                     @elseif ($isManual)
-                                                        <span class="text-success">{{ __('Ready for manual entries') }}</span>
+                                                        @if ($integration['needs_update'] || $integration['status'] === 'needs_update')
+                                                            <span class="text-warning">{{ __('No recent entries (may be stale)') }}</span>
+                                                        @else
+                                                            <span class="text-success">{{ __('Ready for manual entries') }}</span>
+                                                        @endif
                                                     @endif
                                                 </div>
                                             </div>

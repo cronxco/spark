@@ -194,10 +194,56 @@ class Integration extends Model
     }
 
     /**
+     * Get the time of the most recent event for this integration
+     */
+    public function getLastEventTime(): ?Carbon
+    {
+        $lastEvent = Event::where('integration_id', $this->id)
+            ->orderBy('time', 'desc')
+            ->first();
+
+        return $lastEvent ? Carbon::parse($lastEvent->time) : null;
+    }
+
+    /**
+     * Check if this integration is stale (for webhook/manual integrations)
+     */
+    public function isStale(): bool
+    {
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        if (! $pluginClass) {
+            return false;
+        }
+
+        $timeUntilStaleMinutes = $pluginClass::getTimeUntilStaleMinutes();
+        if ($timeUntilStaleMinutes === null) {
+            return false; // Staleness checking disabled for this plugin
+        }
+
+        $lastEventTime = $this->getLastEventTime();
+        if (! $lastEventTime) {
+            return true; // No events yet, consider stale
+        }
+
+        $staleThreshold = Carbon::now()->subMinutes($timeUntilStaleMinutes);
+
+        return $lastEventTime->lessThan($staleThreshold);
+    }
+
+    /**
      * Check if this integration needs to be updated (schedule overrides frequency)
      */
     public function needsUpdate(): bool
     {
+        // For webhook and manual integrations, check staleness instead of update schedule
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        if ($pluginClass) {
+            $serviceType = $pluginClass::getServiceType();
+            if (in_array($serviceType, ['webhook', 'manual'])) {
+                return $this->isStale();
+            }
+        }
+
         return $this->isDue();
     }
 

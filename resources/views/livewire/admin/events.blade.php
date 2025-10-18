@@ -20,14 +20,16 @@ new class extends Component {
     public string $domainFilter = '';
     public string $actionFilter = '';
     public array $selectedEvents = [];
-    public bool $selectAll = false;
     public int $perPage = 25;
+    public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
     protected $queryString = [
         'search' => ['except' => ''],
         'serviceFilter' => ['except' => ''],
         'domainFilter' => ['except' => ''],
         'actionFilter' => ['except' => ''],
+        'sortBy' => ['except' => ['column' => 'time', 'direction' => 'desc']],
+        'perPage' => ['except' => 25],
         'page' => ['except' => 1],
     ];
 
@@ -62,25 +64,18 @@ new class extends Component {
         $this->resetPage();
     }
 
-    public function toggleSelectAll(): void
+    public function headers(): array
     {
-        if ($this->selectAll) {
-            $this->selectedEvents = $this->getEvents()->pluck('id')->toArray();
-        } else {
-            $this->selectedEvents = [];
-        }
-    }
-
-    public function toggleEventSelection(string $eventId): void
-    {
-        if (in_array($eventId, $this->selectedEvents)) {
-            $this->selectedEvents = array_filter($this->selectedEvents, fn($id) => $id !== $eventId);
-        } else {
-            $this->selectedEvents[] = $eventId;
-        }
-
-        // Update select all checkbox state
-        $this->selectAll = count($this->selectedEvents) === $this->getEvents()->count();
+        return [
+            ['key' => 'id', 'label' => 'ID', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'service', 'label' => 'Service', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'domain', 'label' => 'Domain', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'action', 'label' => 'Action', 'sortable' => true],
+            ['key' => 'target', 'label' => 'Target', 'sortable' => false],
+            ['key' => 'value', 'label' => 'Value', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'blocks', 'label' => 'Blocks', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'time', 'label' => 'Time', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+        ];
     }
 
     public function bulkDelete(): void
@@ -103,7 +98,6 @@ new class extends Component {
             $this->success("Successfully deleted {$count} event(s) and their associated blocks.");
 
             $this->selectedEvents = [];
-            $this->selectAll = false;
             $this->resetPage();
         } catch (\Exception $e) {
             $this->error('Failed to delete events: ' . $e->getMessage());
@@ -121,14 +115,14 @@ new class extends Component {
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('domain', 'ilike', '%' . $this->search . '%')
-                  ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                  ->orWhereHas('actor', function ($actorQuery) {
-                      $actorQuery->where('title', 'ilike', '%' . $this->search . '%');
-                  })
-                  ->orWhereHas('target', function ($targetQuery) {
-                      $targetQuery->where('title', 'ilike', '%' . $this->search . '%');
-                  });
+                    ->orWhere('domain', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('action', 'ilike', '%' . $this->search . '%')
+                    ->orWhereHas('actor', function ($actorQuery) {
+                        $actorQuery->where('title', 'ilike', '%' . $this->search . '%');
+                    })
+                    ->orWhereHas('target', function ($targetQuery) {
+                        $targetQuery->where('title', 'ilike', '%' . $this->search . '%');
+                    });
             });
         }
 
@@ -147,7 +141,12 @@ new class extends Component {
             $query->where('action', $this->actionFilter);
         }
 
-        return $query->orderBy('time', 'desc')->paginate($this->perPage);
+        // Apply sorting
+        $sortColumn = $this->sortBy['column'] ?? 'time';
+        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $query->orderBy($sortColumn, $sortDirection);
+
+        return $query->paginate($this->perPage);
     }
 
     public function getUniqueServices()
@@ -208,171 +207,192 @@ new class extends Component {
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedEvents) > 0)
-                    <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                            onclick="return confirm('Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.')">
-                        <x-icon name="o-trash" class="w-4 h-4 mr-1" />
-                        Delete Selected ({{ count($selectedEvents) }})
-                    </button>
+                <button class="btn btn-error btn-sm" wire:click="bulkDelete"
+                    onclick="return confirm('Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.')">
+                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    Delete Selected ({{ count($selectedEvents) }})
+                </button>
                 @endif
             </div>
         </x-slot:actions>
     </x-header>
 
     <div class="space-y-4 lg:space-y-6">
-        <!-- Search and Filters -->
-        <div class="card bg-base-200 shadow">
+        <!-- Desktop Filters -->
+        <div class="hidden lg:block card bg-base-200 shadow">
             <div class="card-body">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <!-- Search -->
-                    <div class="form-control md:col-span-1">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            class="input input-bordered w-full"
-                            placeholder="Search events..."
-                            wire:model.live.debounce.300ms="search"
-                        />
+                <div class="flex flex-row gap-4">
+                    <div class="form-control flex-1">
+                        <label class="label"><span class="label-text">Search</span></label>
+                        <input type="text" class="input input-bordered w-full" placeholder="Search events..." wire:model.live.debounce.300ms="search" />
                     </div>
-
-                    <!-- Service Filter -->
                     <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Service</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="serviceFilter">
+                        <label class="label"><span class="label-text">Service</span></label>
+                        <select class="select select-bordered" wire:model.live="serviceFilter">
                             <option value="">All Services</option>
                             @foreach ($this->getUniqueServices() as $service)
-                                <option value="{{ $service }}">{{ $service }}</option>
+                            <option value="{{ $service }}">{{ $service }}</option>
                             @endforeach
                         </select>
                     </div>
-
-                    <!-- Domain Filter -->
                     <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Domain</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="domainFilter">
+                        <label class="label"><span class="label-text">Domain</span></label>
+                        <select class="select select-bordered" wire:model.live="domainFilter">
                             <option value="">All Domains</option>
                             @foreach ($this->getUniqueDomains() as $domain)
-                                <option value="{{ $domain }}">{{ $domain }}</option>
+                            <option value="{{ $domain }}">{{ $domain }}</option>
                             @endforeach
                         </select>
                     </div>
-
-                    <!-- Action Filter -->
                     <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Action</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="actionFilter">
+                        <label class="label"><span class="label-text">Action</span></label>
+                        <select class="select select-bordered" wire:model.live="actionFilter">
                             <option value="">All Actions</option>
                             @foreach ($this->getUniqueActions() as $action)
-                                <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
+                            <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
                             @endforeach
                         </select>
                     </div>
-                </div>
-
-                <!-- Clear Filters Button -->
-                @if ($search || $serviceFilter || $domainFilter || $actionFilter)
-                    <div class="flex justify-end mt-4">
-                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
+                    @if ($search || $serviceFilter || $domainFilter || $actionFilter)
+                    <div class="form-control content-end">
+                        <label class="label"><span class="label-text">&nbsp;</span></label>
+                        <button class="btn btn-outline" wire:click="clearFilters">
                             <x-icon name="o-x-mark" class="w-4 h-4" />
-                            Clear Filters
+                            Clear
                         </button>
                     </div>
-                @endif
+                    @endif
+                </div>
             </div>
         </div>
 
-        <!-- Events Table -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="overflow-x-auto">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>
-                                    <label class="cursor-pointer">
-                                        <input type="checkbox" class="checkbox checkbox-sm"
-                                               wire:model="selectAll"
-                                               wire:change="toggleSelectAll" />
-                                    </label>
-                                </th>
-                                <th>ID</th>
-                                <th>Service</th>
-                                <th>Domain</th>
-                                <th>Action</th>
-                                <th>Target Title</th>
-                                <th>Value</th>
-                                <th>Blocks</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($this->getEvents() as $event)
-                                <tr class="hover">
-                                    <td>
-                                        <label class="cursor-pointer">
-                                            <input type="checkbox" class="checkbox checkbox-sm"
-                                                   value="{{ $event->id }}"
-                                                   wire:change="toggleEventSelection('{{ $event->id }}')"
-                                                   @checked(in_array($event->id, $selectedEvents)) />
-                                        </label>
-                                    </td>
-                                    <td>
-                                        <a href="{{ route('events.show', $event->id) }}" class="link link-primary font-mono text-xs" title="{{ $event->id }}">
-                                            {{ $this->truncateId($event->id) }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm">{{ $event->service }}</span>
-                                    </td>
-                                    <td><span class="text-sm">{{ $event->domain }}</span></td>
-                                    <td><span class="text-sm">{{ $this->prettifyAction($event->action) }}</span></td>
-                                    <td>
-                                        @if ($event->target)
-                                            <a href="{{ route('objects.show', $event->target->id) }}" class="link link-primary">
-                                                {{ Str::limit($event->target->title, 30) }}
-                                            </a>
-                                        @else
-                                            <span class="text-base-content/50">-</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <span class="text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm text-base-content/70">{{ $event->blocks_count ?? $event->blocks->count() }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm">{{ $event->time->format('M j, Y g:i A') }}</span>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="9" class="text-center py-8">
-                                        <div class="text-base-content/70">
-                                            @if ($search || $serviceFilter || $domainFilter || $actionFilter)
-                                                No events found matching your criteria.
-                                            @else
-                                                No events found.
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+        <!-- Mobile Filters -->
+        <div class="lg:hidden">
+            <x-collapse separator class="bg-base-200">
+                <x-slot:heading>
+                    <div class="flex items-center gap-2">
+                        <x-icon name="o-funnel" class="w-5 h-5" />
+                        Filters
+                        @if ($search || $serviceFilter || $domainFilter || $actionFilter)
+                        <x-badge value="Active" class="badge-primary badge-xs" />
+                        @endif
+                    </div>
+                </x-slot:heading>
+                <x-slot:content>
+                    <div class="flex flex-col gap-4">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Search</span></label>
+                            <input type="text" class="input input-bordered w-full" placeholder="Search events..." wire:model.live.debounce.300ms="search" />
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Service</span></label>
+                            <select class="select select-bordered w-full" wire:model.live="serviceFilter">
+                                <option value="">All Services</option>
+                                @foreach ($this->getUniqueServices() as $service)
+                                <option value="{{ $service }}">{{ $service }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Domain</span></label>
+                            <select class="select select-bordered w-full" wire:model.live="domainFilter">
+                                <option value="">All Domains</option>
+                                @foreach ($this->getUniqueDomains() as $domain)
+                                <option value="{{ $domain }}">{{ $domain }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Action</span></label>
+                            <select class="select select-bordered w-full" wire:model.live="actionFilter">
+                                <option value="">All Actions</option>
+                                @foreach ($this->getUniqueActions() as $action)
+                                <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @if ($search || $serviceFilter || $domainFilter || $actionFilter)
+                        <button class="btn btn-outline" wire:click="clearFilters">
+                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            Clear Filters
+                        </button>
+                        @endif
+                    </div>
+                </x-slot:content>
+            </x-collapse>
+        </div>
 
-                <!-- Pagination -->
-                <div class="mt-6">
-                    {{ $this->getEvents()->links() }}
-                </div>
+        <!-- Events Table -->
+        <div class="card bg-base-200 shadow card-xs sm:card-md">
+            <div class="card-body">
+                <x-table
+                    :headers="$this->headers()"
+                    :rows="$this->getEvents()"
+                    :sort-by="$sortBy"
+                    with-pagination
+                    per-page="perPage"
+                    :per-page-values="[10, 25, 50, 100]"
+                    selectable
+                    selectable-key="id"
+                    wire:model.live="selectedEvents"
+                    link="/events/{id}"
+                    striped
+                    class="[&_table]:!static [&_td]:!static">
+                    <x-slot:empty>
+                        <div class="text-center py-12">
+                            <x-icon name="o-calendar" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <h3 class="text-lg font-medium text-base-content mb-2">No events found</h3>
+                            <p class="text-base-content/70">
+                                @if ($search || $serviceFilter || $domainFilter || $actionFilter)
+                                Try adjusting your filters or search terms
+                                @else
+                                No events have been recorded yet
+                                @endif
+                            </p>
+                        </div>
+                    </x-slot:empty>
+
+                    @scope('cell_id', $event)
+                    <span class="text-sm font-mono">{{ $this->truncateId($event->id) }}</span>
+                    @endscope
+
+                    @scope('cell_service', $event)
+                    <span class="text-sm">{{ $event->service }}</span>
+                    @endscope
+
+                    @scope('cell_domain', $event)
+                    <span class="text-sm">{{ $event->domain }}</span>
+                    @endscope
+
+                    @scope('cell_action', $event)
+                    <div class="flex flex-col gap-1">
+                        <span class="sm:hidden text-xs">{{ $event->service }}</span>
+                        <span class="text-sm">{{ $this->prettifyAction($event->action) }}</span>
+                        @if (!empty($event->value))
+                        <span class="sm:hidden text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
+                        @endif
+                    </div>
+                    @endscope
+
+                    @scope('cell_target', $event)
+                    <x-uk-date :date="$event->time" />
+                    @if ($event->target)
+                    {{ Str::limit($event->target->title, 30) }}
+                    @endif
+                    @endscope
+
+                    @scope('cell_value', $event)
+                    <span class="text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
+                    @endscope
+
+                    @scope('cell_blocks', $event)
+                    <span class="text-sm text-base-content/70">{{ $event->blocks_count ?? $event->blocks->count() }}</span>
+                    @endscope
+
+                    @scope('cell_time', $event)
+                    <x-uk-date :date="$event->time" />
+                    @endscope
+                </x-table>
             </div>
         </div>
     </div>

@@ -101,6 +101,13 @@ interface IntegrationPlugin
     public static function getObjectTypes(): array;
 
     /**
+     * Get the number of minutes after which an integration is considered stale
+     * if no new events have been received. Return null to disable staleness checking.
+     * This is primarily used for webhook and manual integrations.
+     */
+    public static function getTimeUntilStaleMinutes(): ?int;
+
+    /**
      * Initialize an auth group (for OAuth/webhook setup)
      */
     public function initializeGroup(User $user): IntegrationGroup;

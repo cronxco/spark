@@ -15,6 +15,14 @@ class OutlinePlugin extends ManualPlugin
         return 'apikey';
     }
 
+    /**
+     * API key integrations use polling, not staleness checking
+     */
+    public static function getTimeUntilStaleMinutes(): ?int
+    {
+        return null;
+    }
+
     public static function getIdentifier(): string
     {
         return 'outline';
@@ -54,7 +62,7 @@ class OutlinePlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Sync collections and documents from Outline, generate Day Notes, and extract tasks.';
+        return 'Sync documents from Outline and track tasks.';
     }
 
     public static function getConfigurationSchema($instanceType = null): array

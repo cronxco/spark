@@ -681,3 +681,65 @@ if (! function_exists('karakeep_add_bookmark')) {
         }
     }
 }
+
+if (! function_exists('get_domain_from_url')) {
+    /**
+     * Extract the base domain from a URL (without subdomain, protocol, port, or path).
+     * Examples:
+     *   - http://emptycity.substack.com/p/article → substack.com
+     *   - https://www.bbc.co.uk/culture/article → bbc.co.uk
+     *   - https://www.google.com:8080/search?q=test → google.com
+     *   - api.github.com/users → github.com
+     *
+     * @param  string  $url  The URL to parse
+     * @return string|null The base domain or null if invalid
+     */
+    function get_domain_from_url(string $url): ?string
+    {
+        // Add protocol if not present to help parse_url work correctly
+        if (! preg_match('~^(?:f|ht)tps?://~i', $url)) {
+            $url = 'http://' . $url;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (! $host) {
+            return null;
+        }
+
+        // Split the host into parts
+        $parts = explode('.', $host);
+        $numParts = count($parts);
+
+        // Handle edge cases
+        if ($numParts < 2) {
+            return $host;
+        }
+
+        // Common two-part TLDs that need special handling
+        $twoPartTlds = [
+            'co.uk', 'gov.uk', 'org.uk', 'ac.uk', 'sch.uk', 'net.uk',
+            'co.za', 'gov.za', 'org.za', 'net.za', 'ac.za',
+            'co.nz', 'gov.nz', 'org.nz', 'net.nz', 'ac.nz',
+            'co.jp', 'gov.jp', 'org.jp', 'ne.jp', 'ac.jp',
+            'com.au', 'gov.au', 'org.au', 'net.au', 'edu.au',
+            'co.in', 'gov.in', 'org.in', 'net.in', 'ac.in',
+            'com.br', 'gov.br', 'org.br', 'net.br', 'edu.br',
+            'co.kr', 'gov.kr', 'org.kr', 'ne.kr', 'ac.kr',
+        ];
+
+        // Check if we have a two-part TLD (e.g., co.uk)
+        if ($numParts >= 3) {
+            $possibleTld = $parts[$numParts - 2] . '.' . $parts[$numParts - 1];
+            if (in_array($possibleTld, $twoPartTlds, true)) {
+                // Return domain.co.uk format (last 3 parts)
+                return $parts[$numParts - 3] . '.' . $possibleTld;
+            }
+        }
+
+        // Default: Get the last two parts (domain.tld)
+        $domain = $parts[$numParts - 2] . '.' . $parts[$numParts - 1];
+
+        return $domain;
+    }
+}

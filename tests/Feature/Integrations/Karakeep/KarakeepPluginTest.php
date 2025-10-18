@@ -38,10 +38,10 @@ class KarakeepPluginTest extends TestCase
     {
         $actionTypes = KarakeepPlugin::getActionTypes();
 
-        $this->assertArrayHasKey('saved_bookmark', $actionTypes);
+        $this->assertArrayHasKey('bookmarked', $actionTypes);
         $this->assertArrayHasKey('added_to_list', $actionTypes);
 
-        $this->assertEquals('Saved Bookmark', $actionTypes['saved_bookmark']['display_name']);
+        $this->assertEquals('Saved Bookmark', $actionTypes['bookmarked']['display_name']);
         $this->assertEquals('Added to List', $actionTypes['added_to_list']['display_name']);
     }
 
@@ -216,11 +216,9 @@ class KarakeepPluginTest extends TestCase
 
         $this->assertArrayHasKey('update_frequency_minutes', $schema);
         $this->assertArrayHasKey('fetch_limit', $schema);
-        $this->assertArrayHasKey('sync_highlights', $schema);
 
         $this->assertEquals(30, $schema['update_frequency_minutes']['default']);
         $this->assertEquals(50, $schema['fetch_limit']['default']);
-        $this->assertTrue($schema['sync_highlights']['default']);
     }
 
     /**

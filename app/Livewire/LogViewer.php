@@ -6,10 +6,14 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\LoggingService;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class LogViewer extends Component
 {
+    use WithPagination;
+
     public string $type; // 'user', 'group', or 'integration'
 
     public ?string $entityId = null; // UUID of the user, group, or integration
@@ -26,7 +30,11 @@ class LogViewer extends Component
 
     public array $availableDates = [];
 
-    protected $queryString = ['date', 'levelFilter', 'search'];
+    public int $perPage = 50;
+
+    public array $sortBy = ['column' => 'timestamp', 'direction' => 'desc'];
+
+    protected $queryString = ['date', 'levelFilter', 'search', 'perPage' => ['except' => 50]];
 
     public function mount(string $type, ?string $entityId = null, ?string $date = null): void
     {
@@ -53,6 +61,12 @@ class LogViewer extends Component
         $this->loadLogs();
     }
 
+    public function clearFilters(): void
+    {
+        $this->reset(['search', 'levelFilter']);
+        $this->loadLogs();
+    }
+
     public function refreshLogs(): void
     {
         $this->loadLogs();
@@ -69,6 +83,15 @@ class LogViewer extends Component
         return response()->download($path);
     }
 
+    public function headers(): array
+    {
+        return [
+            ['key' => 'timestamp', 'label' => 'Timestamp', 'sortable' => false, 'class' => 'w-40'],
+            ['key' => 'level', 'label' => 'Level', 'sortable' => false, 'class' => 'w-24'],
+            ['key' => 'message', 'label' => 'Message', 'sortable' => false],
+        ];
+    }
+
     public function getLevelBadgeClass(string $level): string
     {
         return match ($level) {
@@ -82,9 +105,26 @@ class LogViewer extends Component
         };
     }
 
+    public function getPaginatedLogs(): LengthAwarePaginator
+    {
+        $currentPage = $this->getPage();
+        $offset = ($currentPage - 1) * $this->perPage;
+        $items = array_slice($this->logLines, $offset, $this->perPage);
+
+        return new LengthAwarePaginator(
+            $items,
+            count($this->logLines),
+            $this->perPage,
+            $currentPage,
+            ['path' => request()->url(), 'pageName' => 'page']
+        );
+    }
+
     public function render()
     {
-        return view('livewire.log-viewer');
+        return view('livewire.log-viewer', [
+            'paginatedLogs' => $this->getPaginatedLogs(),
+        ]);
     }
 
     protected function loadAvailableDates(): void
@@ -195,7 +235,10 @@ class LogViewer extends Component
             return User::findOrFail($this->entityId);
         }
 
-        return auth()->user();
+        /** @var User */
+        $user = auth()->user();
+
+        return $user;
     }
 
     protected function getGroup(): IntegrationGroup

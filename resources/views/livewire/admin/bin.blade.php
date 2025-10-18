@@ -23,12 +23,14 @@ new class extends Component
     public string $search = '';
     public string $typeFilter = '';
     public array $selectedItems = [];
-    public bool $selectAll = false;
     public int $perPage = 25;
+    public array $sortBy = ['column' => 'deleted_at', 'direction' => 'desc'];
 
     protected $queryString = [
         'search' => ['except' => ''],
         'typeFilter' => ['except' => ''],
+        'sortBy' => ['except' => ['column' => 'deleted_at', 'direction' => 'desc']],
+        'perPage' => ['except' => 25],
         'page' => ['except' => 1],
     ];
 
@@ -53,24 +55,16 @@ new class extends Component
         $this->resetPage();
     }
 
-    public function toggleSelectAll(): void
+    public function headers(): array
     {
-        if ($this->selectAll) {
-            $this->selectedItems = $this->getDeletedItems()->pluck('id')->toArray();
-        } else {
-            $this->selectedItems = [];
-        }
-    }
-
-    public function toggleItemSelection(string $itemId): void
-    {
-        if (in_array($itemId, $this->selectedItems)) {
-            $this->selectedItems = array_diff($this->selectedItems, [$itemId]);
-        } else {
-            $this->selectedItems[] = $itemId;
-        }
-
-        $this->selectAll = count($this->selectedItems) === $this->getDeletedItems()->count();
+        return [
+            ['key' => 'id', 'label' => 'ID', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'type', 'label' => 'Type', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'title', 'label' => 'Title', 'sortable' => false],
+            ['key' => 'subtitle', 'label' => 'Subtitle', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'deleted_at', 'label' => 'Deleted At', 'sortable' => true],
+            ['key' => 'created_at', 'label' => 'Created At', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+        ];
     }
 
     public function bulkRestore(): void
@@ -135,7 +129,6 @@ new class extends Component
         }
 
         $this->selectedItems = [];
-        $this->selectAll = false;
 
         $this->success("Restored {$restoredCount} item(s).");
         $this->resetPage();
@@ -223,7 +216,6 @@ new class extends Component
         }
 
         $this->selectedItems = [];
-        $this->selectAll = false;
 
         $this->success("Permanently deleted {$deletedCount} item(s).");
         $this->resetPage();
@@ -243,7 +235,10 @@ new class extends Component
 
         if ($totalItems === 0) {
             return new Illuminate\Pagination\LengthAwarePaginator(
-                collect([]), 0, $this->perPage, $this->getPage(),
+                collect([]),
+                0,
+                $this->perPage,
+                $this->getPage(),
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         }
@@ -341,7 +336,7 @@ new class extends Component
 
         // Events query
         $eventsQuery = Event::onlyTrashed()
-            ->whereHas('integration', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('integration', fn($q) => $q->where('user_id', $userId))
             ->with(['target:id,title', 'integration:id,user_id'])
             ->orderBy('deleted_at', 'desc');
 
@@ -349,7 +344,7 @@ new class extends Component
             $eventsQuery->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
                     ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                    ->orWhereHas('target', fn ($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+                    ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
             });
         }
         $queries['event'] = $eventsQuery;
@@ -370,7 +365,7 @@ new class extends Component
 
         // Blocks query
         $blocksQuery = Block::onlyTrashed()
-            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('event.integration', fn($q) => $q->where('user_id', $userId))
             ->with(['event:id,integration_id'])
             ->orderBy('deleted_at', 'desc');
 
@@ -465,11 +460,11 @@ new class extends Component
     {
         $query = match ($type) {
             'event' => Event::onlyTrashed()
-                ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
+                ->whereHas('integration', fn($q) => $q->where('user_id', Auth::id()))
                 ->with(['target:id,title', 'integration:id,user_id']),
             'object' => EventObject::onlyTrashed()->where('user_id', Auth::id()),
             'block' => Block::onlyTrashed()
-                ->whereHas('event.integration', fn ($q) => $q->where('user_id', Auth::id()))
+                ->whereHas('event.integration', fn($q) => $q->where('user_id', Auth::id()))
                 ->with(['event:id,integration_id']),
             'integration' => Integration::onlyTrashed()->where('user_id', Auth::id()),
             'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', Auth::id()),
@@ -498,7 +493,7 @@ new class extends Component
             'event' => $query->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
                     ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                    ->orWhereHas('target', fn ($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+                    ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
             }),
             'object' => $query->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')
@@ -580,20 +575,20 @@ new class extends Component
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedItems) > 0)
-                    <button class="btn btn-success btn-sm" wire:click="bulkRestore">
-                        <x-icon name="o-arrow-uturn-left" class="w-4 h-4 mr-1" />
-                        Restore Selected ({{ count($selectedItems) }})
-                    </button>
-                    <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                            onclick="return confirm('Are you sure you want to permanently delete {{ count($selectedItems) }} item(s)? This action cannot be undone.')">
-                        <x-icon name="o-trash" class="w-4 h-4 mr-1" />
-                        Delete Selected ({{ count($selectedItems) }})
-                    </button>
+                <button class="btn btn-success btn-sm" wire:click="bulkRestore">
+                    <x-icon name="o-arrow-uturn-left" class="w-4 h-4 mr-1" />
+                    Restore Selected ({{ count($selectedItems) }})
+                </button>
+                <button class="btn btn-error btn-sm" wire:click="bulkDelete"
+                    onclick="return confirm('Are you sure you want to permanently delete {{ count($selectedItems) }} item(s)? This action cannot be undone.')">
+                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    Delete Selected ({{ count($selectedItems) }})
+                </button>
                 @endif
 
                 <!-- Delete All Button -->
                 <button class="btn btn-error btn-sm" wire:click="deleteAll"
-                        onclick="return confirm('Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.')">
+                    onclick="return confirm('Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.')">
                     <x-icon name="o-fire" class="w-4 h-4 mr-1" />
                     Delete All
                 </button>
@@ -601,11 +596,65 @@ new class extends Component
         </x-slot:actions>
     </x-header>
 
-    <div class="space-y-4 lg:space-y-6">
-        <!-- Search and Filters -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Desktop Filters -->
+    <div class="hidden lg:block card bg-base-200 shadow mb-6">
+        <div class="card-body">
+            <div class="flex flex-row gap-4">
+                <!-- Search -->
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">Search</span>
+                    </label>
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="search"
+                        placeholder="Search deleted items..."
+                        class="input input-bordered w-full" />
+                </div>
+
+                <!-- Type Filter -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Type</span>
+                    </label>
+                    <select class="select select-bordered w-full" wire:model.live="typeFilter">
+                        <option value="">All Types</option>
+                        @foreach ($this->getUniqueTypes() as $type)
+                        <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Clear Filters Button -->
+                @if ($search || $typeFilter)
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">&nbsp;</span>
+                    </label>
+                    <button class="btn btn-outline" wire:click="clearFilters">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        Clear
+                    </button>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Filters -->
+    <div class="lg:hidden mb-4">
+        <x-collapse separator class="bg-base-200">
+            <x-slot:heading>
+                <div class="flex items-center gap-2">
+                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    Filters
+                    @if ($search || $typeFilter)
+                    <x-badge value="Active" class="badge-primary badge-xs" />
+                    @endif
+                </div>
+            </x-slot:heading>
+            <x-slot:content>
+                <div class="flex flex-col gap-4">
                     <!-- Search -->
                     <div class="form-control">
                         <label class="label">
@@ -615,8 +664,7 @@ new class extends Component
                             type="text"
                             wire:model.live.debounce.300ms="search"
                             placeholder="Search deleted items..."
-                            class="input input-bordered w-full"
-                        />
+                            class="input input-bordered w-full" />
                     </div>
 
                     <!-- Type Filter -->
@@ -627,90 +675,94 @@ new class extends Component
                         <select class="select select-bordered w-full" wire:model.live="typeFilter">
                             <option value="">All Types</option>
                             @foreach ($this->getUniqueTypes() as $type)
-                                <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
+                            <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
                             @endforeach
                         </select>
                     </div>
 
+                    <!-- Clear Filters Button -->
+                    @if ($search || $typeFilter)
+                    <button class="btn btn-outline" wire:click="clearFilters">
+                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        Clear Filters
+                    </button>
+                    @endif
                 </div>
+            </x-slot:content>
+        </x-collapse>
+    </div>
 
-                <!-- Clear Filters Button -->
-                @if ($search || $typeFilter)
-                    <div class="flex justify-end mt-4">
-                        <button class="btn btn-outline btn-sm" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
+    <!-- Bin Items Table -->
+    <div class="card bg-base-200 shadow card-xs sm:card-md">
+        <div class="card-body">
+            <x-table
+                :headers="$this->headers()"
+                :rows="$this->getDeletedItems()"
+                :sort-by="$sortBy"
+                with-pagination
+                per-page="perPage"
+                :per-page-values="[10, 25, 50, 100]"
+                selectable
+                selectable-key="id"
+                wire:model.live="selectedItems"
+                class="[&_table]:!static [&_td]:!static">
+
+                @scope('cell_id', $item)
+                <span class="font-mono text-xs hidden md:inline" title="{{ $item->id }}">
+                    {{ $this->truncateId($item->id) }}
+                </span>
+                @endscope
+
+                @scope('cell_type', $item)
+                <span class="badge badge-outline">{{ $item->type_label }}</span>
+                @endscope
+
+                @scope('cell_title', $item)
+                <span class="text-sm sm:hidden">{{ $item->type_label }}:</span>
+                <br />
+                {{ $item->title }}
+                @endscope
+
+                @scope('cell_subtitle', $item)
+                {{ $item->subtitle }}
+                @endscope
+
+                @scope('cell_deleted_at', $item)
+                <x-uk-date :date="$item->deleted_at" />
+                @endscope
+
+                @scope('cell_created_at', $item)
+                <x-uk-date :date="$item->created_at" />
+                @endscope
+
+                @scope('actions', $item)
+                <div class="flex gap-2 hidden sm:inline-flex">
+                    <button
+                        wire:click="bulkRestore"
+                        class="btn btn-success btn-xs"
+                        title="Restore">
+                        <x-icon name="o-arrow-uturn-left" class="w-3 h-3" />
+                    </button>
+                    <button
+                        wire:click="bulkDelete"
+                        wire:confirm="Are you sure you want to permanently delete this item? This action cannot be undone."
+                        class="btn btn-error btn-xs"
+                        title="Delete Permanently">
+                        <x-icon name="o-trash" class="w-3 h-3" />
+                    </button>
+                </div>
+                @endscope
+
+                <x-slot:empty>
+                    <div class="text-center py-12">
+                        <x-icon name="o-trash" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                        <p class="font-medium text-base-content mb-2">No deleted items found</p>
+                        @if ($search || $typeFilter)
+                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
+                        @endif
                     </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- Items Table -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="overflow-x-auto">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>
-                                    <label class="cursor-pointer">
-                                        <input type="checkbox" class="checkbox checkbox-sm"
-                                               wire:model="selectAll"
-                                               wire:change="toggleSelectAll" />
-                                    </label>
-                                </th>
-                                <th>ID</th>
-                                <th>Type</th>
-                                <th>Title</th>
-                                <th>Subtitle</th>
-                                <th>Deleted At</th>
-                                <th>Created At</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($this->getDeletedItems() as $item)
-                                <tr class="hover">
-                                    <td>
-                                        <label class="cursor-pointer">
-                                            <input type="checkbox" class="checkbox checkbox-sm"
-                                                   value="{{ $item->id }}"
-                                                   wire:change="toggleItemSelection('{{ $item->id }}')"
-                                                   @checked(in_array($item->id, $selectedItems)) />
-                                        </label>
-                                    </td>
-                                    <td>
-                                        <span class="font-mono text-xs" title="{{ $item->id }}">
-                                            {{ $this->truncateId($item->id) }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-outline">{{ $item->type_label }}</span>
-                                    </td>
-                                    <td>{{ $item->title }}</td>
-                                    <td>{{ $item->subtitle }}</td>
-                                    <td>{{ $this->formatDate($item->deleted_at) }}</td>
-                                    <td>{{ $this->formatDate($item->created_at) }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center py-12">
-                                        <div class="flex flex-col items-center gap-4">
-                                            <x-icon name="o-trash" class="w-16 h-16 text-base-content/70" />
-                                            <span class="font-medium text-base-content">No deleted items found</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination -->
-                <div class="mt-6">
-                    {{ $this->getDeletedItems()->links() }}
-                </div>
-            </div>
+                </x-slot:empty>
+            </x-table>
         </div>
     </div>
 </div>

@@ -25,6 +25,15 @@ abstract class WebhookPlugin implements IntegrationPlugin
         return false;
     }
 
+    /**
+     * Default stale time for webhook integrations: 24 hours
+     * Override in child classes to customize
+     */
+    public static function getTimeUntilStaleMinutes(): ?int
+    {
+        return 24 * 60; // 24 hours
+    }
+
     public function initializeGroup(User $user): IntegrationGroup
     {
         $webhookSecret = Str::random(32);

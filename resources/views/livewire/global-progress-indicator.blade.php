@@ -147,8 +147,18 @@ new class extends Component {
             return (int) $seconds . 's ago';
         }
 
-        $minutes = (int) floor($seconds / 60);
-        return $minutes . 'm ago';
+        if ($seconds < 3600) {
+            $minutes = (int) floor($seconds / 60);
+            return $minutes . 'm ago';
+        }
+
+        if ($seconds < 86400) {
+            $hours = (int) floor($seconds / 3600);
+            return $hours . 'h ago';
+        }
+
+        $days = (int) floor($seconds / 86400);
+        return $days . 'd ago';
     }
 
     public function getRunningDuration($startTime): string
@@ -258,7 +268,7 @@ new class extends Component {
         {{-- Desktop dropdown --}}
         <div tabindex="0" class="hidden sm:block dropdown-content z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto">
             <div class="card-body">
-                <h3 class="font-semibold text-sm mb-3">Activity</h3>
+                <h3 class="font-semibold text-sm mb-3">Updates</h3>
 
                 {{-- Active Operations --}}
                 @if ($activeProgresses->isNotEmpty())
@@ -532,7 +542,7 @@ new class extends Component {
     </div>
 
     {{-- Mobile drawer --}}
-    <x-drawer wire:model="showMobileModal" class="sm:hidden w-full max-w-lg" title="Task Progress" right with-close-button>
+    <x-drawer wire:model="showMobileModal" class="sm:hidden w-full max-w-lg" title="Updates" right with-close-button>
         <div class="p-4">
             @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
 

@@ -83,7 +83,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     public static function getDescription(): string
     {
-        return 'Connect bank accounts via GoCardless Bank Account Data API to ingest balances and transactions.';
+        return 'Connect bank accounts to sync transactions and balances.';
     }
 
     public static function getConfigurationSchema(): array
@@ -1196,6 +1196,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // Create or update actor (bank account)
         $actorObject = $this->upsertAccountObject($integration, $account);
 
+        // If account object doesn't exist yet (minimal data and no existing object),
+        // skip transaction event creation - the account data job will create the object
+        if (! $actorObject) {
+            Log::info('GoCardless processTransactionItem: Skipping transaction - account object not ready yet', [
+                'integration_id' => $integration->id,
+                'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
+            ]);
+
+            return;
+        }
+
         // Create or update target (counterparty)
         $targetObject = $this->upsertCounterpartyObject($integration, $tx);
 
@@ -1316,6 +1327,19 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $accountData = ['id' => $accountId];
         $accountObject = $this->upsertAccountObject($integration, $accountData);
 
+        // If account object doesn't exist yet (minimal data and no existing object),
+        // skip balance event creation - the account data job will create the object
+        if (! $accountObject) {
+            Log::info('GoCardless: Skipping balance event - account object not ready yet', [
+                'integration_id' => $integration->id,
+                'account_id' => $accountId,
+                'balance_type' => $balanceType,
+                'reference_date' => $balanceReferenceDate,
+            ]);
+
+            return;
+        }
+
         Log::info('GoCardless: Creating balance event', [
             'integration_id' => $integration->id,
             'account_id' => $accountId,
@@ -1409,7 +1433,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Upsert account object - handles both onboarding-created and transaction-created objects
      */
-    public function upsertAccountObject(Integration $integration, array $account): EventObject
+    public function upsertAccountObject(Integration $integration, array $account): ?EventObject
     {
         $accountId = $account['id'] ?? 'unknown';
 
@@ -1437,6 +1461,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ]);
 
             return $existingObject;
+        }
+
+        // If no existing object found and we only have minimal data, return null
+        // This prevents creating duplicate stub objects - the account data job will create the proper object
+        if (! $existingObject && ! $hasCompleteData) {
+            Log::info('GoCardless: No existing account object found and only minimal data available, returning null', [
+                'account_id' => $accountId,
+                'integration_id' => $integration->id,
+            ]);
+
+            return null;
         }
 
         // Determine account type based on GoCardless data
