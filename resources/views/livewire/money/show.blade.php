@@ -91,6 +91,13 @@
                             <div class="text-sm text-base-content/70">
                                 {{ $provider }} · {{ $accountTypeLabel }}
                             </div>
+                            @if ($account->tags->isNotEmpty())
+                                <div class="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
+                                    @foreach ($account->tags as $tag)
+                                        <x-spark-tag :tag="$tag" size="sm" />
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
 
                         <!-- Current Balance Display -->

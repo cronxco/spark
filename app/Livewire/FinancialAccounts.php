@@ -25,6 +25,8 @@ class FinancialAccounts extends Component
 
     public bool $showArchived = false;
 
+    public bool $showEmptyAccounts = true;
+
     public array $sortBy = ['column' => 'title', 'direction' => 'asc'];
 
     public int $perPage = 25;
@@ -33,13 +35,28 @@ class FinancialAccounts extends Component
 
     public bool $showCreateAccountModal = false;
 
+    public string $viewMode = 'cards';
+
+    public array $expandedSections = [
+        'current_account' => true,
+        'credit_card' => true,
+        'savings_account' => true,
+        'loan' => true,
+        'mortgage' => true,
+        'investment_account' => true,
+        'pension' => true,
+        'other' => true,
+    ];
+
     protected $queryString = [
         'search' => ['except' => ''],
         'accountTypeFilter' => ['except' => ''],
         'providerFilter' => ['except' => ''],
         'showArchived' => ['except' => false],
+        'showEmptyAccounts' => ['except' => true],
         'sortBy' => ['except' => ['column' => 'title', 'direction' => 'asc']],
         'perPage' => ['except' => 25],
+        'viewMode' => ['except' => 'cards'],
     ];
 
     public function updatedSearch(): void
@@ -59,7 +76,7 @@ class FinancialAccounts extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'accountTypeFilter', 'providerFilter', 'showArchived']);
+        $this->reset(['search', 'accountTypeFilter', 'providerFilter', 'showArchived', 'showEmptyAccounts']);
         $this->resetPage();
     }
 
@@ -139,6 +156,9 @@ class FinancialAccounts extends Component
             $accounts = $plugin->getFinancialAccounts(Auth::user());
         }
 
+        // Eager load tags for all accounts
+        $accounts->load('tags');
+
         // Apply filters
         if ($this->search) {
             $accounts = $accounts->filter(function ($account) {
@@ -159,6 +179,15 @@ class FinancialAccounts extends Component
         if ($this->providerFilter) {
             $accounts = $accounts->filter(function ($account) {
                 return ($account->metadata['provider'] ?? '') === $this->providerFilter;
+            });
+        }
+
+        // Filter out empty accounts if toggle is off
+        if (! $this->showEmptyAccounts) {
+            $accounts = $accounts->filter(function ($account) {
+                $balance = $this->getFormattedBalance($account);
+
+                return $balance !== null && $balance != 0;
             });
         }
 
@@ -202,8 +231,12 @@ class FinancialAccounts extends Component
             ]
         );
 
+        // Group accounts by type for cards view
+        $groupedAccounts = $this->groupAccountsByType($accounts);
+
         return view('livewire.money.index', [
             'accounts' => $paginatedAccounts,
+            'groupedAccounts' => $groupedAccounts,
             'accountTypes' => $accountTypes,
             'providers' => $providers,
         ]);
@@ -283,5 +316,48 @@ class FinancialAccounts extends Component
         }
 
         return null;
+    }
+
+    /**
+     * Group accounts by type and sort by balance within groups
+     */
+    private function groupAccountsByType($accounts): array
+    {
+        // Define the order of account types
+        $typeOrder = [
+            'current_account' => 1,
+            'credit_card' => 2,
+            'savings_account' => 3,
+            'loan' => 4,
+            'mortgage' => 5,
+            'investment_account' => 6,
+            'pension' => 7,
+            'other' => 8,
+        ];
+
+        $grouped = $accounts->groupBy(function ($account) {
+            return $account->metadata['account_type'] ?? 'other';
+        });
+
+        // Sort groups by defined order and sort accounts within each group by balance
+        $sorted = collect($typeOrder)
+            ->map(function ($order, $type) use ($grouped) {
+                if (! $grouped->has($type)) {
+                    return null;
+                }
+
+                return [
+                    'type' => $type,
+                    'label' => $this->getAccountTypeLabel($type) . 's',
+                    'accounts' => $grouped->get($type)->sortByDesc(function ($account) {
+                        return $this->getFormattedBalance($account) ?? 0;
+                    })->values(),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->toArray();
+
+        return $sorted;
     }
 }
