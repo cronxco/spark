@@ -256,7 +256,7 @@
                             <a href="/money/{{ $account->id }}" wire:navigate class="card bg-base-100 shadow hover:shadow-lg transition-shadow cursor-pointer">
                                 <div class="card-body p-4">
                                     <h3 class="card-title text-base">
-                                        {{$provider}}
+                                        {{ $provider }}
                                         @if (in_array($account->type, ['monzo_pot', 'monzo_archived_pot', 'monzo_account']) && !empty($account->title))
                                         {{ $account->title }}
                                         @elseif (!empty($metadata['name']))
