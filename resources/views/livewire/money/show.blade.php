@@ -409,4 +409,8 @@
             </div>
         </x-drawer>
     </div>
+    <!-- Create Tag Modal -->
+    <x-modal wire:model="showCreateTagModal" title="Create New Tag" subtitle="Define a new tag with a specific type" separator>
+        <livewire:create-tag :key="'create-tag-object-' . $account->id" @tag-created="handleTagCreated" />
+    </x-modal>
 </div>
