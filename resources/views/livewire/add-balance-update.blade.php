@@ -1,27 +1,5 @@
 <div>
-    <div class="max-w-2xl mx-auto">
-        <!-- Header -->
-        <div class="mb-6">
-            <h1 class="text-3xl font-bold text-base-content">
-                @if ($isAccountPreselected)
-                    Add Balance Update for {{ $accounts->firstWhere('id', $accountId)?->metadata['name'] ?? 'Account' }}
-                @else
-                    Add Balance Update
-                @endif
-            </h1>
-            <p class="text-base-content/70">
-                @if ($isAccountPreselected)
-                    Record a new balance for this account
-                @else
-                    Record a new balance for one of your accounts
-                @endif
-            </p>
-        </div>
-
-        <!-- Form -->
-        <div class="card bg-base-200 shadow-sm">
-            <div class="card-body">
-                <form wire:submit="save">
+    <form wire:submit.prevent="saveAndClose">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Account Selection -->
                         <div class="form-control md:col-span-2">
@@ -171,37 +149,19 @@
                         </div>
                     </div>
 
-                    <!-- Form Actions -->
-                    <div class="flex gap-3 mt-8">
-                        <button type="submit" class="btn btn-primary">
-                            <x-icon name="o-currency-dollar" class="w-4 h-4" />
-                            Add Balance Update
-                        </button>
-                        <a href="{{ route('money') }}" class="btn btn-outline">
-                            Cancel
-                        </a>
-                    </div>
-                </form>
-            </div>
+        <!-- Form Actions -->
+        <div class="flex gap-3 mt-8">
+            <button type="button" wire:click="saveAndContinue" class="btn btn-primary">
+                <x-icon name="o-plus" class="w-4 h-4" />
+                Save & Continue
+            </button>
+            <button type="submit" class="btn btn-outline">
+                <x-icon name="o-check" class="w-4 h-4" />
+                Save & Close
+            </button>
+            <button type="button" wire:click="$dispatch('close-add-balance-modal')" class="btn btn-ghost">
+                Cancel
+            </button>
         </div>
-
-        <!-- Help Text -->
-        <div class="card bg-base-200 shadow-sm mt-6">
-            <div class="card-body">
-                <h3 class="card-title text-base-content">
-                    <x-icon name="o-information-circle" class="w-5 h-5" />
-                    Tips for Balance Updates
-                </h3>
-                <ul class="list-disc list-inside space-y-2 text-sm text-base-content/70">
-                    <li>Update your balances regularly to keep track of your financial progress</li>
-                    <li>For mortgages and loans, use negative balances to represent outstanding debt</li>
-                    <li>Include notes for significant changes or important context</li>
-                    <li>You can update balances as frequently as needed</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast notifications -->
-    <x-toast position="toast-top toast-end" />
+    </form>
 </div>

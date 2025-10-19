@@ -33,7 +33,7 @@ class AddBalanceUpdateTest extends TestCase
             ->assertSet('accountId', '')
             ->assertSet('isAccountPreselected', false)
             ->assertSet('date', now()->format('Y-m-d'))
-            ->assertSee('Add Balance Update');
+            ->assertSee('Account');
     }
 
     #[Test]
@@ -65,7 +65,7 @@ class AddBalanceUpdateTest extends TestCase
         Livewire::test(AddBalanceUpdate::class, ['account' => $account->id])
             ->assertSet('accountId', $account->id)
             ->assertSet('isAccountPreselected', true)
-            ->assertSee('Add Balance Update for Test Account');
+            ->assertSee('Test Account');
     }
 
     #[Test]
@@ -99,10 +99,9 @@ class AddBalanceUpdateTest extends TestCase
             ->set('balance', 1500.75)
             ->set('date', '2025-01-27')
             ->set('notes', 'Monthly salary received')
-            ->call('save')
+            ->call('saveAndClose')
             ->assertDispatched('balance-updated')
-            ->assertSet('balance', null)
-            ->assertSet('notes', null);
+            ->assertDispatched('close-add-balance-modal');
 
         // Verify the event was created
         $this->assertDatabaseHas('events', [
@@ -143,7 +142,7 @@ class AddBalanceUpdateTest extends TestCase
             ->set('accountId', $monzoAccount->id)
             ->set('balance', 1500.75)
             ->set('date', '2025-01-27')
-            ->call('save');
+            ->call('saveAndClose');
     }
 
     #[Test]
@@ -179,7 +178,7 @@ class AddBalanceUpdateTest extends TestCase
             ->set('accountId', $account->id)
             ->set('balance', 1500.75)
             ->set('date', '2025-01-27')
-            ->call('save');
+            ->call('saveAndClose');
     }
 
     #[Test]
@@ -192,7 +191,7 @@ class AddBalanceUpdateTest extends TestCase
             ->set('accountId', '')
             ->set('balance', null)
             ->set('date', '')
-            ->call('save')
+            ->call('saveAndClose')
             ->assertHasErrors(['accountId', 'balance', 'date']);
     }
 
@@ -265,5 +264,44 @@ class AddBalanceUpdateTest extends TestCase
         Livewire::test(AddBalanceUpdate::class)
             ->assertSee('Manual Account - Test Bank')
             ->assertDontSee('Monzo Account');
+    }
+
+    #[Test]
+    public function save_and_continue_keeps_account_selection(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Create integration and account
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'manual_account',
+        ]);
+
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'manual_account',
+            'name' => 'Test Account',
+        ]);
+
+        $plugin = new FinancialPlugin;
+        $account = $plugin->upsertAccountObject($integration, [
+            'name' => 'Test Account',
+            'account_type' => 'current_account',
+            'provider' => 'Test Bank',
+        ]);
+
+        Livewire::test(AddBalanceUpdate::class)
+            ->set('accountId', $account->id)
+            ->set('balance', 1500.75)
+            ->set('date', '2025-01-27')
+            ->set('notes', 'Monthly salary received')
+            ->call('saveAndContinue')
+            ->assertDispatched('balance-updated')
+            ->assertSet('accountId', $account->id)
+            ->assertSet('balance', null)
+            ->assertSet('notes', null)
+            ->assertSet('date', now()->format('Y-m-d'));
     }
 }

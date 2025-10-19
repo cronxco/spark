@@ -22,6 +22,8 @@ class AddBalanceUpdate extends Component
 
     public bool $isAccountPreselected = false;
 
+    public bool $showModal = false;
+
     protected $rules = [
         'accountId' => 'required|string|exists:objects,id',
         'balance' => 'required|numeric',
@@ -41,7 +43,48 @@ class AddBalanceUpdate extends Component
         }
     }
 
-    public function save(): void
+    public function saveAndContinue(): void
+    {
+        $this->performSave();
+
+        // Reset form but keep account selection
+        $this->reset(['balance', 'notes']);
+        $this->date = now()->format('Y-m-d');
+    }
+
+    public function saveAndClose(): void
+    {
+        $this->performSave();
+
+        // Close modal and reset all fields
+        $this->showModal = false;
+        $this->dispatch('close-add-balance-modal');
+    }
+
+    public function render(): View
+    {
+        $plugin = new FinancialPlugin;
+        $accounts = $plugin->getManualFinancialAccounts(Auth::user());
+
+        return view('livewire.add-balance-update', [
+            'accounts' => $accounts,
+        ]);
+    }
+
+    protected function validateAccount(string $accountId): void
+    {
+        $account = EventObject::where('id', $accountId)
+            ->where('user_id', Auth::id())
+            ->where('concept', 'account')
+            ->where('type', 'manual_account')
+            ->first();
+
+        if (! $account) {
+            abort(404, 'Account not found or access denied. Only manual accounts can have balance updates added.');
+        }
+    }
+
+    private function performSave(): void
     {
         $this->validate();
 
@@ -126,30 +169,5 @@ class AddBalanceUpdate extends Component
         ]);
 
         $this->dispatch('balance-updated');
-        $this->reset(['balance', 'notes']);
-        $this->date = now()->format('Y-m-d');
-    }
-
-    public function render(): View
-    {
-        $plugin = new FinancialPlugin;
-        $accounts = $plugin->getManualFinancialAccounts(Auth::user());
-
-        return view('livewire.add-balance-update', [
-            'accounts' => $accounts,
-        ]);
-    }
-
-    protected function validateAccount(string $accountId): void
-    {
-        $account = EventObject::where('id', $accountId)
-            ->where('user_id', Auth::id())
-            ->where('concept', 'account')
-            ->where('type', 'manual_account')
-            ->first();
-
-        if (! $account) {
-            abort(404, 'Account not found or access denied. Only manual accounts can have balance updates added.');
-        }
     }
 }
