@@ -45,7 +45,7 @@ class FinancialAccounts extends Component
         'mortgage' => true,
         'investment_account' => true,
         'pension' => true,
-        'other' => true,
+        'other' => false, // 'other' accounts collapsed by default
     ];
 
     protected $queryString = [
