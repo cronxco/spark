@@ -44,13 +44,13 @@ class IconValidationTest extends TestCase
         if (! empty($this->invalidIcons)) {
             $this->fail(
                 "Found invalid icon references:\n" .
-                implode("\n", $this->invalidIcons) .
-                "\n\nValid HeroIcons are:\n" .
-                implode("\n", array_slice($this->validHeroIcons, 0, 50)) . // Show first 50 valid icons
-                "\n\nValid FontAwesome icons are:\n" .
-                implode("\n", array_slice($this->validFontAwesomeIcons, 0, 50)) . // Show first 50 valid icons
-                "\n\nTotal valid HeroIcons available: " . count($this->validHeroIcons) .
-                "\nTotal valid FontAwesome icons available: " . count($this->validFontAwesomeIcons)
+                    implode("\n", $this->invalidIcons) .
+                    "\n\nValid HeroIcons are:\n" .
+                    implode("\n", array_slice($this->validHeroIcons, 0, 50)) . // Show first 50 valid icons
+                    "\n\nValid FontAwesome icons are:\n" .
+                    implode("\n", array_slice($this->validFontAwesomeIcons, 0, 50)) . // Show first 50 valid icons
+                    "\n\nTotal valid HeroIcons available: " . count($this->validHeroIcons) .
+                    "\nTotal valid FontAwesome icons available: " . count($this->validFontAwesomeIcons)
             );
         }
 
@@ -279,12 +279,14 @@ class IconValidationTest extends TestCase
             if (preg_match_all($pattern, $content, $matches)) {
                 foreach ($matches[1] ?? [] as $match) {
                     // Handle HeroIcons (m-, o-, s- prefix)
-                    if (preg_match('/^[mso]-[a-zA-Z0-9-]+$/', $match) &&
+                    if (
+                        preg_match('/^[mso]-[a-zA-Z0-9-]+$/', $match) &&
                         strlen($match) > 4 && // Must be longer than just "o-b" or "s-xs"
                         ! preg_match('/^[mso]-[a-z]$/', $match) && // Exclude single letters
-                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl|boxed)$/', $match) && // Exclude CSS-like classes
+                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl|boxed|error|success|warning)$/', $match) && // Exclude CSS-like classes
                         ! preg_match('/^[mso]-[a-z]+-[0-9]+$/', $match) && // Exclude color classes like m-neutral-950, m-purple-500
-                        ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match)) { // Exclude common CSS class patterns
+                        ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match)
+                    ) { // Exclude common CSS class patterns
                         $this->foundIcons[] = $match;
                     }
 

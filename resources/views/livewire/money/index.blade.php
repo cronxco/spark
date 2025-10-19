@@ -308,7 +308,7 @@
                                     </div>
                                     @elseif ($ageMinutes < 60 * 24 * 30)
                                         <div class="flex items-center gap-1">
-                                        <div aria-label="updated-month" class="status status-warnnig"></div>
+                                        <div aria-label="updated-month" class="status status-warning"></div>
                                         <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
                                 </div>
                                 @else
