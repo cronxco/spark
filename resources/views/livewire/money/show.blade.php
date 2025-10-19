@@ -92,11 +92,11 @@
                                 {{ $provider }} · {{ $accountTypeLabel }}
                             </div>
                             @if ($account->tags->isNotEmpty())
-                                <div class="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
-                                    @foreach ($account->tags as $tag)
-                                        <x-spark-tag :tag="$tag" size="sm" />
-                                    @endforeach
-                                </div>
+                            <div class="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
+                                @foreach ($account->tags as $tag)
+                                <x-spark-tag :tag="$tag" size="sm" />
+                                @endforeach
+                            </div>
                             @endif
                         </div>
 
@@ -243,6 +243,27 @@
         <!-- Drawer for Account Details -->
         <x-drawer wire:model="showSidebar" right title="Account Details" separator with-close-button class="w-11/12 lg:w-1/3">
             <div class="space-y-4 lg:space-y-6">
+                <!-- Tags Manager -->
+                <x-card class="bg-base-100 shadow">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+                            <x-icon name="o-tag" class="w-5 h-5" />
+                            Tags
+                        </h3>
+                        <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
+                            <x-icon name="o-plus" class="w-3 h-3" />
+                        </button>
+                    </div>
+                    <div class="space-y-2" wire:key="object-tags-{{ $account->id }}" wire:ignore>
+                        <input id="tag-input-{{ $account->id }}" data-tagify data-initial="tag-initial-{{ $account->id }}" data-suggestions-id="tag-suggestions-{{ $account->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
+                        <script type="application/json" id="tag-initial-{{ $account->id }}">
+                                {!! json_encode($account->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
+                            </script>
+                            <script type="application/json" id="tag-suggestions-{{ $account->id }}">
+                                {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
+                            </script>
+                    </div>
+                </x-card>
                 <!-- Account Information -->
                 <div>
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">

@@ -465,7 +465,7 @@ $getBadgeAccentForService = function ($service) {
 $valueColorClass = function ($event) {
     // Only apply coloring for money domain
     if ($event->domain !== 'money') {
-        return 'text-base-content';
+        return 'text-accent dark:text-primary';
     }
 
     $value = $event->formatted_value ?? $event->value;
@@ -836,13 +836,13 @@ $areAllGroupsExpanded = computed(function () {
         @else
         <!-- Custom Vertical Timeline View -->
         @if ($this->pollMode === 'keep')
-            <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
-        @else
+        <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
+            @else
             <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.visible>
-        @endif
-            @php $previousHour = null; @endphp
+                @endif
+                @php $previousHour = null; @endphp
 
-            @foreach (($this->groupedEvents ?? []) as $eventGroup)
+                @foreach (($this->groupedEvents ?? []) as $eventGroup)
                 @php
                 $first = $eventGroup['events'][0];
                 $hour = $first->time->format('H');
@@ -884,13 +884,13 @@ $areAllGroupsExpanded = computed(function () {
                             @else
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
                             <div class="py-2 px-2">
-                                <a href="{{ route('events.show', $firstEvent->id) }}" class="block hover:text-primary transition-colors min-w-0">
+                                <a href="{{ route('events.show', $firstEvent->id) }}" class="block hover:text-primary transition-colors min-w-0 text-xl">
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                     @if ($firstEvent->target)
-                                    <span class="text-base-content/80 block truncate font-bold min-w-0">{{ ' ' . $firstEvent->target->title }}</span>
+                                    <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $firstEvent->target->title }}</span>
                                     @elseif ($firstEvent->actor)
-                                    <span class="text-base-content/80 block truncate font-bold min-w-0">{{ ' ' . $firstEvent->actor->title }}</span>
+                                    <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $firstEvent->actor->title }}</span>
                                     @endif
                                     @endif
                                 </a>
@@ -899,16 +899,9 @@ $areAllGroupsExpanded = computed(function () {
                                     <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }}</span>
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    <x-badge class="badge-xs badge-outline">
-                                        <x-slot:value>
-                                            <x-icon name="fas.bell-concierge" class="w-3 h-3 text-base-content/40" />
-                                            {{ str::Lower($firstEvent->service) }}
-                                        </x-slot:value>
-                                    </x-badge>
                                     @if ($firstEvent->integration)
-                                    <x-badge class="badge-xs badge-outline">
+                                    <x-badge class="badge-sm sm:badge-md badge-base">
                                         <x-slot:value>
-                                            <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
                                             {{ str::Lower($firstEvent->integration->name) }}
                                         </x-slot:value>
                                     </x-badge>
@@ -917,7 +910,7 @@ $areAllGroupsExpanded = computed(function () {
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @endif
-                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" fill />@endforeach
+                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="md" fill />@endforeach
                                 </div>
                             </div>
                             @endif
@@ -941,13 +934,13 @@ $areAllGroupsExpanded = computed(function () {
                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                     </div>
                     <div class="py-2 px-2">
-                        <a href="{{ route('events.show', $event->id) }}" class="text-base-content block hover:text-primary transition-colors min-w-0">
+                        <a href="{{ route('events.show', $event->id) }}" class="text-base-content block hover:text-primary transition-colors min-w-0 text-lg">
                             <span class="font-medium">{{ $this->formatAction($event->action) }}</span>
                             @if (should_display_action_with_object($event->action, $event->service))
                             @if ($event->target)
-                            <span class="text-base-content/80 block truncate font-medium min-w-0">{{ ' ' . $event->target->title }}</span>
+                            <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $event->target->title }}</span>
                             @elseif ($event->actor)
-                            <span class="text-base-content/80 block truncate font-medium min-w-0">{{ ' ' . $event->actor->title }}</span>
+                            <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $event->actor->title }}</span>
                             @endif
                             @endif
                         </a>
@@ -956,9 +949,8 @@ $areAllGroupsExpanded = computed(function () {
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @if ($event->integration)
-                            <x-badge class="badge-xs badge-outline">
+                            <x-badge class="badge-sm badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Lower($event->integration->name) }}
                                 </x-slot:value>
                             </x-badge>
@@ -967,7 +959,7 @@ $areAllGroupsExpanded = computed(function () {
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @endif
-                            @foreach ($event->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="xs" />@endforeach
+                            @foreach ($event->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="sm" />@endforeach
                         </div>
                     </div>
                     <div class="py-2 pr-2 text-right">
