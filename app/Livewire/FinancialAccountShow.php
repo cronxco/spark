@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Spatie\Tags\Tag;
 
 #[Title('Account Details')]
 class FinancialAccountShow extends Component
@@ -22,6 +23,7 @@ class FinancialAccountShow extends Component
     public bool $showEditModal = false;
     public bool $showArchiveModal = false;
     public bool $showAddBalanceModal = false;
+    public bool $showCreateTagModal = false;
     public int $perPage = 25;
     public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
@@ -206,6 +208,106 @@ class FinancialAccountShow extends Component
     {
         $this->closeArchiveModal();
         $this->redirect(route('money'));
+    }
+
+    public function addTag(string $value, ?string $type = null): void
+    {
+        $name = trim((string) $value);
+        if ($name === '') {
+            return;
+        }
+
+        if (str_starts_with($name, 'tag-whitelist-') || str_starts_with($name, 'tag-initial-')) {
+            return;
+        }
+
+        // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
+        $detectedType = $type !== null ? trim($type) : null;
+        if ($detectedType === null) {
+            if (preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $m) === 1) {
+                $detectedType = strtolower($m[1]);
+                $name = trim($m[2]);
+            }
+        } else {
+            // Strip matching prefix from the visible value if present
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
+                $name = trim($m[1]);
+            }
+        }
+
+        // Default free-form tags to 'spark' unless they are emoji-only
+        if ($detectedType === null) {
+            $detectedType = preg_match('/^\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?(?:\\x{200D}\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?)*$/u', $name) === 1
+                ? 'emoji'
+                : 'spark';
+        }
+
+        $tag = Tag::findOrCreate($name, $detectedType);
+        // Ensure type persisted in case library returned an existing tag without the type set
+        if (($tag->type ?? null) !== $detectedType) {
+            $tag->type = $detectedType;
+            $tag->save();
+        }
+
+        $this->account->attachTag($tag);
+        $this->account->refresh()->loadMissing('tags');
+    }
+
+    public function removeTag(string $value, ?string $type = null): void
+    {
+        $name = trim((string) $value);
+        if ($name === '') {
+            return;
+        }
+
+        if (str_starts_with($name, 'tag-whitelist-') || str_starts_with($name, 'tag-initial-')) {
+            return;
+        }
+
+        // If type not explicitly provided, infer from value prefix (e.g., type:label or type_label)
+        $detectedType = $type !== null ? trim($type) : null;
+        if ($detectedType === null) {
+            if (preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $m) === 1) {
+                $detectedType = strtolower($m[1]);
+                $name = trim($m[2]);
+            }
+        } else {
+            // Strip matching prefix from the visible value if present
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
+                $name = trim($m[1]);
+            }
+        }
+
+        // Default free-form tags to 'spark' unless they are emoji-only
+        if ($detectedType === null) {
+            $detectedType = preg_match('/^\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?(?:\\x{200D}\\p{Extended_Pictographic}(?:[\\x{FE0F}\\x{FE0E}])?)*$/u', $name) === 1
+                ? 'emoji'
+                : 'spark';
+        }
+
+        $this->account->detachTag($name, $detectedType);
+        $this->account->refresh()->loadMissing('tags');
+    }
+
+    public function notifyCopied(string $what): void
+    {
+        $this->success($what . ' copied to clipboard!');
+    }
+
+    public function openCreateTagModal(): void
+    {
+        $this->showCreateTagModal = true;
+    }
+
+    public function closeCreateTagModal(): void
+    {
+        $this->showCreateTagModal = false;
+    }
+
+    public function handleTagCreated(): void
+    {
+        $this->account->refresh()->loadMissing('tags');
+        $this->showCreateTagModal = false;
     }
 
     protected function getListeners(): array
