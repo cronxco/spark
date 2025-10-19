@@ -95,7 +95,7 @@
                         @if ($displayBalance !== null)
                         <div class="p-4 lg:p-6 rounded-lg bg-base-300/50 border border-base-300 text-center sm:text-left">
                             <div class="text-sm text-base-content/70 mb-2">
-                                @if ($isNegativeBalance)
+                                @if ($this->isNegativeBalance)
                                 Current Debt
                                 @else
                                 Current Balance
@@ -154,7 +154,7 @@
                         }
 
                         // For negative balance accounts, invert the sign for display
-                        if ($isNegativeBalance && $balance !== null) {
+                        if ($this->isNegativeBalance && $balance !== null) {
                         $eventDisplayBalance = -$balance;
                         } else {
                         $eventDisplayBalance = $balance;
@@ -163,9 +163,9 @@
                         @if ($eventDisplayBalance !== null)
                         <span class="font-mono font-medium text-lg {{ $eventDisplayBalance < 0 ? 'text-error' : '' }}">
                             @if ($eventDisplayBalance < 0)
-                                -{{ $currencySymbol }}{{ number_format(abs($eventDisplayBalance), 2) }}
+                                -{{ $this->currencySymbol }}{{ number_format(abs($eventDisplayBalance), 2) }}
                                 @else
-                                {{ $currencySymbol }}{{ number_format($eventDisplayBalance, 2) }}
+                                {{ $this->currencySymbol }}{{ number_format($eventDisplayBalance, 2) }}
                                 @endif
                                 </span>
                                 @else
@@ -274,7 +274,7 @@
                         <div>
                             <span class="text-base-content/70">Balance Type:</span>
                             <span class="font-medium">
-                                @if ($isNegativeBalance)
+                                @if ($this->isNegativeBalance)
                                 <span class="text-error">Debt Account</span>
                                 @else
                                 Asset Account
