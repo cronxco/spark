@@ -6,36 +6,35 @@
             <!-- Header -->
             <x-header separator>
                 <x-slot:title>
-                    @if (in_array($account->type, ['monzo_pot', 'monzo_archived_pot', 'monzo_account']) && !empty($account->title))
-                    {{ $account->title }}
-                    @elseif (!empty($metadata['name']))
-                    {{ $metadata['name'] }}
-                    @elseif (!empty($account->title))
-                    {{ $account->title }}
-                    @else
-                    Unnamed Account
-                    @endif
+                    Account Details
                 </x-slot:title>
-                <x-slot:subtitle>{{ $provider }} - {{ $accountTypeLabel }}</x-slot:subtitle>
+                <x-slot:subtitle>
+                    <x-button link="{{ route('money') }}" class="btn-ghost btn-xs">
+                        <x-icon name="o-arrow-left" class="w-4 h-4" />
+                        Back to Accounts
+                    </x-button>
+                </x-slot:subtitle>
                 <x-slot:actions>
                     <!-- Desktop: Full buttons -->
                     <div class="hidden sm:flex gap-2">
                         @if ($account->type === 'manual_account')
-                        <x-button link="{{ route('balance-updates.create.for-account', $account->id) }}" class="btn-primary">
+                        <x-button wire:click="openAddBalanceModal" class="btn-primary btn-sm">
                             <x-icon name="o-banknotes" class="w-4 h-4" />
-                            Add Balance Update
+                            Add Balance
                         </x-button>
                         @endif
                         @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
-                        <x-button wire:click="openEditModal" class="btn-outline">
+                        <x-button wire:click="openEditModal" class="btn-outline btn-sm">
                             <x-icon name="o-pencil" class="w-4 h-4" />
                             Edit Account
                         </x-button>
                         @endif
-                        <x-button link="{{ route('money') }}" class="btn-outline">
-                            <x-icon name="o-arrow-left" class="w-4 h-4" />
-                            Back
+                        @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'bank_account']) && !($account->metadata['deleted'] ?? false))
+                        <x-button wire:click="openArchiveModal" class="btn-outline btn-error btn-sm">
+                            <x-icon name="o-archive-box" class="w-4 h-4" />
+                            Archive
                         </x-button>
+                        @endif
                         <x-button wire:click="toggleSidebar" class="btn-ghost btn-sm">
                             <x-icon name="{{ 'o-adjustments-horizontal' }}" class="w-5 h-5" />
                         </x-button>
@@ -50,10 +49,13 @@
                                 </x-button>
                             </x-slot:trigger>
                             @if ($account->type === 'manual_account')
-                            <x-menu-item title="Add Balance Update" icon="o-banknotes" link="{{ route('balance-updates.create.for-account', $account->id) }}" />
+                            <x-menu-item title="Add Balance" icon="o-banknotes" wire:click="openAddBalanceModal" />
                             @endif
                             @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
                             <x-menu-item title="Edit Account" icon="o-pencil" wire:click="openEditModal" />
+                            @endif
+                            @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'bank_account']) && !($account->metadata['deleted'] ?? false))
+                            <x-menu-item title="Archive Account" icon="o-archive-box" wire:click="openArchiveModal" />
                             @endif
                             <x-menu-item title="Back to Accounts" icon="o-arrow-left" link="{{ route('money') }}" />
                             <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" wire:click="toggleSidebar" />
@@ -192,16 +194,16 @@
                                             @if ($account->type === 'manual_account')
                                             Add your first balance update to get started
                                             @elseif (in_array($account->type, ['monzo_account', 'monzo_pot', 'bank_account']))
-                                            Balance history will appear here once your integration fetches data
+                                            Balance history will appear here once the account has synced
                                             @else
                                             No balance history available
                                             @endif
                                         </p>
                                         @if ($account->type === 'manual_account')
-                                        <a href="{{ route('balance-updates.create.for-account', $account->id) }}" class="btn">
+                                        <button wire:click="openAddBalanceModal" class="btn">
                                             <x-icon name="o-plus" class="w-4 h-4" />
-                                            Add Balance Update
-                                        </a>
+                                            Add Balance
+                                        </button>
                                         @endif
                                     </div>
                                 </x-slot:empty>
@@ -214,6 +216,20 @@
         @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
         <x-modal wire:model="showEditModal" title="Edit Account" subtitle="Update your account details and metadata" separator>
             <livewire:edit-financial-account :account="$account" :key="'edit-account-' . $account->id" />
+        </x-modal>
+        @endif
+
+        <!-- Archive Account Modal -->
+        @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'bank_account']) && !($account->metadata['deleted'] ?? false))
+        <x-modal wire:model="showArchiveModal" title="Archive Account" subtitle="Mark this account as archived and create a final balance event" separator>
+            <livewire:archive-financial-account :account="$account" :key="'archive-account-' . $account->id" />
+        </x-modal>
+        @endif
+
+        <!-- Add Balance Update Modal -->
+        @if ($account->type === 'manual_account')
+        <x-modal wire:model="showAddBalanceModal" title="Add Balance Update" subtitle="Record a new balance for this account" separator>
+            <livewire:add-balance-update :account="$account->id" :key="'add-balance-update-' . $account->id" />
         </x-modal>
         @endif
 
@@ -331,9 +347,9 @@
                         </div>
 
                         <div class="pt-2">
-                            <a href="{{ route('objects.show', $account->id) }}" class="btn btn-outline btn-sm w-full">
-                                <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
-                                View Full Object Details
+                            <a href="{{ route('objects.show', $account->id) }}" class="btn btn-outline w-full">
+                                <x-icon name="o-cube" class="w-4 h-4" />
+                                View Object
                             </a>
                         </div>
                     </div>
@@ -351,6 +367,17 @@
                         <pre class="text-xs bg-base-300 p-3 rounded overflow-x-auto"><code>{{ json_encode($metadata, JSON_PRETTY_PRINT) }}</code></pre>
                     </x-slot:content>
                 </x-collapse>
+
+                <!-- Danger Zone -->
+                <div class="pt-6 border-t border-error/20">
+                    <button
+                        wire:click="deleteAccount"
+                        wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
+                        class="btn btn-error btn-outline w-full">
+                        <x-icon name="o-trash" class="w-4 h-4" />
+                        Delete Account
+                    </button>
+                </div>
             </div>
         </x-drawer>
     </div>

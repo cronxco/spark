@@ -29,6 +29,8 @@ class CreateFinancialAccount extends Component
 
     public bool $isNegativeBalance = false;
 
+    public bool $showModal = false;
+
     protected $rules = [
         'name' => 'required|string|max:255',
         'accountType' => 'required|string|in:current_account,savings_account,mortgage,investment_account,credit_card,loan,pension,other',
@@ -53,7 +55,30 @@ class CreateFinancialAccount extends Component
         $this->isNegativeBalance = in_array($value, $negativeBalanceTypes);
     }
 
-    public function save(): void
+    public function saveAndContinue(): void
+    {
+        $this->performSave();
+
+        // Reset form to allow creating another account
+        $this->reset(['name', 'accountType', 'provider', 'accountNumber', 'sortCode', 'interestRate', 'startDate', 'isNegativeBalance']);
+        $this->currency = 'GBP';
+    }
+
+    public function saveAndClose(): void
+    {
+        $this->performSave();
+
+        // Close modal and reset all fields
+        $this->showModal = false;
+        $this->dispatch('close-create-account-modal');
+    }
+
+    public function render(): View
+    {
+        return view('livewire.create-financial-account');
+    }
+
+    private function performSave(): void
     {
         $this->validate();
 
@@ -103,12 +128,5 @@ class CreateFinancialAccount extends Component
         $plugin->upsertAccountObject($integration, $accountData);
 
         $this->dispatch('account-created');
-        $this->reset();
-        $this->redirectRoute('money');
-    }
-
-    public function render(): View
-    {
-        return view('livewire.create-financial-account');
     }
 }

@@ -81,10 +81,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Money routes
     Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');
-    Volt::route('/money/create', 'create-financial-account')->name('money.create');
     Route::get('money/{account}', \App\Livewire\FinancialAccountShow::class)->name('money.show');
-    Volt::route('/balance-updates/create', 'add-balance-update')->name('balance-updates.create');
-    Volt::route('/balance-updates/create/{account}', 'add-balance-update')->name('balance-updates.create.for-account');
     // GoCardless bank selection page
     Route::get('integrations/groups/{group}/gocardless/bank-selection', function (IntegrationGroup $group) {
         if ((string) $group->user_id !== (string) Auth::id()) {
@@ -215,7 +212,6 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('integrations.oauth', ['service' => 'gocardless'])
             ->with('success', __('Bank selection saved.'));
     })->whereUuid('group')->name('integrations.gocardless.setInstitution');
-
 });
 
 // Webhook routes (no auth required)

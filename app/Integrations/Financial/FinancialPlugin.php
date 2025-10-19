@@ -276,7 +276,7 @@ class FinancialPlugin extends ManualPlugin
     }
 
     /**
-     * Get all financial accounts for a user
+     * Get all financial accounts for a user (excluding archived)
      */
     public function getFinancialAccounts(User $user): \Illuminate\Database\Eloquent\Collection
     {
@@ -284,9 +284,32 @@ class FinancialPlugin extends ManualPlugin
             ->where('concept', 'account')
             ->whereIn('type', [
                 'manual_account',      // Manual financial accounts
-                'monzo_account',          // Monzo bank accounts
-                'monzo_pot',              // Monzo pots
-                'bank_account',           // GoCardless bank accounts
+                'monzo_account',       // Monzo bank accounts
+                'monzo_pot',           // Monzo pots
+                'bank_account',        // GoCardless bank accounts
+            ])
+            ->orderBy('title')
+            ->get()
+            ->filter(function ($account) {
+                // Exclude accounts marked as deleted/archived
+                return ! ($account->metadata['deleted'] ?? false);
+            })
+            ->values();
+    }
+
+    /**
+     * Get all financial accounts for a user (including archived)
+     */
+    public function getAllFinancialAccounts(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        return EventObject::where('user_id', $user->id)
+            ->where('concept', 'account')
+            ->whereIn('type', [
+                'manual_account',      // Manual financial accounts
+                'monzo_account',       // Monzo bank accounts
+                'monzo_pot',           // Monzo pots
+                'monzo_archived_pot',  // Archived Monzo pots (for backwards compatibility)
+                'bank_account',        // GoCardless bank accounts
             ])
             ->orderBy('title')
             ->get();

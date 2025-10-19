@@ -9,22 +9,22 @@
                             <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
                         </x-button>
                     </x-slot:trigger>
-                    <x-menu-item title="Add Account" icon="o-plus" link="{{ route('money.create') }}" />
-                    <x-menu-item title="Add Balance Update" icon="o-banknotes" link="{{ route('balance-updates.create') }}" />
+                    <x-menu-item title="Add Account" icon="o-plus" wire:click="openCreateAccountModal" />
+                    <x-menu-item title="Add Balance Update" icon="o-banknotes" wire:click="openAddBalanceModal" />
                 </x-dropdown>
             </div>
 
             <!-- Desktop buttons -->
             <div class="hidden sm:flex gap-2">
                 <x-button
-                    link="{{ route('money.create') }}"
-                    class="btn-primary">
+                    wire:click="openCreateAccountModal"
+                    class="btn-primary btn-sm">
                     <x-icon name="o-plus" class="w-4 h-4" />
                     Add Account
                 </x-button>
                 <x-button
-                    link="{{ route('balance-updates.create') }}"
-                    class="btn-outline">
+                    wire:click="openAddBalanceModal"
+                    class="btn-outline btn-sm">
                     <x-icon name="o-banknotes" class="w-4 h-4" />
                     Add Balance Update
                 </x-button>
@@ -74,7 +74,7 @@
                     </select>
                 </div>
 
-                <!-- Archived Pots Toggle -->
+                <!-- Show Archived Toggle -->
                 <div class="form-control">
                     <label class="label">
                         <span class="label-text">Archived?</span>
@@ -82,13 +82,13 @@
                     <div class="flex items-center h-12">
                         <input
                             type="checkbox"
-                            wire:model.live="showArchivedPots"
+                            wire:model.live="showArchived"
                             class="toggle toggle-primary" />
                     </div>
                 </div>
 
                 <!-- Clear Filters -->
-                @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchivedPots)
+                @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchived)
                 <div class="form-control content-end">
                     <label class="label">
                         <span class="label-text">&nbsp;</span>
@@ -108,7 +108,7 @@
                 <div class="flex items-center gap-2">
                     <x-icon name="o-funnel" class="w-5 h-5" />
                     Filters
-                    @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchivedPots)
+                    @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchived)
                     <x-badge value="Active" class="badge-primary badge-xs" />
                     @endif
                 </div>
@@ -153,19 +153,19 @@
                         </select>
                     </div>
 
-                    <!-- Archived Pots Toggle -->
+                    <!-- Show Archived Toggle -->
                     <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
                         <div>
-                            <div class="font-medium text-sm">Show Archived Pots</div>
+                            <div class="font-medium text-sm">Show Archived</div>
                         </div>
                         <input
                             type="checkbox"
-                            wire:model.live="showArchivedPots"
+                            wire:model.live="showArchived"
                             class="toggle toggle-primary" />
                     </div>
 
                     <!-- Clear Filters -->
-                    @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchivedPots)
+                    @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchived)
                     <button wire:click="clearFilters" class="btn btn-outline">
                         <x-icon name="o-x-mark" class="w-4 h-4" />
                         Clear Filters
@@ -324,18 +324,6 @@
                         @endscope
 
                         @scope('actions', $account)
-                        <!-- Mobile: 3-dot menu -->
-
-                        <!-- Desktop: Full action buttons -->
-                        <div class="hidden lg:flex gap-2">
-                            <button
-                                wire:click="deleteAccount('{{ $account->id }}')"
-                                wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
-                                class="btn btn-sm btn-error btn-outline">
-                                <x-icon name="o-trash" class="w-4 h-4" />
-                                Delete
-                            </button>
-                        </div>
                         @endscope
 
                         <x-slot:empty>
@@ -350,16 +338,26 @@
                                     @endif
                                 </p>
                                 @if (!$search && !$accountTypeFilter && !$providerFilter)
-                                <a href="{{ route('money.create') }}" class="btn btn-primary">
+                                <button wire:click="openCreateAccountModal" class="btn btn-primary">
                                     <x-icon name="o-plus" class="w-4 h-4" />
                                     Add Your First Account
-                                </a>
+                                </button>
                                 @endif
                             </div>
                         </x-slot:empty>
             </x-table>
         </div>
     </div>
+
+    <!-- Add Balance Update Modal -->
+    <x-modal wire:model="showAddBalanceModal" title="Add Balance Update" subtitle="Record a new balance for one of your accounts" separator>
+        <livewire:add-balance-update :key="'add-balance-update-modal'" />
+    </x-modal>
+
+    <!-- Create Account Modal -->
+    <x-modal wire:model="showCreateAccountModal" title="Add Financial Account" subtitle="Create a new financial account to track manually" separator>
+        <livewire:create-financial-account :key="'create-account-modal'" />
+    </x-modal>
 
     <!-- Toast notifications -->
     <x-toast position="toast-top toast-end" />

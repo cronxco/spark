@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Integrations\Financial\FinancialPlugin;
+use App\Models\Event;
 use App\Models\EventObject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,8 @@ class FinancialAccountShow extends Component
     public bool $showSidebar = false;
     public bool $metadataOpen = false;
     public bool $showEditModal = false;
+    public bool $showArchiveModal = false;
+    public bool $showAddBalanceModal = false;
     public int $perPage = 25;
     public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
@@ -43,6 +46,45 @@ class FinancialAccountShow extends Component
     public function closeEditModal(): void
     {
         $this->showEditModal = false;
+    }
+
+    public function openArchiveModal(): void
+    {
+        $this->showArchiveModal = true;
+    }
+
+    public function closeArchiveModal(): void
+    {
+        $this->showArchiveModal = false;
+    }
+
+    public function openAddBalanceModal(): void
+    {
+        $this->showAddBalanceModal = true;
+    }
+
+    public function closeAddBalanceModal(): void
+    {
+        $this->showAddBalanceModal = false;
+    }
+
+    public function deleteAccount(): void
+    {
+        // Ensure user owns this account
+        if ($this->account->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Delete all related balance events first
+        Event::where('actor_id', $this->account->id)
+            ->where('service', 'manual_account')
+            ->delete();
+
+        // Delete the account object
+        $this->account->delete();
+
+        // Redirect to money index page
+        $this->redirect(route('money'));
     }
 
     public function headers(): array
@@ -157,11 +199,20 @@ class FinancialAccountShow extends Component
         ]);
     }
 
+    public function handleAccountArchived(): void
+    {
+        $this->closeArchiveModal();
+        $this->redirect(route('money'));
+    }
+
     protected function getListeners(): array
     {
         return [
             'close-modal' => 'closeEditModal',
+            'close-add-balance-modal' => 'closeAddBalanceModal',
             'account-updated' => '$refresh',
+            'account-archived' => 'handleAccountArchived',
+            'balance-updated' => '$refresh',
         ];
     }
 }

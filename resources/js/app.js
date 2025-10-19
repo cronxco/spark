@@ -144,6 +144,9 @@ function initializeTagifyInput(input) {
             tagTextProp: "value",
             enforceWhitelist: false,
             editTags: { keepInvalid: false },
+            delimiters: null,
+            addTagOn: ["enter"],
+            editTags: false,
             transformTag(tagData) {
                 const raw =
                     tagData?.value ?? tagData?.name ?? tagData?.text ?? "";
@@ -195,6 +198,15 @@ function initializeTagifyInput(input) {
             },
         });
         input._tagifyInstance = tagify;
+
+        // ⬇️ Only create tags when pressing Enter
+        tagify.on("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                const value = tagify.state.inputText?.trim();
+                if (value) tagify.addTags([value]);
+            }
+        });
 
         // Ensure wrapper fills width and receives theme variables
         try {

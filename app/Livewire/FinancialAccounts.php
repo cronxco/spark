@@ -23,17 +23,21 @@ class FinancialAccounts extends Component
 
     public ?string $providerFilter = null;
 
-    public bool $showArchivedPots = false;
+    public bool $showArchived = false;
 
     public array $sortBy = ['column' => 'title', 'direction' => 'asc'];
 
     public int $perPage = 25;
 
+    public bool $showAddBalanceModal = false;
+
+    public bool $showCreateAccountModal = false;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'accountTypeFilter' => ['except' => ''],
         'providerFilter' => ['except' => ''],
-        'showArchivedPots' => ['except' => false],
+        'showArchived' => ['except' => false],
         'sortBy' => ['except' => ['column' => 'title', 'direction' => 'asc']],
         'perPage' => ['except' => 25],
     ];
@@ -55,7 +59,7 @@ class FinancialAccounts extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'accountTypeFilter', 'providerFilter', 'showArchivedPots']);
+        $this->reset(['search', 'accountTypeFilter', 'providerFilter', 'showArchived']);
         $this->resetPage();
     }
 
@@ -70,8 +74,27 @@ class FinancialAccounts extends Component
             ['key' => 'balance', 'label' => 'Balance', 'sortable' => true],
             ['key' => 'currency', 'label' => 'Currency', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
             ['key' => 'interest_rate', 'label' => 'Interest Rate', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
-            ['key' => 'actions', 'label' => 'actions', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
         ];
+    }
+
+    public function openAddBalanceModal(): void
+    {
+        $this->showAddBalanceModal = true;
+    }
+
+    public function closeAddBalanceModal(): void
+    {
+        $this->showAddBalanceModal = false;
+    }
+
+    public function openCreateAccountModal(): void
+    {
+        $this->showCreateAccountModal = true;
+    }
+
+    public function closeCreateAccountModal(): void
+    {
+        $this->showCreateAccountModal = false;
     }
 
     public function deleteAccount(EventObject $account): void
@@ -107,22 +130,12 @@ class FinancialAccounts extends Component
     {
         $plugin = new FinancialPlugin;
 
-        // Get accounts based on archived pots preference
-        if ($this->showArchivedPots) {
-            // Include archived pots when toggle is enabled
-            $accounts = EventObject::where('user_id', Auth::id())
-                ->where('concept', 'account')
-                ->whereIn('type', [
-                    'manual_account',
-                    'monzo_account',
-                    'monzo_pot',
-                    'monzo_archived_pot',
-                    'bank_account',
-                ])
-                ->orderBy('title')
-                ->get();
+        // Get accounts based on archived preference
+        if ($this->showArchived) {
+            // Include all accounts (including archived) when toggle is enabled
+            $accounts = $plugin->getAllFinancialAccounts(Auth::user());
         } else {
-            // Default: exclude archived pots
+            // Default: exclude archived accounts
             $accounts = $plugin->getFinancialAccounts(Auth::user());
         }
 
@@ -154,17 +167,8 @@ class FinancialAccounts extends Component
 
         // Get unique account types and providers for filters
         // Use the same account set that's being displayed for consistent filtering
-        $allAccounts = $this->showArchivedPots
-            ? EventObject::where('user_id', Auth::id())
-                ->where('concept', 'account')
-                ->whereIn('type', [
-                    'manual_account',
-                    'monzo_account',
-                    'monzo_pot',
-                    'monzo_archived_pot',
-                    'bank_account',
-                ])
-                ->get()
+        $allAccounts = $this->showArchived
+            ? $plugin->getAllFinancialAccounts(Auth::user())
             : $plugin->getFinancialAccounts(Auth::user());
 
         $accountTypes = $allAccounts->pluck('metadata.account_type')
@@ -203,6 +207,16 @@ class FinancialAccounts extends Component
             'accountTypes' => $accountTypes,
             'providers' => $providers,
         ]);
+    }
+
+    protected function getListeners(): array
+    {
+        return [
+            'close-add-balance-modal' => 'closeAddBalanceModal',
+            'close-create-account-modal' => 'closeCreateAccountModal',
+            'balance-updated' => '$refresh',
+            'account-created' => '$refresh',
+        ];
     }
 
     private function applySorting($accounts)

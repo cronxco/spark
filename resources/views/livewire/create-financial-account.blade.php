@@ -1,15 +1,5 @@
 <div>
-    <div class="max-w-2xl mx-auto">
-        <!-- Header -->
-        <div class="mb-6">
-            <h1 class="text-3xl font-bold text-base-content">Add Financial Account</h1>
-            <p class="text-base-content/70">Create a new financial account to track manually</p>
-        </div>
-
-        <!-- Form -->
-        <div class="card bg-base-200 shadow-sm">
-            <div class="card-body">
-                <form wire:submit="save">
+    <form wire:submit.prevent="saveAndClose">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Account Name -->
                         <div class="form-control md:col-span-2">
@@ -182,21 +172,19 @@
                         </div>
                     </div>
 
-                    <!-- Form Actions -->
-                    <div class="flex gap-3 mt-8">
-                        <button type="submit" class="btn btn-primary">
-                            <x-icon name="o-plus" class="w-4 h-4" />
-                            Create Account
-                        </button>
-                        <a href="{{ route('money') }}" class="btn btn-outline">
-                            Cancel
-                        </a>
-                    </div>
-                </form>
-            </div>
+        <!-- Form Actions -->
+        <div class="flex gap-3 mt-8">
+            <button type="button" wire:click="saveAndContinue" class="btn btn-primary">
+                <x-icon name="o-plus" class="w-4 h-4" />
+                Save & Continue
+            </button>
+            <button type="submit" class="btn btn-outline">
+                <x-icon name="o-check" class="w-4 h-4" />
+                Save & Close
+            </button>
+            <button type="button" wire:click="$dispatch('close-create-account-modal')" class="btn btn-ghost">
+                Cancel
+            </button>
         </div>
-    </div>
-
-    <!-- Toast notifications -->
-    <x-toast position="toast-top toast-end" />
+    </form>
 </div>
