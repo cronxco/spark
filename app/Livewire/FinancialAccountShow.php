@@ -31,6 +31,9 @@ class FinancialAccountShow extends Component
         if ($account->user_id !== Auth::id()) {
             abort(403);
         }
+
+        // Eager load tags
+        $this->account->load('tags');
     }
 
     public function toggleSidebar(): void
