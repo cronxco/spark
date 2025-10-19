@@ -14,6 +14,8 @@ new class extends Component {
     /** @var array<int, string> */
     public array $allTags = [];
 
+    public bool $showCreateTagModal = false;
+
     private EloquentModel $model;
 
     public function mount(string $modelClass, string $modelId): void
@@ -26,6 +28,22 @@ new class extends Component {
         $this->model = $model;
 
         $this->refreshData();
+    }
+
+    public function openCreateTagModal(): void
+    {
+        $this->showCreateTagModal = true;
+    }
+
+    public function closeCreateTagModal(): void
+    {
+        $this->showCreateTagModal = false;
+    }
+
+    public function handleTagCreated(): void
+    {
+        $this->refreshData();
+        $this->showCreateTagModal = false;
     }
 
     private function getModel(): EloquentModel
@@ -135,12 +153,22 @@ new class extends Component {
 @php($cid = md5($this->modelClass . '-' . $this->modelId))
 
 <div class="space-y-2" wire:key="tag-manager-{{ $cid }}">
-    <label class="label text-sm text-base-content/70">Tags</label>
+    <div class="flex items-center justify-between">
+        <label class="label text-sm text-base-content/70">Tags</label>
+        <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
+            <x-icon name="o-plus" class="w-3 h-3" />
+        </button>
+    </div>
     <div class="w-full" wire:ignore>
         <input id="tag-input-{{ $cid }}" data-tagify data-whitelist="tag-whitelist-{{ $cid }}" data-initial="tag-initial-{{ $cid }}" aria-label="Tags" class="w-full" placeholder="Add tags" />
     </div>
     <script type="application/json" id="tag-whitelist-{{ $cid }}">{!! json_encode($this->allTags) !!}</script>
     <script type="application/json" id="tag-initial-{{ $cid }}">{!! json_encode($this->currentTags) !!}</script>
+
+    <!-- Create Tag Modal -->
+    <x-modal wire:model="showCreateTagModal" title="Create New Tag" subtitle="Define a new tag with a specific type" separator>
+        <livewire:create-tag :key="'create-tag-manager-' . $cid" @tag-created="handleTagCreated" />
+    </x-modal>
 </div>
 
 

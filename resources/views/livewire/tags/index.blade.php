@@ -1,6 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
+use Livewire\Attributes\On;
 use Spatie\Tags\Tag;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,6 +12,7 @@ new class extends Component {
     public string $searchQuery = '';
     public array $collapsedSections = [];
     public array $sortBy = ['column' => 'total_count', 'direction' => 'desc'];
+    public bool $showCreateModal = false;
 
     public function mount(): void
     {
@@ -20,6 +22,23 @@ new class extends Component {
     public function updatedSearchQuery(): void
     {
         $this->loadTags();
+    }
+
+    public function openCreateModal(): void
+    {
+        $this->showCreateModal = true;
+    }
+
+    public function closeCreateModal(): void
+    {
+        $this->showCreateModal = false;
+    }
+
+    #[On('tag-created')]
+    public function handleTagCreated(): void
+    {
+        $this->loadTags();
+        $this->showCreateModal = false;
     }
 
     public function clearFilters(): void
@@ -159,7 +178,14 @@ new class extends Component {
 ?>
 
 <div>
-    <x-header title="Tags" subtitle="Browse and manage all tags across events and objects" separator />
+    <x-header title="Tags" subtitle="Browse and manage all tags across events and objects" separator>
+        <x-slot:actions>
+            <button wire:click="openCreateModal" class="btn btn-primary">
+                <x-icon name="o-plus" class="w-4 h-4" />
+                Create Tag
+            </button>
+        </x-slot:actions>
+    </x-header>
 
     <!-- Filters -->
     <div class="hidden lg:block card bg-base-200 shadow mb-6">
@@ -288,4 +314,9 @@ new class extends Component {
         @endforeach
     </div>
     @endif
+
+    <!-- Create Tag Modal -->
+    <x-modal wire:model="showCreateModal" title="Create New Tag" subtitle="Define a new tag with a specific type" separator>
+        <livewire:create-tag :key="'create-tag-' . now()->timestamp" />
+    </x-modal>
 </div>

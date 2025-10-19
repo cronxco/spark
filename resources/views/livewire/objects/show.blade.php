@@ -18,6 +18,7 @@ new class extends Component {
     public string $comment = '';
     public bool $activityOpen = true;
     public bool $objectMetaOpen = false;
+    public bool $showCreateTagModal = false;
 
     public function mount(EventObject $object): void
     {
@@ -776,6 +777,22 @@ new class extends Component {
     {
         $this->success($what . ' copied to clipboard!');
     }
+
+    public function openCreateTagModal(): void
+    {
+        $this->showCreateTagModal = true;
+    }
+
+    public function closeCreateTagModal(): void
+    {
+        $this->showCreateTagModal = false;
+    }
+
+    public function handleTagCreated(): void
+    {
+        $this->object->refresh()->loadMissing('tags');
+        $this->showCreateTagModal = false;
+    }
 };
 
 ?>
@@ -950,21 +967,22 @@ new class extends Component {
                 <div class="space-y-4 lg:space-y-6">
                     <!-- Tags Manager -->
                     <x-card class="bg-base-100 shadow">
-                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-tag" class="w-5 h-5" />
-                            Tags
-                        </h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+                                <x-icon name="o-tag" class="w-5 h-5" />
+                                Tags
+                            </h3>
+                            <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
+                                <x-icon name="o-plus" class="w-3 h-3" />
+                            </button>
+                        </div>
                         <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
                             <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
-                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
-                                {
-                                    !!json_encode(\Spatie\ Tags\ Tag::query() - > pluck('name') - > map(fn($n) => (string) $n) - > unique() - > values() - > all()) !!
-                                }
-                            </script>
                             <script type="application/json" id="tag-initial-{{ $this->object->id }}">
-                                {
-                                    !!json_encode($this - > object - > tags - > pluck('name') - > values() - > all()) !!
-                                }
+                                {!! json_encode($this->object->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
+                            </script>
+                            <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
+                                {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                         </div>
                     </x-card>
@@ -1082,4 +1100,9 @@ new class extends Component {
         </div>
         @endif
     </div>
+
+    <!-- Create Tag Modal -->
+    <x-modal wire:model="showCreateTagModal" title="Create New Tag" subtitle="Define a new tag with a specific type" separator>
+        <livewire:create-tag :key="'create-tag-object-' . $this->object->id" @tag-created="handleTagCreated" />
+    </x-modal>
 </div>
