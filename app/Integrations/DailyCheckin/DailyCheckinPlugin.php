@@ -64,7 +64,8 @@ class DailyCheckinPlugin extends ManualPlugin
                 'display_name' => 'Morning Check-in',
                 'description' => 'Morning energy levels recorded',
                 'display_with_object' => false,
-                'value_unit' => 'out of 10',
+                'value_unit' => '/10',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">/10</span>',
                 'hidden' => false,
             ],
             'had_afternoon_checkin' => [
@@ -72,7 +73,8 @@ class DailyCheckinPlugin extends ManualPlugin
                 'display_name' => 'Afternoon Check-in',
                 'description' => 'Afternoon energy levels recorded',
                 'display_with_object' => false,
-                'value_unit' => 'out of 10',
+                'value_unit' => '/10',
+                'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">/10</span>',
                 'hidden' => false,
             ],
         ];
