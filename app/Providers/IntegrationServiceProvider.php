@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Integrations\AppleHealth\AppleHealthPlugin;
+use App\Integrations\DailyCheckin\DailyCheckinPlugin;
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
@@ -39,6 +40,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(TaskPlugin::class);
         PluginRegistry::register(OutlinePlugin::class);
         PluginRegistry::register(KarakeepPlugin::class);
+        PluginRegistry::register(DailyCheckinPlugin::class);
     }
 
     /**

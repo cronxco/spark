@@ -289,7 +289,7 @@ new class extends Component {
                     :headers="$this->headers()"
                     :rows="$tags"
                     :sort-by="$sortBy"
-                    :link="route('tags.show', ['type' => '[type]', 'slug' => 'slug', 'id' => '[id]'])"
+                    link="/tags/{type}/{slug}/{id}"
                     class="[&_table]:!static [&_td]:!static">
 
                     @scope('cell_name', $tag)

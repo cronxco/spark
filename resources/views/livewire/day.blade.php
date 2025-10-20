@@ -1,13 +1,17 @@
 <?php
 
-use function Livewire\Volt\{state, computed, on, layout};
+use App\Integrations\DailyCheckin\DailyCheckinPlugin;
+use App\Integrations\Outline\OutlineApi;
+use App\Integrations\PluginRegistry;
+use App\Jobs\Outline\OutlinePullTodayDayNote;
 use App\Models\Event;
 use App\Models\Integration;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use App\Integrations\PluginRegistry;
-use App\Integrations\Outline\OutlineApi;
-use App\Jobs\Outline\OutlinePullTodayDayNote;
+
+use function Livewire\Volt\computed;
+use function Livewire\Volt\layout;
+use function Livewire\Volt\state;
 
 state([
     'view' => 'index',
@@ -39,6 +43,7 @@ state([
         } catch (\Throwable $e) {
             // Fallback to today if parsing fails
         }
+
         return Carbon::today()->format('Y-m-d');
     })(),
     // Group collapse state keyed by group key
@@ -51,6 +56,48 @@ state([
 
 layout('components.layouts.app');
 
+$checkinStatus = computed(function () {
+    $userId = optional(auth()->guard('web')->user())->id;
+    if (! $userId) {
+        return 'red';
+    }
+
+    $plugin = new DailyCheckinPlugin;
+    $checkins = $plugin->getCheckinsForDate($userId, $this->date);
+
+    $morningComplete = $checkins['morning'] ? true : false;
+    $afternoonComplete = $checkins['afternoon'] ? true : false;
+
+    $currentHour = Carbon::now()->hour;
+    $isViewingToday = Carbon::parse($this->date)->isToday();
+
+    // If viewing a past date or future date, ignore time-based logic
+    if (! $isViewingToday) {
+        if ($morningComplete && $afternoonComplete) {
+            return 'green';
+        } elseif ($morningComplete || $afternoonComplete) {
+            return 'amber';
+        } else {
+            return 'red';
+        }
+    }
+
+    // Time-based logic for today
+    if ($currentHour < 12) {
+        // Morning
+        return $morningComplete ? 'green' : 'amber';
+    } else {
+        // Afternoon
+        if ($morningComplete && $afternoonComplete) {
+            return 'green';
+        } elseif ($morningComplete) {
+            return 'amber';
+        } else {
+            return 'red';
+        }
+    }
+});
+
 $navigateToDate = function (): void {
     try {
         $selected = Carbon::parse((string) $this->date)->startOfDay();
@@ -58,16 +105,19 @@ $navigateToDate = function (): void {
 
         if ($selected->equalTo($today)) {
             $this->redirect(route('today.main'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->subDay())) {
             $this->redirect(route('day.yesterday'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->addDay())) {
             $this->redirect(route('tomorrow'), navigate: true);
+
             return;
         }
 
@@ -149,16 +199,19 @@ $updatedDate = function ($value): void {
 
         if ($selected->equalTo($today)) {
             $this->redirect(route('today.main'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->subDay())) {
             $this->redirect(route('day.yesterday'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->addDay())) {
             $this->redirect(route('tomorrow'), navigate: true);
+
             return;
         }
 
@@ -451,6 +504,7 @@ $getAccentColorForService = function ($service) {
     if ($pluginClass) {
         return 'text-' . ($pluginClass::getAccentColor() ?: 'primary');
     }
+
     return 'text-primary';
 };
 
@@ -459,6 +513,7 @@ $getBadgeAccentForService = function ($service) {
     if ($pluginClass) {
         return 'badge-' . ($pluginClass::getAccentColor() ?: 'primary');
     }
+
     return 'badge-primary';
 };
 
@@ -508,8 +563,9 @@ $isDurationUnit = function ($unit): bool {
         'hr',
         'hrs',
         'hour',
-        'hours'
+        'hours',
     ];
+
     return in_array($u, $map, true);
 };
 
@@ -534,6 +590,7 @@ $formatDurationShort = function ($value, $unit): string {
     if ($seconds < 1) {
         // Show milliseconds if under a second
         $ms = (int) round($seconds * 1000);
+
         return $ms . 'ms';
     }
 
@@ -580,16 +637,19 @@ $previousDay = function () {
 
         if ($selected->equalTo($today)) {
             $this->redirect(route('today.main'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->subDay())) {
             $this->redirect(route('day.yesterday'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->addDay())) {
             $this->redirect(route('tomorrow'), navigate: true);
+
             return;
         }
 
@@ -612,16 +672,19 @@ $nextDay = function () {
 
         if ($selected->equalTo($today)) {
             $this->redirect(route('today.main'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->subDay())) {
             $this->redirect(route('day.yesterday'), navigate: true);
+
             return;
         }
 
         if ($selected->equalTo($today->copy()->addDay())) {
             $this->redirect(route('tomorrow'), navigate: true);
+
             return;
         }
 
@@ -742,12 +805,13 @@ $areAllGroupsExpanded = computed(function () {
             return false;
         }
     }
+
     return true;
 });
 
 ?>
 
-<div wire:init="loadDayNote">
+<div wire:init="loadDayNote" @checkin-status-updated="$wire.checkinStatusUpdated($event.detail.status)">
     <x-header :title="'Day — ' . $this->dateLabel" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2 sm:gap-3 w-full">
@@ -809,9 +873,37 @@ $areAllGroupsExpanded = computed(function () {
                         - <span class="text-sm text-success">Saved</span>
                         @endif
                     </span>
+                    <!-- Check-in status indicator -->
+                    <span class="ml-auto">
+                        @if ($this->checkinStatus === 'green')
+                            <div class="badge badge-success badge-sm gap-1">
+                                <x-icon name="o-check-circle" class="w-3 h-3" />
+                                Complete
+                            </div>
+                        @elseif ($this->checkinStatus === 'amber')
+                            <div class="badge badge-warning badge-sm gap-1">
+                                <x-icon name="o-clock" class="w-3 h-3" />
+                                Partial
+                            </div>
+                        @else
+                            <div class="badge badge-error badge-sm gap-1">
+                                <x-icon name="o-exclamation-circle" class="w-3 h-3" />
+                                Pending
+                            </div>
+                        @endif
+                    </span>
                 </div>
             </x-slot:heading>
             <x-slot:content>
+                <!-- Daily Check-in -->
+                <div x-on:checkin-status-updated.window="$wire.checkinStatusUpdated($event.detail.status)">
+                    <livewire:daily-checkin :date="$this->date" :key="'checkin-' . $this->date" />
+                </div>
+
+                <!-- Divider -->
+                <div class="divider my-3"></div>
+
+                <!-- Day Note -->
                 @if ($this->dayNoteDocId)
                 <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200 shadow">
                     <div class="space-y-3">
