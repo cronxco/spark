@@ -111,6 +111,12 @@ class DailyCheckinPlugin extends ManualPlugin
                 'description' => 'A calendar day',
                 'hidden' => false,
             ],
+            'user' => [
+                'icon' => 'o-user',
+                'display_name' => 'User',
+                'description' => 'The user performing the check-in',
+                'hidden' => false,
+            ],
         ];
     }
 
