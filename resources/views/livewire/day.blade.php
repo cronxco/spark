@@ -811,7 +811,7 @@ $areAllGroupsExpanded = computed(function () {
 
 ?>
 
-<div wire:init="loadDayNote" @checkin-status-updated="$wire.checkinStatusUpdated($event.detail.status)">
+<div wire:init="loadDayNote" @checkin-status-updated.window="$wire.$refresh()">
     <x-header :title="'Day — ' . $this->dateLabel" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2 sm:gap-3 w-full">
@@ -878,17 +878,14 @@ $areAllGroupsExpanded = computed(function () {
                         @if ($this->checkinStatus === 'green')
                             <div class="badge badge-success badge-sm gap-1">
                                 <x-icon name="o-check-circle" class="w-3 h-3" />
-                                Complete
                             </div>
                         @elseif ($this->checkinStatus === 'amber')
                             <div class="badge badge-warning badge-sm gap-1">
                                 <x-icon name="o-clock" class="w-3 h-3" />
-                                Partial
                             </div>
                         @else
                             <div class="badge badge-error badge-sm gap-1">
                                 <x-icon name="o-exclamation-circle" class="w-3 h-3" />
-                                Pending
                             </div>
                         @endif
                     </span>
@@ -896,7 +893,7 @@ $areAllGroupsExpanded = computed(function () {
             </x-slot:heading>
             <x-slot:content>
                 <!-- Daily Check-in -->
-                <div x-on:checkin-status-updated.window="$wire.checkinStatusUpdated($event.detail.status)">
+                <div>
                     <livewire:daily-checkin :date="$this->date" :key="'checkin-' . $this->date" />
                 </div>
 
