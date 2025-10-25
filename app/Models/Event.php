@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\Metrics\DetectMetricAnomaliesJob;
 use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -63,6 +64,11 @@ class Event extends Model
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
+        });
+
+        static::created(function ($model): void {
+            // Dispatch anomaly detection job after event is created
+            DetectMetricAnomaliesJob::dispatch($model);
         });
 
         static::deleted(function ($model): void {

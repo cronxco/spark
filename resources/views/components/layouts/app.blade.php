@@ -167,6 +167,7 @@
 
                 <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" />
                 <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" />
+                <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" />
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" />
 
                 <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')">

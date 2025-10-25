@@ -89,6 +89,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's metric statistics
+     */
+    public function metricStatistics()
+    {
+        return $this->hasMany(MetricStatistic::class);
+    }
+
+    /**
      * Get the user's sessions
      */
     public function sessions()
@@ -274,6 +282,67 @@ class User extends Authenticatable
         $preferences = $this->getNotificationPreferences();
 
         return $preferences['delayed_sending']['digest_time'] ?? '09:00';
+    }
+
+    /**
+     * Get metric tracking preferences
+     */
+    public function getMetricTrackingPreferences(): array
+    {
+        $settings = $this->settings ?? [];
+
+        return $settings['metric_tracking'] ?? [
+            'disabled_metrics' => [],
+        ];
+    }
+
+    /**
+     * Check if a specific metric is disabled
+     */
+    public function isMetricTrackingDisabled(string $service, string $action, string $unit): bool
+    {
+        $preferences = $this->getMetricTrackingPreferences();
+        $identifier = "{$service}.{$action}.{$unit}";
+
+        return in_array($identifier, $preferences['disabled_metrics'] ?? []);
+    }
+
+    /**
+     * Disable tracking for a specific metric
+     */
+    public function disableMetricTracking(string $service, string $action, string $unit): void
+    {
+        $settings = $this->settings ?? [];
+        $metricTracking = $settings['metric_tracking'] ?? [];
+        $disabledMetrics = $metricTracking['disabled_metrics'] ?? [];
+
+        $identifier = "{$service}.{$action}.{$unit}";
+
+        if (! in_array($identifier, $disabledMetrics)) {
+            $disabledMetrics[] = $identifier;
+            $metricTracking['disabled_metrics'] = $disabledMetrics;
+            $settings['metric_tracking'] = $metricTracking;
+
+            $this->update(['settings' => $settings]);
+        }
+    }
+
+    /**
+     * Enable tracking for a specific metric
+     */
+    public function enableMetricTracking(string $service, string $action, string $unit): void
+    {
+        $settings = $this->settings ?? [];
+        $metricTracking = $settings['metric_tracking'] ?? [];
+        $disabledMetrics = $metricTracking['disabled_metrics'] ?? [];
+
+        $identifier = "{$service}.{$action}.{$unit}";
+
+        $disabledMetrics = array_filter($disabledMetrics, fn ($metric) => $metric !== $identifier);
+        $metricTracking['disabled_metrics'] = array_values($disabledMetrics);
+        $settings['metric_tracking'] = $metricTracking;
+
+        $this->update(['settings' => $settings]);
     }
 
     /**

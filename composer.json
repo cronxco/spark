@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "icehouse-ventures/laravel-chartjs": "^4.2",
         "jenssegers/agent": "^2.6",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.30.3",

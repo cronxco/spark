@@ -1,6 +1,8 @@
 <?php
 
 use App\Jobs\CheckIntegrationUpdates;
+use App\Jobs\Metrics\CalculateMetricStatisticsJob;
+use App\Jobs\Metrics\DetectMetricTrendsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -12,5 +14,17 @@ Artisan::command('inspire', function () {
 // Schedule integration update check job every minute
 Schedule::job(new CheckIntegrationUpdates)
     ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Calculate metric statistics hourly
+Schedule::job(new CalculateMetricStatisticsJob)
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Detect metric trends daily
+Schedule::job(new DetectMetricTrendsJob)
+    ->daily()
     ->withoutOverlapping()
     ->onOneServer();

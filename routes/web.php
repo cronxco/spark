@@ -45,6 +45,11 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
+
+    // Metrics routes
+    Route::get('metrics', \App\Livewire\MetricsOverview::class)->name('metrics.index');
+    Route::get('metrics/{metric}', \App\Livewire\MetricDetail::class)->whereUuid('metric')->name('metrics.show');
+
     Route::get('integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
