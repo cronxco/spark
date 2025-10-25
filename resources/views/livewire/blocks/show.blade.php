@@ -147,7 +147,7 @@ new class extends Component {
                             @if ($this->block->time)
                                 <div class="flex items-center gap-2">
                                     <x-icon name="o-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                                    <span class="text-base-content/70">{{ $this->block->time->format('d/m/Y H:i') }}</span>
+                                    <span class="text-base-content/70">{{ to_user_timezone($this->block->time, auth()->user())->format('d/m/Y H:i') }}</span>
                                 </div>
                             @endif
                             @if ($this->block->time)
@@ -209,7 +209,7 @@ new class extends Component {
                                         @endif
                                     </div>
                                     <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                        <span>{{ $this->block->event->time->format('d/m/Y H:i') }}</span>
+                                        <span>{{ to_user_timezone($this->block->event->time, auth()->user())->format('d/m/Y H:i') }}</span>
                                         @if ($this->block->event->domain)
                                             <span>·</span>
                                             <x-badge :value="$this->block->event->domain" class="badge-xs badge-outline" />
@@ -364,7 +364,7 @@ new class extends Component {
                                     @if ($relatedBlock->time)
                                         <div class="flex items-center gap-1">
                                             <x-icon name="o-clock" class="w-3 h-3" />
-                                            {{ $relatedBlock->time->format('H:i') }}
+                                            {{ to_user_timezone($relatedBlock->time, auth()->user())->format('H:i') }}
                                         </div>
                                     @endif
                                     @if ($relatedBlock->url)

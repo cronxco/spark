@@ -1,5 +1,6 @@
 <?php
 
+use App\Cards\CardRegistry;
 use App\Integrations\DailyCheckin\DailyCheckinPlugin;
 use App\Integrations\Outline\OutlineApi;
 use App\Integrations\PluginRegistry;
@@ -7,6 +8,7 @@ use App\Jobs\Outline\OutlinePullTodayDayNote;
 use App\Models\Event;
 use App\Models\Integration;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 use function Livewire\Volt\computed;
@@ -68,8 +70,10 @@ $checkinStatus = computed(function () {
     $morningComplete = $checkins['morning'] ? true : false;
     $afternoonComplete = $checkins['afternoon'] ? true : false;
 
-    $currentHour = Carbon::now()->hour;
-    $isViewingToday = Carbon::parse($this->date)->isToday();
+    $user = auth()->guard('web')->user();
+    $currentHour = user_now($user)->hour;
+    $today = user_today($user);
+    $isViewingToday = Carbon::parse($this->date)->isSameDay($today);
 
     // If viewing a past date or future date, ignore time-based logic
     if (! $isViewingToday) {
@@ -222,21 +226,24 @@ $updatedDate = function ($value): void {
 };
 
 $dateLabel = computed(function () {
+    $user = auth()->guard('web')->user();
+    $today = user_today($user);
+
     try {
         $date = Carbon::parse($this->date);
     } catch (\Throwable $e) {
-        $date = Carbon::today();
+        $date = $today;
     }
 
-    if ($date->isToday()) {
+    if ($date->isSameDay($today)) {
         return 'Today';
     }
 
-    if ($date->isYesterday()) {
+    if ($date->isSameDay($today->copy()->subDay())) {
         return 'Yesterday';
     }
 
-    if ($date->isTomorrow()) {
+    if ($date->isSameDay($today->copy()->addDay())) {
         return 'Tomorrow';
     }
 
@@ -748,7 +755,7 @@ $groupedEvents = computed(function () {
 
     foreach ($this->events as $event) {
         $key = $event->service . '::' . $event->action;
-        $hour = $event->time?->format('H');
+        $hour = to_user_timezone($event->time, auth()->user())->format('H');
         if ($currentKey !== $key || $currentHour !== $hour) {
             if ($current) {
                 $groups[] = $current;
@@ -809,6 +816,62 @@ $areAllGroupsExpanded = computed(function () {
     return true;
 });
 
+// Get available card streams with eligible cards
+$availableStreams = computed(function () {
+    try {
+        $user = auth()->guard('web')->user();
+        if (! $user) {
+            Log::info('FAB Debug: No authenticated user');
+
+            return collect();
+        }
+
+        $now = user_now($user);
+        $today = user_today($user);
+        Log::info('FAB Debug: Checking streams', [
+            'user_id' => $user->id,
+            'date' => $this->date,
+            'current_time' => $now->toTimeString(),
+            'current_hour' => $now->hour,
+            'user_timezone' => $user->getTimezone(),
+            'is_viewing_today' => Carbon::parse($this->date)->isSameDay($today),
+        ]);
+
+        $streams = CardRegistry::getStreamsWithCards($user, $this->date);
+
+        Log::info('FAB Debug: Streams with cards found', [
+            'count' => $streams->count(),
+            'stream_ids' => $streams->pluck('id')->toArray(),
+        ]);
+
+        // Add eligible card IDs to each stream for client-side filtering
+        return $streams->map(function ($stream) use ($user) {
+            $cards = CardRegistry::getEligibleCards($stream->id, $user, $this->date);
+
+            Log::info("FAB Debug: Eligible cards for stream {$stream->id}", [
+                'count' => $cards->count(),
+                'card_ids' => $cards->map(fn ($card) => $card->getId())->toArray(),
+            ]);
+
+            $stream->eligibleCardIds = $cards->map(fn ($card) => $card->getId())->toArray();
+            $stream->eligibleCardsMeta = $cards->map(fn ($card) => [
+                'id' => $card->getId(),
+                'requiresInteraction' => $card->requiresInteraction(),
+            ])->toArray();
+
+            return $stream;
+        });
+    } catch (\Throwable $e) {
+        Log::error('FAB Debug: Error getting streams', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        // Return empty collection if there's any error
+        return collect();
+    }
+});
+
 ?>
 
 <div wire:init="loadDayNote" @checkin-status-updated.window="$wire.$refresh()">
@@ -860,8 +923,8 @@ $areAllGroupsExpanded = computed(function () {
     </x-header>
 
     <!-- Day Note editor -->
-    <div class="mb-2">
-        <x-collapse wire:model="dayNoteOpen" separator class="bg-base-200">
+    <div class="mb-2" x-data="{ dayNoteOpenState: @entangle('dayNoteOpen').live }">
+        <x-collapse x-model="dayNoteOpenState" separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
                     <x-icon name="o-calendar" />
@@ -876,17 +939,17 @@ $areAllGroupsExpanded = computed(function () {
                     <!-- Check-in status indicator -->
                     <span class="ml-auto">
                         @if ($this->checkinStatus === 'green')
-                            <div class="badge badge-success badge-sm gap-1">
-                                <x-icon name="o-check-circle" class="w-3 h-3" />
-                            </div>
+                        <div class="badge badge-success badge-sm gap-1">
+                            <x-icon name="o-check-circle" class="w-3 h-3" />
+                        </div>
                         @elseif ($this->checkinStatus === 'amber')
-                            <div class="badge badge-warning badge-sm gap-1">
-                                <x-icon name="o-clock" class="w-3 h-3" />
-                            </div>
+                        <div class="badge badge-warning badge-sm gap-1">
+                            <x-icon name="o-clock" class="w-3 h-3" />
+                        </div>
                         @else
-                            <div class="badge badge-error badge-sm gap-1">
-                                <x-icon name="o-exclamation-circle" class="w-3 h-3" />
-                            </div>
+                        <div class="badge badge-error badge-sm gap-1">
+                            <x-icon name="o-exclamation-circle" class="w-3 h-3" />
+                        </div>
                         @endif
                     </span>
                 </div>
@@ -934,7 +997,8 @@ $areAllGroupsExpanded = computed(function () {
                 @foreach (($this->groupedEvents ?? []) as $eventGroup)
                 @php
                 $first = $eventGroup['events'][0];
-                $hour = $first->time->format('H');
+                $userTime = to_user_timezone($first->time, auth()->user());
+                $hour = $userTime->format('H');
                 $showHourMarker = $previousHour !== $hour;
                 $previousHour = $hour;
                 $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? false);
@@ -945,7 +1009,7 @@ $areAllGroupsExpanded = computed(function () {
                 <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3 items-center py-1 select-none">
                     <div class="relative h-8">
                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
-                        <div class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center text-[10px] text-base-content/70">{{ $first->time->format('H') }}</div>
+                        <div class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center text-[10px] text-base-content/70">{{ $hour }}</div>
                     </div>
                     <div></div>
                     <div></div>
@@ -977,15 +1041,15 @@ $areAllGroupsExpanded = computed(function () {
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                     @if ($firstEvent->target)
-                                    <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $firstEvent->target->title }}</span>
+                                    <span class="sm:inline block break-words font-bold min-w-0">{{ ' ' . $firstEvent->target->title }}</span>
                                     @elseif ($firstEvent->actor)
-                                    <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $firstEvent->actor->title }}</span>
+                                    <span class="sm:inline block break-words font-bold min-w-0">{{ ' ' . $firstEvent->actor->title }}</span>
                                     @endif
                                     @endif
                                 </a>
                                 <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
-                                    {{ $firstEvent->time->format(' H:i') }} ·
-                                    <span title="{{ $firstEvent->time->toDayDateTimeString() }}">{{ $firstEvent->time->diffForHumans() }}</span>
+                                    {{ to_user_timezone($firstEvent->time, auth()->user())->format(' H:i') }} ·
+                                    <span title="{{ to_user_timezone($firstEvent->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($firstEvent->time, auth()->user())->diffForHumans() }}</span>
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @if ($firstEvent->integration)
@@ -1027,14 +1091,14 @@ $areAllGroupsExpanded = computed(function () {
                             <span class="font-medium">{{ $this->formatAction($event->action) }}</span>
                             @if (should_display_action_with_object($event->action, $event->service))
                             @if ($event->target)
-                            <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $event->target->title }}</span>
+                            <span class="sm:inline block break-words font-bold min-w-0">{{ ' ' . $event->target->title }}</span>
                             @elseif ($event->actor)
-                            <span class="sm:inline block truncate font-bold min-w-0">{{ ' ' . $event->actor->title }}</span>
+                            <span class="sm:inline block break-words font-bold min-w-0">{{ ' ' . $event->actor->title }}</span>
                             @endif
                             @endif
                         </a>
                         <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
-                            <span title="{{ $event->time->toDayDateTimeString() }}">{{ $event->time->diffForHumans() }}</span>
+                            <span title="{{ to_user_timezone($event->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($event->time, auth()->user())->diffForHumans() }}</span>
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @if ($event->integration)
@@ -1064,4 +1128,147 @@ $areAllGroupsExpanded = computed(function () {
             </div>
             @endif
         </div>
+
+    <!-- Floating Action Button for Card Streams -->
+    @php
+        try {
+            $availableStreamsCount = $this->availableStreams->count();
+            $hasStreams = $availableStreamsCount > 0;
+        } catch (\Throwable $e) {
+            $hasStreams = false;
+            $availableStreamsCount = 0;
+        }
+    @endphp
+
+    <script>
+        console.log('=== FAB Debug Info ===');
+        console.log('Current time:', new Date().toLocaleTimeString());
+        console.log('Viewing date:', @js($this->date));
+        console.log('Is viewing today?:', @js(Carbon::parse($this->date)->isToday()));
+        console.log('Has streams:', @js($hasStreams));
+        console.log('Available streams count:', @js($availableStreamsCount));
+        console.log('Available streams:', @js($this->availableStreams->toArray()));
+
+        @if (!$hasStreams)
+        console.log('⚠️ No streams detected! This could mean:');
+        console.log('  1. No cards are eligible based on time/date constraints');
+        console.log('  2. Card eligibility logic is filtering out all cards');
+        console.log('  3. CardRegistry is not returning any eligible cards');
+        @endif
+    </script>
+
+    @if ($hasStreams)
+    <div class="fixed bottom-6 right-6 z-40"
+        x-data="{
+            userId: '{{ auth()->id() }}',
+            currentDate: '{{ $this->date }}',
+            streams: @js($this->availableStreams->values()->toArray()),
+            shouldShow: true,
+
+            getStorageKey() {
+                return `spark_card_views_${this.userId}_${this.currentDate}`;
+            },
+
+            getCardState() {
+                if (!this.userId) return {};
+
+                try {
+                    const stored = localStorage.getItem(this.getStorageKey());
+                    return stored ? JSON.parse(stored) : {};
+                } catch (e) {
+                    return {};
+                }
+            },
+
+            hasUnviewedCards(stream) {
+                const state = this.getCardState();
+                const streamState = state[stream.id] || {};
+                const eligibleCards = stream.eligibleCardsMeta || [];
+
+                console.log('=== Checking Stream:', stream.id, '===');
+                console.log('Stream state:', streamState);
+                console.log('Eligible cards:', eligibleCards);
+
+                // Check each eligible card
+                for (const card of eligibleCards) {
+                    const cardState = streamState[card.id];
+
+                    console.log(`Card ${card.id}:`, {
+                        cardState,
+                        viewed: cardState?.viewed,
+                        requiresInteraction: card.requiresInteraction,
+                        interacted: cardState?.interacted
+                    });
+
+                    // Card not viewed yet
+                    if (!cardState || !cardState.viewed) {
+                        console.log(`✓ Card ${card.id} is unviewed - showing FAB`);
+                        return true;
+                    }
+
+                    // Card requires interaction but not completed
+                    if (card.requiresInteraction && !cardState.interacted) {
+                        console.log(`✓ Card ${card.id} requires interaction - showing FAB`);
+                        return true;
+                    }
+                }
+
+                console.log('✗ No unviewed cards in stream', stream.id);
+                return false;
+            },
+
+            hasAnyUnviewedCards() {
+                console.log('=== FAB Visibility Check ===');
+                console.log('All streams:', this.streams);
+                console.log('User ID:', this.userId);
+                console.log('Current Date:', this.currentDate);
+                console.log('Storage Key:', this.getStorageKey());
+
+                const result = this.streams.some(stream => this.hasUnviewedCards(stream));
+                console.log('=== FAB Should Show:', result, '===');
+                return result;
+            },
+
+            checkVisibility() {
+                this.shouldShow = this.hasAnyUnviewedCards();
+            }
+        }"
+        x-init="checkVisibility()"
+        x-show="shouldShow"
+        x-transition
+        @card-stream-closed.window="checkVisibility()">
+        @if ($availableStreamsCount === 1)
+        <!-- Single stream: simple FAB -->
+        @php $stream = $this->availableStreams->first(); @endphp
+        <button
+            class="btn btn-circle btn-lg btn-primary shadow-lg"
+            @click="console.log('FAB clicked!', { streamId: '{{ $stream->id }}', date: '{{ $this->date }}' }); $dispatch('open-card-stream', { streamId: '{{ $stream->id }}', date: '{{ $this->date }}' }); console.log('Event dispatched');"
+            aria-label="Open {{ $stream->name }} stream">
+            <x-icon name="{{ $stream->icon }}" class="w-6 h-6" />
+        </button>
+        @else
+        <!-- Multiple streams: flower FAB -->
+        <div class="dropdown dropdown-top dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-circle btn-lg btn-primary shadow-lg m-1">
+                <x-icon name="o-rectangle-stack" class="w-6 h-6" />
+            </div>
+            <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow-xl mb-2">
+                @foreach ($this->availableStreams as $stream)
+                <li>
+                    <button
+                        @click="$dispatch('open-card-stream', { streamId: '{{ $stream->id }}', date: '{{ $this->date }}' })"
+                        class="flex items-center gap-2">
+                        <x-icon name="{{ $stream->icon }}" class="w-5 h-5" />
+                        <span>{{ $stream->name }}</span>
+                        @if ($stream->description)
+                        <span class="text-xs text-base-content/60">{{ $stream->description }}</span>
+                        @endif
+                    </button>
+                </li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
     </div>
+    @endif
+</div>

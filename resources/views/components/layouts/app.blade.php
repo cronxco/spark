@@ -101,7 +101,38 @@
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
                     <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('settings.notifications') }}" :active="request()->routeIs('settings.notifications')" />
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
+                    <x-menu-item
+                        title="Reset Card Views"
+                        icon="o-arrow-path"
+                        x-data
+                        @click.prevent="
+                            if (confirm('Reset all card view history? This will show all cards again.')) {
+                                const userId = '{{ auth()->id() }}';
+                                const prefix = `spark_card_views_${userId}_`;
+                                const keysToRemove = [];
+                                for (let i = 0; i < localStorage.length; i++) {
+                                    const key = localStorage.key(i);
+                                    if (key && key.startsWith(prefix)) {
+                                        keysToRemove.push(key);
+                                    }
+                                }
+                                keysToRemove.forEach(key => localStorage.removeItem(key));
+
+                                // Clear server-side cache via API
+                                fetch('/api/clear-card-cache', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                                    }
+                                }).catch(err => console.error('Failed to clear cache:', err));
+
+                                alert('Card view history cleared! All cards will show again on your next visit.');
+                                window.location.reload();
+                            }
+                        " />
                 </x-menu>
+                <x-menu-separator />
                 <form method="POST" action="{{ route('logout') }}" x-data>
                     @csrf
                     <x-menu-item @click.prevent="$el.closest('form').submit();" title="Logout" />
@@ -206,6 +237,9 @@
             });
         })();
     </script>
+
+    <!-- Global Card Streams Component -->
+    <livewire:card-streams />
 
 </body>
 

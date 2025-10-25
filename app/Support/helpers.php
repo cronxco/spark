@@ -5,10 +5,67 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\LoggingService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+
+if (! function_exists('user_now')) {
+    /**
+     * Get the current time in the user's timezone.
+     * If no user is provided, falls back to UTC.
+     */
+    function user_now(?User $user = null): Carbon
+    {
+        $timezone = $user?->getTimezone() ?? 'UTC';
+
+        return Carbon::now($timezone);
+    }
+}
+
+if (! function_exists('user_today')) {
+    /**
+     * Get today's date in the user's timezone.
+     * If no user is provided, falls back to UTC.
+     */
+    function user_today(?User $user = null): Carbon
+    {
+        $timezone = $user?->getTimezone() ?? 'UTC';
+
+        return Carbon::today($timezone);
+    }
+}
+
+if (! function_exists('to_user_timezone')) {
+    /**
+     * Convert a datetime to the user's timezone.
+     * If no user is provided, returns the datetime as-is.
+     */
+    function to_user_timezone(Carbon $datetime, ?User $user = null): Carbon
+    {
+        if (! $user) {
+            return $datetime;
+        }
+
+        $timezone = $user->getTimezone();
+
+        return $datetime->copy()->setTimezone($timezone);
+    }
+}
+
+if (! function_exists('format_time_for_user')) {
+    /**
+     * Format a datetime for display in the user's timezone.
+     * If no user is provided, uses UTC.
+     */
+    function format_time_for_user(Carbon $datetime, ?User $user = null, string $format = 'Y-m-d H:i:s'): string
+    {
+        $userDatetime = to_user_timezone($datetime, $user);
+
+        return $userDatetime->format($format);
+    }
+}
 
 if (! function_exists('format_action_title')) {
     /**

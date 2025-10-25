@@ -13,6 +13,7 @@ new class extends Component {
     public string $name = '';
     public string $email = '';
     public bool $debugLoggingEnabled = false;
+    public string $timezone = '';
 
     /**
      * Mount the component.
@@ -22,6 +23,7 @@ new class extends Component {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
         $this->debugLoggingEnabled = Auth::user()->hasDebugLoggingEnabled();
+        $this->timezone = Auth::user()->getTimezone();
     }
 
     /**
@@ -87,6 +89,67 @@ new class extends Component {
             $user->disableDebugLogging();
             $this->success('Debug logging disabled. Only important events will be logged.');
         }
+    }
+
+    /**
+     * Update timezone preference
+     */
+    public function updateTimezone(): void
+    {
+        $user = Auth::user();
+
+        $validated = $this->validate([
+            'timezone' => ['required', 'string', 'timezone:all'],
+        ]);
+
+        $user->setTimezone($validated['timezone']);
+
+        $this->success('Timezone updated successfully!');
+    }
+
+    /**
+     * Get list of common timezones for dropdown
+     */
+    public function getTimezoneOptions(): array
+    {
+        return [
+            'UTC' => 'UTC',
+            'America/New_York' => 'Eastern Time (US & Canada)',
+            'America/Chicago' => 'Central Time (US & Canada)',
+            'America/Denver' => 'Mountain Time (US & Canada)',
+            'America/Los_Angeles' => 'Pacific Time (US & Canada)',
+            'America/Phoenix' => 'Arizona',
+            'America/Anchorage' => 'Alaska',
+            'Pacific/Honolulu' => 'Hawaii',
+            'Europe/London' => 'London',
+            'Europe/Paris' => 'Paris',
+            'Europe/Berlin' => 'Berlin',
+            'Europe/Madrid' => 'Madrid',
+            'Europe/Rome' => 'Rome',
+            'Europe/Amsterdam' => 'Amsterdam',
+            'Europe/Brussels' => 'Brussels',
+            'Europe/Vienna' => 'Vienna',
+            'Europe/Stockholm' => 'Stockholm',
+            'Europe/Copenhagen' => 'Copenhagen',
+            'Europe/Helsinki' => 'Helsinki',
+            'Europe/Oslo' => 'Oslo',
+            'Europe/Warsaw' => 'Warsaw',
+            'Europe/Athens' => 'Athens',
+            'Europe/Bucharest' => 'Bucharest',
+            'Europe/Istanbul' => 'Istanbul',
+            'Asia/Dubai' => 'Dubai',
+            'Asia/Kolkata' => 'Mumbai, Kolkata',
+            'Asia/Singapore' => 'Singapore',
+            'Asia/Hong_Kong' => 'Hong Kong',
+            'Asia/Tokyo' => 'Tokyo',
+            'Asia/Seoul' => 'Seoul',
+            'Asia/Shanghai' => 'Beijing, Shanghai',
+            'Australia/Sydney' => 'Sydney',
+            'Australia/Melbourne' => 'Melbourne',
+            'Australia/Brisbane' => 'Brisbane',
+            'Australia/Perth' => 'Perth',
+            'Pacific/Auckland' => 'Auckland',
+        ];
     }
 }; ?>
 
@@ -164,6 +227,42 @@ new class extends Component {
             </div>
         </div>
     @endif
+
+    <!-- Timezone Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Timezone') }}</h3>
+            <p class="text-sm text-base-content/70 mb-4">
+                {{ __('Set your local timezone for accurate time displays and card scheduling') }}
+            </p>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Your Timezone') }}</span>
+                </label>
+                <select
+                    wire:model="timezone"
+                    class="select select-bordered w-full"
+                >
+                    @foreach ($this->getTimezoneOptions() as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Cards and time-based features will use this timezone') }}</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end mt-4">
+                <x-button
+                    label="{{ __('Update Timezone') }}"
+                    wire:click="updateTimezone"
+                    class="btn-primary"
+                    spinner="updateTimezone"
+                />
+            </div>
+        </div>
+    </div>
 
     <!-- Debug Logging Card -->
     <div class="card bg-base-200 shadow">
