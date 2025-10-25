@@ -90,8 +90,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_name' => 'Workout',
                 'description' => 'Workout activity data',
                 'display_with_object' => true,
-                'value_unit' => 'seconds',
-                'value_formatter' => '{{ format_duration($value) }}',
+                'value_unit' => 'kcal',
+                'value_formatter' => '{{ round($value) }} kcal',
                 'hidden' => false,
             ],
             'had_mindfulness_session' => [

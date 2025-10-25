@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Integrations\AppleHealth\AppleHealthPlugin;
+use App\Integrations\BlueSky\BlueSkyPlugin;
 use App\Integrations\DailyCheckin\DailyCheckinPlugin;
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
+use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Integrations\Hevy\HevyPlugin;
 use App\Integrations\Karakeep\KarakeepPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
@@ -41,6 +43,8 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(OutlinePlugin::class);
         PluginRegistry::register(KarakeepPlugin::class);
         PluginRegistry::register(DailyCheckinPlugin::class);
+        PluginRegistry::register(GoogleCalendarPlugin::class);
+        PluginRegistry::register(BlueSkyPlugin::class);
     }
 
     /**
