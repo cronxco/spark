@@ -59,22 +59,19 @@
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 lg:p-6 rounded-lg bg-base-300/50 border border-base-300">
                     <div class="text-center sm:text-left">
                         <div class="text-xs text-base-content/70 mb-1">Mean</div>
-                        <div class="text-2xl font-bold">{{ number_format($metric->mean_value, 2) }}</div>
-                        <div class="text-xs text-base-content/70">{{ $metric->value_unit }}</div>
+                        <div class="text-2xl font-bold">{!! format_event_value_display($metric->mean_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
                     </div>
 
                     <div class="text-center sm:text-left">
                         <div class="text-xs text-base-content/70 mb-1">Std Dev</div>
-                        <div class="text-2xl font-bold">{{ number_format($metric->stddev_value, 2) }}</div>
-                        <div class="text-xs text-base-content/70">±{{ $metric->value_unit }}</div>
+                        <div class="text-2xl font-bold">±{!! format_event_value_display($metric->stddev_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
                     </div>
 
                     <div class="text-center sm:text-left">
                         <div class="text-xs text-base-content/70 mb-1">Range</div>
                         <div class="text-xl font-bold">
-                            {{ number_format($metric->min_value, 1) }} - {{ number_format($metric->max_value, 1) }}
+                            {!! format_event_value_display($metric->min_value, $metric->value_unit, $metric->service, $metric->action) !!} - {!! format_event_value_display($metric->max_value, $metric->value_unit, $metric->service, $metric->action) !!}
                         </div>
-                        <div class="text-xs text-base-content/70">{{ $metric->value_unit }}</div>
                     </div>
 
                     <div class="text-center sm:text-left">
@@ -143,7 +140,7 @@
 
                                 <div>
                                     <div class="font-semibold">
-                                        {{ number_format($anomaly->current_value, 2) }} {{ $metric->value_unit }}
+                                        {!! format_event_value_display($anomaly->current_value, $metric->value_unit, $metric->service, $metric->action) !!}
                                     </div>
                                     <div class="text-sm text-gray-500">
                                         {{ $anomaly->detected_at->format('M j, Y') }} •
@@ -192,8 +189,8 @@
                                         change
                                     </div>
                                     <div class="text-xs text-gray-500">
-                                        {{ number_format($trend->baseline_value, 1) }} →
-                                        {{ number_format($trend->current_value, 1) }} {{ $metric->value_unit }}
+                                        {!! format_event_value_display($trend->baseline_value, $metric->value_unit, $metric->service, $metric->action) !!} →
+                                        {!! format_event_value_display($trend->current_value, $metric->value_unit, $metric->service, $metric->action) !!}
                                     </div>
                                 </div>
                             </div>
