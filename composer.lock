@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cf47406fcc2912c4c2ae97ea49fc2136",
+    "content-hash": "cc7bfa01b0908c731930830e79240c8b",
     "packages": [
         {
             "name": "blade-ui-kit/blade-heroicons",
@@ -792,6 +792,180 @@
                 }
             ],
             "time": "2023-10-12T05:21:21+00:00"
+        },
+        {
+            "name": "google/apiclient",
+            "version": "v2.18.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/googleapis/google-api-php-client.git",
+                "reference": "5b51fdb2cbd2a96088e3dfc6f565bdf6fb0af94b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/googleapis/google-api-php-client/zipball/5b51fdb2cbd2a96088e3dfc6f565bdf6fb0af94b",
+                "reference": "5b51fdb2cbd2a96088e3dfc6f565bdf6fb0af94b",
+                "shasum": ""
+            },
+            "require": {
+                "firebase/php-jwt": "^6.0",
+                "google/apiclient-services": "~0.350",
+                "google/auth": "^1.37",
+                "guzzlehttp/guzzle": "^7.4.5",
+                "guzzlehttp/psr7": "^2.6",
+                "monolog/monolog": "^2.9||^3.0",
+                "php": "^8.1",
+                "phpseclib/phpseclib": "^3.0.36"
+            },
+            "require-dev": {
+                "cache/filesystem-adapter": "^1.1",
+                "composer/composer": "^1.10.23",
+                "phpcompatibility/php-compatibility": "^9.2",
+                "phpspec/prophecy-phpunit": "^2.1",
+                "phpunit/phpunit": "^9.6",
+                "squizlabs/php_codesniffer": "^3.8",
+                "symfony/css-selector": "~2.1",
+                "symfony/dom-crawler": "~2.1"
+            },
+            "suggest": {
+                "cache/filesystem-adapter": "For caching certs and tokens (using Google\\Client::setCache)"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "2.x-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/aliases.php"
+                ],
+                "psr-4": {
+                    "Google\\": "src/"
+                },
+                "classmap": [
+                    "src/aliases.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Client library for Google APIs",
+            "homepage": "http://developers.google.com/api-client-library/php",
+            "keywords": [
+                "google"
+            ],
+            "support": {
+                "issues": "https://github.com/googleapis/google-api-php-client/issues",
+                "source": "https://github.com/googleapis/google-api-php-client/tree/v2.18.4"
+            },
+            "time": "2025-09-30T04:23:07+00:00"
+        },
+        {
+            "name": "google/apiclient-services",
+            "version": "v0.417.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/googleapis/google-api-php-client-services.git",
+                "reference": "d09f54168a8886ed758b5973e5231abefb5d5667"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/googleapis/google-api-php-client-services/zipball/d09f54168a8886ed758b5973e5231abefb5d5667",
+                "reference": "d09f54168a8886ed758b5973e5231abefb5d5667",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.6"
+            },
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "autoload.php"
+                ],
+                "psr-4": {
+                    "Google\\Service\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Client library for Google APIs",
+            "homepage": "http://developers.google.com/api-client-library/php",
+            "keywords": [
+                "google"
+            ],
+            "support": {
+                "issues": "https://github.com/googleapis/google-api-php-client-services/issues",
+                "source": "https://github.com/googleapis/google-api-php-client-services/tree/v0.417.0"
+            },
+            "time": "2025-10-20T00:54:22+00:00"
+        },
+        {
+            "name": "google/auth",
+            "version": "v1.48.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/googleapis/google-auth-library-php.git",
+                "reference": "023f41a2c80fb98a493dfb9dffcab643481a7ab0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/googleapis/google-auth-library-php/zipball/023f41a2c80fb98a493dfb9dffcab643481a7ab0",
+                "reference": "023f41a2c80fb98a493dfb9dffcab643481a7ab0",
+                "shasum": ""
+            },
+            "require": {
+                "firebase/php-jwt": "^6.0",
+                "guzzlehttp/guzzle": "^7.4.5",
+                "guzzlehttp/psr7": "^2.4.5",
+                "php": "^8.1",
+                "psr/cache": "^2.0||^3.0",
+                "psr/http-message": "^1.1||^2.0",
+                "psr/log": "^3.0"
+            },
+            "require-dev": {
+                "guzzlehttp/promises": "^2.0",
+                "kelvinmo/simplejwt": "0.7.1",
+                "phpseclib/phpseclib": "^3.0.35",
+                "phpspec/prophecy-phpunit": "^2.1",
+                "phpunit/phpunit": "^9.6",
+                "sebastian/comparator": ">=1.2.3",
+                "squizlabs/php_codesniffer": "^4.0",
+                "symfony/process": "^6.0||^7.0",
+                "webmozart/assert": "^1.11"
+            },
+            "suggest": {
+                "phpseclib/phpseclib": "May be used in place of OpenSSL for signing strings or for token management. Please require version ^2."
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Google\\Auth\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Google Auth Library for PHP",
+            "homepage": "https://github.com/google/google-auth-library-php",
+            "keywords": [
+                "Authentication",
+                "google",
+                "oauth2"
+            ],
+            "support": {
+                "docs": "https://cloud.google.com/php/docs/reference/auth/latest",
+                "issues": "https://github.com/googleapis/google-auth-library-php/issues",
+                "source": "https://github.com/googleapis/google-auth-library-php/tree/v1.48.1"
+            },
+            "time": "2025-09-30T04:22:33+00:00"
         },
         {
             "name": "graham-campbell/result-type",
@@ -4425,6 +4599,55 @@
             "time": "2025-08-06T06:41:24+00:00"
         },
         {
+            "name": "psr/cache",
+            "version": "3.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-fig/cache.git",
+                "reference": "aa5030cfa5405eccfdcb1083ce040c2cb8d253bf"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-fig/cache/zipball/aa5030cfa5405eccfdcb1083ce040c2cb8d253bf",
+                "reference": "aa5030cfa5405eccfdcb1083ce040c2cb8d253bf",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.0.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "1.0.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Psr\\Cache\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "PHP-FIG",
+                    "homepage": "https://www.php-fig.org/"
+                }
+            ],
+            "description": "Common interface for caching libraries",
+            "keywords": [
+                "cache",
+                "psr",
+                "psr-6"
+            ],
+            "support": {
+                "source": "https://github.com/php-fig/cache/tree/3.0.0"
+            },
+            "time": "2021-02-03T23:26:27+00:00"
+        },
+        {
             "name": "psr/clock",
             "version": "1.0.0",
             "source": {
@@ -5113,6 +5336,141 @@
             "time": "2025-09-04T20:59:21+00:00"
         },
         {
+            "name": "revolution/atproto-lexicon-contracts",
+            "version": "1.0.82",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/invokable/atproto-lexicon-contracts.git",
+                "reference": "07110f78d88ce49547d664140b83165ddfb5b5cf"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/invokable/atproto-lexicon-contracts/zipball/07110f78d88ce49547d664140b83165ddfb5b5cf",
+                "reference": "07110f78d88ce49547d664140b83165ddfb5b5cf",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "guzzlehttp/guzzle": "^7.9",
+                "laravel/pint": "^1.22"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Revolution\\AtProto\\Lexicon\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "kawax",
+                    "email": "kawaxbiz@gmail.com"
+                }
+            ],
+            "description": "Auto generated pure PHP interface and enum",
+            "keywords": [
+                "Lexicon",
+                "atproto",
+                "bluesky",
+                "contracts"
+            ],
+            "support": {
+                "source": "https://github.com/invokable/atproto-lexicon-contracts/tree/1.0.82"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/invokable",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-09-03T04:11:59+00:00"
+        },
+        {
+            "name": "revolution/laravel-bluesky",
+            "version": "1.1.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/invokable/laravel-bluesky.git",
+                "reference": "bdee3d69d4b95388696864559e5cd1c506b94b73"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/invokable/laravel-bluesky/zipball/bdee3d69d4b95388696864559e5cd1c506b94b73",
+                "reference": "bdee3d69d4b95388696864559e5cd1c506b94b73",
+                "shasum": ""
+            },
+            "require": {
+                "firebase/php-jwt": "^6.10",
+                "guzzlehttp/guzzle": "^7.8",
+                "illuminate/support": "^11.30||^12.0",
+                "laravel/socialite": "^5.16",
+                "php": "^8.2",
+                "phpseclib/phpseclib": "^3.0",
+                "revolution/atproto-lexicon-contracts": "1.0.82",
+                "yocto/yoclib-multibase": "^1.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.22",
+                "orchestra/testbench": "^9.0||^10.0",
+                "revolt/event-loop": "^1.0",
+                "workerman/workerman": "^5.0"
+            },
+            "suggest": {
+                "ext-gmp": "*",
+                "ext-pcntl": "*",
+                "revolt/event-loop": "Required to use WebSocket.",
+                "workerman/workerman": "Required to use WebSocket."
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Revolution\\Bluesky\\Providers\\BlueskyServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Revolution\\Bluesky\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "kawax",
+                    "email": "kawaxbiz@gmail.com"
+                }
+            ],
+            "description": "Bluesky(AT Protocol) for Laravel",
+            "keywords": [
+                "atproto",
+                "bluesky",
+                "feed-generator",
+                "labeler",
+                "laravel",
+                "notifications",
+                "socialite"
+            ],
+            "support": {
+                "source": "https://github.com/invokable/laravel-bluesky/tree/1.1.3"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/invokable",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-09-03T05:23:09+00:00"
+        },
+        {
             "name": "robsontenorio/mary",
             "version": "dev-main",
             "source": {
@@ -5669,6 +6027,80 @@
                 }
             ],
             "time": "2025-06-15T06:59:49+00:00"
+        },
+        {
+            "name": "spatie/laravel-google-calendar",
+            "version": "3.8.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/laravel-google-calendar.git",
+                "reference": "10db95c47f3705c430dc33f714164aa3108b53b8"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/laravel-google-calendar/zipball/10db95c47f3705c430dc33f714164aa3108b53b8",
+                "reference": "10db95c47f3705c430dc33f714164aa3108b53b8",
+                "shasum": ""
+            },
+            "require": {
+                "google/apiclient": "^2.2",
+                "illuminate/support": "^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
+                "nesbot/carbon": "^2.63|^3.0",
+                "php": "^7.2|^8.0"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.3.3|^1.4",
+                "orchestra/testbench": "^4.0|^5.0|^6.0|^7.0|^8.0|^9.0|^10.0",
+                "phpunit/phpunit": "^8.4|^9.0|^10.5|^11.5.3"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "GoogleCalendar": "Spatie\\GoogleCalendar\\GoogleCalendarFacade"
+                    },
+                    "providers": [
+                        "Spatie\\GoogleCalendar\\GoogleCalendarServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\GoogleCalendar\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Manage events on a Google Calendar",
+            "homepage": "https://github.com/spatie/laravel-google-calendar",
+            "keywords": [
+                "calendar",
+                "event",
+                "google",
+                "laravel-google-calendar",
+                "schedule",
+                "spatie"
+            ],
+            "support": {
+                "source": "https://github.com/spatie/laravel-google-calendar/tree/3.8.3"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                }
+            ],
+            "time": "2025-02-21T13:58:10+00:00"
         },
         {
             "name": "spatie/laravel-package-tools",
@@ -9010,6 +9442,52 @@
                 "issues": "https://github.com/cronxco/monzo-php/issues"
             },
             "time": "2025-03-23T21:58:10+00:00"
+        },
+        {
+            "name": "yocto/yoclib-multibase",
+            "version": "v1.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/yocto/yoclib-multibase-php.git",
+                "reference": "c7171897bf61dbc4a4cc6bb3f2fd5c3e62298e13"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/yocto/yoclib-multibase-php/zipball/c7171897bf61dbc4a4cc6bb3f2fd5c3e62298e13",
+                "reference": "c7171897bf61dbc4a4cc6bb3f2fd5c3e62298e13",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": "^7.4||^8"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^7||^8||^9"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "YOCLIB\\Multiformats\\Multibase\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-3.0-or-later"
+            ],
+            "description": "This yocLibrary enables your project to encode and decode Multibases in PHP.",
+            "keywords": [
+                "composer",
+                "multibase",
+                "multiformats",
+                "php",
+                "yoclib",
+                "yocto"
+            ],
+            "support": {
+                "issues": "https://github.com/yocto/yoclib-multibase-php/issues",
+                "source": "https://github.com/yocto/yoclib-multibase-php/tree/v1.2.0"
+            },
+            "time": "2024-06-05T13:42:01+00:00"
         }
     ],
     "packages-dev": [

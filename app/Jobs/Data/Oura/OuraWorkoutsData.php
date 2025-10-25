@@ -80,7 +80,9 @@ class OuraWorkoutsData extends BaseProcessingJob
         ]);
 
         $duration = $item['duration'] ?? 0;
-        [$encodedDuration, $durationMultiplier] = $plugin->encodeNumericValue($duration);
+        $calories = $item['calories'] ?? $item['total_calories'] ?? 0;
+
+        [$encodedCalories, $caloriesMultiplier] = $plugin->encodeNumericValue($calories);
 
         $event = Event::create([
             'source_id' => $sourceId,
@@ -90,18 +92,33 @@ class OuraWorkoutsData extends BaseProcessingJob
             'service' => 'oura',
             'domain' => 'health',
             'action' => 'did_workout',
-            'value' => $encodedDuration,
-            'value_multiplier' => $durationMultiplier,
-            'value_unit' => 'seconds',
+            'value' => $encodedCalories,
+            'value_multiplier' => $caloriesMultiplier,
+            'value_unit' => 'kcal',
             'event_metadata' => [
                 'end_datetime' => $end,
                 'activity_type' => $activityType,
                 'workout_id' => $id,
+                'duration_seconds' => $duration,
             ],
             'target_id' => $target->id,
         ]);
 
-        // Add calorie metrics
+        // Add duration block
+        if ($duration > 0) {
+            [$encodedDuration, $durationMultiplier] = $plugin->encodeNumericValue($duration);
+            $event->createBlock([
+                'block_type' => 'workout_metrics',
+                'time' => $event->time,
+                'title' => 'Duration',
+                'metadata' => ['type' => 'duration', 'field' => 'duration'],
+                'value' => $encodedDuration,
+                'value_multiplier' => $durationMultiplier,
+                'value_unit' => 'seconds',
+            ]);
+        }
+
+        // Add calorie metrics (only if they differ from the main value)
         $calorieMetrics = [
             'calories' => ['title' => 'Total Calories', 'type' => 'total'],
             'total_calories' => ['title' => 'Total Calories (Enhanced)', 'type' => 'total_enhanced'],
@@ -109,7 +126,8 @@ class OuraWorkoutsData extends BaseProcessingJob
 
         foreach ($calorieMetrics as $field => $config) {
             $value = $item[$field] ?? null;
-            if ($value !== null) {
+            // Skip if this value is already the main event value
+            if ($value !== null && $value != $calories) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
                     'block_type' => 'workout_metrics',

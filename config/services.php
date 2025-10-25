@@ -112,4 +112,15 @@ return [
         'access_token' => env('KARAKEEP_ACCESS_TOKEN'),
     ],
 
+    'google-calendar' => [
+        'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI'),
+    ],
+
+    'bluesky' => [
+        'oauth_private_key' => env('BLUESKY_OAUTH_PRIVATE_KEY'),
+        'redirect' => env('BLUESKY_REDIRECT', '/bluesky/oauth/callback'),
+    ],
+
 ];
