@@ -141,6 +141,26 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's timezone preference
+     */
+    public function getTimezone(): string
+    {
+        $settings = $this->settings ?? [];
+
+        return $settings['timezone'] ?? 'UTC';
+    }
+
+    /**
+     * Set the user's timezone preference
+     */
+    public function setTimezone(string $timezone): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['timezone'] = $timezone;
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
      * Get notification preferences from settings
      */
     public function getNotificationPreferences(): array

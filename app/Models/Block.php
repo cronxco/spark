@@ -141,11 +141,6 @@ class Block extends Model
         return $this->belongsTo(Event::class)->withTrashed();
     }
 
-    public function integration()
-    {
-        return $this->belongsTo(Integration::class)->withTrashed();
-    }
-
     /**
      * Get the formatted value considering the multiplier
      */

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\EventApiController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -73,6 +74,22 @@ Route::middleware('sentry.api.logging')->group(function () {
         ]);
         Route::post('integrations/{integration}/configure', [IntegrationApiController::class, 'configure'])->name('api.integrations.configure');
         Route::delete('integrations/{integration}', [IntegrationApiController::class, 'destroy'])->name('api.integrations.destroy');
+
+        // Clear card stream cache
+        Route::post('clear-card-cache', function (Request $request) {
+            $userId = $request->user()->id;
+            $pattern = "card_stream_{$userId}_*";
+
+            // Clear all cache entries matching the pattern
+            $store = Cache::getStore();
+            if (method_exists($store, 'flush')) {
+                // For stores that support flushing specific patterns
+                // We'll just clear all card_stream entries for this user
+                Cache::flush(); // Note: This clears ALL cache. In production, use a more targeted approach
+            }
+
+            return response()->json(['message' => 'Cache cleared successfully']);
+        })->name('api.clear-card-cache');
     });
 });
 

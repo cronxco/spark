@@ -19,13 +19,16 @@ state([
     'activeView' => 'am', // 'am' or 'pm'
     'saving' => false,
     'lastSavedAt' => null,
+    'hideSelector' => false,
 ]);
 
-mount(function (?string $date = null) {
-    $this->date = $date ?? Carbon::today()->format('Y-m-d');
+mount(function (?string $date = null, bool $hideSelector = false) {
+    $user = auth()->guard('web')->user();
+    $this->date = $date ?? user_today($user)->format('Y-m-d');
+    $this->hideSelector = $hideSelector;
 
-    // Determine default view based on current hour
-    $currentHour = Carbon::now()->hour;
+    // Determine default view based on current hour in user's timezone
+    $currentHour = user_now($user)->hour;
     $this->activeView = $currentHour < 12 ? 'am' : 'pm';
 
     // Load existing check-ins
@@ -192,8 +195,10 @@ $switchView = function (string $view): void {
 };
 
 $completionStatus = computed(function () {
-    $currentHour = Carbon::now()->hour;
-    $isViewingToday = Carbon::parse($this->date)->isToday();
+    $user = auth()->guard('web')->user();
+    $currentHour = user_now($user)->hour;
+    $today = user_today($user);
+    $isViewingToday = Carbon::parse($this->date)->isSameDay($today);
 
     $morningComplete = $this->amPhysical && $this->amMental;
     $afternoonComplete = $this->pmPhysical && $this->pmMental;
@@ -229,22 +234,24 @@ $completionStatus = computed(function () {
 
 <div class="flex items-center justify-between gap-4 flex-wrap">
     <!-- Tabs for AM/PM -->
-    <div role="tablist" class="tabs tabs-boxed tabs-sm flex-none">
-        <a
-            role="tab"
-            class="tab tab-sm gap-1.5 {{ $activeView === 'am' ? 'tab-active' : '' }}"
-            wire:click="switchView('am')">
-            <x-icon name="o-sun" class="w-3.5 h-3.5" />
-            AM
-        </a>
-        <a
-            role="tab"
-            class="tab tab-sm gap-1.5 {{ $activeView === 'pm' ? 'tab-active' : '' }}"
-            wire:click="switchView('pm')">
-            <x-icon name="o-moon" class="w-3.5 h-3.5" />
-            PM
-        </a>
-    </div>
+    @unless ($hideSelector)
+        <div role="tablist" class="tabs tabs-boxed tabs-sm flex-none">
+            <a
+                role="tab"
+                class="tab tab-sm gap-1.5 {{ $activeView === 'am' ? 'tab-active' : '' }}"
+                wire:click="switchView('am')">
+                <x-icon name="o-sun" class="w-3.5 h-3.5" />
+                AM
+            </a>
+            <a
+                role="tab"
+                class="tab tab-sm gap-1.5 {{ $activeView === 'pm' ? 'tab-active' : '' }}"
+                wire:click="switchView('pm')">
+                <x-icon name="o-moon" class="w-3.5 h-3.5" />
+                PM
+            </a>
+        </div>
+    @endunless
 
     <!-- Morning View -->
     @if ($activeView === 'am')

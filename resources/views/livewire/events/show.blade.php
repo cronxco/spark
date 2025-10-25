@@ -364,7 +364,7 @@ new class extends Component {
                         <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <x-icon name="o-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                                <span class="text-base-content/70">{{ $this->event->time->format('d/m/Y H:i') }} · {{ $this->event->time->diffForHumans() }}</span>
+                                <span class="text-base-content/70">{{ to_user_timezone($this->event->time, auth()->user())->format('d/m/Y H:i') }} · {{ to_user_timezone($this->event->time, auth()->user())->diffForHumans() }}</span>
                             </div>
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
@@ -489,7 +489,7 @@ new class extends Component {
                             @if ($block->time)
                             <div class="flex items-center gap-1">
                                 <x-icon name="o-clock" class="w-3 h-3" />
-                                {{ $block->time->format('H:i') }}
+                                {{ to_user_timezone($block->time, auth()->user())->format('H:i') }}
                             </div>
                             @endif
                             @if ($block->url)
@@ -543,7 +543,7 @@ new class extends Component {
                                         @endif
                                     </div>
                                     <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                        <span>{{ $relatedEvent->time->format('d/m/Y H:i') }}</span>
+                                        <span>{{ to_user_timezone($relatedEvent->time, auth()->user())->format('d/m/Y H:i') }}</span>
                                         @if ($relatedEvent->domain)
                                         <span>·</span>
                                         <x-badge class="badge-xs badge-outline">
