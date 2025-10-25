@@ -2,18 +2,37 @@
 
 namespace App\Livewire;
 
+use App\Jobs\Metrics\CalculateMetricStatisticsJob;
+use App\Jobs\Metrics\DetectMetricTrendsJob;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
+use Mary\Traits\Toast;
 
 class MetricsOverview extends Component
 {
+    use Toast;
+
     public string $filterService = '';
 
     public string $filterDomain = '';
 
     public string $sortBy = 'interesting'; // interesting, service, recent
+
+    public function calculateStatistics(): void
+    {
+        CalculateMetricStatisticsJob::dispatch();
+
+        $this->success('Statistics calculation job dispatched. This may take a few minutes.');
+    }
+
+    public function detectTrends(): void
+    {
+        DetectMetricTrendsJob::dispatch();
+
+        $this->success('Trend detection job dispatched. This may take a few minutes.');
+    }
 
     public function render()
     {

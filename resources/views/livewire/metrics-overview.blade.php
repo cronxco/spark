@@ -1,7 +1,19 @@
 <div>
     <x-header title="Metrics" subtitle="Track trends and anomalies across your data" separator>
         <x-slot:actions>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2 items-center">
+                <button wire:click="calculateStatistics" class="btn btn-outline btn-sm">
+                    <x-icon name="o-calculator" class="h-4 w-4" />
+                    Calculate Statistics
+                </button>
+
+                <button wire:click="detectTrends" class="btn btn-outline btn-sm">
+                    <x-icon name="o-chart-bar" class="h-4 w-4" />
+                    Detect Trends
+                </button>
+
+                <div class="divider divider-horizontal mx-0"></div>
+
                 <select wire:model.live="sortBy" class="select select-bordered select-sm w-40">
                     <option value="interesting">Most Interesting</option>
                     <option value="recent">Most Recent</option>
@@ -74,15 +86,15 @@
                         <div class="mt-4 grid grid-cols-3 gap-2 text-center">
                             <div>
                                 <div class="text-xs text-gray-500">Current</div>
-                                <div class="font-semibold">{{ number_format($metric->mean_value, 1) }}</div>
+                                <div class="font-semibold">{!! format_event_value_display($metric->mean_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500">Min</div>
-                                <div class="font-semibold">{{ number_format($metric->min_value, 1) }}</div>
+                                <div class="font-semibold">{!! format_event_value_display($metric->min_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500">Max</div>
-                                <div class="font-semibold">{{ number_format($metric->max_value, 1) }}</div>
+                                <div class="font-semibold">{!! format_event_value_display($metric->max_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
                             </div>
                         </div>
 
@@ -139,11 +151,10 @@
                             <div class="flex items-center gap-2">
                                 <div class="text-right text-sm">
                                     <div class="font-semibold">
-                                        {{ number_format($trend->current_value, 1) }}
-                                        {{ $trend->metricStatistic->value_unit }}
+                                        {!! format_event_value_display($trend->current_value, $trend->metricStatistic->value_unit, $trend->metricStatistic->service, $trend->metricStatistic->action) !!}
                                     </div>
                                     <div class="text-gray-500">
-                                        vs {{ number_format($trend->baseline_value, 1) }}
+                                        vs {!! format_event_value_display($trend->baseline_value, $trend->metricStatistic->value_unit, $trend->metricStatistic->service, $trend->metricStatistic->action) !!}
                                     </div>
                                 </div>
 
