@@ -801,3 +801,19 @@ if (! function_exists('get_domain_from_url')) {
         return $domain;
     }
 }
+
+if (! function_exists('normalize_icon_for_spotlight')) {
+    /**
+     * Normalize MaryUI icon names to Wire Elements Spotlight format.
+     * MaryUI uses 'o-' prefix for outline icons (e.g., 'o-banknotes'),
+     * but Spotlight expects plain icon names (e.g., 'banknotes').
+     *
+     * @param  string  $icon  The icon name (possibly with MaryUI prefix)
+     * @return string The normalized icon name for Spotlight
+     */
+    function normalize_icon_for_spotlight(string $icon): string
+    {
+        // Strip 'o-' (outline) or 's-' (solid) prefixes used by MaryUI
+        return preg_replace('/^[os]-/', '', $icon);
+    }
+}

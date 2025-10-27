@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Jobs\CalculateMetricStatisticsJob;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
@@ -44,6 +45,26 @@ class MetricDetail extends Component
         }
 
         $trend->acknowledge();
+    }
+
+    public function acknowledgeAllTrends(): void
+    {
+        // Acknowledge all unacknowledged trends for this metric
+        MetricTrend::where('metric_statistic_id', $this->metric->id)
+            ->whereNull('acknowledged_at')
+            ->get()
+            ->each(fn ($trend) => $trend->acknowledge());
+
+        $this->dispatch('trends-acknowledged');
+    }
+
+    public function calculateMetricStatistics(): void
+    {
+        // Dispatch job to calculate statistics for all metrics
+        // Note: The job recalculates all metrics, including this one
+        CalculateMetricStatisticsJob::dispatch();
+
+        $this->dispatch('statistics-calculation-started');
     }
 
     public function toggleTracking(): void
@@ -103,5 +124,14 @@ class MetricDetail extends Component
             'detectedTrends' => $trends['trends'] ?? collect(),
             'isTrackingDisabled' => $isTrackingDisabled,
         ]);
+    }
+
+    protected function getListeners(): array
+    {
+        return [
+            // Spotlight command events
+            'acknowledge-all-trends' => 'acknowledgeAllTrends',
+            'calculate-metric-statistics' => 'calculateMetricStatistics',
+        ];
     }
 }

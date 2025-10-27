@@ -15,6 +15,15 @@ new class extends Component {
     public string $comment = '';
     public bool $activityOpen = true;
     public bool $blockMetaOpen = false;
+    public bool $showEditBlockModal = false;
+
+    protected $listeners = [
+        'jump-to-parent-event' => 'handleJumpToParentEvent',
+        'open-edit-block-modal' => 'handleOpenEditModal',
+        'delete-block' => 'handleDeleteBlock',
+        'block-updated' => 'handleBlockUpdated',
+        'close-modal' => 'closeEditModal',
+    ];
 
     public function mount(Block $block): void
     {
@@ -89,6 +98,35 @@ new class extends Component {
     {
         $this->success($what . ' copied to clipboard!');
     }
+
+    public function handleJumpToParentEvent(): void
+    {
+        if ($this->block->event_id) {
+            $this->redirect(route('events.show', $this->block->event_id), navigate: true);
+        }
+    }
+
+    public function handleOpenEditModal(): void
+    {
+        $this->showEditBlockModal = true;
+    }
+
+    public function handleDeleteBlock(): void
+    {
+        $this->block->delete();
+        $this->redirect(route('today.main'), navigate: true);
+    }
+
+    public function handleBlockUpdated(): void
+    {
+        $this->block->refresh()->load(['event']);
+        $this->showEditBlockModal = false;
+    }
+
+    public function closeEditModal(): void
+    {
+        $this->showEditBlockModal = false;
+    }
 };
 
 ?>
@@ -104,6 +142,7 @@ new class extends Component {
                             class="btn-ghost btn-sm"
                             title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                             aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                            data-hotkey="d"
                         >
                             <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
                     </x-button>
@@ -392,4 +431,9 @@ new class extends Component {
             </x-button>
         </div>
     @endif
+
+    <!-- Edit Block Modal -->
+    <x-modal wire:model="showEditBlockModal" title="Edit Block" subtitle="Update block details" separator>
+        <livewire:edit-block :block="$this->block" :key="'edit-block-' . $this->block->id" />
+    </x-modal>
 </div>

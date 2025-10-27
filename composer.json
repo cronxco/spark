@@ -30,7 +30,8 @@
         "spatie/laravel-google-calendar": "*",
         "spatie/laravel-tags": "^4.10",
         "symfony/emoji": "^7.3",
-        "willscottuk/monzo-php": "dev-master"
+        "willscottuk/monzo-php": "dev-master",
+        "wire-elements/pro": "^4.0"
     },
     "require-dev": {
         "deployer/deployer": "^7.5",

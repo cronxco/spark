@@ -3,6 +3,7 @@
 namespace App\Integrations\Spotify;
 
 use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsSpotlightCommands;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -20,7 +21,7 @@ use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
 use Throwable;
 
-class SpotifyPlugin extends OAuthPlugin
+class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
 {
     protected string $baseUrl = 'https://api.spotify.com/v1';
 
@@ -116,6 +117,37 @@ class SpotifyPlugin extends OAuthPlugin
     public static function supportsMigration(): bool
     {
         return true;
+    }
+
+    /**
+     * Provide Spotlight commands for Spotify integration.
+     */
+    public static function getSpotlightCommands(): array
+    {
+        return [
+            'spotify-sync-recent' => [
+                'title' => 'Sync Recent Spotify Plays',
+                'subtitle' => 'Fetch your latest listening history from Spotify',
+                'icon' => 'musical-note',
+                'action' => 'dispatch_event',
+                'actionParams' => [
+                    'name' => 'trigger-spotify-sync',
+                    'data' => ['type' => 'recent'],
+                    'close' => true,
+                ],
+                'priority' => 7,
+            ],
+            'spotify-view-stats' => [
+                'title' => 'View Spotify Listening Stats',
+                'subtitle' => 'See your music trends and top artists',
+                'icon' => 'chart-bar',
+                'action' => 'jump_to',
+                'actionParams' => [
+                    'path' => '/integrations?filter=spotify',
+                ],
+                'priority' => 5,
+            ],
+        ];
     }
 
     public static function getActionTypes(): array

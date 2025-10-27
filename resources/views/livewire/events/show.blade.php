@@ -21,6 +21,17 @@ new class extends Component {
     public bool $actorMetaOpen = false;
     public bool $targetMetaOpen = false;
     public bool $showCreateTagModal = false;
+    public bool $showEditEventModal = false;
+    public bool $showTagModal = false;
+
+    protected $listeners = [
+        'open-tag-modal' => 'handleOpenTagModal',
+        'open-edit-event-modal' => 'handleOpenEditModal',
+        'delete-event' => 'handleDeleteEvent',
+        'event-updated' => 'handleEventUpdated',
+        'tags-updated' => 'handleTagsUpdated',
+        'close-modal' => 'closeModals',
+    ];
 
     public function mount(Event $event): void
     {
@@ -294,6 +305,55 @@ new class extends Component {
         $this->event->refresh()->loadMissing('tags');
         $this->showCreateTagModal = false;
     }
+
+    public function handleOpenTagModal(): void
+    {
+        $this->showTagModal = true;
+    }
+
+    public function handleOpenEditModal(): void
+    {
+        $this->showEditEventModal = true;
+    }
+
+    public function handleDeleteEvent(): void
+    {
+        $this->event->delete();
+        $this->redirect(route('today.main'), navigate: true);
+    }
+
+    public function handleEventUpdated(): void
+    {
+        $this->event->refresh()->load([
+            'actor',
+            'target',
+            'integration',
+            'blocks',
+            'tags',
+            'actor.tags',
+            'target.tags'
+        ]);
+        $this->showEditEventModal = false;
+    }
+
+    public function handleTagsUpdated(): void
+    {
+        $this->event->refresh()->load([
+            'actor',
+            'target',
+            'integration',
+            'blocks',
+            'tags',
+            'actor.tags',
+            'target.tags'
+        ]);
+    }
+
+    public function closeModals(): void
+    {
+        $this->showEditEventModal = false;
+        $this->showTagModal = false;
+    }
 };
 ?>
 
@@ -320,7 +380,8 @@ new class extends Component {
                         wire:click="toggleSidebar"
                         class="btn-ghost btn-sm"
                         title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
-                        aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}">
+                        aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        data-hotkey="d">
                         <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
                     </x-button>
                 </x-slot:actions>
@@ -597,7 +658,7 @@ new class extends Component {
                         </button>
                     </div>
                     <div class="space-y-2" wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
-                        <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" />
+                        <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" data-hotkey="t" />
                         <script type="application/json" id="tag-initial-{{ $this->event->id }}">
                             {!! json_encode($this->event->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                         </script>
@@ -899,5 +960,15 @@ new class extends Component {
     <!-- Create Tag Modal -->
     <x-modal wire:model="showCreateTagModal" title="Create New Tag" subtitle="Define a new tag with a specific type" separator>
         <livewire:create-tag :key="'create-tag-event-' . $this->event->id" @tag-created="handleTagCreated" />
+    </x-modal>
+
+    <!-- Tag Management Modal -->
+    <x-modal wire:model="showTagModal" title="Manage Tags" subtitle="Add or remove tags for this event" separator>
+        <livewire:manage-event-tags :event="$this->event" :key="'manage-tags-event-' . $this->event->id" />
+    </x-modal>
+
+    <!-- Edit Event Modal -->
+    <x-modal wire:model="showEditEventModal" title="Edit Event" subtitle="Update event details" separator>
+        <livewire:edit-event :event="$this->event" :key="'edit-event-' . $this->event->id" />
     </x-modal>
 </div>

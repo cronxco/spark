@@ -1,6 +1,10 @@
 import * as Sentry from "@sentry/browser";
 import Tagify from "@yaireo/tagify";
 import "@yaireo/tagify/dist/tagify.css";
+import { install as installHotkey } from "@github/hotkey";
+
+// Wire Elements Spotlight
+import "../../vendor/wire-elements/pro/resources/js/spotlight-component.js";
 
 Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN || window.SENTRY_DSN || undefined,
@@ -420,3 +424,19 @@ if (document.readyState === "loading") {
 
 document.addEventListener("livewire:init", initializeAllTagify);
 document.addEventListener("livewire:navigated", initializeAllTagify);
+
+// Initialize hotkeys
+function initializeAllHotkeys() {
+    document
+        .querySelectorAll("[data-hotkey]")
+        ?.forEach((el) => installHotkey(el));
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeAllHotkeys);
+} else {
+    initializeAllHotkeys();
+}
+
+document.addEventListener("livewire:init", initializeAllHotkeys);
+document.addEventListener("livewire:navigated", initializeAllHotkeys);

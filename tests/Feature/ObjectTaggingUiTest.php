@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\EventObject;
-use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -19,13 +18,11 @@ class ObjectTaggingUiTest extends TestCase
     {
         /** @var User $user */
         $user = User::factory()->create();
-        // Ensure user has an integration to satisfy related events queries guards
-        Integration::factory()->create(['user_id' => $user->id]);
         $object = $this->createObjectFor($user);
 
         $this->actingAs($user);
 
-        Livewire::test('objects.show', ['object' => $object])
+        Livewire::test(\App\Livewire\ManageObjectTags::class, ['object' => $object])
             ->call('addTag', 'alpha')
             ->call('addTag', 'beta')
             ->call('removeTag', 'alpha');
@@ -41,12 +38,11 @@ class ObjectTaggingUiTest extends TestCase
     {
         /** @var User $user */
         $user = User::factory()->create();
-        Integration::factory()->create(['user_id' => $user->id]);
         $object = $this->createObjectFor($user);
 
         $this->actingAs($user);
 
-        Livewire::test('objects.show', ['object' => $object])
+        Livewire::test(\App\Livewire\ManageObjectTags::class, ['object' => $object])
             ->call('addTag', 'tag-whitelist-123')
             ->call('addTag', 'tag-initial-123')
             ->call('removeTag', 'tag-whitelist-123')
