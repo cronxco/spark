@@ -1,3 +1,4 @@
+/* Wire Elements Pro Spotlight CSS is replaced by custom Spark theming below */
 /* @import "../../vendor/wire-elements/pro/resources/css/tailwind/spotlight-component.css"; */
 
 /* Tailwind */
@@ -199,12 +200,16 @@ pretty-json {
     @apply text-primary-content;
 }
 
+.wep-spotlight-item-content {
+    @apply flex-1 min-w-0;
+}
+
 .wep-spotlight-item-title {
     @apply truncate whitespace-nowrap text-base-content;
 }
 
 .wep-spotlight-item-subtitle {
-    @apply text-xs ml-2 truncate whitespace-nowrap font-mono text-base-content;
+    @apply text-xs truncate whitespace-nowrap font-mono text-base-content/70 mt-0.5;
 }
 
 .wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-title {
@@ -212,7 +217,7 @@ pretty-json {
 }
 
 .wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-subtitle {
-    @apply text-xs ml-2 truncate whitespace-nowrap font-mono text-primary-content;
+    @apply text-xs truncate whitespace-nowrap font-mono text-primary-content/80;
 }
 
 .wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-instructions {

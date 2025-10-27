@@ -295,3 +295,91 @@ $integration->configuration = [
 ```
 
 Access via helper methods: `getUpdateFrequencyMinutes()`, `isPaused()`, `useSchedule()`, etc.
+
+## Spotlight Command Palette
+
+Spark uses Wire Elements Spotlight as a keyboard-driven command palette for power users to navigate, search, and execute actions.
+
+### Quick Reference
+
+- **Activation**: `Cmd+K` / `Ctrl+K` or click Search button in header
+- **Modes**: `>` (actions), `#` (tags), `$` (metrics), `@` (integrations), `!` (admin), `?` (help)
+- **Configuration**: All registration in `app/Providers/SpotlightServiceProvider.php`
+- **Queries**: Organized in `app/Spotlight/Queries/` by category (Navigation, Search, Actions, Integration)
+- **Custom Actions**: `app/Spotlight/Actions/`
+- **Styling**: Custom CSS in `resources/css/app.css` (lines 140-566) using Spark theme variables
+
+### Adding Commands
+
+Create query classes that return `SpotlightResult` objects:
+
+```php
+// In app/Spotlight/Queries/...
+public static function make(): SpotlightQuery
+{
+    return SpotlightQuery::asDefault(function (string $query) {
+        return collect([
+            SpotlightResult::make()
+                ->setTitle('Command Name')
+                ->setSubtitle('Description')
+                ->setIcon('heroicon-name')
+                ->setGroup('group-name')
+                ->setPriority(10)
+                ->setAction('jump_to', ['path' => route('...')])
+        ]);
+    });
+}
+```
+
+Register in `SpotlightServiceProvider::registerQueries()`.
+
+### Integration Plugin Commands
+
+Plugins can provide Spotlight commands by implementing `SupportsSpotlightCommands`:
+
+```php
+use App\Integrations\Contracts\SupportsSpotlightCommands;
+
+class YourPlugin extends OAuthPlugin implements SupportsSpotlightCommands
+{
+    public static function getSpotlightCommands(): array
+    {
+        return [
+            'command-key' => [
+                'title' => 'Command Title',
+                'subtitle' => 'Description',
+                'icon' => 'icon-name',
+                'action' => 'dispatch_event',
+                'actionParams' => ['name' => 'event-name', 'close' => true],
+                'priority' => 5,
+            ],
+        ];
+    }
+}
+```
+
+Commands are auto-discovered via `PluginRegistry::getSpotlightCommands()` - no manual registration needed.
+
+### Context-Aware Commands
+
+Commands can be context-aware by checking the current route:
+
+```php
+$routeName = request()->route()->getName();
+if ($routeName === 'metrics.show') {
+    // Show metric-specific commands
+}
+```
+
+Context commands appear only on relevant pages and are prioritized first.
+
+### Full Documentation
+
+See `SPOTLIGHT.md` for comprehensive documentation including:
+
+- User guide with all modes and shortcuts
+- Developer guide with examples
+- Architecture overview
+- Adding custom commands and actions
+- Integration plugin support
+- Troubleshooting and best practices

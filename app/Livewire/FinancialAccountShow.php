@@ -318,6 +318,10 @@ class FinancialAccountShow extends Component
             'account-updated' => '$refresh',
             'account-archived' => 'handleAccountArchived',
             'balance-updated' => '$refresh',
+            // Spotlight command events
+            'open-balance-modal' => 'openAddBalanceModal',
+            'open-edit-modal' => 'openEditModal',
+            'open-archive-modal' => 'openArchiveModal',
         ];
     }
 }

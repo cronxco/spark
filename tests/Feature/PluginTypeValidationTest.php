@@ -339,28 +339,32 @@ class PluginTypeValidationTest extends TestCase
             $objectTypes = array_merge($objectTypes, $matches[1]);
         }
 
-        // Look for 'type' => '...' patterns but exclude tag contexts
+        // Look for 'type' => '...' patterns but exclude tag contexts and Spotlight command data
         // Tag contexts are arrays that contain BOTH 'name' => and 'type' => keys
-        // We'll use negative lookahead/lookbehind to exclude those patterns
+        // Spotlight commands contain actionParams with 'data' => ['type' => '...']
 
         // Remove tag array assignments specifically
         // Target the exact pattern: $tags[] = [ ... 'type' => '...' ... ];
         $withoutTagArrays = preg_replace('/\$tags\[\]\s*=\s*\[[^;]*?\];/s', '', $fileContent);
 
+        // Remove Spotlight command data arrays
+        // Target pattern: 'data' => ['type' => '...'] or "data" => ["type" => "..."]
+        $withoutSpotlightData = preg_replace("/['\"]data['\"]\s*=>\s*\[[^\]]*?['\"]type['\"]\s*=>\s*['\"][^'\"]+['\"]\s*[^\]]*?\]/s", '', $withoutTagArrays);
+
         // Now look for 'type' => '...' patterns in the cleaned content
-        preg_match_all("/'type'\s*=>\s*['\"]([^'\"]+)['\"]/", $withoutTagArrays, $matches);
+        preg_match_all("/'type'\s*=>\s*['\"]([^'\"]+)['\"]/", $withoutSpotlightData, $matches);
         if (! empty($matches[1])) {
             $filtered = array_filter($matches[1], function ($type) {
-                return ! in_array($type, ['array', 'integer', 'string', 'boolean', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
+                return ! in_array($type, ['array', 'integer', 'string', 'boolean', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout', 'recent']);
             });
             $objectTypes = array_merge($objectTypes, $filtered);
         }
 
         // Look for "type" => "..." patterns in the cleaned content
-        preg_match_all('/"type"\s*=>\s*["\']([^"\']+)["\']/', $withoutTagArrays, $matches);
+        preg_match_all('/"type"\s*=>\s*["\']([^"\']+)["\']/', $withoutSpotlightData, $matches);
         if (! empty($matches[1])) {
             $filtered = array_filter($matches[1], function ($type) {
-                return ! in_array($type, ['array', 'integer', 'string', 'boolean', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout']);
+                return ! in_array($type, ['array', 'integer', 'string', 'boolean', 'number', 'select', 'text', 'date', 'textarea', 'uk_retail', 'apple_workout', 'recent']);
             });
             $objectTypes = array_merge($objectTypes, $filtered);
         }

@@ -92,4 +92,13 @@ class MetricsOverview extends Component
             'recentTrends' => $recentTrends,
         ]);
     }
+
+    protected function getListeners(): array
+    {
+        return [
+            // Spotlight command events
+            'calculate-statistics' => 'calculateStatistics',
+            'detect-trends' => 'detectTrends',
+        ];
+    }
 }

@@ -76,14 +76,31 @@
 
         {{-- Right side actions --}}
         <x-slot:actions>
-            <label for="main-drawer" class="btn btn-ghost btn-sm lg:hidden" title="Menu" aria-label="Menu">
+            <label for="main-drawer" class="btn btn-ghost btn-sm lg:hidden" title="Menu" aria-label="Menu" data-hotkey="b">
                 <x-icon name="o-bars-3" class="w-5 h-5" />
             </label>
 
             {{-- Global Progress Indicator --}}
             @livewire('global-progress-indicator')
 
-            <x-button label="Search" icon="fab.searchengin" link="/search" class="btn-ghost btn-sm" responsive />
+            <x-button
+                label="Search"
+                icon="fab.searchengin"
+                class="btn-ghost btn-sm"
+                responsive
+                @click="$dispatch('spotlight.toggle')"
+                data-hotkey="/"
+            />
+
+            <button
+                type="button"
+                class="btn btn-ghost btn-sm btn-circle"
+                title="Keyboard Shortcuts"
+                @click="$dispatch('toggle-hotkey-help')"
+                data-hotkey="?"
+            >
+                <x-icon name="o-question-mark-circle" class="w-5 h-5" />
+            </button>
 
             {{-- User --}}
             @if ($user = auth()->user())
@@ -161,16 +178,16 @@
             </x-menu>
 
             <x-menu title="" class="p-1">
-                <x-menu-item title="Today" icon="fas.calendar-day" link="{{ route('today.main') }}" :active="request()->routeIs('today.*')" />
-                <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')" />
+                <x-menu-item title="Today" icon="fas.calendar-day" link="{{ route('today.main') }}" :active="request()->routeIs('today.*')" data-hotkey="g d" />
+                <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')" data-hotkey="g y" />
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')" />
 
-                <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" />
-                <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" />
-                <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" />
-                <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" />
+                <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" data-hotkey="g t" />
+                <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" data-hotkey="g m" />
+                <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" data-hotkey="g x" />
+                <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
 
-                <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')">
+                <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')" data-hotkey="g s">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')" />
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')" />
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
@@ -179,7 +196,7 @@
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                 </x-menu-sub>
 
-                <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')">
+                <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')" data-hotkey="g a">
                     <x-menu-item title="Sense Check" icon="fas.brain" link="{{ route('admin.sense-check.index') }}" :active="request()->routeIs('admin.sense-check.*')" />
                     <x-menu-item title="Activity" icon="fas.history" link="{{ route('admin.activity.index') }}" :active="request()->routeIs('admin.activity.*')" />
                     <x-menu-item title="Events" icon="fas.list" link="{{ route('admin.events.index') }}" :active="request()->routeIs('admin.events.*')" />
@@ -241,6 +258,12 @@
 
     <!-- Global Card Streams Component -->
     <livewire:card-streams />
+
+    <!-- Spotlight Command Palette -->
+    @livewire('spotlight-pro')
+
+    <!-- Keyboard Shortcuts Help Modal -->
+    <livewire:hotkey-help-modal />
 
 </body>
 

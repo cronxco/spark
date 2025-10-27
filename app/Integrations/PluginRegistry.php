@@ -3,6 +3,7 @@
 namespace App\Integrations;
 
 use App\Integrations\Contracts\IntegrationPlugin;
+use App\Integrations\Contracts\SupportsSpotlightCommands;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -121,5 +122,28 @@ class PluginRegistry
             'object_types' => $pluginClass::getObjectTypes(),
             'instance_types' => $pluginClass::getInstanceTypes(),
         ];
+    }
+
+    /**
+     * Get Spotlight commands from all plugins that support them.
+     *
+     * @return Collection<array{plugin: string, key: string, command: array}>
+     */
+    public static function getSpotlightCommands(): Collection
+    {
+        return self::getAllPlugins()
+            ->filter(fn ($pluginClass) => is_subclass_of($pluginClass, SupportsSpotlightCommands::class))
+            ->flatMap(function ($pluginClass) {
+                $identifier = $pluginClass::getIdentifier();
+                $commands = $pluginClass::getSpotlightCommands();
+
+                return collect($commands)->map(function ($command, $key) use ($identifier) {
+                    return [
+                        'plugin' => $identifier,
+                        'key' => $key,
+                        'command' => $command,
+                    ];
+                });
+            });
     }
 }

@@ -283,9 +283,11 @@ class IconValidationTest extends TestCase
                         preg_match('/^[mso]-[a-zA-Z0-9-]+$/', $match) &&
                         strlen($match) > 4 && // Must be longer than just "o-b" or "s-xs"
                         ! preg_match('/^[mso]-[a-z]$/', $match) && // Exclude single letters
-                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl|boxed|error|success|warning)$/', $match) && // Exclude CSS-like classes
+                        ! preg_match('/^[mso]-(1|8|accent|center|horizontal|info|lg|px|start|rows-min|control|neutral-950|purple-500|baseline|visible|primary|progress|xs|sm|md|lg|xl|2xl|3xl|boxed|error|success|warning|500|700)$/', $match) && // Exclude CSS-like classes and numeric suffixes
                         ! preg_match('/^[mso]-[a-z]+-[0-9]+$/', $match) && // Exclude color classes like m-neutral-950, m-purple-500
-                        ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match)
+                        ! preg_match('/^[mso]-[0-9]+$/', $match) && // Exclude numeric classes like o-500, o-700
+                        ! preg_match('/^[mso]-(col|row|wrap|start|end|top|bottom|left|right|center|middle|auto|none|block|inline|flex|grid|hidden|show|active|disabled|focus|hover|group|peer|first|last|odd|even|visited|checked|default|required|valid|invalid|in-range|out-of-range|placeholder-shown|autofill|read-only|open|closed|loading|loaded|selected|current|target|enabled)$/', $match) &&
+                        ! preg_match('/^[mso]-(action|action-description|action-key|enter-icon|icon|inner|inner-headline|inner-photo|inner-subheadline|instructions|no-results|title|token|token-key|results|results-heading|results-icon|results-message|arrow|arrow-container|body|header|text|content|subtitle)$/', $match) // Exclude Spotlight component CSS classes
                     ) { // Exclude common CSS class patterns
                         $this->foundIcons[] = $match;
                     }

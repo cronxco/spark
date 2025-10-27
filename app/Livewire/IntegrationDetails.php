@@ -30,6 +30,31 @@ class IntegrationDetails extends Component
         $this->showSidebar = ! $this->showSidebar;
     }
 
+    public function triggerIntegrationUpdate(): void
+    {
+        // Trigger an immediate update for this integration
+        $this->integration->trigger();
+
+        $this->dispatch('integration-update-triggered');
+    }
+
+    public function toggleIntegrationPause(): void
+    {
+        // Toggle the paused state
+        $config = $this->integration->configuration ?? [];
+        $config['paused'] = ! ($config['paused'] ?? false);
+        $this->integration->configuration = $config;
+        $this->integration->save();
+
+        $this->dispatch('integration-pause-toggled');
+    }
+
+    public function openConfigureModal(): void
+    {
+        // This would open a configuration modal - for now just redirect to settings
+        $this->redirect(route('integrations.details', $this->integration->id) . '#configuration');
+    }
+
     public function getPluginClass()
     {
         return PluginRegistry::getPlugin($this->integration->service);
@@ -147,5 +172,15 @@ class IntegrationDetails extends Component
     {
         return view('livewire.integration-details')
             ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+    }
+
+    protected function getListeners(): array
+    {
+        return [
+            // Spotlight command events
+            'trigger-integration-update' => 'triggerIntegrationUpdate',
+            'toggle-integration-pause' => 'toggleIntegrationPause',
+            'open-configure-modal' => 'openConfigureModal',
+        ];
     }
 }
