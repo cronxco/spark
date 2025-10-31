@@ -43,6 +43,32 @@ export function getThemeColors() {
         return `${f(0)}, ${f(8)}, ${f(4)}`;
     };
 
+    // Helper to convert oklch to RGB
+    const oklchToRgb = (oklch) => {
+        // For base-content, we can just extract the lightness and use it
+        // This is a simplified conversion for grayscale colors
+        const match = oklch.match(/oklch\(([\d.]+)%/);
+        if (match) {
+            const lightness = parseFloat(match[1]);
+            const value = Math.round((lightness / 100) * 255);
+            return `${value}, ${value}, ${value}`;
+        }
+        // Fallback for hex colors or other formats
+        const hex = style.getPropertyValue("--color-base-content").trim();
+        if (hex.startsWith("#")) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `${r}, ${g}, ${b}`;
+        }
+        // Default fallback
+        return "128, 128, 128";
+    };
+
+    const baseContent =
+        style.getPropertyValue("--bc").trim() ||
+        oklchToRgb(style.getPropertyValue("--color-base-content"));
+
     return {
         primary: hslToRgb(style.getPropertyValue("--p")),
         secondary: hslToRgb(style.getPropertyValue("--s")),
@@ -51,6 +77,9 @@ export function getThemeColors() {
         warning: hslToRgb(style.getPropertyValue("--wa")),
         error: hslToRgb(style.getPropertyValue("--er")),
         info: hslToRgb(style.getPropertyValue("--in")),
+        baseContent: baseContent.includes(",")
+            ? baseContent
+            : hslToRgb(baseContent),
     };
 }
 
@@ -78,6 +107,7 @@ export function getChartDefaults() {
                         family: "Nunito, sans-serif",
                         size: 12,
                     },
+                    color: `rgb(${colors.baseContent})`,
                 },
             },
             tooltip: {
@@ -98,25 +128,33 @@ export function getChartDefaults() {
             x: {
                 grid: {
                     display: true,
-                    color: "rgba(0, 0, 0, 0.05)",
+                    color: `rgba(${colors.baseContent}, 0.1)`,
                 },
                 ticks: {
                     font: {
                         family: "Nunito, sans-serif",
                         size: 11,
                     },
+                    color: `rgba(${colors.baseContent}, 0.7)`,
+                },
+                title: {
+                    color: `rgba(${colors.baseContent}, 0.7)`,
                 },
             },
             y: {
                 grid: {
                     display: true,
-                    color: "rgba(0, 0, 0, 0.05)",
+                    color: `rgba(${colors.baseContent}, 0.1)`,
                 },
                 ticks: {
                     font: {
                         family: "Nunito, sans-serif",
                         size: 11,
                     },
+                    color: `rgba(${colors.baseContent}, 0.7)`,
+                },
+                title: {
+                    color: `rgba(${colors.baseContent}, 0.7)`,
                 },
             },
         },
@@ -128,7 +166,6 @@ export function getChartDefaults() {
  */
 export function createLineChart(ctx, data, options = {}) {
     const defaults = getChartDefaults();
-    const colors = getThemeColors();
 
     const config = {
         type: "line",

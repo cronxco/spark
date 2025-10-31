@@ -25,7 +25,12 @@
         </div>
 
         <!-- Chart container -->
-        <div x-data="balanceChart(@js($chartData), '{{ $currencySymbol }}')" class="h-[300px]">
+        <div
+            wire:key="balance-chart-{{ $rangeMonths }}"
+            x-data="balanceChart(@js($chartData), '{{ $currencySymbol }}')"
+            x-on:destroy="destroy()"
+            class="h-[300px]"
+        >
             <canvas x-ref="canvas"></canvas>
         </div>
     @endif
@@ -37,8 +42,18 @@
         chart: null,
 
         init() {
+            this.renderChart();
+        },
+
+        renderChart() {
             if (!data || data.length === 0) {
                 return;
+            }
+
+            // Destroy existing chart if it exists
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
             }
 
             const ctx = this.$refs.canvas.getContext('2d');
@@ -123,9 +138,9 @@
                                 color: (context) => {
                                     // Highlight the zero line
                                     if (context.tick.value === 0 && hasNegative) {
-                                        return 'rgba(0, 0, 0, 0.2)';
+                                        return `rgba(${colors.baseContent}, 0.3)`;
                                     }
-                                    return 'rgba(0, 0, 0, 0.05)';
+                                    return `rgba(${colors.baseContent}, 0.1)`;
                                 },
                                 lineWidth: (context) => {
                                     if (context.tick.value === 0 && hasNegative) {
@@ -149,13 +164,13 @@
                     }
                 }
             });
+        },
 
-            // Cleanup on destroy
-            this.$cleanup(() => {
-                if (this.chart) {
-                    this.chart.destroy();
-                }
-            });
+        destroy() {
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
         }
     }));
 </script>

@@ -15,7 +15,8 @@ class BalanceHistoryChart extends Component
     public function mount(): void
     {
         // Set default range based on account age
-        $firstBalance = Event::where('target_id', $this->account->id)
+        $firstBalance = Event::where('actor_id', $this->account->id)
+            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->orderBy('time')
             ->first();
@@ -36,7 +37,8 @@ class BalanceHistoryChart extends Component
 
         $isNegativeBalance = ($this->account->metadata['negative_balance'] ?? false) === true;
 
-        $balances = Event::where('target_id', $this->account->id)
+        $balances = Event::where('actor_id', $this->account->id)
+            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->when($startDate, fn ($q) => $q->where('time', '>=', $startDate))
             ->orderBy('time')
