@@ -7,7 +7,12 @@
             </h3>
 
             <!-- Compact chart container -->
-            <div x-data="eventContextChart(@js($chartData), '{{ $valueUnit }}')" class="h-[200px]">
+            <div
+                wire:key="event-context-chart-{{ $chartData->first()['id'] ?? 'empty' }}"
+                x-data="eventContextChart(@js($chartData), '{{ $valueUnit }}')"
+                x-on:destroy="destroy()"
+                class="h-[200px]"
+            >
                 <canvas x-ref="canvas"></canvas>
             </div>
 
@@ -24,8 +29,18 @@
         chart: null,
 
         init() {
+            this.renderChart();
+        },
+
+        renderChart() {
             if (!data || data.length === 0) {
                 return;
+            }
+
+            // Destroy existing chart if it exists
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
             }
 
             const ctx = this.$refs.canvas.getContext('2d');
@@ -100,13 +115,13 @@
                     }
                 }
             });
+        },
 
-            // Cleanup on destroy
-            this.$cleanup(() => {
-                if (this.chart) {
-                    this.chart.destroy();
-                }
-            });
+        destroy() {
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
         }
     }));
 </script>

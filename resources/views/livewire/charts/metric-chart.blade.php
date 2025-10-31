@@ -32,16 +32,21 @@
         </div>
     @else
         <!-- Chart -->
-        <div x-data="metricChart(
-            @js($chartData),
-            @js($movingAverage),
-            {{ $normalLowerBound }},
-            {{ $normalUpperBound }},
-            {{ $meanValue }},
-            {{ $showNormalRange ? 'true' : 'false' }},
-            {{ $showMovingAverage ? 'true' : 'false' }},
-            '{{ $metric->value_unit }}'
-        )" class="h-[350px]">
+        <div
+            wire:key="metric-chart-{{ $timeRange }}-{{ $showNormalRange ? '1' : '0' }}-{{ $showMovingAverage ? '1' : '0' }}"
+            x-data="metricChart(
+                @js($chartData),
+                @js($movingAverage),
+                {{ $normalLowerBound }},
+                {{ $normalUpperBound }},
+                {{ $meanValue }},
+                {{ $showNormalRange ? 'true' : 'false' }},
+                {{ $showMovingAverage ? 'true' : 'false' }},
+                '{{ $metric->value_unit }}'
+            )"
+            x-on:destroy="destroy()"
+            class="h-[350px]"
+        >
             <canvas x-ref="canvas"></canvas>
         </div>
     @endif
@@ -62,8 +67,18 @@
         chart: null,
 
         init() {
+            this.renderChart();
+        },
+
+        renderChart() {
             if (!data || data.length === 0) {
                 return;
+            }
+
+            // Destroy existing chart if it exists
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
             }
 
             const ctx = this.$refs.canvas.getContext('2d');
@@ -182,13 +197,13 @@
                     }
                 }
             });
+        },
 
-            // Cleanup on destroy
-            this.$cleanup(() => {
-                if (this.chart) {
-                    this.chart.destroy();
-                }
-            });
+        destroy() {
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
         }
     }));
 </script>
