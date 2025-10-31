@@ -37,10 +37,9 @@
         <div class="alert alert-info">
             <x-icon name="o-information-circle" class="h-5 w-5" />
             <div>
-                <h3 class="font-bold">{{ $recentTrends->count() }} Unacknowledged Trends</h3>
+                <h3 class="font-bold">{{ $recentTrends->count() }} Unacknowledged {{ Str::plural('Trend', $recentTrends->count()) }}</h3>
                 <div class="text-sm">
-                    You have {{ $recentTrends->where('type', 'like', 'anomaly_%')->count() }} anomalies and
-                    {{ $recentTrends->where('type', 'not like', 'anomaly_%')->count() }} trends awaiting review.
+                    You have {{ $recentTrends->count() }} {{ Str::plural('trend', $recentTrends->count()) }} awaiting review.
                 </div>
             </div>
         </div>
@@ -98,15 +97,6 @@
                             </div>
                         </div>
 
-                        {{-- Anomaly indicators --}}
-                        @if ($metric->recent_anomalies_count > 0)
-                            <div class="mt-2 flex items-center gap-2 rounded-lg bg-warning/10 px-3 py-2 text-sm">
-                                <x-icon name="o-exclamation-triangle" class="h-4 w-4 text-warning" />
-                                <span class="text-warning">{{ $metric->recent_anomalies_count }} recent
-                                    {{ Str::plural('anomaly', $metric->recent_anomalies_count) }}</span>
-                            </div>
-                        @endif
-
                         {{-- Last updated --}}
                         <div class="mt-2 text-xs text-gray-500">
                             Last event: {{ $metric->last_event_at?->diffForHumans() }}
@@ -121,7 +111,7 @@
     @if ($recentTrends->count() > 0)
         <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <h3 class="card-title">Recent Trends & Anomalies</h3>
+                <h3 class="card-title">Recent Trends</h3>
 
                 <div class="divide-y">
                     @foreach ($recentTrends as $trend)

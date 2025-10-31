@@ -41,10 +41,6 @@
     <script defer src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     {{-- <script>hljs.highlightAll();</script> --}}
     <script src="https://unpkg.com/pretty-json-custom-element/index.js" async></script>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js@^4"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-trendline/dist/chartjs-plugin-trendline.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/luxon@^2"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@^1"></script> -->
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <!-- <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css"> -->

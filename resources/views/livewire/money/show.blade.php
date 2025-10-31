@@ -130,15 +130,27 @@
                     </div>
             </x-card>
 
-            <!-- Balance History -->
+            <!-- Balance History Chart -->
             <div class="card bg-base-200 shadow">
                 <div class="card-body">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-chart-bar" class="w-5 h-5 text-primary" />
-                            Balance History
-                        </h3>
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-chart-bar" class="w-5 h-5 text-primary" />
+                        Balance History
+                    </h3>
+
+                    <div class="min-h-[300px]">
+                        <livewire:charts.balance-history-chart :account="$account" wire:lazy />
                     </div>
+                </div>
+            </div>
+
+            <!-- Balance History Table -->
+            <div class="card bg-base-200 shadow">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-table-cells" class="w-5 h-5 text-primary" />
+                        Balance Events
+                    </h3>
 
                     <x-table
                         :headers="$this->headers()"
