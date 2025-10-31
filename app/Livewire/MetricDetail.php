@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Jobs\CalculateMetricStatisticsJob;
-use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use Illuminate\Support\Facades\Auth;
@@ -14,16 +13,6 @@ use Livewire\Component;
 class MetricDetail extends Component
 {
     public MetricStatistic $metric;
-
-    public string $timeRange = '30'; // days
-
-    public bool $showMovingAverage = true;
-
-    public bool $showNormalRange = true;
-
-    public bool $showAnomalies = true;
-
-    public bool $showTrends = false;
 
     public function mount(MetricStatistic $metric): void
     {
@@ -84,25 +73,6 @@ class MetricDetail extends Component
     {
         $user = Auth::user();
 
-        // Get events for the selected time range
-        $startDate = now()->subDays((int) $this->timeRange);
-        $events = Event::whereHas('integration', function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-                ->whereNull('deleted_at');
-        })
-            ->where('service', $this->metric->service)
-            ->where('action', $this->metric->action)
-            ->where('value_unit', $this->metric->value_unit)
-            ->whereNotNull('value')
-            ->whereNull('deleted_at')
-            ->where('time', '>=', $startDate)
-            ->orderBy('time')
-            ->get();
-
-        // Prepare chart data
-        $chartLabels = $events->pluck('time')->map(fn ($time) => $time->format('Y-m-d'))->toArray();
-        $chartData = $events->map(fn ($event) => $event->getFormattedValueAttribute())->toArray();
-
         // Get trends for this metric
         $trends = $this->metric->trends()
             ->orderByDesc('detected_at')
@@ -117,9 +87,6 @@ class MetricDetail extends Component
         );
 
         return view('livewire.metric-detail', [
-            'events' => $events,
-            'chartLabels' => $chartLabels,
-            'chartData' => $chartData,
             'anomalies' => $trends['anomalies'] ?? collect(),
             'detectedTrends' => $trends['trends'] ?? collect(),
             'isTrackingDisabled' => $isTrackingDisabled,

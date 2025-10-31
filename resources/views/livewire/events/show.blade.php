@@ -72,6 +72,37 @@ new class extends Component {
             ->get();
     }
 
+    public function getEventAnomalies()
+    {
+        // Check if this event has any associated anomalies
+        if (!$this->event->value || !$this->event->value_unit) {
+            return collect();
+        }
+
+        $userId = optional(auth()->guard('web')->user())->id;
+        if (!$userId) {
+            return collect();
+        }
+
+        // Find metric statistic for this event
+        $metricStatistic = App\Models\MetricStatistic::where('user_id', $userId)
+            ->where('service', $this->event->service)
+            ->where('action', $this->event->action)
+            ->where('value_unit', $this->event->value_unit)
+            ->first();
+
+        if (!$metricStatistic) {
+            return collect();
+        }
+
+        // Find anomalies that reference this event
+        return App\Models\MetricTrend::where('metric_statistic_id', $metricStatistic->id)
+            ->anomalies()
+            ->whereJsonContains('metadata->event_id', $this->event->id)
+            ->with('metricStatistic')
+            ->get();
+    }
+
     public function getActivities()
     {
         return Activity::forSubject($this->event)
@@ -518,6 +549,71 @@ new class extends Component {
                     </div>
                 </div>
             </x-card>
+
+            <!-- Anomaly Information -->
+            @php $anomalies = $this->getEventAnomalies(); @endphp
+            @if ($anomalies->isNotEmpty())
+            <x-card class="bg-warning/5 border-2 border-warning/30">
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-exclamation-triangle" class="w-5 h-5 text-warning" />
+                    Anomaly Detected
+                </h3>
+                <div class="space-y-3">
+                    @foreach ($anomalies as $anomaly)
+                    <div class="rounded-lg bg-base-100 p-4 border border-warning/20">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    @if ($anomaly->getDirection() === 'up')
+                                        <x-icon name="o-arrow-trending-up" class="h-5 w-5 text-warning" />
+                                    @else
+                                        <x-icon name="o-arrow-trending-down" class="h-5 w-5 text-warning" />
+                                    @endif
+                                    <span class="font-semibold text-warning">{{ $anomaly->getTypeLabel() }}</span>
+                                </div>
+                                <p class="text-sm text-base-content/70 mb-3">
+                                    This event's value is <strong>{{ number_format($anomaly->deviation, 2) }} standard deviations</strong> away from the normal range for this metric.
+                                </p>
+                                <div class="grid grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                        <div class="text-xs text-base-content/60 mb-1">This Event</div>
+                                        <div class="font-semibold text-warning">
+                                            {!! format_event_value_display($anomaly->current_value, $anomaly->metricStatistic->value_unit, $anomaly->metricStatistic->service, $anomaly->metricStatistic->action) !!}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs text-base-content/60 mb-1">Normal Average</div>
+                                        <div class="font-semibold">
+                                            {!! format_event_value_display($anomaly->baseline_value, $anomaly->metricStatistic->value_unit, $anomaly->metricStatistic->service, $anomaly->metricStatistic->action) !!}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs text-base-content/60 mb-1">Normal Range</div>
+                                        <div class="font-semibold text-xs">
+                                            {!! format_event_value_display($anomaly->metadata['normal_lower_bound'] ?? 0, $anomaly->metricStatistic->value_unit, $anomaly->metricStatistic->service, $anomaly->metricStatistic->action) !!}
+                                            -
+                                            {!! format_event_value_display($anomaly->metadata['normal_upper_bound'] ?? 0, $anomaly->metricStatistic->value_unit, $anomaly->metricStatistic->service, $anomaly->metricStatistic->action) !!}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="{{ route('metrics.show', $anomaly->metricStatistic->id) }}"
+                                class="btn btn-warning btn-sm flex-shrink-0">
+                                View Metric
+                            </a>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </x-card>
+            @endif
+
+            <!-- Event Context Chart -->
+            @if ($this->event->value && $this->event->value_unit)
+            <div class="min-h-[250px]">
+                <livewire:charts.event-context-chart :event="$this->event" wire:lazy :key="'event-context-chart-' . $this->event->id" />
+            </div>
+            @endif
 
             <!-- Linked Blocks - Compact Grid View -->
             @if ($this->event->blocks->isNotEmpty())

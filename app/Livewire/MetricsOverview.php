@@ -47,16 +47,11 @@ class MetricsOverview extends Component
             $metricsQuery->where('service', $this->filterService);
         }
 
-        // Get metrics with their trend counts
+        // Get metrics with their trend counts (excluding anomalies)
         $metrics = $metricsQuery->get()->map(function ($metric) {
             $metric->unacknowledged_trends_count = $metric->trends()
+                ->trends() // Only count actual trends, not anomalies
                 ->unacknowledged()
-                ->count();
-
-            $metric->recent_anomalies_count = $metric->trends()
-                ->anomalies()
-                ->unacknowledged()
-                ->where('detected_at', '>=', now()->subDays(7))
                 ->count();
 
             return $metric;
@@ -76,10 +71,11 @@ class MetricsOverview extends Component
             ->pluck('service')
             ->sort();
 
-        // Get recent unacknowledged trends
+        // Get recent unacknowledged trends (excluding anomalies)
         $recentTrends = MetricTrend::whereHas('metricStatistic', function ($query) use ($user) {
             $query->where('user_id', $user->id);
         })
+            ->trends() // Only get actual trends, not anomalies
             ->unacknowledged()
             ->with('metricStatistic')
             ->orderByDesc('detected_at')
