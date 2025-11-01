@@ -41,7 +41,7 @@ class GoogleCalendarEventsPull extends BaseFetchJob
             return;
         }
 
-        // Dispatch event processing job
+        // Dispatch events processing job
         GoogleCalendarEventsData::dispatch($this->integration, $rawData);
     }
 }

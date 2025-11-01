@@ -57,14 +57,14 @@
                         label: unit,
                         data: data.map(d => d.value),
                         borderColor: `rgb(${colors.primary})`,
-                        backgroundColor: `rgba(${colors.primary}, 0.1)`,
-                        tension: 0.3,
-                        fill: true,
-                        pointRadius: data.map((d, i) => d.isCurrent ? 8 : 3),
-                        pointHoverRadius: data.map((d, i) => d.isCurrent ? 10 : 5),
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: false,
+                        pointRadius: data.map((d, i) => d.isCurrent ? 6 : 4),
+                        pointHoverRadius: data.map((d, i) => d.isCurrent ? 8 : 6),
                         pointBackgroundColor: data.map(d => d.isCurrent ? `rgb(${colors.accent})` : `rgb(${colors.primary})`),
                         pointBorderColor: data.map(d => d.isCurrent ? `rgb(${colors.accent})` : `rgb(${colors.primary})`),
-                        pointBorderWidth: data.map(d => d.isCurrent ? 3 : 1),
+                        pointBorderWidth: 2,
                     }]
                 },
                 options: {
@@ -97,14 +97,22 @@
                     scales: {
                         y: {
                             ticks: {
-                                callback: (value) => `${value.toFixed(0)}`
+                                callback: (value) => `${value.toFixed(0)}`,
+                                color: `rgba(${colors.baseContent}, 0.7)`
+                            },
+                            grid: {
+                                color: `rgba(${colors.baseContent}, 0.1)`
                             }
                         },
                         x: {
                             ticks: {
                                 maxRotation: 45,
                                 minRotation: 45,
-                                maxTicksLimit: 10
+                                maxTicksLimit: 10,
+                                color: `rgba(${colors.baseContent}, 0.7)`
+                            },
+                            grid: {
+                                color: `rgba(${colors.baseContent}, 0.1)`
                             }
                         }
                     },

@@ -247,7 +247,19 @@ class IntegrationController extends Controller
 
         try {
             if (method_exists($plugin, 'handleOAuthCallback')) {
+                Log::info('Calling plugin handleOAuthCallback', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'group_id' => $group->id,
+                ]);
+
                 $plugin->handleOAuthCallback($request, $group);
+
+                Log::info('Plugin handleOAuthCallback completed successfully', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'group_id' => $group->id,
+                ]);
             }
 
             // Clean up GoCardless session data after successful OAuth
@@ -264,6 +276,12 @@ class IntegrationController extends Controller
                 ]);
             }
 
+            Log::info('Redirecting to onboarding', [
+                'service' => $service,
+                'user_id' => $user->id,
+                'group_id' => $group->id,
+            ]);
+
             // Redirect to onboarding to select instance types
             return redirect()->route('integrations.onboarding', ['group' => $group->id])
                 ->with('success', 'Connected! Now choose what to track.');
@@ -274,11 +292,17 @@ class IntegrationController extends Controller
                 'user_id' => $user->id,
                 'group_id' => $group->id ?? null,
                 'exception' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'trace' => $e->getTraceAsString(),
+                'request_params' => [
+                    'code' => $request->has('code') ? 'present' : 'missing',
+                    'state' => $request->has('state') ? 'present' : 'missing',
+                    'error' => $request->get('error'),
+                ],
             ]);
 
             return redirect()->route('integrations.index')
-                ->with('error', 'Failed to connect integration. Please try again or contact support if the problem persists.');
+                ->with('error', 'Failed to connect integration: ' . $e->getMessage());
         }
     }
 
@@ -355,11 +379,21 @@ class IntegrationController extends Controller
             }
         }
 
+        // Get available calendars for Google Calendar onboarding
+        $availableCalendars = [];
+        if ($group->service === 'google-calendar' && $pluginClass) {
+            $plugin = new $pluginClass;
+            if (method_exists($plugin, 'fetchAvailableCalendars')) {
+                $availableCalendars = $plugin->fetchAvailableCalendars($group);
+            }
+        }
+
         return view('livewire.integrations.onboarding', [
             'group' => $group,
             'pluginName' => $pluginName,
             'types' => $types,
             'availableAccounts' => $availableAccounts,
+            'availableCalendars' => $availableCalendars,
             'presets' => $presets,
         ]);
     }

@@ -59,19 +59,22 @@
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 lg:p-6 rounded-lg bg-base-300/50 border border-base-300">
                     <div class="text-center sm:text-left">
                         <div class="text-xs text-base-content/70 mb-1">Mean</div>
-                        <div class="text-2xl font-bold">{!! format_event_value_display($metric->mean_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
+                        <div class="text-2xl font-bold">{{ number_format($metric->mean_value, 2) }}</div>
+                        <div class="text-xs text-base-content/70">{{ $metric->value_unit }}</div>
                     </div>
 
                     <div class="text-center sm:text-left">
                         <div class="text-xs text-base-content/70 mb-1">Std Dev</div>
-                        <div class="text-2xl font-bold">±{!! format_event_value_display($metric->stddev_value, $metric->value_unit, $metric->service, $metric->action) !!}</div>
+                        <div class="text-2xl font-bold">{{ number_format($metric->stddev_value, 2) }}</div>
+                        <div class="text-xs text-base-content/70">±{{ $metric->value_unit }}</div>
                     </div>
 
                     <div class="text-center sm:text-left">
                         <div class="text-xs text-base-content/70 mb-1">Range</div>
                         <div class="text-xl font-bold">
-                            {!! format_event_value_display($metric->min_value, $metric->value_unit, $metric->service, $metric->action) !!} - {!! format_event_value_display($metric->max_value, $metric->value_unit, $metric->service, $metric->action) !!}
+                            {{ number_format($metric->min_value, 1) }} - {{ number_format($metric->max_value, 1) }}
                         </div>
+                        <div class="text-xs text-base-content/70">{{ $metric->value_unit }}</div>
                     </div>
 
                     <div class="text-center sm:text-left">
@@ -84,16 +87,40 @@
         </div>
     </x-card>
 
-    {{-- Chart --}}
+    {{-- Chart Controls --}}
     <div class="card bg-base-200 shadow">
         <div class="card-body">
-            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="o-chart-bar" class="w-5 h-5 text-primary" />
-                Metric Trend
-            </h3>
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex gap-2">
+                    <select wire:model.live="timeRange" class="select select-bordered select-sm">
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="365">Last Year</option>
+                    </select>
+                </div>
 
-            <div class="min-h-[350px]">
-                <livewire:charts.metric-chart :metric="$metric" wire:lazy :key="'metric-chart-' . $metric->id" />
+                <div class="flex flex-wrap gap-2">
+                    <label class="label cursor-pointer gap-2">
+                        <input type="checkbox" wire:model.live="showNormalRange" class="checkbox checkbox-sm" />
+                        <span class="label-text text-xs">Normal Range</span>
+                    </label>
+
+                    <label class="label cursor-pointer gap-2">
+                        <input type="checkbox" wire:model.live="showAnomalies" class="checkbox checkbox-sm" />
+                        <span class="label-text text-xs">Anomalies</span>
+                    </label>
+
+                    <label class="label cursor-pointer gap-2">
+                        <input type="checkbox" wire:model.live="showMovingAverage" class="checkbox checkbox-sm" />
+                        <span class="label-text text-xs">Moving Average</span>
+                    </label>
+                </div>
+            </div>
+
+            {{-- Chart --}}
+            <div class="mt-4">
+                <canvas id="metricChart" height="100" data-labels='{{ json_encode($chartLabels) }}' data-data='{{ json_encode($chartData) }}' data-mean='{{ $metric->mean_value }}' data-lower='{{ $metric->normal_lower_bound }}' data-upper='{{ $metric->normal_upper_bound }}' data-show-normal='{{ $showNormalRange ? 1 : 0 }}'></canvas>
             </div>
         </div>
     </div>
@@ -116,7 +143,7 @@
 
                                 <div>
                                     <div class="font-semibold">
-                                        {!! format_event_value_display($anomaly->current_value, $metric->value_unit, $metric->service, $metric->action) !!}
+                                        {{ number_format($anomaly->current_value, 2) }} {{ $metric->value_unit }}
                                     </div>
                                     <div class="text-sm text-gray-500">
                                         {{ $anomaly->detected_at->format('M j, Y') }} •
@@ -165,8 +192,8 @@
                                         change
                                     </div>
                                     <div class="text-xs text-gray-500">
-                                        {!! format_event_value_display($trend->baseline_value, $metric->value_unit, $metric->service, $metric->action) !!} →
-                                        {!! format_event_value_display($trend->current_value, $metric->value_unit, $metric->service, $metric->action) !!}
+                                        {{ number_format($trend->baseline_value, 1) }} →
+                                        {{ number_format($trend->current_value, 1) }} {{ $metric->value_unit }}
                                     </div>
                                 </div>
                             </div>
@@ -201,4 +228,111 @@
         </div>
     @endif
 
+    @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script>
+            document.addEventListener('livewire:init', () => {
+                let chart = null;
+
+                function renderChart() {
+                    const ctx = document.getElementById('metricChart');
+                    if (!ctx) return;
+
+                    const labels = JSON.parse(ctx.dataset.labels || '[]');
+                    const data = JSON.parse(ctx.dataset.data || '[]');
+                    const mean = parseFloat(ctx.dataset.mean || '0');
+                    const lowerBound = parseFloat(ctx.dataset.lower || '0');
+                    const upperBound = parseFloat(ctx.dataset.upper || '0');
+
+                    // Destroy existing chart
+                    if (chart) {
+                        chart.destroy();
+                    }
+
+                    // Prepare datasets
+                    const datasets = [{
+                        label: '{{ $metric->getDisplayName() }}',
+                        data: data,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1,
+                        fill: false
+                    }];
+
+                    // Optionally include normal range lines if enabled
+                    if (parseInt(ctx.dataset.showNormal || '0', 10) === 1) {
+                        datasets.push({
+                            label: 'Normal Upper Bound',
+                            data: labels.map(() => upperBound),
+                            borderColor: 'rgba(255, 99, 132, 0.5)',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+
+                        datasets.push({
+                            label: 'Normal Lower Bound',
+                            data: labels.map(() => lowerBound),
+                            borderColor: 'rgba(54, 162, 235, 0.5)',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom'
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) +
+                                                ' {{ $metric->value_unit }}';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    title: {
+                                        display: true,
+                                        text: '{{ $metric->value_unit }}'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                renderChart();
+
+                // Re-render chart when Livewire updates
+                Livewire.hook('morph.updated', () => {
+                    setTimeout(renderChart, 100);
+                });
+            });
+        </script>
+    @endpush
 </div>

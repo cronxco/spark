@@ -108,6 +108,12 @@ class StartIntegrationMigration implements ShouldQueue
                 return;
             }
 
+            if ($service === 'google-calendar') {
+                $this->startGoogleCalendar();
+
+                return;
+            }
+
             $this->updateProgress('failed', 'Unsupported service', 0, [
                 'service' => $service,
                 'integration_id' => $this->integration->id,
@@ -535,6 +541,103 @@ class StartIntegrationMigration implements ShouldQueue
         Bus::chain([
             new FetchIntegrationPage($this->integration, $context),
         ])->onConnection('redis')->onQueue('migration')->dispatch();
+    }
+
+    protected function startGoogleCalendar(): void
+    {
+        $instanceType = $this->integration->instance_type ?: 'events';
+
+        $this->updateProgress('configuring', 'Configuring Google Calendar migration...', 20, [
+            'service' => 'google-calendar',
+            'instance_type' => $instanceType,
+        ]);
+
+        // Track migration start time for statistics
+        $this->integration->update([
+            'configuration->migration_started_at' => now()->toIso8601String(),
+        ]);
+
+        // Google Calendar uses incremental sync with syncToken
+        // For migration, we'll do a full sync with the configured time window
+        $config = $this->integration->configuration ?? [];
+        $syncDaysPast = (int) ($config['sync_days_past'] ?? 7);
+        $syncDaysFuture = (int) ($config['sync_days_future'] ?? 30);
+
+        // Clear any existing sync token to force full sync during migration
+        if (isset($config['sync_token'])) {
+            $config['sync_token'] = null;
+            $this->integration->update(['configuration' => $config]);
+        }
+
+        $this->updateProgress('fetching', 'Starting Google Calendar data fetch...', 30, [
+            'service' => 'google-calendar',
+            'instance_type' => $instanceType,
+            'sync_days_past' => $syncDaysPast,
+            'sync_days_future' => $syncDaysFuture,
+        ]);
+
+        // For Google Calendar, we can directly trigger the pull and process
+        // since it's a simple API call without complex pagination
+        $plugin = PluginRegistry::getPlugin('google-calendar');
+        if ($plugin) {
+            try {
+                $pluginInstance = new $plugin;
+                $rawData = $pluginInstance->pullEventData($this->integration);
+
+                $this->updateProgress('processing', 'Processing Google Calendar events...', 60, [
+                    'service' => 'google-calendar',
+                    'instance_type' => $instanceType,
+                    'events_count' => count($rawData['events'] ?? []),
+                ]);
+
+                if (! empty($rawData['events'])) {
+                    $pluginInstance->processEventData($this->integration, $rawData);
+                }
+
+                $this->updateProgress('completed', 'Google Calendar migration completed successfully', 100, [
+                    'service' => 'google-calendar',
+                    'instance_type' => $instanceType,
+                    'events_processed' => count($rawData['events'] ?? []),
+                ]);
+
+                // Mark as completed
+                if ($this->progressRecord) {
+                    $this->progressRecord->markCompleted([
+                        'service' => 'google-calendar',
+                        'instance_type' => $instanceType,
+                        'events_processed' => count($rawData['events'] ?? []),
+                    ]);
+                }
+
+                // Unpause the integration after successful migration
+                static::unpauseAfterMigration($this->integration);
+
+                Log::info('Google Calendar migration completed successfully', [
+                    'integration_id' => $this->integration->id,
+                    'instance_type' => $instanceType,
+                    'events_processed' => count($rawData['events'] ?? []),
+                ]);
+            } catch (Throwable $e) {
+                Log::error('Google Calendar migration failed', [
+                    'integration_id' => $this->integration->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->markFailed($e->getMessage(), [
+                    'service' => 'google-calendar',
+                    'instance_type' => $instanceType,
+                ]);
+
+                throw $e;
+            }
+        } else {
+            $errorMessage = 'Google Calendar plugin not found';
+            Log::error($errorMessage, [
+                'integration_id' => $this->integration->id,
+            ]);
+
+            $this->markFailed($errorMessage);
+        }
     }
 
     /**
