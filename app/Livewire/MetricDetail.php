@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Jobs\CalculateMetricStatisticsJob;
+use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use Illuminate\Support\Facades\Auth;
@@ -97,6 +98,20 @@ class MetricDetail extends Component
         // Prepare chart data
         $chartLabels = [];
         $chartData = [];
+
+        // Get events for the selected time range
+        $events = Event::where('service', $this->metric->service)
+            ->where('action', $this->metric->action)
+            ->where('value_unit', $this->metric->value_unit)
+            ->where('time', '>=', now()->subDays($this->timeRange))
+            ->orderBy('time')
+            ->get();
+
+        // Populate chart data
+        foreach ($events as $event) {
+            $chartLabels[] = $event->time->format('M j');
+            $chartData[] = $event->value;
+        }
 
         return view('livewire.metric-detail', [
             'anomalies' => $trends['anomalies'] ?? collect(),
