@@ -17,9 +17,8 @@ class EditObject extends Component
 
     public function mount(EventObject $object): void
     {
-        // Ensure user owns this object through integration
-        $integration = $object->integration;
-        if (! $integration || $integration->user_id !== Auth::id()) {
+        // Ensure user owns this object
+        if ($object->user_id !== Auth::id()) {
             abort(403);
         }
 

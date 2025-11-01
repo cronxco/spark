@@ -290,7 +290,7 @@
                                         @endif
                                     </div>
                                     @else
-                                    <div class="text-2xl font-medium text-base-content/50 my-2">
+                                    <div class="text-2xl font-medium text-base-content/40 my-2">
                                         No balance
                                     </div>
                                     @endif
@@ -497,7 +497,7 @@
                     @endif
                 </span>
                 @else
-                <span class="text-base-content/50">No balance</span>
+                <span class="text-base-content/40">No balance</span>
                 @endif
                 @endscope
 

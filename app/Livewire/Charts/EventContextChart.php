@@ -34,11 +34,11 @@ class EventContextChart extends Component
             ->whereBetween('time', [$startDate, $endDate])
             ->whereNotNull('value')
             ->orderBy('time')
-            ->get(['time', 'value', 'id'])
+            ->get(['time', 'value', 'value_multiplier', 'id'])
             ->map(fn ($e) => [
                 'date' => $e->time->format('Y-m-d'),
                 'datetime' => $e->time->format('d/m/Y H:i'),
-                'value' => (float) $e->value,
+                'value' => (float) $e->formatted_value,
                 'id' => (string) $e->id,
                 'isCurrent' => $e->id === $this->event->id,
             ])
