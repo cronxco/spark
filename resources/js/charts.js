@@ -31,55 +31,97 @@ Chart.register(
 export function getThemeColors() {
     const style = getComputedStyle(document.documentElement);
 
-    // Helper to convert HSL to RGB
-    const hslToRgb = (hsl) => {
-        const [h, s, l] = hsl.split(" ").map((v) => parseFloat(v));
-        const a = (s * Math.min(l, 1 - l)) / 100;
-        const f = (n) => {
-            const k = (n + h / 30) % 12;
-            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-            return Math.round(255 * color);
-        };
-        return `${f(0)}, ${f(8)}, ${f(4)}`;
-    };
-
-    // Helper to convert oklch to RGB
-    const oklchToRgb = (oklch) => {
-        // For base-content, we can just extract the lightness and use it
-        // This is a simplified conversion for grayscale colors
-        const match = oklch.match(/oklch\(([\d.]+)%/);
-        if (match) {
-            const lightness = parseFloat(match[1]);
-            const value = Math.round((lightness / 100) * 255);
-            return `${value}, ${value}, ${value}`;
+    // Helper to convert hex to RGB string
+    const hexToRgb = (hex) => {
+        if (!hex) return null;
+        // Remove # if present
+        hex = hex.trim().replace("#", "");
+        if (hex.length === 3) {
+            // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+            hex = hex
+                .split("")
+                .map((c) => c + c)
+                .join("");
         }
-        // Fallback for hex colors or other formats
-        const hex = style.getPropertyValue("--color-base-content").trim();
-        if (hex.startsWith("#")) {
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
+        if (hex.length === 6) {
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
             return `${r}, ${g}, ${b}`;
         }
-        // Default fallback
-        return "128, 128, 128";
+        return null;
     };
 
-    const baseContent =
-        style.getPropertyValue("--bc").trim() ||
-        oklchToRgb(style.getPropertyValue("--color-base-content"));
+    // Helper to get color from CSS variable (supports hex and rgb)
+    const getColorValue = (varName) => {
+        const value = style.getPropertyValue(varName).trim();
+        if (!value) return null;
+
+        // If it's already rgb/rgba, extract the values
+        if (value.startsWith("rgb")) {
+            const match = value.match(/\d+/g);
+            if (match && match.length >= 3) {
+                return `${match[0]}, ${match[1]}, ${match[2]}`;
+            }
+        }
+
+        // If it's hex, convert it
+        if (value.startsWith("#")) {
+            return hexToRgb(value);
+        }
+
+        // Try as HSL (for daisyUI compatibility)
+        const hslMatch = value.match(
+            /^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%?\s+(\d+(?:\.\d+)?)%?$/,
+        );
+        if (hslMatch) {
+            const [, h, s, l] = hslMatch.map(parseFloat);
+            const a = (s * Math.min(l, 100 - l)) / 10000;
+            const f = (n) => {
+                const k = (n + h / 30) % 12;
+                const color =
+                    l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color);
+            };
+            return `${f(0)}, ${f(8)}, ${f(4)}`;
+        }
+
+        return null;
+    };
 
     return {
-        primary: hslToRgb(style.getPropertyValue("--p")),
-        secondary: hslToRgb(style.getPropertyValue("--s")),
-        accent: hslToRgb(style.getPropertyValue("--a")),
-        success: hslToRgb(style.getPropertyValue("--su")),
-        warning: hslToRgb(style.getPropertyValue("--wa")),
-        error: hslToRgb(style.getPropertyValue("--er")),
-        info: hslToRgb(style.getPropertyValue("--in")),
-        baseContent: baseContent.includes(",")
-            ? baseContent
-            : hslToRgb(baseContent),
+        primary:
+            getColorValue("--color-primary") ||
+            getColorValue("--p") ||
+            "255, 191, 0",
+        secondary:
+            getColorValue("--color-secondary") ||
+            getColorValue("--s") ||
+            "128, 128, 128",
+        accent:
+            getColorValue("--color-accent") ||
+            getColorValue("--a") ||
+            "255, 191, 0",
+        success:
+            getColorValue("--color-success") ||
+            getColorValue("--su") ||
+            "0, 128, 0",
+        warning:
+            getColorValue("--color-warning") ||
+            getColorValue("--wa") ||
+            "255, 165, 0",
+        error:
+            getColorValue("--color-error") ||
+            getColorValue("--er") ||
+            "255, 0, 0",
+        info:
+            getColorValue("--color-info") ||
+            getColorValue("--in") ||
+            "0, 128, 255",
+        baseContent:
+            getColorValue("--color-base-content") ||
+            getColorValue("--bc") ||
+            "245, 245, 245",
     };
 }
 

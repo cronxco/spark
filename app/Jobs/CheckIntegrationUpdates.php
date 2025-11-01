@@ -7,6 +7,7 @@ use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
 use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
+use App\Jobs\OAuth\GoogleCalendar\GoogleCalendarEventsPull;
 use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
 use App\Jobs\OAuth\Karakeep\KarakeepBookmarksPull;
 use App\Jobs\OAuth\Monzo\MonzoAccountPull;
@@ -220,6 +221,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             'hevy' => $this->getHevyFetchJobs($integration),
             'outline' => $this->getOutlineFetchJobs($integration),
             'karakeep' => $this->getKarakeepFetchJobs($integration),
+            'google-calendar' => $this->getGoogleCalendarFetchJobs($integration),
             // Add other services here as they are implemented
             default => [],
         };
@@ -339,6 +341,16 @@ class CheckIntegrationUpdates implements ShouldQueue
 
         return match ($instanceType) {
             'bookmarks' => [KarakeepBookmarksPull::class],
+            default => [],
+        };
+    }
+
+    private function getGoogleCalendarFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'events';
+
+        return match ($instanceType) {
+            'events' => [GoogleCalendarEventsPull::class],
             default => [],
         };
     }

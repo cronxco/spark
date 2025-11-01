@@ -14,6 +14,14 @@ class MetricDetail extends Component
 {
     public MetricStatistic $metric;
 
+    public int $timeRange = 30;
+
+    public bool $showNormalRange = true;
+
+    public bool $showAnomalies = true;
+
+    public bool $showMovingAverage = false;
+
     public function mount(MetricStatistic $metric): void
     {
         // Ensure user owns this metric
@@ -86,10 +94,17 @@ class MetricDetail extends Component
             $this->metric->value_unit
         );
 
+        // Prepare chart data
+        $chartLabels = [];
+        $chartData = [];
+
         return view('livewire.metric-detail', [
             'anomalies' => $trends['anomalies'] ?? collect(),
             'detectedTrends' => $trends['trends'] ?? collect(),
             'isTrackingDisabled' => $isTrackingDisabled,
+            'chartLabels' => $chartLabels,
+            'chartData' => $chartData,
+            'showNormalRange' => $this->showNormalRange,
         ]);
     }
 

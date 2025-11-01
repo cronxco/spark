@@ -21,6 +21,10 @@ use Throwable;
 
 class GoogleCalendarPlugin extends OAuthPlugin
 {
+    protected string $baseUrl = 'https://www.googleapis.com/calendar/v3';
+
+    protected string $authUrl = 'https://accounts.google.com/o/oauth2/v2';
+
     protected string $clientId;
 
     protected string $clientSecret;
@@ -60,33 +64,49 @@ class GoogleCalendarPlugin extends OAuthPlugin
             'calendar_id' => [
                 'type' => 'string',
                 'label' => 'Calendar ID',
-                'description' => 'The Google Calendar ID to sync',
+                'description' => 'The Google Calendar ID to sync (e.g., primary or specific calendar ID)',
                 'required' => true,
             ],
             'calendar_name' => [
                 'type' => 'string',
                 'label' => 'Calendar Name',
-                'description' => 'Display name of the calendar',
+                'description' => 'Display name for the calendar',
                 'required' => false,
             ],
             'update_frequency_minutes' => [
                 'type' => 'integer',
                 'label' => 'Update Frequency (minutes)',
-                'description' => 'How often to check for calendar updates (minimum 5 minutes)',
+                'description' => 'How often to check for new events (minimum 5 minutes)',
                 'required' => true,
                 'min' => 5,
                 'default' => 15,
             ],
+            'sync_days_past' => [
+                'type' => 'integer',
+                'label' => 'Sync Days (Past)',
+                'description' => 'How many days in the past to sync events',
+                'required' => false,
+                'min' => 1,
+                'default' => 7,
+            ],
+            'sync_days_future' => [
+                'type' => 'integer',
+                'label' => 'Sync Days (Future)',
+                'description' => 'How many days in the future to sync events',
+                'required' => false,
+                'min' => 1,
+                'default' => 30,
+            ],
             'title_include_patterns' => [
                 'type' => 'array',
-                'label' => 'Include Patterns',
-                'description' => 'Regex patterns for event titles to include (OR logic). Leave empty to include all.',
+                'label' => 'Title Include Patterns (Regex)',
+                'description' => 'Only sync events whose titles match these patterns (OR logic if multiple)',
                 'required' => false,
             ],
             'title_exclude_patterns' => [
                 'type' => 'array',
-                'label' => 'Exclude Patterns',
-                'description' => 'Regex patterns for event titles to exclude',
+                'label' => 'Title Exclude Patterns (Regex)',
+                'description' => 'Exclude events whose titles match these patterns',
                 'required' => false,
             ],
         ];
@@ -131,6 +151,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'description' => 'A timed calendar event',
                 'display_with_object' => true,
                 'value_unit' => 'minutes',
+                'value_formatter' => '{{ format_duration($value * 60) }}',
                 'hidden' => false,
             ],
             'had_all_day_event' => [
@@ -139,6 +160,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'description' => 'An all-day calendar event',
                 'display_with_object' => true,
                 'value_unit' => 'minutes',
+                'value_formatter' => '{{ format_duration($value * 60) }}',
                 'hidden' => false,
             ],
         ];
@@ -158,7 +180,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
             'event_attendees' => [
                 'icon' => 'o-user-group',
                 'display_name' => 'Attendees',
-                'description' => 'Event attendees and responses',
+                'description' => 'Event attendees and their responses',
                 'display_with_object' => true,
                 'value_unit' => null,
                 'hidden' => false,
@@ -202,7 +224,8 @@ class GoogleCalendarPlugin extends OAuthPlugin
         $csrfToken = Str::random(32);
 
         // Store CSRF token in session for validation
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        // Use only group_id in the key to avoid session_id mismatch issues
+        $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -220,11 +243,11 @@ class GoogleCalendarPlugin extends OAuthPlugin
             'state' => $state,
             'code_challenge' => $codeChallenge,
             'code_challenge_method' => 'S256',
-            'access_type' => 'offline', // Request refresh token
-            'prompt' => 'consent', // Force consent to get refresh token
+            'access_type' => 'offline',
+            'prompt' => 'consent',
         ];
 
-        return 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+        return $this->authUrl . '/auth?' . http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -281,11 +304,22 @@ class GoogleCalendarPlugin extends OAuthPlugin
             throw new Exception('Missing code verifier');
         }
 
+        // Log the API request
+        $this->logApiRequest('POST', '/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->redirectUri,
+            'code_verifier' => '[REDACTED]',
+        ]);
+
         // Exchange code for tokens with PKCE
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST https://oauth2.googleapis.com/token'));
-        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+        $tokenEndpoint = 'https://oauth2.googleapis.com/token';
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $tokenEndpoint));
+        $response = Http::asForm()->post($tokenEndpoint, [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'code' => $code,
@@ -294,6 +328,9 @@ class GoogleCalendarPlugin extends OAuthPlugin
             'code_verifier' => $codeVerifier,
         ]);
         $span?->finish();
+
+        // Log the API response
+        $this->logApiResponse('POST', '/token', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Google Calendar token exchange failed', [
@@ -321,20 +358,8 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 : null,
         ]);
 
-        // Fetch primary calendar email as account_id
+        // Fetch account information
         $this->fetchAccountInfoForGroup($group);
-    }
-
-    public function fetchData(Integration $integration): void
-    {
-        // This method is not directly used - we use pullEventData instead
-        // But kept for compatibility with base class expectations
-    }
-
-    public function convertData(array $externalData, Integration $integration): array
-    {
-        // This method is not used for OAuth plugins
-        return [];
     }
 
     /**
@@ -347,52 +372,38 @@ class GoogleCalendarPlugin extends OAuthPlugin
             $this->refreshToken($group);
         }
 
-        try {
-            $hub = SentrySdk::getCurrentHub();
-            $parentSpan = $hub->getSpan();
-            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET calendar/v3/users/me/calendarList'));
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/users/me/calendarList'));
 
-            $response = Http::withToken($group->access_token)
-                ->get('https://www.googleapis.com/calendar/v3/users/me/calendarList');
+        $response = Http::withToken($group->access_token)
+            ->get($this->baseUrl . '/users/me/calendarList');
+        $span?->finish();
 
-            $span?->finish();
-
-            if (! $response->successful()) {
-                Log::error('Failed to fetch calendar list', [
-                    'group_id' => $group->id,
-                    'status' => $response->status(),
-                    'response' => $response->body(),
-                ]);
-
-                return [];
-            }
-
-            $data = $response->json();
-            $calendars = [];
-
-            foreach ($data['items'] ?? [] as $calendar) {
-                $calendars[] = [
-                    'id' => $calendar['id'],
-                    'name' => $calendar['summary'] ?? 'Unnamed Calendar',
-                    'description' => $calendar['description'] ?? null,
-                    'primary' => $calendar['primary'] ?? false,
-                    'access_role' => $calendar['accessRole'] ?? null,
-                ];
-            }
-
-            return $calendars;
-        } catch (Exception $e) {
-            Log::error('Exception fetching calendar list', [
+        if (! $response->successful()) {
+            Log::warning('Failed to fetch calendar list', [
                 'group_id' => $group->id,
-                'error' => $e->getMessage(),
+                'status' => $response->status(),
             ]);
 
             return [];
         }
+
+        $calendars = [];
+        foreach ($response->json()['items'] ?? [] as $calendar) {
+            $calendars[] = [
+                'id' => $calendar['id'],
+                'name' => $calendar['summary'] ?? 'Unnamed Calendar',
+                'primary' => $calendar['primary'] ?? false,
+                'access_role' => $calendar['accessRole'] ?? null,
+            ];
+        }
+
+        return $calendars;
     }
 
     /**
-     * Pull event data for fetch jobs
+     * Pull event data for pull jobs
      */
     public function pullEventData(Integration $integration): array
     {
@@ -400,317 +411,134 @@ class GoogleCalendarPlugin extends OAuthPlugin
         $calendarId = $config['calendar_id'] ?? null;
 
         if (! $calendarId) {
-            Log::error('Google Calendar: No calendar_id configured', [
+            Log::warning('Google Calendar integration missing calendar_id', [
                 'integration_id' => $integration->id,
             ]);
 
-            return [
-                'events' => [],
-                'current_event_ids' => [],
-                'fetched_at' => now()->toISOString(),
-            ];
+            return [];
+        }
+
+        $group = $integration->group;
+        if (! $group) {
+            Log::error('Google Calendar integration missing group', [
+                'integration_id' => $integration->id,
+            ]);
+
+            return [];
         }
 
         // Ensure token is fresh
-        $group = $integration->group;
         if ($group->expiry && $group->expiry->isPast()) {
             $this->refreshToken($group);
         }
 
-        // Fetch events from 7 days past to 30 days future
-        $startDate = now()->subDays(7)->startOfDay();
-        $endDate = now()->addDays(30)->endOfDay();
+        $syncDaysPast = (int) ($config['sync_days_past'] ?? 7);
+        $syncDaysFuture = (int) ($config['sync_days_future'] ?? 30);
+        $syncToken = $config['sync_token'] ?? null;
 
-        try {
-            $hub = SentrySdk::getCurrentHub();
-            $parentSpan = $hub->getSpan();
-            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET calendar/v3/calendars/events'));
+        $params = [
+            'singleEvents' => 'true',
+            'orderBy' => 'startTime',
+            'maxResults' => 2500,
+        ];
 
-            $params = [
-                'timeMin' => $startDate->toIso8601String(),
-                'timeMax' => $endDate->toIso8601String(),
-                'singleEvents' => true, // Expand recurring events into instances
-                'orderBy' => 'startTime',
-                'maxResults' => 2500,
-            ];
+        // Use syncToken for incremental sync if available
+        if ($syncToken) {
+            $params['syncToken'] = $syncToken;
+            Log::info('Using syncToken for incremental sync', [
+                'integration_id' => $integration->id,
+            ]);
+        } else {
+            // Full sync with time window
+            $params['timeMin'] = now()->subDays($syncDaysPast)->toIso8601String();
+            $params['timeMax'] = now()->addDays($syncDaysFuture)->toIso8601String();
+            Log::info('Performing full sync', [
+                'integration_id' => $integration->id,
+                'time_min' => $params['timeMin'],
+                'time_max' => $params['timeMax'],
+            ]);
+        }
 
-            $response = Http::withToken($group->access_token)
-                ->get("https://www.googleapis.com/calendar/v3/calendars/{$calendarId}/events", $params);
+        $this->logApiRequest('GET', "/calendars/{$calendarId}/events", [
+            'Authorization' => '[REDACTED]',
+        ], $params, $integration->id);
 
-            $span?->finish();
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . "/calendars/{$calendarId}/events"));
 
-            if (! $response->successful()) {
-                Log::error('Failed to fetch calendar events', [
+        $response = Http::withToken($group->access_token)
+            ->get($this->baseUrl . "/calendars/{$calendarId}/events", $params);
+        $span?->finish();
+
+        $this->logApiResponse('GET', "/calendars/{$calendarId}/events", $response->status(), $response->body(), $response->headers(), $integration->id);
+
+        if (! $response->successful()) {
+            // If syncToken is invalid (410 Gone), clear it and retry with full sync
+            if ($response->status() === 410 && $syncToken) {
+                Log::warning('SyncToken expired, performing full sync', [
                     'integration_id' => $integration->id,
-                    'calendar_id' => $calendarId,
-                    'status' => $response->status(),
-                    'response' => $response->body(),
                 ]);
 
-                return [
-                    'events' => [],
-                    'current_event_ids' => [],
-                    'fetched_at' => now()->toISOString(),
-                ];
+                // Clear syncToken and retry
+                $config['sync_token'] = null;
+                $integration->update(['configuration' => $config]);
+
+                return $this->pullEventData($integration);
             }
 
-            $data = $response->json();
-            $events = [];
-            $currentEventIds = [];
-
-            foreach ($data['items'] ?? [] as $event) {
-                // Skip cancelled events
-                if (($event['status'] ?? null) === 'cancelled') {
-                    continue;
-                }
-
-                $events[] = $event;
-                $currentEventIds[] = $event['id'];
-            }
-
-            Log::info('Google Calendar: Fetched events', [
+            Log::warning('Failed to fetch Google Calendar events', [
                 'integration_id' => $integration->id,
-                'calendar_id' => $calendarId,
-                'event_count' => count($events),
+                'status' => $response->status(),
+                'response' => $response->body(),
             ]);
 
-            return [
-                'events' => $events,
-                'current_event_ids' => $currentEventIds,
-                'fetched_at' => now()->toISOString(),
-                'start_date' => $startDate->toISOString(),
-                'end_date' => $endDate->toISOString(),
-            ];
-        } catch (Exception $e) {
-            Log::error('Exception fetching calendar events', [
+            return [];
+        }
+
+        $data = $response->json();
+
+        // Store new syncToken for next incremental sync
+        if (isset($data['nextSyncToken'])) {
+            $config['sync_token'] = $data['nextSyncToken'];
+            $integration->update(['configuration' => $config]);
+            Log::info('Stored new syncToken', [
                 'integration_id' => $integration->id,
-                'error' => $e->getMessage(),
             ]);
-
-            return [
-                'events' => [],
-                'current_event_ids' => [],
-                'fetched_at' => now()->toISOString(),
-            ];
         }
+
+        return [
+            'events' => $data['items'] ?? [],
+            'calendar_id' => $calendarId,
+            'calendar_name' => $config['calendar_name'] ?? $calendarId,
+            'sync_window' => [
+                'time_min' => $params['timeMin'] ?? null,
+                'time_max' => $params['timeMax'] ?? null,
+            ],
+        ];
     }
 
     /**
-     * Process event data
+     * Process event data for processing jobs
      */
-    public function processEventData(Integration $integration, array $eventData): void
+    public function processEventData(Integration $integration, array $rawData): void
     {
-        $config = $integration->configuration ?? [];
-        $calendarId = $config['calendar_id'] ?? null;
+        $events = $rawData['events'] ?? [];
+        $calendarId = $rawData['calendar_id'] ?? null;
+        $calendarName = $rawData['calendar_name'] ?? $calendarId;
+        $syncWindow = $rawData['sync_window'] ?? [];
 
-        $events = $eventData['events'] ?? [];
-        $currentEventIds = $eventData['current_event_ids'] ?? [];
-        $startDate = isset($eventData['start_date']) ? Carbon::parse($eventData['start_date']) : now()->subDays(7)->startOfDay();
-        $endDate = isset($eventData['end_date']) ? Carbon::parse($eventData['end_date']) : now()->addDays(30)->endOfDay();
-
-        // Get include/exclude patterns
-        $includePatterns = $config['title_include_patterns'] ?? [];
-        $excludePatterns = $config['title_exclude_patterns'] ?? [];
-
-        $processedCount = 0;
-        $filteredCount = 0;
-
-        foreach ($events as $event) {
-            $eventTitle = $event['summary'] ?? 'Untitled Event';
-
-            // Apply filtering
-            if (! $this->shouldIncludeEvent($eventTitle, $includePatterns, $excludePatterns)) {
-                $filteredCount++;
-
-                continue;
-            }
-
-            $this->processEvent($integration, $event, $calendarId);
-            $processedCount++;
-        }
-
-        // Handle deletions - find events in our DB that are no longer in Google's response
-        $this->handleDeletedEvents($integration, $currentEventIds, $startDate, $endDate);
-
-        Log::info('Google Calendar: Completed processing events', [
-            'integration_id' => $integration->id,
-            'total_events' => count($events),
-            'processed_count' => $processedCount,
-            'filtered_count' => $filteredCount,
-        ]);
-    }
-
-    /**
-     * Check if an event should be included based on filter patterns
-     */
-    protected function shouldIncludeEvent(string $title, array $includePatterns, array $excludePatterns): bool
-    {
-        // Check exclude patterns first
-        foreach ($excludePatterns as $pattern) {
-            if (empty($pattern)) {
-                continue;
-            }
-
-            if (@preg_match($pattern, $title)) {
-                return false;
-            }
-        }
-
-        // If no include patterns, include everything (that wasn't excluded)
-        if (empty($includePatterns)) {
-            return true;
-        }
-
-        // Check include patterns (OR logic - match any)
-        foreach ($includePatterns as $pattern) {
-            if (empty($pattern)) {
-                continue;
-            }
-
-            if (@preg_match($pattern, $title)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Process a single event
-     */
-    protected function processEvent(Integration $integration, array $event, string $calendarId): void
-    {
-        $eventId = $event['id'];
-        $eventTitle = $event['summary'] ?? 'Untitled Event';
-
-        // Determine if all-day event
-        $isAllDay = isset($event['start']['date']);
-
-        // Parse start and end times
-        if ($isAllDay) {
-            $startTime = Carbon::parse($event['start']['date'])->startOfDay();
-            $endTime = Carbon::parse($event['end']['date'])->startOfDay();
-            $durationMinutes = 1440; // 24 hours
-        } else {
-            $startTime = Carbon::parse($event['start']['dateTime']);
-            $endTime = Carbon::parse($event['end']['dateTime']);
-            $durationMinutes = $startTime->diffInMinutes($endTime);
-        }
-
-        // Create unique source ID (include start time for recurring instances)
-        $sourceId = "google_calendar_{$calendarId}_{$eventId}_{$startTime->format('Y-m-d_H-i')}";
-
-        // Check if we already processed this event
-        $existingEvent = Event::where('source_id', $sourceId)
-            ->where('integration_id', $integration->id)
-            ->first();
-
-        if ($existingEvent) {
-            // Update if changed
-            $existingEvent->update([
-                'time' => $startTime,
-                'value' => $durationMinutes,
-                'event_metadata' => $this->buildEventMetadata($event),
+        if (! $calendarId) {
+            Log::warning('Missing calendar_id in raw data', [
+                'integration_id' => $integration->id,
             ]);
 
             return;
         }
 
-        // Create or update calendar object (the calendar itself)
-        $calendarObject = $this->createOrUpdateCalendar($integration);
-
-        // Create or update event object (the specific event)
-        $eventObject = $this->createOrUpdateEventObject($integration, $event);
-
-        // Create the event record
-        $eventRecord = Event::create([
-            'source_id' => $sourceId,
-            'time' => $startTime,
-            'integration_id' => $integration->id,
-            'actor_id' => $calendarObject->id,
-            'service' => 'google-calendar',
-            'domain' => self::getDomain(),
-            'action' => $isAllDay ? 'had_all_day_event' : 'had_event',
-            'value' => $durationMinutes,
-            'value_multiplier' => 1,
-            'value_unit' => 'minutes',
-            'event_metadata' => $this->buildEventMetadata($event),
-            'target_id' => $eventObject->id,
-        ]);
-
-        // Create blocks
-        $this->createEventBlocks($eventRecord, $event);
-
-        Log::info("Created event for calendar event: {$eventTitle}");
-    }
-
-    /**
-     * Handle events that were deleted from Google Calendar
-     */
-    protected function handleDeletedEvents(Integration $integration, array $currentEventIds, Carbon $startDate, Carbon $endDate): void
-    {
-        // Find events in our DB within the sync window
-        $existingEvents = Event::where('integration_id', $integration->id)
-            ->where('service', 'google-calendar')
-            ->whereBetween('time', [$startDate, $endDate])
-            ->get();
-
-        $deletedCount = 0;
-
-        foreach ($existingEvents as $event) {
-            // Extract Google event ID from source_id
-            // Format: google_calendar_{calendarId}_{eventId}_{timestamp}
-            $parts = explode('_', $event->source_id);
-            if (count($parts) < 4) {
-                continue;
-            }
-
-            $googleEventId = $parts[2]; // Third part is the event ID
-
-            // If this event ID is not in the current list, delete it
-            if (! in_array($googleEventId, $currentEventIds)) {
-                $event->delete();
-                $deletedCount++;
-            }
-        }
-
-        if ($deletedCount > 0) {
-            Log::info('Google Calendar: Deleted removed events', [
-                'integration_id' => $integration->id,
-                'deleted_count' => $deletedCount,
-            ]);
-        }
-    }
-
-    /**
-     * Build event metadata
-     */
-    protected function buildEventMetadata(array $event): array
-    {
-        return [
-            'google_event_id' => $event['id'],
-            'description' => $event['description'] ?? null,
-            'location' => $event['location'] ?? null,
-            'hangout_link' => $event['hangoutLink'] ?? null,
-            'html_link' => $event['htmlLink'] ?? null,
-            'creator' => $event['creator'] ?? null,
-            'organizer' => $event['organizer'] ?? null,
-            'status' => $event['status'] ?? null,
-            'visibility' => $event['visibility'] ?? null,
-            'recurrence' => $event['recurrence'] ?? null,
-            'recurring_event_id' => $event['recurringEventId'] ?? null,
-        ];
-    }
-
-    /**
-     * Create or update calendar object
-     */
-    protected function createOrUpdateCalendar(Integration $integration): EventObject
-    {
-        $config = $integration->configuration ?? [];
-        $calendarName = $config['calendar_name'] ?? 'Google Calendar';
-
-        return EventObject::firstOrCreate(
+        // Get or create calendar EventObject
+        // Create or find a calendar object scoped to the user. Use title/concept/type for consistency
+        $calendarObject = EventObject::firstOrCreate(
             [
                 'user_id' => $integration->user_id,
                 'concept' => 'calendar',
@@ -719,174 +547,442 @@ class GoogleCalendarPlugin extends OAuthPlugin
             ],
             [
                 'time' => now(),
-                'content' => "Google Calendar: {$calendarName}",
+                'content' => null,
                 'metadata' => [
-                    'calendar_id' => $config['calendar_id'] ?? null,
+                    'source_id' => "google_calendar_{$calendarId}",
                 ],
             ]
         );
-    }
 
-    /**
-     * Create or update event object
-     */
-    protected function createOrUpdateEventObject(Integration $integration, array $event): EventObject
-    {
-        $eventTitle = $event['summary'] ?? 'Untitled Event';
+        $config = $integration->configuration ?? [];
+        $includePatterns = $config['title_include_patterns'] ?? [];
+        $excludePatterns = $config['title_exclude_patterns'] ?? [];
 
-        return EventObject::updateOrCreate(
-            [
-                'user_id' => $integration->user_id,
-                'concept' => 'event',
-                'type' => 'calendar_event',
-                'title' => $eventTitle,
-            ],
-            [
-                'time' => now(),
-                'content' => $event['description'] ?? $eventTitle,
-                'metadata' => [
-                    'google_event_id' => $event['id'],
-                ],
-                'url' => $event['htmlLink'] ?? null,
-            ]
-        );
-    }
+        $processedEventIds = [];
 
-    /**
-     * Create blocks for an event
-     */
-    protected function createEventBlocks(Event $eventRecord, array $event): void
-    {
-        // Event details block
-        $eventRecord->createBlock([
-            'block_type' => 'event_details',
-            'time' => $eventRecord->time,
-            'title' => 'Event Details',
-            'metadata' => [
-                'description' => $event['description'] ?? null,
-                'status' => $event['status'] ?? null,
-                'visibility' => $event['visibility'] ?? null,
-                'creator' => $event['creator']['displayName'] ?? $event['creator']['email'] ?? null,
-                'organizer' => $event['organizer']['displayName'] ?? $event['organizer']['email'] ?? null,
-            ],
-            'url' => $event['htmlLink'] ?? null,
-        ]);
+        foreach ($events as $event) {
+            $eventId = $event['id'] ?? null;
+            $summary = $event['summary'] ?? 'Untitled Event';
+            $status = $event['status'] ?? 'confirmed';
 
-        // Attendees block (if there are attendees)
-        if (! empty($event['attendees'])) {
-            $attendeeList = [];
-            foreach ($event['attendees'] as $attendee) {
-                $attendeeList[] = [
-                    'email' => $attendee['email'] ?? null,
-                    'name' => $attendee['displayName'] ?? null,
-                    'response_status' => $attendee['responseStatus'] ?? null,
-                    'organizer' => $attendee['organizer'] ?? false,
-                ];
+            // Skip cancelled events
+            if ($status === 'cancelled') {
+                continue;
             }
 
-            $eventRecord->createBlock([
-                'block_type' => 'event_attendees',
-                'time' => $eventRecord->time,
-                'title' => 'Attendees',
-                'metadata' => [
-                    'attendees' => $attendeeList,
-                    'attendee_count' => count($attendeeList),
-                ],
-                'value' => count($attendeeList),
-                'value_multiplier' => 1,
-                'value_unit' => 'attendees',
-            ]);
-        }
+            if (! $eventId) {
+                continue;
+            }
 
-        // Location block (if there's a location or meet link)
-        if (! empty($event['location']) || ! empty($event['hangoutLink'])) {
-            $eventRecord->createBlock([
-                'block_type' => 'event_location',
-                'time' => $eventRecord->time,
-                'title' => 'Location',
-                'metadata' => [
+            // Apply filtering
+            if (! $this->shouldIncludeEvent($summary, $includePatterns, $excludePatterns)) {
+                continue;
+            }
+
+            // Get start and end times
+            $start = $event['start'] ?? [];
+            $end = $event['end'] ?? [];
+
+            // Determine if all-day event
+            $isAllDay = isset($start['date']);
+
+            if ($isAllDay) {
+                $startTime = Carbon::parse($start['date'])->startOfDay();
+                $endTime = Carbon::parse($end['date'])->startOfDay();
+                $durationMinutes = null;
+                $actionType = 'had_all_day_event';
+            } else {
+                $startTime = Carbon::parse($start['dateTime']);
+                $endTime = Carbon::parse($end['dateTime']);
+                $durationMinutes = $startTime->diffInMinutes($endTime);
+                $actionType = 'had_event';
+            }
+
+            // Create unique source ID with timestamp for recurring events
+            $sourceId = "google_calendar_{$calendarId}_{$eventId}_{$startTime->timestamp}";
+
+            $processedEventIds[] = $sourceId;
+
+            // Get or create event EventObject
+            // Use a user-scoped event object for the calendar event (avoid querying objects by integration_id)
+            $eventObject = EventObject::firstOrCreate(
+                [
+                    'user_id' => $integration->user_id,
+                    'concept' => 'event',
+                    'type' => 'calendar_event',
+                    'title' => $summary,
+                ],
+                [
+                    'time' => $startTime,
+                    'content' => $event['description'] ?? null,
+                    'metadata' => [
+                        'google_event_id' => $eventId,
+                        'source_id' => "google_calendar_event_{$eventId}",
+                    ],
+                ]
+            );
+
+            // Create or update Event
+            $eventData = [
+                'time' => $startTime,
+                'actor_id' => $calendarObject->id,
+                'target_id' => $eventObject->id,
+                'service' => 'google_calendar',
+                'domain' => self::getDomain(),
+                'action' => $actionType,
+                'value' => $durationMinutes,
+                'event_metadata' => array_filter([
+                    'google_event_id' => $eventId,
+                    'description' => $event['description'] ?? null,
                     'location' => $event['location'] ?? null,
                     'hangout_link' => $event['hangoutLink'] ?? null,
+                    'html_link' => $event['htmlLink'] ?? null,
+                    'creator' => $event['creator'] ?? null,
+                    'organizer' => $event['organizer'] ?? null,
+                    'status' => $status,
+                    'visibility' => $event['visibility'] ?? null,
+                    'recurrence' => $event['recurrence'] ?? null,
+                    'recurring_event_id' => $event['recurringEventId'] ?? null,
+                ], fn ($value) => $value !== null),
+            ];
+
+            // Only set value_unit for timed events
+            if (! $isAllDay) {
+                $eventData['value_unit'] = 'minutes';
+            }
+
+            $eventRecord = Event::updateOrCreate(
+                [
+                    'integration_id' => $integration->id,
+                    'source_id' => $sourceId,
                 ],
-                'url' => $event['hangoutLink'] ?? null,
-            ]);
+                $eventData
+            );
+
+            // Create blocks for event details
+            $this->createEventBlocks($eventRecord, $event, $isAllDay, $startTime, $endTime);
         }
+
+        // Handle event deletion - remove events in sync window that are no longer present
+        if (isset($syncWindow['time_min']) && isset($syncWindow['time_max'])) {
+            $this->handleEventDeletion($integration, $processedEventIds, $syncWindow);
+        }
+    }
+
+    public function fetchData(Integration $integration): void
+    {
+        // This method is called for direct data fetching
+        // For job-based syncing, use pullEventData() and processEventData() instead
+        $rawData = $this->pullEventData($integration);
+        if (! empty($rawData['events'])) {
+            $this->processEventData($integration, $rawData);
+        }
+    }
+
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        // This method is not used for OAuth plugins
+        return [];
     }
 
     protected function getRequiredScopes(): string
     {
-        return 'https://www.googleapis.com/auth/calendar.readonly';
+        return 'https://www.googleapis.com/auth/calendar';
+    }
+
+    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
+    {
+        // Ensure token is fresh
+        if ($group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+        }
+
+        // Get primary calendar to extract user email
+        $hub = SentrySdk::getCurrentHub();
+        $parentSpan = $hub->getSpan();
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/calendars/primary'));
+
+        $response = Http::withToken($group->access_token)
+            ->get($this->baseUrl . '/calendars/primary');
+        $span?->finish();
+
+        if ($response->successful()) {
+            $calendarData = $response->json();
+            $accountId = $calendarData['id'] ?? 'primary';
+
+            Log::info('Google Calendar account info fetched', [
+                'group_id' => $group->id,
+                'account_id' => $accountId,
+            ]);
+
+            $group->update(['account_id' => $accountId]);
+        } else {
+            Log::warning('Failed to fetch Google Calendar account info', [
+                'group_id' => $group->id,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+        }
     }
 
     protected function refreshToken(IntegrationGroup $group): void
     {
-        if (empty($group->refresh_token)) {
-            Log::error('Google Calendar token refresh skipped: missing refresh_token', [
+        if (! $group->refresh_token) {
+            Log::warning('Cannot refresh Google Calendar token: no refresh token available', [
                 'group_id' => $group->id,
             ]);
 
             return;
         }
 
+        Log::info('Refreshing Google Calendar access token', [
+            'group_id' => $group->id,
+        ]);
+
+        // Log the API request
+        $this->logApiRequest('POST', '/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'refresh_token',
+        ]);
+
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST https://oauth2.googleapis.com/token'));
-        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+        $tokenEndpoint = 'https://oauth2.googleapis.com/token';
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $tokenEndpoint));
+
+        $response = Http::asForm()->post($tokenEndpoint, [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
-            'refresh_token' => $group->refresh_token,
             'grant_type' => 'refresh_token',
+            'refresh_token' => $group->refresh_token,
         ]);
         $span?->finish();
 
+        // Log the API response
+        $this->logApiResponse('POST', '/token', $response->status(), $response->body(), $response->headers());
+
         if (! $response->successful()) {
-            Log::error('Google Calendar token refresh failed', [
+            Log::error('Failed to refresh Google Calendar token', [
                 'group_id' => $group->id,
-                'response' => $response->body(),
                 'status' => $response->status(),
+                'response' => $response->body(),
             ]);
-            throw new Exception('Failed to refresh token: ' . $response->body());
+
+            // Check if refresh token is invalid
+            $errorData = $response->json();
+            if (isset($errorData['error']) && $errorData['error'] === 'invalid_grant') {
+                Log::error('Google Calendar refresh token is invalid - user needs to re-authorize', [
+                    'group_id' => $group->id,
+                ]);
+                // TODO: Notify user to re-authorize
+            }
+
+            throw new Exception('Failed to refresh access token');
         }
 
         $tokenData = $response->json();
 
-        Log::info('Google Calendar token refresh successful', [
-            'group_id' => $group->id,
-            'has_access_token' => isset($tokenData['access_token']),
-            'expires_in' => $tokenData['expires_in'] ?? null,
-        ]);
-
-        $group->update([
+        // Update tokens
+        $updateData = [
             'access_token' => $tokenData['access_token'],
-            'refresh_token' => $tokenData['refresh_token'] ?? $group->refresh_token,
             'expiry' => isset($tokenData['expires_in'])
                 ? now()->addSeconds($tokenData['expires_in'])
                 : null,
+        ];
+
+        // Google may issue a new refresh token
+        if (isset($tokenData['refresh_token'])) {
+            $updateData['refresh_token'] = $tokenData['refresh_token'];
+        }
+
+        $group->update($updateData);
+
+        Log::info('Google Calendar token refreshed successfully', [
+            'group_id' => $group->id,
         ]);
     }
 
-    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
+    /**
+     * Validate CSRF token against stored session value
+     * Overrides base implementation to use consistent session key format
+     */
+    protected function validateCsrfToken(string $token, IntegrationGroup $group): bool
     {
-        // Fetch primary calendar to get user email
-        try {
-            $response = Http::withToken($group->access_token)
-                ->get('https://www.googleapis.com/calendar/v3/calendars/primary');
+        // Get the session key for this group (without session_id to avoid session regeneration issues)
+        $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
 
-            if ($response->successful()) {
-                $calendarData = $response->json();
-                $group->update([
-                    'account_id' => $calendarData['id'] ?? 'primary',
-                ]);
-            }
-        } catch (Exception $e) {
-            Log::warning('Failed to fetch account info for Google Calendar', [
+        // Retrieve stored token from session
+        $storedToken = Session::get($sessionKey);
+
+        if (! $storedToken) {
+            Log::warning('Google Calendar CSRF token not found in session', [
                 'group_id' => $group->id,
-                'error' => $e->getMessage(),
+                'session_key' => $sessionKey,
             ]);
-            // Set a default
-            $group->update([
-                'account_id' => 'primary',
+
+            return false; // No stored token found
+        }
+
+        // Compare tokens
+        $isValid = hash_equals($storedToken, $token);
+
+        // Remove the token from session after validation (one-time use)
+        if ($isValid) {
+            Session::forget($sessionKey);
+            Log::info('Google Calendar CSRF token validated and removed', [
+                'group_id' => $group->id,
             ]);
+        } else {
+            Log::warning('Google Calendar CSRF token mismatch', [
+                'group_id' => $group->id,
+            ]);
+        }
+
+        return $isValid;
+    }
+
+    /**
+     * Check if event should be included based on filtering patterns
+     */
+    protected function shouldIncludeEvent(string $title, array $includePatterns, array $excludePatterns): bool
+    {
+        // Check exclude patterns first (any match = exclude)
+        foreach ($excludePatterns as $pattern) {
+            if (@preg_match($pattern, $title)) {
+                return false;
+            }
+        }
+
+        // If include patterns specified, must match at least one
+        if (! empty($includePatterns)) {
+            foreach ($includePatterns as $pattern) {
+                if (@preg_match($pattern, $title)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Create blocks for event details
+     */
+    protected function createEventBlocks(Event $event, array $eventData, bool $isAllDay, Carbon $startTime, Carbon $endTime): void
+    {
+        // Start and end time blocks for timed events
+        if (! $isAllDay) {
+            // Extract timezone from the event data
+            $timezone = $eventData['start']['timeZone'] ?? $eventData['end']['timeZone'] ?? null;
+
+            // Start time block
+            $event->createBlock([
+                'block_type' => 'event_time',
+                'time' => $startTime,
+                'title' => 'Start Time',
+                'metadata' => array_filter([
+                    'time' => $startTime,
+                    'timezone' => $timezone,
+                ], fn ($value) => $value !== null),
+                'url' => $eventData['htmlLink'] ?? null,
+            ]);
+
+            // End time block
+            $event->createBlock([
+                'block_type' => 'event_time',
+                'time' => $endTime,
+                'title' => 'End Time',
+                'metadata' => array_filter([
+                    'time' => $endTime,
+                    'timezone' => $timezone,
+                ], fn ($value) => $value !== null),
+                'url' => $eventData['htmlLink'] ?? null,
+            ]);
+        }
+
+        // Event details block
+        $detailsMetadata = array_filter([
+            'description' => $eventData['description'] ?? null,
+            'status' => $eventData['status'] ?? null,
+            'visibility' => $eventData['visibility'] ?? null,
+            'creator' => $eventData['creator'] ?? null,
+            'organizer' => $eventData['organizer'] ?? null,
+        ], fn ($value) => $value !== null);
+
+        if (! empty($detailsMetadata)) {
+            $event->createBlock([
+                'block_type' => 'event_details',
+                'time' => $event->time,
+                'title' => 'Event Details',
+                'metadata' => $detailsMetadata,
+                'url' => $eventData['htmlLink'] ?? null,
+            ]);
+        }
+
+        // Attendees block
+        if (isset($eventData['attendees']) && ! empty($eventData['attendees'])) {
+            $attendeeCount = count($eventData['attendees']);
+            $event->createBlock([
+                'block_type' => 'event_attendees',
+                'time' => $event->time,
+                'title' => 'Attendees',
+                'metadata' => [
+                    'attendees' => $eventData['attendees'],
+                ],
+                'value' => $attendeeCount,
+                'value_unit' => 'attendees',
+                'url' => $eventData['htmlLink'] ?? null,
+            ]);
+        }
+
+        // Location block
+        $locationMetadata = array_filter([
+            'location' => $eventData['location'] ?? null,
+            'conference_data' => $eventData['conferenceData'] ?? null,
+        ], fn ($value) => $value !== null);
+
+        // Determine the best URL for the location block
+        $locationUrl = $eventData['hangoutLink'] ?? $eventData['htmlLink'] ?? null;
+
+        if (! empty($locationMetadata) || $locationUrl) {
+            $event->createBlock([
+                'block_type' => 'event_location',
+                'time' => $event->time,
+                'title' => 'Location',
+                'metadata' => $locationMetadata,
+                'url' => $locationUrl,
+            ]);
+        }
+    }
+
+    /**
+     * Handle event deletion - remove events that no longer exist in Google Calendar
+     */
+    protected function handleEventDeletion(Integration $integration, array $processedEventIds, array $syncWindow): void
+    {
+        $timeMin = Carbon::parse($syncWindow['time_min']);
+        $timeMax = Carbon::parse($syncWindow['time_max']);
+
+        // Get all events in the sync window that weren't in the current sync
+        $eventsToDelete = Event::where('integration_id', $integration->id)
+            ->where('source_id', 'like', 'google_calendar_%')
+            ->whereBetween('time', [$timeMin, $timeMax])
+            ->whereNotIn('source_id', $processedEventIds)
+            ->get();
+
+        if ($eventsToDelete->isNotEmpty()) {
+            Log::info('Deleting events no longer in Google Calendar', [
+                'integration_id' => $integration->id,
+                'count' => $eventsToDelete->count(),
+            ]);
+
+            foreach ($eventsToDelete as $event) {
+                $event->delete();
+            }
         }
     }
 }

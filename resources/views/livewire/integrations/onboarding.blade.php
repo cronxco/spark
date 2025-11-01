@@ -147,7 +147,47 @@ use Carbon\Carbon;
                         </div>
                     @endif
 
+                    <!-- Available calendars for Google Calendar -->
+                    @if (!empty($availableCalendars) && $group->service === 'google-calendar')
+                        <div class="p-4 bg-base-200 rounded-lg">
+                            <div class="mb-4">
+                                <h4 class="text-lg font-medium">{{ __('Available Calendars') }}</h4>
+                                <p class="text-sm text-base-content/70">{{ __('These calendars are available in your Google account') }}</p>
+                            </div>
 
+                            <div class="space-y-3">
+                                @if (empty($availableCalendars))
+                                    <div class="p-4 text-center bg-base-100 border border-base-300 rounded-lg">
+                                        <div class="text-base-content/70">
+                                            <div class="font-medium mb-2">No Calendars Available</div>
+                                            <div class="text-sm">Unable to fetch calendars from your Google account.</div>
+                                        </div>
+                                    </div>
+                                @else
+                                    @foreach ($availableCalendars as $calendar)
+                                        <div class="p-3 rounded-lg bg-base-100 border border-base-300">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <div class="font-medium">
+                                                        {{ $calendar['name'] }}
+                                                        @if ($calendar['primary'] ?? false)
+                                                            <span class="badge badge-primary badge-xs ml-2">Primary</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="text-sm text-base-content/70">
+                                                        ID: {{ $calendar['id'] }}
+                                                    </div>
+                                                    @if (isset($calendar['access_role']))
+                                                        <div class="text-xs text-base-content/50">Access: {{ ucfirst($calendar['access_role']) }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    @endif
 
                     @if (!empty($presets))
                         <div class="p-4 bg-base-200 rounded-lg">
@@ -256,8 +296,21 @@ use Carbon\Carbon;
                                               @error('config.'.$typeKey.'.'.$field)
                                                   <div class="text-xs text-error mt-1">{{ $message }}</div>
                                               @enderror
+                                        @elseif ($group->service === 'google-calendar' && $field === 'calendar_id' && !empty($availableCalendars))
+                                              <!-- Special handling for Google Calendar dropdown -->
+                                              <select name="config[{{ $typeKey }}][{{ $field }}]" class="select select-bordered w-full" id="calendar-id-select" data-type-key="{{ $typeKey }}">
+                                                  <option value="">{{ __('Select a calendar...') }}</option>
+                                                  @foreach ($availableCalendars as $calendar)
+                                                      <option value="{{ $calendar['id'] }}" data-calendar-name="{{ $calendar['name'] }}" @selected(old('config.'.$typeKey.'.'.$field) == $calendar['id'])>
+                                                          {{ $calendar['name'] }}@if ($calendar['primary'] ?? false) (Primary)@endif
+                                                      </option>
+                                                  @endforeach
+                                              </select>
+                                              @error('config.'.$typeKey.'.'.$field)
+                                                  <div class="text-xs text-error mt-1">{{ $message }}</div>
+                                              @enderror
                                         @else
-                                             <x-input name="config[{{ $typeKey }}][{{ $field }}]" value="{{ old('config.'.$typeKey.'.'.$field, $config['default'] ?? '') }}" />
+                                             <x-input name="config[{{ $typeKey }}][{{ $field }}]" value="{{ old('config.'.$typeKey.'.'.$field, $config['default'] ?? '') }}" @if ($group->service === 'google-calendar' && $field === 'calendar_name') id="calendar-name-input" data-type-key="{{ $typeKey }}" @endif />
                                              @if ($field === 'task_job_class' && !empty(($presets[$typeKey] ?? [])))
                                                  <div class="text-xs text-base-content/70 mt-1">Tip: Selecting a preset above will set sensible defaults. You can still override them here.</div>
                                              @endif
@@ -348,6 +401,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Google Calendar: auto-populate calendar_name when calendar_id is selected
+    const calendarSelect = document.getElementById('calendar-id-select');
+    const calendarNameInput = document.getElementById('calendar-name-input');
+
+    if (calendarSelect && calendarNameInput) {
+        calendarSelect.addEventListener('change', (e) => {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const calendarName = selectedOption.getAttribute('data-calendar-name');
+
+            if (calendarName) {
+                // Auto-populate the calendar name field
+                calendarNameInput.value = calendarName;
+            }
+        });
+    }
 });
 </script>
 

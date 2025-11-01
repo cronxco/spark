@@ -7,6 +7,16 @@ use App\Jobs\Base\BaseProcessingJob;
 
 class GoogleCalendarEventsData extends BaseProcessingJob
 {
+    public function getIntegration()
+    {
+        return $this->integration;
+    }
+
+    public function getRawData()
+    {
+        return $this->rawData;
+    }
+
     protected function getServiceName(): string
     {
         return 'google-calendar';
