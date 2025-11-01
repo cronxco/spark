@@ -3,6 +3,7 @@
 use App\Jobs\CheckIntegrationUpdates;
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
 use App\Jobs\Metrics\DetectMetricTrendsJob;
+use App\Jobs\Metrics\DetectRetrospectiveMetricAnomaliesJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -25,6 +26,12 @@ Schedule::job(new CalculateMetricStatisticsJob)
 
 // Detect metric trends daily
 Schedule::job(new DetectMetricTrendsJob)
+    ->daily()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Detect retrospective metric anomalies daily
+Schedule::job(new DetectRetrospectiveMetricAnomaliesJob)
     ->daily()
     ->withoutOverlapping()
     ->onOneServer();

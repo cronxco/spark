@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Integrations\PluginRegistry;
 use App\Jobs\Metrics\DetectMetricAnomaliesJob;
 use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -67,8 +68,27 @@ class Event extends Model
         });
 
         static::created(function ($model): void {
-            // Dispatch anomaly detection job after event is created
-            DetectMetricAnomaliesJob::dispatch($model);
+            // Check if anomaly detection should run in realtime for this integration
+            $shouldRunRealtime = true;
+
+            if ($model->integration) {
+                $plugin = PluginRegistry::getPlugin($model->service);
+                if ($plugin) {
+                    $instanceTypes = $plugin::getInstanceTypes();
+                    $instanceType = $model->integration->instance_type;
+
+                    if (isset($instanceTypes[$instanceType]['anomaly_detection_mode'])) {
+                        $mode = $instanceTypes[$instanceType]['anomaly_detection_mode'];
+                        // Only dispatch for realtime mode, skip for retrospective and disabled
+                        $shouldRunRealtime = $mode === 'realtime';
+                    }
+                }
+            }
+
+            // Dispatch anomaly detection job only if mode is realtime
+            if ($shouldRunRealtime) {
+                DetectMetricAnomaliesJob::dispatch($model);
+            }
         });
 
         static::deleted(function ($model): void {
