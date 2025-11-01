@@ -42,17 +42,17 @@ class MetricChart extends Component
             ->where('time', '>=', $startDate)
             ->whereNotNull('value')
             ->orderBy('time')
-            ->get(['time', 'value', 'id']);
+            ->get(['time', 'value', 'value_multiplier', 'id']);
 
-        // Group by date and calculate daily average
+        // Group by date and calculate daily average (using formatted values)
         $chartData = $events
             ->groupBy(fn ($e) => $e->time->format('Y-m-d'))
             ->map(fn ($dailyEvents) => [
                 'date' => $dailyEvents->first()->time->format('Y-m-d'),
-                'value' => $dailyEvents->avg('value'),
+                'value' => $dailyEvents->avg('formatted_value'),
                 'count' => $dailyEvents->count(),
-                'min' => $dailyEvents->min('value'),
-                'max' => $dailyEvents->max('value'),
+                'min' => $dailyEvents->min('formatted_value'),
+                'max' => $dailyEvents->max('formatted_value'),
             ])
             ->values();
 

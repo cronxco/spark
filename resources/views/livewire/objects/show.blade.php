@@ -35,7 +35,23 @@ new class extends Component {
 
     public function mount(EventObject $object): void
     {
-        $this->object = $object->load(['tags']);
+        Log::info('EventObject mount called', [
+            'object_id' => $object->id,
+            'user_id' => $object->user_id,
+            'auth_id' => auth()->id(),
+        ]);
+
+        try {
+            $this->object = $object->load(['tags']);
+            Log::info('EventObject mount complete');
+        } catch (\Exception $e) {
+            Log::error('EventObject mount failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
     }
 
     public function toggleSidebar(): void

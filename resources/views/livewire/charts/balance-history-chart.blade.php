@@ -57,54 +57,7 @@
             }
 
             const ctx = this.$refs.canvas.getContext('2d');
-
-            // Get theme colors from CSS variables
-            const style = getComputedStyle(document.documentElement);
-
-            // Helper to get computed color from CSS variable
-            const getColorValue = (varName) => {
-                // Create a temporary element to get the computed color
-                const temp = document.createElement('div');
-                temp.style.color = `var(${varName})`;
-                document.body.appendChild(temp);
-                const computed = getComputedStyle(temp).color;
-                document.body.removeChild(temp);
-
-                // Convert rgb/rgba to hex
-                if (computed.startsWith('rgb')) {
-                    const values = computed.match(/\d+/g);
-                    if (values && values.length >= 3) {
-                        const r = parseInt(values[0]).toString(16).padStart(2, '0');
-                        const g = parseInt(values[1]).toString(16).padStart(2, '0');
-                        const b = parseInt(values[2]).toString(16).padStart(2, '0');
-                        return `#${r}${g}${b}`;
-                    }
-                }
-
-                // If already hex, return as is
-                const direct = style.getPropertyValue(varName).trim();
-                if (direct.startsWith('#')) {
-                    return direct;
-                }
-
-                // Fallback
-                return null;
-            };
-
-            // Helper to add opacity to hex color
-            const addOpacity = (hexColor, opacity) => {
-                if (!hexColor) return 'rgba(128, 128, 128, ' + opacity + ')';
-                // Remove # if present
-                const hex = hexColor.replace('#', '');
-                // Convert opacity (0-1) to hex (00-FF)
-                const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
-                return `#${hex}${alpha}`;
-            };
-
-            const primary = getColorValue('--color-primary') || '#ffd966';
-            const error = getColorValue('--color-error') || '#e26969';
-            const baseContent = getColorValue('--color-base-content') || '#f5f5f5';
-            const base100 = getColorValue('--color-base-100') || '#011627';
+            const colors = window.chartUtils.getThemeColors();
 
             // Check if any balances are negative
             const hasNegative = data.some(d => d.balance < 0);
@@ -116,14 +69,14 @@
                     datasets: [{
                         label: 'Balance',
                         data: data.map(d => d.balance),
-                        borderColor: primary,
+                        borderColor: `rgb(${colors.primary})`,
                         borderWidth: 2,
                         tension: 0.4,
                         fill: false,
                         pointRadius: 4,
                         pointHoverRadius: 6,
-                        pointBackgroundColor: data.map(d => d.balance < 0 ? error : primary),
-                        pointBorderColor: data.map(d => d.balance < 0 ? error : primary),
+                        pointBackgroundColor: data.map(d => d.balance < 0 ? `rgb(${colors.error})` : `rgb(${colors.primary})`),
+                        pointBorderColor: data.map(d => d.balance < 0 ? `rgb(${colors.error})` : `rgb(${colors.primary})`),
                         pointBorderWidth: 2,
                         segment: {
                             borderColor: ctx => {
@@ -131,9 +84,9 @@
                                 const prevBalance = data[ctx.p0DataIndex]?.balance;
                                 const currBalance = data[ctx.p1DataIndex]?.balance;
                                 if (prevBalance < 0 || currBalance < 0) {
-                                    return error;
+                                    return `rgb(${colors.error})`;
                                 }
-                                return primary;
+                                return `rgb(${colors.primary})`;
                             }
                         }
                     }]
@@ -149,13 +102,7 @@
                     },
                     plugins: {
                         tooltip: {
-                            backgroundColor: base100,
-                            titleColor: baseContent,
-                            bodyColor: baseContent,
-                            borderColor: primary,
-                            borderWidth: 2,
-                            padding: 12,
-                            cornerRadius: 8,
+                            backgroundColor: `rgba(${colors.primary}, 0.9)`,
                             callbacks: {
                                 title: (items) => {
                                     const index = items[0].dataIndex;
@@ -185,16 +132,16 @@
                                 },
                                 color: (context) => {
                                     // Color negative values in red
-                                    return context.tick.value < 0 ? error : baseContent;
+                                    return context.tick.value < 0 ? `rgb(${colors.error})` : `rgba(${colors.baseContent}, 0.7)`;
                                 }
                             },
                             grid: {
                                 color: (context) => {
                                     // Highlight the zero line
                                     if (context.tick.value === 0 && hasNegative) {
-                                        return addOpacity(baseContent, 0.3);
+                                        return `rgba(${colors.baseContent}, 0.3)`;
                                     }
-                                    return addOpacity(baseContent, 0.1);
+                                    return `rgba(${colors.baseContent}, 0.1)`;
                                 },
                                 lineWidth: (context) => {
                                     if (context.tick.value === 0 && hasNegative) {
@@ -208,10 +155,10 @@
                             ticks: {
                                 maxRotation: 45,
                                 minRotation: 45,
-                                color: baseContent
+                                color: `rgba(${colors.baseContent}, 0.7)`
                             },
                             grid: {
-                                color: addOpacity(baseContent, 0.1)
+                                color: `rgba(${colors.baseContent}, 0.1)`
                             }
                         }
                     },
