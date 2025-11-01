@@ -115,4 +115,14 @@ class MetricStatistic extends Model
             && $this->normal_lower_bound !== null
             && $this->normal_upper_bound !== null;
     }
+
+    /**
+     * Delete all anomaly records (metric trends) for this metric statistic
+     */
+    public function deleteAllAnomalies(): int
+    {
+        return $this->trends()
+            ->whereIn('type', ['anomaly_high', 'anomaly_low'])
+            ->delete();
+    }
 }

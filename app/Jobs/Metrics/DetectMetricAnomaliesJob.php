@@ -48,6 +48,11 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             return;
         }
 
+        // Check if user has overridden the anomaly detection mode for this metric
+        if ($this->hasUserOverrideDisabled()) {
+            return;
+        }
+
         // Find the metric statistic
         $metricStatistic = MetricStatistic::where('user_id', $this->event->integration->user_id)
             ->where('service', $this->event->service)
@@ -135,5 +140,20 @@ class DetectMetricAnomaliesJob implements ShouldQueue
         $disabledMetrics = $metricTracking['disabled_metrics'] ?? [];
 
         return in_array($identifier, $disabledMetrics);
+    }
+
+    /**
+     * Check if user has overridden anomaly detection mode to disabled
+     */
+    protected function hasUserOverrideDisabled(): bool
+    {
+        $user = $this->event->integration->user;
+        $override = $user->getAnomalyDetectionModeOverride(
+            $this->event->service,
+            $this->event->action,
+            $this->event->value_unit
+        );
+
+        return $override === 'disabled';
     }
 }

@@ -346,6 +346,58 @@ class User extends Authenticatable
     }
 
     /**
+     * Set anomaly detection mode override for a specific metric
+     *
+     * @param  string  $mode  One of: 'realtime', 'retrospective', 'disabled'
+     */
+    public function setAnomalyDetectionMode(string $service, string $action, string $unit, string $mode): void
+    {
+        $settings = $this->settings ?? [];
+        $metricTracking = $settings['metric_tracking'] ?? [];
+        $overrides = $metricTracking['anomaly_detection_mode_override'] ?? [];
+
+        $identifier = "{$service}.{$action}.{$unit}";
+        $overrides[$identifier] = $mode;
+
+        $metricTracking['anomaly_detection_mode_override'] = $overrides;
+        $settings['metric_tracking'] = $metricTracking;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Remove anomaly detection mode override for a specific metric
+     */
+    public function clearAnomalyDetectionModeOverride(string $service, string $action, string $unit): void
+    {
+        $settings = $this->settings ?? [];
+        $metricTracking = $settings['metric_tracking'] ?? [];
+        $overrides = $metricTracking['anomaly_detection_mode_override'] ?? [];
+
+        $identifier = "{$service}.{$action}.{$unit}";
+        unset($overrides[$identifier]);
+
+        $metricTracking['anomaly_detection_mode_override'] = $overrides;
+        $settings['metric_tracking'] = $metricTracking;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Get anomaly detection mode override for a specific metric
+     */
+    public function getAnomalyDetectionModeOverride(string $service, string $action, string $unit): ?string
+    {
+        $settings = $this->settings ?? [];
+        $metricTracking = $settings['metric_tracking'] ?? [];
+        $overrides = $metricTracking['anomaly_detection_mode_override'] ?? [];
+
+        $identifier = "{$service}.{$action}.{$unit}";
+
+        return $overrides[$identifier] ?? null;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

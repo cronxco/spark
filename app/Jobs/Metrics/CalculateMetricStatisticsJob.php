@@ -101,6 +101,16 @@ class CalculateMetricStatisticsJob implements ShouldQueue
                     return false;
                 }
 
+                // Check if user has anomaly detection mode set to disabled
+                $override = $user->getAnomalyDetectionModeOverride(
+                    $metricData->service,
+                    $metricData->action,
+                    $metricData->value_unit
+                );
+                if ($override === 'disabled') {
+                    return false;
+                }
+
                 // Check if needs recalculation
                 $statistic = MetricStatistic::where('user_id', $metricData->user_id)
                     ->where('service', $metricData->service)

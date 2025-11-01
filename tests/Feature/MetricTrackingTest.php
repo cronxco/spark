@@ -235,4 +235,116 @@ class MetricTrackingTest extends TestCase
 
         $this->assertNotNull($trend->fresh()->acknowledged_at);
     }
+
+    /**
+     * @test
+     */
+    public function user_can_set_anomaly_detection_mode_override(): void
+    {
+        $user = User::factory()->create();
+
+        $this->assertNull($user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+
+        $user->setAnomalyDetectionMode('oura', 'had_readiness_score', 'percent', 'retrospective');
+
+        $this->assertEquals('retrospective', $user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+    }
+
+    /**
+     * @test
+     */
+    public function user_can_clear_anomaly_detection_mode_override(): void
+    {
+        $user = User::factory()->create();
+        $user->setAnomalyDetectionMode('oura', 'had_readiness_score', 'percent', 'disabled');
+
+        $this->assertEquals('disabled', $user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+
+        $user->clearAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent');
+
+        $this->assertNull($user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+    }
+
+    /**
+     * @test
+     */
+    public function metric_statistic_can_delete_all_anomalies(): void
+    {
+        $user = User::factory()->create();
+        $metric = MetricStatistic::factory()->create(['user_id' => $user->id]);
+
+        // Create anomalies
+        MetricTrend::factory()->create([
+            'metric_statistic_id' => $metric->id,
+            'type' => 'anomaly_high',
+        ]);
+        MetricTrend::factory()->create([
+            'metric_statistic_id' => $metric->id,
+            'type' => 'anomaly_low',
+        ]);
+        MetricTrend::factory()->create([
+            'metric_statistic_id' => $metric->id,
+            'type' => 'trend_up_weekly',
+        ]);
+
+        $this->assertEquals(3, $metric->trends()->count());
+
+        $deletedCount = $metric->deleteAllAnomalies();
+
+        $this->assertEquals(2, $deletedCount);
+        $this->assertEquals(1, $metric->trends()->count());
+        $this->assertEquals('trend_up_weekly', $metric->trends()->first()->type);
+    }
+
+    /**
+     * @test
+     */
+    public function anomaly_detection_skipped_when_user_override_is_disabled(): void
+    {
+        $user = User::factory()->create();
+        $metric = MetricStatistic::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+            'value_unit' => 'percent',
+            'mean_value' => 75,
+            'stddev_value' => 5,
+            'normal_lower_bound' => 65,
+            'normal_upper_bound' => 85,
+            'event_count' => 50,
+        ]);
+
+        // Set user override to disabled
+        $user->setAnomalyDetectionMode('oura', 'had_readiness_score', 'percent', 'disabled');
+
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+        ]);
+
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
+
+        // Create an event with anomalous value
+        $event = Event::create([
+            'source_id' => 'anomaly-test',
+            'time' => now(),
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => 'had_readiness_score',
+            'value' => 95, // Much higher than upper bound
+            'value_multiplier' => 1,
+            'value_unit' => 'percent',
+            'target_id' => $target->id,
+        ]);
+
+        $job = new DetectMetricAnomaliesJob($event);
+        $job->handle();
+
+        // No anomaly should be created due to user override
+        $this->assertEquals(0, MetricTrend::where('metric_statistic_id', $metric->id)->count());
+    }
 }

@@ -47,11 +47,13 @@ class AppleHealthPlugin extends WebhookPlugin
                 'label' => 'Workouts',
                 'schema' => self::getConfigurationSchema(),
                 'mandatory' => false,
+                'anomaly_detection_mode' => 'realtime',
             ],
             'metrics' => [
                 'label' => 'Metrics',
                 'schema' => self::getConfigurationSchema(),
                 'mandatory' => false,
+                'anomaly_detection_mode' => 'retrospective',
             ],
         ];
     }
