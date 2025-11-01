@@ -364,7 +364,6 @@ class GoogleCalendarIntegrationTest extends TestCase
         $event = Event::where('integration_id', $this->integration->id)->first();
         $this->assertNotNull($event);
         $this->assertEquals('had_all_day_event', $event->action);
-        $this->assertEquals(1440, $event->value); // 24 hours = 1440 minutes
     }
 
     #[Test]

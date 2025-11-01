@@ -193,6 +193,14 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'event_time' => [
+                'icon' => 'o-clock',
+                'display_name' => 'Event Time',
+                'description' => 'Start or end time of the event',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 
