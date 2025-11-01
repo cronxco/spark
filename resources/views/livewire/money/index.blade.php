@@ -209,7 +209,17 @@
             <div class="mb-6">
                 <x-collapse class="bg-base-200" separator wire:model="expandedSections.{{ $group['type'] }}">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold">{{ $group['label'] }}</div>
+                        <div class="flex items-center justify-between w-full">
+                            <div class="text-lg font-semibold">{{ $group['label'] }}</div>
+                            @php
+                                $total = $group['total'];
+                                // Use darker colors for better contrast on bg-base-200
+                                $colorClass = $total < 0 ? 'text-red-700 dark:text-red-400' : ($total == 0 ? 'text-base-content' : 'text-green-700 dark:text-green-400');
+                            @endphp
+                            <div class="text-lg font-bold font-mono {{ $colorClass }}">
+                                £{{ number_format(abs($total), 2) }}
+                            </div>
+                        </div>
                     </x-slot:heading>
                     <x-slot:content>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
@@ -269,89 +279,92 @@
                                     </h3>
 
                                     @if ($displayBalance !== null)
-                                    <div class="text-3xl font-bold font-mono my-2 {{ $displayBalance < 0 ? 'text-error' : 'text-success' }}">
+                                    @php
+                                        $balanceColorClass = $displayBalance < 0 ? 'text-error' : ($displayBalance == 0 ? 'text-base-content' : 'text-success');
+                                    @endphp
+                                    <div class="text-3xl font-bold font-mono my-2 {{ $balanceColorClass }}">
                                         @if ($displayBalance < 0)
-                                            {{ $currencySymbol }}{{ number_format(abs($displayBalance), 2) }}
-                                            @else
-                                            {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
-                                            @endif
-                                            </div>
-                                            @else
-                                            <div class="text-2xl font-medium text-base-content/50 my-2">
-                                                No balance
-                                            </div>
-                                            @endif
-
-                                            @if ($account->tags->isNotEmpty())
-                                            <div class="flex flex-wrap gap-1.5 mb-3">
-                                                @foreach ($account->tags as $tag)
-                                                <x-badge :value="$tag->name" class="badge-sm badge-outline" />
-                                                @endforeach
-                                            </div>
-                                            @endif
-
-                                            @if ($lastUpdated)
-                                            <div class="flex items-center gap-1.5 text-xs text-base-content/70">
-                                                @php
-                                                $ageMinutes = $lastUpdated->diffInMinutes(now());
-                                                @endphp
-
-                                                @if ($ageMinutes < 60)
-                                                    <div class="flex items-center gap-1">
-                                                    <div aria-label="updated-recently" class="status status-success" />
-                                                    <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
-                                            </div>
-                                            @elseif ($ageMinutes < 60 * 24)
-                                                <div class="flex items-center gap-1">
-                                                <div aria-label="updated-today" class="status status-info"></div>
-                                                <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
+                                        {{ $currencySymbol }}{{ number_format(abs($displayBalance), 2) }}
+                                        @else
+                                        {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
+                                        @endif
                                     </div>
-                                    @elseif ($ageMinutes < 60 * 24 * 30)
-                                        <div class="flex items-center gap-1">
-                                        <div aria-label="updated-month" class="status status-warning"></div>
-                                        <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
-                                </div>
-                                @else
-                                <div class="flex items-center gap-1">
-                                    <div aria-label="updated-old" class="status status-error"></div>
-                                    <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
-                                </div>
-                                @endif
-                        </div>
-                        @endif
+                                    @else
+                                    <div class="text-2xl font-medium text-base-content/50 my-2">
+                                        No balance
+                                    </div>
+                                    @endif
 
+                                    @if ($account->tags->isNotEmpty())
+                                    <div class="flex flex-wrap gap-1.5 mb-3">
+                                        @foreach ($account->tags as $tag)
+                                        <x-badge :value="$tag->name" class="badge-sm badge-outline" />
+                                        @endforeach
+                                    </div>
+                                    @endif
+
+                                    @if ($lastUpdated)
+                                    <div class="flex items-center gap-1.5 text-xs text-base-content/70">
+                                        @php
+                                        $ageMinutes = $lastUpdated->diffInMinutes(now());
+                                        @endphp
+
+                                        @if ($ageMinutes < 60)
+                                        <div class="flex items-center gap-1">
+                                            <div aria-label="updated-recently" class="status status-success" />
+                                            <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
+                                        </div>
+                                        @elseif ($ageMinutes < 60 * 24)
+                                        <div class="flex items-center gap-1">
+                                            <div aria-label="updated-today" class="status status-info"></div>
+                                            <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
+                                        </div>
+                                        @elseif ($ageMinutes < 60 * 24 * 30)
+                                        <div class="flex items-center gap-1">
+                                            <div aria-label="updated-month" class="status status-warning"></div>
+                                            <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
+                                        </div>
+                                        @else
+                                        <div class="flex items-center gap-1">
+                                            <div aria-label="updated-old" class="status status-error"></div>
+                                            <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
+                                        </div>
+                                        @endif
+                                    </div>
+                                    @endif
+
+                                </div>
+                            </a>
+                            @endforeach
+                        </div>
+                    </x-slot:content>
+                </x-collapse>
             </div>
-            </a>
             @endforeach
-</div>
-</x-slot:content>
-</x-collapse>
-</div>
-@endforeach
-@else
-<div class="card bg-base-200 shadow">
-    <div class="card-body">
-        <div class="text-center py-12">
-            <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-            <h3 class="text-lg font-medium text-base-content mb-2">No accounts found</h3>
-            <p class="text-base-content/70 mb-6">
-                @if ($search || $accountTypeFilter || $providerFilter)
-                Try adjusting your filters or search terms.
-                @else
-                Get started by adding your first account.
-                @endif
-            </p>
-            @if (!$search && !$accountTypeFilter && !$providerFilter)
-            <button wire:click="openCreateAccountModal" class="btn btn-primary">
-                <x-icon name="o-plus" class="w-4 h-4" />
-                Add Your First Account
-            </button>
+            @else
+            <div class="card bg-base-200 shadow">
+                <div class="card-body">
+                    <div class="text-center py-12">
+                        <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <h3 class="text-lg font-medium text-base-content mb-2">No accounts found</h3>
+                        <p class="text-base-content/70 mb-6">
+                            @if ($search || $accountTypeFilter || $providerFilter)
+                            Try adjusting your filters or search terms.
+                            @else
+                            Get started by adding your first account.
+                            @endif
+                        </p>
+                        @if (!$search && !$accountTypeFilter && !$providerFilter)
+                        <button wire:click="openCreateAccountModal" class="btn btn-primary">
+                            <x-icon name="o-plus" class="w-4 h-4" />
+                            Add Your First Account
+                        </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
             @endif
-        </div>
-    </div>
-</div>
-@endif
-</x-tab>
+        </x-tab>
 
 <x-tab name="table" label="Table" icon="o-table-cells">
     <!-- Table View -->
@@ -470,19 +483,23 @@
                 } else {
                 $displayBalance = $currentBalance;
                 }
+
+                $balanceColorClass = $displayBalance !== null
+                    ? ($displayBalance < 0 ? 'text-error' : ($displayBalance == 0 ? 'text-base-content' : 'text-success'))
+                    : '';
                 @endphp
                 @if ($displayBalance !== null)
-                <span class="font-mono font-medium {{ $displayBalance < 0 ? 'text-error' : 'text-success' }}">
+                <span class="font-mono font-medium {{ $balanceColorClass }}">
                     @if ($displayBalance < 0)
-                        {{ $currencySymbol }}{{ number_format(abs($displayBalance), 2) }}
-                        @else
-                        {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
-                        @endif
-                        </span>
-                        @else
-                        <span class="text-base-content/50">No balance</span>
-                        @endif
-                        @endscope
+                    {{ $currencySymbol }}{{ number_format(abs($displayBalance), 2) }}
+                    @else
+                    {{ $currencySymbol }}{{ number_format($displayBalance, 2) }}
+                    @endif
+                </span>
+                @else
+                <span class="text-base-content/50">No balance</span>
+                @endif
+                @endscope
 
                         @scope('cell_currency', $account)
                         {{ $account->metadata['currency'] ?? 'GBP' }}

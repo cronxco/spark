@@ -346,12 +346,15 @@ class FinancialAccounts extends Component
                     return null;
                 }
 
+                $groupAccounts = $grouped->get($type);
+
                 return [
                     'type' => $type,
                     'label' => $this->getAccountTypeLabel($type) . 's',
-                    'accounts' => $grouped->get($type)->sortByDesc(function ($account) {
+                    'accounts' => $groupAccounts->sortByDesc(function ($account) {
                         return $this->getFormattedBalance($account) ?? 0;
                     })->values(),
+                    'total' => $this->calculateGroupTotal($groupAccounts),
                 ];
             })
             ->filter()
@@ -359,5 +362,25 @@ class FinancialAccounts extends Component
             ->toArray();
 
         return $sorted;
+    }
+
+    /**
+     * Calculate the total balance for a group of accounts,
+     * taking into account positive and negative balances
+     */
+    private function calculateGroupTotal($accounts): float
+    {
+        return $accounts->sum(function ($account) {
+            $metadata = $account->metadata ?? [];
+            $isNegativeBalance = $metadata['is_negative_balance'] ?? false;
+            $balance = $this->getFormattedBalance($account) ?? 0;
+
+            // For negative balance accounts (debts), invert the sign
+            if ($isNegativeBalance) {
+                return -$balance;
+            }
+
+            return $balance;
+        });
     }
 }
