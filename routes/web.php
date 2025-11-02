@@ -87,6 +87,10 @@ Route::middleware(['auth'])->group(function () {
     // Money routes
     Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');
     Route::get('money/{account}', \App\Livewire\FinancialAccountShow::class)->name('money.show');
+
+    // Bookmarks routes
+    Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks.index');
+    Volt::route('bookmarks/fetch', 'bookmarks.fetch.index')->name('bookmarks.fetch');
     // GoCardless bank selection page
     Route::get('integrations/groups/{group}/gocardless/bank-selection', function (IntegrationGroup $group) {
         if ((string) $group->user_id !== (string) Auth::id()) {
