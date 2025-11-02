@@ -174,7 +174,6 @@
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
                     <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('settings.notifications') }}" :active="request()->routeIs('settings.notifications')" />
                     <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')" />
-                    <x-menu-item title="Content Fetcher Cookies" icon="o-bookmark" link="{{ route('settings.fetcher-cookies') }}" :active="request()->routeIs('settings.fetcher-cookies')" />
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                 </x-menu-sub>
 
