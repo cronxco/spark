@@ -311,7 +311,7 @@
 
                                         @if ($ageMinutes < 60)
                                         <div class="flex items-center gap-1">
-                                            <div aria-label="updated-recently" class="status status-success" />
+                                            <div aria-label="updated-recently" class="status status-success"></div>
                                             <span class="text-xs">Last updated {{ $lastUpdated->diffForHumans() }}</span>
                                         </div>
                                         @elseif ($ageMinutes < 60 * 24)
