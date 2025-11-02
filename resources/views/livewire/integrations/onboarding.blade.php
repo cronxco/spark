@@ -310,7 +310,7 @@ use Carbon\Carbon;
                                                   <div class="text-xs text-error mt-1">{{ $message }}</div>
                                               @enderror
                                         @else
-                                             <x-input name="config[{{ $typeKey }}][{{ $field }}]" value="{{ old('config.'.$typeKey.'.'.$field, $config['default'] ?? '') }}" @if ($group->service === 'google-calendar' && $field === 'calendar_name') id="calendar-name-input" data-type-key="{{ $typeKey }}" @endif />
+                                             <input type="text" name="config[{{ $typeKey }}][{{ $field }}]" value="{{ old('config.'.$typeKey.'.'.$field, $config['default'] ?? '') }}" class="input input-bordered w-full" placeholder="{{ $config['description'] ?? '' }}" @if ($group->service === 'google-calendar' && $field === 'calendar_name') id="calendar-name-input" data-type-key="{{ $typeKey }}" @endif />
                                              @if ($field === 'task_job_class' && !empty(($presets[$typeKey] ?? [])))
                                                  <div class="text-xs text-base-content/70 mt-1">Tip: Selecting a preset above will set sensible defaults. You can still override them here.</div>
                                              @endif

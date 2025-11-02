@@ -79,24 +79,9 @@
             {{-- Global Progress Indicator --}}
             @livewire('global-progress-indicator')
 
-            <x-button
-                label="Search"
-                icon="fab.searchengin"
-                class="btn-ghost btn-sm"
-                responsive
-                @click="$dispatch('spotlight.toggle')"
-                data-hotkey="/"
-            />
+            <livewire:spotlight-toggle />
 
-            <button
-                type="button"
-                class="btn btn-ghost btn-sm btn-circle"
-                title="Keyboard Shortcuts"
-                @click="$dispatch('toggle-hotkey-help')"
-                data-hotkey="?"
-            >
-                <x-icon name="o-question-mark-circle" class="w-5 h-5" />
-            </button>
+            <livewire:help-toggle />
 
             {{-- User --}}
             @if ($user = auth()->user())
@@ -113,6 +98,7 @@
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')" />
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
                     <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('settings.notifications') }}" :active="request()->routeIs('settings.notifications')" />
+                    <x-menu-item title="Content Fetcher Cookies" icon="o-bookmark" link="{{ route('settings.fetcher-cookies') }}" :active="request()->routeIs('settings.fetcher-cookies')" />
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                     <x-menu-item
                         title="Reset Card Views"
@@ -189,6 +175,7 @@
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
                     <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('settings.notifications') }}" :active="request()->routeIs('settings.notifications')" />
                     <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')" />
+                    <x-menu-item title="Content Fetcher Cookies" icon="o-bookmark" link="{{ route('settings.fetcher-cookies') }}" :active="request()->routeIs('settings.fetcher-cookies')" />
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                 </x-menu-sub>
 
