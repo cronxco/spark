@@ -90,6 +90,11 @@ class EventObject extends Model
         return $this->belongsTo(User::class)->withTrashed();
     }
 
+    public function integration()
+    {
+        return $this->belongsTo(Integration::class)->withTrashed();
+    }
+
     public function actorEvents()
     {
         return $this->hasMany(Event::class, 'actor_id')->withTrashed();

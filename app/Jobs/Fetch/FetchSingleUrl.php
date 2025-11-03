@@ -7,6 +7,7 @@ use App\Integrations\Fetch\FetchHttpClient;
 use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Notifications\FetchMultipleFailures;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Bus\Queueable;
@@ -177,14 +178,28 @@ class FetchSingleUrl implements ShouldQueue
         $metadata = $webpage->metadata ?? [];
         $metadata['last_checked_at'] = now()->toIso8601String();
         $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
+        $consecutiveFailures = ($metadata['last_error']['consecutive_failures'] ?? 0) + 1;
         $metadata['last_error'] = [
             'message' => $errorMessage,
             'timestamp' => now()->toIso8601String(),
-            'consecutive_failures' => ($metadata['last_error']['consecutive_failures'] ?? 0) + 1,
+            'consecutive_failures' => $consecutiveFailures,
         ];
 
+        // Send notification after 3 consecutive failures
+        if ($consecutiveFailures === 3) {
+            $this->integration->user->notify(
+                new FetchMultipleFailures($webpage, $errorMessage)
+            );
+
+            Log::info('Fetch: Sent multiple failures notification', [
+                'url' => $this->url,
+                'webpage_id' => $webpage->id,
+                'consecutive_failures' => $consecutiveFailures,
+            ]);
+        }
+
         // Auto-disable after 5 consecutive failures
-        if ($metadata['last_error']['consecutive_failures'] >= 5) {
+        if ($consecutiveFailures >= 5) {
             $metadata['enabled'] = false;
             Log::warning('Fetch: Auto-disabled URL after 5 failures', [
                 'url' => $this->url,

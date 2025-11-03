@@ -115,11 +115,6 @@ class ContentExtractor
             }
         }
 
-        // Check if content is suspiciously short for an article
-        if (strlen($textContent) < 200) {
-            return true;
-        }
-
         return false;
     }
 
@@ -207,20 +202,21 @@ class ContentExtractor
             ];
         }
 
+        // Check for paywall BEFORE checking content length
+        // This ensures paywall indicators are detected even with short content
+        if (self::detectPaywall($html, $textContent)) {
+            return [
+                'success' => false,
+                'reason' => 'Paywall detected',
+                'data' => null,
+            ];
+        }
+
         // Check for insufficient content
         if (strlen($textContent) < 100) {
             return [
                 'success' => false,
                 'reason' => 'Insufficient content (< 100 chars)',
-                'data' => null,
-            ];
-        }
-
-        // Check for paywall
-        if (self::detectPaywall($html, $textContent)) {
-            return [
-                'success' => false,
-                'reason' => 'Paywall detected',
                 'data' => null,
             ];
         }

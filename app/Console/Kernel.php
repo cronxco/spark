@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\Fetch\CheckCookieExpiryJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -20,6 +21,13 @@ class Kernel extends ConsoleKernel
         $schedule
             ->command('horizon:snapshot')
             ->everyFiveMinutes()
+            ->onOneServer()
+            ->withoutOverlapping();
+
+        // Check cookie expiry daily at 6am
+        $schedule
+            ->job(new CheckCookieExpiryJob)
+            ->dailyAt('06:00')
             ->onOneServer()
             ->withoutOverlapping();
     }

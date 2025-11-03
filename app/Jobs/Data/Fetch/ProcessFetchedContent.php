@@ -5,6 +5,7 @@ namespace App\Jobs\Data\Fetch;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Notifications\FetchContentChanged;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -134,6 +135,18 @@ class ProcessFetchedContent implements ShouldQueue
                     'last_error' => null, // Clear any previous errors
                 ]),
             ]);
+
+            // Send notification for content change (only if content was previously fetched)
+            if ($previousHash) {
+                $this->integration->user->notify(
+                    new FetchContentChanged($this->webpage, $previousHash, $this->contentHash)
+                );
+
+                Log::info('Fetch: Content change notification sent', [
+                    'url' => $this->webpage->url,
+                    'user_id' => $this->integration->user_id,
+                ]);
+            }
 
             Log::info('Fetch: Processing completed successfully', [
                 'url' => $this->webpage->url,

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Integrations\PluginRegistry;
+use App\Jobs\Fetch\FetchScheduledUrls;
 use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
@@ -222,6 +223,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             'outline' => $this->getOutlineFetchJobs($integration),
             'karakeep' => $this->getKarakeepFetchJobs($integration),
             'google-calendar' => $this->getGoogleCalendarFetchJobs($integration),
+            'fetch' => $this->getFetchFetchJobs($integration),
             // Add other services here as they are implemented
             default => [],
         };
@@ -351,6 +353,16 @@ class CheckIntegrationUpdates implements ShouldQueue
 
         return match ($instanceType) {
             'events' => [GoogleCalendarEventsPull::class],
+            default => [],
+        };
+    }
+
+    private function getFetchFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'fetcher';
+
+        return match ($instanceType) {
+            'fetcher' => [FetchScheduledUrls::class],
             default => [],
         };
     }

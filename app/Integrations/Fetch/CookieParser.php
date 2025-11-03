@@ -15,11 +15,10 @@ class CookieParser
      * 2. Simple: {"cookie_name": "value"}
      * 3. Browser HAR: [{"name": "session", "value": "xyz", "expirationDate": 1733155200}]
      *
-     * @return array ['cookies' => [...], 'expires_at' => Carbon|null, 'errors' => [...]]
+     * @return array ['success' => bool, 'cookies' => [...], 'expires_at' => string|null, 'error' => string|null]
      */
     public static function parse(string $jsonString): array
     {
-        $errors = [];
         $cookies = [];
         $earliestExpiry = null;
 
@@ -28,33 +27,51 @@ class CookieParser
             $data = json_decode($jsonString, true, 512, JSON_THROW_ON_ERROR);
         } catch (Exception $e) {
             return [
+                'success' => false,
                 'cookies' => [],
                 'expires_at' => null,
-                'errors' => ['Invalid JSON: ' . $e->getMessage()],
+                'error' => 'Invalid JSON: ' . $e->getMessage(),
+            ];
+        }
+
+        // Handle empty JSON
+        if (empty($data)) {
+            return [
+                'success' => false,
+                'cookies' => [],
+                'expires_at' => null,
+                'error' => 'No cookies found in JSON',
             ];
         }
 
         // Handle simple key-value format: {"cookie_name": "value"}
+        // Require at least 2 cookies for simple format to avoid false positives
         if (self::isSimpleFormat($data)) {
+            if (count($data) < 2) {
+                return [
+                    'success' => false,
+                    'cookies' => [],
+                    'expires_at' => null,
+                    'error' => 'Unsupported cookie format: simple format requires at least 2 cookies',
+                ];
+            }
+
             foreach ($data as $name => $value) {
                 $cookies[$name] = $value;
             }
 
-            $errors[] = 'Simple format detected: no expiry information available';
-
             return [
+                'success' => true,
                 'cookies' => $cookies,
                 'expires_at' => null,
-                'errors' => $errors,
+                'error' => null,
             ];
         }
 
         // Handle array format (standard or HAR)
         if (is_array($data) && isset($data[0]) && is_array($data[0])) {
-            foreach ($data as $index => $cookie) {
+            foreach ($data as $cookie) {
                 if (! isset($cookie['name']) || ! isset($cookie['value'])) {
-                    $errors[] = "Cookie at index {$index} missing 'name' or 'value'";
-
                     continue;
                 }
 
@@ -71,33 +88,48 @@ class CookieParser
                     }
                 }
             }
-        } else {
-            $errors[] = 'Unrecognized format';
+
+            if (empty($cookies)) {
+                return [
+                    'success' => false,
+                    'cookies' => [],
+                    'expires_at' => null,
+                    'error' => 'No valid cookies found in array',
+                ];
+            }
+
+            return [
+                'success' => true,
+                'cookies' => $cookies,
+                'expires_at' => $earliestExpiry?->toIso8601String(),
+                'error' => null,
+            ];
         }
 
-        if (empty($cookies)) {
-            $errors[] = 'No cookies were parsed';
-        }
-
+        // Unsupported format
         return [
-            'cookies' => $cookies,
-            'expires_at' => $earliestExpiry,
-            'errors' => $errors,
+            'success' => false,
+            'cookies' => [],
+            'expires_at' => null,
+            'error' => 'Unsupported cookie format',
         ];
     }
 
     /**
      * Format parsed cookies for storage in auth_metadata
+     *
+     * @param  array  $parsed  Result from parse() method
+     * @param  string  $domain  The domain these cookies are for
      */
-    public static function formatForStorage(array $cookies, ?Carbon $expiresAt): array
+    public static function formatForStorage(array $parsed, string $domain): array
     {
         return [
-            'cookies' => $cookies,
+            'cookies' => $parsed['cookies'],
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             ],
             'added_at' => now()->toIso8601String(),
-            'expires_at' => $expiresAt?->toIso8601String(),
+            'expires_at' => $parsed['expires_at'],
             'last_used_at' => null,
         ];
     }
@@ -105,9 +137,42 @@ class CookieParser
     /**
      * Get expiry status for UI display
      *
+     * @return string 'green'|'yellow'|'red'|'gray'
+     */
+    public static function getExpiryStatus(?string $expiresAt): string
+    {
+        if (! $expiresAt) {
+            return 'gray';
+        }
+
+        try {
+            $expiry = Carbon::parse($expiresAt);
+            $now = now();
+
+            if ($expiry->isPast()) {
+                return 'red';
+            }
+
+            $daysUntilExpiry = $now->diffInDays($expiry);
+
+            if ($daysUntilExpiry < 3) {
+                return 'red';
+            } elseif ($daysUntilExpiry <= 7) {
+                return 'yellow';
+            } else {
+                return 'green';
+            }
+        } catch (Exception) {
+            return 'gray';
+        }
+    }
+
+    /**
+     * Get detailed expiry information for UI display
+     *
      * @return array ['status' => 'green|yellow|red|gray', 'message' => string, 'days_until_expiry' => int|null]
      */
-    public static function getExpiryStatus(?string $expiresAt): array
+    public static function getExpiryDetails(?string $expiresAt): array
     {
         if (! $expiresAt) {
             return [
@@ -124,9 +189,7 @@ class CookieParser
             if ($expiry->isPast()) {
                 return [
                     'status' => 'red',
-                    'message' => 'Expired ' .
-
-$expiry->diffForHumans(),
+                    'message' => 'Expired ' . $expiry->diffForHumans(),
                     'days_until_expiry' => 0,
                 ];
             }
@@ -158,7 +221,7 @@ $expiry->diffForHumans(),
                     'days_until_expiry' => $daysUntilExpiry,
                 ];
             }
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
                 'status' => 'gray',
                 'message' => 'Invalid expiry date',
@@ -182,7 +245,7 @@ $expiry->diffForHumans(),
         }
 
         // Check if all values are scalars (strings/numbers)
-        foreach ($data as $key => $value) {
+        foreach ($data as $value) {
             if (is_array($value) || is_object($value)) {
                 return false;
             }

@@ -3,12 +3,13 @@
 namespace App\Integrations\Fetch;
 
 use App\Integrations\Base\ManualPlugin;
+use App\Integrations\Contracts\SupportsSpotlightCommands;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Throwable;
 
-class FetchPlugin extends ManualPlugin
+class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
 {
     public static function getServiceType(): string
     {
@@ -102,7 +103,7 @@ class FetchPlugin extends ManualPlugin
 
     public static function getIcon(): string
     {
-        return 'shield-dog';
+        return 'o-globe-alt';
     }
 
     public static function getAccentColor(): string
@@ -218,6 +219,65 @@ class FetchPlugin extends ManualPlugin
                 'display_name' => 'Fetch User',
                 'description' => 'Fetch system user',
                 'hidden' => true,
+            ],
+        ];
+    }
+
+    /**
+     * Get Spotlight commands for Fetch integration
+     */
+    public static function getSpotlightCommands(): array
+    {
+        return [
+            'fetch-add-url' => [
+                'title' => 'Add URL to Fetch',
+                'subtitle' => 'Subscribe to a new URL to monitor and archive',
+                'icon' => 'plus-circle',
+                'action' => 'jump_to',
+                'actionParams' => [
+                    'path' => '/bookmarks/fetch?tab=urls',
+                ],
+                'priority' => 7,
+            ],
+            'fetch-manage-cookies' => [
+                'title' => 'Manage Fetch Cookies',
+                'subtitle' => 'Add or update authentication cookies for paywalled sites',
+                'icon' => 'key',
+                'action' => 'jump_to',
+                'actionParams' => [
+                    'path' => '/bookmarks/fetch?tab=cookies',
+                ],
+                'priority' => 5,
+            ],
+            'fetch-discovery-settings' => [
+                'title' => 'Configure URL Discovery',
+                'subtitle' => 'Set up automatic URL discovery from other integrations',
+                'icon' => 'magnifying-glass',
+                'action' => 'jump_to',
+                'actionParams' => [
+                    'path' => '/bookmarks/fetch?tab=discovery',
+                ],
+                'priority' => 4,
+            ],
+            'fetch-view-stats' => [
+                'title' => 'View Fetch Statistics',
+                'subtitle' => 'See your archived content and fetch history',
+                'icon' => 'chart-bar',
+                'action' => 'jump_to',
+                'actionParams' => [
+                    'path' => '/bookmarks/fetch?tab=stats',
+                ],
+                'priority' => 3,
+            ],
+            'fetch-view-bookmarks' => [
+                'title' => 'View All Bookmarks',
+                'subtitle' => 'Browse your fetched content and summaries',
+                'icon' => 'bookmark',
+                'action' => 'jump_to',
+                'actionParams' => [
+                    'path' => '/bookmarks',
+                ],
+                'priority' => 6,
             ],
         ];
     }

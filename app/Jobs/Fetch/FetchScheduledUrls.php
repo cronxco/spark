@@ -26,18 +26,19 @@ class FetchScheduledUrls extends BaseFetchJob
         ]);
 
         // Query all enabled fetch_webpage EventObjects for this integration
+        // EventObjects don't have integration_id, filter by fetch_integration_id in metadata
         $webpages = EventObject::where('user_id', $this->integration->user_id)
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->whereNotNull('url')
             ->get();
 
-        // Filter to only enabled URLs
+        // Filter to only this integration's URLs and enabled URLs
         $enabledWebpages = $webpages->filter(function ($webpage) {
             $metadata = $webpage->metadata ?? [];
 
-            return ($metadata['enabled'] ?? true) === true;
+            return ($metadata['fetch_integration_id'] ?? null) === $this->integration->id
+                && ($metadata['enabled'] ?? true) === true;
         });
 
         Log::info('Fetch: Found URLs to fetch', [
@@ -68,6 +69,17 @@ class FetchScheduledUrls extends BaseFetchJob
             'integration_id' => $this->integration->id,
             'job_count' => count($webpages),
         ]);
+
+        // Dispatch URL discovery job if monitoring is configured
+        $monitoredIntegrations = $this->integration->configuration['monitor_integrations'] ?? [];
+        if (! empty($monitoredIntegrations)) {
+            DiscoverUrlsFromIntegrations::dispatch($this->integration);
+
+            Log::info('Fetch: Dispatched URL discovery job', [
+                'integration_id' => $this->integration->id,
+                'monitored_count' => count($monitoredIntegrations),
+            ]);
+        }
 
         // Dispatch FetchSingleUrl job for each webpage
         foreach ($webpages as $webpage) {

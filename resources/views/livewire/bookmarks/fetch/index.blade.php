@@ -9,11 +9,12 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Livewire\Volt\Component;
 use Livewire\Attributes\Validate;
+use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
-new class extends Component {
+new class extends Component
+{
     use Toast;
 
     public ?Integration $integration = null;
@@ -95,20 +96,19 @@ new class extends Component {
     public function loadUrls(): void
     {
         $query = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage');
 
         // Apply search
-        if (!empty($this->urlSearch)) {
+        if (! empty($this->urlSearch)) {
             $query->where(function ($q) {
                 $q->where('url', 'like', '%' . $this->urlSearch . '%')
-                  ->orWhere('title', 'like', '%' . $this->urlSearch . '%');
+                    ->orWhere('title', 'like', '%' . $this->urlSearch . '%');
             });
         }
 
         // Apply domain filter
-        if (!empty($this->domainFilter)) {
+        if (! empty($this->domainFilter)) {
             $query->whereRaw("metadata->>'domain' = ?", [$this->domainFilter]);
         }
 
@@ -117,7 +117,7 @@ new class extends Component {
             switch ($this->statusFilter) {
                 case 'active':
                     $query->whereRaw("(metadata->>'enabled')::boolean = true")
-                          ->whereNull('metadata->last_error');
+                        ->whereNull('metadata->last_error');
                     break;
                 case 'disabled':
                     $query->whereRaw("(metadata->>'enabled')::boolean = false");
@@ -149,6 +149,7 @@ new class extends Component {
 
         $this->urls = $query->get()->map(function ($obj) {
             $metadata = $obj->metadata ?? [];
+
             return [
                 'id' => $obj->id,
                 'url' => $obj->url,
@@ -189,10 +190,11 @@ new class extends Component {
         // Load available integrations
         $this->availableIntegrations = Integration::where('user_id', Auth::id())
             ->where('service', '!=', 'fetch')
-            ->with('integrationGroup')
+            ->with('group')
             ->get()
             ->map(function ($integration) {
                 $pluginClass = PluginRegistry::getPlugin($integration->service);
+
                 return [
                     'id' => (string) $integration->id,
                     'name' => $integration->name ?: ($pluginClass ? $pluginClass::getDisplayName() : $integration->service),
@@ -208,7 +210,6 @@ new class extends Component {
 
         // Load recently discovered URLs (last 50)
         $this->discoveredUrls = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->whereRaw("metadata->>'subscription_source' = 'discovered'")
@@ -217,6 +218,7 @@ new class extends Component {
             ->get()
             ->map(function ($obj) {
                 $metadata = $obj->metadata ?? [];
+
                 return [
                     'id' => $obj->id,
                     'url' => $obj->url,
@@ -231,20 +233,17 @@ new class extends Component {
     public function loadStats(): void
     {
         $totalUrls = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->count();
 
         $activeUrls = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->whereRaw("(metadata->>'enabled')::boolean = true")
             ->count();
 
         $urlsWithErrors = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->whereNotNull('metadata->last_error')
@@ -271,12 +270,14 @@ new class extends Component {
 
         // Check if URL already exists
         $existing = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
+            ->where('concept', 'bookmark')
+            ->where('type', 'fetch_webpage')
             ->where('url', $this->newUrl)
             ->exists();
 
         if ($existing) {
             $this->error('This URL is already subscribed.');
+
             return;
         }
 
@@ -285,7 +286,6 @@ new class extends Component {
 
             EventObject::create([
                 'user_id' => Auth::id(),
-                'integration_id' => $this->integration->id,
                 'concept' => 'bookmark',
                 'type' => 'fetch_webpage',
                 'title' => $this->newUrl, // Will be updated on first fetch
@@ -319,13 +319,14 @@ new class extends Component {
     {
         $eventObject = EventObject::find($id);
 
-        if (!$eventObject || $eventObject->user_id !== Auth::id()) {
+        if (! $eventObject || $eventObject->user_id !== Auth::id()) {
             $this->error('URL not found.');
+
             return;
         }
 
         $metadata = $eventObject->metadata ?? [];
-        $metadata['enabled'] = !($metadata['enabled'] ?? true);
+        $metadata['enabled'] = ! ($metadata['enabled'] ?? true);
 
         $eventObject->update(['metadata' => $metadata]);
 
@@ -337,8 +338,9 @@ new class extends Component {
     {
         $eventObject = EventObject::find($id);
 
-        if (!$eventObject || $eventObject->user_id !== Auth::id()) {
+        if (! $eventObject || $eventObject->user_id !== Auth::id()) {
             $this->error('URL not found.');
+
             return;
         }
 
@@ -351,13 +353,14 @@ new class extends Component {
     {
         $eventObject = EventObject::find($id);
 
-        if (!$eventObject || $eventObject->user_id !== Auth::id()) {
+        if (! $eventObject || $eventObject->user_id !== Auth::id()) {
             $this->error('URL not found.');
+
             return;
         }
 
         try {
-            FetchSingleUrl::dispatch($this->integration, $eventObject);
+            FetchSingleUrl::dispatch($this->integration, $eventObject->id, $eventObject->url);
             $this->success('Fetch job queued. Check back shortly for results.');
         } catch (\Exception $e) {
             Log::error('Failed to dispatch fetch job', [
@@ -376,25 +379,21 @@ new class extends Component {
         ]);
 
         try {
-            $result = CookieParser::parse($this->cookieJson);
+            $parsed = CookieParser::parse($this->cookieJson);
 
-            if (!empty($result['errors'])) {
-                $this->error('Cookie parsing failed: ' . implode(', ', $result['errors']));
+            if (! $parsed['success']) {
+                $this->error('Cookie parsing failed: ' . ($parsed['error'] ?? 'Unknown error'));
+
                 return;
             }
 
             $authMetadata = $this->group->auth_metadata ?? [];
-            if (!isset($authMetadata['domains'])) {
+            if (! isset($authMetadata['domains'])) {
                 $authMetadata['domains'] = [];
             }
 
-            $authMetadata['domains'][$this->cookieDomain] = [
-                'cookies' => $result['cookies'],
-                'headers' => $result['headers'],
-                'added_at' => $result['added_at'],
-                'expires_at' => $result['expires_at'],
-                'last_used_at' => null,
-            ];
+            // Use formatForStorage to get properly structured data
+            $authMetadata['domains'][$this->cookieDomain] = CookieParser::formatForStorage($parsed, $this->cookieDomain);
 
             $this->group->update(['auth_metadata' => $authMetadata]);
 
@@ -429,17 +428,18 @@ new class extends Component {
     {
         // Find a URL for this domain to test
         $url = EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
+            ->where('concept', 'bookmark')
+            ->where('type', 'fetch_webpage')
             ->whereRaw("metadata->>'domain' = ?", [$domain])
             ->value('url');
 
-        if (!$url) {
+        if (! $url) {
             // Use a generic test URL for the domain
             $url = 'https://' . $domain;
         }
 
         try {
-            $client = new FetchHttpClient();
+            $client = new FetchHttpClient;
             $result = $client->testUrl($url, $this->group);
 
             if ($result['success']) {
@@ -467,7 +467,6 @@ new class extends Component {
     public function getDomainOptions(): array
     {
         return EventObject::where('user_id', Auth::id())
-            ->where('integration_id', $this->integration->id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->select('metadata->domain as domain')
@@ -479,13 +478,80 @@ new class extends Component {
             ->toArray();
     }
 
+    public function updateMonitoredIntegrations(): void
+    {
+        try {
+            $config = $this->integration->configuration ?? [];
+            $config['monitor_integrations'] = $this->monitoredIntegrations;
+
+            $this->integration->update([
+                'configuration' => $config,
+            ]);
+
+            $this->success('Discovery settings saved successfully!');
+            $this->loadDiscoverySettings();
+        } catch (\Exception $e) {
+            $this->error('Failed to save discovery settings: ' . $e->getMessage());
+            Log::error('Failed to update monitored integrations', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function triggerDiscovery(): void
+    {
+        try {
+            if (empty($this->monitoredIntegrations)) {
+                $this->warning('Please select at least one integration to monitor.');
+
+                return;
+            }
+
+            // Dispatch the discovery job
+            App\Jobs\Fetch\DiscoverUrlsFromIntegrations::dispatch($this->integration);
+
+            $this->success('URL discovery started! Check back in a few minutes.');
+            Log::info('Manual URL discovery triggered', [
+                'integration_id' => $this->integration->id,
+                'monitored_integrations' => $this->monitoredIntegrations,
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to start discovery: ' . $e->getMessage());
+            Log::error('Failed to trigger URL discovery', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function removeDiscoveredUrl(string $urlId): void
+    {
+        try {
+            $url = EventObject::where('user_id', Auth::id())
+                ->where('concept', 'bookmark')
+                ->where('type', 'fetch_webpage')
+                ->where('id', $urlId)
+                ->first();
+
+            if ($url) {
+                $url->delete();
+                $this->success('URL removed successfully.');
+                $this->loadDiscoverySettings();
+                $this->loadUrls();
+            } else {
+                $this->error('URL not found.');
+            }
+        } catch (\Exception $e) {
+            $this->error('Failed to remove URL: ' . $e->getMessage());
+        }
+    }
+
     private function getCookieExpiryStatus(?string $expiresAt): string
     {
-        if (!$expiresAt) {
+        if (! $expiresAt) {
             return 'gray'; // No expiry set
         }
 
-        $expiryDate = \Carbon\Carbon::parse($expiresAt);
+        $expiryDate = Carbon\Carbon::parse($expiresAt);
         $now = now();
         $daysUntilExpiry = $now->diffInDays($expiryDate, false);
 
@@ -844,17 +910,145 @@ new class extends Component {
 
         <!-- Discovery Settings Tab -->
         <x-tab name="discovery" label="Discovery" icon="o-magnifying-glass">
+            <!-- Monitor Integrations Section -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
-                    <h3 class="text-lg font-semibold mb-4">URL Discovery</h3>
+                    <h3 class="text-lg font-semibold mb-4">Monitor Integrations</h3>
                     <p class="text-sm text-base-content/70 mb-4">
-                        Fetch can automatically discover URLs from other integrations and subscribe to them.
+                        Select integrations to automatically discover URLs from. Fetch will scan EventObjects and Events for URLs and subscribe to them automatically.
                     </p>
-                    <p class="text-sm text-warning font-medium">
-                        This feature is coming soon.
-                    </p>
+
+                    @if (empty($availableIntegrations))
+                        <div class="alert alert-info">
+                            <x-icon name="o-information-circle" class="w-6 h-6" />
+                            <span>No other integrations found. Add integrations like Karakeep, Reddit, or Outline to enable URL discovery.</span>
+                        </div>
+                    @else
+                        <div class="form-control mb-4">
+                            <label class="label">
+                                <span class="label-text">Select Integrations to Monitor</span>
+                            </label>
+                            <div class="space-y-2">
+                                @foreach ($availableIntegrations as $integration)
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:bg-base-300 cursor-pointer transition">
+                                        <input
+                                            type="checkbox"
+                                            class="checkbox checkbox-primary"
+                                            value="{{ $integration['id'] }}"
+                                            wire:model="monitoredIntegrations"
+                                        />
+                                        <div class="flex-1">
+                                            <div class="font-medium">{{ $integration['name'] }}</div>
+                                            <div class="text-sm text-base-content/70">{{ $integration['service_name'] }}</div>
+                                        </div>
+                                        @if (isset($integration['object_count']))
+                                            <span class="badge badge-neutral">{{ $integration['object_count'] }} objects</span>
+                                        @endif
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button
+                                type="button"
+                                class="btn btn-primary"
+                                wire:click="updateMonitoredIntegrations"
+                            >
+                                <x-icon name="o-check" class="w-4 h-4" />
+                                Save Settings
+                            </button>
+
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                wire:click="triggerDiscovery"
+                                @if (empty($monitoredIntegrations)) disabled @endif
+                            >
+                                <x-icon name="o-magnifying-glass" class="w-4 h-4" />
+                                Scan Now
+                            </button>
+                        </div>
+                    @endif
                 </div>
             </div>
+
+            <!-- Recently Discovered URLs -->
+            @if (!empty($discoveredUrls))
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Recently Discovered URLs (Last 50)</h3>
+
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>URL</th>
+                                        <th>Source</th>
+                                        <th>Discovered</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($discoveredUrls as $url)
+                                        <tr>
+                                            <td>
+                                                <div class="flex items-center gap-2">
+                                                    <img
+                                                        src="https://www.google.com/s2/favicons?domain={{ parse_url($url['url'], PHP_URL_HOST) }}&sz=32"
+                                                        alt="favicon"
+                                                        class="w-4 h-4"
+                                                    />
+                                                    <a href="{{ $url['url'] }}" target="_blank" class="link link-hover text-sm truncate max-w-xs">
+                                                        {{ Str::limit($url['url'], 50) }}
+                                                    </a>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @if (isset($url['discovered_from_integration_id']))
+                                                    @php
+                                                        $sourceIntegration = collect($availableIntegrations)->firstWhere('id', $url['discovered_from_integration_id']);
+                                                    @endphp
+                                                    @if ($sourceIntegration)
+                                                        <span class="badge badge-sm badge-neutral">{{ $sourceIntegration['service_name'] }}</span>
+                                                    @else
+                                                        <span class="badge badge-sm badge-ghost">Unknown</span>
+                                                    @endif
+                                                @else
+                                                    <span class="badge badge-sm badge-ghost">-</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <span class="text-sm text-base-content/70" title="{{ $url['discovered_at'] }}">
+                                                    {{ $url['discovered_at'] ? \Carbon\Carbon::parse($url['discovered_at'])->diffForHumans() : '-' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if ($url['enabled'])
+                                                    <span class="badge badge-sm badge-success">Active</span>
+                                                @else
+                                                    <span class="badge badge-sm badge-neutral">Disabled</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-ghost btn-xs"
+                                                    wire:click="removeDiscoveredUrl('{{ $url['id'] }}')"
+                                                    wire:confirm="Are you sure you want to remove this URL?"
+                                                >
+                                                    <x-icon name="o-trash" class="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </x-tab>
 
         <!-- Stats Tab -->
