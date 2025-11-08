@@ -1079,8 +1079,8 @@ new class extends Component
                     <div class="alert alert-info mt-4">
                         <x-icon name="o-information-circle" class="w-5 h-5" />
                         <div>
-                            <p class="font-semibold">Browser Session Available</p>
-                            <p class="text-sm">You can manually log in to sites using the browser session, then extract cookies here.</p>
+                            <p class="font-semibold">Need to access a logged-in site?</p>
+                            <p class="text-sm">Open the browser, log in to any site, then come back here to save your session cookies.</p>
                             <a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="link link-primary text-sm">
                                 Open Browser (VNC)
                             </a>
@@ -1214,9 +1214,9 @@ new class extends Component
                 <div class="card-body">
                     <div class="text-center py-12">
                         <x-icon name="o-lock-closed" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-                        <h3 class="text-lg font-medium text-base-content mb-2">No cookies configured</h3>
+                        <h3 class="text-lg font-medium text-base-content mb-2">No saved sessions yet</h3>
                         <p class="text-base-content/70">
-                            Add cookies for domains that require authentication.
+                            Add cookies to access sites that require login.
                         </p>
                     </div>
                 </div>
@@ -1229,15 +1229,15 @@ new class extends Component
             <!-- Monitor Integrations Section -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
-                    <h3 class="text-lg font-semibold mb-4">Monitor Integrations</h3>
+                    <h3 class="text-lg font-semibold mb-4">Smart URL Discovery</h3>
                     <p class="text-sm text-base-content/70 mb-4">
-                        Select integrations to automatically discover URLs from. Fetch will scan EventObjects and Events for URLs and subscribe to them automatically.
+                        Let Fetch automatically find links from your connected apps. It will scan your notes, posts, and bookmarks to discover URLs worth saving.
                     </p>
 
                     @if (empty($availableIntegrations))
                         <div class="alert alert-info">
                             <x-icon name="o-information-circle" class="w-6 h-6" />
-                            <span>No other integrations found. Add integrations like Karakeep, Reddit, or Outline to enable URL discovery.</span>
+                            <span>Add integrations like Karakeep, Reddit, or Outline to get started.</span>
                         </div>
                     @else
                         <div class="form-control mb-4">
@@ -1471,8 +1471,8 @@ new class extends Component
                         <div class="alert alert-warning mt-4">
                             <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
                             <div>
-                                <p class="font-semibold">Playwright Worker Not Available</p>
-                                <p class="text-sm">Start the Playwright services with: <code class="bg-base-300 px-2 py-1 rounded">sail up -d --profile playwright</code></p>
+                                <p class="font-semibold">Browser automation unavailable</p>
+                                <p class="text-sm">To enable, run: <code class="bg-base-300 px-2 py-1 rounded">sail up -d --profile playwright</code></p>
                             </div>
                         </div>
                         @endif
@@ -1635,43 +1635,12 @@ new class extends Component
                     </div>
                 </div>
 
-                <!-- Configuration Info Card -->
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">How Playwright Works</h3>
-                        <div class="prose prose-sm max-w-none">
-                            <ul class="text-sm space-y-2">
-                                <li>
-                                    <strong>Smart Routing:</strong> The system automatically detects which URLs need JavaScript execution
-                                    and uses Playwright for those, while using faster HTTP fetching for simple pages.
-                                </li>
-                                <li>
-                                    <strong>Auto-Escalation:</strong> If an HTTP fetch fails with robot detection or paywalls,
-                                    the system automatically retries with Playwright.
-                                </li>
-                                <li>
-                                    <strong>Cookie Extraction:</strong> Use the VNC browser to manually log in to sites,
-                                    then extract cookies via the Cookies tab for automated fetching.
-                                </li>
-                                <li>
-                                    <strong>Screenshot Capture:</strong> Playwright automatically captures screenshots
-                                    of fetched pages for visual reference.
-                                </li>
-                                <li>
-                                    <strong>VNC Access:</strong> Connect to the browser session for debugging and manual interactions.
-                                    Password: <code class="bg-base-300 px-2 py-1 rounded">{{ config('services.playwright.chrome_vnc_password') }}</code>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- JavaScript-Required Domains -->
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">JavaScript-Required Domains</h3>
+                        <h3 class="text-lg font-semibold mb-4">Sites That Need Browser Automation</h3>
                         <p class="text-sm text-base-content/70 mb-4">
-                            URLs from these domains always use Playwright for fetching:
+                            These sites are always fetched using the browser:
                         </p>
                         <div class="flex flex-wrap gap-2">
                             @php

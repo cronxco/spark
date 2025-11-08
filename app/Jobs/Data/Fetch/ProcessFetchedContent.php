@@ -88,7 +88,7 @@ class ProcessFetchedContent implements ShouldQueue
 
             // Create or update today's Event
             $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
-            $action = $previousHash ? 'updated' : 'fetched';
+            $action = 'fetched';
 
             $event = Event::updateOrCreate(
                 [
