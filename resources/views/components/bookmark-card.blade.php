@@ -48,7 +48,7 @@
 
         <!-- Summary -->
         @if ($summary)
-            <p class="text-sm text-base-content/70 line-clamp-3 leading-relaxed">
+            <p class="text-sm text-base-content/70 line-clamp-5 leading-relaxed">
                 {{ $summary }}
             </p>
         @endif

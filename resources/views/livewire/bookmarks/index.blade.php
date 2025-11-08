@@ -50,29 +50,24 @@ new class extends \Livewire\Volt\Component {
     public function getBookmarkSummary(Event $event): ?string
     {
         // Try to get tweet-sized summary from Fetch
-        $tweetSummary = $event->blocks->firstWhere('type', 'fetch_summary_tweet');
-        if ($tweetSummary && ! empty($tweetSummary->content)) {
-            return $tweetSummary->content;
+        $tweetSummary = $event->blocks->firstWhere('block_type', 'fetch_summary_tweet');
+        if ($tweetSummary && ! empty($tweetSummary->metadata['summary'])) {
+            return $tweetSummary->metadata['summary'];
         }
 
         // Try to get Karakeep AI summary
-        $karakeepSummary = $event->blocks->firstWhere('type', 'bookmark_summary');
-        if ($karakeepSummary && ! empty($karakeepSummary->content)) {
-            return $karakeepSummary->content;
+        $karakeepSummary = $event->blocks->firstWhere('block_type', 'bookmark_summary');
+        if ($karakeepSummary && ! empty($karakeepSummary->metadata['summary'])) {
+            return $karakeepSummary->metadata['summary'];
         }
 
         // Try to get BlueSky post content
-        $postContent = $event->blocks->firstWhere('type', 'post_content');
-        if ($postContent && ! empty($postContent->content)) {
-            return Str::limit($postContent->content, 280);
+        $postContent = $event->blocks->firstWhere('block_type', 'post_content');
+        if ($postContent && ! empty($postContent->metadata['content'])) {
+            return Str::limit($postContent->metadata['content'], 280);
         }
 
-        // Fallback to target title or first 280 chars of metadata
-        if ($event->target && ! empty($event->target->title)) {
-            return Str::limit($event->target->title, 280);
-        }
-
-        // Last resort: event metadata
+        // Last resort: event metadata description
         if (! empty($event->event_metadata['description'])) {
             return Str::limit($event->event_metadata['description'], 280);
         }
