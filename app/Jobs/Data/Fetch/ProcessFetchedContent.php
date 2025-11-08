@@ -2,10 +2,10 @@
 
 namespace App\Jobs\Data\Fetch;
 
+use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Notifications\FetchContentChanged;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,15 +13,14 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
 
 class ProcessFetchedContent implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public $tries = 1;
 
-    public $backoff = [60, 300, 900];
+    public $maxExceptions = 1;
 
     public function __construct(
         public Integration $integration,
@@ -30,6 +29,13 @@ class ProcessFetchedContent implements ShouldQueue
         public string $contentHash,
         public bool $forceRefresh = false
     ) {}
+
+    public function uniqueId(): string
+    {
+        // Use content hash to ensure we don't process the same content multiple times
+        // This prevents race conditions when multiple fetches return the same content
+        return 'process_fetch_' . $this->integration->id . '_' . $this->webpage->id . '_' . $this->contentHash;
+    }
 
     public function handle(): void
     {
@@ -58,7 +64,7 @@ class ProcessFetchedContent implements ShouldQueue
         }
 
         // Content is new or changed - process it
-        Log::info('Fetch: Content changed, generating summaries', [
+        Log::info('Fetch: Content changed, creating event and dispatching extraction', [
             'url' => $this->webpage->url,
             'previous_hash' => $previousHash ? substr($previousHash, 0, 8) : 'none',
             'new_hash' => substr($this->contentHash, 0, 8),
@@ -66,12 +72,6 @@ class ProcessFetchedContent implements ShouldQueue
         ]);
 
         try {
-            // Generate AI summaries
-            $summaries = $this->generateSummaries(
-                $this->extracted['title'],
-                $this->extracted['text_content']
-            );
-
             // Create or find actor (fetch_user)
             $actorObject = EventObject::firstOrCreate(
                 [
@@ -109,7 +109,6 @@ class ProcessFetchedContent implements ShouldQueue
                         'content_hash' => $this->contentHash,
                         'content_changed' => true,
                         'previous_hash' => $previousHash,
-                        'extraction_success' => true,
                     ],
                 ]
             );
@@ -119,11 +118,21 @@ class ProcessFetchedContent implements ShouldQueue
                 'action' => $action,
             ]);
 
-            // Create/update blocks
-            $this->createBlocks($event, $summaries);
+            // Create Block 1: Raw Content
+            $event->createBlock([
+                'title' => 'Raw Content',
+                'block_type' => 'fetch_content',
+                'time' => $event->time,
+                'metadata' => [
+                    'html' => $this->extracted['content'],
+                    'text' => $this->extracted['text_content'],
+                    'excerpt' => $this->extracted['excerpt'],
+                ],
+            ]);
 
-            // Attach tags to webpage EventObject
-            $this->attachTags($summaries);
+            Log::info('Fetch: Created raw content block', [
+                'event_id' => $event->id,
+            ]);
 
             // Update webpage EventObject
             $this->webpage->update([
@@ -140,19 +149,16 @@ class ProcessFetchedContent implements ShouldQueue
                 ]),
             ]);
 
-            // Send notification for content change (only if content was previously fetched)
-            if ($previousHash) {
-                $this->integration->user->notify(
-                    new FetchContentChanged($this->webpage, $previousHash, $this->contentHash)
-                );
+            // Dispatch content extraction job
+            ExtractContentJob::dispatch(
+                $this->integration,
+                $event,
+                $this->webpage,
+                $this->extracted
+            );
 
-                Log::info('Fetch: Content change notification sent', [
-                    'url' => $this->webpage->url,
-                    'user_id' => $this->integration->user_id,
-                ]);
-            }
-
-            Log::info('Fetch: Processing completed successfully', [
+            Log::info('Fetch: Dispatched content extraction job', [
+                'event_id' => $event->id,
                 'url' => $this->webpage->url,
             ]);
         } catch (Exception $e) {
@@ -162,278 +168,6 @@ class ProcessFetchedContent implements ShouldQueue
             ]);
 
             throw $e;
-        }
-    }
-
-    private function generateSummaries(string $title, string $content): array
-    {
-        $contentLength = strlen($content);
-        $maxContentLength = 10000;
-        $wasTruncated = $contentLength > $maxContentLength;
-        $contentToSend = mb_substr($content, 0, $maxContentLength);
-
-        Log::debug('Fetch: Generating AI summaries', [
-            'title' => $title,
-            'content_length' => $contentLength,
-            'truncated' => $wasTruncated,
-            'truncated_length' => $wasTruncated ? strlen($contentToSend) : null,
-        ]);
-
-        if ($wasTruncated) {
-            Log::warning('Fetch: Content truncated for AI processing', [
-                'url' => $this->webpage->url ?? 'unknown',
-                'original_length' => $contentLength,
-                'truncated_to' => strlen($contentToSend),
-                'characters_lost' => $contentLength - strlen($contentToSend),
-                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1) . '%',
-            ]);
-        }
-
-        $systemPrompt = <<<'PROMPT'
-You are an intelligent content summarizer and extractor. Given an article title and content, provide exactly 8 different outputs in JSON.
-
-Requirements:
-1. article_text: The full, clean article text extracted from the input. Remove navigation, ads, footers, and other non-article content. Preserve the complete article text including all paragraphs, maintaining proper formatting and structure.
-2. summary_tweet: 280 characters maximum, ultra-concise, engaging
-3. summary_short: No more than 40 words, concise overview
-4. summary_paragraph: No more than 150 words, detailed overview with key points
-5. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight
-6. tldr: Single sentence (max 20 words), absolute minimum summary
-7. emoji: Single emoji that best represents the article's theme or content
-8. tags: Array of 1-5 semantic tags with types. Only include tags that are clearly relevant and mentioned in the content:
-   - "topic-tag" for subjects/themes (e.g., "Machine Learning", "Climate Change")
-   - "person-tag" for people mentioned (e.g., "Elon Musk", "Jane Doe")
-   - "organisation-tag" for organizations (e.g., "NASA", "Microsoft")
-   - "place-tag" for locations (e.g., "New York", "Mars")
-
-Return ONLY valid JSON in this exact format:
-{
-  "article_text": "Complete cleaned article text here...",
-  "summary_tweet": "280 char version here",
-  "summary_short": "40 word version here",
-  "summary_paragraph": "150 word version here",
-  "key_takeaways": ["point 1", "point 2", "point 3"],
-  "tldr": "One sentence version here",
-  "emoji": "📰",
-  "tags": [
-    {"tag": "Artificial Intelligence", "tag_type": "topic-tag"},
-    {"tag": "Sam Altman", "tag_type": "person-tag"}
-  ]
-}
-PROMPT;
-
-        try {
-            $result = OpenAI::chat()->create([
-                'model' => 'gpt-5-nano',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => $systemPrompt,
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => json_encode([
-                            'title' => $title,
-                            'content' => $contentToSend,
-                        ]),
-                    ],
-                ],
-                'response_format' => ['type' => 'json_object'],
-            ]);
-
-            $summaries = json_decode($result->choices[0]->message->content, true);
-
-            // Validate response structure
-            $requiredKeys = ['article_text', 'summary_tweet', 'summary_short', 'summary_paragraph', 'key_takeaways', 'tldr', 'emoji', 'tags'];
-            foreach ($requiredKeys as $key) {
-                if (! isset($summaries[$key])) {
-                    throw new Exception("Missing required summary type: {$key}");
-                }
-            }
-
-            Log::debug('Fetch: AI summaries generated successfully', [
-                'emoji' => $summaries['emoji'] ?? null,
-                'tag_count' => count($summaries['tags'] ?? []),
-            ]);
-
-            return $summaries;
-        } catch (Exception $e) {
-            Log::error('Fetch: AI summary generation failed', [
-                'error' => $e->getMessage(),
-            ]);
-
-            // Return fallback summaries
-            return [
-                'article_text' => $content,
-                'summary_tweet' => mb_substr($content, 0, 280),
-                'summary_short' => implode(' ', array_slice(str_word_count($content, 1), 0, 40)),
-                'summary_paragraph' => implode(' ', array_slice(str_word_count($content, 1), 0, 150)),
-                'key_takeaways' => ['Summary generation failed'],
-                'tldr' => mb_substr($content, 0, 100),
-                'emoji' => '📄',
-                'tags' => [],
-            ];
-        }
-    }
-
-    private function createBlocks(Event $event, array $summaries): void
-    {
-        $eventTime = $event->time;
-
-        // Block 1: Raw Content
-        $event->createBlock([
-            'title' => 'Raw Content',
-            'block_type' => 'fetch_content',
-            'time' => $eventTime,
-            'metadata' => [
-                'html' => $this->extracted['content'],
-                'text' => $this->extracted['text_content'],
-                'excerpt' => $this->extracted['excerpt'],
-            ],
-        ]);
-
-        // Block 2: Cleaned Article Text (AI-extracted)
-        $event->createBlock([
-            'title' => 'Article Text',
-            'block_type' => 'fetch_article_text',
-            'time' => $eventTime,
-            'metadata' => [
-                'article_text' => $summaries['article_text'],
-                'word_count' => str_word_count($summaries['article_text']),
-                'char_count' => strlen($summaries['article_text']),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        // Block 3: Metadata
-        $event->createBlock([
-            'title' => 'Metadata',
-            'block_type' => 'fetch_metadata',
-            'time' => $eventTime,
-            'metadata' => [
-                'author' => $this->extracted['author'],
-                'image' => $this->extracted['image'],
-                'direction' => $this->extracted['direction'],
-                'extracted_at' => now()->toIso8601String(),
-            ],
-        ]);
-
-        // Block 4: Tweet Summary
-        $event->createBlock([
-            'title' => 'Tweet Summary',
-            'block_type' => 'fetch_summary_tweet',
-            'time' => $eventTime,
-            'metadata' => [
-                'summary' => $summaries['summary_tweet'],
-                'char_count' => strlen($summaries['summary_tweet']),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        // Block 5: Short Summary
-        $event->createBlock([
-            'title' => 'Short Summary',
-            'block_type' => 'fetch_summary_short',
-            'time' => $eventTime,
-            'metadata' => [
-                'summary' => $summaries['summary_short'],
-                'word_count' => str_word_count($summaries['summary_short']),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        // Block 6: Paragraph Summary
-        $event->createBlock([
-            'title' => 'Paragraph Summary',
-            'block_type' => 'fetch_summary_paragraph',
-            'time' => $eventTime,
-            'metadata' => [
-                'summary' => $summaries['summary_paragraph'],
-                'word_count' => str_word_count($summaries['summary_paragraph']),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        // Block 7: Key Takeaways
-        $event->createBlock([
-            'title' => 'Key Takeaways',
-            'block_type' => 'fetch_key_takeaways',
-            'time' => $eventTime,
-            'metadata' => [
-                'takeaways' => $summaries['key_takeaways'],
-                'count' => count($summaries['key_takeaways']),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        // Block 8: TL;DR
-        $event->createBlock([
-            'title' => 'TL;DR',
-            'block_type' => 'fetch_tldr',
-            'time' => $eventTime,
-            'metadata' => [
-                'summary' => $summaries['tldr'],
-                'word_count' => str_word_count($summaries['tldr']),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        // Block 9: Tags
-        $event->createBlock([
-            'title' => 'Tags',
-            'block_type' => 'fetch_tags',
-            'time' => $eventTime,
-            'metadata' => [
-                'emoji' => $summaries['emoji'] ?? null,
-                'tags' => $summaries['tags'] ?? [],
-                'tag_count' => count($summaries['tags'] ?? []),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        Log::info('Fetch: Created 9 blocks for event', [
-            'event_id' => $event->id,
-        ]);
-    }
-
-    private function attachTags(array $summaries): void
-    {
-        // Attach emoji tag if present
-        if (! empty($summaries['emoji'])) {
-            $this->webpage->attachTags([$summaries['emoji']], 'spark-emoji');
-
-            Log::debug('Fetch: Attached emoji tag', [
-                'emoji' => $summaries['emoji'],
-                'webpage_id' => $this->webpage->id,
-            ]);
-        }
-
-        // Attach semantic tags if present
-        if (! empty($summaries['tags']) && is_array($summaries['tags'])) {
-            foreach ($summaries['tags'] as $tagData) {
-                if (isset($tagData['tag']) && isset($tagData['tag_type'])) {
-                    $this->webpage->attachTags([$tagData['tag']], $tagData['tag_type']);
-
-                    Log::debug('Fetch: Attached semantic tag', [
-                        'tag' => $tagData['tag'],
-                        'tag_type' => $tagData['tag_type'],
-                        'webpage_id' => $this->webpage->id,
-                    ]);
-                }
-            }
-
-            Log::info('Fetch: Attached tags to webpage', [
-                'webpage_id' => $this->webpage->id,
-                'emoji' => $summaries['emoji'] ?? null,
-                'tag_count' => count($summaries['tags']),
-            ]);
         }
     }
 }
