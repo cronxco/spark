@@ -30,7 +30,8 @@ class FetchSingleUrl implements ShouldQueue
     public function __construct(
         public Integration $integration,
         public string $webpageObjectId,
-        public string $url
+        public string $url,
+        public bool $forceRefresh = false
     ) {}
 
     public function handle(): void
@@ -176,7 +177,8 @@ class FetchSingleUrl implements ShouldQueue
                 $this->integration,
                 $webpage,
                 $extracted,
-                $contentHash
+                $contentHash,
+                $this->forceRefresh
             );
         } catch (GuzzleException $e) {
             $durationMs = round((microtime(true) - $startTime) * 1000);

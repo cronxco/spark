@@ -27,7 +27,8 @@ class ProcessFetchedContent implements ShouldQueue
         public Integration $integration,
         public EventObject $webpage,
         public array $extracted,
-        public string $contentHash
+        public string $contentHash,
+        public bool $forceRefresh = false
     ) {}
 
     public function handle(): void
@@ -41,8 +42,8 @@ class ProcessFetchedContent implements ShouldQueue
         $metadata = $this->webpage->metadata ?? [];
         $previousHash = $metadata['content_hash'] ?? null;
 
-        // Check if content has changed
-        if ($previousHash && $previousHash === $this->contentHash) {
+        // Check if content has changed (skip if force refresh is enabled)
+        if (! $this->forceRefresh && $previousHash && $previousHash === $this->contentHash) {
             // Content unchanged - just update last_checked_at
             Log::info('Fetch: Content unchanged, skipping processing', [
                 'url' => $this->webpage->url,
@@ -61,6 +62,7 @@ class ProcessFetchedContent implements ShouldQueue
             'url' => $this->webpage->url,
             'previous_hash' => $previousHash ? substr($previousHash, 0, 8) : 'none',
             'new_hash' => substr($this->contentHash, 0, 8),
+            'force_refresh' => $this->forceRefresh,
         ]);
 
         try {
@@ -119,6 +121,9 @@ class ProcessFetchedContent implements ShouldQueue
 
             // Create/update blocks
             $this->createBlocks($event, $summaries);
+
+            // Attach tags to webpage EventObject
+            $this->attachTags($summaries);
 
             // Update webpage EventObject
             $this->webpage->update([
@@ -185,7 +190,7 @@ class ProcessFetchedContent implements ShouldQueue
         }
 
         $systemPrompt = <<<'PROMPT'
-You are an intelligent content summarizer and extractor. Given an article title and content, provide exactly 6 different outputs in JSON.
+You are an intelligent content summarizer and extractor. Given an article title and content, provide exactly 8 different outputs in JSON.
 
 Requirements:
 1. article_text: The full, clean article text extracted from the input. Remove navigation, ads, footers, and other non-article content. Preserve the complete article text including all paragraphs, maintaining proper formatting and structure.
@@ -194,6 +199,12 @@ Requirements:
 4. summary_paragraph: No more than 150 words, detailed overview with key points
 5. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight
 6. tldr: Single sentence (max 20 words), absolute minimum summary
+7. emoji: Single emoji that best represents the article's theme or content
+8. tags: Array of 1-5 semantic tags with types. Only include tags that are clearly relevant and mentioned in the content:
+   - "topic-tag" for subjects/themes (e.g., "Machine Learning", "Climate Change")
+   - "person-tag" for people mentioned (e.g., "Elon Musk", "Jane Doe")
+   - "organisation-tag" for organizations (e.g., "NASA", "Microsoft")
+   - "place-tag" for locations (e.g., "New York", "Mars")
 
 Return ONLY valid JSON in this exact format:
 {
@@ -202,7 +213,12 @@ Return ONLY valid JSON in this exact format:
   "summary_short": "40 word version here",
   "summary_paragraph": "150 word version here",
   "key_takeaways": ["point 1", "point 2", "point 3"],
-  "tldr": "One sentence version here"
+  "tldr": "One sentence version here",
+  "emoji": "📰",
+  "tags": [
+    {"tag": "Artificial Intelligence", "tag_type": "topic-tag"},
+    {"tag": "Sam Altman", "tag_type": "person-tag"}
+  ]
 }
 PROMPT;
 
@@ -223,20 +239,22 @@ PROMPT;
                     ],
                 ],
                 'response_format' => ['type' => 'json_object'],
-                'temperature' => 0.7,
             ]);
 
             $summaries = json_decode($result->choices[0]->message->content, true);
 
             // Validate response structure
-            $requiredKeys = ['article_text', 'summary_tweet', 'summary_short', 'summary_paragraph', 'key_takeaways', 'tldr'];
+            $requiredKeys = ['article_text', 'summary_tweet', 'summary_short', 'summary_paragraph', 'key_takeaways', 'tldr', 'emoji', 'tags'];
             foreach ($requiredKeys as $key) {
                 if (! isset($summaries[$key])) {
                     throw new Exception("Missing required summary type: {$key}");
                 }
             }
 
-            Log::debug('Fetch: AI summaries generated successfully');
+            Log::debug('Fetch: AI summaries generated successfully', [
+                'emoji' => $summaries['emoji'] ?? null,
+                'tag_count' => count($summaries['tags'] ?? []),
+            ]);
 
             return $summaries;
         } catch (Exception $e) {
@@ -252,6 +270,8 @@ PROMPT;
                 'summary_paragraph' => implode(' ', array_slice(str_word_count($content, 1), 0, 150)),
                 'key_takeaways' => ['Summary generation failed'],
                 'tldr' => mb_substr($content, 0, 100),
+                'emoji' => '📄',
+                'tags' => [],
             ];
         }
     }
@@ -364,8 +384,56 @@ PROMPT;
             ],
         ]);
 
-        Log::info('Fetch: Created 8 blocks for event', [
+        // Block 9: Tags
+        $event->createBlock([
+            'title' => 'Tags',
+            'block_type' => 'fetch_tags',
+            'time' => $eventTime,
+            'metadata' => [
+                'emoji' => $summaries['emoji'] ?? null,
+                'tags' => $summaries['tags'] ?? [],
+                'tag_count' => count($summaries['tags'] ?? []),
+                'generated_at' => now()->toIso8601String(),
+                'model' => 'gpt-5-nano',
+            ],
+        ]);
+
+        Log::info('Fetch: Created 9 blocks for event', [
             'event_id' => $event->id,
         ]);
+    }
+
+    private function attachTags(array $summaries): void
+    {
+        // Attach emoji tag if present
+        if (! empty($summaries['emoji'])) {
+            $this->webpage->attachTags([$summaries['emoji']], 'spark-emoji');
+
+            Log::debug('Fetch: Attached emoji tag', [
+                'emoji' => $summaries['emoji'],
+                'webpage_id' => $this->webpage->id,
+            ]);
+        }
+
+        // Attach semantic tags if present
+        if (! empty($summaries['tags']) && is_array($summaries['tags'])) {
+            foreach ($summaries['tags'] as $tagData) {
+                if (isset($tagData['tag']) && isset($tagData['tag_type'])) {
+                    $this->webpage->attachTags([$tagData['tag']], $tagData['tag_type']);
+
+                    Log::debug('Fetch: Attached semantic tag', [
+                        'tag' => $tagData['tag'],
+                        'tag_type' => $tagData['tag_type'],
+                        'webpage_id' => $this->webpage->id,
+                    ]);
+                }
+            }
+
+            Log::info('Fetch: Attached tags to webpage', [
+                'webpage_id' => $this->webpage->id,
+                'emoji' => $summaries['emoji'] ?? null,
+                'tag_count' => count($summaries['tags']),
+            ]);
+        }
     }
 }

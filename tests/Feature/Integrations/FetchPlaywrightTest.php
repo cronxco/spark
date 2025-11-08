@@ -72,6 +72,12 @@ class FetchPlaywrightTest extends TestCase
     {
         config(['services.playwright.enabled' => true]);
 
+        // Mock Playwright worker as unavailable
+        Http::fake([
+            '*/health' => Http::response(['status' => 'error'], 500),
+            'example.com' => Http::response('<html><body>Test</body></html>', 200),
+        ]);
+
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
 
@@ -100,7 +106,10 @@ class FetchPlaywrightTest extends TestCase
      */
     public function playwright_client_detects_unavailable_worker(): void
     {
-        config(['services.playwright.enabled' => true]);
+        // Mock Playwright worker as unavailable
+        Http::fake([
+            '*/health' => Http::response(['status' => 'error'], 500),
+        ]);
 
         $client = new PlaywrightFetchClient;
         $isAvailable = $client->isAvailable();

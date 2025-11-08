@@ -412,7 +412,7 @@ new class extends Component
         $this->loadData();
     }
 
-    public function fetchNow(string $id): void
+    public function fetchNow(string $id, bool $forceRefresh = false): void
     {
         $eventObject = EventObject::find($id);
 
@@ -423,11 +423,13 @@ new class extends Component
         }
 
         try {
-            FetchSingleUrl::dispatch($this->integration, $eventObject->id, $eventObject->url);
-            $this->success('Fetch job queued. Check back shortly for results.');
+            FetchSingleUrl::dispatch($this->integration, $eventObject->id, $eventObject->url, $forceRefresh);
+            $message = $forceRefresh ? 'Force refresh queued. Will regenerate AI summaries even if content unchanged.' : 'Fetch job queued. Check back shortly for results.';
+            $this->success($message);
         } catch (\Exception $e) {
             Log::error('Failed to dispatch fetch job', [
                 'object_id' => $id,
+                'force_refresh' => $forceRefresh,
                 'error' => $e->getMessage(),
             ]);
             $this->error('Failed to queue fetch job. Please try again.');
@@ -893,6 +895,11 @@ new class extends Component
                                         title="Fetch Now"
                                         icon="o-arrow-path"
                                         wire:click="fetchNow('{{ $url['id'] }}')" />
+                                    <x-menu-item
+                                        title="Force Refresh"
+                                        icon="o-arrow-path-rounded-square"
+                                        wire:click="fetchNow('{{ $url['id'] }}', true)" />
+                                    <x-menu-separator />
                                     <x-menu-item
                                         title="{{ $url['enabled'] ? 'Disable' : 'Enable' }}"
                                         icon="o-power"
