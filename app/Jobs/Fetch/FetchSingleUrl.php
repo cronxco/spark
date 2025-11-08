@@ -3,11 +3,12 @@
 namespace App\Jobs\Fetch;
 
 use App\Integrations\Fetch\ContentExtractor;
-use App\Integrations\Fetch\FetchHttpClient;
+use App\Integrations\Fetch\FetchEngineManager;
 use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
+use App\Services\PlaywrightHealthMetrics;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Bus\Queueable;
@@ -16,6 +17,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class FetchSingleUrl implements ShouldQueue
 {
@@ -33,6 +35,8 @@ class FetchSingleUrl implements ShouldQueue
 
     public function handle(): void
     {
+        $startTime = microtime(true);
+
         Log::info('Fetch: Fetching single URL', [
             'integration_id' => $this->integration->id,
             'webpage_id' => $this->webpageObjectId,
@@ -58,6 +62,8 @@ class FetchSingleUrl implements ShouldQueue
             return;
         }
 
+        $engine = new FetchEngineManager;
+
         try {
             // Check if URL is a PDF
             if (str_ends_with(strtolower($this->url), '.pdf')) {
@@ -66,15 +72,28 @@ class FetchSingleUrl implements ShouldQueue
                 return;
             }
 
-            // Fetch URL with cookies
-            $response = FetchHttpClient::fetchWithCookies($this->url, $group);
-            $html = (string) $response->getBody();
-            $statusCode = $response->getStatusCode();
+            // Fetch URL using engine manager (auto-selects between Playwright and HTTP)
+            $result = $engine->fetch($this->url, $group, $webpage);
 
-            Log::debug('Fetch: HTTP response received', [
+            if ($result['error']) {
+                throw new Exception($result['error']);
+            }
+
+            $html = $result['html'];
+            $statusCode = $result['status_code'];
+            $screenshot = $result['screenshot'] ?? null;
+            $method = $result['method'] ?? 'unknown';
+
+            // Calculate duration
+            $durationMs = round((microtime(true) - $startTime) * 1000);
+
+            Log::debug('Fetch: Response received', [
                 'url' => $this->url,
                 'status_code' => $statusCode,
                 'content_length' => strlen($html),
+                'method' => $method,
+                'has_screenshot' => ! empty($screenshot),
+                'duration_ms' => $durationMs,
             ]);
 
             // Extract content using Readability
@@ -87,6 +106,13 @@ class FetchSingleUrl implements ShouldQueue
                     'reason' => $reason,
                 ]);
                 $this->updateWebpageError($webpage, $reason);
+
+                // Update history with failure
+                $engine->updateLastHistoryEntry($webpage, [
+                    'outcome' => 'failed',
+                    'duration_ms' => $durationMs,
+                    'status_code' => $statusCode,
+                ]);
 
                 return;
             }
@@ -101,7 +127,49 @@ class FetchSingleUrl implements ShouldQueue
                 'title' => $extracted['title'],
                 'content_length' => strlen($extracted['text_content']),
                 'content_hash' => substr($contentHash, 0, 8),
+                'method' => $method,
             ]);
+
+            // Store screenshot if available
+            if ($screenshot) {
+                try {
+                    $webpage->addMediaFromBase64($screenshot)
+                        ->usingFileName('screenshot-' . now()->format('Y-m-d-His') . '.png')
+                        ->toMediaCollection('screenshots');
+
+                    Log::debug('Fetch: Screenshot saved', ['url' => $this->url]);
+                } catch (Exception $e) {
+                    Log::warning('Fetch: Failed to save screenshot', [
+                        'url' => $this->url,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Update webpage metadata with fetch method
+            $metadata = $webpage->metadata ?? [];
+            $metadata['last_fetch_method'] = $method;
+            $webpage->update(['metadata' => $metadata]);
+
+            // Update history with success
+            $engine->updateLastHistoryEntry($webpage, [
+                'outcome' => 'success',
+                'duration_ms' => $durationMs,
+                'status_code' => $statusCode,
+            ]);
+
+            // Record metrics
+            $metrics = new PlaywrightHealthMetrics;
+            $metrics->recordFetch($method, true, (int) $durationMs);
+
+            // Check if stealth was used and effective (for robot detection)
+            if ($method === 'playwright' && isset($webpage->metadata['last_error'])) {
+                $lastError = $webpage->metadata['last_error'];
+                $errorMsg = strtolower($lastError['message'] ?? '');
+                if (str_contains($errorMsg, 'robot') || str_contains($errorMsg, 'captcha')) {
+                    $metrics->recordStealthBypass(true);
+                }
+            }
 
             // Dispatch processing job
             ProcessFetchedContent::dispatch(
@@ -111,25 +179,58 @@ class FetchSingleUrl implements ShouldQueue
                 $contentHash
             );
         } catch (GuzzleException $e) {
+            $durationMs = round((microtime(true) - $startTime) * 1000);
+
             Log::error('Fetch: HTTP request failed', [
                 'url' => $this->url,
                 'error' => $e->getMessage(),
             ]);
             $this->updateWebpageError($webpage, 'HTTP error: ' . $e->getMessage());
 
+            // Update history with failure
+            $engine->updateLastHistoryEntry($webpage, [
+                'outcome' => 'failed',
+                'duration_ms' => $durationMs,
+                'status_code' => 0,
+            ]);
+
+            // Record metrics
+            $metrics = new PlaywrightHealthMetrics;
+            $method = $webpage->metadata['last_fetch_method'] ?? 'http';
+            $metrics->recordFetch($method, false, (int) $durationMs, 'http_error');
+
+            // Check for bot detection
+            if (str_contains(strtolower($e->getMessage()), 'robot') || str_contains(strtolower($e->getMessage()), 'captcha')) {
+                $metrics->recordStealthBypass(false);
+            }
+
             throw $e; // Re-throw to trigger retry
         } catch (Exception $e) {
+            $durationMs = round((microtime(true) - $startTime) * 1000);
+
             Log::error('Fetch: Unexpected error', [
                 'url' => $this->url,
                 'error' => $e->getMessage(),
             ]);
             $this->updateWebpageError($webpage, 'Error: ' . $e->getMessage());
 
+            // Update history with failure
+            $engine->updateLastHistoryEntry($webpage, [
+                'outcome' => 'failed',
+                'duration_ms' => $durationMs,
+                'status_code' => 0,
+            ]);
+
+            // Record metrics
+            $metrics = new PlaywrightHealthMetrics;
+            $method = $webpage->metadata['last_fetch_method'] ?? 'http';
+            $metrics->recordFetch($method, false, (int) $durationMs, 'general_error');
+
             throw $e; // Re-throw to trigger retry
         }
     }
 
-    public function failed(Exception $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::error('Fetch: Job failed after all retries', [
             'url' => $this->url,
@@ -188,7 +289,7 @@ class FetchSingleUrl implements ShouldQueue
         // Send notification after 3 consecutive failures
         if ($consecutiveFailures === 3) {
             $this->integration->user->notify(
-                new FetchMultipleFailures($webpage, $errorMessage)
+                new FetchMultipleFailures($webpage, $consecutiveFailures, $errorMessage)
             );
 
             Log::info('Fetch: Sent multiple failures notification', [

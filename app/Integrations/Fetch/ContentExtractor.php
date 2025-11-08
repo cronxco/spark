@@ -42,6 +42,9 @@ class ContentExtractor
             // Validate extracted content
             $validation = self::validate($extracted, $html);
 
+            // Write debug file with extracted content
+            self::writeDebugExtraction($url, $extracted, $validation);
+
             if (! $validation['success']) {
                 Log::warning('Fetch: Content extraction validation failed', [
                     'url' => $url,
@@ -93,7 +96,7 @@ class ContentExtractor
     /**
      * Detect if content is behind a paywall
      */
-    public static function detectPaywall(string $html, string $textContent): bool
+    public static function detectPaywall(string $html): bool
     {
         $paywallIndicators = [
             'class="paywall"',
@@ -119,35 +122,55 @@ class ContentExtractor
     }
 
     /**
-     * Detect if page has robot check / CAPTCHA
+     * Detect if page has robot check / CAPTCHA that's actually blocking content
+     *
+     * @param  string  $title  Page title
+     * @param  string  $html  Raw HTML
+     * @param  string|null  $extractedContent  Successfully extracted text content
      */
-    public static function detectRobotCheck(string $title, string $html): bool
+    public static function detectRobotCheck(string $title, string $html, ?string $extractedContent = null): bool
     {
-        $robotIndicators = [
-            'robot',
-            'captcha',
-            'verify you',
-            'are you human',
-            'cloudflare',
+        // Strong indicators in title are always a robot check
+        $titleIndicators = [
+            'just a moment',
             'security check',
             'access denied',
-            'bot detection',
+            'verify you',
+            'are you human',
+            'attention required',
         ];
 
         $lowerTitle = strtolower($title);
-        $lowerHtml = strtolower($html);
-
-        foreach ($robotIndicators as $indicator) {
+        foreach ($titleIndicators as $indicator) {
             if (str_contains($lowerTitle, $indicator)) {
                 return true;
             }
         }
 
-        // Check HTML for common CAPTCHA providers
-        $captchaProviders = ['recaptcha', 'hcaptcha', 'turnstile', 'cf-challenge'];
-        foreach ($captchaProviders as $provider) {
-            if (str_contains($lowerHtml, $provider)) {
-                return true;
+        // If we successfully extracted substantial content, it's not a blocking robot check
+        // even if CAPTCHA libraries are present (e.g., for comment forms)
+        if ($extractedContent !== null && strlen($extractedContent) >= 500) {
+            return false;
+        }
+
+        // Check for active CAPTCHA challenges (not just library presence)
+        $lowerHtml = strtolower($html);
+
+        // Look for active challenge pages (Cloudflare, reCAPTCHA challenge pages)
+        $activeChallengeIndicators = [
+            'cf-challenge',
+            'cf-browser-verification',
+            'g-recaptcha-response',
+            'data-hcaptcha',
+            'turnstile-wrapper',
+        ];
+
+        foreach ($activeChallengeIndicators as $indicator) {
+            if (str_contains($lowerHtml, $indicator)) {
+                // Found challenge indicator - only flag if content is insufficient
+                if ($extractedContent === null || strlen($extractedContent) < 500) {
+                    return true;
+                }
             }
         }
 
@@ -163,6 +186,41 @@ class ContentExtractor
         $normalized = preg_replace('/\s+/', ' ', trim($textContent));
 
         return hash('sha256', $normalized);
+    }
+
+    /**
+     * Write most recent content extraction to debug file
+     */
+    private static function writeDebugExtraction(string $url, array $extracted, array $validation): void
+    {
+        try {
+            $logPath = storage_path('logs/fetch_extraction_last.json');
+
+            $debugData = [
+                'timestamp' => now()->toIso8601String(),
+                'url' => $url,
+                'validation' => [
+                    'success' => $validation['success'],
+                    'reason' => $validation['reason'],
+                ],
+                'extracted' => [
+                    'title' => $extracted['title'] ?? '',
+                    'author' => $extracted['author'] ?? '',
+                    'excerpt' => $extracted['excerpt'] ?? '',
+                    'direction' => $extracted['direction'] ?? '',
+                    'image' => $extracted['image'] ?? '',
+                    'content_length' => strlen($extracted['content'] ?? ''),
+                    'text_content_length' => strlen($extracted['text_content'] ?? ''),
+                    'content_html' => $extracted['content'] ?? '',
+                    'text_content' => $extracted['text_content'] ?? '',
+                ],
+            ];
+
+            file_put_contents($logPath, json_encode($debugData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        } catch (Exception $e) {
+            // Silently fail - don't break the extraction process
+            Log::debug('Failed to write extraction debug file', ['error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -193,8 +251,8 @@ class ContentExtractor
             ];
         }
 
-        // Check for robot detection
-        if (self::detectRobotCheck($title, $html)) {
+        // Check for robot detection (pass extracted content for context-aware detection)
+        if (self::detectRobotCheck($title, $html, $textContent)) {
             return [
                 'success' => false,
                 'reason' => 'Robot check detected',
@@ -204,7 +262,7 @@ class ContentExtractor
 
         // Check for paywall BEFORE checking content length
         // This ensures paywall indicators are detected even with short content
-        if (self::detectPaywall($html, $textContent)) {
+        if (self::detectPaywall($html)) {
             return [
                 'success' => false,
                 'reason' => 'Paywall detected',

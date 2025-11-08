@@ -123,4 +123,33 @@ return [
         'redirect' => env('BLUESKY_REDIRECT', '/bluesky/oauth/callback'),
     ],
 
+    'playwright' => [
+        'enabled' => env('PLAYWRIGHT_ENABLED', false),
+        'worker_url' => env('PLAYWRIGHT_WORKER_URL', 'http://playwright-worker:3000'),
+        'chrome_vnc_url' => env('CHROME_VNC_URL', 'vnc://localhost:5900'),
+        'chrome_vnc_password' => env('CHROME_VNC_PASSWORD', 'spark-dev-vnc'),
+        'timeout' => env('PLAYWRIGHT_TIMEOUT', 30000), // 30 seconds
+        'screenshot_enabled' => env('PLAYWRIGHT_SCREENSHOT_ENABLED', true),
+        'auto_escalate' => env('PLAYWRIGHT_AUTO_ESCALATE', true), // Auto-use Playwright on HTTP failures
+        'js_required_domains' => env('PLAYWRIGHT_JS_DOMAINS', 'twitter.com,x.com,instagram.com,facebook.com'),
+
+        // Stealth mode (anti-bot detection)
+        'stealth_enabled' => env('PLAYWRIGHT_STEALTH_ENABLED', true),
+
+        // Cookie auto-refresh
+        'auto_update_cookies' => env('PLAYWRIGHT_AUTO_UPDATE_COOKIES', true),
+
+        // Browser context persistence
+        'context_persistence_enabled' => env('PLAYWRIGHT_CONTEXT_PERSISTENCE', true),
+        'context_ttl' => env('PLAYWRIGHT_CONTEXT_TTL', 1800), // 30 minutes in seconds
+        'context_ttl_minutes' => env('PLAYWRIGHT_CONTEXT_TTL', 1800) / 60, // For display
+
+        // Use default browser context (includes extensions like cookie popup blocker)
+        'use_default_context' => env('PLAYWRIGHT_USE_DEFAULT_CONTEXT', true),
+
+        // Scheduled cookie refresh
+        'cookie_refresh_enabled' => env('PLAYWRIGHT_COOKIE_REFRESH_ENABLED', true),
+        'cookie_refresh_threshold_days' => env('PLAYWRIGHT_COOKIE_REFRESH_THRESHOLD', 7),
+    ],
+
 ];

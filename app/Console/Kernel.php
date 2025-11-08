@@ -3,6 +3,7 @@
 namespace App\Console;
 
 use App\Jobs\Fetch\CheckCookieExpiryJob;
+use App\Jobs\Fetch\RefreshExpiringCookies;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -28,6 +29,13 @@ class Kernel extends ConsoleKernel
         $schedule
             ->job(new CheckCookieExpiryJob)
             ->dailyAt('06:00')
+            ->onOneServer()
+            ->withoutOverlapping();
+
+        // Refresh expiring cookies daily at 2am
+        $schedule
+            ->job(new RefreshExpiringCookies)
+            ->dailyAt('02:00')
             ->onOneServer()
             ->withoutOverlapping();
     }

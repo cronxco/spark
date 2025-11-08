@@ -194,4 +194,70 @@ class ContentExtractorTest extends TestCase
         $this->assertArrayHasKey('success', $result);
         $this->assertArrayHasKey('reason', $result);
     }
+
+    /** @test */
+    public function it_allows_pages_with_recaptcha_library_but_substantial_content()
+    {
+        // Simulate NYTimes-like page: has reCAPTCHA library loaded (for comments)
+        // but article content is fully accessible
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>The Soothing British Radio Show That Blew My Mind</title>
+                <script src="https://www.google.com/recaptcha/api.js"></script>
+            </head>
+            <body>
+                <article>
+                    <h1>Article Title</h1>
+                    <p>This is a real article with substantial content that spans multiple paragraphs.
+                    The article discusses important topics and provides valuable information to readers.
+                    Even though this page loads the reCAPTCHA library for its comment system, the main
+                    article content is fully accessible and should be extracted successfully.</p>
+                    <p>More content here to ensure we have plenty of text extracted. This simulates a
+                    real news article that might be 1000+ words long with multiple paragraphs, images,
+                    and rich content. The presence of reCAPTCHA should not cause a false positive.</p>
+                    <p>Additional paragraphs continue the article with even more valuable information
+                    for the reader. This content is freely accessible and not behind any robot check
+                    or CAPTCHA challenge. The reCAPTCHA is only used for the comment form at the bottom.</p>
+                </article>
+                <div id="comments">
+                    <div class="g-recaptcha" data-sitekey="6LexampleKEY"></div>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com/article');
+
+        // Should succeed because we extracted substantial content (>500 chars)
+        $this->assertTrue($result['success'], 'Should extract content despite reCAPTCHA library presence');
+        $this->assertArrayHasKey('data', $result);
+        $this->assertGreaterThan(500, strlen($result['data']['text_content']));
+    }
+
+    /** @test */
+    public function it_detects_actual_recaptcha_challenge_page()
+    {
+        // This simulates an actual CAPTCHA challenge page with minimal content
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Just a moment...</title></head>
+            <body>
+                <div class="cf-challenge">
+                    <form method="POST">
+                        <div class="g-recaptcha-response"></div>
+                        <p>Please verify you are human</p>
+                    </form>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('robot', strtolower($result['reason']));
+    }
 }

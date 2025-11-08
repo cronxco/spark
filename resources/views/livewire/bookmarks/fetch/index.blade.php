@@ -1,12 +1,15 @@
 <?php
 
 use App\Integrations\Fetch\CookieParser;
+use App\Integrations\Fetch\FetchEngineManager;
 use App\Integrations\Fetch\FetchHttpClient;
+use App\Integrations\Fetch\PlaywrightFetchClient;
 use App\Integrations\PluginRegistry;
 use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\PlaywrightHealthMetrics;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Validate;
@@ -42,6 +45,13 @@ new class extends Component
 
     // Stats
     public array $stats = [];
+
+    // Playwright
+    public bool $playwrightEnabled = false;
+    public bool $playwrightAvailable = false;
+    public array $playwrightStats = [];
+    public array $healthMetrics = [];
+    public array $workerStats = [];
 
     protected $listeners = ['$refresh' => 'loadData'];
 
@@ -91,6 +101,38 @@ new class extends Component
         $this->loadCookies();
         $this->loadDiscoverySettings();
         $this->loadStats();
+        $this->loadPlaywrightStatus();
+    }
+
+    public function loadPlaywrightStatus(): void
+    {
+        $this->playwrightEnabled = config('services.playwright.enabled', false);
+
+        if ($this->playwrightEnabled) {
+            $engine = new FetchEngineManager;
+            $this->playwrightAvailable = $engine->isPlaywrightAvailable();
+            $this->playwrightStats = $engine->getMethodStats($this->group);
+
+            // Load health metrics
+            $metrics = new PlaywrightHealthMetrics;
+            $this->healthMetrics = $metrics->getStats('24h');
+
+            // Load worker stats
+            if ($this->playwrightAvailable) {
+                $client = new PlaywrightFetchClient;
+                $this->workerStats = $client->getWorkerStats() ?? [];
+            }
+        } else {
+            $this->playwrightAvailable = false;
+            $this->playwrightStats = [];
+            $this->healthMetrics = [];
+            $this->workerStats = [];
+        }
+    }
+
+    public function refreshMetrics(): void
+    {
+        $this->loadPlaywrightStatus();
     }
 
     public function loadUrls(): void
@@ -161,8 +203,26 @@ new class extends Component
                 'last_error' => $metadata['last_error'] ?? null,
                 'subscription_source' => $metadata['subscription_source'] ?? 'manual',
                 'fetch_count' => $metadata['fetch_count'] ?? 0,
+                'last_fetch_method' => $metadata['last_fetch_method'] ?? null,
+                'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10), // Last 10 entries
             ];
         })->toArray();
+    }
+
+    private function getReasonLabel(string $reason): string
+    {
+        return match($reason) {
+            'js_domain' => 'Domain requires JavaScript (configured)',
+            'robot_detected' => 'Previous fetch detected bot/CAPTCHA',
+            'paywall_detected' => 'Previous fetch encountered paywall',
+            'learned' => 'Previously successful with Playwright',
+            'user_preference' => 'Manual preference set',
+            'escalated' => 'Auto-escalated after failures',
+            'error_detected' => 'Previous errors detected',
+            'default' => 'Default HTTP fetch',
+            'playwright_disabled' => 'Playwright disabled',
+            default => ucfirst(str_replace('_', ' ', $reason)),
+        };
     }
 
     public function loadCookies(): void
@@ -181,6 +241,9 @@ new class extends Component
                 'expiry_status' => $status,
                 'last_used_at' => $config['last_used_at'] ?? null,
                 'added_at' => $config['added_at'] ?? null,
+                'updated_at' => $config['updated_at'] ?? null,
+                'auto_refresh_enabled' => $config['auto_refresh_enabled'] ?? false,
+                'last_refreshed_at' => $config['last_refreshed_at'] ?? null,
             ];
         })->sortBy('domain')->values()->toArray();
     }
@@ -545,6 +608,115 @@ new class extends Component
         }
     }
 
+    public function extractCookiesFromBrowser(): void
+    {
+        if (! $this->playwrightEnabled || ! $this->playwrightAvailable) {
+            $this->error('Playwright is not available. Please ensure the playwright-worker service is running.');
+            return;
+        }
+
+        if (empty($this->cookieDomain)) {
+            $this->error('Please enter a domain first.');
+            return;
+        }
+
+        try {
+            $client = new PlaywrightFetchClient;
+            $result = $client->extractCookies($this->cookieDomain);
+
+            if (! $result['success']) {
+                $this->error('Failed to extract cookies: ' . ($result['error'] ?? 'Unknown error'));
+                return;
+            }
+
+            if (empty($result['cookies'])) {
+                $this->warning('No cookies found for domain: ' . $this->cookieDomain);
+                return;
+            }
+
+            // Convert Playwright cookies to storage format
+            $simpleCookies = [];
+            $earliestExpiry = null;
+
+            foreach ($result['cookies'] as $cookie) {
+                $simpleCookies[$cookie['name']] = $cookie['value'];
+
+                // Track earliest expiry
+                if (isset($cookie['expires']) && $cookie['expires'] > 0) {
+                    $expiryDate = Carbon\Carbon::createFromTimestamp($cookie['expires']);
+                    if (! $earliestExpiry || $expiryDate->lt($earliestExpiry)) {
+                        $earliestExpiry = $expiryDate;
+                    }
+                }
+            }
+
+            // Store in auth_metadata
+            $authMetadata = $this->group->auth_metadata ?? [];
+            $domains = $authMetadata['domains'] ?? [];
+
+            $domains[$this->cookieDomain] = [
+                'cookies' => $simpleCookies,
+                'headers' => $domains[$this->cookieDomain]['headers'] ?? [],
+                'added_at' => now()->toIso8601String(),
+                'expires_at' => $earliestExpiry ? $earliestExpiry->toIso8601String() : null,
+                'last_used_at' => null,
+                'extracted_via' => 'playwright',
+            ];
+
+            $authMetadata['domains'] = $domains;
+            $this->group->update(['auth_metadata' => $authMetadata]);
+
+            $this->success('Successfully extracted ' . count($simpleCookies) . ' cookies from browser session!');
+            $this->cookieDomain = '';
+            $this->loadCookies();
+
+            Log::info('Fetch: Cookies extracted from Playwright browser', [
+                'domain' => $this->cookieDomain,
+                'cookie_count' => count($simpleCookies),
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to extract cookies: ' . $e->getMessage());
+            Log::error('Failed to extract cookies from Playwright', [
+                'domain' => $this->cookieDomain,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function toggleCookieAutoRefresh(string $domain): void
+    {
+        try {
+            $authMetadata = $this->group->auth_metadata ?? [];
+            $domains = $authMetadata['domains'] ?? [];
+
+            if (! isset($domains[$domain])) {
+                $this->error('Domain not found.');
+                return;
+            }
+
+            // Toggle auto-refresh
+            $domains[$domain]['auto_refresh_enabled'] = ! ($domains[$domain]['auto_refresh_enabled'] ?? false);
+
+            $authMetadata['domains'] = $domains;
+            $this->group->update(['auth_metadata' => $authMetadata]);
+
+            $status = $domains[$domain]['auto_refresh_enabled'] ? 'enabled' : 'disabled';
+            $this->success("Cookie auto-refresh {$status} for {$domain}.");
+            $this->loadCookies();
+
+            Log::info('Fetch: Cookie auto-refresh toggled', [
+                'domain' => $domain,
+                'enabled' => $domains[$domain]['auto_refresh_enabled'],
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to toggle auto-refresh: ' . $e->getMessage());
+            Log::error('Failed to toggle cookie auto-refresh', [
+                'domain' => $domain,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function getCookieExpiryStatus(?string $expiresAt): string
     {
         if (! $expiresAt) {
@@ -707,6 +879,11 @@ new class extends Component
                                 <x-badge value="Active" class="badge-success" />
                                 @endif
 
+                                <!-- Fetch Method Badge -->
+                                @if (isset($url['last_fetch_method']))
+                                <x-badge value="{{ $url['last_fetch_method'] }}" class="badge-info badge-sm" />
+                                @endif
+
                                 <!-- Actions Dropdown -->
                                 <x-dropdown position="dropdown-end">
                                     <x-slot:trigger>
@@ -741,6 +918,78 @@ new class extends Component
                                 </span>
                                 @endif
                             </span>
+                        </div>
+                        @endif
+
+                        <!-- Fetch History -->
+                        @if (!empty($url['playwright_history']) && count($url['playwright_history']) > 0)
+                        <div class="mt-4">
+                            <x-collapse>
+                                <x-slot:heading>
+                                    <div class="flex items-center gap-2">
+                                        <x-icon name="o-clock" class="w-4 h-4" />
+                                        <span class="text-sm font-medium">Fetch History ({{ count($url['playwright_history']) }} entries)</span>
+                                    </div>
+                                </x-slot:heading>
+                                <x-slot:content>
+                                    <div class="overflow-x-auto">
+                                        <table class="table table-xs">
+                                            <thead>
+                                                <tr>
+                                                    <th>Time</th>
+                                                    <th>Method</th>
+                                                    <th>Reason</th>
+                                                    <th>Outcome</th>
+                                                    <th>Duration</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (array_reverse($url['playwright_history']) as $entry)
+                                                <tr>
+                                                    <td>
+                                                        <span class="text-xs" title="{{ $entry['timestamp'] }}">
+                                                            {{ \Carbon\Carbon::parse($entry['timestamp'])->diffForHumans() }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <x-badge value="{{ $entry['decision'] }}" class="badge-xs {{ $entry['decision'] === 'playwright' ? 'badge-info' : 'badge-neutral' }}" />
+                                                    </td>
+                                                    <td>
+                                                        <span class="text-xs" title="{{ $this->getReasonLabel($entry['reason']) }}">
+                                                            {{ Str::limit($this->getReasonLabel($entry['reason']), 30) }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        @if (is_null($entry['outcome']))
+                                                        <x-badge value="pending" class="badge-xs badge-ghost" />
+                                                        @elseif ($entry['outcome'] === 'success')
+                                                        <x-badge value="success" class="badge-xs badge-success" />
+                                                        @else
+                                                        <x-badge value="failed" class="badge-xs badge-error" />
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if ($entry['duration_ms'])
+                                                        <span class="text-xs">{{ number_format($entry['duration_ms']) }}ms</span>
+                                                        @else
+                                                        <span class="text-xs text-base-content/50">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if ($entry['status_code'])
+                                                        <span class="text-xs">{{ $entry['status_code'] }}</span>
+                                                        @else
+                                                        <span class="text-xs text-base-content/50">-</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </x-slot:content>
+                            </x-collapse>
                         </div>
                         @endif
                     </div>
@@ -804,11 +1053,33 @@ new class extends Component
                                 </label>
                             @enderror
                         </div>
-                        <x-button type="submit" class="btn-primary">
-                            <x-icon name="o-plus" class="w-4 h-4" />
-                            Add Cookies
-                        </x-button>
+                        <div class="flex gap-2">
+                            <x-button type="submit" class="btn-primary">
+                                <x-icon name="o-plus" class="w-4 h-4" />
+                                Add Cookies
+                            </x-button>
+
+                            @if ($playwrightEnabled && $playwrightAvailable)
+                            <x-button type="button" wire:click="extractCookiesFromBrowser" class="btn-secondary">
+                                <x-icon name="o-globe-alt" class="w-4 h-4" />
+                                Extract from Browser
+                            </x-button>
+                            @endif
+                        </div>
                     </form>
+
+                    @if ($playwrightEnabled && $playwrightAvailable)
+                    <div class="alert alert-info mt-4">
+                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                        <div>
+                            <p class="font-semibold">Browser Session Available</p>
+                            <p class="text-sm">You can manually log in to sites using the browser session, then extract cookies here.</p>
+                            <a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="link link-primary text-sm">
+                                Open Browser (VNC)
+                            </a>
+                        </div>
+                    </div>
+                    @endif
 
                     <!-- Format Help -->
                     <x-collapse class="mt-6">
@@ -841,7 +1112,7 @@ new class extends Component
                 @foreach ($domains as $domain)
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <div class="flex items-start justify-between">
+                        <div class="flex items-start justify-between mb-4">
                             <div class="flex-1">
                                 <h3 class="text-lg font-semibold mb-2">{{ $domain['domain'] }}</h3>
                                 <div class="flex flex-wrap gap-2 items-center text-sm">
@@ -888,6 +1159,44 @@ new class extends Component
                                     Delete
                                 </x-button>
                             </div>
+                        </div>
+
+                        <!-- Auto-Refresh Toggle Section -->
+                        <div class="border-t border-base-300 pt-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            class="toggle toggle-primary toggle-sm"
+                                            @if ($domain['auto_refresh_enabled']) checked @endif
+                                            wire:click="toggleCookieAutoRefresh('{{ $domain['domain'] }}')"
+                                        />
+                                        <span class="text-sm font-medium">Auto-refresh cookies before expiry</span>
+                                    </label>
+                                    <div class="tooltip" data-tip="Automatically refresh cookies before they expire using Playwright">
+                                        <x-icon name="o-information-circle" class="w-4 h-4 text-base-content/50" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Status Info -->
+                            @if ($domain['auto_refresh_enabled'] || $domain['updated_at'] || $domain['last_refreshed_at'])
+                            <div class="mt-2 flex flex-wrap gap-3 text-xs text-base-content/70">
+                                @if ($domain['updated_at'])
+                                <span class="flex items-center gap-1">
+                                    <x-icon name="o-clock" class="w-3 h-3" />
+                                    Auto-updated {{ \Carbon\Carbon::parse($domain['updated_at'])->diffForHumans() }}
+                                </span>
+                                @endif
+                                @if ($domain['last_refreshed_at'])
+                                <span class="flex items-center gap-1">
+                                    <x-icon name="o-arrow-path" class="w-3 h-3" />
+                                    Last refreshed {{ \Carbon\Carbon::parse($domain['last_refreshed_at'])->diffForHumans() }}
+                                </span>
+                                @endif
+                            </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -1102,6 +1411,279 @@ new class extends Component
                 </div>
             </div>
         </x-tab>
+
+        <!-- Playwright Settings Tab -->
+        @if ($playwrightEnabled)
+        <x-tab name="playwright" label="Playwright" icon="o-computer-desktop">
+            <div class="space-y-6" wire:poll.30s="refreshMetrics">
+                <!-- Status Card -->
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">Playwright Status</h3>
+                            <span class="text-xs text-base-content/50">Auto-refreshes every 30s</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex-1">
+                                <p class="text-sm text-base-content/70">Service Status</p>
+                                <p class="font-semibold">
+                                    @if ($playwrightAvailable)
+                                    <x-badge value="Available" class="badge-success" />
+                                    @else
+                                    <x-badge value="Unavailable" class="badge-error" />
+                                    @endif
+                                </p>
+                            </div>
+                            @if ($playwrightAvailable && !empty($workerStats))
+                            <div class="stats stats-vertical sm:stats-horizontal shadow-sm">
+                                <div class="stat py-2 px-4">
+                                    <div class="stat-title text-xs">Stealth</div>
+                                    <div class="stat-value text-sm">
+                                        @if ($workerStats['stealth_enabled'])
+                                        <x-badge value="Enabled" class="badge-success badge-sm" />
+                                        @else
+                                        <x-badge value="Disabled" class="badge-neutral badge-sm" />
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="stat py-2 px-4">
+                                    <div class="stat-title text-xs">Context TTL</div>
+                                    <div class="stat-value text-sm">{{ $workerStats['context_ttl'] }}m</div>
+                                </div>
+                            </div>
+                            @endif
+                            @if ($playwrightAvailable)
+                            <a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="btn btn-primary btn-sm">
+                                <x-icon name="o-computer-desktop" class="w-4 h-4" />
+                                Open Browser (VNC)
+                            </a>
+                            @endif
+                        </div>
+
+                        @if (!$playwrightAvailable)
+                        <div class="alert alert-warning mt-4">
+                            <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                            <div>
+                                <p class="font-semibold">Playwright Worker Not Available</p>
+                                <p class="text-sm">Start the Playwright services with: <code class="bg-base-300 px-2 py-1 rounded">sail up -d --profile playwright</code></p>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Real-time Metrics Card -->
+                @if ($playwrightAvailable && !empty($healthMetrics))
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Real-time Metrics (Last 24h)</h3>
+
+                        <!-- Success Rate Comparison -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            <div class="card bg-base-100 shadow-sm">
+                                <div class="card-body">
+                                    <h4 class="font-medium mb-2">HTTP Success Rate</h4>
+                                    <div class="flex items-end gap-2">
+                                        <span class="text-3xl font-bold text-secondary">{{ $healthMetrics['http']['success_rate'] }}%</span>
+                                        <span class="text-sm text-base-content/70 mb-1">
+                                            ({{ $healthMetrics['http']['success'] }}/{{ $healthMetrics['http']['total'] }})
+                                        </span>
+                                    </div>
+                                    <progress class="progress progress-secondary w-full mt-2" value="{{ $healthMetrics['http']['success_rate'] }}" max="100"></progress>
+                                    <p class="text-xs text-base-content/70 mt-2">
+                                        Avg: {{ $healthMetrics['http']['avg_duration_ms'] }}ms
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="card bg-base-100 shadow-sm">
+                                <div class="card-body">
+                                    <h4 class="font-medium mb-2">Playwright Success Rate</h4>
+                                    <div class="flex items-end gap-2">
+                                        <span class="text-3xl font-bold text-primary">{{ $healthMetrics['playwright']['success_rate'] }}%</span>
+                                        <span class="text-sm text-base-content/70 mb-1">
+                                            ({{ $healthMetrics['playwright']['success'] }}/{{ $healthMetrics['playwright']['total'] }})
+                                        </span>
+                                    </div>
+                                    <progress class="progress progress-primary w-full mt-2" value="{{ $healthMetrics['playwright']['success_rate'] }}" max="100"></progress>
+                                    <p class="text-xs text-base-content/70 mt-2">
+                                        Avg: {{ $healthMetrics['playwright']['avg_duration_ms'] }}ms
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Fetches Today -->
+                        <div class="stats shadow w-full">
+                            <div class="stat">
+                                <div class="stat-title">Total Fetches Today</div>
+                                <div class="stat-value text-primary">{{ $healthMetrics['total_fetches'] }}</div>
+                                <div class="stat-desc">
+                                    HTTP: {{ $healthMetrics['http']['total'] }} |
+                                    Playwright: {{ $healthMetrics['playwright']['total'] }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stealth Effectiveness Card -->
+                @if ($playwrightAvailable && !empty($healthMetrics['stealth']) && $healthMetrics['stealth']['total'] > 0)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Stealth Effectiveness</h3>
+                        <div class="flex items-center gap-6">
+                            @php
+                                $effectiveness = $healthMetrics['stealth']['effectiveness'];
+                            @endphp
+                            <div class="radial-progress text-accent" style="--value: {{ $effectiveness }};" role="progressbar">
+                                {{ $effectiveness }}%
+                            </div>
+                            <div class="flex-1">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-sm text-base-content/70">Bypassed</p>
+                                        <p class="text-2xl font-bold text-success">{{ $healthMetrics['stealth']['bypassed'] }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-base-content/70">Detected</p>
+                                        <p class="text-2xl font-bold text-error">{{ $healthMetrics['stealth']['detected'] }}</p>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-base-content/50 mt-2">
+                                    Bot detection attempts in last 24 hours
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+                @endif
+
+                <!-- Statistics Card -->
+                @if ($playwrightAvailable && !empty($playwrightStats))
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Fetch Method Statistics</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="stat">
+                                <div class="stat-title">Requires Playwright</div>
+                                <div class="stat-value text-primary">{{ $playwrightStats['requires_playwright'] ?? 0 }}</div>
+                                <div class="stat-desc">URLs that need JavaScript</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-title">Prefers HTTP</div>
+                                <div class="stat-value text-secondary">{{ $playwrightStats['prefers_http'] ?? 0 }}</div>
+                                <div class="stat-desc">Simple HTTP fetches</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-title">Auto-detect</div>
+                                <div class="stat-value text-info">{{ $playwrightStats['auto'] ?? 0 }}</div>
+                                <div class="stat-desc">Smart routing enabled</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                <!-- Cookie Auto-Refresh Card -->
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Cookie Auto-Refresh</h3>
+                        @php
+                            $autoRefreshEnabled = collect($domains)->where('auto_refresh_enabled', true)->count();
+                            $totalDomains = count($domains);
+                        @endphp
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="stat">
+                                <div class="stat-title">Domains with Auto-Refresh</div>
+                                <div class="stat-value text-primary">{{ $autoRefreshEnabled }}</div>
+                                <div class="stat-desc">Out of {{ $totalDomains }} total domains</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-title">Status</div>
+                                <div class="stat-value text-sm">
+                                    @if ($autoRefreshEnabled > 0)
+                                    <x-badge value="Active" class="badge-success badge-lg" />
+                                    @else
+                                    <x-badge value="Inactive" class="badge-neutral badge-lg" />
+                                    @endif
+                                </div>
+                                <div class="stat-desc">
+                                    @if ($autoRefreshEnabled > 0)
+                                    Cookies will refresh automatically
+                                    @else
+                                    No domains configured
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-4">
+                            <x-icon name="o-information-circle" class="w-5 h-5" />
+                            <div class="text-sm">
+                                <p>Cookie auto-refresh uses Playwright to automatically update cookies before they expire.</p>
+                                <p class="mt-1">Enable it per-domain in the <strong>Cookies</strong> tab.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Info Card -->
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">How Playwright Works</h3>
+                        <div class="prose prose-sm max-w-none">
+                            <ul class="text-sm space-y-2">
+                                <li>
+                                    <strong>Smart Routing:</strong> The system automatically detects which URLs need JavaScript execution
+                                    and uses Playwright for those, while using faster HTTP fetching for simple pages.
+                                </li>
+                                <li>
+                                    <strong>Auto-Escalation:</strong> If an HTTP fetch fails with robot detection or paywalls,
+                                    the system automatically retries with Playwright.
+                                </li>
+                                <li>
+                                    <strong>Cookie Extraction:</strong> Use the VNC browser to manually log in to sites,
+                                    then extract cookies via the Cookies tab for automated fetching.
+                                </li>
+                                <li>
+                                    <strong>Screenshot Capture:</strong> Playwright automatically captures screenshots
+                                    of fetched pages for visual reference.
+                                </li>
+                                <li>
+                                    <strong>VNC Access:</strong> Connect to the browser session for debugging and manual interactions.
+                                    Password: <code class="bg-base-300 px-2 py-1 rounded">{{ config('services.playwright.chrome_vnc_password') }}</code>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JavaScript-Required Domains -->
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">JavaScript-Required Domains</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            URLs from these domains always use Playwright for fetching:
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            @php
+                                $jsDomains = array_filter(array_map('trim', explode(',', config('services.playwright.js_required_domains', ''))));
+                            @endphp
+                            @forelse ($jsDomains as $domain)
+                                <x-badge value="{{ $domain }}" class="badge-primary" />
+                            @empty
+                                <p class="text-sm text-base-content/50">No domains configured</p>
+                            @endforelse
+                        </div>
+                        <p class="text-sm text-base-content/50 mt-4">
+                            Configure via PLAYWRIGHT_JS_DOMAINS environment variable (comma-separated).
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </x-tab>
+        @endif
     </x-tabs>
 
     <!-- Toast notifications -->

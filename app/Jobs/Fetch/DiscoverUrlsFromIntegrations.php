@@ -54,9 +54,9 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                 $query->whereHas('actorEvents', function ($q) use ($monitoredIntegrationIds) {
                     $q->whereIn('integration_id', $monitoredIntegrationIds);
                 })
-                ->orWhereHas('targetEvents', function ($q) use ($monitoredIntegrationIds) {
-                    $q->whereIn('integration_id', $monitoredIntegrationIds);
-                });
+                    ->orWhereHas('targetEvents', function ($q) use ($monitoredIntegrationIds) {
+                        $q->whereIn('integration_id', $monitoredIntegrationIds);
+                    });
             })
             ->get();
 

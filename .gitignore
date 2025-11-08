@@ -16,6 +16,8 @@ public_html/storage
 public_html/hot
 
 storage/*.key
+storage/logs/fetch_playwright_last.json
+storage/logs/fetch_extraction_last.json
 .env
 Homestead.yaml
 Homestead.json

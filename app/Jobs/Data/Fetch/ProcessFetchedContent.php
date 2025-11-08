@@ -74,12 +74,11 @@ class ProcessFetchedContent implements ShouldQueue
             $actorObject = EventObject::firstOrCreate(
                 [
                     'user_id' => $this->integration->user_id,
-                    'integration_id' => $this->integration->id,
                     'concept' => 'user',
                     'type' => 'fetch_user',
+                    'title' => 'Fetch',
                 ],
                 [
-                    'title' => 'Fetch',
                     'time' => now(),
                     'metadata' => ['service' => 'fetch'],
                 ]
@@ -163,23 +162,42 @@ class ProcessFetchedContent implements ShouldQueue
 
     private function generateSummaries(string $title, string $content): array
     {
+        $contentLength = strlen($content);
+        $maxContentLength = 10000;
+        $wasTruncated = $contentLength > $maxContentLength;
+        $contentToSend = mb_substr($content, 0, $maxContentLength);
+
         Log::debug('Fetch: Generating AI summaries', [
             'title' => $title,
-            'content_length' => strlen($content),
+            'content_length' => $contentLength,
+            'truncated' => $wasTruncated,
+            'truncated_length' => $wasTruncated ? strlen($contentToSend) : null,
         ]);
 
+        if ($wasTruncated) {
+            Log::warning('Fetch: Content truncated for AI processing', [
+                'url' => $this->webpage->url ?? 'unknown',
+                'original_length' => $contentLength,
+                'truncated_to' => strlen($contentToSend),
+                'characters_lost' => $contentLength - strlen($contentToSend),
+                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1) . '%',
+            ]);
+        }
+
         $systemPrompt = <<<'PROMPT'
-You are an intelligent content summarizer. Given an article title and content, provide exactly 5 different summary formats in JSON.
+You are an intelligent content summarizer and extractor. Given an article title and content, provide exactly 6 different outputs in JSON.
 
 Requirements:
-1. summary_tweet: Exactly 280 characters maximum, ultra-concise, engaging
-2. summary_short: Exactly 40 words, concise overview
-3. summary_paragraph: Exactly 150 words, detailed overview with key points
-4. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight
-5. tldr: Single sentence (max 20 words), absolute minimum summary
+1. article_text: The full, clean article text extracted from the input. Remove navigation, ads, footers, and other non-article content. Preserve the complete article text including all paragraphs, maintaining proper formatting and structure.
+2. summary_tweet: 280 characters maximum, ultra-concise, engaging
+3. summary_short: No more than 40 words, concise overview
+4. summary_paragraph: No more than 150 words, detailed overview with key points
+5. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight
+6. tldr: Single sentence (max 20 words), absolute minimum summary
 
 Return ONLY valid JSON in this exact format:
 {
+  "article_text": "Complete cleaned article text here...",
   "summary_tweet": "280 char version here",
   "summary_short": "40 word version here",
   "summary_paragraph": "150 word version here",
@@ -189,9 +207,8 @@ Return ONLY valid JSON in this exact format:
 PROMPT;
 
         try {
-            // TODO: Update to gpt-5-mini when available
             $result = OpenAI::chat()->create([
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-5-nano',
                 'messages' => [
                     [
                         'role' => 'system',
@@ -201,7 +218,7 @@ PROMPT;
                         'role' => 'user',
                         'content' => json_encode([
                             'title' => $title,
-                            'content' => mb_substr($content, 0, 10000), // Limit to avoid token issues
+                            'content' => $contentToSend,
                         ]),
                     ],
                 ],
@@ -212,7 +229,7 @@ PROMPT;
             $summaries = json_decode($result->choices[0]->message->content, true);
 
             // Validate response structure
-            $requiredKeys = ['summary_tweet', 'summary_short', 'summary_paragraph', 'key_takeaways', 'tldr'];
+            $requiredKeys = ['article_text', 'summary_tweet', 'summary_short', 'summary_paragraph', 'key_takeaways', 'tldr'];
             foreach ($requiredKeys as $key) {
                 if (! isset($summaries[$key])) {
                     throw new Exception("Missing required summary type: {$key}");
@@ -229,6 +246,7 @@ PROMPT;
 
             // Return fallback summaries
             return [
+                'article_text' => $content,
                 'summary_tweet' => mb_substr($content, 0, 280),
                 'summary_short' => implode(' ', array_slice(str_word_count($content, 1), 0, 40)),
                 'summary_paragraph' => implode(' ', array_slice(str_word_count($content, 1), 0, 150)),
@@ -254,7 +272,21 @@ PROMPT;
             ],
         ]);
 
-        // Block 2: Metadata
+        // Block 2: Cleaned Article Text (AI-extracted)
+        $event->createBlock([
+            'title' => 'Article Text',
+            'block_type' => 'fetch_article_text',
+            'time' => $eventTime,
+            'metadata' => [
+                'article_text' => $summaries['article_text'],
+                'word_count' => str_word_count($summaries['article_text']),
+                'char_count' => strlen($summaries['article_text']),
+                'generated_at' => now()->toIso8601String(),
+                'model' => 'gpt-5-nano',
+            ],
+        ]);
+
+        // Block 3: Metadata
         $event->createBlock([
             'title' => 'Metadata',
             'block_type' => 'fetch_metadata',
@@ -267,7 +299,7 @@ PROMPT;
             ],
         ]);
 
-        // Block 3: Tweet Summary
+        // Block 4: Tweet Summary
         $event->createBlock([
             'title' => 'Tweet Summary',
             'block_type' => 'fetch_summary_tweet',
@@ -276,11 +308,11 @@ PROMPT;
                 'summary' => $summaries['summary_tweet'],
                 'char_count' => strlen($summaries['summary_tweet']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 4: Short Summary
+        // Block 5: Short Summary
         $event->createBlock([
             'title' => 'Short Summary',
             'block_type' => 'fetch_summary_short',
@@ -289,11 +321,11 @@ PROMPT;
                 'summary' => $summaries['summary_short'],
                 'word_count' => str_word_count($summaries['summary_short']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 5: Paragraph Summary
+        // Block 6: Paragraph Summary
         $event->createBlock([
             'title' => 'Paragraph Summary',
             'block_type' => 'fetch_summary_paragraph',
@@ -302,11 +334,11 @@ PROMPT;
                 'summary' => $summaries['summary_paragraph'],
                 'word_count' => str_word_count($summaries['summary_paragraph']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 6: Key Takeaways
+        // Block 7: Key Takeaways
         $event->createBlock([
             'title' => 'Key Takeaways',
             'block_type' => 'fetch_key_takeaways',
@@ -315,11 +347,11 @@ PROMPT;
                 'takeaways' => $summaries['key_takeaways'],
                 'count' => count($summaries['key_takeaways']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 7: TL;DR
+        // Block 8: TL;DR
         $event->createBlock([
             'title' => 'TL;DR',
             'block_type' => 'fetch_tldr',
@@ -328,11 +360,11 @@ PROMPT;
                 'summary' => $summaries['tldr'],
                 'word_count' => str_word_count($summaries['tldr']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-5-nano',
             ],
         ]);
 
-        Log::info('Fetch: Created 7 blocks for event', [
+        Log::info('Fetch: Created 8 blocks for event', [
             'event_id' => $event->id,
         ]);
     }
