@@ -94,9 +94,9 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
     {
         return [
             'fetcher' => [
-                'label' => 'URL Fetcher',
+                'label' => 'Fetch',
                 'schema' => self::getConfigurationSchema('fetcher'),
-                'description' => 'Fetch and archive web content from subscribed URLs',
+                'description' => 'Fetch and archive web content from URLs',
             ],
         ];
     }
@@ -130,6 +130,14 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'description' => 'URL content was fetched',
                 'display_with_object' => true,
                 'value_unit' => null,
+                'hidden' => true,
+            ],
+            'bookmarked' => [
+                'icon' => 'o-bookmark',
+                'display_name' => 'Fetched',
+                'description' => 'URL was bookmarked',
+                'display_with_object' => true,
+                'value_unit' => null,
                 'hidden' => false,
             ],
             'updated' => [
@@ -138,7 +146,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'description' => 'URL content was updated',
                 'display_with_object' => true,
                 'value_unit' => null,
-                'hidden' => false,
+                'hidden' => true,
             ],
             // NOTE: had_link_to has been migrated to the Relationship model.
             // See app/Models/Relationship.php and relationship type 'linked_to'
