@@ -7,7 +7,8 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 
-new class extends \Livewire\Volt\Component {
+new class extends \Livewire\Volt\Component
+{
     use WithPagination;
 
     public int $perPage = 25;
@@ -271,6 +272,27 @@ new class extends \Livewire\Volt\Component {
                     </div>
                 </a>
             @endif
+
+            <!-- API Access Card (Always shown) -->
+            <a href="{{ route('bookmarks.fetch') }}?tab=api" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
+                <div class="card-body">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                            <x-icon name="o-key" class="w-5 h-5 text-accent" />
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold">API & Share</h3>
+                        </div>
+                    </div>
+                    <p class="text-sm text-base-content/70 mb-4">
+                        Save bookmarks via API, Apple Shortcuts, browser bookmarklets, or custom integrations.
+                    </p>
+                    <div class="flex items-center gap-2 text-sm text-primary">
+                        <span>Setup & Docs</span>
+                        <x-icon name="o-arrow-right" class="w-4 h-4" />
+                    </div>
+                </div>
+            </a>
 
             <!-- Add More Sources Card (Always shown) -->
             <a href="{{ route('integrations.index') }}" wire:navigate class="card bg-base-100 border-2 border-dashed border-base-300 shadow hover:shadow-lg transition-shadow cursor-pointer">
