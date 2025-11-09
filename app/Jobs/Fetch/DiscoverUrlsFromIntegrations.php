@@ -74,12 +74,14 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                 ?? $object->targetEvents()->whereIn('integration_id', $monitoredIntegrationIds)->value('integration_id');
 
             // Extract from url field
+            // Only URLs from url field will update the source object/event with fetched content
             if ($object->url) {
                 $discoveredUrls->push([
                     'url' => $object->url,
                     'source_object_id' => $object->id,
                     'source_integration_id' => $integrationId,
                     'found_in' => 'url_field',
+                    'is_linkable' => true, // This URL will be linked to source object
                 ]);
             }
 
@@ -92,6 +94,7 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                         'source_object_id' => $object->id,
                         'source_integration_id' => $integrationId,
                         'found_in' => 'metadata',
+                        'is_linkable' => false,
                     ]);
                 }
             }
@@ -105,14 +108,15 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                         'source_object_id' => $object->id,
                         'source_integration_id' => $integrationId,
                         'found_in' => 'content',
+                        'is_linkable' => false,
                     ]);
                 }
             }
         }
 
         // Extract URLs from Events
+        // Check if Events have a url field, and also check event_metadata
         $events = Event::whereIn('integration_id', $monitoredIntegrationIds)
-            ->whereNotNull('event_metadata')
             ->get();
 
         Log::debug('DiscoverUrlsFromIntegrations: Found Events', [
@@ -120,14 +124,36 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
         ]);
 
         foreach ($events as $event) {
+            // Check if event has a url field (EventObjects have url, but Events might in event_metadata)
+            // We'll check event_metadata for a 'url' key at the top level
+            if ($event->event_metadata && is_array($event->event_metadata) && isset($event->event_metadata['url'])) {
+                $url = $event->event_metadata['url'];
+                if (is_string($url) && preg_match('/^https?:\/\//i', $url)) {
+                    $discoveredUrls->push([
+                        'url' => $url,
+                        'source_event_id' => $event->id,
+                        'source_integration_id' => $event->integration_id,
+                        'found_in' => 'event_url_field',
+                        'is_linkable' => true, // This URL will be linked to source event
+                    ]);
+                }
+            }
+
+            // Extract other URLs from event_metadata (nested, not top-level url key)
             if ($event->event_metadata && is_array($event->event_metadata)) {
                 $eventUrls = $this->extractUrlsFromArray($event->event_metadata);
                 foreach ($eventUrls as $url) {
+                    // Skip if this is the same as the top-level url field we already added
+                    if (isset($event->event_metadata['url']) && $url === $event->event_metadata['url']) {
+                        continue;
+                    }
+
                     $discoveredUrls->push([
                         'url' => $url,
                         'source_event_id' => $event->id,
                         'source_integration_id' => $event->integration_id,
                         'found_in' => 'event_metadata',
+                        'is_linkable' => false,
                     ]);
                 }
             }
@@ -247,6 +273,9 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                         'last_changed_at' => null,
                         'content_hash' => null,
                         'fetch_count' => 0,
+                        'is_discovered_url' => true, // Flag for discovered URLs
+                        'is_linkable' => $urlData['is_linkable'] ?? false, // Whether to link to source
+                        'source_is_object' => isset($urlData['source_object_id']), // URL from object vs event
                     ],
                 ]);
 

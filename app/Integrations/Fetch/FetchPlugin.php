@@ -140,6 +140,14 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'had_link_to' => [
+                'icon' => 'o-link',
+                'display_name' => 'Had Link To',
+                'description' => 'Object linked to fetched webpage',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 

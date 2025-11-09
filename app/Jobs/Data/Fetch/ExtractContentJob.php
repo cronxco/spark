@@ -27,18 +27,23 @@ class ExtractContentJob implements ShouldQueue
 
     public function __construct(
         public Integration $integration,
-        public Event $event,
+        public ?Event $event,
         public EventObject $webpage,
-        public array $extracted
+        public array $extracted,
+        public ?string $sourceObjectId = null,
+        public ?string $sourceEventId = null,
+        public bool $sourceIsObject = false
     ) {}
 
     public function handle(): void
     {
         Log::info('Fetch: Extracting article content with AI', [
             'integration_id' => $this->integration->id,
-            'event_id' => $this->event->id,
+            'event_id' => $this->event?->id,
             'webpage_id' => $this->webpage->id,
             'url' => $this->webpage->url,
+            'has_source_object' => ! is_null($this->sourceObjectId),
+            'has_source_event' => ! is_null($this->sourceEventId),
         ]);
 
         try {
@@ -48,26 +53,44 @@ class ExtractContentJob implements ShouldQueue
                 $this->extracted['text_content']
             );
 
-            // Create Block 2: Article Text
-            $this->event->createBlock([
-                'title' => 'Article Text',
-                'block_type' => 'fetch_article_text',
-                'time' => $this->event->time,
-                'metadata' => [
-                    'article_text' => $articleText,
-                    'word_count' => str_word_count($articleText),
-                    'char_count' => strlen($articleText),
-                    'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
-                ],
-            ]);
+            // If this is a linkable discovered URL, update the source object's content and title
+            if ($this->sourceObjectId) {
+                $sourceObject = EventObject::find($this->sourceObjectId);
+                if ($sourceObject) {
+                    $sourceObject->title = $this->extracted['title'];
+                    $sourceObject->content = $articleText;
+                    $sourceObject->save();
 
-            // Store extracted content in EventObject content field
+                    Log::info('Fetch: Updated source EventObject title and content', [
+                        'source_object_id' => $this->sourceObjectId,
+                        'title' => $this->extracted['title'],
+                        'word_count' => str_word_count($articleText),
+                    ]);
+                }
+            }
+
+            // Create Block 2: Article Text (only if we have an event)
+            if ($this->event) {
+                $this->event->createBlock([
+                    'title' => 'Article Text',
+                    'block_type' => 'fetch_article_text',
+                    'time' => $this->event->time,
+                    'metadata' => [
+                        'article_text' => $articleText,
+                        'word_count' => str_word_count($articleText),
+                        'char_count' => strlen($articleText),
+                        'generated_at' => now()->toIso8601String(),
+                        'model' => 'gpt-5-nano',
+                    ],
+                ]);
+            }
+
+            // Store extracted content in webpage EventObject content field
             $this->webpage->content = $articleText;
             $this->webpage->save();
 
             Log::info('Fetch: Article text extracted successfully', [
-                'event_id' => $this->event->id,
+                'event_id' => $this->event?->id,
                 'word_count' => str_word_count($articleText),
             ]);
 
@@ -91,16 +114,21 @@ class ExtractContentJob implements ShouldQueue
                 $this->event,
                 $this->webpage,
                 $this->extracted,
-                $articleText
+                $articleText,
+                $this->sourceObjectId,
+                $this->sourceEventId,
+                $this->sourceIsObject
             );
 
             Log::info('Fetch: Dispatched summary generation job', [
-                'event_id' => $this->event->id,
+                'event_id' => $this->event?->id,
+                'has_source_object' => ! is_null($this->sourceObjectId),
+                'has_source_event' => ! is_null($this->sourceEventId),
             ]);
         } catch (Exception $e) {
             Log::error('Fetch: Content extraction failed', [
                 'url' => $this->webpage->url,
-                'event_id' => $this->event->id,
+                'event_id' => $this->event?->id,
                 'error' => $e->getMessage(),
             ]);
 
@@ -116,7 +144,7 @@ class ExtractContentJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'extract_content_' . $this->integration->id . '_' . $this->event->id;
+        return 'extract_content_' . $this->integration->id . '_' . ($this->event?->id ?? 'linkable_' . $this->webpage->id);
     }
 
     private function extractArticleText(string $title, string $content): string

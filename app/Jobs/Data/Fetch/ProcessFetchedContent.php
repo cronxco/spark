@@ -72,67 +72,83 @@ class ProcessFetchedContent implements ShouldQueue
         ]);
 
         try {
-            // Create or find actor (fetch_user)
-            $actorObject = EventObject::firstOrCreate(
-                [
-                    'user_id' => $this->integration->user_id,
-                    'concept' => 'user',
-                    'type' => 'fetch_user',
-                    'title' => 'Fetch',
-                ],
-                [
-                    'time' => now(),
-                    'metadata' => ['service' => 'fetch'],
-                ]
-            );
+            // Check if this is a discovered linkable URL (should update source object/event)
+            $isLinkable = $metadata['is_linkable'] ?? false;
+            $sourceObjectId = $isLinkable ? ($metadata['discovered_from_object_id'] ?? null) : null;
+            $sourceEventId = $isLinkable ? ($metadata['discovered_from_event_id'] ?? null) : null;
+            $sourceIsObject = $metadata['source_is_object'] ?? false;
 
-            // Create or update today's Event
-            $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
-            $action = 'fetched';
-
-            $event = Event::updateOrCreate(
-                [
-                    'source_id' => $sourceId,
-                    'integration_id' => $this->integration->id,
-                ],
-                [
-                    'user_id' => $this->integration->user_id,
-                    'service' => 'fetch',
-                    'domain' => 'knowledge',
-                    'action' => $action,
-                    'time' => now(),
-                    'actor_id' => $actorObject->id,
-                    'target_id' => $this->webpage->id,
-                    'event_metadata' => [
-                        'url' => $this->webpage->url,
-                        'fetch_time' => now()->toIso8601String(),
-                        'content_hash' => $this->contentHash,
-                        'content_changed' => true,
-                        'previous_hash' => $previousHash,
+            // Only create daily fetch event for non-linkable URLs (manual subscriptions)
+            $event = null;
+            if (! $isLinkable) {
+                // Create or find actor (fetch_user)
+                $actorObject = EventObject::firstOrCreate(
+                    [
+                        'user_id' => $this->integration->user_id,
+                        'concept' => 'user',
+                        'type' => 'fetch_user',
+                        'title' => 'Fetch',
                     ],
-                ]
-            );
+                    [
+                        'time' => now(),
+                        'metadata' => ['service' => 'fetch'],
+                    ]
+                );
 
-            Log::info('Fetch: Event created/updated', [
-                'event_id' => $event->id,
-                'action' => $action,
-            ]);
+                // Create or update today's Event
+                $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
+                $action = 'fetched';
 
-            // Create Block 1: Raw Content
-            $event->createBlock([
-                'title' => 'Raw Content',
-                'block_type' => 'fetch_content',
-                'time' => $event->time,
-                'metadata' => [
-                    'html' => $this->extracted['content'],
-                    'text' => $this->extracted['text_content'],
-                    'excerpt' => $this->extracted['excerpt'],
-                ],
-            ]);
+                $event = Event::updateOrCreate(
+                    [
+                        'source_id' => $sourceId,
+                        'integration_id' => $this->integration->id,
+                    ],
+                    [
+                        'user_id' => $this->integration->user_id,
+                        'service' => 'fetch',
+                        'domain' => 'knowledge',
+                        'action' => $action,
+                        'time' => now(),
+                        'actor_id' => $actorObject->id,
+                        'target_id' => $this->webpage->id,
+                        'event_metadata' => [
+                            'url' => $this->webpage->url,
+                            'fetch_time' => now()->toIso8601String(),
+                            'content_hash' => $this->contentHash,
+                            'content_changed' => true,
+                            'previous_hash' => $previousHash,
+                        ],
+                    ]
+                );
 
-            Log::info('Fetch: Created raw content block', [
-                'event_id' => $event->id,
-            ]);
+                Log::info('Fetch: Event created/updated', [
+                    'event_id' => $event->id,
+                    'action' => $action,
+                ]);
+
+                // Create Block 1: Raw Content
+                $event->createBlock([
+                    'title' => 'Raw Content',
+                    'block_type' => 'fetch_content',
+                    'time' => $event->time,
+                    'metadata' => [
+                        'html' => $this->extracted['content'],
+                        'text' => $this->extracted['text_content'],
+                        'excerpt' => $this->extracted['excerpt'],
+                    ],
+                ]);
+
+                Log::info('Fetch: Created raw content block', [
+                    'event_id' => $event->id,
+                ]);
+            } else {
+                Log::info('Fetch: Skipping daily event creation for linkable discovered URL', [
+                    'url' => $this->webpage->url,
+                    'source_object_id' => $sourceObjectId,
+                    'source_event_id' => $sourceEventId,
+                ]);
+            }
 
             // Check if this is a one-time fetch that should be disabled after successful fetch
             $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
@@ -180,12 +196,18 @@ class ProcessFetchedContent implements ShouldQueue
                 $this->integration,
                 $event,
                 $this->webpage,
-                $this->extracted
+                $this->extracted,
+                $sourceObjectId,
+                $sourceEventId,
+                $sourceIsObject
             );
 
             Log::info('Fetch: Dispatched content extraction job', [
-                'event_id' => $event->id,
+                'event_id' => $event?->id,
                 'url' => $this->webpage->url,
+                'is_linkable' => $isLinkable,
+                'source_object_id' => $sourceObjectId,
+                'source_event_id' => $sourceEventId,
             ]);
         } catch (Exception $e) {
             Log::error('Fetch: Processing failed', [

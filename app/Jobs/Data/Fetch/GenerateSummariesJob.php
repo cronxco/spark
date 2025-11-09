@@ -27,19 +27,27 @@ class GenerateSummariesJob implements ShouldQueue
 
     public function __construct(
         public Integration $integration,
-        public Event $event,
+        public ?Event $event,
         public EventObject $webpage,
         public array $extracted,
-        public string $articleText
+        public string $articleText,
+        public ?string $sourceObjectId = null,
+        public ?string $sourceEventId = null,
+        public bool $sourceIsObject = false
     ) {}
 
     public function handle(): void
     {
+        $isLinkable = ! is_null($this->sourceObjectId) || ! is_null($this->sourceEventId);
+
         Log::info('Fetch: Generating summaries with AI', [
             'integration_id' => $this->integration->id,
-            'event_id' => $this->event->id,
+            'event_id' => $this->event?->id,
             'webpage_id' => $this->webpage->id,
             'url' => $this->webpage->url,
+            'is_linkable' => $isLinkable,
+            'source_object_id' => $this->sourceObjectId,
+            'source_event_id' => $this->sourceEventId,
         ]);
 
         try {
@@ -49,22 +57,30 @@ class GenerateSummariesJob implements ShouldQueue
                 $this->articleText
             );
 
-            // Create summary blocks (Blocks 3-9)
-            $this->createSummaryBlocks($summaries);
+            // For linkable URLs, attach blocks to source events instead of creating new ones
+            if ($isLinkable) {
+                $this->attachBlocksToSourceEvents($summaries);
+                $this->attachTagsToSourceObjectsAndEvents($summaries);
+                $this->createLinkEvent();
+            } else {
+                // Create summary blocks on the fetch event (Blocks 3-9)
+                $this->createSummaryBlocks($summaries);
 
-            // Attach tags to webpage EventObject (only if tags are present)
-            if (! empty($summaries['emoji']) || ! empty($summaries['tags'])) {
-                $this->attachTags($summaries);
+                // Attach tags to webpage EventObject (only if tags are present)
+                if (! empty($summaries['emoji']) || ! empty($summaries['tags'])) {
+                    $this->attachTags($summaries);
+                }
             }
 
             Log::info('Fetch: Summaries generated successfully', [
-                'event_id' => $this->event->id,
+                'event_id' => $this->event?->id,
                 'url' => $this->webpage->url,
+                'is_linkable' => $isLinkable,
             ]);
         } catch (Exception $e) {
             Log::error('Fetch: Summary generation failed', [
                 'url' => $this->webpage->url,
-                'event_id' => $this->event->id,
+                'event_id' => $this->event?->id,
                 'error' => $e->getMessage(),
             ]);
 
@@ -80,7 +96,7 @@ class GenerateSummariesJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'generate_summaries_' . $this->integration->id . '_' . $this->event->id;
+        return 'generate_summaries_' . $this->integration->id . '_' . ($this->event?->id ?? 'linkable_' . $this->webpage->id);
     }
 
     private function generateSummaries(string $title, string $articleText): array
@@ -350,5 +366,309 @@ PROMPT;
                 'url' => $this->webpage->url,
             ]);
         }
+    }
+
+    private function attachBlocksToSourceEvents(array $summaries): void
+    {
+        // Get all relevant events to attach blocks to
+        $events = $this->getSourceEvents();
+
+        if ($events->isEmpty()) {
+            Log::warning('Fetch: No source events found to attach blocks to', [
+                'source_object_id' => $this->sourceObjectId,
+                'source_event_id' => $this->sourceEventId,
+            ]);
+
+            return;
+        }
+
+        Log::info('Fetch: Attaching blocks to source events', [
+            'event_count' => $events->count(),
+            'event_ids' => $events->pluck('id')->toArray(),
+        ]);
+
+        // Attach all 9 blocks to each event
+        foreach ($events as $event) {
+            $eventTime = $event->time;
+
+            // Block 1: Raw Content
+            $event->createBlock([
+                'title' => 'Raw Content',
+                'block_type' => 'fetch_content',
+                'time' => $eventTime,
+                'metadata' => [
+                    'html' => $this->extracted['content'],
+                    'text' => $this->extracted['text_content'],
+                    'excerpt' => $this->extracted['excerpt'],
+                ],
+            ]);
+
+            // Block 2: Article Text
+            $event->createBlock([
+                'title' => 'Article Text',
+                'block_type' => 'fetch_article_text',
+                'time' => $eventTime,
+                'metadata' => [
+                    'article_text' => $this->articleText,
+                    'word_count' => str_word_count($this->articleText),
+                    'char_count' => strlen($this->articleText),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            // Block 3: Metadata
+            $event->createBlock([
+                'title' => 'Metadata',
+                'block_type' => 'fetch_metadata',
+                'time' => $eventTime,
+                'metadata' => [
+                    'author' => $this->extracted['author'],
+                    'image' => $this->extracted['image'],
+                    'direction' => $this->extracted['direction'],
+                    'extracted_at' => now()->toIso8601String(),
+                ],
+            ]);
+
+            // Block 4: Tweet Summary
+            $event->createBlock([
+                'title' => 'Tweet Summary',
+                'block_type' => 'fetch_summary_tweet',
+                'time' => $eventTime,
+                'metadata' => [
+                    'summary' => $summaries['summary_tweet'],
+                    'char_count' => strlen($summaries['summary_tweet']),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            // Block 5: Short Summary
+            $event->createBlock([
+                'title' => 'Short Summary',
+                'block_type' => 'fetch_summary_short',
+                'time' => $eventTime,
+                'metadata' => [
+                    'summary' => $summaries['summary_short'],
+                    'word_count' => str_word_count($summaries['summary_short']),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            // Block 6: Paragraph Summary
+            $event->createBlock([
+                'title' => 'Paragraph Summary',
+                'block_type' => 'fetch_summary_paragraph',
+                'time' => $eventTime,
+                'metadata' => [
+                    'summary' => $summaries['summary_paragraph'],
+                    'word_count' => str_word_count($summaries['summary_paragraph']),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            // Block 7: Key Takeaways
+            $event->createBlock([
+                'title' => 'Key Takeaways',
+                'block_type' => 'fetch_key_takeaways',
+                'time' => $eventTime,
+                'metadata' => [
+                    'takeaways' => $summaries['key_takeaways'],
+                    'count' => count($summaries['key_takeaways']),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            // Block 8: TL;DR
+            $event->createBlock([
+                'title' => 'TL;DR',
+                'block_type' => 'fetch_tldr',
+                'time' => $eventTime,
+                'metadata' => [
+                    'summary' => $summaries['tldr'],
+                    'word_count' => str_word_count($summaries['tldr']),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            // Block 9: Tags
+            $event->createBlock([
+                'title' => 'Tags',
+                'block_type' => 'fetch_tags',
+                'time' => $eventTime,
+                'metadata' => [
+                    'emoji' => $summaries['emoji'] ?? null,
+                    'tags' => $summaries['tags'] ?? [],
+                    'tag_count' => count($summaries['tags'] ?? []),
+                    'generated_at' => now()->toIso8601String(),
+                    'model' => 'gpt-5-nano',
+                ],
+            ]);
+
+            Log::info('Fetch: Attached 9 blocks to source event', [
+                'event_id' => $event->id,
+            ]);
+        }
+    }
+
+    private function attachTagsToSourceObjectsAndEvents(array $summaries): void
+    {
+        // Get source object and events
+        $sourceObject = null;
+        $sourceEvents = $this->getSourceEvents();
+
+        if ($this->sourceObjectId) {
+            $sourceObject = EventObject::find($this->sourceObjectId);
+        } elseif ($this->sourceEventId) {
+            $sourceEvent = Event::find($this->sourceEventId);
+            if ($sourceEvent && $sourceEvent->target_id) {
+                $sourceObject = EventObject::find($sourceEvent->target_id);
+            }
+        }
+
+        // Attach emoji tag if present
+        if (! empty($summaries['emoji'])) {
+            if ($sourceObject) {
+                $sourceObject->attachTags([$summaries['emoji']], 'spark-emoji');
+                Log::debug('Fetch: Attached emoji tag to source object', [
+                    'emoji' => $summaries['emoji'],
+                    'object_id' => $sourceObject->id,
+                ]);
+            }
+
+            foreach ($sourceEvents as $event) {
+                $event->detachTags($event->tagsWithType('spark-emoji'));
+                $event->attachTags([$summaries['emoji']], 'spark-emoji');
+                Log::debug('Fetch: Attached emoji tag to source event', [
+                    'emoji' => $summaries['emoji'],
+                    'event_id' => $event->id,
+                ]);
+            }
+        }
+
+        // Attach semantic tags if present
+        if (! empty($summaries['tags']) && is_array($summaries['tags'])) {
+            $tagsByType = [];
+            foreach ($summaries['tags'] as $tagData) {
+                if (isset($tagData['tag']) && isset($tagData['tag_type'])) {
+                    $tagsByType[$tagData['tag_type']][] = $tagData['tag'];
+                }
+            }
+
+            foreach ($tagsByType as $type => $tags) {
+                if ($sourceObject) {
+                    $sourceObject->attachTags($tags, $type);
+                }
+
+                foreach ($sourceEvents as $event) {
+                    $event->detachTags($event->tagsWithType($type));
+                    $event->attachTags($tags, $type);
+                }
+
+                Log::debug('Fetch: Attached semantic tags to source objects/events', [
+                    'tag_type' => $type,
+                    'tags' => $tags,
+                    'object_id' => $sourceObject?->id,
+                    'event_count' => $sourceEvents->count(),
+                ]);
+            }
+        }
+
+        // Mark one-time bookmarks as completed
+        $metadata = $this->webpage->metadata ?? [];
+        $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
+
+        if ($fetchMode === 'once') {
+            $metadata['discovery_status'] = 'completed';
+            $this->webpage->metadata = $metadata;
+            $this->webpage->save();
+
+            Log::info('Fetch: Marked one-time linkable bookmark as completed', [
+                'webpage_id' => $this->webpage->id,
+                'url' => $this->webpage->url,
+            ]);
+        }
+    }
+
+    private function createLinkEvent(): void
+    {
+        // Get source object for the actor
+        $sourceObject = null;
+        if ($this->sourceObjectId) {
+            $sourceObject = EventObject::find($this->sourceObjectId);
+        } elseif ($this->sourceEventId) {
+            $sourceEvent = Event::find($this->sourceEventId);
+            if ($sourceEvent && $sourceEvent->target_id) {
+                $sourceObject = EventObject::find($sourceEvent->target_id);
+            }
+        }
+
+        if (! $sourceObject) {
+            Log::warning('Fetch: Could not create link event - source object not found', [
+                'source_object_id' => $this->sourceObjectId,
+                'source_event_id' => $this->sourceEventId,
+            ]);
+
+            return;
+        }
+
+        // Get the integration that owns the source object
+        // We need to find an event for this object to get the integration_id
+        $sourceIntegration = Event::where('actor_id', $sourceObject->id)
+            ->orWhere('target_id', $sourceObject->id)
+            ->first();
+
+        if (! $sourceIntegration) {
+            Log::warning('Fetch: Could not create link event - no integration found for source object', [
+                'source_object_id' => $sourceObject->id,
+            ]);
+
+            return;
+        }
+
+        // Create the link event
+        Event::create([
+            'source_id' => 'fetch_link_' . $sourceObject->id . '_' . $this->webpage->id,
+            'integration_id' => $sourceIntegration->integration_id,
+            'service' => $sourceIntegration->service,
+            'domain' => $sourceIntegration->domain,
+            'action' => 'had_link_to',
+            'time' => now(),
+            'actor_id' => $sourceObject->id,
+            'target_id' => $this->webpage->id,
+            'event_metadata' => [
+                'url' => $this->webpage->url,
+                'linked_at' => now()->toIso8601String(),
+                'fetch_integration_id' => $this->integration->id,
+            ],
+        ]);
+
+        Log::info('Fetch: Created link event', [
+            'actor_id' => $sourceObject->id,
+            'target_id' => $this->webpage->id,
+            'url' => $this->webpage->url,
+        ]);
+    }
+
+    private function getSourceEvents()
+    {
+        if ($this->sourceIsObject && $this->sourceObjectId) {
+            // URL was from an object - get all events where this object is actor or target
+            return Event::where(function ($query) {
+                $query->where('actor_id', $this->sourceObjectId)
+                    ->orWhere('target_id', $this->sourceObjectId);
+            })->get();
+        } elseif (! $this->sourceIsObject && $this->sourceEventId) {
+            // URL was from an event - return just that event
+            $event = Event::find($this->sourceEventId);
+
+            return $event ? collect([$event]) : collect();
+        }
+
+        return collect();
     }
 }
