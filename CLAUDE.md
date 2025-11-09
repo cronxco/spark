@@ -149,6 +149,11 @@ IntegrationGroup (stores OAuth tokens/credentials)
     - Shared across integrations for the same user
 - **Event**: Individual timestamped data points with action, value, and metadata
 - **Block**: Aggregated/formatted data for display (e.g., daily summaries, visualizations)
+- **Relationship**: Polymorphic relationships between Events, EventObjects, and Blocks
+    - User-scoped connections between any model types
+    - Supports directional and bi-directional relationship types
+    - Optional value/unit/multiplier fields for monetary tracking
+    - Managed via `RelationshipTypeRegistry` for type configuration
 
 ### Job Architecture
 
@@ -315,6 +320,71 @@ $eventObject = EventObject::firstOrCreate(
 ```
 
 **Important:** EventObjects are shared across integrations for the same user. Use unique `title` values to differentiate between instances if needed.
+
+### Creating Relationships
+
+Relationships connect Events, EventObjects, and Blocks with typed, directional or bi-directional links:
+
+```php
+use App\Models\Relationship;
+use App\Models\EventObject;
+
+// Create a directional relationship (e.g., A links to B)
+Relationship::createRelationship([
+    'user_id' => $user->id,
+    'from_type' => EventObject::class,
+    'from_id' => $sourceObject->id,
+    'to_type' => EventObject::class,
+    'to_id' => $targetObject->id,
+    'type' => 'linked_to', // Directional
+    'metadata' => ['url' => 'https://example.com'],
+]);
+
+// Create a bi-directional relationship (e.g., A related to B = B related to A)
+Relationship::createRelationship([
+    'user_id' => $user->id,
+    'from_type' => EventObject::class,
+    'from_id' => $object1->id,
+    'to_type' => EventObject::class,
+    'to_id' => $object2->id,
+    'type' => 'related_to', // Bi-directional (won't create duplicates)
+]);
+
+// Create a monetary relationship
+Relationship::createRelationship([
+    'user_id' => $user->id,
+    'from_type' => EventObject::class,
+    'from_id' => $fromAccount->id,
+    'to_type' => EventObject::class,
+    'to_id' => $toAccount->id,
+    'type' => 'transferred_to',
+    'value' => 10000, // £100.00 in pence
+    'value_multiplier' => 100,
+    'value_unit' => 'GBP',
+]);
+
+// Query relationships
+$object->relationshipsFrom()->get(); // Where this is "from"
+$object->relationshipsTo()->get();   // Where this is "to"
+$object->relationships()->get();     // All relationships
+
+// Get related entities
+$object->relatedObjects()->get();           // All related objects
+$object->relatedObjects('linked_to')->get(); // Only "linked_to" type
+$object->relatedEvents()->get();            // All related events
+$object->relatedBlocks()->get();            // All related blocks
+```
+
+**Available Relationship Types** (see `app/Services/RelationshipTypeRegistry.php`):
+
+- `linked_to` - Directional, source links to target
+- `related_to` - Bi-directional, general association
+- `caused_by` - Directional, causal relationship
+- `part_of` - Directional, hierarchical relationship
+- `similar_to` - Bi-directional, similarity relationship
+- `transferred_to` - Directional, money/value transfer (supports value fields)
+
+**Important:** The old `had_link_to` event type has been migrated to the `linked_to` relationship type. Use `Relationship` model instead of creating events with `action: 'had_link_to'`.
 
 ### Working with Integration Configuration
 

@@ -96,8 +96,13 @@ class ProcessFetchedContent implements ShouldQueue
                 );
 
                 // Create or update today's Event
+                $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
                 $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
-                $action = 'fetched';
+                if ($fetchMode === 'once') {
+                    $action = 'bookmarked';
+                } else {
+                    $action = 'fetched';
+                }
 
                 $event = Event::updateOrCreate(
                     [
@@ -143,7 +148,7 @@ class ProcessFetchedContent implements ShouldQueue
                     'event_id' => $event->id,
                 ]);
             } else {
-                Log::info('Fetch: Skipping daily event creation for linkable discovered URL', [
+                Log::info('Fetch: Skipping event creation for linkable discovered URL', [
                     'url' => $this->webpage->url,
                     'source_object_id' => $sourceObjectId,
                     'source_event_id' => $sourceEventId,
@@ -151,7 +156,6 @@ class ProcessFetchedContent implements ShouldQueue
             }
 
             // Check if this is a one-time fetch that should be disabled after successful fetch
-            $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
             $newFetchCount = ($metadata['fetch_count'] ?? 0) + 1;
             $shouldDisable = ($fetchMode === 'once' && $newFetchCount >= 1);
 
