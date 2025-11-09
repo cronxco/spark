@@ -41,8 +41,12 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
             return;
         }
 
+        // Check user's auto-fetch preference
+        $autoFetchEnabled = $this->integration->user->getFetchDiscoveryAutoFetchEnabled();
+
         Log::info('DiscoverUrlsFromIntegrations: Monitoring integrations', [
             'monitored_ids' => $monitoredIntegrationIds,
+            'auto_fetch_enabled' => $autoFetchEnabled,
         ]);
 
         $discoveredUrls = collect();
@@ -140,6 +144,58 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
             'count' => $discoveredUrls->count(),
         ]);
 
+        // Filter out image and static asset URLs by file extension
+        $imageExtensions = ['ico', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'tiff', 'avif'];
+        $assetExtensions = ['css', 'js', 'woff', 'woff2', 'ttf', 'eot', 'map'];
+        $excludedExtensions = array_merge($imageExtensions, $assetExtensions);
+
+        $beforeExtensionFilter = $discoveredUrls->count();
+        $discoveredUrls = $discoveredUrls->reject(function ($urlData) use ($excludedExtensions) {
+            $url = $urlData['url'];
+            $path = parse_url($url, PHP_URL_PATH);
+
+            if (! $path) {
+                return false; // Keep URLs without paths
+            }
+
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+            return in_array($extension, $excludedExtensions);
+        });
+
+        $extensionFilteredCount = $beforeExtensionFilter - $discoveredUrls->count();
+        Log::info('DiscoverUrlsFromIntegrations: URLs after filtering static assets', [
+            'count' => $discoveredUrls->count(),
+            'filtered_count' => $extensionFilteredCount,
+        ]);
+
+        // Filter out URLs from excluded domains
+        $excludedDomains = $this->integration->user->getFetchDiscoveryExcludedDomains();
+        if (! empty($excludedDomains)) {
+            $beforeDomainFilter = $discoveredUrls->count();
+
+            $discoveredUrls = $discoveredUrls->filter(function ($urlData) use ($excludedDomains) {
+                $domain = parse_url($urlData['url'], PHP_URL_HOST);
+                if (! $domain) {
+                    return true; // Keep invalid URLs for later validation
+                }
+
+                // Normalize domain for comparison
+                $domain = strtolower($domain);
+                $domain = preg_replace('#^www\.#', '', $domain);
+
+                return ! in_array($domain, $excludedDomains);
+            });
+
+            $domainFilteredCount = $beforeDomainFilter - $discoveredUrls->count();
+
+            Log::info('DiscoverUrlsFromIntegrations: URLs after filtering excluded domains', [
+                'count' => $discoveredUrls->count(),
+                'filtered_count' => $domainFilteredCount,
+                'excluded_domains' => $excludedDomains,
+            ]);
+        }
+
         // Filter out URLs that are already subscribed
         // Query for fetch_webpage objects belonging to this user
         $existingUrls = EventObject::where('user_id', $this->integration->user_id)
@@ -178,12 +234,15 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                         'domain' => $domain,
                         'fetch_integration_id' => $this->integration->id, // Store which Fetch integration manages this
                         'subscription_source' => 'discovered',
+                        'fetch_mode' => 'once', // Auto-discovered URLs are fetched once
                         'discovered_from_integration_id' => $urlData['source_integration_id'],
                         'discovered_from_object_id' => $urlData['source_object_id'] ?? null,
                         'discovered_from_event_id' => $urlData['source_event_id'] ?? null,
                         'discovered_at' => now()->toIso8601String(),
                         'found_in' => $urlData['found_in'],
-                        'enabled' => true,
+                        'enabled' => $autoFetchEnabled, // Respect user's auto-fetch setting
+                        'discovery_status' => 'pending',
+                        'discovery_ignored' => false,
                         'last_checked_at' => null,
                         'last_changed_at' => null,
                         'content_hash' => null,

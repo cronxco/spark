@@ -62,10 +62,28 @@ class ExtractContentJob implements ShouldQueue
                 ],
             ]);
 
+            // Store extracted content in EventObject content field
+            $this->webpage->content = $articleText;
+            $this->webpage->save();
+
             Log::info('Fetch: Article text extracted successfully', [
                 'event_id' => $this->event->id,
                 'word_count' => str_word_count($articleText),
             ]);
+
+            // Check if this is a one-time fetch that's already completed
+            $metadata = $this->webpage->metadata ?? [];
+            $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
+            $discoveryStatus = $metadata['discovery_status'] ?? 'pending';
+
+            if ($fetchMode === 'once' && $discoveryStatus === 'completed') {
+                Log::info('Fetch: Skipping summary generation - one-time bookmark already completed', [
+                    'webpage_id' => $this->webpage->id,
+                    'url' => $this->webpage->url,
+                ]);
+
+                return;
+            }
 
             // Dispatch summary generation job
             GenerateSummariesJob::dispatch(

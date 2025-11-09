@@ -42,6 +42,8 @@ new class extends Component
     public array $availableIntegrations = [];
     public array $monitoredIntegrations = [];
     public array $discoveredUrls = [];
+    public array $excludedDomains = [];
+    public string $newExcludedDomain = '';
 
     // Stats
     public array $stats = [];
@@ -194,7 +196,12 @@ new class extends Component
     {
         $query = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
-            ->where('type', 'fetch_webpage');
+            ->where('type', 'fetch_webpage')
+            ->where(function ($q) {
+                // Only show subscribed URLs (exclude discovered URLs)
+                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
+                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs without source
+            });
 
         // Apply search
         if (! empty($this->urlSearch)) {
@@ -310,40 +317,131 @@ new class extends Component
         $config = $this->integration->configuration ?? [];
         $this->monitoredIntegrations = $config['monitor_integrations'] ?? [];
 
+        // Load excluded domains and set defaults if empty
+        $user = Auth::user();
+        $this->excludedDomains = $user->getFetchDiscoveryExcludedDomains();
+
+        // Pre-populate common asset CDN domains if list is empty
+        if (empty($this->excludedDomains)) {
+            $defaultExcludedDomains = [
+                't0.gstatic.com',
+                't1.gstatic.com',
+                't2.gstatic.com',
+                't3.gstatic.com',
+                'cdnjs.cloudflare.com',
+                'unpkg.com',
+                'cdn.jsdelivr.net',
+            ];
+            $user->setFetchDiscoveryExcludedDomains($defaultExcludedDomains);
+            $this->excludedDomains = $defaultExcludedDomains;
+        }
+
         // Load recently discovered URLs (last 50)
         $this->discoveredUrls = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->whereRaw("metadata->>'subscription_source' = 'discovered'")
+            ->whereRaw("(metadata->>'discovery_ignored')::boolean IS NOT TRUE") // Exclude ignored URLs
             ->orderByRaw("metadata->>'discovered_at' DESC")
             ->limit(50)
             ->get()
             ->map(function ($obj) {
                 $metadata = $obj->metadata ?? [];
+                $discoveryStatus = $this->determineDiscoveryStatus($metadata);
+
+                // Find source integration name
+                $sourceIntegrationId = $metadata['discovered_from_integration_id'] ?? null;
+                $sourceIntegrationName = null;
+                if ($sourceIntegrationId) {
+                    $sourceIntegration = collect($this->availableIntegrations)
+                        ->firstWhere('id', $sourceIntegrationId);
+                    $sourceIntegrationName = $sourceIntegration['service_name'] ?? 'Unknown';
+                }
 
                 return [
                     'id' => $obj->id,
                     'url' => $obj->url,
+                    'title' => $obj->title !== $obj->url ? $obj->title : null,
                     'discovered_at' => $metadata['discovered_at'] ?? null,
-                    'discovered_from_integration_id' => $metadata['discovered_from_integration_id'] ?? null,
+                    'discovered_from_integration_id' => $sourceIntegrationId,
+                    'source_integration_name' => $sourceIntegrationName,
                     'enabled' => $metadata['enabled'] ?? true,
+                    'discovery_status' => $discoveryStatus,
+                    'last_checked_at' => $metadata['last_checked_at'] ?? null,
+                    'last_error' => $metadata['last_error'] ?? null,
+                    'fetch_count' => $metadata['fetch_count'] ?? 0,
                 ];
             })
             ->toArray();
     }
 
+    public function determineDiscoveryStatus(array $metadata): string
+    {
+        // Check if ignored
+        if ($metadata['discovery_ignored'] ?? false) {
+            return 'ignored';
+        }
+
+        // Check if there's an error
+        if (isset($metadata['last_error'])) {
+            return 'error';
+        }
+
+        // Check if it's been fetched
+        if (($metadata['fetch_count'] ?? 0) > 0 || isset($metadata['last_checked_at'])) {
+            return 'fetched';
+        }
+
+        // Otherwise it's pending
+        return 'pending';
+    }
+
+    public function getAutoFetchEnabled(): bool
+    {
+        return Auth::user()->getFetchDiscoveryAutoFetchEnabled();
+    }
+
     public function loadStats(): void
     {
-        $totalUrls = EventObject::where('user_id', Auth::id())
+        // Subscribed URLs (URLs tab)
+        $subscribedUrls = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
+            ->where(function ($q) {
+                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
+                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs
+            })
             ->count();
 
-        $activeUrls = EventObject::where('user_id', Auth::id())
+        $activeSubscribedUrls = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
+            ->where(function ($q) {
+                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
+                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs
+            })
             ->whereRaw("(metadata->>'enabled')::boolean = true")
             ->count();
+
+        // Discovered URLs (Discovery tab)
+        $discoveredUrls = EventObject::where('user_id', Auth::id())
+            ->where('concept', 'bookmark')
+            ->where('type', 'fetch_webpage')
+            ->whereRaw("metadata->>'subscription_source' = 'discovered'")
+            ->whereRaw("(metadata->>'discovery_ignored')::boolean IS NOT TRUE")
+            ->count();
+
+        $activeDiscoveredUrls = EventObject::where('user_id', Auth::id())
+            ->where('concept', 'bookmark')
+            ->where('type', 'fetch_webpage')
+            ->whereRaw("metadata->>'subscription_source' = 'discovered'")
+            ->whereRaw("(metadata->>'discovery_ignored')::boolean IS NOT TRUE")
+            ->whereRaw("(metadata->>'enabled')::boolean = true")
+            ->count();
+
+        // Overall stats
+        $totalUrls = $subscribedUrls + $discoveredUrls;
+        $activeUrls = $activeSubscribedUrls + $activeDiscoveredUrls;
 
         $urlsWithErrors = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
@@ -361,6 +459,11 @@ new class extends Component
             'urls_with_errors' => $urlsWithErrors,
             'domains_with_cookies' => $domainsWithCookies,
             'next_run' => $nextRun?->toISOString(),
+            // Breakdown
+            'subscribed_urls' => $subscribedUrls,
+            'subscribed_active' => $activeSubscribedUrls,
+            'discovered_urls' => $discoveredUrls,
+            'discovered_active' => $activeDiscoveredUrls,
         ];
     }
 
@@ -370,11 +473,15 @@ new class extends Component
             'newUrl' => 'required|url|max:2048',
         ]);
 
-        // Check if URL already exists
+        // Check if URL already exists as a subscription (allow if it's only discovered)
         $existing = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->where('url', $this->newUrl)
+            ->where(function ($q) {
+                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
+                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs
+            })
             ->exists();
 
         if ($existing) {
@@ -395,8 +502,10 @@ new class extends Component
                 'time' => now(),
                 'metadata' => [
                     'domain' => $domain,
-                    'subscription_source' => 'manual',
-                    'subscribed_at' => now(),
+                    'fetch_integration_id' => $this->integration->id,
+                    'subscription_source' => 'subscribed',
+                    'fetch_mode' => 'recurring', // Subscribed URLs are fetched repeatedly
+                    'subscribed_at' => now()->toIso8601String(),
                     'enabled' => true,
                     'last_checked_at' => null,
                     'last_changed_at' => null,
@@ -602,6 +711,67 @@ new class extends Component
         }
     }
 
+    public function addExcludedDomain(): void
+    {
+        $this->validate([
+            'newExcludedDomain' => 'required|string|max:255',
+        ]);
+
+        try {
+            $user = Auth::user();
+            $user->addFetchDiscoveryExcludedDomain($this->newExcludedDomain);
+            $this->success('Domain added to exclusion list.');
+            $this->newExcludedDomain = '';
+            $this->loadDiscoverySettings();
+        } catch (\Exception $e) {
+            $this->error('Failed to add domain: ' . $e->getMessage());
+            Log::error('Failed to add excluded domain', [
+                'error' => $e->getMessage(),
+                'domain' => $this->newExcludedDomain,
+            ]);
+        }
+    }
+
+    public function removeExcludedDomain(string $domain): void
+    {
+        try {
+            Auth::user()->removeFetchDiscoveryExcludedDomain($domain);
+            $this->success('Domain removed from exclusion list.');
+            $this->loadDiscoverySettings();
+        } catch (\Exception $e) {
+            $this->error('Failed to remove domain: ' . $e->getMessage());
+            Log::error('Failed to remove excluded domain', [
+                'error' => $e->getMessage(),
+                'domain' => $domain,
+            ]);
+        }
+    }
+
+    public function clearAllDiscoveredUrls(): void
+    {
+        try {
+            $count = EventObject::where('user_id', Auth::id())
+                ->where('concept', 'bookmark')
+                ->where('type', 'fetch_webpage')
+                ->whereRaw("metadata->>'subscription_source' = 'discovered'")
+                ->delete();
+
+            $this->success("Cleared {$count} discovered URL(s).");
+            $this->loadDiscoverySettings();
+
+            Log::info('Cleared all discovered URLs', [
+                'user_id' => Auth::id(),
+                'count' => $count,
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to clear discovered URLs: ' . $e->getMessage());
+            Log::error('Failed to clear discovered URLs', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id(),
+            ]);
+        }
+    }
+
     public function triggerDiscovery(): void
     {
         try {
@@ -646,6 +816,148 @@ new class extends Component
             }
         } catch (\Exception $e) {
             $this->error('Failed to remove URL: ' . $e->getMessage());
+        }
+    }
+
+    public function toggleAutoFetchMode(): void
+    {
+        try {
+            $user = Auth::user();
+            $currentValue = $user->getFetchDiscoveryAutoFetchEnabled();
+            $newValue = ! $currentValue;
+
+            $user->setFetchDiscoveryAutoFetchEnabled($newValue);
+
+            $message = $newValue
+                ? 'Auto-fetch enabled. New discovered URLs will be fetched automatically.'
+                : 'Auto-fetch disabled. New discovered URLs will require manual approval.';
+
+            $this->success($message);
+            $this->loadDiscoverySettings();
+
+            Log::info('Fetch discovery auto-fetch mode toggled', [
+                'user_id' => $user->id,
+                'new_value' => $newValue,
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to toggle auto-fetch mode: ' . $e->getMessage());
+            Log::error('Failed to toggle auto-fetch mode', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function toggleUrlAutoFetch(string $urlId): void
+    {
+        try {
+            $eventObject = EventObject::where('user_id', Auth::id())
+                ->where('concept', 'bookmark')
+                ->where('type', 'fetch_webpage')
+                ->where('id', $urlId)
+                ->first();
+
+            if (! $eventObject) {
+                $this->error('URL not found.');
+
+                return;
+            }
+
+            $metadata = $eventObject->metadata ?? [];
+            $currentValue = $metadata['enabled'] ?? false;
+            $metadata['enabled'] = ! $currentValue;
+
+            $eventObject->update(['metadata' => $metadata]);
+
+            $message = $metadata['enabled']
+                ? 'Auto-fetch enabled for this URL.'
+                : 'Auto-fetch disabled for this URL.';
+
+            $this->success($message);
+            $this->loadDiscoverySettings();
+            $this->loadUrls();
+        } catch (\Exception $e) {
+            $this->error('Failed to toggle auto-fetch: ' . $e->getMessage());
+            Log::error('Failed to toggle URL auto-fetch', [
+                'url_id' => $urlId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function ignoreDiscoveredUrl(string $urlId): void
+    {
+        try {
+            $eventObject = EventObject::where('user_id', Auth::id())
+                ->where('concept', 'bookmark')
+                ->where('type', 'fetch_webpage')
+                ->where('id', $urlId)
+                ->first();
+
+            if (! $eventObject) {
+                $this->error('URL not found.');
+
+                return;
+            }
+
+            $metadata = $eventObject->metadata ?? [];
+            $metadata['discovery_ignored'] = true;
+            $metadata['ignored_at'] = now()->toIso8601String();
+            $metadata['enabled'] = false; // Also disable auto-fetch
+
+            $eventObject->update(['metadata' => $metadata]);
+
+            $this->success('URL ignored. It will no longer appear in the discovery list.');
+            $this->loadDiscoverySettings();
+            $this->loadUrls();
+
+            Log::info('Discovered URL ignored', [
+                'url_id' => $urlId,
+                'url' => $eventObject->url,
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to ignore URL: ' . $e->getMessage());
+            Log::error('Failed to ignore discovered URL', [
+                'url_id' => $urlId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function unignoreDiscoveredUrl(string $urlId): void
+    {
+        try {
+            $eventObject = EventObject::where('user_id', Auth::id())
+                ->where('concept', 'bookmark')
+                ->where('type', 'fetch_webpage')
+                ->where('id', $urlId)
+                ->first();
+
+            if (! $eventObject) {
+                $this->error('URL not found.');
+
+                return;
+            }
+
+            $metadata = $eventObject->metadata ?? [];
+            $metadata['discovery_ignored'] = false;
+            unset($metadata['ignored_at']);
+
+            $eventObject->update(['metadata' => $metadata]);
+
+            $this->success('URL restored. It will now appear in the discovery list.');
+            $this->loadDiscoverySettings();
+            $this->loadUrls();
+
+            Log::info('Discovered URL unignored', [
+                'url_id' => $urlId,
+                'url' => $eventObject->url,
+            ]);
+        } catch (\Exception $e) {
+            $this->error('Failed to restore URL: ' . $e->getMessage());
+            Log::error('Failed to unignore discovered URL', [
+                'url_id' => $urlId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -896,9 +1208,9 @@ new class extends Component
                                 class="input input-bordered w-full"
                                 required />
                             @error('newUrl')
-                                <label class="label">
-                                    <span class="label-text-alt text-error">{{ $message }}</span>
-                                </label>
+                            <label class="label">
+                                <span class="label-text-alt text-error">{{ $message }}</span>
+                            </label>
                             @enderror
                         </div>
                         <x-button type="submit" class="btn-primary">
@@ -924,7 +1236,7 @@ new class extends Component
                             <select wire:model.live="domainFilter" class="select select-bordered">
                                 <option value="">All Domains</option>
                                 @foreach ($this->getDomainOptions() as $domain)
-                                    <option value="{{ $domain }}">{{ $domain }}</option>
+                                <option value="{{ $domain }}">{{ $domain }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -965,12 +1277,12 @@ new class extends Component
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-2">
                                     <img src="https://www.google.com/s2/favicons?domain={{ $url['domain'] }}"
-                                         alt="Favicon"
-                                         class="w-4 h-4" />
+                                        alt="Favicon"
+                                        class="w-4 h-4" />
                                     <a href="{{ $url['url'] }}"
-                                       target="_blank"
-                                       class="text-sm font-mono text-primary hover:underline truncate"
-                                       title="{{ $url['url'] }}">
+                                        target="_blank"
+                                        class="text-sm font-mono text-primary hover:underline truncate"
+                                        title="{{ $url['url'] }}">
                                         {{ $url['url'] }}
                                     </a>
                                 </div>
@@ -1168,24 +1480,25 @@ new class extends Component
                                 class="input input-bordered w-full"
                                 required />
                             @error('cookieDomain')
-                                <label class="label">
-                                    <span class="label-text-alt text-error">{{ $message }}</span>
-                                </label>
+                            <label class="label">
+                                <span class="label-text-alt text-error">{{ $message }}</span>
+                            </label>
                             @enderror
                         </div>
                         <div class="form-control">
                             <label class="label">
                                 <span class="label-text">Cookies (JSON)</span>
                             </label>
+                            <br />
                             <textarea
                                 wire:model="cookieJson"
                                 placeholder='[{"name": "session_id", "value": "abc123", "expires": 1733155200}]'
                                 class="textarea textarea-bordered h-32 font-mono text-sm"
                                 required></textarea>
                             @error('cookieJson')
-                                <label class="label">
-                                    <span class="label-text-alt text-error">{{ $message }}</span>
-                                </label>
+                            <label class="label">
+                                <span class="label-text-alt text-error">{{ $message }}</span>
+                            </label>
                             @enderror
                         </div>
                         <div class="flex gap-2">
@@ -1193,27 +1506,22 @@ new class extends Component
                                 <x-icon name="o-plus" class="w-4 h-4" />
                                 Add Cookies
                             </x-button>
-
-                            @if ($playwrightEnabled && $playwrightAvailable)
-                            <x-button type="button" wire:click="extractCookiesFromBrowser" class="btn-secondary">
-                                <x-icon name="o-globe-alt" class="w-4 h-4" />
-                                Extract from Browser
-                            </x-button>
-                            @endif
                         </div>
                     </form>
 
                     @if ($playwrightEnabled && $playwrightAvailable)
-                    <div class="alert alert-info mt-4">
-                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                    <x-alert icon="o-information-circle" class="alert-info alert-soft mt-4">
                         <div>
                             <p class="font-semibold">Need to access a logged-in site?</p>
-                            <p class="text-sm">Open the browser, log in to any site, then come back here to save your session cookies.</p>
-                            <a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="link link-primary text-sm">
-                                Open Browser (VNC)
-                            </a>
+                            <p class="text-sm"><a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="link link-primary text-sm">Open the browser</a>, log in to any site, then come back here to save your session cookies.</p>
                         </div>
-                    </div>
+                        <x-slot:actions>
+                            <x-button type="button" wire:click="extractCookiesFromBrowser" class="btn-info btn-outline">
+                                <x-icon name="o-globe-alt" class="w-4 h-4" />
+                                Extract from Browser
+                            </x-button>
+                        </x-slot:actions>
+                    </x-alert>
                     @endif
 
                     <!-- Format Help -->
@@ -1254,17 +1562,17 @@ new class extends Component
                                     <!-- Expiry Badge -->
                                     @if ($domain['expires_at'])
                                     @php
-                                        $expiryDate = \Carbon\Carbon::parse($domain['expires_at']);
-                                        $badgeClass = match($domain['expiry_status']) {
-                                            'green' => 'badge-success',
-                                            'yellow' => 'badge-warning',
-                                            'red' => 'badge-error',
-                                            default => 'badge-neutral',
-                                        };
+                                    $expiryDate = \Carbon\Carbon::parse($domain['expires_at']);
+                                    $badgeClass = match($domain['expiry_status']) {
+                                    'green' => 'badge-success',
+                                    'yellow' => 'badge-warning',
+                                    'red' => 'badge-error',
+                                    default => 'badge-neutral',
+                                    };
                                     @endphp
-                                    <x-badge value="Expires {{ $expiryDate->format('M j') }}" class="{{ $badgeClass }}" />
+                                    <x-badge value="Expires {{ $expiryDate->format('M j') }}" class="{{ $badgeClass }} badge-outline" />
                                     @else
-                                    <x-badge value="No expiry set" class="badge-neutral" />
+                                    <x-badge value="No expiry set" class="badge-neutral badge-outline" />
                                     @endif
 
                                     <span class="text-base-content/70">{{ $domain['cookie_count'] }} cookies</span>
@@ -1305,8 +1613,7 @@ new class extends Component
                                             type="checkbox"
                                             class="toggle toggle-primary toggle-sm"
                                             @if ($domain['auto_refresh_enabled']) checked @endif
-                                            wire:click="toggleCookieAutoRefresh('{{ $domain['domain'] }}')"
-                                        />
+                                            wire:click="toggleCookieAutoRefresh('{{ $domain['domain'] }}')" />
                                         <span class="text-sm font-medium">Auto-refresh cookies before expiry</span>
                                     </label>
                                     <div class="tooltip" data-tip="Automatically refresh cookies before they expire using Playwright">
@@ -1354,145 +1661,303 @@ new class extends Component
 
         <!-- Discovery Settings Tab -->
         <x-tab name="discovery" label="Discovery" icon="o-magnifying-glass">
+            <!-- Discovered URLs Table -->
+            @if (!empty($discoveredUrls))
+            <div class="card bg-base-200 shadow mb-6">
+                <div class="card-body">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">Discovered URLs (Last 50)</h3>
+                        <button
+                            type="button"
+                            class="btn btn-error btn-sm"
+                            wire:click="clearAllDiscoveredUrls"
+                            wire:confirm="Are you sure you want to clear all discovered URLs? This action cannot be undone.">
+                            <x-icon name="o-trash" class="w-4 h-4" />
+                            Clear All
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm table-zebra">
+                            <thead>
+                                <tr>
+                                    <th>URL</th>
+                                    <th>Source</th>
+                                    <th>Discovered</th>
+                                    <th>Status</th>
+                                    <th>Fetch</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($discoveredUrls as $url)
+                                <tr class="hover">
+                                    <td>
+                                        <div class="flex items-center gap-2 max-w-md">
+                                            <img
+                                                src="https://www.google.com/s2/favicons?domain={{ parse_url($url['url'], PHP_URL_HOST) }}&sz=32"
+                                                alt="favicon"
+                                                class="w-4 h-4 flex-shrink-0" />
+                                            <div class="flex flex-col min-w-0">
+                                                @if ($url['title'])
+                                                <span class="text-sm font-medium truncate">
+                                                    {{ Str::limit($url['title'], 60) }}
+                                                </span>
+                                                <span class="text-xs text-base-content/50 truncate">{{ Str::limit($url['url'], 50) }}</span>
+                                                @else
+                                                <span class="text-sm truncate">
+                                                    {{ Str::limit($url['url'], 60) }}
+                                                </span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if ($url['source_integration_name'])
+                                        <span class="badge badge-sm badge-neutral">{{ $url['source_integration_name'] }}</span>
+                                        @else
+                                        <span class="badge badge-sm badge-ghost">Unknown</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="text-xs text-base-content/70" title="{{ $url['discovered_at'] }}">
+                                            {{ $url['discovered_at'] ? \Carbon\Carbon::parse($url['discovered_at'])->diffForHumans() : '-' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if ($url['discovery_status'] === 'pending')
+                                        <span class="badge badge-sm badge-warning gap-1">
+                                            <x-icon name="o-clock" class="w-3 h-3" />
+                                            Pending
+                                        </span>
+                                        @elseif ($url['discovery_status'] === 'fetched')
+                                        <span class="badge badge-sm badge-success gap-1">
+                                            <x-icon name="o-check-circle" class="w-3 h-3" />
+                                            Fetched
+                                        </span>
+                                        @elseif ($url['discovery_status'] === 'error')
+                                        <span class="badge badge-sm badge-error gap-1">
+                                            <x-icon name="o-exclamation-circle" class="w-3 h-3" />
+                                            Error
+                                        </span>
+                                        @else
+                                        <span class="badge badge-sm badge-ghost">{{ ucfirst($url['discovery_status']) }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            class="toggle toggle-sm toggle-success"
+                                            wire:click="toggleUrlAutoFetch('{{ $url['id'] }}')"
+                                            @if ($url['enabled']) checked @endif />
+                                    </td>
+                                    <td>
+                                        <div class="dropdown dropdown-end">
+                                            <button tabindex="0" class="btn btn-ghost btn-xs">
+                                                <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                                            </button>
+                                            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
+                                                <li>
+                                                    <a wire:click="fetchNow('{{ $url['id'] }}')">
+                                                        <x-icon name="o-arrow-path" class="w-4 h-4" />
+                                                        Fetch Now
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a wire:click="ignoreDiscoveredUrl('{{ $url['id'] }}')" class="text-warning">
+                                                        <x-icon name="o-eye-slash" class="w-4 h-4" />
+                                                        Ignore
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a
+                                                        wire:click="removeDiscoveredUrl('{{ $url['id'] }}')"
+                                                        wire:confirm="Are you sure you want to remove this URL?"
+                                                        class="text-error">
+                                                        <x-icon name="o-trash" class="w-4 h-4" />
+                                                        Delete
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @elseif (!empty($monitoredIntegrations))
+            <div class="card bg-base-200 shadow mb-6">
+                <div class="card-body text-center py-12">
+                    <x-icon name="o-magnifying-glass" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                    <h3 class="text-lg font-medium text-base-content mb-2">No URLs Discovered Yet</h3>
+                    <p class="text-base-content/70 mb-4">
+                        Click "Scan Now" above to start discovering URLs from your connected integrations.
+                    </p>
+                </div>
+            </div>
+            @endif
+            <!-- Auto-Fetch Mode Toggle -->
+            <div class="card bg-base-200 shadow mb-6">
+                <div class="card-body">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold mb-2">Auto-Fetch Mode</h3>
+                            <p class="text-sm text-base-content/70">
+                                @if ($this->getAutoFetchEnabled())
+                                New discovered URLs will be automatically fetched and processed.
+                                @else
+                                New discovered URLs require manual approval before being fetched.
+                                @endif
+                            </p>
+                        </div>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-primary toggle-lg"
+                            wire:click="toggleAutoFetchMode"
+                            @if ($this->getAutoFetchEnabled()) checked @endif
+                        />
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                        <div class="stat bg-base-100 rounded-lg p-3">
+                            <div class="stat-title text-xs">Discovered</div>
+                            <div class="stat-value text-2xl">{{ count($discoveredUrls) }}</div>
+                        </div>
+                        <div class="stat bg-base-100 rounded-lg p-3">
+                            <div class="stat-title text-xs">Pending</div>
+                            <div class="stat-value text-2xl text-warning">
+                                {{ count(array_filter($discoveredUrls, fn($u) => $u['discovery_status'] === 'pending')) }}
+                            </div>
+                        </div>
+                        <div class="stat bg-base-100 rounded-lg p-3">
+                            <div class="stat-title text-xs">Fetched</div>
+                            <div class="stat-value text-2xl text-success">
+                                {{ count(array_filter($discoveredUrls, fn($u) => $u['discovery_status'] === 'fetched')) }}
+                            </div>
+                        </div>
+                        <div class="stat bg-base-100 rounded-lg p-3">
+                            <div class="stat-title text-xs">Errors</div>
+                            <div class="stat-value text-2xl text-error">
+                                {{ count(array_filter($discoveredUrls, fn($u) => $u['discovery_status'] === 'error')) }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Monitor Integrations Section -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
                     <h3 class="text-lg font-semibold mb-4">Smart URL Discovery</h3>
-                    <p class="text-sm text-base-content/70 mb-4">
-                        Let Fetch automatically find links from your connected apps. It will scan your notes, posts, and bookmarks to discover URLs worth saving.
-                    </p>
 
                     @if (empty($availableIntegrations))
-                        <div class="alert alert-info">
-                            <x-icon name="o-information-circle" class="w-6 h-6" />
-                            <span>Add integrations like Karakeep, Reddit, or Outline to get started.</span>
-                        </div>
+                    <div class="alert alert-info">
+                        <x-icon name="o-information-circle" class="w-6 h-6" />
+                        <span>Add integrations to get started.</span>
+                    </div>
                     @else
-                        <div class="form-control mb-4">
-                            <label class="label">
-                                <span class="label-text">Select Integrations to Monitor</span>
+                    <div class="form-control mb-4">
+                        <label class="label">
+                            <span class="label-text">Select Integrations to Monitor</span>
+                        </label>
+                        <div class="space-y-2">
+                            @foreach ($availableIntegrations as $integration)
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:bg-base-300 cursor-pointer transition">
+                                <input
+                                    type="checkbox"
+                                    class="checkbox"
+                                    value="{{ $integration['id'] }}"
+                                    wire:model="monitoredIntegrations" />
+                                <div class="flex-1">
+                                    <div class="font-medium">{{ $integration['name'] }}</div>
+                                    <div class="text-sm text-base-content/70">{{ $integration['service_name'] }}</div>
+                                </div>
+                                @if (isset($integration['object_count']))
+                                <span class="badge badge-neutral">{{ $integration['object_count'] }} objects</span>
+                                @endif
                             </label>
-                            <div class="space-y-2">
-                                @foreach ($availableIntegrations as $integration)
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:bg-base-300 cursor-pointer transition">
-                                        <input
-                                            type="checkbox"
-                                            class="checkbox checkbox-primary"
-                                            value="{{ $integration['id'] }}"
-                                            wire:model="monitoredIntegrations"
-                                        />
-                                        <div class="flex-1">
-                                            <div class="font-medium">{{ $integration['name'] }}</div>
-                                            <div class="text-sm text-base-content/70">{{ $integration['service_name'] }}</div>
-                                        </div>
-                                        @if (isset($integration['object_count']))
-                                            <span class="badge badge-neutral">{{ $integration['object_count'] }} objects</span>
-                                        @endif
-                                    </label>
-                                @endforeach
-                            </div>
+                            @endforeach
                         </div>
+                    </div>
 
-                        <div class="flex gap-2">
-                            <button
-                                type="button"
-                                class="btn btn-primary"
-                                wire:click="updateMonitoredIntegrations"
-                            >
-                                <x-icon name="o-check" class="w-4 h-4" />
-                                Save Settings
-                            </button>
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            class="btn btn-success"
+                            wire:click="updateMonitoredIntegrations">
+                            <x-icon name="o-check" class="w-4 h-4" />
+                            Save
+                        </button>
 
-                            <button
-                                type="button"
-                                class="btn btn-secondary"
-                                wire:click="triggerDiscovery"
-                                @if (empty($monitoredIntegrations)) disabled @endif
-                            >
-                                <x-icon name="o-magnifying-glass" class="w-4 h-4" />
-                                Scan Now
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-outline"
+                            wire:click="triggerDiscovery"
+                            @if (empty($monitoredIntegrations)) disabled @endif>
+                            <x-icon name="o-magnifying-glass" class="w-4 h-4" />
+                            Scan Now
+                        </button>
+                    </div>
                     @endif
                 </div>
             </div>
 
-            <!-- Recently Discovered URLs -->
-            @if (!empty($discoveredUrls))
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">Recently Discovered URLs (Last 50)</h3>
+            <!-- Excluded Domains Section -->
+            <div class="card bg-base-200 shadow mb-6">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4">Excluded Domains</h3>
+                    <p class="text-sm text-base-content/70 mb-4">
+                        URLs from these domains will be automatically ignored during discovery.
+                    </p>
 
-                        <div class="overflow-x-auto">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>URL</th>
-                                        <th>Source</th>
-                                        <th>Discovered</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($discoveredUrls as $url)
-                                        <tr>
-                                            <td>
-                                                <div class="flex items-center gap-2">
-                                                    <img
-                                                        src="https://www.google.com/s2/favicons?domain={{ parse_url($url['url'], PHP_URL_HOST) }}&sz=32"
-                                                        alt="favicon"
-                                                        class="w-4 h-4"
-                                                    />
-                                                    <a href="{{ $url['url'] }}" target="_blank" class="link link-hover text-sm truncate max-w-xs">
-                                                        {{ Str::limit($url['url'], 50) }}
-                                                    </a>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                @if (isset($url['discovered_from_integration_id']))
-                                                    @php
-                                                        $sourceIntegration = collect($availableIntegrations)->firstWhere('id', $url['discovered_from_integration_id']);
-                                                    @endphp
-                                                    @if ($sourceIntegration)
-                                                        <span class="badge badge-sm badge-neutral">{{ $sourceIntegration['service_name'] }}</span>
-                                                    @else
-                                                        <span class="badge badge-sm badge-ghost">Unknown</span>
-                                                    @endif
-                                                @else
-                                                    <span class="badge badge-sm badge-ghost">-</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <span class="text-sm text-base-content/70" title="{{ $url['discovered_at'] }}">
-                                                    {{ $url['discovered_at'] ? \Carbon\Carbon::parse($url['discovered_at'])->diffForHumans() : '-' }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                @if ($url['enabled'])
-                                                    <span class="badge badge-sm badge-success">Active</span>
-                                                @else
-                                                    <span class="badge badge-sm badge-neutral">Disabled</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <button
-                                                    type="button"
-                                                    class="btn btn-ghost btn-xs"
-                                                    wire:click="removeDiscoveredUrl('{{ $url['id'] }}')"
-                                                    wire:confirm="Are you sure you want to remove this URL?"
-                                                >
-                                                    <x-icon name="o-trash" class="w-4 h-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
+                    <!-- Add Domain Form -->
+                    <div class="flex gap-2 mb-4">
+                        <input
+                            type="text"
+                            class="input input-bordered flex-1"
+                            placeholder="example.com or cdn.example.com"
+                            wire:model="newExcludedDomain"
+                            wire:keydown.enter="addExcludedDomain" />
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            wire:click="addExcludedDomain">
+                            <x-icon name="o-plus" class="w-4 h-4" />
+                            Add Domain
+                        </button>
                     </div>
+
+                    <!-- Excluded Domains List -->
+                    @if (empty($excludedDomains))
+                    <div class="alert">
+                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                        <span>No domains excluded. Add domains above to filter them from discovery.</span>
+                    </div>
+                    @else
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        @foreach ($excludedDomains as $domain)
+                        <div class="flex items-center justify-between p-3 rounded-lg border border-base-300 bg-base-100">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <x-icon name="o-no-symbol" class="w-4 h-4 text-base-content/50 flex-shrink-0" />
+                                <span class="font-mono text-sm truncate">{{ $domain }}</span>
+                            </div>
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+                                wire:click="removeExcludedDomain('{{ $domain }}')"
+                                title="Remove">
+                                <x-icon name="o-x-mark" class="w-4 h-4" />
+                            </button>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
                 </div>
-            @endif
+            </div>
         </x-tab>
 
         <!-- Stats Tab -->
@@ -1669,7 +2134,7 @@ new class extends Component
                         <h3 class="text-lg font-semibold mb-4">Stealth Effectiveness</h3>
                         <div class="flex items-center gap-6">
                             @php
-                                $effectiveness = $healthMetrics['stealth']['effectiveness'];
+                            $effectiveness = $healthMetrics['stealth']['effectiveness'];
                             @endphp
                             <div class="radial-progress text-accent" style="--value: {{ $effectiveness }};" role="progressbar">
                                 {{ $effectiveness }}%
@@ -1726,8 +2191,8 @@ new class extends Component
                     <div class="card-body">
                         <h3 class="text-lg font-semibold mb-4">Cookie Auto-Refresh</h3>
                         @php
-                            $autoRefreshEnabled = collect($domains)->where('auto_refresh_enabled', true)->count();
-                            $totalDomains = count($domains);
+                        $autoRefreshEnabled = collect($domains)->where('auto_refresh_enabled', true)->count();
+                        $totalDomains = count($domains);
                         @endphp
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="stat">
@@ -1772,12 +2237,12 @@ new class extends Component
                         </p>
                         <div class="flex flex-wrap gap-2">
                             @php
-                                $jsDomains = array_filter(array_map('trim', explode(',', config('services.playwright.js_required_domains', ''))));
+                            $jsDomains = array_filter(array_map('trim', explode(',', config('services.playwright.js_required_domains', ''))));
                             @endphp
                             @forelse ($jsDomains as $domain)
-                                <x-badge value="{{ $domain }}" class="badge-primary" />
+                            <x-badge value="{{ $domain }}" class="badge-primary" />
                             @empty
-                                <p class="text-sm text-base-content/50">No domains configured</p>
+                            <p class="text-sm text-base-content/50">No domains configured</p>
                             @endforelse
                         </div>
                         <p class="text-sm text-base-content/50 mt-4">
@@ -2261,9 +2726,9 @@ saveToFetch('https://example.com/article')
                         autofocus
                         required />
                     @error('newTokenName')
-                        <label class="label">
-                            <span class="label-text-alt text-error">{{ $message }}</span>
-                        </label>
+                    <label class="label">
+                        <span class="label-text-alt text-error">{{ $message }}</span>
+                    </label>
                     @enderror
                     <label class="label">
                         <span class="label-text-alt">Give it a descriptive name so you know where it's used</span>

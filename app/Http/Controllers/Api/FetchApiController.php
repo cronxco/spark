@@ -19,6 +19,7 @@ class FetchApiController extends Controller
             'url' => ['required', 'url', 'max:2048'],
             'fetch_immediately' => ['boolean'],
             'force_refresh' => ['boolean'],
+            'fetch_mode' => ['string', 'in:once,recurring'],
         ]);
 
         if ($validator->fails()) {
@@ -32,6 +33,7 @@ class FetchApiController extends Controller
         $url = $validated['url'];
         $fetchImmediately = $validated['fetch_immediately'] ?? true;
         $forceRefresh = $validated['force_refresh'] ?? false;
+        $fetchMode = $validated['fetch_mode'] ?? 'once'; // Default to one-time fetch for API bookmarks
 
         // Parse domain from URL
         $domain = parse_url($url, PHP_URL_HOST);
@@ -72,6 +74,11 @@ class FetchApiController extends Controller
             ]);
         }
 
+        // Get user's Fetch integration to store in metadata
+        $integration = $request->user()->integrations()
+            ->where('service', 'fetch')
+            ->first();
+
         // Create new bookmark
         $bookmark = EventObject::create([
             'user_id' => $request->user()->id,
@@ -82,24 +89,20 @@ class FetchApiController extends Controller
             'time' => now(),
             'metadata' => [
                 'domain' => $domain,
+                'fetch_integration_id' => $integration?->id,
                 'subscription_source' => 'api',
+                'fetch_mode' => $fetchMode, // Default 'once', but can be 'recurring'
                 'enabled' => true,
                 'subscribed_at' => now()->toISOString(),
+                'fetch_count' => 0,
             ],
         ]);
 
         // Dispatch fetch job if requested
         $jobDispatched = false;
-        if ($fetchImmediately) {
-            // Get user's Fetch integration
-            $integration = $request->user()->integrations()
-                ->where('service', 'fetch')
-                ->first();
-
-            if ($integration) {
-                FetchSingleUrl::dispatch($integration, $bookmark->id, $bookmark->url);
-                $jobDispatched = true;
-            }
+        if ($fetchImmediately && $integration) {
+            FetchSingleUrl::dispatch($integration, $bookmark->id, $bookmark->url);
+            $jobDispatched = true;
         }
 
         return response()->json([

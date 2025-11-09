@@ -11,7 +11,7 @@ new class extends \Livewire\Volt\Component
 {
     use WithPagination;
 
-    public int $perPage = 25;
+    public int $perPage = 15;
 
     #[Computed]
     public function bookmarks()
@@ -206,7 +206,7 @@ new class extends \Livewire\Volt\Component
 
             <!-- Reddit Integration Card (Conditional) -->
             @if ($this->hasReddit)
-                <a href="{{ route('integrations.show', ['service' => 'reddit']) }}" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
+                <a href="{{ route('plugins.show', ['service' => 'reddit']) }}" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center flex-shrink-0">
@@ -229,7 +229,7 @@ new class extends \Livewire\Volt\Component
 
             <!-- Karakeep Integration Card (Conditional) -->
             @if ($this->hasKarakeep)
-                <a href="{{ route('integrations.show', ['service' => 'karakeep']) }}" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
+                <a href="{{ route('plugins.show', ['service' => 'karakeep']) }}" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center flex-shrink-0">
@@ -252,7 +252,7 @@ new class extends \Livewire\Volt\Component
 
             <!-- BlueSky Integration Card (Conditional) -->
             @if ($this->hasBlueSky)
-                <a href="{{ route('integrations.show', ['service' => 'bluesky']) }}" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
+                <a href="{{ route('plugins.show', ['service' => 'bluesky']) }}" wire:navigate class="card bg-base-200 shadow hover:shadow-lg transition-shadow cursor-pointer">
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">

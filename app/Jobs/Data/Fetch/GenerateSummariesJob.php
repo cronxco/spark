@@ -287,32 +287,67 @@ PROMPT;
     {
         // Attach emoji tag if present
         if (! empty($summaries['emoji'])) {
+            // Attach to EventObject
             $this->webpage->attachTags([$summaries['emoji']], 'spark-emoji');
+
+            // Attach to Event (detach old ones first to override)
+            $this->event->detachTags($this->event->tagsWithType('spark-emoji'));
+            $this->event->attachTags([$summaries['emoji']], 'spark-emoji');
 
             Log::debug('Fetch: Attached emoji tag', [
                 'emoji' => $summaries['emoji'],
                 'webpage_id' => $this->webpage->id,
+                'event_id' => $this->event->id,
             ]);
         }
 
         // Attach semantic tags if present
         if (! empty($summaries['tags']) && is_array($summaries['tags'])) {
+            // Group tags by type for efficient processing
+            $tagsByType = [];
             foreach ($summaries['tags'] as $tagData) {
                 if (isset($tagData['tag']) && isset($tagData['tag_type'])) {
-                    $this->webpage->attachTags([$tagData['tag']], $tagData['tag_type']);
-
-                    Log::debug('Fetch: Attached semantic tag', [
-                        'tag' => $tagData['tag'],
-                        'tag_type' => $tagData['tag_type'],
-                        'webpage_id' => $this->webpage->id,
-                    ]);
+                    $tagsByType[$tagData['tag_type']][] = $tagData['tag'];
                 }
             }
 
-            Log::info('Fetch: Attached tags to webpage', [
+            // Attach tags by type
+            foreach ($tagsByType as $type => $tags) {
+                // Attach to EventObject
+                $this->webpage->attachTags($tags, $type);
+
+                // Attach to Event (replace existing tags of this type)
+                $this->event->detachTags($this->event->tagsWithType($type));
+                $this->event->attachTags($tags, $type);
+
+                Log::debug('Fetch: Attached semantic tags', [
+                    'tag_type' => $type,
+                    'tags' => $tags,
+                    'webpage_id' => $this->webpage->id,
+                    'event_id' => $this->event->id,
+                ]);
+            }
+
+            Log::info('Fetch: Attached tags to webpage and event', [
                 'webpage_id' => $this->webpage->id,
+                'event_id' => $this->event->id,
                 'emoji' => $summaries['emoji'] ?? null,
                 'tag_count' => count($summaries['tags']),
+            ]);
+        }
+
+        // Mark one-time bookmarks as completed
+        $metadata = $this->webpage->metadata ?? [];
+        $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
+
+        if ($fetchMode === 'once') {
+            $metadata['discovery_status'] = 'completed';
+            $this->webpage->metadata = $metadata;
+            $this->webpage->save();
+
+            Log::info('Fetch: Marked one-time bookmark as completed', [
+                'webpage_id' => $this->webpage->id,
+                'url' => $this->webpage->url,
             ]);
         }
     }

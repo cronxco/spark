@@ -398,6 +398,87 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if auto-fetch is enabled for Fetch Discovery
+     * Defaults to false (read-only mode)
+     */
+    public function getFetchDiscoveryAutoFetchEnabled(): bool
+    {
+        $settings = $this->settings ?? [];
+
+        return $settings['fetch_discovery_auto_fetch'] ?? false;
+    }
+
+    /**
+     * Set auto-fetch mode for Fetch Discovery
+     */
+    public function setFetchDiscoveryAutoFetchEnabled(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['fetch_discovery_auto_fetch'] = $enabled;
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Get excluded domains for Fetch Discovery
+     * These domains will be filtered out during URL discovery
+     */
+    public function getFetchDiscoveryExcludedDomains(): array
+    {
+        $settings = $this->settings ?? [];
+
+        return $settings['fetch_discovery_excluded_domains'] ?? [];
+    }
+
+    /**
+     * Set excluded domains for Fetch Discovery
+     */
+    public function setFetchDiscoveryExcludedDomains(array $domains): void
+    {
+        $settings = $this->settings ?? [];
+        // Normalize domains (remove protocol, www, trailing slash)
+        $normalizedDomains = array_map(function ($domain) {
+            return $this->normalizeDomain($domain);
+        }, $domains);
+        $settings['fetch_discovery_excluded_domains'] = array_values(array_unique($normalizedDomains));
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Add domain to Fetch Discovery exclusion list
+     */
+    public function addFetchDiscoveryExcludedDomain(string $domain): void
+    {
+        $excluded = $this->getFetchDiscoveryExcludedDomains();
+        $domain = $this->normalizeDomain($domain);
+        if (! in_array($domain, $excluded)) {
+            $excluded[] = $domain;
+            $this->setFetchDiscoveryExcludedDomains($excluded);
+        }
+    }
+
+    /**
+     * Remove domain from Fetch Discovery exclusion list
+     */
+    public function removeFetchDiscoveryExcludedDomain(string $domain): void
+    {
+        $excluded = $this->getFetchDiscoveryExcludedDomains();
+        $domain = $this->normalizeDomain($domain);
+        $excluded = array_filter($excluded, fn ($d) => $d !== $domain);
+        $this->setFetchDiscoveryExcludedDomains(array_values($excluded));
+    }
+
+    /**
+     * Check if domain is excluded from Fetch Discovery
+     */
+    public function isFetchDiscoveryDomainExcluded(string $domain): bool
+    {
+        $excluded = $this->getFetchDiscoveryExcludedDomains();
+        $domain = $this->normalizeDomain($domain);
+
+        return in_array($domain, $excluded);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -409,5 +490,18 @@ class User extends Authenticatable
             'password' => 'hashed',
             'settings' => 'array',
         ];
+    }
+
+    /**
+     * Normalize domain for comparison
+     */
+    private function normalizeDomain(string $domain): string
+    {
+        $domain = trim($domain);
+        $domain = preg_replace('#^https?://#', '', $domain);
+        $domain = preg_replace('#^www\.#', '', $domain);
+        $domain = rtrim($domain, '/');
+
+        return strtolower($domain);
     }
 }

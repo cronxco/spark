@@ -34,11 +34,34 @@ class FetchScheduledUrls extends BaseFetchJob
             ->get();
 
         // Filter to only this integration's URLs and enabled URLs
+        // For one-time fetch mode, only fetch if never fetched before (fetch_count = 0)
         $enabledWebpages = $webpages->filter(function ($webpage) {
             $metadata = $webpage->metadata ?? [];
 
-            return ($metadata['fetch_integration_id'] ?? null) === $this->integration->id
-                && ($metadata['enabled'] ?? true) === true;
+            // Must belong to this integration and be enabled
+            if (($metadata['fetch_integration_id'] ?? null) !== $this->integration->id) {
+                return false;
+            }
+
+            if (($metadata['enabled'] ?? true) !== true) {
+                return false;
+            }
+
+            // Check fetch mode
+            $fetchMode = $metadata['fetch_mode'] ?? 'recurring'; // Default to recurring for backward compatibility
+            $fetchCount = $metadata['fetch_count'] ?? 0;
+
+            // Recurring mode: always fetch if enabled
+            if ($fetchMode === 'recurring') {
+                return true;
+            }
+
+            // One-time mode: only fetch if never fetched before
+            if ($fetchMode === 'once') {
+                return $fetchCount === 0;
+            }
+
+            return true; // Unknown mode, default to allowing fetch
         });
 
         Log::info('Fetch: Found URLs to fetch', [

@@ -2,16 +2,28 @@
 
 @php
     $integration = $event->integration;
-    $serviceIcon = match($integration->service) {
+
+    // Determine display service based on fetch_mode for Fetch integration
+    $displayService = $integration->service;
+    if ($integration->service === 'fetch' && $event->target) {
+        $fetchMode = $event->target->metadata['fetch_mode'] ?? 'recurring';
+        if ($fetchMode === 'once') {
+            $displayService = 'spark'; // Show as "Spark" for one-time fetches
+        }
+    }
+
+    $serviceIcon = match($displayService) {
         'fetch' => 'o-shield-check',
+        'spark' => 'o-sparkles',
         'karakeep' => 'o-bookmark',
         'bluesky' => 'o-cloud',
         'reddit' => 'o-chat-bubble-left-right',
         default => 'o-link'
     };
 
-    $accentColor = match($integration->service) {
+    $accentColor = match($displayService) {
         'fetch' => 'info',
+        'spark' => 'accent',
         'karakeep' => 'warning',
         'bluesky' => 'primary',
         'reddit' => 'error',
@@ -25,7 +37,7 @@
         <div class="flex items-center justify-between gap-2 mb-1">
             <div class="badge badge-{{ $accentColor }} badge-outline badge-sm gap-1">
                 <x-icon :name="$serviceIcon" class="w-3 h-3" />
-                <span class="text-xs">{{ ucfirst($integration->service) }}</span>
+                <span class="text-xs">{{ ucfirst($displayService) }}</span>
             </div>
             <div class="text-xs text-base-content/60">
                 <x-uk-date :date="$event->time" :show-time="true" class="text-xs" />

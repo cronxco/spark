@@ -134,6 +134,11 @@ class ProcessFetchedContent implements ShouldQueue
                 'event_id' => $event->id,
             ]);
 
+            // Check if this is a one-time fetch that should be disabled after successful fetch
+            $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
+            $newFetchCount = ($metadata['fetch_count'] ?? 0) + 1;
+            $shouldDisable = ($fetchMode === 'once' && $newFetchCount >= 1);
+
             // Update webpage EventObject
             $this->webpage->update([
                 'title' => $this->extracted['title'],
@@ -144,10 +149,31 @@ class ProcessFetchedContent implements ShouldQueue
                     'last_changed_at' => now()->toIso8601String(),
                     'content_hash' => $this->contentHash,
                     'previous_hash' => $previousHash,
-                    'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                    'fetch_count' => $newFetchCount,
                     'last_error' => null, // Clear any previous errors
+                    'enabled' => $shouldDisable ? false : ($metadata['enabled'] ?? true), // Disable one-time fetches after first successful fetch
                 ]),
             ]);
+
+            if ($shouldDisable) {
+                Log::info('Fetch: One-time bookmark fetched successfully and disabled', [
+                    'url' => $this->webpage->url,
+                    'fetch_mode' => $fetchMode,
+                    'fetch_count' => $newFetchCount,
+                ]);
+            }
+
+            // Check if this is a one-time fetch that's already completed
+            $discoveryStatus = $metadata['discovery_status'] ?? 'pending';
+
+            if ($fetchMode === 'once' && $discoveryStatus === 'completed') {
+                Log::info('Fetch: Skipping AI processing - one-time bookmark already completed', [
+                    'webpage_id' => $this->webpage->id,
+                    'url' => $this->webpage->url,
+                ]);
+
+                return;
+            }
 
             // Dispatch content extraction job
             ExtractContentJob::dispatch(
