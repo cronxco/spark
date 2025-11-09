@@ -85,7 +85,7 @@ services:
             retries: 3
             timeout: 5s
     chrome:
-        image: "maelp/docker-vnc-chromium:latest"
+        image: "maelp/docker-vnc-chromium:latest@sha256:0fb0477d22a1bad5141084661bcd479c5a37543fb7c01f4570d1d3dcf6d1ece4"
         ports:
             - "${CHROME_VNC_PORT:-5900}:5900"
             - "${CHROME_CDP_PORT:-9222}:9222"
