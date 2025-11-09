@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Spatie\Activitylog\LogOptions;
@@ -163,105 +164,114 @@ class Block extends Model
     }
 
     /**
-     * Get relationships where this block is the "from" entity
+     * Polymorphic relationships where this block is the "from" entity.
      */
     public function relationshipsFrom()
     {
-        return $this->morphMany(Relationship::class, 'from');
+        return $this->morphMany(Relationship::class, 'from')->withTrashed();
     }
 
     /**
-     * Get relationships where this block is the "to" entity
+     * Polymorphic relationships where this block is the "to" entity.
      */
     public function relationshipsTo()
     {
-        return $this->morphMany(Relationship::class, 'to');
+        return $this->morphMany(Relationship::class, 'to')->withTrashed();
     }
 
     /**
-     * Get all relationships (both from and to)
+     * Get all relationships for this block (both from and to).
      */
     public function relationships()
     {
         return Relationship::where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('from_type', static::class)
-                    ->where('from_id', $this->id);
-            })->orWhere(function ($q) {
-                $q->where('to_type', static::class)
-                    ->where('to_id', $this->id);
-            });
-        })->where('user_id', $this->event->integration->user_id);
+            $query->where('from_type', self::class)
+                ->where('from_id', $this->id);
+        })->orWhere(function ($query) {
+            $query->where('to_type', self::class)
+                ->where('to_id', $this->id);
+        })->withTrashed();
     }
 
     /**
-     * Get related EventObjects
+     * Get all related EventObjects through relationships.
+     *
+     * @param  string|null  $type  Optional relationship type filter
      */
     public function relatedObjects(?string $type = null)
     {
-        $query = EventObject::whereHas('relationshipsFrom', function ($q) use ($type) {
-            $q->where('to_type', static::class)
-                ->where('to_id', $this->id);
-            if ($type) {
-                $q->where('type', $type);
-            }
-        })->orWhereHas('relationshipsTo', function ($q) use ($type) {
-            $q->where('from_type', static::class)
-                ->where('from_id', $this->id);
-            if ($type) {
-                $q->where('type', $type);
-            }
+        $query = EventObject::whereIn('id', function ($subQuery) use ($type) {
+            $subQuery->select('from_id')
+                ->from('relationships')
+                ->where('from_type', EventObject::class)
+                ->where('to_type', self::class)
+                ->where('to_id', $this->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->union(
+                    DB::table('relationships')
+                        ->select('to_id')
+                        ->where('to_type', EventObject::class)
+                        ->where('from_type', self::class)
+                        ->where('from_id', $this->id)
+                        ->when($type, fn ($q) => $q->where('type', $type))
+                );
         });
 
-        return $query->where('user_id', $this->event->integration->user_id);
+        return $query;
     }
 
     /**
-     * Get related Events
+     * Get all related Events through relationships.
+     *
+     * @param  string|null  $type  Optional relationship type filter
      */
     public function relatedEvents(?string $type = null)
     {
-        $query = Event::whereHas('relationshipsFrom', function ($q) use ($type) {
-            $q->where('to_type', static::class)
-                ->where('to_id', $this->id);
-            if ($type) {
-                $q->where('type', $type);
-            }
-        })->orWhereHas('relationshipsTo', function ($q) use ($type) {
-            $q->where('from_type', static::class)
-                ->where('from_id', $this->id);
-            if ($type) {
-                $q->where('type', $type);
-            }
+        $query = Event::whereIn('id', function ($subQuery) use ($type) {
+            $subQuery->select('from_id')
+                ->from('relationships')
+                ->where('from_type', Event::class)
+                ->where('to_type', self::class)
+                ->where('to_id', $this->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->union(
+                    DB::table('relationships')
+                        ->select('to_id')
+                        ->where('to_type', Event::class)
+                        ->where('from_type', self::class)
+                        ->where('from_id', $this->id)
+                        ->when($type, fn ($q) => $q->where('type', $type))
+                );
         });
 
-        return $query->whereHas('integration', function ($q) {
-            $q->where('user_id', $this->event->integration->user_id);
-        });
+        return $query;
     }
 
     /**
-     * Get related Blocks
+     * Get all related Blocks through relationships.
+     *
+     * @param  string|null  $type  Optional relationship type filter
      */
     public function relatedBlocks(?string $type = null)
     {
-        $query = static::whereHas('relationshipsFrom', function ($q) use ($type) {
-            $q->where('to_type', static::class)
-                ->where('to_id', $this->id);
-            if ($type) {
-                $q->where('type', $type);
-            }
-        })->orWhereHas('relationshipsTo', function ($q) use ($type) {
-            $q->where('from_type', static::class)
-                ->where('from_id', $this->id);
-            if ($type) {
-                $q->where('type', $type);
-            }
+        $query = self::whereIn('id', function ($subQuery) use ($type) {
+            $subQuery->select('from_id')
+                ->from('relationships')
+                ->where('from_type', self::class)
+                ->where('to_type', self::class)
+                ->where('to_id', $this->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->union(
+                    DB::table('relationships')
+                        ->select('to_id')
+                        ->where('to_type', self::class)
+                        ->where('from_type', self::class)
+                        ->where('from_id', $this->id)
+                        ->when($type, fn ($q) => $q->where('type', $type))
+                );
         });
 
-        return $query->whereHas('event.integration', function ($q) {
-            $q->where('user_id', $this->event->integration->user_id);
-        });
+        return $query;
     }
 
     /**

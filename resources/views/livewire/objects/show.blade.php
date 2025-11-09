@@ -22,14 +22,20 @@ new class extends Component {
     public bool $showEditObjectModal = false;
     public bool $showTimeline = false;
     public bool $showTagModal = false;
+    public bool $showManageRelationshipsModal = false;
+    public bool $showAddRelationshipModal = false;
 
     protected $listeners = [
         'open-tag-modal' => 'handleOpenTagModal',
         'show-timeline' => 'handleShowTimeline',
         'open-edit-object-modal' => 'handleOpenEditModal',
+        'open-manage-relationships-modal' => 'handleOpenManageRelationshipsModal',
+        'open-add-relationship-modal' => 'handleOpenAddRelationshipModal',
         'delete-object' => 'handleDeleteObject',
         'object-updated' => 'handleObjectUpdated',
         'tags-updated' => 'handleTagsUpdated',
+        'relationship-created' => 'handleRelationshipUpdated',
+        'relationship-deleted' => 'handleRelationshipUpdated',
         'close-modal' => 'closeModals',
     ];
 
@@ -42,7 +48,7 @@ new class extends Component {
         ]);
 
         try {
-            $this->object = $object->load(['tags']);
+            $this->object = $object->load(['tags', 'relationshipsFrom', 'relationshipsTo']);
             Log::info('EventObject mount complete');
         } catch (\Exception $e) {
             Log::error('EventObject mount failed', [
@@ -57,6 +63,11 @@ new class extends Component {
     public function toggleSidebar(): void
     {
         $this->showSidebar = ! $this->showSidebar;
+    }
+
+    public function getRelationships()
+    {
+        return $this->object->relationships()->get();
     }
 
     public function getRelatedEvents()
@@ -876,10 +887,32 @@ new class extends Component {
         $this->object->refresh()->load(['tags']);
     }
 
+    public function handleOpenManageRelationshipsModal(): void
+    {
+        $this->showManageRelationshipsModal = true;
+        $this->showAddRelationshipModal = false;
+    }
+
+    public function handleOpenAddRelationshipModal(): void
+    {
+        $this->showAddRelationshipModal = true;
+        $this->showManageRelationshipsModal = false;
+    }
+
+    public function handleRelationshipUpdated(): void
+    {
+        $this->object->refresh()->load([
+            'relationshipsFrom',
+            'relationshipsTo'
+        ]);
+    }
+
     public function closeModals(): void
     {
         $this->showEditObjectModal = false;
         $this->showTagModal = false;
+        $this->showManageRelationshipsModal = false;
+        $this->showAddRelationshipModal = false;
     }
 };
 
@@ -1069,6 +1102,114 @@ new class extends Component {
             </x-card>
             @endif
 
+            <!-- Relationships -->
+            @php $relationships = $this->getRelationships(); @endphp
+            @if ($relationships->isNotEmpty())
+            <x-card class="bg-base-200/50 border-2 border-accent/10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
+                        Relationships ({{ $relationships->count() }})
+                    </h3>
+                    <x-button
+                        icon="o-cog-6-tooth"
+                        class="btn-sm btn-ghost"
+                        wire:click="handleOpenManageRelationshipsModal"
+                        label="Manage"
+                    />
+                </div>
+
+                <div class="space-y-3">
+                    @foreach ($relationships->take(5) as $relationship)
+                        @php
+                            // Determine if this object is "from" or "to" in the relationship
+                            $isFrom = $relationship->from_type === get_class($object) && $relationship->from_id === $object->id;
+                            $relatedModel = $isFrom ? $relationship->to : $relationship->from;
+                            $direction = $isFrom ? '→' : '←';
+
+                            // Get display info for related model
+                            // Initialize defaults
+                            $icon = 'o-question-mark-circle';
+                            $title = 'Unknown';
+                            $subtitle = null;
+                            $route = '#';
+                            $badgeText = 'Unknown';
+                            $badgeClass = 'badge-ghost';
+
+                            if ($relatedModel instanceof \App\Models\Event) {
+                                $icon = 'o-calendar';
+                                $title = $relatedModel->action;
+                                $subtitle = $relatedModel->time?->format('M j, Y g:i A');
+                                $route = route('events.show', $relatedModel);
+                                $badgeText = 'Event';
+                                $badgeClass = 'badge-primary';
+                            } elseif ($relatedModel instanceof \App\Models\EventObject) {
+                                $icon = 'o-cube';
+                                $title = $relatedModel->title;
+                                $subtitle = $relatedModel->concept;
+                                $route = route('objects.show', $relatedModel);
+                                $badgeText = 'Object';
+                                $badgeClass = 'badge-secondary';
+                            } elseif ($relatedModel instanceof \App\Models\Block) {
+                                $icon = 'o-squares-2x2';
+                                $title = $relatedModel->type;
+                                $subtitle = $relatedModel->time?->format('M j, Y');
+                                $route = route('blocks.show', $relatedModel);
+                                $badgeText = 'Block';
+                                $badgeClass = 'badge-accent';
+                            }
+                        @endphp
+
+                        <div class="flex items-center gap-2 p-3 rounded-lg bg-base-100">
+                            <!-- Relationship Type Icon -->
+                            <div class="tooltip" data-tip="{{ \App\Services\RelationshipTypeRegistry::getDisplayName($relationship->type) }}">
+                                <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-4 h-4 text-accent" />
+                            </div>
+
+                            <!-- Direction -->
+                            @if (\App\Services\RelationshipTypeRegistry::isDirectional($relationship->type))
+                                <span class="text-base-content/40 text-sm">{{ $direction }}</span>
+                            @else
+                                <span class="text-base-content/40 text-sm">↔</span>
+                            @endif
+
+                            <!-- Related Entity -->
+                            <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
+                                <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
+                                <div class="min-w-0 flex-1">
+                                    <div class="font-medium truncate text-sm">{{ $title }}</div>
+                                    @if ($subtitle)
+                                        <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
+                                    @endif
+                                </div>
+                            </a>
+
+                            <!-- Badge -->
+                            <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
+
+                            <!-- Value (if present) -->
+                            @if ($relationship->value !== null)
+                                <div class="text-xs font-mono text-info">
+                                    @if ($relationship->value_unit)
+                                        {{ $relationship->value_unit }}
+                                    @endif
+                                    {{ number_format($relationship->value / ($relationship->value_multiplier ?? 1), 2) }}
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+
+                    @if ($relationships->count() > 5)
+                        <div class="text-center pt-2">
+                            <button wire:click="handleOpenManageRelationshipsModal" class="text-sm text-accent hover:underline">
+                                View all {{ $relationships->count() }} relationships
+                            </button>
+                        </div>
+                    @endif
+                </div>
+            </x-card>
+            @endif
+
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Object Details" with-close-button separator class="w-11/12 lg:w-1/3">
                 <div class="space-y-4 lg:space-y-6">
@@ -1092,6 +1233,65 @@ new class extends Component {
                                 {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                         </div>
+                    </x-card>
+
+                    <!-- Relationships -->
+                    <x-card class="bg-base-100 shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+                                <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
+                                Relationships
+                            </h3>
+                            <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
+                                <x-icon name="o-plus" class="w-3 h-3" />
+                            </button>
+                        </div>
+                        @php $sidebarRelationships = $this->getRelationships(); @endphp
+                        @if ($sidebarRelationships->isEmpty())
+                            <div class="text-center py-4 text-base-content/60 text-sm">
+                                No relationships yet
+                            </div>
+                        @else
+                            <div class="space-y-2 max-h-64 overflow-y-auto">
+                                @foreach ($sidebarRelationships->take(10) as $relationship)
+                                    @php
+                                        $isFrom = $relationship->from_type === get_class($object) && $relationship->from_id === $object->id;
+                                        $relatedModel = $isFrom ? $relationship->to : $relationship->from;
+
+                                        // Initialize defaults
+                                        $icon = 'o-question-mark-circle';
+                                        $title = 'Unknown';
+                                        $route = '#';
+
+                                        if ($relatedModel instanceof \App\Models\Event) {
+                                            $icon = 'o-calendar';
+                                            $title = $relatedModel->action;
+                                            $route = route('events.show', $relatedModel);
+                                        } elseif ($relatedModel instanceof \App\Models\EventObject) {
+                                            $icon = 'o-cube';
+                                            $title = $relatedModel->title;
+                                            $route = route('objects.show', $relatedModel);
+                                        } elseif ($relatedModel instanceof \App\Models\Block) {
+                                            $icon = 'o-squares-2x2';
+                                            $title = $relatedModel->type;
+                                            $route = route('blocks.show', $relatedModel);
+                                        }
+                                    @endphp
+                                    <a href="{{ $route }}" class="flex items-center gap-2 p-2 rounded hover:bg-base-200 transition-colors">
+                                        <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 text-accent flex-shrink-0" />
+                                        <x-icon name="{{ $icon }}" class="w-3 h-3 flex-shrink-0" />
+                                        <span class="text-sm truncate flex-1">{{ $title }}</span>
+                                    </a>
+                                @endforeach
+                            </div>
+                            @if ($sidebarRelationships->count() > 10)
+                                <div class="text-center mt-2">
+                                    <button wire:click="handleOpenManageRelationshipsModal" class="text-xs text-accent hover:underline">
+                                        View all {{ $sidebarRelationships->count() }}
+                                    </button>
+                                </div>
+                            @endif
+                        @endif
                     </x-card>
 
                     <!-- Activity Timeline -->
@@ -1232,5 +1432,23 @@ new class extends Component {
     <!-- Edit Object Modal -->
     <x-modal wire:model="showEditObjectModal" title="Edit Object" subtitle="Update object details" separator>
         <livewire:edit-object :object="$this->object" :key="'edit-object-' . $this->object->id" />
+    </x-modal>
+
+    <!-- Manage Relationships Modal -->
+    <x-modal wire:model="showManageRelationshipsModal" title="Manage Relationships" subtitle="View and manage connections to other items" separator box-class="[max-width:1024px]">
+        <livewire:manage-relationships
+            :model-type="get_class($this->object)"
+            :model-id="(string) $this->object->id"
+            :key="'manage-relationships-object-' . $this->object->id"
+        />
+    </x-modal>
+
+    <!-- Add Relationship Modal -->
+    <x-modal wire:model="showAddRelationshipModal" title="Add Relationship" subtitle="Create a connection to another item" separator box-class="[max-width:1024px]">
+        <livewire:add-relationship
+            :from-type="get_class($this->object)"
+            :from-id="(string) $this->object->id"
+            :key="'add-relationship-object-' . $this->object->id"
+        />
     </x-modal>
 </div>

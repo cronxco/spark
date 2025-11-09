@@ -66,6 +66,38 @@ class ObjectActionsQuery
                 );
             }
 
+            // Manage Relationships
+            if (blank($query) || str_contains(strtolower($query), 'relationship') || str_contains(strtolower($query), 'link') || str_contains(strtolower($query), 'connect')) {
+                $results->push(
+                    SpotlightResult::make()
+                        ->setTitle('Manage Relationships')
+                        ->setSubtitle('Connect this object to other items')
+                        ->setIcon('arrows-right-left')
+                        ->setGroup('commands')
+                        ->setPriority(3)
+                        ->setAction('dispatch_event', [
+                            'name' => 'open-manage-relationships-modal',
+                            'data' => [],
+                            'close' => true,
+                        ])
+                );
+            }
+            if (blank($query) || str_contains(strtolower($query), 'relationship') || str_contains(strtolower($query), 'add') || str_contains(strtolower($query), 'link') || str_contains(strtolower($query), 'connect')) {
+                $results->push(
+                    SpotlightResult::make()
+                        ->setTitle('Add Relationship')
+                        ->setSubtitle('Connect this object to other items')
+                        ->setIcon('arrows-right-left')
+                        ->setGroup('commands')
+                        ->setPriority(3)
+                        ->setAction('dispatch_event', [
+                            'name' => 'open-add-relationship-modal',
+                            'data' => [],
+                            'close' => true,
+                        ])
+                );
+            }
+
             // Delete Object
             if (blank($query) || str_contains(strtolower($query), 'delete')) {
                 $results->push(
@@ -74,7 +106,7 @@ class ObjectActionsQuery
                         ->setSubtitle('Move this object to the bin')
                         ->setIcon('trash')
                         ->setGroup('commands')
-                        ->setPriority(3)
+                        ->setPriority(4)
                         ->setAction('dispatch_event', [
                             'name' => 'delete-object',
                             'data' => [],

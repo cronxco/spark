@@ -6,6 +6,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\Relationship;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
