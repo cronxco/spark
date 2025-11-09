@@ -84,13 +84,77 @@ services:
                 - ping
             retries: 3
             timeout: 5s
+    chrome:
+        image: "maelp/docker-vnc-chromium:latest"
+        ports:
+            - "${CHROME_VNC_PORT:-5900}:5900"
+            - "${CHROME_CDP_PORT:-9222}:9222"
+        environment:
+            - VNC_PASSWORD=${CHROME_VNC_PASSWORD:-spark-dev-vnc}
+            - DISPLAY_WIDTH=1920
+            - DISPLAY_HEIGHT=1080
+            - CHROME_EXTRA_ARGS=--remote-debugging-address=0.0.0.0
+        volumes:
+            - "chrome-userdata:/config/userdata"
+        networks:
+            sail:
+                ipv4_address: 172.20.0.10
+        healthcheck:
+            test:
+                - CMD
+                - curl
+                - "-f"
+                - "http://localhost:9222/json/version"
+            interval: 10s
+            timeout: 5s
+            retries: 3
+        profiles:
+            - playwright
+    playwright-worker:
+        build:
+            context: ./docker/playwright
+            dockerfile: Dockerfile
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        environment:
+            - CHROME_CDP_URL=http://172.20.0.10:9222
+            - NODE_ENV=production
+            - STEALTH_ENABLED=${PLAYWRIGHT_STEALTH_ENABLED:-true}
+            - CONTEXT_TTL=${PLAYWRIGHT_CONTEXT_TTL:-1800000}
+        ports:
+            - "${PLAYWRIGHT_WORKER_PORT:-3000}:3000"
+        volumes:
+            - "./storage/app/playwright:/app/storage:rw"
+        networks:
+            - sail
+        depends_on:
+            chrome:
+                condition: service_healthy
+        healthcheck:
+            test:
+                - CMD
+                - wget
+                - "--quiet"
+                - "--tries=1"
+                - "--spider"
+                - "http://localhost:3000/health"
+            interval: 10s
+            timeout: 5s
+            retries: 3
+        profiles:
+            - playwright
 networks:
     sail:
         driver: bridge
+        ipam:
+            config:
+                - subnet: 172.20.0.0/16
 volumes:
     sail-nginx:
         driver: local
     sail-pgsql:
         driver: local
     sail-redis:
+        driver: local
+    chrome-userdata:
         driver: local

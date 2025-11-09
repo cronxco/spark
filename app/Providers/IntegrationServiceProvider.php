@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Integrations\BlueSky\BlueSkyPlugin;
 use App\Integrations\DailyCheckin\DailyCheckinPlugin;
+use App\Integrations\Fetch\FetchPlugin;
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
@@ -42,6 +43,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(TaskPlugin::class);
         PluginRegistry::register(OutlinePlugin::class);
         PluginRegistry::register(KarakeepPlugin::class);
+        PluginRegistry::register(FetchPlugin::class);
         PluginRegistry::register(DailyCheckinPlugin::class);
         PluginRegistry::register(GoogleCalendarPlugin::class);
         PluginRegistry::register(BlueSkyPlugin::class);

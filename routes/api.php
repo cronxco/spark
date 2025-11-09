@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\FetchApiController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\EventApiController;
 use Illuminate\Http\Request;
@@ -74,6 +75,9 @@ Route::middleware('sentry.api.logging')->group(function () {
         ]);
         Route::post('integrations/{integration}/configure', [IntegrationApiController::class, 'configure'])->name('api.integrations.configure');
         Route::delete('integrations/{integration}', [IntegrationApiController::class, 'destroy'])->name('api.integrations.destroy');
+
+        // Fetch API
+        Route::post('fetch/bookmarks', [FetchApiController::class, 'bookmarkUrl'])->name('api.fetch.bookmarks.store');
 
         // Clear card stream cache
         Route::post('clear-card-cache', function (Request $request) {

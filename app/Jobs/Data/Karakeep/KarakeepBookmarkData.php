@@ -252,7 +252,6 @@ class KarakeepBookmarkData extends BaseProcessingJob
             $bookmarkObject->update($data);
         } else {
             $data['user_id'] = $this->integration->user_id;
-            $data['integration_id'] = $this->integration->id;
             $data['concept'] = 'bookmark';
             $data['type'] = 'karakeep_bookmark';
             $bookmarkObject = EventObject::create($data);
@@ -309,7 +308,6 @@ class KarakeepBookmarkData extends BaseProcessingJob
         } else {
             $listObject = EventObject::create([
                 'user_id' => $this->integration->user_id,
-                'integration_id' => $this->integration->id,
                 'concept' => 'collection',
                 'type' => 'karakeep_list',
                 'title' => $title,

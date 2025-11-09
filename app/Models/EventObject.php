@@ -60,6 +60,24 @@ class EventObject extends Model
             // no-op: user_id must be provided by callers now
         });
 
+        static::updating(function ($model) {
+            // Prevent title and content updates on locked objects
+            if ($model->isLocked()) {
+                $original = $model->getOriginal();
+
+                // Check if title or content are being changed
+                if ($model->isDirty('title') && $model->title !== $original['title']) {
+                    // Revert title to original value
+                    $model->title = $original['title'];
+                }
+
+                if ($model->isDirty('content') && $model->content !== $original['content']) {
+                    // Revert content to original value
+                    $model->content = $original['content'];
+                }
+            }
+        });
+
         static::deleted(function ($model): void {
             activity('changelog')
                 ->performedOn($model)
@@ -88,6 +106,11 @@ class EventObject extends Model
     public function user()
     {
         return $this->belongsTo(User::class)->withTrashed();
+    }
+
+    public function integration()
+    {
+        return $this->belongsTo(Integration::class)->withTrashed();
     }
 
     public function actorEvents()
@@ -145,6 +168,47 @@ class EventObject extends Model
             });
 
         return $this;
+    }
+
+    /**
+     * Check if this object is locked (prevents title/content updates)
+     */
+    public function isLocked(): bool
+    {
+        return $this->metadata['locked'] ?? false;
+    }
+
+    /**
+     * Lock this object to prevent title and content updates
+     */
+    public function lock(): void
+    {
+        $metadata = $this->metadata ?? [];
+        $metadata['locked'] = true;
+        $metadata['locked_at'] = now()->toIso8601String();
+
+        $this->updateQuietly(['metadata' => $metadata]);
+
+        activity('changelog')
+            ->performedOn($this)
+            ->event('locked')
+            ->log('locked object');
+    }
+
+    /**
+     * Unlock this object to allow title and content updates
+     */
+    public function unlock(): void
+    {
+        $metadata = $this->metadata ?? [];
+        $metadata['locked'] = false;
+
+        $this->updateQuietly(['metadata' => $metadata]);
+
+        activity('changelog')
+            ->performedOn($this)
+            ->event('unlocked')
+            ->log('unlocked object');
     }
 
     /**
