@@ -104,6 +104,17 @@ new class extends Component {
         $this->comment = '';
     }
 
+    public function toggleLock(): void
+    {
+        if ($this->object->isLocked()) {
+            $this->object->unlock();
+            $this->js('$wire.notifyCopied("Object unlocked")');
+        } else {
+            $this->object->lock();
+            $this->js('$wire.notifyCopied("Object locked")');
+        }
+    }
+
     public function formatAction($action)
     {
         return format_action_title($action);
@@ -898,8 +909,11 @@ new class extends Component {
                     <div class="flex-1">
                         <div class="mb-4 text-center sm:text-left">
                             <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 mb-2">
-                                <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content leading-tight">
+                                <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content leading-tight flex items-center gap-2">
                                     {{ $this->object->title }}
+                                    @if ($this->object->isLocked())
+                                        <x-icon name="o-lock-closed" class="w-5 h-5 text-base-content/60" title="This object is locked" />
+                                    @endif
                                 </h2>
                             </div>
                         </div>
@@ -1130,6 +1144,17 @@ new class extends Component {
                                 <x-button type="submit" class="btn-primary btn-sm" label="Post" />
                             </div>
                         </x-form>
+                    </x-card>
+
+                    <!-- Lock Object -->
+                    <x-card class="bg-base-100 shadow">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <x-icon name="{{ $this->object->isLocked() ? 'o-lock-closed' : 'o-lock-open' }}" class="w-5 h-5" />
+                                <span class="text-base font-medium">Lock Object</span>
+                            </div>
+                            <x-toggle wire:model.live="object.metadata.locked" wire:change="toggleLock" />
+                        </div>
                     </x-card>
 
                     @if ($this->object->metadata && count($this->object->metadata) > 0)

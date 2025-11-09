@@ -61,7 +61,10 @@ class ExtractContentJob implements ShouldQueue
                     $sourceObject->content = $articleText;
                     $sourceObject->save();
 
-                    Log::info('Fetch: Updated source EventObject title and content', [
+                    // Lock the object to prevent further automatic updates
+                    $sourceObject->lock();
+
+                    Log::info('Fetch: Updated and locked source EventObject', [
                         'source_object_id' => $this->sourceObjectId,
                         'title' => $this->extracted['title'],
                         'word_count' => str_word_count($articleText),
