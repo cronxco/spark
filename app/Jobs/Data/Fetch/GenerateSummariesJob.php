@@ -6,6 +6,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\Relationship;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -608,7 +609,7 @@ PROMPT;
         }
 
         if (! $sourceObject) {
-            Log::warning('Fetch: Could not create link event - source object not found', [
+            Log::warning('Fetch: Could not create link relationship - source object not found', [
                 'source_object_id' => $this->sourceObjectId,
                 'source_event_id' => $this->sourceEventId,
             ]);
@@ -616,40 +617,24 @@ PROMPT;
             return;
         }
 
-        // Get the integration that owns the source object
-        // We need to find an event for this object to get the integration_id
-        $sourceIntegration = Event::where('actor_id', $sourceObject->id)
-            ->orWhere('target_id', $sourceObject->id)
-            ->first();
-
-        if (! $sourceIntegration) {
-            Log::warning('Fetch: Could not create link event - no integration found for source object', [
-                'source_object_id' => $sourceObject->id,
-            ]);
-
-            return;
-        }
-
-        // Create the link event
-        Event::create([
-            'source_id' => 'fetch_link_' . $sourceObject->id . '_' . $this->webpage->id,
-            'integration_id' => $sourceIntegration->integration_id,
-            'service' => $sourceIntegration->service,
-            'domain' => $sourceIntegration->domain,
-            'action' => 'had_link_to',
-            'time' => now(),
-            'actor_id' => $sourceObject->id,
-            'target_id' => $this->webpage->id,
-            'event_metadata' => [
+        // Create the relationship using the new Relationship model
+        Relationship::createRelationship([
+            'user_id' => $this->integration->user_id,
+            'from_type' => EventObject::class,
+            'from_id' => $sourceObject->id,
+            'to_type' => EventObject::class,
+            'to_id' => $this->webpage->id,
+            'type' => 'linked_to',
+            'metadata' => [
                 'url' => $this->webpage->url,
                 'linked_at' => now()->toIso8601String(),
                 'fetch_integration_id' => $this->integration->id,
             ],
         ]);
 
-        Log::info('Fetch: Created link event', [
-            'actor_id' => $sourceObject->id,
-            'target_id' => $this->webpage->id,
+        Log::info('Fetch: Created link relationship', [
+            'from_id' => $sourceObject->id,
+            'to_id' => $this->webpage->id,
             'url' => $this->webpage->url,
         ]);
     }

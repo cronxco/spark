@@ -140,14 +140,8 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'value_unit' => null,
                 'hidden' => false,
             ],
-            'had_link_to' => [
-                'icon' => 'o-link',
-                'display_name' => 'Had Link To',
-                'description' => 'Object linked to fetched webpage',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
+            // NOTE: had_link_to has been migrated to the Relationship model.
+            // See app/Models/Relationship.php and relationship type 'linked_to'
         ];
     }
 

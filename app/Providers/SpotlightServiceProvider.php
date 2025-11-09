@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Spotlight\Actions\ClearBinAction;
+use App\Spotlight\Queries\Actions\BookmarkUrlQuery;
 use App\Spotlight\Queries\Actions\ContextualActionsQuery;
 use App\Spotlight\Queries\Actions\GlobalActionsQuery;
 use App\Spotlight\Queries\Integration\IntegrationSearchQuery;
@@ -10,6 +11,7 @@ use App\Spotlight\Queries\Integration\PluginCommandsQuery;
 use App\Spotlight\Queries\Navigation\AdminNavigationQuery;
 use App\Spotlight\Queries\Navigation\CoreNavigationQuery;
 use App\Spotlight\Queries\Navigation\DailyNavigationQuery;
+use App\Spotlight\Queries\Navigation\FetchNavigationQuery;
 use App\Spotlight\Queries\Navigation\HelpQuery;
 use App\Spotlight\Queries\Navigation\SettingsNavigationQuery;
 use App\Spotlight\Queries\Scoped\AccountActionsQuery;
@@ -296,6 +298,7 @@ class SpotlightServiceProvider extends ServiceProvider
         Spotlight::registerQueries(
             DailyNavigationQuery::make(),
             CoreNavigationQuery::make(),
+            FetchNavigationQuery::make(),
             SettingsNavigationQuery::make(),
             AdminNavigationQuery::make(),
             HelpQuery::make(),
@@ -315,6 +318,7 @@ class SpotlightServiceProvider extends ServiceProvider
         Spotlight::registerQueries(
             GlobalActionsQuery::make(),
             ContextualActionsQuery::make(),
+            BookmarkUrlQuery::make(),
         );
 
         // Integration queries

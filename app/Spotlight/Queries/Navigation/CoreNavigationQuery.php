@@ -67,6 +67,19 @@ class CoreNavigationQuery
                 );
             }
 
+            if (blank($query) || str_contains('bookmarks', strtolower($query))) {
+                $results->push(
+                    SpotlightResult::make()
+                        ->setTitle('Bookmarks')
+                        ->setSubtitle('View and manage your saved content')
+                        ->setTypeahead('Go to Bookmarks')
+                        ->setIcon('bookmark')
+                        ->setGroup('navigation')
+                        ->setPriority(2)
+                        ->setAction('jump_to', ['path' => route('bookmarks.index')])
+                );
+            }
+
             return $results;
         });
     }
