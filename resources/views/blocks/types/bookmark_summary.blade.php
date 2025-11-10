@@ -7,7 +7,7 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
+$summary = $block->metadata['content'] ?? '';
 $wordCount = str_word_count($summary);
 $model = $block->metadata['model'] ?? 'AI';
 @endphp

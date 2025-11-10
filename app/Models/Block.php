@@ -307,4 +307,46 @@ class Block extends Model
 
         return view()->exists($path) ? $path : null;
     }
+
+    /**
+     * Get the markdown content from metadata
+     */
+    public function getContent(): ?string
+    {
+        return $this->metadata['content'] ?? null;
+    }
+
+    /**
+     * Get the content rendered as HTML from markdown
+     */
+    public function getContentAsHtml(): ?string
+    {
+        $content = $this->getContent();
+
+        if (empty($content)) {
+            return null;
+        }
+
+        return Str::markdown($content);
+    }
+
+    /**
+     * Set the content as markdown text in metadata
+     */
+    public function setContent(string $text): self
+    {
+        $metadata = $this->metadata ?? [];
+        $metadata['content'] = $text;
+        $this->metadata = $metadata;
+
+        return $this;
+    }
+
+    /**
+     * Check if this block has content
+     */
+    public function hasContent(): bool
+    {
+        return ! empty($this->getContent());
+    }
 }

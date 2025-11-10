@@ -156,30 +156,6 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
     public static function getBlockTypes(): array
     {
         return [
-            'fetch_content' => [
-                'icon' => 'o-document-text',
-                'display_name' => 'Raw Content',
-                'description' => 'Extracted HTML and text content',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'fetch_article_text' => [
-                'icon' => 'o-document-text',
-                'display_name' => 'Article Text',
-                'description' => 'AI-cleaned article text',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'fetch_metadata' => [
-                'icon' => 'o-information-circle',
-                'display_name' => 'Metadata',
-                'description' => 'Article metadata (author, date, image)',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
             'fetch_summary_tweet' => [
                 'icon' => 'o-chat-bubble-left-right',
                 'display_name' => 'Tweet Summary',
@@ -216,14 +192,6 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'icon' => 'o-bolt',
                 'display_name' => 'TL;DR',
                 'description' => 'One sentence summary',
-                'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'fetch_tags' => [
-                'icon' => 'o-tag',
-                'display_name' => 'Tags',
-                'description' => 'AI-generated semantic tags and emoji',
                 'display_with_object' => true,
                 'value_unit' => null,
                 'hidden' => false,
