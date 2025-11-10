@@ -35,7 +35,7 @@ class FetchSubscriptionTest extends TestCase
             'user_id' => $this->user->id,
             'service' => 'fetch',
             'instance_type' => 'fetcher',
-            'name' => 'URL Fetcher',
+            'name' => 'Fetch',
             'integration_group_id' => $this->group->id,
             'configuration' => [
                 'update_frequency_minutes' => 180,

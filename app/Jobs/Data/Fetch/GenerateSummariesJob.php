@@ -61,7 +61,6 @@ class GenerateSummariesJob implements ShouldQueue
             if ($isLinkable) {
                 $this->attachBlocksToSourceEvents($summaries);
                 $this->attachTagsToSourceObjectsAndEvents($summaries);
-                $this->createLinkEvent();
             } else {
                 // Create summary blocks on the fetch event (Blocks 3-9)
                 $this->createSummaryBlocks($summaries);
@@ -592,66 +591,6 @@ PROMPT;
                 'url' => $this->webpage->url,
             ]);
         }
-    }
-
-    private function createLinkEvent(): void
-    {
-        // Get source object for the actor
-        $sourceObject = null;
-        if ($this->sourceObjectId) {
-            $sourceObject = EventObject::find($this->sourceObjectId);
-        } elseif ($this->sourceEventId) {
-            $sourceEvent = Event::find($this->sourceEventId);
-            if ($sourceEvent && $sourceEvent->target_id) {
-                $sourceObject = EventObject::find($sourceEvent->target_id);
-            }
-        }
-
-        if (! $sourceObject) {
-            Log::warning('Fetch: Could not create link event - source object not found', [
-                'source_object_id' => $this->sourceObjectId,
-                'source_event_id' => $this->sourceEventId,
-            ]);
-
-            return;
-        }
-
-        // Get the integration that owns the source object
-        // We need to find an event for this object to get the integration_id
-        $sourceIntegration = Event::where('actor_id', $sourceObject->id)
-            ->orWhere('target_id', $sourceObject->id)
-            ->first();
-
-        if (! $sourceIntegration) {
-            Log::warning('Fetch: Could not create link event - no integration found for source object', [
-                'source_object_id' => $sourceObject->id,
-            ]);
-
-            return;
-        }
-
-        // Create the link event
-        Event::create([
-            'source_id' => 'fetch_link_' . $sourceObject->id . '_' . $this->webpage->id,
-            'integration_id' => $sourceIntegration->integration_id,
-            'service' => $sourceIntegration->service,
-            'domain' => $sourceIntegration->domain,
-            'action' => 'had_link_to',
-            'time' => now(),
-            'actor_id' => $sourceObject->id,
-            'target_id' => $this->webpage->id,
-            'event_metadata' => [
-                'url' => $this->webpage->url,
-                'linked_at' => now()->toIso8601String(),
-                'fetch_integration_id' => $this->integration->id,
-            ],
-        ]);
-
-        Log::info('Fetch: Created link event', [
-            'actor_id' => $sourceObject->id,
-            'target_id' => $this->webpage->id,
-            'url' => $this->webpage->url,
-        ]);
     }
 
     private function getSourceEvents()

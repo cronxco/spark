@@ -5,6 +5,7 @@ namespace App\Jobs\Fetch;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\Relationship;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -249,7 +250,7 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                     continue;
                 }
 
-                EventObject::create([
+                $webpage = EventObject::create([
                     'user_id' => $this->integration->user_id,
                     'concept' => 'bookmark',
                     'type' => 'fetch_webpage',
@@ -285,6 +286,59 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                     'url' => $urlData['url'],
                     'domain' => $domain,
                 ]);
+
+                // Create relationship if this is a linkable URL
+                if ($urlData['is_linkable'] ?? false) {
+                    try {
+                        // Determine source object
+                        $sourceObject = null;
+
+                        if (isset($urlData['source_object_id'])) {
+                            // URL came from an EventObject
+                            $sourceObject = EventObject::find($urlData['source_object_id']);
+                        } elseif (isset($urlData['source_event_id'])) {
+                            // URL came from an Event - get its target object
+                            $event = Event::find($urlData['source_event_id']);
+                            if ($event && $event->target_id) {
+                                $sourceObject = EventObject::find($event->target_id);
+                            }
+                        }
+
+                        if ($sourceObject) {
+                            Relationship::createRelationship([
+                                'user_id' => $this->integration->user_id,
+                                'from_type' => EventObject::class,
+                                'from_id' => $sourceObject->id,
+                                'to_type' => EventObject::class,
+                                'to_id' => $webpage->id,
+                                'type' => 'linked_to',
+                                'metadata' => [
+                                    'url' => $urlData['url'],
+                                    'linked_at' => now()->toIso8601String(),
+                                    'fetch_integration_id' => $this->integration->id,
+                                    'found_in' => $urlData['found_in'],
+                                ],
+                            ]);
+
+                            Log::debug('DiscoverUrlsFromIntegrations: Created linked_to relationship', [
+                                'from_object_id' => $sourceObject->id,
+                                'to_webpage_id' => $webpage->id,
+                                'url' => $urlData['url'],
+                            ]);
+                        } else {
+                            Log::warning('DiscoverUrlsFromIntegrations: Could not find source object for linkable URL', [
+                                'url' => $urlData['url'],
+                                'source_object_id' => $urlData['source_object_id'] ?? null,
+                                'source_event_id' => $urlData['source_event_id'] ?? null,
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        Log::error('DiscoverUrlsFromIntegrations: Failed to create relationship', [
+                            'url' => $urlData['url'],
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             } catch (Exception $e) {
                 Log::error('DiscoverUrlsFromIntegrations: Failed to create EventObject', [
                     'url' => $urlData['url'],
