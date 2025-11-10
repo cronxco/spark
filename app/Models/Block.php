@@ -104,6 +104,27 @@ class Block extends Model
         return static::create(array_merge($attributes, $values, ['event_id' => $eventId]));
     }
 
+    /**
+     * Get all block types that have custom card layouts defined
+     *
+     * @return array<string, bool> Map of block_type => has_custom_layout
+     */
+    public static function getBlockTypesWithCustomLayouts(): array
+    {
+        $blockTypes = static::select('block_type')
+            ->distinct()
+            ->whereNotNull('block_type')
+            ->pluck('block_type')
+            ->toArray();
+
+        $layoutMap = [];
+        foreach ($blockTypes as $blockType) {
+            $layoutMap[$blockType] = view()->exists("blocks.types.{$blockType}");
+        }
+
+        return $layoutMap;
+    }
+
     protected static function booted()
     {
         static::creating(function ($model) {
@@ -267,5 +288,23 @@ class Block extends Model
         }
 
         return $this->value / $this->value_multiplier;
+    }
+
+    /**
+     * Check if a custom card layout exists for this block type
+     */
+    public function hasCustomCardLayout(): bool
+    {
+        return view()->exists("blocks.types.{$this->block_type}");
+    }
+
+    /**
+     * Get the path to the custom card layout if it exists
+     */
+    public function getCustomCardLayoutPath(): ?string
+    {
+        $path = "blocks.types.{$this->block_type}";
+
+        return view()->exists($path) ? $path : null;
     }
 }

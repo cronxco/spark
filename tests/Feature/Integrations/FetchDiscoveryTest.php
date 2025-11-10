@@ -37,7 +37,7 @@ class FetchDiscoveryTest extends TestCase
             'user_id' => $this->user->id,
             'service' => 'fetch',
             'instance_type' => 'fetcher',
-            'name' => 'URL Fetcher',
+            'name' => 'Fetch',
             'integration_group_id' => $this->fetchGroup->id,
             'configuration' => [
                 'monitor_integrations' => [],

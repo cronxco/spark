@@ -650,53 +650,19 @@ new class extends Component {
             </div>
             @endif
 
-            <!-- Linked Blocks - Compact Grid View -->
+            <!-- Linked Blocks -->
             @if ($this->event->blocks->isNotEmpty())
-            <x-card class="bg-base-200/50 border-2 border-info/10">
+            <div>
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
                     <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
                     Linked Blocks ({{ $this->event->blocks->count() }})
                 </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     @foreach ($this->event->blocks as $block)
-                    <div class="border-2 border-info/30 bg-base-100/80 rounded-lg p-3 hover:bg-base-50 transition-colors shadow-sm">
-                        <div class="flex items-start justify-between gap-3 mb-2">
-                            <a href="{{ route('blocks.show', $block->id) }}"
-                                class="font-semibold text-base-content hover:text-primary transition-colors text-base flex-1">
-                                {{ $block->title }}
-                            </a>
-                            @if ($block->value)
-                            <span class="text-lg font-bold text-primary flex-shrink-0">{!! format_event_value_display($block->formatted_value, $block->value_unit, $this->event->service, $block->block_type, 'block') !!}</span>
-                            @endif
-                        </div>
-
-                        @php $meta = is_array($block->metadata ?? null) ? $block->metadata : []; @endphp
-                        @if (!empty($meta))
-                        <div class="mb-2">
-                            <x-metadata-list :data="$meta" />
-                        </div>
-                        @endif
-
-                        <div class="flex items-center gap-2 text-xs text-base-content/60">
-                            @if ($block->time)
-                            <div class="flex items-center gap-1">
-                                <x-icon name="o-clock" class="w-3 h-3" />
-                                {{ to_user_timezone($block->time, auth()->user())->format('H:i') }}
-                            </div>
-                            @endif
-                            @if ($block->url)
-                            <div class="flex items-center gap-1">
-                                <x-icon name="o-link" class="w-3 h-3" />
-                                <a href="{{ $block->url }}" target="_blank" class="text-primary hover:underline">
-                                    View
-                                </a>
-                            </div>
-                            @endif
-                        </div>
-                    </div>
+                        <x-block-card :block="$block" />
                     @endforeach
                 </div>
-            </x-card>
+            </div>
             @endif
 
             <!-- Related Events -->

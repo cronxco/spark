@@ -91,6 +91,16 @@ new class extends Component {
             ->get();
     }
 
+    public function getRelatedBlocks()
+    {
+        // Get blocks related to this object through relationships
+        return $this->object->relatedBlocks()
+            ->with('event.integration')
+            ->orderBy('time', 'desc')
+            ->limit(12)
+            ->get();
+    }
+
     public function getActivities()
     {
         return Activity::forSubject($this->object)
@@ -1013,6 +1023,21 @@ new class extends Component {
                     </div>
                 </div>
             </x-card>
+
+            <!-- Related Blocks -->
+            @if ($this->getRelatedBlocks()->isNotEmpty())
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                    Related Blocks ({{ $this->getRelatedBlocks()->count() }})
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    @foreach ($this->getRelatedBlocks() as $block)
+                        <x-block-card :block="$block" />
+                    @endforeach
+                </div>
+            </div>
+            @endif
 
             <!-- Related Events -->
             @if ($this->getRelatedEvents()->isNotEmpty())

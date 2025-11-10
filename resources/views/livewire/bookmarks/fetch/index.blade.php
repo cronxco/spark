@@ -95,7 +95,7 @@ new class extends Component
                 'instance_type' => 'fetcher',
             ],
             [
-                'name' => 'URL Fetcher',
+                'name' => 'Fetch',
                 'integration_group_id' => $this->group->id,
                 'configuration' => [
                     'update_frequency_minutes' => 180,
