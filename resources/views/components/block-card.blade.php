@@ -71,13 +71,14 @@ if (!$isValueBlock) {
     {{-- VALUE CARD VARIANT --}}
     <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
         <div class="card-body p-4 gap-3">
-            {{-- Header: Block type badge and date --}}
+            {{-- Header: Title and Date --}}
             <div class="flex items-center justify-between gap-2">
-                <div class="badge badge-{{ $badgeColor }} badge-outline badge-sm gap-1">
-                    <x-icon :name="$blockIcon" class="w-3 h-3" />
-                    {{ $blockDisplayName }}
-                </div>
-                <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
+                <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
+                    <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
+                        {{ $block->title }}
+                    </a>
+                </h3>
+                <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
             </div>
 
             {{-- Prominent Value Display --}}
@@ -91,13 +92,6 @@ if (!$isValueBlock) {
                     </div>
                 @endif
             </div>
-
-            {{-- Title --}}
-            <h3 class="font-semibold text-base text-center leading-snug">
-                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                    {{ $block->title }}
-                </a>
-            </h3>
 
             {{-- Metadata Preview --}}
             @if($block->metadata && count($block->metadata) > 0)
@@ -116,20 +110,15 @@ if (!$isValueBlock) {
                 </div>
             @endif
 
-            {{-- Footer: Integration badge, event link, and actions --}}
+            {{-- Footer: Block type badge and actions --}}
             <div class="flex items-center gap-2 mt-2 pt-2 border-t border-base-300">
-                {{-- Integration badge --}}
-                <div class="badge badge-{{ $badgeColor }} badge-xs gap-1">
-                    <x-icon :name="$icon" class="w-2.5 h-2.5" />
-                    {{ $displayName }}
+                {{-- Block type badge --}}
+                <div class="badge badge-ghost badge-sm gap-1">
+                    <x-icon :name="$blockIcon" class="w-3 h-3" />
+                    {{ $blockDisplayName }}
                 </div>
 
-                {{-- Event link --}}
-                <a href="{{ route('events.show', $block->event) }}"
-                   wire:navigate
-                   class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                    Event: {{ Str::limit($block->event->action, 20) }}
-                </a>
+                <div class="flex-1"></div>
 
                 {{-- Actions dropdown --}}
                 <div class="dropdown dropdown-end">
@@ -173,13 +162,14 @@ if (!$isValueBlock) {
     {{-- CONTENT CARD VARIANT --}}
     <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
         <div class="card-body p-4 gap-3">
-            {{-- Header: Block type badge and date --}}
+            {{-- Header: Title and Date --}}
             <div class="flex items-center justify-between gap-2 mb-1">
-                <div class="badge badge-{{ $badgeColor }} badge-outline badge-sm gap-1">
-                    <x-icon :name="$blockIcon" class="w-3 h-3" />
-                    {{ $blockDisplayName }}
-                </div>
-                <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
+                <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
+                    <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
+                        {{ $block->title }}
+                    </a>
+                </h3>
+                <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
             </div>
 
             {{-- Image (if available) --}}
@@ -192,13 +182,6 @@ if (!$isValueBlock) {
                 </div>
             @endif
 
-            {{-- Title --}}
-            <h3 class="font-semibold text-base leading-snug line-clamp-2">
-                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                    {{ $block->title }}
-                </a>
-            </h3>
-
             {{-- Content Preview --}}
             @if($contentPreview)
                 <p class="text-sm text-base-content/70 line-clamp-5 leading-relaxed">
@@ -206,29 +189,15 @@ if (!$isValueBlock) {
                 </p>
             @endif
 
-            {{-- Footer: Integration badge, event link, and actions --}}
+            {{-- Footer: Block type badge and actions --}}
             <div class="flex items-center gap-2 mt-2 pt-2 border-t border-base-300">
-                {{-- Integration badge --}}
-                <div class="badge badge-{{ $badgeColor }} badge-xs gap-1">
-                    <x-icon :name="$icon" class="w-2.5 h-2.5" />
-                    {{ $displayName }}
+                {{-- Block type badge --}}
+                <div class="badge badge-ghost badge-sm gap-1">
+                    <x-icon :name="$blockIcon" class="w-3 h-3" />
+                    {{ $blockDisplayName }}
                 </div>
 
-                {{-- Event link or URL --}}
-                @if($block->url)
-                    <a href="{{ $block->url }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                        {{ parse_url($block->url, PHP_URL_HOST) }}
-                    </a>
-                @else
-                    <a href="{{ route('events.show', $block->event) }}"
-                       wire:navigate
-                       class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                        {{ Str::limit($block->event->action, 30) }}
-                    </a>
-                @endif
+                <div class="flex-1"></div>
 
                 {{-- Actions dropdown --}}
                 <div class="dropdown dropdown-end">

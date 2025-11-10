@@ -14,16 +14,14 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
     <div class="card-body p-4 gap-3">
-        {{-- Header with Twitter-style badge --}}
+        {{-- Header: Title and Date --}}
         <div class="flex items-center justify-between gap-2">
-            <div class="badge badge-info badge-outline badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
-            </div>
-            <div class="flex items-center gap-2">
-                <div class="badge badge-ghost badge-xs">{{ $charCount }}/280</div>
-                <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
-            </div>
+            <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
+                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
+                    {{ $block->title }}
+                </a>
+            </h3>
+            <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
         {{-- Tweet-style content box --}}
@@ -39,6 +37,10 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                 <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
                 {{ $wordCount }} words
             </div>
+            <div class="flex items-center gap-1">
+                <x-icon name="o-document-text" class="w-3 h-3" />
+                {{ $charCount }}/280 chars
+            </div>
             @if(isset($block->metadata['model']))
                 <div class="flex items-center gap-1">
                     <x-icon name="o-cpu-chip" class="w-3 h-3" />
@@ -49,16 +51,12 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
-            <div class="badge badge-info badge-xs gap-1">
-                <x-icon :name="$icon" class="w-2.5 h-2.5" />
-                {{ $displayName }}
+            <div class="badge badge-ghost badge-sm gap-1">
+                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
+                Tweet Summary
             </div>
 
-            <a href="{{ route('events.show', $block->event) }}"
-               wire:navigate
-               class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                {{ Str::limit($block->event->action, 30) }}
-            </a>
+            <div class="flex-1"></div>
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">

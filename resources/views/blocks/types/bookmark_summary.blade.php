@@ -14,26 +14,20 @@ $model = $block->metadata['model'] ?? 'AI';
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
     <div class="card-body p-4 gap-3">
-        {{-- Header with AI badge --}}
+        {{-- Header: Title and Date --}}
         <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-                <div class="badge badge-warning badge-outline badge-sm gap-1">
-                    <x-icon name="o-sparkles" class="w-3 h-3" />
-                    AI Summary
-                </div>
+            <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
+                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
+                    {{ $block->title }}
+                </a>
+            </h3>
+            <div class="flex items-center gap-2 flex-shrink-0">
                 @if(isset($block->metadata['model']))
                     <div class="badge badge-ghost badge-xs">{{ $block->metadata['model'] }}</div>
                 @endif
+                <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
             </div>
-            <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
         </div>
-
-        {{-- Title --}}
-        <h3 class="font-semibold text-base leading-snug">
-            <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                {{ $block->title }}
-            </a>
-        </h3>
 
         {{-- Summary content with gradient effect --}}
         <div class="relative">
@@ -64,25 +58,12 @@ $model = $block->metadata['model'] ?? 'AI';
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
-            <div class="badge badge-warning badge-xs gap-1">
-                <x-icon :name="$icon" class="w-2.5 h-2.5" />
-                {{ $displayName }}
+            <div class="badge badge-ghost badge-sm gap-1">
+                <x-icon name="o-sparkles" class="w-3 h-3" />
+                AI Summary
             </div>
 
-            @if($block->url)
-                <a href="{{ $block->url }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                    {{ parse_url($block->url, PHP_URL_HOST) }}
-                </a>
-            @else
-                <a href="{{ route('events.show', $block->event) }}"
-                   wire:navigate
-                   class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                    {{ Str::limit($block->event->action, 30) }}
-                </a>
-            @endif
+            <div class="flex-1"></div>
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">

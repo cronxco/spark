@@ -14,13 +14,20 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
     <div class="card-body p-4 gap-3">
-        {{-- Header --}}
+        {{-- Header: Title and Date --}}
         <div class="flex items-center justify-between gap-2">
-            <div class="badge badge-warning badge-outline badge-sm gap-1">
-                <x-icon name="o-bookmark" class="w-3 h-3" />
-                Preview Card
-            </div>
-            <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
+            <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
+                @if($block->url)
+                    <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer" class="hover:underline">
+                        {{ $title }}
+                    </a>
+                @else
+                    <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
+                        {{ $title }}
+                    </a>
+                @endif
+            </h3>
+            <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
         {{-- Large image preview (taller than default) --}}
@@ -32,19 +39,6 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
                      loading="lazy">
             </div>
         @endif
-
-        {{-- Title (from metadata, not block title) --}}
-        <h3 class="font-semibold text-base leading-snug line-clamp-2">
-            @if($block->url)
-                <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer" class="hover:underline">
-                    {{ $title }}
-                </a>
-            @else
-                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                    {{ $title }}
-                </a>
-            @endif
-        </h3>
 
         {{-- Description --}}
         @if($description)
@@ -73,25 +67,12 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
-            <div class="badge badge-warning badge-xs gap-1">
-                <x-icon :name="$icon" class="w-2.5 h-2.5" />
-                {{ $displayName }}
+            <div class="badge badge-ghost badge-sm gap-1">
+                <x-icon name="o-bookmark" class="w-3 h-3" />
+                Preview Card
             </div>
 
-            @if($block->url)
-                <a href="{{ $block->url }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                    {{ parse_url($block->url, PHP_URL_HOST) }}
-                </a>
-            @else
-                <a href="{{ route('events.show', $block->event) }}"
-                   wire:navigate
-                   class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                    {{ Str::limit($block->event->action, 30) }}
-                </a>
-            @endif
+            <div class="flex-1"></div>
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">

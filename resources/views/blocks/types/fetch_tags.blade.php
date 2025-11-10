@@ -16,21 +16,15 @@ if (is_string($tags)) {
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
     <div class="card-body p-4 gap-3">
-        {{-- Header --}}
+        {{-- Header: Title and Date --}}
         <div class="flex items-center justify-between gap-2">
-            <div class="badge badge-accent badge-outline badge-sm gap-1">
-                <x-icon name="o-tag" class="w-3 h-3" />
-                Tags
-            </div>
-            <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
+            <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
+                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
+                    {{ $block->title }}
+                </a>
+            </h3>
+            <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
-
-        {{-- Title --}}
-        <h3 class="font-semibold text-base leading-snug">
-            <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                {{ $block->title }}
-            </a>
-        </h3>
 
         {{-- Tags cloud --}}
         @if(count($tags) > 0)
@@ -75,16 +69,12 @@ if (is_string($tags)) {
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
-            <div class="badge badge-accent badge-xs gap-1">
-                <x-icon :name="$icon" class="w-2.5 h-2.5" />
-                {{ $displayName }}
+            <div class="badge badge-ghost badge-sm gap-1">
+                <x-icon name="o-tag" class="w-3 h-3" />
+                Tags
             </div>
 
-            <a href="{{ route('events.show', $block->event) }}"
-               wire:navigate
-               class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors flex-1 truncate">
-                {{ Str::limit($block->event->action, 30) }}
-            </a>
+            <div class="flex-1"></div>
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
