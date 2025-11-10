@@ -41,6 +41,7 @@ new class extends Component
         'invalid_integrations' => false,
         'plugin_config_issues' => false,
         'data_consistency_issues' => false,
+        'block_custom_layouts' => false,
     ];
 
     public function mount(): void
@@ -310,6 +311,59 @@ new class extends Component
     }
 
     /**
+     * Get block types with custom card layouts information
+     *
+     * @return array<int, array{service: string, block_type: string, display_name: string, has_custom_layout: bool, block_count: int, is_high_volume: bool}>
+     */
+    public function getBlockCustomLayoutsProperty(): array
+    {
+        $results = [];
+
+        // Get all block types from plugins
+        foreach (PluginRegistry::getAllPlugins() as $identifier => $pluginClass) {
+            $blockTypes = $pluginClass::getBlockTypes();
+
+            foreach ($blockTypes as $blockType => $config) {
+                // Check if custom layout exists
+                $hasCustomLayout = view()->exists("blocks.types.{$blockType}");
+
+                // Get count of blocks of this type
+                $blockCount = Block::where('block_type', $blockType)->count();
+
+                // Consider high volume if > 100 blocks
+                $isHighVolume = $blockCount > 100;
+
+                $results[] = [
+                    'service' => $identifier,
+                    'block_type' => $blockType,
+                    'display_name' => $config['display_name'] ?? str_replace('_', ' ', $blockType),
+                    'has_custom_layout' => $hasCustomLayout,
+                    'block_count' => $blockCount,
+                    'is_high_volume' => $isHighVolume,
+                ];
+            }
+        }
+
+        // Sort: high volume without layouts first, then by count descending
+        usort($results, function ($a, $b) {
+            // Priority 1: High volume without custom layout
+            $aHighNoLayout = $a['is_high_volume'] && ! $a['has_custom_layout'];
+            $bHighNoLayout = $b['is_high_volume'] && ! $b['has_custom_layout'];
+            if ($aHighNoLayout && ! $bHighNoLayout) {
+                return -1;
+            }
+            if (! $aHighNoLayout && $bHighNoLayout) {
+                return 1;
+            }
+
+            // Priority 2: Block count descending
+            return $b['block_count'] <=> $a['block_count'];
+        });
+
+        return $results;
+    }
+
+    /**
      * Get all sense check sections organized with issues first, then clean sections
      *
      * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool}>
@@ -372,6 +426,13 @@ new class extends Component
                 'description' => 'Missing timestamps, future dates, duplicate events, and other data quality issues.',
                 'icon' => 'o-clock',
                 'issue_count' => count($this->dataConsistencyIssues),
+            ],
+            [
+                'key' => 'block_custom_layouts',
+                'title' => 'Block types with custom card layouts',
+                'description' => 'Overview of which block types have custom display layouts defined. High-volume block types without custom layouts are highlighted.',
+                'icon' => 'o-rectangle-stack',
+                'issue_count' => 0, // This is informational, not an issue
             ],
         ];
 
@@ -691,6 +752,90 @@ new class extends Component
                                 @endforeach
                             </div>
                         @endif
+
+                    @elseif ($section['key'] === 'block_custom_layouts')
+                        @php($items = $this->blockCustomLayouts)
+                        @php($totalTypes = count($items))
+                        @php($withLayouts = collect($items)->filter(fn($item) => $item['has_custom_layout'])->count())
+                        @php($highVolumeWithoutLayouts = collect($items)->filter(fn($item) => $item['is_high_volume'] && !$item['has_custom_layout'])->count())
+
+                        <div class="mb-4 flex items-center gap-4 text-sm">
+                            <div class="badge badge-lg badge-primary">{{ $totalTypes }} total block types</div>
+                            <div class="badge badge-lg badge-success">{{ $withLayouts }} with custom layouts</div>
+                            @if($highVolumeWithoutLayouts > 0)
+                                <div class="badge badge-lg badge-warning">{{ $highVolumeWithoutLayouts }} high-volume without layouts</div>
+                            @endif
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Service</th>
+                                        <th>Block Type</th>
+                                        <th>Display Name</th>
+                                        <th class="text-center">Custom Layout</th>
+                                        <th class="text-right">Block Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($items as $item)
+                                        @php
+                                            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($item['service']);
+                                            $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+                                            $serviceName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($item['service']);
+
+                                            // Determine row styling
+                                            if ($item['is_high_volume'] && !$item['has_custom_layout']) {
+                                                $rowClass = 'bg-warning/5 hover:bg-warning/10';
+                                            } elseif ($item['has_custom_layout']) {
+                                                $rowClass = 'bg-success/5 hover:bg-success/10';
+                                            } else {
+                                                $rowClass = 'hover:bg-base-200';
+                                            }
+                                        @endphp
+                                        <tr class="{{ $rowClass }}">
+                                            <td>
+                                                <div class="flex items-center gap-2">
+                                                    <x-icon :name="$icon" class="w-4 h-4" />
+                                                    {{ $serviceName }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <code class="text-xs">{{ $item['block_type'] }}</code>
+                                            </td>
+                                            <td>{{ $item['display_name'] }}</td>
+                                            <td class="text-center">
+                                                @if($item['has_custom_layout'])
+                                                    <x-icon name="o-check-circle" class="w-5 h-5 text-success inline-block" />
+                                                @else
+                                                    <x-icon name="o-x-circle" class="w-5 h-5 text-base-content/30 inline-block" />
+                                                @endif
+                                            </td>
+                                            <td class="text-right">
+                                                <a href="{{ route('admin.blocks.index', ['blockTypeFilter' => $item['block_type']]) }}"
+                                                   class="hover:underline">
+                                                    @if($item['is_high_volume'])
+                                                        <span class="badge badge-warning badge-sm">{{ number_format($item['block_count']) }}</span>
+                                                    @else
+                                                        {{ number_format($item['block_count']) }}
+                                                    @endif
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-4 text-sm text-base-content/70 space-y-1">
+                            <p><strong>Legend:</strong></p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><span class="inline-block w-4 h-4 bg-success/10 border border-success/20 rounded mr-1"></span> Block type has custom layout</li>
+                                <li><span class="inline-block w-4 h-4 bg-warning/10 border border-warning/20 rounded mr-1"></span> High-volume block type (>100 blocks) without custom layout</li>
+                            </ul>
+                            <p class="mt-2"><strong>Custom layouts location:</strong> <code class="text-xs">resources/views/blocks/types/{block_type}.blade.php</code></p>
+                        </div>
                     @endif
                 </x-slot:content>
             </x-collapse>

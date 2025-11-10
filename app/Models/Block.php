@@ -103,6 +103,27 @@ class Block extends Model
         return static::create(array_merge($attributes, $values, ['event_id' => $eventId]));
     }
 
+    /**
+     * Get all block types that have custom card layouts defined
+     *
+     * @return array<string, bool> Map of block_type => has_custom_layout
+     */
+    public static function getBlockTypesWithCustomLayouts(): array
+    {
+        $blockTypes = static::select('block_type')
+            ->distinct()
+            ->whereNotNull('block_type')
+            ->pluck('block_type')
+            ->toArray();
+
+        $layoutMap = [];
+        foreach ($blockTypes as $blockType) {
+            $layoutMap[$blockType] = view()->exists("blocks.types.{$blockType}");
+        }
+
+        return $layoutMap;
+    }
+
     protected static function booted()
     {
         static::creating(function ($model) {
@@ -142,6 +163,108 @@ class Block extends Model
     }
 
     /**
+     * Get relationships where this block is the "from" entity
+     */
+    public function relationshipsFrom()
+    {
+        return $this->morphMany(Relationship::class, 'from');
+    }
+
+    /**
+     * Get relationships where this block is the "to" entity
+     */
+    public function relationshipsTo()
+    {
+        return $this->morphMany(Relationship::class, 'to');
+    }
+
+    /**
+     * Get all relationships (both from and to)
+     */
+    public function relationships()
+    {
+        return Relationship::where(function ($query) {
+            $query->where(function ($q) {
+                $q->where('from_type', static::class)
+                    ->where('from_id', $this->id);
+            })->orWhere(function ($q) {
+                $q->where('to_type', static::class)
+                    ->where('to_id', $this->id);
+            });
+        })->where('user_id', $this->event->integration->user_id);
+    }
+
+    /**
+     * Get related EventObjects
+     */
+    public function relatedObjects(?string $type = null)
+    {
+        $query = EventObject::whereHas('relationshipsFrom', function ($q) use ($type) {
+            $q->where('to_type', static::class)
+                ->where('to_id', $this->id);
+            if ($type) {
+                $q->where('type', $type);
+            }
+        })->orWhereHas('relationshipsTo', function ($q) use ($type) {
+            $q->where('from_type', static::class)
+                ->where('from_id', $this->id);
+            if ($type) {
+                $q->where('type', $type);
+            }
+        });
+
+        return $query->where('user_id', $this->event->integration->user_id);
+    }
+
+    /**
+     * Get related Events
+     */
+    public function relatedEvents(?string $type = null)
+    {
+        $query = Event::whereHas('relationshipsFrom', function ($q) use ($type) {
+            $q->where('to_type', static::class)
+                ->where('to_id', $this->id);
+            if ($type) {
+                $q->where('type', $type);
+            }
+        })->orWhereHas('relationshipsTo', function ($q) use ($type) {
+            $q->where('from_type', static::class)
+                ->where('from_id', $this->id);
+            if ($type) {
+                $q->where('type', $type);
+            }
+        });
+
+        return $query->whereHas('integration', function ($q) {
+            $q->where('user_id', $this->event->integration->user_id);
+        });
+    }
+
+    /**
+     * Get related Blocks
+     */
+    public function relatedBlocks(?string $type = null)
+    {
+        $query = static::whereHas('relationshipsFrom', function ($q) use ($type) {
+            $q->where('to_type', static::class)
+                ->where('to_id', $this->id);
+            if ($type) {
+                $q->where('type', $type);
+            }
+        })->orWhereHas('relationshipsTo', function ($q) use ($type) {
+            $q->where('from_type', static::class)
+                ->where('from_id', $this->id);
+            if ($type) {
+                $q->where('type', $type);
+            }
+        });
+
+        return $query->whereHas('event.integration', function ($q) {
+            $q->where('user_id', $this->event->integration->user_id);
+        });
+    }
+
+    /**
      * Get the formatted value considering the multiplier
      */
     public function getFormattedValueAttribute()
@@ -155,5 +278,23 @@ class Block extends Model
         }
 
         return $this->value / $this->value_multiplier;
+    }
+
+    /**
+     * Check if a custom card layout exists for this block type
+     */
+    public function hasCustomCardLayout(): bool
+    {
+        return view()->exists("blocks.types.{$this->block_type}");
+    }
+
+    /**
+     * Get the path to the custom card layout if it exists
+     */
+    public function getCustomCardLayoutPath(): ?string
+    {
+        $path = "blocks.types.{$this->block_type}";
+
+        return view()->exists($path) ? $path : null;
     }
 }
