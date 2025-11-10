@@ -166,9 +166,9 @@ class OuraWorkoutsData extends BaseProcessingJob
 
         // Add intensity and performance metrics
         $performanceMetrics = [
-            'intensity' => ['unit' => 'intensity_level', 'title' => 'Workout Intensity'],
-            'load' => ['unit' => 'load_units', 'title' => 'Training Load'],
-            'rpe' => ['unit' => 'rpe_scale', 'title' => 'Rate of Perceived Exertion'],
+            'intensity' => ['unit' => null, 'title' => 'Workout Intensity'],
+            'load' => ['unit' => null, 'title' => 'Training Load'],
+            'rpe' => ['unit' => null, 'title' => 'Rate of Perceived Exertion'],
         ];
 
         foreach ($performanceMetrics as $field => $config) {
