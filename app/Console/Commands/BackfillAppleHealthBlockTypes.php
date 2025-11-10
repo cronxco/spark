@@ -3,10 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Block;
-use App\Models\Event;
 use Exception;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class BackfillAppleHealthBlockTypes extends Command
 {
