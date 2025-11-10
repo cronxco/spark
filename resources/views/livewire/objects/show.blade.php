@@ -1024,6 +1024,21 @@ new class extends Component {
                 </div>
             </x-card>
 
+            <!-- Content Section -->
+            @if ($this->object->content)
+            <x-card class="bg-base-100 shadow">
+                <div class="max-w-prose mx-auto">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-document-text" class="w-5 h-5 text-info" />
+                        Content
+                    </h3>
+                    <div class="prose dark:prose-invert prose-base lg:prose-lg">
+                        {!! nl2br(e($this->object->content)) !!}
+                    </div>
+                </div>
+            </x-card>
+            @endif
+
             <!-- Related Blocks -->
             @if ($this->getRelatedBlocks()->isNotEmpty())
             <div>

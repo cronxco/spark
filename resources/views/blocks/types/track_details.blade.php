@@ -54,7 +54,7 @@ $popularity = $block->metadata['popularity'] ?? $block->formatted_value ?? 0;
                 </div>
             </div>
 
-            @if ($duration)
+            @if ($duration && is_numeric($duration))
             <div class="flex items-center gap-2 text-xs text-base-content/60">
                 <x-icon name="o-clock" class="w-3 h-3" />
                 {{ format_duration($duration / 1000) }}
