@@ -9,7 +9,11 @@ $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->e
 
 $type = $block->metadata['type'] ?? '';
 $field = $block->metadata['field'] ?? '';
-$value = round($block->formatted_value ?? 0, 1);
+$rawValue = $block->formatted_value ?? 0;
+
+// Check if title contains "duration" (case-insensitive)
+$isDuration = str_contains(strtolower($block->title), 'duration');
+$value = $isDuration ? format_duration($rawValue) : round($rawValue, 1);
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -29,19 +33,7 @@ $value = round($block->formatted_value ?? 0, 1);
             <div class="text-4xl font-bold text-info">
                 {{ $value }}
             </div>
-            @if ($field)
-            <div class="text-sm text-base-content/60 mt-1">
-                {{ $field }}
-            </div>
-            @endif
         </div>
-
-        @if ($type)
-        <div class="flex items-center justify-center gap-2 text-xs text-base-content/60">
-            <x-icon name="o-beaker" class="w-3 h-3" />
-            {{ $type }}
-        </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">

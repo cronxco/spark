@@ -9,8 +9,8 @@ $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->e
 
 $takeaways = $block->metadata['takeaways'] ?? [];
 if (is_string($takeaways)) {
-    // Parse if stored as string with line breaks or bullets
-    $takeaways = array_filter(array_map('trim', preg_split('/[\n\r]+/', $takeaways)));
+// Parse if stored as string with line breaks or bullets
+$takeaways = array_filter(array_map('trim', preg_split('/[\n\r]+/', $takeaways)));
 }
 @endphp
 
@@ -28,20 +28,30 @@ if (is_string($takeaways)) {
 
         {{-- Takeaways list --}}
         @if (count($takeaways) > 0)
-            <div class="space-y-2">
-                @foreach ($takeaways as $index => $takeaway)
+        {{-- AI Summary Display --}}
+        <div class="relative">
+            <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
+                <div class="space-y-2">
+                    @foreach ($takeaways as $index => $takeaway)
                     <div class="flex gap-2 items-start">
-                        <div class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
-                            <x-icon name="o-check" class="w-4 h-4 text-primary" />
+                        <div class="flex-shrink-0 w-6 h-6 rounded-full bg-warning/10 flex items-center justify-center mt-0.5">
+                            <x-icon name="o-check" class="w-4 h-4 text-warning" />
                         </div>
                         <p class="text-sm text-base-content/80 leading-relaxed flex-1">
                             {{ is_string($takeaway) ? $takeaway : ($takeaway['text'] ?? $takeaway['content'] ?? '') }}
                         </p>
                     </div>
-                @endforeach
+                    @endforeach
+                </div>
             </div>
+            {{-- AI Badge --}}
+            <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                <x-icon name="o-sparkles" class="w-3 h-3 text-warning-content" />
+            </div>
+        </div>
+
         @else
-            <p class="text-sm text-base-content/60 italic">No takeaways available</p>
+        <p class="text-sm text-base-content/60 italic">No takeaways available</p>
         @endif
 
         {{-- Stats --}}
@@ -51,10 +61,10 @@ if (is_string($takeaways)) {
                 {{ count($takeaways) }} takeaways
             </div>
             @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
+            <div class="flex items-center gap-1">
+                <x-icon name="o-cpu-chip" class="w-3 h-3" />
+                {{ $block->metadata['model'] }}
+            </div>
             @endif
         </div>
 

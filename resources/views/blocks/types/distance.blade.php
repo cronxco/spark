@@ -28,10 +28,7 @@ $unit = $block->value_unit ?? 'km';
             <x-icon name="o-map" class="w-10 h-10 text-accent" />
             <div>
                 <div class="text-4xl font-bold text-accent">
-                    {{ $value }}
-                </div>
-                <div class="text-sm text-base-content/60">
-                    {{ $unit }}
+                    {{ $value }} <span class="text-base">{{ $unit }}</span>
                 </div>
             </div>
         </div>

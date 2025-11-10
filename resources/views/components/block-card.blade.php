@@ -184,9 +184,9 @@ if (!$isValueBlock) {
 
             {{-- Content Preview --}}
             @if ($contentPreview)
-                <p class="text-sm text-base-content/70 line-clamp-5 leading-relaxed">
-                    {{ $contentPreview }}
-                </p>
+                <div class="prose prose-sm max-w-none text-base-content/70 line-clamp-5">
+                    {!! Str::markdown($contentPreview) !!}
+                </div>
             @endif
 
             {{-- Footer: Block type badge and actions --}}

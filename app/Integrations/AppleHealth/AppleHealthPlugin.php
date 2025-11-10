@@ -689,19 +689,17 @@ class AppleHealthPlugin extends WebhookPlugin
         foreach ($statMap as $key => $label) {
             if (array_key_exists($key, $point)) {
                 [$bVal, $bMult] = $this->encodeNumericValue($point[$key]);
-                $blocks[] = [
-                    'block_type' => $name,
-                    'time' => $date,
-                    'title' => $label,
-                    'metadata' => [
-                        'statistic' => strtolower($label),
-                        'metric' => $name,
-                        'original_key' => $key,
-                    ],
-                    'value' => $bVal,
-                    'value_multiplier' => $bMult,
-                    'value_unit' => $unit,
-                ];
+                // Only add a block if there's a type
+                if ($name !== null) {
+                    $blocks[] = [
+                        'block_type' => $name,
+                        'time' => $date,
+                        'title' => $label,
+                        'value' => $bVal,
+                        'value_multiplier' => $bMult,
+                        'value_unit' => $unit,
+                    ];
+                }
             }
         }
         $tags = [];

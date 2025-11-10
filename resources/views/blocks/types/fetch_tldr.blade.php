@@ -31,7 +31,7 @@ $model = $block->metadata['model'] ?? null;
 
         {{-- AI Summary Display --}}
         <div class="relative">
-            <div class="bg-gradient-to-br from-warning/5 to-warning/10 rounded-lg p-3 border border-warning/20">
+            <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
                 <p class="text-sm text-base-content/80 leading-relaxed">
                     {{ $summary }}
                 </p>
@@ -48,6 +48,12 @@ $model = $block->metadata['model'] ?? null;
                 <x-icon name="o-document-text" class="w-3 h-3" />
                 {{ $wordCount }} words
             </div>
+            @if (isset($block->metadata['model']))
+            <div class="flex items-center gap-1">
+                <x-icon name="o-cpu-chip" class="w-3 h-3" />
+                {{ $block->metadata['model'] }}
+            </div>
+            @endif
         </div>
 
         {{-- Footer --}}

@@ -18,10 +18,10 @@ foreach($block->metadata as $key => $value) {
     if(strlen($key) === 3 && ctype_alpha($key) && is_numeric($value)) {
         if(!$fromCurrency) {
             $fromCurrency = $key;
-            $fromAmount = $value / 100; // Assuming stored in smallest units
+            $fromAmount = $value;
         } else {
             $toCurrency = $key;
-            $toAmount = $value / 100;
+            $toAmount = $value;
         }
     }
 }
