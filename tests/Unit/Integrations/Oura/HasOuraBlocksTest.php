@@ -77,7 +77,7 @@ class HasOuraBlocksTest extends TestCase
 
         $targetBlock = $blocks->where('title', 'Meet Daily Targets')->first();
         $this->assertNotNull($targetBlock);
-        $this->assertEquals('contributors', $targetBlock->block_type);
+        $this->assertEquals('contributor', $targetBlock->block_type);
         $this->assertEquals(75, $targetBlock->value);
         $this->assertEquals('percent', $targetBlock->value_unit);
         $this->assertEquals('contributor', $targetBlock->metadata['type']);
@@ -140,7 +140,7 @@ class HasOuraBlocksTest extends TestCase
 
         $stepsBlock = $blocks->where('title', 'Steps')->first();
         $this->assertNotNull($stepsBlock);
-        $this->assertEquals('activity_metrics', $stepsBlock->block_type);
+        $this->assertEquals('activity_metric', $stepsBlock->block_type);
         $this->assertEquals(10432, $stepsBlock->value);
         $this->assertEquals('count', $stepsBlock->value_unit);
         $this->assertEquals('core_metric', $stepsBlock->metadata['type']);
@@ -205,7 +205,7 @@ class HasOuraBlocksTest extends TestCase
 
         $totalBlock = $blocks->where('title', 'Total Sleep Duration')->first();
         $this->assertNotNull($totalBlock);
-        $this->assertEquals('sleep_stages', $totalBlock->block_type);
+        $this->assertEquals('sleep_stage', $totalBlock->block_type);
         $this->assertEquals(28800, $totalBlock->value);
         $this->assertEquals('seconds', $totalBlock->value_unit);
 
@@ -303,7 +303,7 @@ class HasOuraBlocksTest extends TestCase
 
         $bedtimeStartBlock = $blocks->where('title', 'Bedtime Start')->first();
         $this->assertNotNull($bedtimeStartBlock);
-        $this->assertEquals('sleep_stages', $bedtimeStartBlock->block_type);
+        $this->assertEquals('sleep_stage', $bedtimeStartBlock->block_type);
         $this->assertEquals('2023-10-15T23:30:00Z', $bedtimeStartBlock->metadata['value']);
         $this->assertEquals('timing', $bedtimeStartBlock->metadata['type']);
         $this->assertEquals('bedtime_start', $bedtimeStartBlock->metadata['field']);

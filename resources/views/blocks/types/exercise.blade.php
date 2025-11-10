@@ -44,19 +44,11 @@ $type = $block->metadata['type'] ?? 'normal';
                 <div class="text-xs text-base-content/60">Weight</div>
                 <div class="text-lg font-bold">{{ number_format($weight, 0) }} {{ $unit }}</div>
             </div>
-        </div>
-
-        <div class="flex items-center justify-between text-xs">
             @if ($rpe)
-            <div class="flex items-center gap-1 text-base-content/60">
-                <x-icon name="o-fire" class="w-3 h-3" />
-                RPE {{ $rpe }}
+            <div class="text-center p-2 bg-base-300 rounded-lg">
+                <div class="text-xs text-base-content/60">RPE</div>
+                <div class="text-lg font-bold">{{ $rpe }}</div>
             </div>
-            @else
-            <div></div>
-            @endif
-            @if ($type !== 'normal')
-            <div class="badge badge-xs badge-accent">{{ ucfirst($type) }}</div>
             @endif
         </div>
 

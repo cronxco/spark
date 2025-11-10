@@ -56,7 +56,7 @@ $event->createBlock([
 // Activity data
 $event->createBlock([
     'title' => 'Steps',
-    'block_type' => 'activity_metrics',
+    'block_type' => 'activity_metric',
     'value' => 10000,
     'value_unit' => 'count',
     'metadata' => ['source' => 'pedometer'],

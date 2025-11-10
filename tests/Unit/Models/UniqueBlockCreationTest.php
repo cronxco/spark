@@ -108,7 +108,7 @@ class UniqueBlockCreationTest extends TestCase
 
         $caloriesBlock = $event->createBlock([
             'title' => 'Calories',
-            'block_type' => 'workout_metrics',
+            'block_type' => 'workout_metric',
             'value' => 250,
             'value_unit' => 'kcal',
         ]);
@@ -149,7 +149,7 @@ class UniqueBlockCreationTest extends TestCase
 
         $avgWorkoutMetricBlock = $event->createBlock([
             'title' => 'Average Heart Rate',
-            'block_type' => 'workout_metrics', // Different block_type
+            'block_type' => 'workout_metric', // Different block_type
             'value' => 75,
             'value_unit' => 'bpm',
         ]);

@@ -123,7 +123,7 @@ class OuraResilienceData extends BaseProcessingJob
             if (is_numeric($value)) {
                 [$encodedContrib, $contribMultiplier] = $plugin->encodeNumericValue((float) $value);
                 $event->createBlock([
-                    'block_type' => 'contributors',
+                    'block_type' => 'contributor',
                     'time' => $event->time,
                     'integration_id' => $this->integration->id,
                     'title' => str_replace('_', ' ', ucwords($name)),

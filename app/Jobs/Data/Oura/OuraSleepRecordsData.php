@@ -188,7 +188,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $blocks[] = [
                     'time' => $start ?? ($day . ' 00:00:00'),
-                    'block_type' => 'sleep_stages',
+                    'block_type' => 'sleep_stage',
                     'title' => $config['title'],
                     'metadata' => [
                         'type' => $config['type'],
@@ -245,7 +245,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
             if ($value) {
                 $blocks[] = [
                     'time' => $start ?? ($day . ' 00:00:00'),
-                    'block_type' => 'sleep_stages',
+                    'block_type' => 'sleep_stage',
                     'title' => $title,
                     'metadata' => [
                         'type' => 'timing',

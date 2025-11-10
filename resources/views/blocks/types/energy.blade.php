@@ -28,10 +28,7 @@ $unit = $block->value_unit ?? 'kcal';
             <x-icon name="o-fire" class="w-10 h-10 text-warning" />
             <div>
                 <div class="text-4xl font-bold text-warning">
-                    {{ number_format($value) }}
-                </div>
-                <div class="text-sm text-base-content/60">
-                    {{ $unit }}
+                    {{ number_format($value) }} <span class="text-base">{{ $unit }}</span>
                 </div>
             </div>
         </div>

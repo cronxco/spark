@@ -60,12 +60,6 @@ $period = $block->metadata['period'] ?? null;
             </div>
         </div>
 
-        @if ($period)
-        <div class="text-center text-xs text-base-content/60">
-            {{ ucfirst($period) }}
-        </div>
-        @endif
-
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">

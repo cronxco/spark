@@ -26,27 +26,14 @@ $followers = $block->metadata['followers'] ?? null;
         </div>
 
         {{-- Artist Display --}}
-        <div class="flex items-center gap-3 py-2">
+        <div class="flex items-center justify-center gap-3 py-2">
             <x-icon name="o-musical-note" class="w-10 h-10 text-success" />
             <div class="flex-1">
                 <div class="text-xl font-bold">
                     {{ $artistName }}
                 </div>
-                @if ($followers)
-                <div class="text-sm text-base-content/60">
-                    {{ number_format($followers) }} followers
-                </div>
-                @endif
             </div>
         </div>
-
-        @if (!empty($genres))
-        <div class="flex flex-wrap gap-1">
-            @foreach (array_slice($genres, 0, 4) as $genre)
-            <span class="badge badge-sm badge-accent">{{ $genre }}</span>
-            @endforeach
-        </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">

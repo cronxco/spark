@@ -44,9 +44,6 @@ $isDeposit = $direction === 'deposit';
                 <div class="text-2xl font-bold">
                     £{{ number_format($amount, 2) }}
                 </div>
-                <div class="text-xs text-base-content/60">
-                    {{ ucfirst($direction) }}
-                </div>
             </div>
         </div>
 

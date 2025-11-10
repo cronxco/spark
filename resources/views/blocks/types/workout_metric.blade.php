@@ -7,10 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$author = $block->metadata['author'] ?? null;
-$imageUrl = $block->metadata['image'] ?? null;
-$direction = $block->metadata['direction'] ?? null;
-$extractedAt = $block->metadata['extracted_at'] ?? null;
+$type = $block->metadata['type'] ?? '';
+$estimated = $block->metadata['estimated'] ?? false;
+$value = $block->formatted_value ?? 0;
+$unit = $block->value_unit ?? '';
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -25,37 +25,21 @@ $extractedAt = $block->metadata['extracted_at'] ?? null;
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Image Display --}}
-        @if ($imageUrl)
-        <div class="w-full h-32 rounded-lg overflow-hidden bg-base-300">
-            <img src="{{ $imageUrl }}"
-                 alt="{{ $block->title }}"
-                 class="w-full h-full object-cover"
-                 loading="lazy">
-        </div>
-        @endif
-
-        {{-- Metadata Display --}}
-        <div class="space-y-2 text-sm">
-            @if ($author)
-            <div class="flex items-center gap-2">
-                <x-icon name="o-user" class="w-4 h-4 text-base-content/60" />
-                <span>{{ $author }}</span>
+        {{-- Value Display --}}
+        <div class="text-center py-2">
+            <div class="text-4xl font-bold text-warning">
+                {{ number_format($value, 0) }}
             </div>
-            @endif
-            @if ($direction)
-            <div class="flex items-center gap-2">
-                <x-icon name="o-language" class="w-4 h-4 text-base-content/60" />
-                <span>{{ $direction }}</span>
+            <div class="text-sm text-base-content/60 mt-1">
+                {{ $unit }}
             </div>
-            @endif
         </div>
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="{{ $icon }}" class="w-3 h-3" />
-                Metadata
+                <x-icon name="o-fire" class="w-3 h-3" />
+                Workout
             </div>
 
             <div class="flex-1"></div>
@@ -71,14 +55,12 @@ $extractedAt = $block->metadata['extracted_at'] ?? null;
                             View Block
                         </a>
                     </li>
-                    @if ($imageUrl)
                     <li>
-                        <a href="{{ $imageUrl }}" target="_blank" rel="noopener noreferrer">
-                            <x-icon name="o-photo" class="w-4 h-4" />
-                            View Image
+                        <a href="{{ route('events.show', $block->event) }}" wire:navigate>
+                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            View Event
                         </a>
                     </li>
-                    @endif
                 </ul>
             </div>
         </div>
