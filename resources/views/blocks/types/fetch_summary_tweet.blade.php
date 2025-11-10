@@ -7,7 +7,7 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
+$summary = $block->metadata['content'] ?? '';
 $charCount = mb_strlen($summary);
 $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
 @endphp
@@ -27,9 +27,9 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
         {{-- AI Summary Display --}}
         <div class="relative">
             <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
-                <p class="text-sm text-base-content/80 leading-relaxed">
-                    {{ $summary }}
-                </p>
+                <div class="text-sm text-base-content/80 leading-relaxed prose prose-sm max-w-none">
+                    {!! str($summary)->markdown() !!}
+                </div>
             </div>
             {{-- AI Badge --}}
             <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">

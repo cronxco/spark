@@ -7,7 +7,7 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$takeaways = $block->metadata['takeaways'] ?? [];
+$takeaways = $block->metadata['content'] ?? [];
 if (is_string($takeaways)) {
 // Parse if stored as string with line breaks or bullets
 $takeaways = array_filter(array_map('trim', preg_split('/[\n\r]+/', $takeaways)));
@@ -38,7 +38,7 @@ $takeaways = array_filter(array_map('trim', preg_split('/[\n\r]+/', $takeaways))
                             <x-icon name="o-check" class="w-4 h-4 text-warning" />
                         </div>
                         <p class="text-sm text-base-content/80 leading-relaxed flex-1">
-                            {{ is_string($takeaway) ? $takeaway : ($takeaway['text'] ?? $takeaway['content'] ?? '') }}
+                            {!! str(is_string($takeaway) ? $takeaway : ($takeaway['text'] ?? $takeaway['content'] ?? ''))->markdown() !!}
                         </p>
                     </div>
                     @endforeach
