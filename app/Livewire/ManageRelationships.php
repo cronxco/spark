@@ -101,8 +101,13 @@ class ManageRelationships extends Component
         $model = $this->modelType::findOrFail($this->modelId);
 
         // Check ownership based on model type
-        if ($model instanceof Event || $model instanceof Block) {
+        if ($model instanceof Event) {
             $integration = $model->integration;
+            if (! $integration || $integration->user_id !== Auth::id()) {
+                abort(403);
+            }
+        } elseif ($model instanceof Block) {
+            $integration = $model->event?->integration;
             if (! $integration || $integration->user_id !== Auth::id()) {
                 abort(403);
             }
