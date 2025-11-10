@@ -184,6 +184,7 @@
                     <x-menu-item title="Events" icon="fas.list" link="{{ route('admin.events.index') }}" :active="request()->routeIs('admin.events.*')" />
                     <x-menu-item title="Objects" icon="fas.cube" link="{{ route('admin.objects.index') }}" :active="request()->routeIs('admin.objects.*')" />
                     <x-menu-item title="Blocks" icon="fas.cubes" link="{{ route('admin.blocks.index') }}" :active="request()->routeIs('admin.blocks.*')" />
+                    <x-menu-item title="Block View" icon="fas.th" link="{{ route('admin.block-view.index') }}" :active="request()->routeIs('admin.block-view.*')" />
                     <x-menu-item title="Relationships" icon="fas.link" link="{{ route('admin.relationships.index') }}" :active="request()->routeIs('admin.relationships.*')" />
                     <x-menu-item title="GoCardless" icon="fas.credit-card" link="{{ route('admin.gocardless.index') }}" :active="request()->routeIs('admin.gocardless.*')" />
                     <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
