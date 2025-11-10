@@ -7,9 +7,11 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$merchantInfo = $block->metadata['merchant'] ?? [];
+$merchantName = is_array($merchantInfo) ? ($merchantInfo['name'] ?? 'Unknown') : $merchantInfo;
+$category = $block->metadata['category'] ?? null;
+$address = $block->metadata['address'] ?? null;
+$logo = is_array($merchantInfo) ? ($merchantInfo['logo'] ?? null) : null;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +26,41 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
+        {{-- Merchant Display --}}
+        <div class="flex items-center gap-3">
+            @if ($logo)
+            <div class="w-12 h-12 rounded-lg overflow-hidden bg-base-300 flex-shrink-0">
+                <img src="{{ $logo }}" alt="{{ $merchantName }}" class="w-full h-full object-cover">
+            </div>
+            @else
+            <div class="w-12 h-12 rounded-lg bg-base-300 flex items-center justify-center flex-shrink-0">
+                <x-icon name="o-building-storefront" class="w-6 h-6 text-base-content/40" />
+            </div>
+            @endif
+            <div class="flex-1 min-w-0">
+                <div class="font-semibold">{{ $merchantName }}</div>
+                @if ($category)
+                <div class="badge badge-sm badge-ghost mt-1">{{ $category }}</div>
+                @endif
+            </div>
         </div>
 
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
+        @if ($address)
+        <div class="text-xs text-base-content/60">
+            <x-icon name="o-map-pin" class="w-3 h-3 inline" />
+            @if (is_array($address))
+                {{ implode(', ', array_filter([$address['short_formatted'] ?? $address['formatted'] ?? null])) }}
+            @else
+                {{ $address }}
             @endif
         </div>
+        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Merchant
             </div>
 
             <div class="flex-1"></div>
@@ -70,10 +77,10 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                         </a>
                     </li>
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ route('events.show', $block->event) }}" wire:navigate>
+                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            View Event
+                        </a>
                     </li>
                 </ul>
             </div>

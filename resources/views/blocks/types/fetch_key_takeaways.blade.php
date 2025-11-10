@@ -27,9 +27,9 @@ if (is_string($takeaways)) {
         </div>
 
         {{-- Takeaways list --}}
-        @if(count($takeaways) > 0)
+        @if (count($takeaways) > 0)
             <div class="space-y-2">
-                @foreach($takeaways as $index => $takeaway)
+                @foreach ($takeaways as $index => $takeaway)
                     <div class="flex gap-2 items-start">
                         <div class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
                             <x-icon name="o-check" class="w-4 h-4 text-primary" />
@@ -50,7 +50,7 @@ if (is_string($takeaways)) {
                 <x-icon name="o-list-bullet" class="w-3 h-3" />
                 {{ count($takeaways) }} takeaways
             </div>
-            @if(isset($block->metadata['model']))
+            @if (isset($block->metadata['model']))
                 <div class="flex items-center gap-1">
                     <x-icon name="o-cpu-chip" class="w-3 h-3" />
                     {{ $block->metadata['model'] }}

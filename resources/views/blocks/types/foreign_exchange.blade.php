@@ -7,9 +7,24 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+// Get currency amounts from metadata
+$fromCurrency = null;
+$fromAmount = null;
+$toCurrency = null;
+$toAmount = null;
+$rate = $block->metadata['rate'] ?? null;
+
+foreach($block->metadata as $key => $value) {
+    if(strlen($key) === 3 && ctype_alpha($key) && is_numeric($value)) {
+        if(!$fromCurrency) {
+            $fromCurrency = $key;
+            $fromAmount = $value / 100; // Assuming stored in smallest units
+        } else {
+            $toCurrency = $key;
+            $toAmount = $value / 100;
+        }
+    }
+}
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +39,34 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
-        </div>
-
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
+        {{-- FX Display --}}
+        <div class="flex items-center justify-center gap-3 py-2">
+            @if ($fromCurrency && $fromAmount)
+            <div class="text-center">
+                <div class="text-2xl font-bold">{{ number_format($fromAmount, 2) }}</div>
+                <div class="text-xs text-base-content/60">{{ $fromCurrency }}</div>
             </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
+            @endif
+            <x-icon name="o-arrow-right" class="w-6 h-6 text-base-content/40" />
+            @if ($toCurrency && $toAmount)
+            <div class="text-center">
+                <div class="text-2xl font-bold">{{ number_format($toAmount, 2) }}</div>
+                <div class="text-xs text-base-content/60">{{ $toCurrency }}</div>
             </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
             @endif
         </div>
+
+        @if ($rate)
+        <div class="text-center text-xs text-base-content/60">
+            Rate: {{ number_format($rate, 4) }}
+        </div>
+        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                FX
             </div>
 
             <div class="flex-1"></div>
@@ -70,10 +83,10 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                         </a>
                     </li>
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ route('events.show', $block->event) }}" wire:navigate>
+                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            View Event
+                        </a>
                     </li>
                 </ul>
             </div>

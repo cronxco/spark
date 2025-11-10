@@ -22,7 +22,7 @@ $model = $block->metadata['model'] ?? 'AI';
                 </a>
             </h3>
             <div class="flex items-center gap-2 flex-shrink-0">
-                @if(isset($block->metadata['model']))
+                @if (isset($block->metadata['model']))
                     <div class="badge badge-ghost badge-xs">{{ $block->metadata['model'] }}</div>
                 @endif
                 <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
@@ -48,7 +48,7 @@ $model = $block->metadata['model'] ?? 'AI';
                 <x-icon name="o-document-text" class="w-3 h-3" />
                 {{ $wordCount }} words
             </div>
-            @if(isset($block->metadata['generated_at']))
+            @if (isset($block->metadata['generated_at']))
                 <div class="flex items-center gap-1">
                     <x-icon name="o-clock" class="w-3 h-3" />
                     Generated {{ \Carbon\Carbon::parse($block->metadata['generated_at'])->diffForHumans() }}
@@ -82,7 +82,7 @@ $model = $block->metadata['model'] ?? 'AI';
                             Copy Summary
                         </button>
                     </li>
-                    @if($block->url)
+                    @if ($block->url)
                         <li>
                             <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
                                 <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />

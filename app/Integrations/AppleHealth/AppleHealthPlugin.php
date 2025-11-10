@@ -690,6 +690,7 @@ class AppleHealthPlugin extends WebhookPlugin
             if (array_key_exists($key, $point)) {
                 [$bVal, $bMult] = $this->encodeNumericValue($point[$key]);
                 $blocks[] = [
+                    'block_type' => $name,
                     'time' => $date,
                     'title' => $label,
                     'metadata' => [

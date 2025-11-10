@@ -27,9 +27,9 @@ if (is_string($tags)) {
         </div>
 
         {{-- Tags cloud --}}
-        @if(count($tags) > 0)
+        @if (count($tags) > 0)
             <div class="flex flex-wrap gap-2">
-                @foreach($tags as $tag)
+                @foreach ($tags as $tag)
                     @php
                         $tagText = is_string($tag) ? $tag : ($tag['name'] ?? $tag['text'] ?? '');
                         // Extract emoji if present at the start (simplified regex)
@@ -42,7 +42,7 @@ if (is_string($tags)) {
                         }
                     @endphp
                     <span class="badge badge-accent badge-lg gap-1">
-                        @if($emoji)
+                        @if ($emoji)
                             <span class="text-base">{{ $emoji }}</span>
                         @endif
                         {{ $tagName }}
@@ -59,7 +59,7 @@ if (is_string($tags)) {
                 <x-icon name="o-hashtag" class="w-3 h-3" />
                 {{ count($tags) }} tags
             </div>
-            @if(isset($block->metadata['model']))
+            @if (isset($block->metadata['model']))
                 <div class="flex items-center gap-1">
                     <x-icon name="o-cpu-chip" class="w-3 h-3" />
                     {{ $block->metadata['model'] }}

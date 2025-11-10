@@ -7,9 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$html = $block->metadata['html'] ?? null;
+$text = $block->metadata['text'] ?? null;
+$excerpt = $block->metadata['excerpt'] ?? null;
+$displayText = $excerpt ?? $text;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +25,20 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
+        {{-- Content Display --}}
+        @if ($displayText)
+        <div class="bg-base-100 rounded-lg p-3 border border-base-300 max-h-48 overflow-y-auto">
+            <p class="text-sm leading-relaxed line-clamp-10">
+                {{ $displayText }}
             </p>
         </div>
-
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
-            @endif
-        </div>
+        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="o-document-text" class="w-3 h-3" />
+                Raw Content
             </div>
 
             <div class="flex-1"></div>
@@ -69,12 +54,14 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                             View Block
                         </a>
                     </li>
+                    @if ($displayText)
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
+                        <a href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ addslashes($displayText) }}')">
                             <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                            Copy Text
+                        </a>
                     </li>
+                    @endif
                 </ul>
             </div>
         </div>

@@ -7,9 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$author = $block->metadata['author'] ?? null;
+$imageUrl = $block->metadata['image'] ?? null;
+$direction = $block->metadata['direction'] ?? null;
+$extractedAt = $block->metadata['extracted_at'] ?? null;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +25,37 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
+        {{-- Image Display --}}
+        @if ($imageUrl)
+        <div class="w-full h-32 rounded-lg overflow-hidden bg-base-300">
+            <img src="{{ $imageUrl }}"
+                 alt="{{ $block->title }}"
+                 class="w-full h-full object-cover"
+                 loading="lazy">
         </div>
+        @endif
 
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
+        {{-- Metadata Display --}}
+        <div class="space-y-2 text-sm">
+            @if ($author)
+            <div class="flex items-center gap-2">
+                <x-icon name="o-user" class="w-4 h-4 text-base-content/60" />
+                <span>{{ $author }}</span>
             </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
+            @endif
+            @if ($direction)
+            <div class="flex items-center gap-2">
+                <x-icon name="o-language" class="w-4 h-4 text-base-content/60" />
+                <span>{{ $direction }}</span>
             </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
             @endif
         </div>
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Metadata
             </div>
 
             <div class="flex-1"></div>
@@ -69,12 +71,14 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                             View Block
                         </a>
                     </li>
+                    @if ($imageUrl)
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ $imageUrl }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-photo" class="w-4 h-4" />
+                            View Image
+                        </a>
                     </li>
+                    @endif
                 </ul>
             </div>
         </div>

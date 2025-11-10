@@ -7,9 +7,9 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$time = $block->metadata['time'] ?? null;
+$timezone = $block->metadata['timezone'] ?? null;
+$isStart = str_contains(strtolower($block->title), 'start');
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -21,39 +21,29 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                     {{ $block->title }}
                 </a>
             </h3>
-            <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
+            <x-uk-date :date="$block->time" :show-time="false" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
-        </div>
-
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
+        {{-- Time Display --}}
+        @if ($time)
+        <div class="flex items-center justify-center gap-3 py-2">
+            <x-icon name="{{ $isStart ? 'o-play' : 'o-stop' }}" class="w-10 h-10 text-info" />
+            <div>
+                <div class="text-3xl font-bold">
+                    {{ \Carbon\Carbon::parse($time)->format('g:i A') }}
                 </div>
-            @endif
+                @if ($timezone)
+                <div class="text-xs text-base-content/60 mt-1">{{ $timezone }}</div>
+                @endif
+            </div>
         </div>
+        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Event Time
             </div>
 
             <div class="flex-1"></div>
@@ -69,12 +59,14 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                             View Block
                         </a>
                     </li>
+                    @if ($block->url)
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
+                            Open in Calendar
+                        </a>
                     </li>
+                    @endif
                 </ul>
             </div>
         </div>

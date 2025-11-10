@@ -7,9 +7,9 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$name = $block->metadata['name'] ?? 'Virtual Card';
+$pan = $block->metadata['card_details']['pan'] ?? $block->metadata['pan'] ?? null;
+$created = $block->metadata['created'] ?? null;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +24,33 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
+        {{-- Card Display --}}
+        <div class="bg-gradient-to-br from-primary to-primary/60 rounded-lg p-4 text-primary-content shadow-md">
+            <div class="flex items-start justify-between mb-3">
+                <x-icon name="o-credit-card" class="w-8 h-8 opacity-80" />
+                <div class="badge badge-sm bg-primary-content/20 text-primary-content border-0">Virtual</div>
+            </div>
+            <div class="space-y-2">
+                <div class="font-semibold">{{ $name }}</div>
+                @if ($pan)
+                <div class="font-mono text-sm tracking-wider">
+                    •••• •••• •••• {{ substr($pan, -4) }}
+                </div>
+                @endif
+            </div>
         </div>
 
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
-            @endif
+        @if ($created)
+        <div class="text-xs text-base-content/60 text-center">
+            Created {{ \Carbon\Carbon::parse($created)->diffForHumans() }}
         </div>
+        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Virtual Card
             </div>
 
             <div class="flex-1"></div>
@@ -70,10 +67,10 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                         </a>
                     </li>
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ route('events.show', $block->event) }}" wire:navigate>
+                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            View Event
+                        </a>
                     </li>
                 </ul>
             </div>

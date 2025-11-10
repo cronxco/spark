@@ -7,9 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$articleText = $block->metadata['article_text'] ?? '';
+$wordCount = $block->metadata['word_count'] ?? str_word_count($articleText);
+$charCount = $block->metadata['char_count'] ?? strlen($articleText);
+$model = $block->metadata['model'] ?? null;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -21,39 +22,44 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                     {{ $block->title }}
                 </a>
             </h3>
-            <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
+            <div class="flex items-center gap-2 flex-shrink-0">
+                @if ($model)
+                <div class="badge badge-ghost badge-xs">{{ $model }}</div>
+                @endif
+                <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
+            </div>
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
+        {{-- AI Content Display --}}
+        <div class="relative">
+            <div class="bg-gradient-to-br from-warning/5 to-warning/10 rounded-lg p-3 border border-warning/20 max-h-48 overflow-y-auto">
+                <p class="text-sm text-base-content/80 leading-relaxed line-clamp-10">
+                    {{ $articleText }}
+                </p>
+            </div>
+            {{-- AI Badge --}}
+            <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                <x-icon name="o-cpu-chip" class="w-3 h-3 text-warning-content" />
+            </div>
         </div>
 
         {{-- Stats --}}
         <div class="flex items-center gap-4 text-xs text-base-content/60">
             <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
+                <x-icon name="o-document-text" class="w-3 h-3" />
+                {{ number_format($wordCount) }} words
             </div>
             <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
+                <x-icon name="o-hashtag" class="w-3 h-3" />
+                {{ number_format($charCount) }} chars
             </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
-            @endif
         </div>
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Article
             </div>
 
             <div class="flex-1"></div>
@@ -70,10 +76,10 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                         </a>
                     </li>
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
+                        <a href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ addslashes($articleText) }}')">
                             <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                            Copy Text
+                        </a>
                     </li>
                 </ul>
             </div>

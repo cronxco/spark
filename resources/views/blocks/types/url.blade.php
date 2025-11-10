@@ -7,53 +7,37 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$url = $block->url ?? $block->title;
+$parsedUrl = parse_url($url);
+$domain = $parsedUrl['host'] ?? '';
+$domain = str_replace('www.', '', $domain);
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
     <div class="card-body p-4 gap-3">
-        {{-- Header: Title and Date --}}
+        {{-- Header: Domain and Date --}}
         <div class="flex items-center justify-between gap-2">
-            <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
-                <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                    {{ $block->title }}
-                </a>
-            </h3>
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <x-icon name="o-link" class="w-4 h-4 text-primary flex-shrink-0" />
+                <h3 class="font-semibold text-base leading-snug flex-1 truncate">
+                    {{ $domain }}
+                </h3>
+            </div>
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
+        {{-- URL Display --}}
         <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
-        </div>
-
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
-            @endif
+            <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" class="text-sm text-primary hover:underline break-all">
+                {{ $url }}
+            </a>
         </div>
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                {{ $displayName }}
             </div>
 
             <div class="flex-1"></div>
@@ -70,10 +54,16 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                         </a>
                     </li>
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
+                        <a href="{{ $url }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
+                            Open URL
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ addslashes($url) }}')">
                             <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                            Copy URL
+                        </a>
                     </li>
                 </ul>
             </div>

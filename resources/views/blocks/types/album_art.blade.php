@@ -7,9 +7,9 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$imageUrl = $block->media_url ?? $block->metadata['url'] ?? null;
+$trackName = $block->metadata['track'] ?? null;
+$artist = $block->metadata['artist'] ?? null;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +24,36 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
+        {{-- Album Art Display --}}
+        @if ($imageUrl)
+        <div class="w-full aspect-square rounded-lg overflow-hidden bg-base-300 shadow-md">
+            <img src="{{ $imageUrl }}"
+                 alt="{{ $block->title }}"
+                 class="w-full h-full object-cover"
+                 loading="lazy">
         </div>
+        @else
+        <div class="w-full aspect-square rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
+            <x-icon name="o-musical-note" class="w-16 h-16 text-base-content/30" />
+        </div>
+        @endif
 
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
-                </div>
+        @if ($trackName || $artist)
+        <div class="text-center text-sm text-base-content/70">
+            @if ($trackName)
+            <div class="font-medium">{{ $trackName }}</div>
+            @endif
+            @if ($artist)
+            <div class="text-xs text-base-content/60">{{ $artist }}</div>
             @endif
         </div>
+        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Album Art
             </div>
 
             <div class="flex-1"></div>
@@ -69,12 +69,22 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                             View Block
                         </a>
                     </li>
+                    @if ($block->url)
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
+                            Open in Spotify
+                        </a>
                     </li>
+                    @endif
+                    @if ($imageUrl)
+                    <li>
+                        <a href="{{ $imageUrl }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-photo" class="w-4 h-4" />
+                            View Full Image
+                        </a>
+                    </li>
+                    @endif
                 </ul>
             </div>
         </div>

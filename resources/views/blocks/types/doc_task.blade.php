@@ -7,9 +7,9 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
-$charCount = mb_strlen($summary);
-$wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
+$lineNumber = $block->metadata['line_number'] ?? null;
+$checked = $block->metadata['checked'] ?? false;
+$documentId = $block->metadata['outline_document_id'] ?? null;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -24,36 +24,34 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Tweet-style content box --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm leading-relaxed">
-                {{ $summary }}
-            </p>
-        </div>
-
-        {{-- Stats --}}
-        <div class="flex items-center gap-4 text-xs text-base-content/60">
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chat-bubble-left" class="w-3 h-3" />
-                {{ $wordCount }} words
-            </div>
-            <div class="flex items-center gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                {{ $charCount }}/280 chars
-            </div>
-            @if (isset($block->metadata['model']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-cpu-chip" class="w-3 h-3" />
-                    {{ $block->metadata['model'] }}
+        {{-- Task Display --}}
+        <div class="flex items-start gap-3 py-2">
+            <div class="flex-shrink-0 mt-1">
+                @if ($checked)
+                <div class="w-6 h-6 rounded bg-success flex items-center justify-center">
+                    <x-icon name="o-check" class="w-4 h-4 text-success-content" />
                 </div>
-            @endif
+                @else
+                <div class="w-6 h-6 rounded border-2 border-base-content/30"></div>
+                @endif
+            </div>
+            <div class="flex-1">
+                <div class="{{ $checked ? 'line-through text-base-content/50' : '' }}">
+                    {{ $block->title }}
+                </div>
+                @if ($lineNumber)
+                <div class="text-xs text-base-content/60 mt-1">
+                    Line {{ $lineNumber }}
+                </div>
+                @endif
+            </div>
         </div>
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Doc Task
             </div>
 
             <div class="flex-1"></div>
@@ -69,12 +67,14 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
                             View Block
                         </a>
                     </li>
+                    @if ($block->url)
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ addslashes($summary) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Summary
-                        </button>
+                        <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
+                            Open in Outline
+                        </a>
                     </li>
+                    @endif
                 </ul>
             </div>
         </div>
