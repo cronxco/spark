@@ -67,7 +67,7 @@ if (!$isValueBlock) {
 }
 @endphp
 
-@if($isValueBlock)
+@if ($isValueBlock)
     {{-- VALUE CARD VARIANT --}}
     <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
         <div class="card-body p-4 gap-3">
@@ -86,7 +86,7 @@ if (!$isValueBlock) {
                 <div class="text-4xl font-bold text-{{ $badgeColor }}">
                     {{ $block->formatted_value }}
                 </div>
-                @if($block->value_unit)
+                @if ($block->value_unit)
                     <div class="text-sm text-base-content/60 mt-1">
                         {{ $block->value_unit }}
                     </div>
@@ -94,13 +94,13 @@ if (!$isValueBlock) {
             </div>
 
             {{-- Metadata Preview --}}
-            @if($block->metadata && count($block->metadata) > 0)
+            @if ($block->metadata && count($block->metadata) > 0)
                 <div class="text-xs text-base-content/60 space-y-1">
                     @php
                         $displayMetadata = collect($block->metadata)->take(3);
                     @endphp
-                    @foreach($displayMetadata as $key => $value)
-                        @if(!in_array($key, ['summary', 'content', 'text', 'description', 'image', 'image_url']) && !is_array($value))
+                    @foreach ($displayMetadata as $key => $value)
+                        @if (!in_array($key, ['summary', 'content', 'text', 'description', 'image', 'image_url']) && !is_array($value))
                             <div class="flex justify-between gap-2">
                                 <span class="font-medium">{{ ucfirst(str_replace('_', ' ', $key)) }}:</span>
                                 <span class="text-right">{{ Str::limit($value, 30) }}</span>
@@ -138,7 +138,7 @@ if (!$isValueBlock) {
                                 View Event
                             </a>
                         </li>
-                        @if($block->url)
+                        @if ($block->url)
                             <li>
                                 <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
                                     <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
@@ -173,7 +173,7 @@ if (!$isValueBlock) {
             </div>
 
             {{-- Image (if available) --}}
-            @if($imageUrl)
+            @if ($imageUrl)
                 <div class="w-full h-48 rounded-lg overflow-hidden bg-base-300">
                     <img src="{{ $imageUrl }}"
                          alt="{{ $block->title }}"
@@ -183,7 +183,7 @@ if (!$isValueBlock) {
             @endif
 
             {{-- Content Preview --}}
-            @if($contentPreview)
+            @if ($contentPreview)
                 <p class="text-sm text-base-content/70 line-clamp-5 leading-relaxed">
                     {{ $contentPreview }}
                 </p>
@@ -217,7 +217,7 @@ if (!$isValueBlock) {
                                 View Event
                             </a>
                         </li>
-                        @if($block->url)
+                        @if ($block->url)
                             <li>
                                 <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
                                     <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
