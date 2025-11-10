@@ -7,7 +7,7 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
+$summary = $block->metadata['content'] ?? '';
 $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
 $model = $block->metadata['model'] ?? null;
 @endphp
@@ -22,19 +22,16 @@ $model = $block->metadata['model'] ?? null;
                 </a>
             </h3>
             <div class="flex items-center gap-2 flex-shrink-0">
-                @if ($model)
-                <div class="badge badge-ghost badge-xs">{{ $model }}</div>
-                @endif
                 <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
             </div>
         </div>
 
         {{-- AI Summary Display --}}
         <div class="relative">
-            <div class="bg-gradient-to-br from-warning/5 to-warning/10 rounded-lg p-3 border border-warning/20">
-                <p class="text-base text-base-content/80 leading-relaxed font-medium">
-                    {{ $summary }}
-                </p>
+            <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
+                <div class="text-base text-base-content/80 leading-relaxed prose prose-base max-w-none">
+                    {!! str($summary)->markdown() !!}
+                </div>
             </div>
             {{-- AI Badge --}}
             <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
@@ -48,6 +45,12 @@ $model = $block->metadata['model'] ?? null;
                 <x-icon name="o-document-text" class="w-3 h-3" />
                 {{ $wordCount }} words
             </div>
+            @if (isset($block->metadata['model']))
+            <div class="flex items-center gap-1">
+                <x-icon name="o-cpu-chip" class="w-3 h-3" />
+                {{ $block->metadata['model'] }}
+            </div>
+            @endif
         </div>
 
         {{-- Footer --}}

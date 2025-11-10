@@ -32,12 +32,8 @@ $isPositive = $direction === 'positive' || $direction === 'increase';
             <x-icon name="o-arrow-trending-down" class="w-8 h-8 text-base-content/70" />
             @endif
             <div class="text-3xl font-bold">
-                {{ $isPositive ? '+' : '-' }}£{{ number_format(abs($amount), 2) }}
+                £{{ number_format(abs($amount), 2) }}
             </div>
-        </div>
-
-        <div class="text-center text-xs text-base-content/60">
-            {{ ucfirst($direction) }}
         </div>
 
         {{-- Footer --}}

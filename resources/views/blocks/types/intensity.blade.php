@@ -28,10 +28,7 @@ $unit = $block->value_unit ?? '';
             <x-icon name="o-bolt" class="w-10 h-10 text-error" />
             <div>
                 <div class="text-4xl font-bold text-error">
-                    {{ $value }}
-                </div>
-                <div class="text-sm text-base-content/60">
-                    {{ $unit }}
+                    {{ $value }} <span class="text-base">{{ $unit }}</span>
                 </div>
             </div>
         </div>

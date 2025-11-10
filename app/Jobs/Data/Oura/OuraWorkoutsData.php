@@ -108,7 +108,7 @@ class OuraWorkoutsData extends BaseProcessingJob
         if ($duration > 0) {
             [$encodedDuration, $durationMultiplier] = $plugin->encodeNumericValue($duration);
             $event->createBlock([
-                'block_type' => 'workout_metrics',
+                'block_type' => 'workout_metric',
                 'time' => $event->time,
                 'title' => 'Duration',
                 'metadata' => ['type' => 'duration', 'field' => 'duration'],
@@ -130,7 +130,7 @@ class OuraWorkoutsData extends BaseProcessingJob
             if ($value !== null && $value != $calories) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
-                    'block_type' => 'workout_metrics',
+                    'block_type' => 'workout_metric',
                     'time' => $event->time,
                     'title' => $config['title'],
                     'metadata' => ['type' => $config['type'], 'field' => $field],
@@ -166,9 +166,9 @@ class OuraWorkoutsData extends BaseProcessingJob
 
         // Add intensity and performance metrics
         $performanceMetrics = [
-            'intensity' => ['unit' => 'intensity_level', 'title' => 'Workout Intensity'],
-            'load' => ['unit' => 'load_units', 'title' => 'Training Load'],
-            'rpe' => ['unit' => 'rpe_scale', 'title' => 'Rate of Perceived Exertion'],
+            'intensity' => ['unit' => null, 'title' => 'Workout Intensity'],
+            'load' => ['unit' => null, 'title' => 'Training Load'],
+            'rpe' => ['unit' => null, 'title' => 'Rate of Perceived Exertion'],
         ];
 
         foreach ($performanceMetrics as $field => $config) {
@@ -176,7 +176,7 @@ class OuraWorkoutsData extends BaseProcessingJob
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
-                    'block_type' => 'workout_metrics',
+                    'block_type' => 'workout_metric',
                     'time' => $event->time,
                     'title' => $config['title'],
                     'metadata' => ['type' => 'performance', 'field' => $field],
@@ -214,7 +214,7 @@ class OuraWorkoutsData extends BaseProcessingJob
         $source = $item['source'] ?? null;
         if ($source) {
             $event->createBlock([
-                'block_type' => 'workout_metrics',
+                'block_type' => 'workout_metric',
                 'time' => $event->time,
                 'title' => 'Workout Source',
                 'metadata' => ['type' => 'source'],
@@ -226,7 +226,7 @@ class OuraWorkoutsData extends BaseProcessingJob
         $labels = $item['labels'] ?? null;
         if ($labels && is_array($labels)) {
             $event->createBlock([
-                'block_type' => 'workout_metrics',
+                'block_type' => 'workout_metric',
                 'time' => $event->time,
                 'title' => 'Workout Labels',
                 'metadata' => [

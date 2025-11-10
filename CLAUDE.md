@@ -476,7 +476,7 @@ Create custom blade files in `resources/views/blocks/types/` named after the blo
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$summary = $block->metadata['summary'] ?? '';
+$summary = $block->metadata['content'] ?? '';
 $charCount = mb_strlen($summary);
 @endphp
 

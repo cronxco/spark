@@ -7,10 +7,8 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$type = $block->metadata['type'] ?? '';
-$estimated = $block->metadata['estimated'] ?? false;
-$value = $block->formatted_value ?? 0;
-$unit = $block->value_unit ?? '';
+$field = $block->metadata['field'] ?? '';
+$percentage = $block->formatted_value ?? 0;
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -25,35 +23,25 @@ $unit = $block->value_unit ?? '';
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Value Display --}}
-        <div class="text-center py-2">
-            <div class="text-4xl font-bold text-warning">
-                {{ number_format($value, 0) }}
+        {{-- Progress Display --}}
+        <div class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+                <span class="text-base-content/70"> </span>
+                <span class="font-semibold text-lg">{{ round($percentage) }}%</span>
             </div>
-            <div class="text-sm text-base-content/60 mt-1">
-                {{ $unit }}
+            <div class="w-full bg-base-300 rounded-full h-3 overflow-hidden">
+                <div
+                    class="bg-success h-full rounded-full transition-all"
+                    style="width: {{ min(100, max(0, $percentage)) }}%"
+                ></div>
             </div>
-        </div>
-
-        <div class="flex items-center justify-center gap-3 text-xs text-base-content/60">
-            @if ($type)
-            <div class="flex items-center gap-1">
-                <x-icon name="o-chart-bar" class="w-3 h-3" />
-                {{ $type }}
-            </div>
-            @endif
-            @if ($estimated)
-            <div class="badge badge-ghost badge-xs">
-                Estimated
-            </div>
-            @endif
         </div>
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-fire" class="w-3 h-3" />
-                Workout
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                {{ $displayName }}
             </div>
 
             <div class="flex-1"></div>

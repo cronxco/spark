@@ -7,10 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$html = $block->metadata['html'] ?? null;
-$text = $block->metadata['text'] ?? null;
-$excerpt = $block->metadata['excerpt'] ?? null;
-$displayText = $excerpt ?? $text;
+$type = $block->metadata['type'] ?? '';
+$field = $block->metadata['field'] ?? '';
+$seconds = $block->formatted_value ?? 0;
+$formattedDuration = format_duration($seconds);
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -25,20 +25,18 @@ $displayText = $excerpt ?? $text;
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Content Display --}}
-        @if ($displayText)
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300 max-h-48 overflow-y-auto">
-            <p class="text-sm leading-relaxed line-clamp-10">
-                {{ $displayText }}
-            </p>
+        {{-- Duration Display --}}
+        <div class="text-center py-2">
+            <div class="text-4xl font-bold text-primary">
+                {{ $formattedDuration }}
+            </div>
         </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-document-text" class="w-3 h-3" />
-                Raw Content
+                <x-icon name="{{ $icon }}" class="w-3 h-3" />
+                Sleep Stage
             </div>
 
             <div class="flex-1"></div>
@@ -54,14 +52,12 @@ $displayText = $excerpt ?? $text;
                             View Block
                         </a>
                     </li>
-                    @if ($displayText)
                     <li>
-                        <a href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ addslashes($displayText) }}')">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy Text
+                        <a href="{{ route('events.show', $block->event) }}" wire:navigate>
+                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            View Event
                         </a>
                     </li>
-                    @endif
                 </ul>
             </div>
         </div>

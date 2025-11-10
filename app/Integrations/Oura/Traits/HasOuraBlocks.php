@@ -15,7 +15,7 @@ trait HasOuraBlocks
         foreach ($contributors as $name => $value) {
             [$encodedContrib, $contribMultiplier] = $plugin->encodeNumericValue($value);
             $event->createBlock([
-                'block_type' => 'contributors',
+                'block_type' => 'contributor',
                 'time' => $event->time,
                 'integration_id' => $event->integration_id,
                 'title' => ucwords(str_replace('_', ' ', $name)),
@@ -37,7 +37,7 @@ trait HasOuraBlocks
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
-                    'block_type' => 'activity_metrics',
+                    'block_type' => 'activity_metric',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
                     'title' => $config['title'],
@@ -64,7 +64,7 @@ trait HasOuraBlocks
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
-                    'block_type' => 'sleep_stages',
+                    'block_type' => 'sleep_stage',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
                     'title' => $config['title'],
@@ -90,7 +90,7 @@ trait HasOuraBlocks
             $value = $item[$field] ?? null;
             if ($value) {
                 $event->createBlock([
-                    'block_type' => 'sleep_stages',
+                    'block_type' => 'sleep_stage',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
                     'title' => $title,
@@ -173,7 +173,7 @@ trait HasOuraBlocks
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
-                    'block_type' => 'workout_metrics',
+                    'block_type' => 'workout_metric',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
                     'title' => $config['title'],

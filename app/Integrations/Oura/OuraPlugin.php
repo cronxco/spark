@@ -215,7 +215,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     public static function getBlockTypes(): array
     {
         return [
-            'activity_metrics' => [
+            'activity_metric' => [
                 'icon' => 'o-chart-bar',
                 'display_name' => 'Activity Metrics',
                 'description' => 'Detailed activity measurements and statistics',
@@ -223,7 +223,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'various',
                 'hidden' => false,
             ],
-            'sleep_stages' => [
+            'sleep_stage' => [
                 'icon' => 'o-clock',
                 'display_name' => 'Sleep Stages',
                 'description' => 'Sleep stage duration information',
@@ -240,7 +240,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_unit' => 'bpm',
                 'hidden' => false,
             ],
-            'contributors' => [
+            'contributor' => [
                 'icon' => 'o-puzzle-piece',
                 'display_name' => 'Score Contributors',
                 'description' => 'Individual components contributing to daily scores',
@@ -249,7 +249,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
                 'hidden' => false,
             ],
-            'workout_metrics' => [
+            'workout_metric' => [
                 'icon' => 'o-fire',
                 'display_name' => 'Workout Metrics',
                 'description' => 'Detailed workout measurements',
@@ -730,16 +730,16 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'resilience_level' => [
                 'field_name' => 'level',
                 'mappings' => [
-                    'exceptional' => 5,  // Fixed: API uses 'exceptional' not 'excellent'
-                    'strong' => 4,       // Fixed: API includes 'strong' level
-                    'solid' => 3,        // Fixed: Moved from 4 to 3
-                    'adequate' => 2,     // Fixed: Moved from 3 to 2
-                    'limited' => 1,      // Fixed: Moved from 2 to 1
+                    'exceptional' => 5,
+                    'strong' => 4,
+                    'solid' => 3,
+                    'adequate' => 2,
+                    'limited' => 1,
                     null => 0,
                 ],
                 'display_mappings' => [
-                    5 => 'Exceptional',  // Fixed: Updated display text
-                    4 => 'Strong',       // Fixed: New level
+                    5 => 'Exceptional',
+                    4 => 'Strong',
                     3 => 'Solid',
                     2 => 'Adequate',
                     1 => 'Limited',
@@ -818,8 +818,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'label' => 'Daily SpO2',
                 'schema' => self::getConfigurationSchema(),
             ],
-
-            // New API v2 endpoints
             'cardiovascular_age' => [
                 'label' => 'Cardiovascular Age',
                 'schema' => self::getConfigurationSchema(),
@@ -1065,7 +1063,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             return;
         }
 
-        // New API v2 endpoints
         if ($type === 'cardiovascular_age') {
             $this->fetchCardiovascularAge($integration, $startDate, $endDate);
 
@@ -1421,10 +1418,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         foreach ($contributors as $name => $value) {
             [$encodedContrib, $contribMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
             $event->createBlock([
-                'block_type' => 'contributors',
+                'block_type' => 'contributor',
                 'time' => $event->time,
                 'title' => Str::title(str_replace('_', ' ', (string) $name)),
-                'metadata' => ['type' => 'contributor', 'field' => $name],
+                'metadata' => ['field' => $name],
                 'value' => $encodedContrib,
                 'value_multiplier' => $contribMultiplier,
                 'value_unit' => $options['contributors_value_unit'] ?? $options['value_unit'] ?? 'score',
@@ -1448,10 +1445,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 $value = $item[$field];
                 [$encodedDetail, $detailMultiplier] = $this->encodeNumericValue(is_numeric($value) ? (float) $value : null);
                 $event->createBlock([
-                    'block_type' => 'activity_metrics',
+                    'block_type' => $field,
                     'time' => $event->time,
                     'title' => $label,
-                    'metadata' => ['type' => 'detail', 'field' => $field],
+                    'metadata' => ['field' => $field],
                     'value' => $encodedDetail,
                     'value_multiplier' => $detailMultiplier,
                     'value_unit' => $unitMap[$field] ?? null,
@@ -1509,10 +1506,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         [$encodedCalories, $calMultiplier] = $this->encodeNumericValue($calories);
         $event->createBlock([
-            'block_type' => 'workout_metrics',
+            'block_type' => 'workout_metric',
             'time' => $event->time,
             'title' => 'Calories',
-            'metadata' => ['type' => 'calorie_burn', 'estimated' => true],
+            'metadata' => [],
             'value' => $encodedCalories,
             'value_multiplier' => $calMultiplier,
             'value_unit' => 'kcal',
@@ -1525,7 +1522,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'title' => 'Average Heart Rate',
-                'metadata' => ['type' => 'average', 'context' => 'workout'],
+                'metadata' => [],
                 'value' => $encodedAvgHr,
                 'value_multiplier' => $avgHrMultiplier,
                 'value_unit' => 'bpm',
@@ -2337,7 +2334,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'target_id' => $target->id,
             ]);
 
-            // Use actual API field names (not sleep_stages array)
             $sleepStages = [
                 'deep_sleep_duration' => 'Deep Sleep',
                 'light_sleep_duration' => 'Light Sleep',
@@ -2350,11 +2346,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                     continue;
                 }
                 $event->createBlock([
-                    'block_type' => 'sleep_stages',
+                    'block_type' => 'sleep_stage',
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => $title,
-                    'metadata' => ['type' => 'stage_duration', 'field' => $field],
+                    'metadata' => ['field' => $field],
                     'value' => (int) $seconds,
                     'value_multiplier' => 1,
                     'value_unit' => 'seconds',
@@ -2369,7 +2365,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                     'time' => $event->time,
                     'integration_id' => $integration->id,
                     'title' => 'Average Heart Rate',
-                    'metadata' => ['type' => 'average', 'context' => 'sleep'],
+                    'metadata' => [],
                     'value' => $encodedHrAvg,
                     'value_multiplier' => $hrAvgMultiplier,
                     'value_unit' => 'bpm',
@@ -2600,7 +2596,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'title' => 'Min Heart Rate',
-                'metadata' => ['type' => 'minimum', 'context' => 'daily_series'],
+                'metadata' => [],
                 'value' => $encMin,
                 'value_multiplier' => $minMult,
                 'value_unit' => 'bpm',
@@ -2611,7 +2607,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'title' => 'Max Heart Rate',
-                'metadata' => ['type' => 'maximum', 'context' => 'daily_series'],
+                'metadata' => [],
                 'value' => $encMax,
                 'value_multiplier' => $maxMult,
                 'value_unit' => 'bpm',
@@ -2621,7 +2617,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'block_type' => 'heart_rate',
                 'time' => $event->time,
                 'title' => 'Data Points',
-                'metadata' => ['type' => 'count', 'context' => 'daily_series'],
+                'metadata' => [],
                 'value' => (int) $points->count(),
                 'value_multiplier' => 1,
                 'value_unit' => 'count',
@@ -2676,7 +2672,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'block_type' => 'biometrics',
                 'time' => $event->time,
                 'title' => 'State',
-                'metadata' => ['type' => 'mood_state', 'value' => (string) $state],
+                'metadata' => ['value' => (string) $state],
                 'content' => (string) $state,
                 'value' => null,
                 'value_multiplier' => 1,
@@ -3276,7 +3272,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 continue;
             }
             $event->createBlock([
-                'block_type' => 'sleep_stages',
+                'block_type' => 'sleep_stage',
                 'time' => $event->time,
                 'integration_id' => $integration->id,
                 'title' => $title,

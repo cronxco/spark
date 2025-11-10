@@ -139,7 +139,7 @@ class OuraActivityData extends BaseProcessingJob
         if ($inactivityAlerts !== null) {
             [$encodedAlerts, $alertsMultiplier] = $plugin->encodeNumericValue($inactivityAlerts);
             $event->createBlock([
-                'block_type' => 'activity_metrics',
+                'block_type' => 'activity_metric',
                 'time' => $event->time,
                 'integration_id' => $this->integration->id,
                 'title' => 'Inactivity Alerts',
@@ -154,7 +154,7 @@ class OuraActivityData extends BaseProcessingJob
         $class5Min = $item['class_5_min'] ?? null;
         if ($class5Min && is_array($class5Min)) {
             $event->createBlock([
-                'block_type' => 'activity_metrics',
+                'block_type' => 'activity_metric',
                 'time' => $event->time,
                 'integration_id' => $this->integration->id,
                 'title' => '5-Minute Activity Classification',
@@ -174,7 +174,7 @@ class OuraActivityData extends BaseProcessingJob
         $met = $item['met'] ?? null;
         if ($met && is_array($met)) {
             $event->createBlock([
-                'block_type' => 'activity_metrics',
+                'block_type' => 'activity_metric',
                 'time' => $event->time,
                 'integration_id' => $this->integration->id,
                 'title' => 'MET Time Series',

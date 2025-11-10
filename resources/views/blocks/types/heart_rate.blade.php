@@ -28,20 +28,10 @@ $bpm = round($block->formatted_value ?? 0);
             <x-icon name="o-heart" class="w-12 h-12 text-error animate-pulse" />
             <div>
                 <div class="text-4xl font-bold text-error">
-                    {{ $bpm }}
-                </div>
-                <div class="text-sm text-base-content/60">
-                    bpm
+                    {{ $bpm }} <span class="text-base">bpm</span>
                 </div>
             </div>
         </div>
-
-        @if ($context)
-        <div class="flex items-center justify-center gap-2 text-xs text-base-content/60">
-            <x-icon name="o-information-circle" class="w-3 h-3" />
-            {{ ucfirst($context) }}
-        </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">

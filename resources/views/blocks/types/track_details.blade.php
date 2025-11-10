@@ -30,13 +30,13 @@ $popularity = $block->metadata['popularity'] ?? $block->formatted_value ?? 0;
         <div class="space-y-2">
             <div>
                 <div class="font-semibold">{{ $trackName }}</div>
-                @if (!empty($artists))
-                <div class="text-sm text-base-content/70">
-                    {{ is_array($artists) ? implode(', ', $artists) : $artists }}
-                </div>
-                @endif
                 @if ($album)
                 <div class="text-xs text-base-content/60">{{ $album }}</div>
+                @endif
+                @if (!empty($artists))
+                <div class="text-sm text-base-content/70 clamp-2">
+                    {{ is_array($artists) ? implode(', ', $artists) : $artists }}
+                </div>
                 @endif
             </div>
 
@@ -49,8 +49,7 @@ $popularity = $block->metadata['popularity'] ?? $block->formatted_value ?? 0;
                 <div class="w-full bg-base-300 rounded-full h-2 overflow-hidden">
                     <div
                         class="bg-success h-full rounded-full transition-all"
-                        style="width: {{ $popularity }}%"
-                    ></div>
+                        style="width: {{ $popularity }}%"></div>
                 </div>
             </div>
 

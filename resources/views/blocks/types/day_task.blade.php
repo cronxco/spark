@@ -18,7 +18,7 @@ $documentId = $block->metadata['outline_document_id'] ?? null;
         <div class="flex items-center justify-between gap-2">
             <h3 class="font-semibold text-base leading-snug flex-1 line-clamp-1">
                 <a href="{{ route('blocks.show', $block) }}" wire:navigate class="hover:underline">
-                    {{ $block->title }}
+                    {!! Str::of($block->title)->markdown()->trim() !!}
                 </a>
             </h3>
             <x-uk-date :date="$block->time" :show-time="false" class="text-xs flex-shrink-0" />
@@ -37,7 +37,7 @@ $documentId = $block->metadata['outline_document_id'] ?? null;
             </div>
             <div class="flex-1">
                 <div class="{{ $checked ? 'line-through text-base-content/50' : '' }}">
-                    {{ $block->title }}
+                    {!! Str::of($block->title)->markdown()->trim() !!}
                 </div>
                 @if ($lineNumber)
                 <div class="text-xs text-base-content/60 mt-1">

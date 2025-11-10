@@ -8,7 +8,7 @@ $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $name = $block->metadata['name'] ?? 'Virtual Card';
-$pan = $block->metadata['card_details']['pan'] ?? $block->metadata['pan'] ?? null;
+$pan = $block->metadata['card_details']['last_digits'] ?? $block->metadata['last_digits'] ?? null;
 $created = $block->metadata['created'] ?? null;
 @endphp
 
@@ -39,12 +39,6 @@ $created = $block->metadata['created'] ?? null;
                 @endif
             </div>
         </div>
-
-        @if ($created)
-        <div class="text-xs text-base-content/60 text-center">
-            Created {{ \Carbon\Carbon::parse($created)->diffForHumans() }}
-        </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">

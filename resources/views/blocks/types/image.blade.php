@@ -48,7 +48,7 @@ $subreddit = $block->metadata['subreddit'] ?? null;
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
                 <x-icon name="{{ $icon }}" class="w-3 h-3" />
-                {{ $displayName }}
+                {{ $displayName }} Image
             </div>
 
             <div class="flex-1"></div>

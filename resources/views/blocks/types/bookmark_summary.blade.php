@@ -7,7 +7,7 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$summary = $block->metadata['summary'] ?? '';
+$summary = $block->metadata['content'] ?? '';
 $wordCount = str_word_count($summary);
 $model = $block->metadata['model'] ?? 'AI';
 @endphp
@@ -23,22 +23,22 @@ $model = $block->metadata['model'] ?? 'AI';
             </h3>
             <div class="flex items-center gap-2 flex-shrink-0">
                 @if (isset($block->metadata['model']))
-                    <div class="badge badge-ghost badge-xs">{{ $block->metadata['model'] }}</div>
+                <div class="badge badge-ghost badge-xs">{{ $block->metadata['model'] }}</div>
                 @endif
                 <x-uk-date :date="$block->time" :show-time="true" class="text-xs" />
             </div>
         </div>
 
-        {{-- Summary content with gradient effect --}}
+        {{-- AI Summary Display --}}
         <div class="relative">
-            <div class="bg-gradient-to-br from-warning/5 to-warning/10 rounded-lg p-3 border border-warning/20">
+            <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
                 <p class="text-sm text-base-content/80 leading-relaxed">
                     {{ $summary }}
                 </p>
             </div>
-            {{-- AI indicator corner badge --}}
+            {{-- AI Badge --}}
             <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                <x-icon name="o-cpu-chip" class="w-3 h-3 text-warning-content" />
+                <x-icon name="o-sparkles" class="w-3 h-3 text-warning-content" />
             </div>
         </div>
 
@@ -49,10 +49,10 @@ $model = $block->metadata['model'] ?? 'AI';
                 {{ $wordCount }} words
             </div>
             @if (isset($block->metadata['generated_at']))
-                <div class="flex items-center gap-1">
-                    <x-icon name="o-clock" class="w-3 h-3" />
-                    Generated {{ \Carbon\Carbon::parse($block->metadata['generated_at'])->diffForHumans() }}
-                </div>
+            <div class="flex items-center gap-1">
+                <x-icon name="o-clock" class="w-3 h-3" />
+                Generated {{ \Carbon\Carbon::parse($block->metadata['generated_at'])->diffForHumans() }}
+            </div>
             @endif
         </div>
 
@@ -83,12 +83,12 @@ $model = $block->metadata['model'] ?? 'AI';
                         </button>
                     </li>
                     @if ($block->url)
-                        <li>
-                            <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
-                                <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
-                                Open URL
-                            </a>
-                        </li>
+                    <li>
+                        <a href="{{ $block->url }}" target="_blank" rel="noopener noreferrer">
+                            <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
+                            Open URL
+                        </a>
+                    </li>
                     @endif
                 </ul>
             </div>

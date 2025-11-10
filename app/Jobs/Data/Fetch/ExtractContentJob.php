@@ -72,23 +72,7 @@ class ExtractContentJob implements ShouldQueue
                 }
             }
 
-            // Create Block 2: Article Text (only if we have an event)
-            if ($this->event) {
-                $this->event->createBlock([
-                    'title' => 'Article Text',
-                    'block_type' => 'fetch_article_text',
-                    'time' => $this->event->time,
-                    'metadata' => [
-                        'article_text' => $articleText,
-                        'word_count' => str_word_count($articleText),
-                        'char_count' => strlen($articleText),
-                        'generated_at' => now()->toIso8601String(),
-                        'model' => 'gpt-5-nano',
-                    ],
-                ]);
-            }
-
-            // Store extracted content in webpage EventObject content field
+            // Store extracted markdown content in webpage EventObject content field
             $this->webpage->content = $articleText;
             $this->webpage->save();
 
@@ -175,16 +159,24 @@ class ExtractContentJob implements ShouldQueue
         }
 
         $systemPrompt = <<<'PROMPT'
-You are an intelligent content extractor. Given an article title and raw content, extract and return the clean article text.
+You are an intelligent content extractor. Given an article title and raw content, extract and return the clean article text formatted in Markdown.
+
+**IMPORTANT**: Your output MUST be formatted in Markdown with appropriate formatting (headings, bold, italic, links, lists, quotes, code blocks, etc.) to enhance readability.
 
 Requirements:
 1. Remove navigation, ads, footers, cookie notices, and other non-article content
 2. Preserve the complete article text including all paragraphs
-3. Maintain proper formatting and structure
+3. Format the content using proper Markdown syntax:
+   - Use # ## ### for headings
+   - Use **bold** and *italic* for emphasis
+   - Use > for blockquotes
+   - Use - or * for unordered lists, 1. 2. 3. for ordered lists
+   - Use [text](url) for links
+   - Use `code` for inline code, ``` for code blocks
 4. Keep all important content intact
-5. Return only the clean article text as a plain string (not JSON)
+5. Return only the clean article text as Markdown (not JSON)
 
-The output should be the full, clean article text that a reader would want to read.
+The output should be the full, clean article text in Markdown format that a reader would want to read.
 PROMPT;
 
         try {

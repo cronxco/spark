@@ -9,8 +9,8 @@ $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->e
 
 $type = $block->metadata['type'] ?? '';
 $field = $block->metadata['field'] ?? '';
-$seconds = $block->formatted_value ?? 0;
-$formattedDuration = format_duration($seconds);
+$value = $block->formatted_value ?? 0;
+$unit = $block->value_unit ?? '';
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -25,30 +25,21 @@ $formattedDuration = format_duration($seconds);
             <x-uk-date :date="$block->time" :show-time="true" class="text-xs flex-shrink-0" />
         </div>
 
-        {{-- Duration Display --}}
+        {{-- Value Display --}}
         <div class="text-center py-2">
-            <div class="text-4xl font-bold text-primary">
-                {{ $formattedDuration }}
+            <div class="text-4xl font-bold text-accent">
+                {{ number_format($value, 2) }}
             </div>
-            @if ($type)
             <div class="text-sm text-base-content/60 mt-1">
-                {{ $type }}
+                {{ $unit }}
             </div>
-            @endif
         </div>
-
-        @if ($field)
-        <div class="flex items-center justify-center gap-2 text-xs text-base-content/60">
-            <x-icon name="o-moon" class="w-3 h-3" />
-            {{ $field }}
-        </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
                 <x-icon name="{{ $icon }}" class="w-3 h-3" />
-                Sleep Stage
+                Activity
             </div>
 
             <div class="flex-1"></div>

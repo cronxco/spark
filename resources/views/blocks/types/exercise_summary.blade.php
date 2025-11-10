@@ -30,9 +30,8 @@ $formula = $block->metadata['volume_formula'] ?? null;
         <div class="text-center py-2">
             <div class="text-sm text-base-content/60 mb-1">Total Volume</div>
             <div class="text-4xl font-bold text-warning">
-                {{ number_format($totalVolume, 0) }}
+                {{ number_format($totalVolume, 0) }} <span class="text-base">{{ $unit }}</span>
             </div>
-            <div class="text-sm text-base-content/60 mt-1">{{ $unit }}</div>
         </div>
 
         <div class="flex items-center justify-center gap-4 text-xs text-base-content/60">
@@ -40,12 +39,6 @@ $formula = $block->metadata['volume_formula'] ?? null;
             <div class="flex items-center gap-1">
                 <x-icon name="o-squares-2x2" class="w-3 h-3" />
                 {{ $setsCount }} sets
-            </div>
-            @endif
-            @if ($formula)
-            <div class="flex items-center gap-1">
-                <x-icon name="o-calculator" class="w-3 h-3" />
-                {{ $formula }}
             </div>
             @endif
         </div>

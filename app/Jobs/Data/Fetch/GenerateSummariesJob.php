@@ -125,12 +125,14 @@ class GenerateSummariesJob implements ShouldQueue
         $systemPrompt = <<<'PROMPT'
 You are an intelligent content summarizer. Given an article title and clean article text, provide exactly 7 different outputs in JSON.
 
+**IMPORTANT**: All text outputs MUST be formatted in Markdown. Use appropriate formatting (bold, italic, links, lists) to enhance readability.
+
 Requirements:
-1. summary_tweet: 280 characters maximum, ultra-concise, engaging
-2. summary_short: No more than 40 words, concise overview
-3. summary_paragraph: No more than 150 words, detailed overview with key points
-4. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight
-5. tldr: Single sentence (max 20 words), absolute minimum summary
+1. summary_tweet: 280 characters maximum, ultra-concise, engaging (Markdown formatted)
+2. summary_short: No more than 40 words, concise overview (Markdown formatted)
+3. summary_paragraph: No more than 150 words, detailed overview with key points (Markdown formatted)
+4. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight (can include bold, links)
+5. tldr: Single sentence (max 20 words), absolute minimum summary (Markdown formatted)
 6. emoji: Single emoji that best represents the article's theme or content
 7. tags: Array of 1-5 semantic tags with types. Only include tags that are clearly relevant and mentioned in the content:
    - "topic-tag" for subjects/themes (e.g., "Machine Learning", "Climate Change")
@@ -140,11 +142,11 @@ Requirements:
 
 Return ONLY valid JSON in this exact format:
 {
-  "summary_tweet": "280 char version here",
-  "summary_short": "40 word version here",
-  "summary_paragraph": "150 word version here",
-  "key_takeaways": ["point 1", "point 2", "point 3"],
-  "tldr": "One sentence version here",
+  "summary_tweet": "**Markdown formatted** 280 char version here",
+  "summary_short": "Markdown formatted 40 word version here",
+  "summary_paragraph": "Markdown formatted 150 word version here with **bold** and *italic*",
+  "key_takeaways": ["**Bold point 1** with details", "Point 2 with [link](url)", "Point 3"],
+  "tldr": "Markdown formatted one sentence version here",
   "emoji": "📰",
   "tags": [
     {"tag": "Artificial Intelligence", "tag_type": "topic-tag"},
@@ -201,99 +203,80 @@ PROMPT;
     {
         $eventTime = $this->event->time;
 
-        // Block 3: Metadata
-        $this->event->createBlock([
-            'title' => 'Metadata',
-            'block_type' => 'fetch_metadata',
-            'time' => $eventTime,
-            'metadata' => [
-                'author' => $this->extracted['author'],
-                'image' => $this->extracted['image'],
-                'direction' => $this->extracted['direction'],
-                'extracted_at' => now()->toIso8601String(),
-            ],
-        ]);
+        // Store metadata on webpage EventObject instead of as block
+        $webpageMetadata = $this->webpage->metadata ?? [];
+        $webpageMetadata['author'] = $this->extracted['author'];
+        $webpageMetadata['image_url'] = $this->extracted['image'];
+        $webpageMetadata['direction'] = $this->extracted['direction'];
+        $webpageMetadata['extracted_at'] = now()->toIso8601String();
+        $this->webpage->update(['metadata' => $webpageMetadata]);
 
-        // Block 4: Tweet Summary
+        // Block 1: Tweet Summary
         $this->event->createBlock([
             'title' => 'Tweet Summary',
             'block_type' => 'fetch_summary_tweet',
             'time' => $eventTime,
             'metadata' => [
-                'summary' => $summaries['summary_tweet'],
+                'content' => $summaries['summary_tweet'],
                 'char_count' => strlen($summaries['summary_tweet']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 5: Short Summary
+        // Block 2: Short Summary
         $this->event->createBlock([
             'title' => 'Short Summary',
             'block_type' => 'fetch_summary_short',
             'time' => $eventTime,
             'metadata' => [
-                'summary' => $summaries['summary_short'],
+                'content' => $summaries['summary_short'],
                 'word_count' => str_word_count($summaries['summary_short']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 6: Paragraph Summary
+        // Block 3: Paragraph Summary
         $this->event->createBlock([
             'title' => 'Paragraph Summary',
             'block_type' => 'fetch_summary_paragraph',
             'time' => $eventTime,
             'metadata' => [
-                'summary' => $summaries['summary_paragraph'],
+                'content' => $summaries['summary_paragraph'],
                 'word_count' => str_word_count($summaries['summary_paragraph']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 7: Key Takeaways
+        // Block 4: Key Takeaways
         $this->event->createBlock([
             'title' => 'Key Takeaways',
             'block_type' => 'fetch_key_takeaways',
             'time' => $eventTime,
             'metadata' => [
-                'takeaways' => $summaries['key_takeaways'],
+                'content' => $summaries['key_takeaways'],
                 'count' => count($summaries['key_takeaways']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 8: TL;DR
+        // Block 5: TL;DR
         $this->event->createBlock([
             'title' => 'TL;DR',
             'block_type' => 'fetch_tldr',
             'time' => $eventTime,
             'metadata' => [
-                'summary' => $summaries['tldr'],
+                'content' => $summaries['tldr'],
                 'word_count' => str_word_count($summaries['tldr']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => 'gpt-5-nano',
             ],
         ]);
 
-        // Block 9: Tags
-        $this->event->createBlock([
-            'title' => 'Tags',
-            'block_type' => 'fetch_tags',
-            'time' => $eventTime,
-            'metadata' => [
-                'emoji' => $summaries['emoji'] ?? null,
-                'tags' => $summaries['tags'] ?? [],
-                'tag_count' => count($summaries['tags'] ?? []),
-                'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
-            ],
-        ]);
-
-        Log::info('Fetch: Created 7 summary blocks for event', [
+        Log::info('Fetch: Created 5 summary blocks for event', [
             'event_id' => $this->event->id,
         ]);
     }
@@ -386,129 +369,84 @@ PROMPT;
             'event_ids' => $events->pluck('id')->toArray(),
         ]);
 
-        // Attach all 9 blocks to each event
+        // Store metadata on webpage EventObject instead of as blocks
+        $webpageMetadata = $this->webpage->metadata ?? [];
+        $webpageMetadata['author'] = $this->extracted['author'];
+        $webpageMetadata['image_url'] = $this->extracted['image'];
+        $webpageMetadata['direction'] = $this->extracted['direction'];
+        $webpageMetadata['extracted_at'] = now()->toIso8601String();
+        $this->webpage->update(['metadata' => $webpageMetadata]);
+
+        // Attach 5 summary blocks to each event
         foreach ($events as $event) {
             $eventTime = $event->time;
 
-            // Block 1: Raw Content
-            $event->createBlock([
-                'title' => 'Raw Content',
-                'block_type' => 'fetch_content',
-                'time' => $eventTime,
-                'metadata' => [
-                    'html' => $this->extracted['content'],
-                    'text' => $this->extracted['text_content'],
-                    'excerpt' => $this->extracted['excerpt'],
-                ],
-            ]);
-
-            // Block 2: Article Text
-            $event->createBlock([
-                'title' => 'Article Text',
-                'block_type' => 'fetch_article_text',
-                'time' => $eventTime,
-                'metadata' => [
-                    'article_text' => $this->articleText,
-                    'word_count' => str_word_count($this->articleText),
-                    'char_count' => strlen($this->articleText),
-                    'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
-                ],
-            ]);
-
-            // Block 3: Metadata
-            $event->createBlock([
-                'title' => 'Metadata',
-                'block_type' => 'fetch_metadata',
-                'time' => $eventTime,
-                'metadata' => [
-                    'author' => $this->extracted['author'],
-                    'image' => $this->extracted['image'],
-                    'direction' => $this->extracted['direction'],
-                    'extracted_at' => now()->toIso8601String(),
-                ],
-            ]);
-
-            // Block 4: Tweet Summary
+            // Block 1: Tweet Summary
             $event->createBlock([
                 'title' => 'Tweet Summary',
                 'block_type' => 'fetch_summary_tweet',
                 'time' => $eventTime,
                 'metadata' => [
-                    'summary' => $summaries['summary_tweet'],
+                    'content' => $summaries['summary_tweet'],
                     'char_count' => strlen($summaries['summary_tweet']),
                     'generated_at' => now()->toIso8601String(),
                     'model' => 'gpt-5-nano',
                 ],
             ]);
 
-            // Block 5: Short Summary
+            // Block 2: Short Summary
             $event->createBlock([
                 'title' => 'Short Summary',
                 'block_type' => 'fetch_summary_short',
                 'time' => $eventTime,
                 'metadata' => [
-                    'summary' => $summaries['summary_short'],
+                    'content' => $summaries['summary_short'],
                     'word_count' => str_word_count($summaries['summary_short']),
                     'generated_at' => now()->toIso8601String(),
                     'model' => 'gpt-5-nano',
                 ],
             ]);
 
-            // Block 6: Paragraph Summary
+            // Block 3: Paragraph Summary
             $event->createBlock([
                 'title' => 'Paragraph Summary',
                 'block_type' => 'fetch_summary_paragraph',
                 'time' => $eventTime,
                 'metadata' => [
-                    'summary' => $summaries['summary_paragraph'],
+                    'content' => $summaries['summary_paragraph'],
                     'word_count' => str_word_count($summaries['summary_paragraph']),
                     'generated_at' => now()->toIso8601String(),
                     'model' => 'gpt-5-nano',
                 ],
             ]);
 
-            // Block 7: Key Takeaways
+            // Block 4: Key Takeaways
             $event->createBlock([
                 'title' => 'Key Takeaways',
                 'block_type' => 'fetch_key_takeaways',
                 'time' => $eventTime,
                 'metadata' => [
-                    'takeaways' => $summaries['key_takeaways'],
+                    'content' => $summaries['key_takeaways'],
                     'count' => count($summaries['key_takeaways']),
                     'generated_at' => now()->toIso8601String(),
                     'model' => 'gpt-5-nano',
                 ],
             ]);
 
-            // Block 8: TL;DR
+            // Block 5: TL;DR
             $event->createBlock([
                 'title' => 'TL;DR',
                 'block_type' => 'fetch_tldr',
                 'time' => $eventTime,
                 'metadata' => [
-                    'summary' => $summaries['tldr'],
+                    'content' => $summaries['tldr'],
                     'word_count' => str_word_count($summaries['tldr']),
                     'generated_at' => now()->toIso8601String(),
                     'model' => 'gpt-5-nano',
                 ],
             ]);
 
-            // Block 9: Tags
-            $event->createBlock([
-                'title' => 'Tags',
-                'block_type' => 'fetch_tags',
-                'time' => $eventTime,
-                'metadata' => [
-                    'emoji' => $summaries['emoji'] ?? null,
-                    'tags' => $summaries['tags'] ?? [],
-                    'tag_count' => count($summaries['tags'] ?? []),
-                    'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
-                ],
-            ]);
-
-            Log::info('Fetch: Attached 9 blocks to source event', [
+            Log::info('Fetch: Attached 5 summary blocks to source event', [
                 'event_id' => $event->id,
             ]);
         }

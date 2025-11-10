@@ -33,7 +33,7 @@ $amount = $block->formatted_value ?? 0;
             </div>
             @if ($sortCode || $accountNumber)
             <div class="flex items-center justify-between text-xs text-base-content/60">
-                <div>Account</div>
+                <div> </div>
                 <div class="font-mono">
                     @if ($sortCode){{ $sortCode }}@endif
                     @if ($sortCode && $accountNumber) • @endif
@@ -42,7 +42,7 @@ $amount = $block->formatted_value ?? 0;
             </div>
             @endif
             <div class="flex items-center justify-between pt-2 border-t border-base-300">
-                <div class="text-sm text-base-content/70">Amount</div>
+                <div class="text-sm text-base-content/70"> </div>
                 <div class="text-2xl font-bold">£{{ number_format($amount, 2) }}</div>
             </div>
         </div>

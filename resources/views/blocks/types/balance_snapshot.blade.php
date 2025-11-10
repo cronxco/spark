@@ -26,20 +26,10 @@ $amount = $block->formatted_value ?? 0;
 
         {{-- Balance Display --}}
         <div class="text-center py-3">
-            <div class="text-sm text-base-content/60 mb-1">
-                {{ $balanceType }}
-            </div>
             <div class="text-4xl font-bold text-primary">
                 £{{ number_format($amount, 2) }}
             </div>
         </div>
-
-        @if ($referenceDate)
-        <div class="flex items-center justify-center gap-2 text-xs text-base-content/60">
-            <x-icon name="o-calendar" class="w-3 h-3" />
-            {{ \Carbon\Carbon::parse($referenceDate)->format('d M Y') }}
-        </div>
-        @endif
 
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
