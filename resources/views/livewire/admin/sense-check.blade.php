@@ -41,7 +41,6 @@ new class extends Component
         'invalid_integrations' => false,
         'plugin_config_issues' => false,
         'data_consistency_issues' => false,
-        'block_custom_layouts' => false,
     ];
 
     public function mount(): void
@@ -80,7 +79,7 @@ new class extends Component
     public function getUnknownServicesProperty(): array
     {
         $servicesInDb = array_keys($this->dbActionsByService);
-        $servicesInPlugins = PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()->all();
+        $servicesInPlugins = PluginRegistry::getAllPlugins()->map(fn($c) => $c::getIdentifier())->values()->all();
 
         return array_values(array_diff($servicesInDb, $servicesInPlugins));
     }
@@ -179,7 +178,7 @@ new class extends Component
         // Integrations with unknown services
         $unknownServices = Integration::whereNotIn(
             'service',
-            PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
+            PluginRegistry::getAllPlugins()->map(fn($c) => $c::getIdentifier())->values()
         )->get();
 
         if ($unknownServices->count() > 0) {
@@ -238,7 +237,6 @@ new class extends Component
                 if (! method_exists($pluginClass, 'getAccentColor')) {
                     $pluginIssues[] = 'Missing getAccentColor method';
                 }
-
             } catch (\Exception $e) {
                 $pluginIssues[] = 'Exception during validation: ' . $e->getMessage();
             }
@@ -311,59 +309,6 @@ new class extends Component
     }
 
     /**
-     * Get block types with custom card layouts information
-     *
-     * @return array<int, array{service: string, block_type: string, display_name: string, has_custom_layout: bool, block_count: int, is_high_volume: bool}>
-     */
-    public function getBlockCustomLayoutsProperty(): array
-    {
-        $results = [];
-
-        // Get all block types from plugins
-        foreach (PluginRegistry::getAllPlugins() as $identifier => $pluginClass) {
-            $blockTypes = $pluginClass::getBlockTypes();
-
-            foreach ($blockTypes as $blockType => $config) {
-                // Check if custom layout exists
-                $hasCustomLayout = view()->exists("blocks.types.{$blockType}");
-
-                // Get count of blocks of this type
-                $blockCount = Block::where('block_type', $blockType)->count();
-
-                // Consider high volume if > 100 blocks
-                $isHighVolume = $blockCount > 100;
-
-                $results[] = [
-                    'service' => $identifier,
-                    'block_type' => $blockType,
-                    'display_name' => $config['display_name'] ?? str_replace('_', ' ', $blockType),
-                    'has_custom_layout' => $hasCustomLayout,
-                    'block_count' => $blockCount,
-                    'is_high_volume' => $isHighVolume,
-                ];
-            }
-        }
-
-        // Sort: high volume without layouts first, then by count descending
-        usort($results, function ($a, $b) {
-            // Priority 1: High volume without custom layout
-            $aHighNoLayout = $a['is_high_volume'] && ! $a['has_custom_layout'];
-            $bHighNoLayout = $b['is_high_volume'] && ! $b['has_custom_layout'];
-            if ($aHighNoLayout && ! $bHighNoLayout) {
-                return -1;
-            }
-            if (! $aHighNoLayout && $bHighNoLayout) {
-                return 1;
-            }
-
-            // Priority 2: Block count descending
-            return $b['block_count'] <=> $a['block_count'];
-        });
-
-        return $results;
-    }
-
-    /**
      * Get all sense check sections organized with issues first, then clean sections
      *
      * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool}>
@@ -427,13 +372,6 @@ new class extends Component
                 'icon' => 'o-clock',
                 'issue_count' => count($this->dataConsistencyIssues),
             ],
-            [
-                'key' => 'block_custom_layouts',
-                'title' => 'Block types with custom card layouts',
-                'description' => 'Overview of which block types have custom display layouts defined. High-volume block types without custom layouts are highlighted.',
-                'icon' => 'o-rectangle-stack',
-                'issue_count' => 0, // This is informational, not an issue
-            ],
         ];
 
         // Add computed properties
@@ -481,7 +419,7 @@ new class extends Component
             ->distinct()
             ->get()
             ->groupBy('service')
-            ->map(fn (Collection $rows) => $rows->pluck('action')->filter()->unique()->values()->all());
+            ->map(fn(Collection $rows) => $rows->pluck('action')->filter()->unique()->values()->all());
 
         $this->dbActionsByService = $actions->toArray();
 
@@ -493,7 +431,7 @@ new class extends Component
             ->distinct()
             ->get()
             ->groupBy('service')
-            ->map(fn (Collection $rows) => $rows->pluck('block_type')->filter()->unique()->values()->all());
+            ->map(fn(Collection $rows) => $rows->pluck('block_type')->filter()->unique()->values()->all());
 
         $this->dbBlockTypesByService = $blockTypes->toArray();
 
@@ -514,7 +452,7 @@ new class extends Component
 
         $objectTypes = $actorTypes->concat($targetTypes)
             ->groupBy('service')
-            ->map(fn (Collection $rows) => $rows->pluck('object_type')->filter()->unique()->values()->all());
+            ->map(fn(Collection $rows) => $rows->pluck('object_type')->filter()->unique()->values()->all());
 
         $this->dbObjectTypesByService = $objectTypes->toArray();
     }
@@ -525,320 +463,236 @@ new class extends Component
 
     <div class="space-y-2">
         @foreach ($this->senseCheckSections as $section)
-            <x-collapse wire:model="collapse.{{ $section['key'] }}" separator class="bg-base-100">
-                <x-slot:heading>
-                    <div class="flex items-center gap-3 w-full" wire:click="toggle('{{ $section['key'] }}')">
-                        <x-icon :name="$section['icon']" class="w-5 h-5" />
-                        <span class="flex-1 text-left">{{ $section['title'] }}</span>
-                        @if ($section['has_issues'])
-                            <x-badge :value="$section['issue_count']" class="{{ $section['badge_class'] }}" />
-                        @else
-                            <x-badge value="✓" class="{{ $section['badge_class'] }}" />
+        <x-collapse wire:model="collapse.{{ $section['key'] }}" separator class="bg-base-100">
+            <x-slot:heading>
+                <div class="flex items-center gap-3 w-full" wire:click="toggle('{{ $section['key'] }}')">
+                    <x-icon :name="$section['icon']" class="w-5 h-5" />
+                    <span class="flex-1 text-left">{{ $section['title'] }}</span>
+                    @if ($section['has_issues'])
+                    <x-badge :value="$section['issue_count']" class="{{ $section['badge_class'] }}" />
+                    @else
+                    <x-badge value="✓" class="{{ $section['badge_class'] }}" />
+                    @endif
+                </div>
+            </x-slot:heading>
+            <x-slot:content>
+                <div class="text-sm text-base-content/70 mb-4">{{ $section['description'] }}</div>
+
+                @if ($section['key'] === 'undefined_actions')
+                @php($items = $this->undefinedActions)
+                @if (empty($items))
+                <div class="alert alert-success">No inconsistencies found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-base-300 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
+                            <span class="badge badge-warning">{{ count($item['actions']) }} missing</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($item['actions'] as $action)
+                            <a href="{{ route('admin.events.index', ['serviceFilter' => $item['service'], 'actionFilter' => $action]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $action }}
+                            </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'unknown_services')
+                @php($items = $this->unknownServices)
+                @if (empty($items))
+                <div class="alert alert-success">All services are registered 🎉</div>
+                @else
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($items as $service)
+                    <a href="{{ route('admin.events.index', ['serviceFilter' => $service]) }}"
+                        class="badge badge-error hover:badge-error-hover transition-colors">
+                        {{ $service }}
+                    </a>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'undefined_block_types')
+                @php($items = $this->undefinedBlockTypes)
+                @if (empty($items))
+                <div class="alert alert-success">No inconsistencies found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-base-300 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
+                            <span class="badge badge-warning">{{ count($item['block_types']) }} missing</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($item['block_types'] as $type)
+                            <a href="{{ route('admin.blocks.index', ['serviceFilter' => $item['service'], 'blockTypeFilter' => $type]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $type }}
+                            </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'undefined_object_types')
+                @php($items = $this->undefinedObjectTypes)
+                @if (empty($items))
+                <div class="alert alert-success">No inconsistencies found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-base-300 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
+                            <span class="badge badge-warning">{{ count($item['object_types']) }} missing</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($item['object_types'] as $type)
+                            <a href="{{ route('admin.objects.index', ['typeFilter' => $type]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $type }}
+                            </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'orphaned_events')
+                @php($orphanedEvents = $this->orphanedEvents)
+                @php($orphanedBlocks = $this->orphanedBlocks)
+                @php($orphanedObjects = $this->orphanedObjects)
+                @if ($orphanedEvents['count'] === 0 && $orphanedBlocks['count'] === 0 && $orphanedObjects['count'] === 0)
+                <div class="alert alert-success">No orphaned records found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @if ($orphanedEvents['count'] > 0)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">Events without integrations</div>
+                            <a href="{{ route('admin.events.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $orphanedEvents['count'] }} found
+                            </a>
+                        </div>
+                        @if (!empty($orphanedEvents['sample_ids']))
+                        <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedEvents['sample_ids'], 0, 3)) }}{{ count($orphanedEvents['sample_ids']) > 3 ? '...' : '' }}</div>
                         @endif
                     </div>
-                </x-slot:heading>
-                <x-slot:content>
-                    <div class="text-sm text-base-content/70 mb-4">{{ $section['description'] }}</div>
-
-                    @if ($section['key'] === 'undefined_actions')
-                        @php($items = $this->undefinedActions)
-                        @if (empty($items))
-                            <div class="alert alert-success">No inconsistencies found 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @foreach ($items as $item)
-                                    <div class="border border-base-300 rounded-lg p-4">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
-                                            <span class="badge badge-warning">{{ count($item['actions']) }} missing</span>
-                                        </div>
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach ($item['actions'] as $action)
-                                                <a href="{{ route('admin.events.index', ['serviceFilter' => $item['service'], 'actionFilter' => $action]) }}"
-                                                   class="badge badge-outline hover:badge-warning transition-colors">
-                                                    {{ $action }}
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'unknown_services')
-                        @php($items = $this->unknownServices)
-                        @if (empty($items))
-                            <div class="alert alert-success">All services are registered 🎉</div>
-                        @else
-                            <div class="flex flex-wrap gap-2">
-                                @foreach ($items as $service)
-                                    <a href="{{ route('admin.events.index', ['serviceFilter' => $service]) }}"
-                                       class="badge badge-error hover:badge-error-hover transition-colors">
-                                        {{ $service }}
-                                    </a>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'undefined_block_types')
-                        @php($items = $this->undefinedBlockTypes)
-                        @if (empty($items))
-                            <div class="alert alert-success">No inconsistencies found 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @foreach ($items as $item)
-                                    <div class="border border-base-300 rounded-lg p-4">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
-                                            <span class="badge badge-warning">{{ count($item['block_types']) }} missing</span>
-                                        </div>
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach ($item['block_types'] as $type)
-                                                <a href="{{ route('admin.blocks.index', ['serviceFilter' => $item['service'], 'blockTypeFilter' => $type]) }}"
-                                                   class="badge badge-outline hover:badge-warning transition-colors">
-                                                    {{ $type }}
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'undefined_object_types')
-                        @php($items = $this->undefinedObjectTypes)
-                        @if (empty($items))
-                            <div class="alert alert-success">No inconsistencies found 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @foreach ($items as $item)
-                                    <div class="border border-base-300 rounded-lg p-4">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
-                                            <span class="badge badge-warning">{{ count($item['object_types']) }} missing</span>
-                                        </div>
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach ($item['object_types'] as $type)
-                                                <a href="{{ route('admin.objects.index', ['typeFilter' => $type]) }}"
-                                                   class="badge badge-outline hover:badge-warning transition-colors">
-                                                    {{ $type }}
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'orphaned_events')
-                        @php($orphanedEvents = $this->orphanedEvents)
-                        @php($orphanedBlocks = $this->orphanedBlocks)
-                        @php($orphanedObjects = $this->orphanedObjects)
-                        @if ($orphanedEvents['count'] === 0 && $orphanedBlocks['count'] === 0 && $orphanedObjects['count'] === 0)
-                            <div class="alert alert-success">No orphaned records found 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @if ($orphanedEvents['count'] > 0)
-                                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold text-red-700">Events without integrations</div>
-                                            <a href="{{ route('admin.events.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
-                                                {{ $orphanedEvents['count'] }} found
-                                            </a>
-                                        </div>
-                                        @if (!empty($orphanedEvents['sample_ids']))
-                                            <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedEvents['sample_ids'], 0, 3)) }}{{ count($orphanedEvents['sample_ids']) > 3 ? '...' : '' }}</div>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                @if ($orphanedBlocks['count'] > 0)
-                                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold text-red-700">Blocks without events</div>
-                                            <a href="{{ route('admin.blocks.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
-                                                {{ $orphanedBlocks['count'] }} found
-                                            </a>
-                                        </div>
-                                        @if (!empty($orphanedBlocks['sample_ids']))
-                                            <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedBlocks['sample_ids'], 0, 3)) }}{{ count($orphanedBlocks['sample_ids']) > 3 ? '...' : '' }}</div>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                @if ($orphanedObjects['count'] > 0)
-                                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold text-red-700">Objects without event references</div>
-                                            <a href="{{ route('admin.objects.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
-                                                {{ $orphanedObjects['count'] }} found
-                                            </a>
-                                        </div>
-                                        @if (!empty($orphanedObjects['sample_ids']))
-                                            <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedObjects['sample_ids'], 0, 3)) }}{{ count($orphanedObjects['sample_ids']) > 3 ? '...' : '' }}</div>
-                                        @endif
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'invalid_integrations')
-                        @php($items = $this->invalidIntegrations)
-                        @if (empty($items))
-                            <div class="alert alert-success">No invalid integrations found 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @foreach ($items as $item)
-                                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold text-red-700">{{ $item['issue'] }}</div>
-                                            <a href="{{ route('integrations.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
-                                                {{ $item['count'] }} found
-                                            </a>
-                                        </div>
-                                        @if (!empty($item['details']))
-                                            <div class="flex flex-wrap gap-1">
-                                                @foreach ($item['details'] as $service => $count)
-                                                    <a href="{{ route('admin.events.index', ['serviceFilter' => $service]) }}"
-                                                       class="badge badge-outline hover:badge-warning transition-colors">
-                                                        {{ $service }}: {{ $count }}
-                                                    </a>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'plugin_config_issues')
-                        @php($items = $this->pluginConfigIssues)
-                        @if (empty($items))
-                            <div class="alert alert-success">All plugins properly configured 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @foreach ($items as $item)
-                                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold text-red-700">{{ strtoupper($item['plugin']) }}</div>
-                                            <span class="badge badge-error">{{ count($item['issues']) }} issues</span>
-                                        </div>
-                                        <ul class="text-sm text-red-600 space-y-1">
-                                            @foreach ($item['issues'] as $issue)
-                                                <li>• {{ $issue }}</li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'data_consistency_issues')
-                        @php($items = $this->dataConsistencyIssues)
-                        @if (empty($items))
-                            <div class="alert alert-success">No data consistency issues found 🎉</div>
-                        @else
-                            <div class="space-y-3">
-                                @foreach ($items as $item)
-                                    <div class="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <div class="font-semibold text-yellow-700">{{ $item['issue'] }}</div>
-                                            <span class="badge badge-warning">{{ $item['count'] }} found</span>
-                                        </div>
-                                        @if (!empty($item['details']['note']))
-                                            <div class="text-sm text-yellow-600">{{ $item['details']['note'] }}</div>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                    @elseif ($section['key'] === 'block_custom_layouts')
-                        @php($items = $this->blockCustomLayouts)
-                        @php($totalTypes = count($items))
-                        @php($withLayouts = collect($items)->filter(fn($item) => $item['has_custom_layout'])->count())
-                        @php($highVolumeWithoutLayouts = collect($items)->filter(fn($item) => $item['is_high_volume'] && !$item['has_custom_layout'])->count())
-
-                        <div class="mb-4 flex items-center gap-4 text-sm">
-                            <div class="badge badge-lg badge-primary">{{ $totalTypes }} total block types</div>
-                            <div class="badge badge-lg badge-success">{{ $withLayouts }} with custom layouts</div>
-                            @if($highVolumeWithoutLayouts > 0)
-                                <div class="badge badge-lg badge-warning">{{ $highVolumeWithoutLayouts }} high-volume without layouts</div>
-                            @endif
-                        </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Service</th>
-                                        <th>Block Type</th>
-                                        <th>Display Name</th>
-                                        <th class="text-center">Custom Layout</th>
-                                        <th class="text-right">Block Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($items as $item)
-                                        @php
-                                            $pluginClass = \App\Integrations\PluginRegistry::getPlugin($item['service']);
-                                            $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
-                                            $serviceName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($item['service']);
-
-                                            // Determine row styling
-                                            if ($item['is_high_volume'] && !$item['has_custom_layout']) {
-                                                $rowClass = 'bg-warning/5 hover:bg-warning/10';
-                                            } elseif ($item['has_custom_layout']) {
-                                                $rowClass = 'bg-success/5 hover:bg-success/10';
-                                            } else {
-                                                $rowClass = 'hover:bg-base-200';
-                                            }
-                                        @endphp
-                                        <tr class="{{ $rowClass }}">
-                                            <td>
-                                                <div class="flex items-center gap-2">
-                                                    <x-icon :name="$icon" class="w-4 h-4" />
-                                                    {{ $serviceName }}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <code class="text-xs">{{ $item['block_type'] }}</code>
-                                            </td>
-                                            <td>{{ $item['display_name'] }}</td>
-                                            <td class="text-center">
-                                                @if($item['has_custom_layout'])
-                                                    <x-icon name="o-check-circle" class="w-5 h-5 text-success inline-block" />
-                                                @else
-                                                    <x-icon name="o-x-circle" class="w-5 h-5 text-base-content/30 inline-block" />
-                                                @endif
-                                            </td>
-                                            <td class="text-right">
-                                                <a href="{{ route('admin.blocks.index', ['blockTypeFilter' => $item['block_type']]) }}"
-                                                   class="hover:underline">
-                                                    @if($item['is_high_volume'])
-                                                        <span class="badge badge-warning badge-sm">{{ number_format($item['block_count']) }}</span>
-                                                    @else
-                                                        {{ number_format($item['block_count']) }}
-                                                    @endif
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="mt-4 text-sm text-base-content/70 space-y-1">
-                            <p><strong>Legend:</strong></p>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li><span class="inline-block w-4 h-4 bg-success/10 border border-success/20 rounded mr-1"></span> Block type has custom layout</li>
-                                <li><span class="inline-block w-4 h-4 bg-warning/10 border border-warning/20 rounded mr-1"></span> High-volume block type (>100 blocks) without custom layout</li>
-                            </ul>
-                            <p class="mt-2"><strong>Custom layouts location:</strong> <code class="text-xs">resources/views/blocks/types/{block_type}.blade.php</code></p>
-                        </div>
                     @endif
-                </x-slot:content>
-            </x-collapse>
+
+                    @if ($orphanedBlocks['count'] > 0)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">Blocks without events</div>
+                            <a href="{{ route('admin.blocks.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $orphanedBlocks['count'] }} found
+                            </a>
+                        </div>
+                        @if (!empty($orphanedBlocks['sample_ids']))
+                        <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedBlocks['sample_ids'], 0, 3)) }}{{ count($orphanedBlocks['sample_ids']) > 3 ? '...' : '' }}</div>
+                        @endif
+                    </div>
+                    @endif
+
+                    @if ($orphanedObjects['count'] > 0)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">Objects without event references</div>
+                            <a href="{{ route('admin.objects.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $orphanedObjects['count'] }} found
+                            </a>
+                        </div>
+                        @if (!empty($orphanedObjects['sample_ids']))
+                        <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedObjects['sample_ids'], 0, 3)) }}{{ count($orphanedObjects['sample_ids']) > 3 ? '...' : '' }}</div>
+                        @endif
+                    </div>
+                    @endif
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'invalid_integrations')
+                @php($items = $this->invalidIntegrations)
+                @if (empty($items))
+                <div class="alert alert-success">No invalid integrations found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">{{ $item['issue'] }}</div>
+                            <a href="{{ route('integrations.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $item['count'] }} found
+                            </a>
+                        </div>
+                        @if (!empty($item['details']))
+                        <div class="flex flex-wrap gap-1">
+                            @foreach ($item['details'] as $service => $count)
+                            <a href="{{ route('admin.events.index', ['serviceFilter' => $service]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $service }}: {{ $count }}
+                            </a>
+                            @endforeach
+                        </div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'plugin_config_issues')
+                @php($items = $this->pluginConfigIssues)
+                @if (empty($items))
+                <div class="alert alert-success">All plugins properly configured 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">{{ strtoupper($item['plugin']) }}</div>
+                            <span class="badge badge-error">{{ count($item['issues']) }} issues</span>
+                        </div>
+                        <ul class="text-sm text-red-600 space-y-1">
+                            @foreach ($item['issues'] as $issue)
+                            <li>• {{ $issue }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'data_consistency_issues')
+                @php($items = $this->dataConsistencyIssues)
+                @if (empty($items))
+                <div class="alert alert-success">No data consistency issues found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-yellow-700">{{ $item['issue'] }}</div>
+                            <span class="badge badge-warning">{{ $item['count'] }} found</span>
+                        </div>
+                        @if (!empty($item['details']['note']))
+                        <div class="text-sm text-yellow-600">{{ $item['details']['note'] }}</div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+                @endif
+            </x-slot:content>
+        </x-collapse>
         @endforeach
     </div>
 </div>

@@ -38,10 +38,14 @@ if (is_string($tags)) {
                 @foreach($tags as $tag)
                     @php
                         $tagText = is_string($tag) ? $tag : ($tag['name'] ?? $tag['text'] ?? '');
-                        // Extract emoji if present at the start
-                        preg_match('/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*(.*)$/u', $tagText, $matches);
-                        $emoji = $matches[1] ?? null;
-                        $tagName = $matches[2] ?? $tagText;
+                        // Extract emoji if present at the start (simplified regex)
+                        if (preg_match('/^([\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]+)\s*(.*)$/u', $tagText, $matches)) {
+                            $emoji = $matches[1];
+                            $tagName = $matches[2] ?: $tagText;
+                        } else {
+                            $emoji = null;
+                            $tagName = $tagText;
+                        }
                     @endphp
                     <span class="badge badge-accent badge-lg gap-1">
                         @if($emoji)
