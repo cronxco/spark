@@ -267,6 +267,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Volt::route('bin', 'admin.bin')->name('bin.index');
     Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
+    Route::get('block-view', [App\Http\Controllers\Admin\BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
         DeleteBinItemsBatch::dispatch(Auth::id());
 
