@@ -594,6 +594,50 @@ PROMPT;
         }
     }
 
+    private function createLinkEvent(): void
+    {
+        // Get source object for the actor
+        $sourceObject = null;
+        if ($this->sourceObjectId) {
+            $sourceObject = EventObject::find($this->sourceObjectId);
+        } elseif ($this->sourceEventId) {
+            $sourceEvent = Event::find($this->sourceEventId);
+            if ($sourceEvent && $sourceEvent->target_id) {
+                $sourceObject = EventObject::find($sourceEvent->target_id);
+            }
+        }
+
+        if (! $sourceObject) {
+            Log::warning('Fetch: Could not create link relationship - source object not found', [
+                'source_object_id' => $this->sourceObjectId,
+                'source_event_id' => $this->sourceEventId,
+            ]);
+
+            return;
+        }
+
+        // Create the relationship using the new Relationship model
+        Relationship::createRelationship([
+            'user_id' => $this->integration->user_id,
+            'from_type' => EventObject::class,
+            'from_id' => $sourceObject->id,
+            'to_type' => EventObject::class,
+            'to_id' => $this->webpage->id,
+            'type' => 'linked_to',
+            'metadata' => [
+                'url' => $this->webpage->url,
+                'linked_at' => now()->toIso8601String(),
+                'fetch_integration_id' => $this->integration->id,
+            ],
+        ]);
+
+        Log::info('Fetch: Created link relationship', [
+            'from_id' => $sourceObject->id,
+            'to_id' => $this->webpage->id,
+            'url' => $this->webpage->url,
+        ]);
+    }
+
     private function getSourceEvents()
     {
         if ($this->sourceIsObject && $this->sourceObjectId) {

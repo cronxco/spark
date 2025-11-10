@@ -133,23 +133,13 @@ class AddRelationship extends Component
 
         // Get user ID from from model
         $fromModel = $this->getFromModel();
-        if ($fromModel instanceof EventObject) {
-            $userId = $fromModel->user_id;
-        } elseif ($fromModel instanceof Block) {
-            $userId = $fromModel->event->integration->user_id;
-        } else {
-            $userId = $fromModel->integration->user_id;
-        }
+        $userId = $fromModel instanceof EventObject
+            ? $fromModel->user_id
+            : $fromModel->integration->user_id;
 
         // Verify ownership of target
-        if ($toModel instanceof Event) {
-            $integration = $toModel->integration;
-            if (! $integration || $integration->user_id !== $userId) {
-                abort(403);
-            }
-        } elseif ($toModel instanceof Block) {
-            $integration = $toModel->event?->integration;
-            if (! $integration || $integration->user_id !== $userId) {
+        if ($toModel instanceof Event || $toModel instanceof Block) {
+            if ($toModel->integration->user_id !== $userId) {
                 abort(403);
             }
         } elseif ($toModel instanceof EventObject) {
@@ -206,13 +196,8 @@ class AddRelationship extends Component
         $model = $this->fromType::findOrFail($this->fromId);
 
         // Check ownership based on model type
-        if ($model instanceof Event) {
+        if ($model instanceof Event || $model instanceof Block) {
             $integration = $model->integration;
-            if (! $integration || $integration->user_id !== Auth::id()) {
-                abort(403);
-            }
-        } elseif ($model instanceof Block) {
-            $integration = $model->event?->integration;
             if (! $integration || $integration->user_id !== Auth::id()) {
                 abort(403);
             }
