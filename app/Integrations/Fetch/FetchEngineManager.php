@@ -257,10 +257,10 @@ class FetchEngineManager
             return 'playwright';
         }
 
-        // Default to HTTP
-        $this->logFetchDecision($webpage, 'http', 'default');
+        // Default to Playwright
+        $this->logFetchDecision($webpage, 'playwright', 'default');
 
-        return 'http';
+        return 'playwright';
     }
 
     /**
