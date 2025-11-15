@@ -1227,12 +1227,54 @@ new class extends Component {
 
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Object Details" with-close-button separator class="w-11/12 lg:w-1/3">
-                <div class="space-y-4 lg:space-y-6">
+                <div class="space-y-6">
+                    <!-- Primary Information (Always Visible) -->
+                    <div class="pb-4 border-b border-base-200">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                        <dl>
+                            <x-metadata-row label="Object ID" :value="$this->object->id" copyable />
+                            <x-metadata-row label="Title" :value="$this->object->title" />
+                            <x-metadata-row label="Concept" :value="Str::headline($this->object->concept)" />
+                            <x-metadata-row label="Type" :value="Str::headline($this->object->type)" />
+                            <x-metadata-row label="Time">
+                                {{ to_user_timezone($this->object->time, auth()->user())->format('M j, Y g:i A') }}
+                                <span class="text-base-content/60">({{ to_user_timezone($this->object->time, auth()->user())->diffForHumans() }})</span>
+                            </x-metadata-row>
+                            <x-metadata-row label="Created">
+                                {{ to_user_timezone($this->object->created_at, auth()->user())->format('M j, Y g:i A') }}
+                                <span class="text-base-content/60">({{ to_user_timezone($this->object->created_at, auth()->user())->diffForHumans() }})</span>
+                            </x-metadata-row>
+                            <x-metadata-row label="Last Updated">
+                                {{ to_user_timezone($this->object->updated_at, auth()->user())->format('M j, Y g:i A') }}
+                                <span class="text-base-content/60">({{ to_user_timezone($this->object->updated_at, auth()->user())->diffForHumans() }})</span>
+                            </x-metadata-row>
+                            @if ($this->object->url)
+                                <x-metadata-row label="URL">
+                                    <a href="{{ $this->object->url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                        {{ $this->object->url }}
+                                    </a>
+                                </x-metadata-row>
+                            @endif
+                            @if ($this->object->media_url)
+                                <x-metadata-row label="Media URL">
+                                    <a href="{{ $this->object->media_url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                        {{ $this->object->media_url }}
+                                    </a>
+                                </x-metadata-row>
+                            @endif
+                            <x-metadata-row label="Locked">
+                                <span class="badge {{ $this->object->isLocked() ? 'badge-warning' : 'badge-ghost' }} badge-sm">
+                                    {{ $this->object->isLocked() ? 'Yes' : 'No' }}
+                                </span>
+                            </x-metadata-row>
+                        </dl>
+                    </div>
+
                     <!-- Tags Manager -->
                     <x-card class="bg-base-100 shadow">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-tag" class="w-5 h-5" />
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                                <x-icon name="o-tag" class="w-4 h-4" />
                                 Tags
                             </h3>
                             <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
@@ -1253,8 +1295,8 @@ new class extends Component {
                     <!-- Relationships -->
                     <x-card class="bg-base-100 shadow">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                                <x-icon name="o-arrows-right-left" class="w-4 h-4" />
                                 Relationships
                             </h3>
                             <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
@@ -1312,8 +1354,8 @@ new class extends Component {
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
-                            <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-clock" class="w-5 h-5" />
+                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                                <x-icon name="o-clock" class="w-4 h-4" />
                                 Activity
                             </div>
                         </x-slot:heading>
@@ -1374,8 +1416,8 @@ new class extends Component {
 
                     <!-- Add Comment -->
                     <x-card class="bg-base-100 shadow">
-                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-5 h-5" />
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-4 flex items-center gap-2">
+                            <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
                             Comment
                         </h3>
                         <x-form wire:submit="addComment">
@@ -1390,8 +1432,8 @@ new class extends Component {
                     <x-card class="bg-base-100 shadow">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
-                                <x-icon name="{{ $this->object->isLocked() ? 'o-lock-closed' : 'o-lock-open' }}" class="w-5 h-5" />
-                                <span class="text-base font-medium">Lock Object</span>
+                                <x-icon name="{{ $this->object->isLocked() ? 'o-lock-closed' : 'o-lock-open' }}" class="w-4 h-4" />
+                                <span class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Lock Object</span>
                             </div>
                             <x-toggle wire:model.live="object.metadata.locked" wire:change="toggleLock" />
                         </div>
@@ -1400,10 +1442,10 @@ new class extends Component {
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
                     <x-collapse wire:model="objectMetaOpen">
                         <x-slot:heading>
-                            <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
+                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between gap-2 w-full">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5" />
-                                    Object Metadata
+                                    <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                                    Technical Metadata
                                 </div>
                                 <script type="application/json" id="object-meta-json-{{ $this->object->id }}">
                                     {
