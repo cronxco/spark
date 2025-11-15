@@ -56,12 +56,14 @@ if (!$isValueBlock) {
         $contentPreview = $metadata['text'];
     }
 
-    // Check for images
-    if ($block->media_url) {
+    // Check for images - use Media Library first, then fallback to metadata or media_url
+    $imageUrl = get_media_url($block, 'downloaded_images', 'thumbnail');
+
+    if (!$imageUrl && $block->media_url) {
         $imageUrl = $block->media_url;
-    } elseif (isset($metadata['image'])) {
+    } elseif (!$imageUrl && isset($metadata['image'])) {
         $imageUrl = $metadata['image'];
-    } elseif (isset($metadata['image_url'])) {
+    } elseif (!$imageUrl && isset($metadata['image_url'])) {
         $imageUrl = $metadata['image_url'];
     }
 }

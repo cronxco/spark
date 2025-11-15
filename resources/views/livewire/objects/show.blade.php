@@ -1033,7 +1033,7 @@ new class extends Component {
                         Content
                     </h3>
                     <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                        {!! nl2br(e($this->object->content)) !!}
+                        {!! Str::markdown($this->object->content) !!}
                     </div>
                 </div>
             </x-card>

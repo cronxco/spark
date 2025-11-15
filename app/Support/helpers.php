@@ -817,3 +817,93 @@ if (! function_exists('normalize_icon_for_spotlight')) {
         return preg_replace('/^[os]-/', '', $icon);
     }
 }
+
+if (! function_exists('get_media_url')) {
+    /**
+     * Get the media URL for a model, falling back to media_url field if no Media Library attachment exists.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\Spatie\MediaLibrary\HasMedia  $model
+     * @param  string  $collection  The media collection to check
+     * @param  string  $conversion  The conversion name (thumbnail, medium, webp, or empty for original)
+     * @return string|null The media URL or null if no media found
+     */
+    function get_media_url(
+        $model,
+        string $collection = 'downloaded_images',
+        string $conversion = ''
+    ): ?string {
+        // Check for Media Library attachment first
+        if (method_exists($model, 'getFirstMedia')) {
+            $media = $model->getFirstMedia($collection);
+
+            if ($media) {
+                if ($conversion) {
+                    return $media->getUrl($conversion);
+                }
+
+                return $media->getUrl();
+            }
+        }
+
+        // Fallback to media_url field (backward compatibility during migration)
+        if (isset($model->media_url) && ! empty($model->media_url)) {
+            return $model->media_url;
+        }
+
+        return null;
+    }
+}
+
+if (! function_exists('get_media_temporary_url')) {
+    /**
+     * Get a temporary signed URL for media (for private S3 buckets).
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\Spatie\MediaLibrary\HasMedia  $model
+     * @param  string  $collection  The media collection to check
+     * @param  string  $conversion  The conversion name (thumbnail, medium, webp, or empty for original)
+     * @param  int  $expirationMinutes  How long the URL should be valid (default: 60 minutes)
+     * @return string|null The temporary URL or null if no media found
+     */
+    function get_media_temporary_url(
+        $model,
+        string $collection = 'downloaded_images',
+        string $conversion = '',
+        int $expirationMinutes = 60
+    ): ?string {
+        if (! method_exists($model, 'getFirstMedia')) {
+            return null;
+        }
+
+        $media = $model->getFirstMedia($collection);
+
+        if (! $media) {
+            // Fallback to regular media_url if no Media Library attachment
+            if (isset($model->media_url) && ! empty($model->media_url)) {
+                return $model->media_url;
+            }
+
+            return null;
+        }
+
+        // For local/public disks, just return the regular URL
+        if (config('media-library.disk_name') !== 's3') {
+            if ($conversion) {
+                return $media->getUrl($conversion);
+            }
+
+            return $media->getUrl();
+        }
+
+        // For S3, generate temporary URL
+        if ($conversion) {
+            return $media->getTemporaryUrl(
+                now()->addMinutes($expirationMinutes),
+                $conversion
+            );
+        }
+
+        return $media->getTemporaryUrl(
+            now()->addMinutes($expirationMinutes)
+        );
+    }
+}

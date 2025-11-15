@@ -95,9 +95,9 @@
 
         <!-- Summary -->
         @if ($summary)
-            <p class="text-sm text-base-content/70 line-clamp-5 leading-relaxed">
-                {{ $summary }}
-            </p>
+            <div class="text-sm text-base-content/70 line-clamp-5 leading-relaxed prose prose-sm max-w-none">
+                {!! Str::markdown($summary) !!}
+            </div>
         @endif
 
         <!-- Footer: Status indicator, URL and actions -->

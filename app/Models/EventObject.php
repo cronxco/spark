@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Media\MediaDeduplicationService;
 use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,11 +11,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Tags\HasTags;
 
-class EventObject extends Model
+class EventObject extends Model implements HasMedia
 {
-    use HasFactory, HasTags, LogsActivity, SoftDeletes;
+    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, SoftDeletes;
 
     /**
      * Only record update events via LogsActivity trait.
@@ -79,6 +83,15 @@ class EventObject extends Model
             }
         });
 
+        static::deleting(function ($model): void {
+            // Handle media deletion with deduplication logic
+            $deduplicationService = app(MediaDeduplicationService::class);
+
+            foreach ($model->media as $media) {
+                $deduplicationService->deleteMedia($media, forceDelete: false);
+            }
+        });
+
         static::deleted(function ($model): void {
             activity('changelog')
                 ->performedOn($model)
@@ -102,6 +115,50 @@ class EventObject extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at']);
+    }
+
+    /**
+     * Register media collections for EventObject.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('screenshots')
+            ->useDisk(config('media-library.disk_name'));
+
+        $this->addMediaCollection('pdfs')
+            ->useDisk(config('media-library.disk_name'));
+
+        $this->addMediaCollection('downloaded_images')
+            ->useDisk(config('media-library.disk_name'));
+
+        $this->addMediaCollection('downloaded_videos')
+            ->useDisk(config('media-library.disk_name'));
+
+        $this->addMediaCollection('downloaded_documents')
+            ->useDisk(config('media-library.disk_name'));
+    }
+
+    /**
+     * Register media conversions for EventObject.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumbnail')
+            ->width(300)
+            ->height(300)
+            ->sharpen(10)
+            ->nonQueued()
+            ->performOnCollections('screenshots', 'downloaded_images');
+
+        $this->addMediaConversion('medium')
+            ->width(800)
+            ->keepOriginalImageFormat()
+            ->performOnCollections('screenshots', 'downloaded_images');
+
+        $this->addMediaConversion('webp')
+            ->width(800)
+            ->format('webp')
+            ->performOnCollections('screenshots', 'downloaded_images');
     }
 
     public function user()
