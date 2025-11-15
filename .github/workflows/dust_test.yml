@@ -33,7 +33,7 @@ jobs:
 
     services:
       postgres:
-        image: "pgvector/pgvector:0.8.1-pg17@sha256:9ae02a756ba16a2d69dd78058e25915e36e189bb36ddf01ceae86390d7ed786a"
+        image: "pgvector/pgvector:0.8.1-pg17@sha256:1a5ea285a159bed991c74a9c4751b6eadc536b3c3263f3f95ec3865885a62b69"
         env:
           PGPASSWORD: postgres
           POSTGRES_DB: laravel
