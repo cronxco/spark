@@ -20,6 +20,7 @@ new class extends Component {
     public bool $eventMetaOpen = false;
     public bool $actorMetaOpen = false;
     public bool $targetMetaOpen = false;
+    public bool $targetContentOpen = true;
     public bool $showCreateTagModal = false;
     public bool $showEditEventModal = false;
     public bool $showTagModal = false;
@@ -652,17 +653,23 @@ new class extends Component {
 
             <!-- Target Object Content -->
             @if ($this->event->target?->content)
-            <x-card class="bg-base-100 shadow">
-                <div class="max-w-prose mx-auto">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-document-text" class="w-5 h-5 text-info" />
-                        {{ $this->event->target->title }}
-                    </h3>
-                    <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                        {!! Str::markdown($this->event->target->content) !!}
-                    </div>
-                </div>
-            </x-card>
+            <div class="mb-6">
+                <x-collapse wire:model="targetContentOpen">
+                    <x-slot:heading>
+                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
+                            <x-icon name="o-document-text" class="w-5 h-5 text-info" />
+                            {{ $this->event->target->title }}
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        <div class="max-w-prose mx-auto pt-4">
+                            <div class="prose dark:prose-invert prose-base lg:prose-lg">
+                                {!! Str::markdown($this->event->target->content) !!}
+                            </div>
+                        </div>
+                    </x-slot:content>
+                </x-collapse>
+            </div>
             @endif
 
             <!-- Linked Blocks -->
