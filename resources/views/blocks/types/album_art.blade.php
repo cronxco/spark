@@ -7,7 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$imageUrl = $block->media_url ?? $block->metadata['url'] ?? null;
+$imageUrl = get_media_url($block, 'downloaded_images', 'thumbnail')
+    ?? $block->media_url
+    ?? $block->metadata['url']
+    ?? null;
 $trackName = $block->metadata['track'] ?? null;
 $artist = $block->metadata['artist'] ?? null;
 @endphp

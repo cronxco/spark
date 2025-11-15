@@ -50,13 +50,13 @@ new class extends \Livewire\Volt\Component
 
     public function getBookmarkSummary(Event $event): ?string
     {
-        // Try to get tweet-sized summary from Fetch
+        // Try to get tweet-sized summary from Fetch (uses 'content' field)
         $tweetSummary = $event->blocks->firstWhere('block_type', 'fetch_summary_tweet');
-        if ($tweetSummary && ! empty($tweetSummary->metadata['summary'])) {
-            return $tweetSummary->metadata['summary'];
+        if ($tweetSummary && ! empty($tweetSummary->metadata['content'])) {
+            return $tweetSummary->metadata['content'];
         }
 
-        // Try to get Karakeep AI summary
+        // Try to get Karakeep AI summary (uses 'summary' field)
         $karakeepSummary = $event->blocks->firstWhere('block_type', 'bookmark_summary');
         if ($karakeepSummary && ! empty($karakeepSummary->metadata['summary'])) {
             return $karakeepSummary->metadata['summary'];
