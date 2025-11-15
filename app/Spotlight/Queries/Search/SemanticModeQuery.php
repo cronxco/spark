@@ -10,24 +10,29 @@ use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
-class SemanticSearchQuery
+class SemanticModeQuery
 {
     /**
-     * Create Spotlight query for semantic search across events and blocks.
+     * Create Spotlight query for dedicated semantic search mode (~).
      */
     public static function make(): SpotlightQuery
     {
-        return SpotlightQuery::asDefault(function (string $query) {
-            // Only trigger semantic search for queries of 3+ words or 15+ characters
-            // This avoids expensive API calls for short queries
-            $wordCount = str_word_count($query);
-            if (blank($query) || (strlen($query) < 15 && $wordCount < 3)) {
+        return SpotlightQuery::asMode('semantic', function (string $query) {
+            // Require at least 2 characters in semantic mode
+            if (blank($query) || strlen($query) < 2) {
                 return collect();
             }
 
             // Check if OpenAI is configured
             if (empty(config('services.openai.api_key'))) {
-                return collect();
+                return collect([
+                    SpotlightResult::make()
+                        ->setTitle('OpenAI not configured')
+                        ->setSubtitle('Set OPENAI_API_KEY in .env to use semantic search')
+                        ->setIcon('exclamation-triangle')
+                        ->setGroup('commands')
+                        ->setPriority(1),
+                ]);
             }
 
             try {
@@ -40,19 +45,26 @@ class SemanticSearchQuery
                 $userIntegrationIds = auth()->user()->integrations()->pluck('id')->toArray();
 
                 if (empty($userIntegrationIds)) {
-                    return collect();
+                    return collect([
+                        SpotlightResult::make()
+                            ->setTitle('No integrations found')
+                            ->setSubtitle('Add integrations to search your data')
+                            ->setIcon('information-circle')
+                            ->setGroup('commands')
+                            ->setPriority(1)
+                            ->setAction('jump_to', ['path' => route('integrations.index')]),
+                    ]);
                 }
 
-                // Search events (limit to top 3 for Spotlight)
-                // Use temporal weighting to slightly boost recent events
-                $events = Event::semanticSearch($embedding, threshold: 0.8, limit: 3, temporalWeight: 0.01)
+                // In semantic mode, show more results and use looser threshold
+                // Search events (limit to top 10)
+                $events = Event::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0.015)
                     ->whereIn('integration_id', $userIntegrationIds)
                     ->with(['actor', 'target', 'integration'])
                     ->get();
 
-                // Search blocks (limit to top 3 for Spotlight)
-                // Use temporal weighting to slightly boost recent blocks
-                $blocks = Block::semanticSearch($embedding, threshold: 0.8, limit: 3, temporalWeight: 0.01)
+                // Search blocks (limit to top 10)
+                $blocks = Block::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0.015)
                     ->whereHas('event', function ($q) use ($userIntegrationIds) {
                         $q->whereIn('integration_id', $userIntegrationIds);
                     })
@@ -95,18 +107,42 @@ class SemanticSearchQuery
                     $subtitleParts[] = $event->time->format('M j, g:ia');
 
                     // Add similarity score
-                    $subtitleParts[] = "{$similarity}% match";
+                    $subtitleParts[] = "✨ {$similarity}% match";
+
+                    // Show days ago if temporal weighting applied
+                    if (isset($event->days_ago)) {
+                        $daysAgo = round($event->days_ago);
+                        if ($daysAgo === 0) {
+                            $subtitleParts[] = '🔥 Today';
+                        } elseif ($daysAgo === 1) {
+                            $subtitleParts[] = '⏰ Yesterday';
+                        } elseif ($daysAgo < 7) {
+                            $subtitleParts[] = "⏰ {$daysAgo}d ago";
+                        }
+                    }
 
                     $subtitle = implode(' • ', $subtitleParts);
 
+                    // Get action icon
+                    $actionIcon = 'sparkles';
+                    if ($event->service && $event->action) {
+                        $pluginClass = PluginRegistry::getPlugin($event->service);
+                        if ($pluginClass) {
+                            $actionTypes = $pluginClass::getActionTypes();
+                            if (isset($actionTypes[$event->action]['icon'])) {
+                                $actionIcon = normalize_icon_for_spotlight($actionTypes[$event->action]['icon']);
+                            }
+                        }
+                    }
+
                     $results->push(
                         SpotlightResult::make()
-                            ->setTitle('🔍 ' . format_action_title($event->action))
+                            ->setTitle(format_action_title($event->action))
                             ->setSubtitle($subtitle)
-                            ->setTypeahead('Semantic: ' . $event->action . ' at ' . $event->time->format('M j, g:ia'))
-                            ->setIcon('magnifying-glass')
+                            ->setTypeahead('Event: ' . $event->action . ' at ' . $event->time->format('M j, g:ia'))
+                            ->setIcon($actionIcon)
                             ->setGroup('events')
-                            ->setPriority(10) // Lower priority than exact matches
+                            ->setPriority(1)
                             ->setAction('jump_to', ['path' => route('events.show', $event)])
                             ->setTokens(['event' => $event])
                     );
@@ -139,7 +175,19 @@ class SemanticSearchQuery
                     }
 
                     // Add similarity score
-                    $subtitleParts[] = "{$similarity}% match";
+                    $subtitleParts[] = "✨ {$similarity}% match";
+
+                    // Show days ago if temporal weighting applied
+                    if (isset($block->days_ago) && $block->time) {
+                        $daysAgo = round($block->days_ago);
+                        if ($daysAgo === 0) {
+                            $subtitleParts[] = '🔥 Today';
+                        } elseif ($daysAgo === 1) {
+                            $subtitleParts[] = '⏰ Yesterday';
+                        } elseif ($daysAgo < 7) {
+                            $subtitleParts[] = "⏰ {$daysAgo}d ago";
+                        }
+                    }
 
                     $subtitle = implode(' • ', $subtitleParts);
 
@@ -148,27 +196,45 @@ class SemanticSearchQuery
 
                     $results->push(
                         SpotlightResult::make()
-                            ->setTitle('🔍 ' . $title)
+                            ->setTitle($title)
                             ->setSubtitle($subtitle)
-                            ->setTypeahead('Semantic: ' . $title)
+                            ->setTypeahead('Block: ' . $title)
                             ->setIcon('document-text')
                             ->setGroup('blocks')
-                            ->setPriority(11) // Slightly lower priority than events
+                            ->setPriority(2)
                             ->setAction('jump_to', ['path' => route('blocks.show', $block)])
                             ->setTokens(['block' => $block])
                     );
                 }
 
+                // If no results, show helpful message
+                if ($results->isEmpty()) {
+                    return collect([
+                        SpotlightResult::make()
+                            ->setTitle('No semantic matches found')
+                            ->setSubtitle('Try a different query or adjust your search terms')
+                            ->setIcon('magnifying-glass')
+                            ->setGroup('commands')
+                            ->setPriority(1),
+                    ]);
+                }
+
                 return $results;
             } catch (\Exception $e) {
-                // Silently fail - don't interrupt user experience
-                // Log error for debugging
-                \Log::warning('Semantic search in Spotlight failed', [
+                // Show error in semantic mode (unlike default mode which fails silently)
+                \Log::error('Semantic search mode failed', [
                     'error' => $e->getMessage(),
                     'query' => $query,
                 ]);
 
-                return collect();
+                return collect([
+                    SpotlightResult::make()
+                        ->setTitle('Semantic search error')
+                        ->setSubtitle('Check logs for details: ' . Str::limit($e->getMessage(), 50))
+                        ->setIcon('exclamation-triangle')
+                        ->setGroup('commands')
+                        ->setPriority(1),
+                ]);
             }
         });
     }

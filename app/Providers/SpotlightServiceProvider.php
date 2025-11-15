@@ -41,6 +41,7 @@ use App\Spotlight\Queries\Search\IntegrationEventsQuery;
 use App\Spotlight\Queries\Search\MetricSearchQuery;
 use App\Spotlight\Queries\Search\MetricTrendsQuery;
 use App\Spotlight\Queries\Search\ObjectSearchQuery;
+use App\Spotlight\Queries\Search\SemanticModeQuery;
 use App\Spotlight\Queries\Search\SemanticSearchQuery;
 use App\Spotlight\Queries\Search\TagSearchQuery;
 use App\Spotlight\Scopes\BlockDetailScope;
@@ -112,6 +113,7 @@ class SpotlightServiceProvider extends ServiceProvider
             SpotlightMode::make('metrics', 'Search Metrics')->setCharacter('$'),
             SpotlightMode::make('integrations', 'Search Integrations')->setCharacter('@'),
             SpotlightMode::make('admin', 'Admin Commands')->setCharacter('!'),
+            SpotlightMode::make('semantic', 'Semantic Search (AI)')->setCharacter('~'),
             SpotlightMode::make('help', 'Help & Tips')->setCharacter('?'),
         );
     }
@@ -307,6 +309,7 @@ class SpotlightServiceProvider extends ServiceProvider
 
         // Search queries
         Spotlight::registerQueries(
+            SemanticModeQuery::make(),
             SemanticSearchQuery::make(),
             EventSearchQuery::make(),
             ObjectSearchQuery::make(),
@@ -391,6 +394,7 @@ class SpotlightServiceProvider extends ServiceProvider
             'Press <kbd>$</kbd> to search metrics',
             'Press <kbd>@</kbd> to search integrations',
             'Press <kbd>!</kbd> for admin commands',
+            'Press <kbd>~</kbd> for AI-powered semantic search (boosted recent results)',
             'Press <kbd>Tab</kbd> to filter results by category',
             'Press <kbd>Tab</kbd> on a result to scope into it and see related items',
             'On detail pages, context-aware commands appear automatically',
