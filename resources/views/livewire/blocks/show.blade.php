@@ -302,39 +302,60 @@ new class extends Component {
 
         <!-- Drawer for Technical Details -->
         <x-drawer wire:model="showSidebar" right title="Block Details" with-close-button separator class="w-11/12 lg:w-1/3">
-            <div class="space-y-4 lg:space-y-6">
-                @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
-                @if (!empty($meta))
-                <x-collapse wire:model="blockMetaOpen">
-                    <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <x-icon name="o-cog-6-tooth" class="w-5 h-5" />
-                                Block Metadata
-                            </div>
-                            <script type="application/json" id="block-meta-json-{{ $this->block->id }}">
-                                {
-                                    !!json_encode($meta, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                                }
-                            </script>
-                            <x-button
-                                icon="o-clipboard"
-                                class="btn-ghost btn-xs"
-                                title="Copy JSON"
-                                onclick="(function(){ var el=document.getElementById('block-meta-json-{{ $this->block->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Block metadata'); }); })()" />
-                        </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <x-metadata-list :data="$meta" />
-                    </x-slot:content>
-                </x-collapse>
-                @endif
+            <div class="space-y-6">
+                <!-- Primary Information (Always Visible) -->
+                <div class="pb-4 border-b border-base-200">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                    <dl>
+                        <x-metadata-row label="Block ID" :value="$this->block->id" copyable />
+                        <x-metadata-row label="Title" :value="$this->block->title" />
+                        <x-metadata-row label="Block Type" :value="Str::headline($this->block->block_type)" />
+                        @if ($this->block->value)
+                            <x-metadata-row label="Value">
+                                {!! format_event_value_display($this->block->formatted_value, $this->block->value_unit, $this->block->event?->service, $this->block->block_type, 'block') !!}
+                            </x-metadata-row>
+                        @endif
+                        <x-metadata-row label="Time">
+                            {{ to_user_timezone($this->block->time, auth()->user())->format('M j, Y g:i A') }}
+                            <span class="text-base-content/60">({{ to_user_timezone($this->block->time, auth()->user())->diffForHumans() }})</span>
+                        </x-metadata-row>
+                        <x-metadata-row label="Created">
+                            {{ to_user_timezone($this->block->created_at, auth()->user())->format('M j, Y g:i A') }}
+                            <span class="text-base-content/60">({{ to_user_timezone($this->block->created_at, auth()->user())->diffForHumans() }})</span>
+                        </x-metadata-row>
+                        <x-metadata-row label="Last Updated">
+                            {{ to_user_timezone($this->block->updated_at, auth()->user())->format('M j, Y g:i A') }}
+                            <span class="text-base-content/60">({{ to_user_timezone($this->block->updated_at, auth()->user())->diffForHumans() }})</span>
+                        </x-metadata-row>
+                        @if ($this->block->url)
+                            <x-metadata-row label="URL">
+                                <a href="{{ $this->block->url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                    {{ $this->block->url }}
+                                </a>
+                            </x-metadata-row>
+                        @endif
+                        @if ($this->block->media_url)
+                            <x-metadata-row label="Media URL">
+                                <a href="{{ $this->block->media_url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                    {{ $this->block->media_url }}
+                                </a>
+                            </x-metadata-row>
+                        @endif
+                        @if ($this->block->event)
+                            <x-metadata-row label="Related Event">
+                                <a href="{{ route('events.show', $this->block->event->id) }}" class="link link-primary text-sm">
+                                    {{ format_action_title($this->block->event->action) }}
+                                </a>
+                            </x-metadata-row>
+                        @endif
+                    </dl>
+                </div>
 
                 <!-- Relationships -->
                 <x-card class="bg-base-100 shadow">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-arrows-right-left" class="w-4 h-4" />
                             Relationships
                         </h3>
                         <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
@@ -392,8 +413,8 @@ new class extends Component {
                 <!-- Activity Timeline -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-clock" class="w-5 h-5" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-clock" class="w-4 h-4" />
                             Activity
                         </div>
                     </x-slot:heading>
@@ -454,8 +475,8 @@ new class extends Component {
 
                 <!-- Add Comment -->
                 <x-card class="bg-base-100 shadow">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-chat-bubble-left" class="w-5 h-5" />
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-4 flex items-center gap-2">
+                        <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
                         Comment
                     </h3>
                     <x-form wire:submit="addComment">
@@ -465,6 +486,34 @@ new class extends Component {
                         </div>
                     </x-form>
                 </x-card>
+
+                <!-- Technical Metadata -->
+                @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
+                @if (!empty($meta))
+                <x-collapse wire:model="blockMetaOpen">
+                    <x-slot:heading>
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between gap-2 w-full">
+                            <div class="flex items-center gap-2">
+                                <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                                Technical Metadata
+                            </div>
+                            <script type="application/json" id="block-meta-json-{{ $this->block->id }}">
+                                {
+                                    !!json_encode($meta, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
+                                }
+                            </script>
+                            <x-button
+                                icon="o-clipboard"
+                                class="btn-ghost btn-xs"
+                                title="Copy JSON"
+                                onclick="(function(){ var el=document.getElementById('block-meta-json-{{ $this->block->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Block metadata'); }); })()" />
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        <x-metadata-list :data="$meta" />
+                    </x-slot:content>
+                </x-collapse>
+                @endif
             </div>
         </x-drawer>
 
