@@ -110,7 +110,7 @@ php artisan horizon
 
 The fastest way to use semantic search is through the Spotlight command palette (`Cmd+K`):
 
-**How it works:**
+#### **Automatic Semantic Search (Default Mode)**
 
 1. Press `Cmd+K` (or `Ctrl+K` on Windows/Linux) to open Spotlight
 2. Type a natural language query with 3+ words or 15+ characters
@@ -134,12 +134,38 @@ The fastest way to use semantic search is through the Spotlight command palette 
 - **High relevance**: Uses 80% similarity threshold for quality results
 - **Graceful fallback**: Silently falls back to regular search if OpenAI unavailable
 - **Performance**: Results appear alongside regular keyword search
+- **Temporal weighting**: Recent events get a small boost (1% per day old)
 
 **Visual indicators:**
 
 - 🔍 icon marks semantic search results
 - Similarity percentage shown (e.g., "85% match")
 - Lower priority than exact keyword matches (intentional)
+
+#### **Dedicated Semantic Mode** (`~` prefix)
+
+For semantic-only results with more options, use the dedicated mode:
+
+1. Press `Cmd+K` to open Spotlight
+2. Type `~` followed by your query (e.g., `~payment issues`)
+3. Get up to 20 semantic results (10 events + 10 blocks)
+4. Uses looser threshold (120% vs 80%) for broader matching
+5. Stronger temporal weighting (1.5% per day) to prioritize recent events
+
+**Why use semantic mode?**
+
+- **More results**: 10 per type instead of 3
+- **Broader matching**: Finds more distant matches
+- **Recency focus**: Recent events boosted more heavily
+- **Visual feedback**: Shows "days ago" labels (🔥 Today, ⏰ Yesterday, etc.)
+- **Error visibility**: Displays helpful messages instead of silent fallback
+
+**Example:**
+```
+~workout performance last month
+```
+
+Shows 10 fitness events and 10 related blocks, with recent workouts appearing first
 
 ### API Usage
 
@@ -244,11 +270,29 @@ Authorization: Bearer {api_token}
 ```php
 use App\Models\Event;
 
-// Semantic search
+// Semantic search (basic)
 $embedding = app(\App\Services\EmbeddingService::class)->embed("payment issues");
 $events = Event::semanticSearch($embedding, threshold: 1.0, limit: 20)->get();
 
-// Hybrid search (semantic + filters)
+// Semantic search with temporal weighting
+// Recent events get a boost: temporalWeight of 0.01 = 1% penalty per day old
+// Example: 7 days ago = 7% lower ranking, today = no penalty
+$events = Event::semanticSearch(
+    $embedding,
+    threshold: 1.0,
+    limit: 20,
+    temporalWeight: 0.01  // Default: 0.01 (1% per day)
+)->get();
+
+// Disable temporal weighting (pure semantic similarity)
+$events = Event::semanticSearch(
+    $embedding,
+    threshold: 1.0,
+    limit: 20,
+    temporalWeight: 0  // No recency boost
+)->get();
+
+// Hybrid search (semantic + filters + temporal weighting)
 $events = Event::hybridSearch(
     $embedding,
     filters: [
@@ -257,12 +301,20 @@ $events = Event::hybridSearch(
         'from_date' => '2025-11-01'
     ],
     threshold: 1.0,
-    limit: 20
+    limit: 20,
+    temporalWeight: 0.015  // Stronger recency bias (1.5% per day)
 )->get();
 
 // Get searchable text
 $text = $event->getSearchableText();
 // Returns: "stripe payment failed 5000 cents"
+
+// Access temporal data (when temporalWeight > 0)
+foreach ($events as $event) {
+    echo $event->similarity;           // Raw cosine distance (0-2)
+    echo $event->days_ago;             // Days since event occurred
+    echo $event->weighted_similarity;  // Adjusted score with temporal boost
+}
 ```
 
 ### Block Model
@@ -270,21 +322,51 @@ $text = $event->getSearchableText();
 ```php
 use App\Models\Block;
 
-// Semantic search
-$blocks = Block::semanticSearch($embedding, threshold: 1.0, limit: 20)->get();
+// Semantic search with temporal weighting
+$blocks = Block::semanticSearch(
+    $embedding,
+    threshold: 1.0,
+    limit: 20,
+    temporalWeight: 0.01  // Default: 1% boost per day recent
+)->get();
 
-// Hybrid search
+// Hybrid search with temporal weighting
 $blocks = Block::hybridSearch(
     $embedding,
     filters: ['block_type' => 'fitness'],
     threshold: 1.0,
-    limit: 20
+    limit: 20,
+    temporalWeight: 0.02  // Strong recency bias (2% per day)
 )->get();
 
 // Get searchable text
 $text = $block->getSearchableText();
 // Returns: "Heart Rate Monitor 75 bpm https://example.com"
 ```
+
+### Temporal Weighting Explained
+
+Temporal weighting biases search results toward recent events:
+
+**Formula:** `weighted_similarity = similarity * (1 + (days_ago * temporal_weight))`
+
+**Examples:**
+
+| Days Ago | Weight 0.01 | Weight 0.015 | Weight 0.02 |
+|----------|-------------|--------------|-------------|
+| Today    | 0% penalty  | 0% penalty   | 0% penalty  |
+| 1 day    | 1% penalty  | 1.5% penalty | 2% penalty  |
+| 7 days   | 7% penalty  | 10.5% penalty| 14% penalty |
+| 30 days  | 30% penalty | 45% penalty  | 60% penalty |
+
+**When to use:**
+
+- **0.01** (default): Subtle recency bias for general queries
+- **0.015**: Moderate bias when recent events are more relevant
+- **0.02+**: Strong bias for time-sensitive searches
+- **0**: No temporal bias (pure semantic similarity)
+
+**Note:** Temporal weighting only applies when `time` field is present and not null.
 
 ## How It Works
 
