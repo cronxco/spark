@@ -15,11 +15,8 @@ new class extends Component {
     public bool $showSidebar = false;
     public string $comment = '';
     public bool $activityOpen = true;
-    public bool $actorOpen = true;
-    public bool $targetOpen = true;
-    public bool $eventMetaOpen = false;
-    public bool $actorMetaOpen = false;
-    public bool $targetMetaOpen = false;
+    public bool $detailsOpen = true;
+    public bool $technicalOpen = false;
     public bool $showCreateTagModal = false;
     public bool $showEditEventModal = false;
     public bool $showTagModal = false;
@@ -862,116 +859,147 @@ new class extends Component {
             @endif
         </div>
 
-        <!-- Drawer for Technical Details -->
+        <!-- Drawer for Event Details -->
         <x-drawer wire:model="showSidebar" right title="Event Details" separator with-close-button class="w-11/12 lg:w-1/3">
-            <div class="space-y-4 lg:space-y-6">
-                <!-- Tags Manager -->
-                <x-card class="mb-0 !p-2">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-tag" class="w-5 h-5 text-primary" />
-                            Tags
-                        </h3>
-                        <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
-                            <x-icon name="o-plus" class="w-3 h-3" />
-                        </button>
-                    </div>
-                    <div class="space-y-2" wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
-                        <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" data-hotkey="t" />
-                        <script type="application/json" id="tag-initial-{{ $this->event->id }}">
-                            {
-                                !!json_encode($this - > event - > tags - > map(fn($tag) => ['value' => (string) $tag - > name, 'type' => $tag - > type ? (string) $tag - > type : null]) - > values() - > all()) !!
-                            }
-                        </script>
-                        <script type="application/json" id="tag-suggestions-{{ $this->event->id }}">
-                            {
-                                !!json_encode(\Spatie\ Tags\ Tag::query() - > select(['name', 'type']) - > get() - > map(fn($tag) => ['value' => (string) $tag - > name, 'type' => $tag - > type ? (string) $tag - > type : null]) - > values() - > all()) !!
-                            }
-                        </script>
-                    </div>
-                </x-card>
+            <div class="space-y-6">
+                <!-- Primary Information (Always Visible) -->
+                <div class="pb-4 border-b border-base-200">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                    <dl>
+                        <x-metadata-row label="Event ID" :value="$this->event->id" copyable />
+                        <x-metadata-row label="Action" :value="$this->formatAction($this->event->action)" />
+                        <x-metadata-row label="Time">
+                            {{ to_user_timezone($this->event->time, auth()->user())->format('M j, Y g:i A') }}
+                            <span class="text-base-content/60">({{ to_user_timezone($this->event->time, auth()->user())->diffForHumans() }})</span>
+                        </x-metadata-row>
+                        @if($this->event->value)
+                            <x-metadata-row label="Value">
+                                {!! format_event_value_display($this->event->formatted_value, $this->event->value_unit, $this->event->service, $this->event->action, 'action') !!}
+                            </x-metadata-row>
+                        @endif
+                        <x-metadata-row label="Service" :value="str::headline($this->event->service)" />
+                        @if($this->event->domain)
+                            <x-metadata-row label="Domain" :value="str::headline($this->event->domain)" />
+                        @endif
+                        @if($this->event->integration)
+                            <x-metadata-row label="Integration" :value="$this->event->integration->name" />
+                        @endif
+                        @if($this->event->actor)
+                            <x-metadata-row label="Actor">
+                                <a href="{{ route('objects.show', $this->event->actor->id) }}" class="text-secondary hover:underline">
+                                    {{ $this->event->actor->title }}
+                                </a>
+                            </x-metadata-row>
+                        @endif
+                        @if($this->event->target)
+                            <x-metadata-row label="Target">
+                                <a href="{{ route('objects.show', $this->event->target->id) }}" class="text-accent hover:underline">
+                                    {{ $this->event->target->title }}
+                                </a>
+                            </x-metadata-row>
+                        @endif
+                    </dl>
+                </div>
 
-                <!-- Relationships -->
-                <x-card class="mb-0 !p-2">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
-                            Relationships
-                        </h3>
-                        <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
-                            <x-icon name="o-plus" class="w-3 h-3" />
-                        </button>
-                    </div>
-                    @php $sidebarRelationships = $this->getRelationships(); @endphp
-                    @if ($sidebarRelationships->isEmpty())
-                    <div class="text-center py-4 text-base-content/60 text-sm">
-                        No relationships yet
-                    </div>
-                    @else
-                    <div class="space-y-2 max-h-64 overflow-y-auto">
-                        @foreach ($sidebarRelationships->take(10) as $relationship)
-                        @php
-                        $isFrom = $relationship->from_type === get_class($event) && $relationship->from_id === $event->id;
-                        $relatedModel = $isFrom ? $relationship->to : $relationship->from;
-
-                        // Initialize defaults
-                        $icon = 'o-question-mark-circle';
-                        $title = 'Unknown';
-                        $route = '#';
-                        $badgeClass = 'badge-ghost';
-
-                        if ($relatedModel instanceof \App\Models\Event) {
-                        $icon = 'o-calendar';
-                        $title = $relatedModel->action;
-                        $route = route('events.show', $relatedModel);
-                        $badgeClass = 'badge-primary';
-                        } elseif ($relatedModel instanceof \App\Models\EventObject) {
-                        $icon = 'o-cube';
-                        $title = $relatedModel->title;
-                        $route = route('objects.show', $relatedModel);
-                        $badgeClass = 'badge-secondary';
-                        } elseif ($relatedModel instanceof \App\Models\Block) {
-                        $icon = 'o-squares-2x2';
-                        $title = $relatedModel->type;
-                        $route = route('blocks.show', $relatedModel);
-                        $badgeClass = 'badge-accent';
-                        }
-                        @endphp
-                        <a href="{{ $route }}" class="flex items-center gap-2 p-2 rounded hover:bg-base-200 transition-colors">
-                            <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 text-accent flex-shrink-0" />
-                            <x-icon name="{{ $icon }}" class="w-3 h-3 flex-shrink-0" />
-                            <span class="text-sm truncate flex-1">{{ $title }}</span>
-                        </a>
-                        @endforeach
-                    </div>
-                    @if ($sidebarRelationships->count() > 10)
-                    <div class="text-center mt-2">
-                        <button wire:click="handleOpenManageRelationshipsModal" class="text-xs text-accent hover:underline">
-                            View all {{ $sidebarRelationships->count() }}
-                        </button>
-                    </div>
-                    @endif
-                    @endif
-                </x-card>
-
-                <!-- Add Comment -->
-                <x-card class="!p-2">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-chat-bubble-left" class="w-5 h-5 text-primary" />
-                        Comment
-                    </h3>
-                    <x-form wire:submit="addComment">
-                        <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." />
-                        <div class="mt-3 flex justify-end">
-                            <x-button type="submit" class="btn-primary btn-sm" label="Post" />
+                <div class="grid grid-cols-1 gap-4">
+                    <!-- Tags -->
+                    <div class="border border-base-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold flex items-center gap-2">
+                                <x-icon name="o-tag" class="w-4 h-4 text-primary" />
+                                Tags
+                            </h3>
+                            <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
+                                <x-icon name="o-plus" class="w-3 h-3" />
+                            </button>
                         </div>
-                    </x-form>
-                </x-card>
-                <!-- Activity Timeline -->
+                        <div wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
+                            <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" data-hotkey="t" />
+                            <script type="application/json" id="tag-initial-{{ $this->event->id }}">
+                                {!!json_encode($this->event->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all())!!}
+                            </script>
+                            <script type="application/json" id="tag-suggestions-{{ $this->event->id }}">
+                                {!!json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all())!!}
+                            </script>
+                        </div>
+                    </div>
+
+                    <!-- Relationships -->
+                    <div class="border border-base-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold flex items-center gap-2">
+                                <x-icon name="o-arrows-right-left" class="w-4 h-4 text-accent" />
+                                Relationships
+                            </h3>
+                            <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
+                                <x-icon name="o-plus" class="w-3 h-3" />
+                            </button>
+                        </div>
+                        @php $sidebarRelationships = $this->getRelationships(); @endphp
+                        @if ($sidebarRelationships->isEmpty())
+                        <div class="text-center py-3 text-base-content/60 text-sm">
+                            No relationships yet
+                        </div>
+                        @else
+                        <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                            @foreach ($sidebarRelationships->take(10) as $relationship)
+                            @php
+                            $isFrom = $relationship->from_type === get_class($event) && $relationship->from_id === $event->id;
+                            $relatedModel = $isFrom ? $relationship->to : $relationship->from;
+                            $icon = 'o-question-mark-circle';
+                            $title = 'Unknown';
+                            $route = '#';
+
+                            if ($relatedModel instanceof \App\Models\Event) {
+                                $icon = 'o-calendar';
+                                $title = $relatedModel->action;
+                                $route = route('events.show', $relatedModel);
+                            } elseif ($relatedModel instanceof \App\Models\EventObject) {
+                                $icon = 'o-cube';
+                                $title = $relatedModel->title;
+                                $route = route('objects.show', $relatedModel);
+                            } elseif ($relatedModel instanceof \App\Models\Block) {
+                                $icon = 'o-squares-2x2';
+                                $title = $relatedModel->type;
+                                $route = route('blocks.show', $relatedModel);
+                            }
+                            @endphp
+                            <a href="{{ $route }}" class="flex items-center gap-2 p-2 rounded hover:bg-base-200 transition-colors">
+                                <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 text-accent flex-shrink-0" />
+                                <x-icon name="{{ $icon }}" class="w-3 h-3 flex-shrink-0" />
+                                <span class="text-sm truncate flex-1">{{ $title }}</span>
+                            </a>
+                            @endforeach
+                        </div>
+                        @if ($sidebarRelationships->count() > 10)
+                        <div class="text-center mt-2">
+                            <button wire:click="handleOpenManageRelationshipsModal" class="text-xs text-accent hover:underline">
+                                View all {{ $sidebarRelationships->count() }}
+                            </button>
+                        </div>
+                        @endif
+                        @endif
+                    </div>
+
+                    <!-- Add Comment -->
+                    <div class="border border-base-200 rounded-lg p-4">
+                        <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <x-icon name="o-chat-bubble-left" class="w-4 h-4 text-primary" />
+                            Add Comment
+                        </h3>
+                        <x-form wire:submit="addComment">
+                            <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." class="textarea-sm" />
+                            <div class="mt-2 flex justify-end">
+                                <x-button type="submit" class="btn-primary btn-sm" label="Post" />
+                            </div>
+                        </x-form>
+                    </div>
+                </div>
+                <!-- Activity Timeline (Collapsible, Default: Open) -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-clock" class="w-5 h-5 text-primary" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-clock" class="w-4 h-4" />
                             Activity
                         </div>
                     </x-slot:heading>
@@ -1034,198 +1062,160 @@ new class extends Component {
 
                     </x-slot:content>
                 </x-collapse>
-                <!-- Actor Details -->
-                @if ($this->event->actor)
-                <x-collapse wire:model="actorOpen">
+
+                <!-- Details (Collapsible, Default: Open) -->
+                @if ($this->event->actor || $this->event->target)
+                <x-collapse wire:model="detailsOpen">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-user" class="w-5 h-5 text-secondary" />
-                            Actor Details
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-cube" class="w-4 h-4" />
+                            Entity Details
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        <div class="space-y-3 text-sm">
-                            <div>
-                                <span class="text-base-content/70">Title:</span>
-                                <div class="font-medium">{{ $this->event->actor->title }}</div>
+                        @if ($this->event->actor)
+                        <div class="mb-6">
+                            <div class="flex items-center gap-2 mb-3">
+                                <x-icon name="o-user" class="w-4 h-4 text-secondary" />
+                                <h4 class="text-sm font-semibold">Actor</h4>
                             </div>
-                            @php $actorText = is_array($this->event->actor->metadata ?? null) ? ($this->event->actor->metadata['text'] ?? null) : null; @endphp
-                            @if ($actorText)
-                            <div>
-                                <span class="text-base-content/70">Content:</span>
-                                <div class="font-medium">{{ $actorText }}</div>
+                            <dl>
+                                <x-metadata-row label="Title" :value="$this->event->actor->title" />
+                                @if ($this->event->actor->type)
+                                    <x-metadata-row label="Type" :value="$this->event->actor->type" />
+                                @endif
+                                @if ($this->event->actor->concept)
+                                    <x-metadata-row label="Concept" :value="$this->event->actor->concept" />
+                                @endif
+                                @if ($this->event->actor->url)
+                                    <x-metadata-row label="URL">
+                                        <a href="{{ $this->event->actor->url }}" target="_blank" class="text-primary hover:underline">View</a>
+                                    </x-metadata-row>
+                                @endif
+                                @if ($this->event->actor->tags->isNotEmpty())
+                                    <x-metadata-row label="Tags">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach ($this->event->actor->tags as $tag)
+                                                <x-spark-tag :tag="$tag" size="xs" />
+                                            @endforeach
+                                        </div>
+                                    </x-metadata-row>
+                                @endif
+                            </dl>
+                        </div>
+                        @endif
+
+                        @if ($this->event->target)
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <x-icon name="o-arrow-trending-up" class="w-4 h-4 text-accent" />
+                                <h4 class="text-sm font-semibold">Target</h4>
                             </div>
-                            @endif
-                            @if ($this->event->actor->type)
-                            <div>
-                                <span class="text-base-content/70">Type:</span>
-                                <x-badge :value="$this->event->actor->type" class="badge-sm" />
-                            </div>
-                            @endif
-                            @if ($this->event->actor->concept)
-                            <div>
-                                <span class="text-base-content/70">Concept:</span>
-                                <x-badge :value="$this->event->actor->concept" class="badge-sm badge-outline" />
-                            </div>
-                            @endif
-                            @if ($this->event->actor->url)
-                            <div>
-                                <span class="text-base-content/70">URL:</span>
-                                <a href="{{ $this->event->actor->url }}" target="_blank" class="text-primary hover:underline block">
-                                    View
-                                </a>
-                            </div>
-                            @endif
-                            @if ($this->event->actor->tags->isNotEmpty())
-                            <div>
-                                <span class="text-base-content/70">Tags:</span>
-                                <div class="flex flex-wrap gap-1 mt-1">
-                                    @foreach ($this->event->actor->tags as $tag)
-                                    <x-spark-tag :tag="$tag" />
-                                    @endforeach
+                            <dl>
+                                <x-metadata-row label="Title" :value="$this->event->target->title" />
+                                @if ($this->event->target->type)
+                                    <x-metadata-row label="Type" :value="$this->event->target->type" />
+                                @endif
+                                @if ($this->event->target->concept)
+                                    <x-metadata-row label="Concept" :value="$this->event->target->concept" />
+                                @endif
+                                @if ($this->event->target->url)
+                                    <x-metadata-row label="URL">
+                                        <a href="{{ $this->event->target->url }}" target="_blank" class="text-primary hover:underline">View</a>
+                                    </x-metadata-row>
+                                @endif
+                                @if ($this->event->target->tags->isNotEmpty())
+                                    <x-metadata-row label="Tags">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach ($this->event->target->tags as $tag)
+                                                <x-spark-tag :tag="$tag" size="xs" />
+                                            @endforeach
+                                        </div>
+                                    </x-metadata-row>
+                                @endif
+                            </dl>
+                        </div>
+                        @endif
+                    </x-slot:content>
+                </x-collapse>
+                @endif
+
+                <!-- Technical Metadata (Collapsible, Default: Closed) -->
+                @if (
+                    ($this->event->event_metadata && count($this->event->event_metadata) > 0) ||
+                    ($this->event->actor && $this->event->actor->metadata && count($this->event->actor->metadata) > 0) ||
+                    ($this->event->target && $this->event->target->metadata && count($this->event->target->metadata) > 0)
+                )
+                <x-collapse wire:model="technicalOpen">
+                    <x-slot:heading>
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                            Technical Metadata
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        @if ($this->event->event_metadata && count($this->event->event_metadata) > 0)
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-document-text" class="w-4 h-4 text-warning" />
+                                    <h4 class="text-sm font-semibold">Event Metadata</h4>
                                 </div>
+                                <script type="application/json" id="event-meta-json-{{ $this->event->id }}">
+                                    {!!json_encode($this->event->event_metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)!!}
+                                </script>
+                                <x-button
+                                    icon="o-clipboard"
+                                    label="Copy"
+                                    class="btn-ghost btn-xs"
+                                    title="Copy JSON"
+                                    onclick="(function(){ var el=document.getElementById('event-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Event metadata'); }); })()" />
                             </div>
-                            @endif
+                            <x-metadata-list :data="$this->event->event_metadata" />
                         </div>
-                    </x-slot:content>
-                </x-collapse>
-                @endif
+                        @endif
 
-                <!-- Target Details -->
-                @if ($this->event->target)
-                <x-collapse wire:model="targetOpen">
-                    <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-arrow-trending-up" class="w-5 h-5 text-accent" />
-                            Target Details
-                        </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <div class="space-y-3 text-sm">
-                            <div>
-                                <span class="text-base-content/70">Title:</span>
-                                <div class="font-medium">{{ $this->event->target->title }}</div>
-                            </div>
-                            @php $targetText = is_array($this->event->target->metadata ?? null) ? ($this->event->target->metadata['text'] ?? null) : null; @endphp
-                            @if ($targetText)
-                            <div>
-                                <span class="text-base-content/70">Content:</span>
-                                <div class="font-medium">{{ $targetText }}</div>
-                            </div>
-                            @endif
-                            @if ($this->event->target->type)
-                            <div>
-                                <span class="text-base-content/70">Type:</span>
-                                <x-badge :value="$this->event->target->type" class="badge-sm" />
-                            </div>
-                            @endif
-                            @if ($this->event->target->concept)
-                            <div>
-                                <span class="text-base-content/70">Concept:</span>
-                                <x-badge :value="$this->event->target->concept" class="badge-sm badge-outline" />
-                            </div>
-                            @endif
-                            @if ($this->event->target->url)
-                            <div>
-                                <span class="text-base-content/70">URL:</span>
-                                <a href="{{ $this->event->target->url }}" target="_blank" class="text-primary hover:underline block">
-                                    View
-                                </a>
-                            </div>
-                            @endif
-                            @if ($this->event->target->tags->isNotEmpty())
-                            <div>
-                                <span class="text-base-content/70">Tags:</span>
-                                <div class="flex flex-wrap gap-1 mt-1">
-                                    @foreach ($this->event->target->tags as $tag)
-                                    <x-spark-tag :tag="$tag" />
-                                    @endforeach
+                        @if ($this->event->actor && $this->event->actor->metadata && count($this->event->actor->metadata) > 0)
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-user" class="w-4 h-4 text-secondary" />
+                                    <h4 class="text-sm font-semibold">Actor Metadata</h4>
                                 </div>
+                                <script type="application/json" id="actor-meta-json-{{ $this->event->id }}">
+                                    {!!json_encode($this->event->actor->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)!!}
+                                </script>
+                                <x-button
+                                    icon="o-clipboard"
+                                    label="Copy"
+                                    class="btn-ghost btn-xs"
+                                    title="Copy JSON"
+                                    onclick="(function(){ var el=document.getElementById('actor-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Actor metadata'); }); })()" />
                             </div>
-                            @endif
+                            <x-metadata-list :data="$this->event->actor->metadata" />
                         </div>
-                    </x-slot:content>
-                </x-collapse>
-                @endif
+                        @endif
 
-                <!-- Technical Metadata -->
-                @if ($this->event->event_metadata && count($this->event->event_metadata) > 0)
-                <x-collapse wire:model="eventMetaOpen">
-                    <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-warning" />
-                                Event Metadata
+                        @if ($this->event->target && $this->event->target->metadata && count($this->event->target->metadata) > 0)
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="o-arrow-trending-up" class="w-4 h-4 text-accent" />
+                                    <h4 class="text-sm font-semibold">Target Metadata</h4>
+                                </div>
+                                <script type="application/json" id="target-meta-json-{{ $this->event->id }}">
+                                    {!!json_encode($this->event->target->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)!!}
+                                </script>
+                                <x-button
+                                    icon="o-clipboard"
+                                    label="Copy"
+                                    class="btn-ghost btn-xs"
+                                    title="Copy JSON"
+                                    onclick="(function(){ var el=document.getElementById('target-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Target metadata'); }); })()" />
                             </div>
-                            <script type="application/json" id="event-meta-json-{{ $this->event->id }}">
-                                {
-                                    !!json_encode($this - > event - > event_metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                                }
-                            </script>
-                            <x-button
-                                icon="o-clipboard"
-                                label="Copy"
-                                class="btn-ghost btn-xs"
-                                title="Copy JSON"
-                                onclick="(function(){ var el=document.getElementById('event-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Event metadata'); }); })()" />
+                            <x-metadata-list :data="$this->event->target->metadata" />
                         </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <x-metadata-list :data="$this->event->event_metadata" />
-                    </x-slot:content>
-                </x-collapse>
-                @endif
-
-                @if ($this->event->actor && $this->event->actor->metadata && count($this->event->actor->metadata) > 0)
-                <x-collapse wire:model="actorMetaOpen">
-                    <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-secondary" />
-                                Actor Metadata
-                            </div>
-                            <script type="application/json" id="actor-meta-json-{{ $this->event->id }}">
-                                {
-                                    !!json_encode($this - > event - > actor - > metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                                }
-                            </script>
-                            <x-button
-                                icon="o-clipboard"
-                                label="Copy"
-                                class="btn-ghost btn-xs"
-                                title="Copy JSON"
-                                onclick="(function(){ var el=document.getElementById('actor-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Actor metadata'); }); })()" />
-                        </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <x-metadata-list :data="$this->event->actor->metadata" />
-                    </x-slot:content>
-                </x-collapse>
-                @endif
-
-                @if ($this->event->target && $this->event->target->metadata && count($this->event->target->metadata) > 0)
-                <x-collapse wire:model="targetMetaOpen">
-                    <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-accent" />
-                                Target Metadata
-                            </div>
-                            <script type="application/json" id="target-meta-json-{{ $this->event->id }}">
-                                {
-                                    !!json_encode($this - > event - > target - > metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                                }
-                            </script>
-                            <x-button
-                                icon="o-clipboard"
-                                label="Copy"
-                                class="btn-ghost btn-xs"
-                                title="Copy JSON"
-                                onclick="(function(){ var el=document.getElementById('target-meta-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Target metadata'); }); })()" />
-                        </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <x-metadata-list :data="$this->event->target->metadata" />
+                        @endif
                     </x-slot:content>
                 </x-collapse>
                 @endif
