@@ -2,17 +2,34 @@ name: Dust and Test
 
 on:
   pull_request:
+  issue_comment:
+    types: [created]
 
 jobs:
   duster:
+    if: |
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && (contains(github.event.comment.body, '/test') || contains(github.event.comment.body, '/run-tests')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Add reaction to comment
+        if: github.event_name == 'issue_comment'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: eyes
+
+      - name: Get PR branch
+        if: github.event_name == 'issue_comment'
+        uses: xt0rted/pull-request-comment-branch@v3
+        id: comment-branch
+
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event_name == 'issue_comment' && steps.comment-branch.outputs.head_ref || github.event.pull_request.head.ref }}
+          repository: ${{ github.event_name == 'issue_comment' && steps.comment-branch.outputs.head_repo || github.event.pull_request.head.repo.full_name }}
 
       - name: "Duster Fix"
         uses: tighten/duster-action@557d11cf6d55a7f7cf6324806c633af0062759eb # v3
@@ -44,8 +61,15 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
+      - name: Get PR branch
+        if: github.event_name == 'issue_comment'
+        uses: xt0rted/pull-request-comment-branch@v3
+        id: comment-branch
+
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && steps.comment-branch.outputs.head_ref || '' }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # v2
@@ -157,3 +181,34 @@ jobs:
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Comment success
+        if: success() && github.event_name == 'issue_comment'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ✅ Dust and tests passed successfully!
+
+            **Test Results:**
+            - Total: `${{ steps.tests.outputs.total }}`
+            - Passed: `${{ steps.tests.outputs.passed }}`
+            - Failed: `${{ steps.tests.outputs.failed }}`
+
+            Triggered by comment from @${{ github.event.comment.user.login }}
+
+      - name: Comment failure
+        if: failure() && github.event_name == 'issue_comment'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ❌ Dust and/or tests failed!
+
+            **Test Results:**
+            - Total: `${{ steps.tests.outputs.total }}`
+            - Passed: `${{ steps.tests.outputs.passed }}`
+            - Failed: `${{ steps.tests.outputs.failed }}`
+
+            Triggered by comment from @${{ github.event.comment.user.login }}
+            Please check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
