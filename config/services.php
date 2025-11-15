@@ -152,4 +152,10 @@ return [
         'cookie_refresh_threshold_days' => env('PLAYWRIGHT_COOKIE_REFRESH_THRESHOLD', 7),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'organization' => env('OPENAI_ORGANIZATION'),
+        'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+    ],
+
 ];

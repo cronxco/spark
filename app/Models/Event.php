@@ -409,4 +409,85 @@ class Event extends Model
             ->withProperties(['tag' => $tagLabel, 'tag_name' => $tagName, 'tag_type' => $tagType])
             ->log("{$action} tag \"{$tagLabel}\"");
     }
+
+    /**
+     * Get the searchable text for this event (used for embedding generation)
+     */
+    public function getSearchableText(): string
+    {
+        $parts = array_filter([
+            $this->service,
+            $this->domain,
+            $this->action,
+            $this->value && $this->value_unit ? "{$this->value} {$this->value_unit}" : null,
+        ]);
+
+        return implode(' ', $parts);
+    }
+
+    /**
+     * Scope for semantic search using vector similarity
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector (1536 dimensions)
+     * @param  float  $threshold  Maximum cosine distance (0-2, lower is more similar)
+     * @param  int  $limit  Maximum number of results
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        return $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+            ->orderBy('similarity', 'asc')
+            ->limit($limit);
+    }
+
+    /**
+     * Scope for hybrid search (semantic + metadata filters)
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector
+     * @param  array  $filters  Additional metadata filters (service, domain, action, integration_id, etc.)
+     * @param  float  $threshold  Maximum cosine distance
+     * @param  int  $limit  Maximum number of results
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold]);
+
+        // Apply metadata filters
+        if (isset($filters['integration_id'])) {
+            $query->where('integration_id', $filters['integration_id']);
+        }
+
+        if (isset($filters['service'])) {
+            $query->where('service', $filters['service']);
+        }
+
+        if (isset($filters['domain'])) {
+            $query->where('domain', $filters['domain']);
+        }
+
+        if (isset($filters['action'])) {
+            $query->where('action', $filters['action']);
+        }
+
+        if (isset($filters['from_date'])) {
+            $query->where('time', '>=', $filters['from_date']);
+        }
+
+        if (isset($filters['to_date'])) {
+            $query->where('time', '<=', $filters['to_date']);
+        }
+
+        return $query->orderBy('similarity', 'asc')->limit($limit);
+    }
 }
