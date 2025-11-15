@@ -400,4 +400,77 @@ class Block extends Model implements HasMedia
     {
         return ! empty($this->getContent());
     }
+
+    /**
+     * Get the searchable text for this block (used for embedding generation)
+     */
+    public function getSearchableText(): string
+    {
+        $parts = array_filter([
+            $this->title,
+            $this->getContent(),
+            $this->url,
+            $this->value && $this->value_unit ? "{$this->value} {$this->value_unit}" : null,
+        ]);
+
+        return implode(' ', $parts);
+    }
+
+    /**
+     * Scope for semantic search using vector similarity
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector (1536 dimensions)
+     * @param  float  $threshold  Maximum cosine distance (0-2, lower is more similar)
+     * @param  int  $limit  Maximum number of results
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        return $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+            ->orderBy('similarity', 'asc')
+            ->limit($limit);
+    }
+
+    /**
+     * Scope for hybrid search (semantic + metadata filters)
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector
+     * @param  array  $filters  Additional metadata filters (event_id, block_type, etc.)
+     * @param  float  $threshold  Maximum cosine distance
+     * @param  int  $limit  Maximum number of results
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold]);
+
+        // Apply metadata filters
+        if (isset($filters['event_id'])) {
+            $query->where('event_id', $filters['event_id']);
+        }
+
+        if (isset($filters['block_type'])) {
+            $query->where('block_type', $filters['block_type']);
+        }
+
+        if (isset($filters['from_date'])) {
+            $query->where('time', '>=', $filters['from_date']);
+        }
+
+        if (isset($filters['to_date'])) {
+            $query->where('time', '<=', $filters['to_date']);
+        }
+
+        return $query->orderBy('similarity', 'asc')->limit($limit);
+    }
 }
