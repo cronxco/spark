@@ -201,49 +201,83 @@
 
         <!-- Drawer for Technical Details -->
         <x-drawer wire:model="showSidebar" right title="Integration Details" separator with-close-button class="w-11/12 lg:w-1/3">
-            <div class="space-y-4 lg:space-y-6">
-                <!-- Configuration Preview -->
+            <div class="space-y-6">
+                <!-- Primary Information (Always Visible) -->
+                <div class="pb-4 border-b border-base-200">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                    <dl>
+                        <x-metadata-row label="Integration ID" :value="$integration->id" copyable />
+                        <x-metadata-row label="Service" :value="$integration->service" />
+                        <x-metadata-row label="Instance Type" :value="$integration->instance_type" />
+                        <x-metadata-row label="Status">
+                            <span class="badge {{ $integration->isPaused() ? 'badge-neutral' : 'badge-success' }} badge-sm">
+                                {{ $integration->isPaused() ? 'Paused' : 'Active' }}
+                            </span>
+                        </x-metadata-row>
+                        <x-metadata-row label="Created">
+                            {{ to_user_timezone($integration->created_at, auth()->user())->format('M j, Y g:i A') }}
+                            <span class="text-base-content/60">({{ to_user_timezone($integration->created_at, auth()->user())->diffForHumans() }})</span>
+                        </x-metadata-row>
+                        @if ($integration->last_triggered_at)
+                            <x-metadata-row label="Last Triggered">
+                                {{ to_user_timezone($integration->last_triggered_at, auth()->user())->format('M j, Y g:i A') }}
+                                <span class="text-base-content/60">({{ to_user_timezone($integration->last_triggered_at, auth()->user())->diffForHumans() }})</span>
+                            </x-metadata-row>
+                        @endif
+                        @if ($integration->last_successful_update_at)
+                            <x-metadata-row label="Last Successful Update">
+                                {{ to_user_timezone($integration->last_successful_update_at, auth()->user())->format('M j, Y g:i A') }}
+                                <span class="text-base-content/60">({{ to_user_timezone($integration->last_successful_update_at, auth()->user())->diffForHumans() }})</span>
+                            </x-metadata-row>
+                        @endif
+                    </dl>
+                </div>
+
+                <!-- Configuration (Collapsible, Default Open) -->
                 <x-collapse wire:model="configOpen">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-primary" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
                             Configuration
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        <div class="space-y-3 text-sm">
+                        <dl>
                             @if ($integration->getUpdateFrequencyMinutes())
-                            <div>
-                                <span class="text-base-content/70">Update Frequency:</span>
-                                <span class="font-medium">{{ $integration->getUpdateFrequencyMinutes() }} minutes</span>
-                            </div>
+                                <x-metadata-row
+                                    label="Update Frequency"
+                                    :value="$integration->getUpdateFrequencyMinutes() . ' minutes'"
+                                />
                             @endif
 
                             @if ($integration->useSchedule())
-                            <div>
-                                <span class="text-base-content/70">Schedule Times:</span>
-                                <span class="font-medium">{{ implode(', ', $integration->getScheduleTimes()) }}</span>
-                            </div>
-                            <div>
-                                <span class="text-base-content/70">Timezone:</span>
-                                <span class="font-medium">{{ $integration->getScheduleTimezone() }}</span>
-                            </div>
+                                <x-metadata-row
+                                    label="Schedule Times"
+                                    :value="implode(', ', $integration->getScheduleTimes())"
+                                />
+                                <x-metadata-row
+                                    label="Schedule Timezone"
+                                    :value="$integration->getScheduleTimezone()"
+                                />
                             @endif
-
-                            <div>
-                                <span class="text-base-content/70">Status:</span>
-                                <span class="font-medium">{{ $integration->isPaused() ? 'Paused' : 'Active' }}</span>
-                            </div>
 
                             @if ($integration->account_id)
-                            <div>
-                                <span class="text-base-content/70">Account ID:</span>
-                                <span class="font-mono text-xs">{{ $integration->account_id }}</span>
-                            </div>
+                                <x-metadata-row
+                                    label="Account ID"
+                                    :value="$integration->account_id"
+                                    copyable
+                                />
                             @endif
-                        </div>
 
-                        <div class="mt-4">
+                            @if ($integration->getNextUpdateTime())
+                                <x-metadata-row label="Next Update">
+                                    {{ $integration->getNextUpdateTime()->format('M j, Y g:i A') }}
+                                    <span class="text-base-content/60">({{ $integration->getNextUpdateTime()->diffForHumans() }})</span>
+                                </x-metadata-row>
+                            @endif
+                        </dl>
+
+                        <div class="mt-4 pt-4 border-t border-base-200">
                             <x-button
                                 label="Edit Configuration"
                                 link="{{ route('integrations.configure', $integration->id) }}"
@@ -254,11 +288,11 @@
                     </x-slot:content>
                 </x-collapse>
 
-                <!-- Logs Section -->
+                <!-- Logs (Collapsible, Default Closed) -->
                 <x-collapse wire:model="logsOpen">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-document-text" class="w-5 h-5 text-primary" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                            <x-icon name="o-document-text" class="w-4 h-4" />
                             Logs
                         </div>
                     </x-slot:heading>
