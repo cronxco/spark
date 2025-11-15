@@ -104,7 +104,44 @@ php artisan queue:work
 php artisan horizon
 ```
 
-## API Usage
+## Usage
+
+### Spotlight Command Palette (Recommended)
+
+The fastest way to use semantic search is through the Spotlight command palette (`Cmd+K`):
+
+**How it works:**
+
+1. Press `Cmd+K` (or `Ctrl+K` on Windows/Linux) to open Spotlight
+2. Type a natural language query with 3+ words or 15+ characters
+3. Semantic search automatically activates and shows AI-powered results
+4. Results appear with a 🔍 icon and similarity percentage
+5. Click any result to navigate to that event or block
+
+**Example queries:**
+
+- "payment failures from last week"
+- "workout data from yesterday morning"
+- "customer support tickets about billing"
+- "health metrics showing low energy"
+- "transactions over $100"
+
+**Features:**
+
+- **Automatic activation**: No special prefix needed - just type naturally
+- **Smart threshold**: Only triggers for meaningful queries (3+ words)
+- **Top results**: Shows top 3 events and top 3 blocks
+- **High relevance**: Uses 80% similarity threshold for quality results
+- **Graceful fallback**: Silently falls back to regular search if OpenAI unavailable
+- **Performance**: Results appear alongside regular keyword search
+
+**Visual indicators:**
+
+- 🔍 icon marks semantic search results
+- Similarity percentage shown (e.g., "85% match")
+- Lower priority than exact keyword matches (intentional)
+
+### API Usage
 
 ### Search Events
 
