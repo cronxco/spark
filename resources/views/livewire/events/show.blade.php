@@ -659,7 +659,7 @@ new class extends Component {
                         {{ $this->event->target->title }}
                     </h3>
                     <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                        {!! nl2br(e($this->event->target->content)) !!}
+                        {!! Str::markdown($this->event->target->content) !!}
                     </div>
                 </div>
             </x-card>

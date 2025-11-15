@@ -7,7 +7,10 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$imageUrl = $block->media_url ?? $block->metadata['source'] ?? null;
+$imageUrl = get_media_url($block, 'downloaded_images', 'medium')
+    ?? $block->media_url
+    ?? $block->metadata['source']
+    ?? null;
 $subreddit = $block->metadata['subreddit'] ?? null;
 @endphp
 

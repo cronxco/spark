@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Media\MediaDeduplicationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,10 +11,13 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Block extends Model
+class Block extends Model implements HasMedia
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, InteractsWithMedia, LogsActivity, SoftDeletes;
 
     /**
      * Only record update events via LogsActivity trait.
@@ -133,6 +137,15 @@ class Block extends Model
             }
         });
 
+        static::deleting(function ($model): void {
+            // Handle media deletion with deduplication logic
+            $deduplicationService = app(MediaDeduplicationService::class);
+
+            foreach ($model->media as $media) {
+                $deduplicationService->deleteMedia($media, forceDelete: false);
+            }
+        });
+
         static::deleted(function ($model): void {
             activity('changelog')
                 ->performedOn($model)
@@ -156,6 +169,44 @@ class Block extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at']);
+    }
+
+    /**
+     * Register media collections for Block.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('downloaded_images')
+            ->useDisk(config('media-library.disk_name'));
+
+        $this->addMediaCollection('downloaded_videos')
+            ->useDisk(config('media-library.disk_name'));
+
+        $this->addMediaCollection('downloaded_documents')
+            ->useDisk(config('media-library.disk_name'));
+    }
+
+    /**
+     * Register media conversions for Block.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumbnail')
+            ->width(300)
+            ->height(300)
+            ->sharpen(10)
+            ->nonQueued()
+            ->performOnCollections('downloaded_images');
+
+        $this->addMediaConversion('medium')
+            ->width(800)
+            ->keepOriginalImageFormat()
+            ->performOnCollections('downloaded_images');
+
+        $this->addMediaConversion('webp')
+            ->width(800)
+            ->format('webp')
+            ->performOnCollections('downloaded_images');
     }
 
     public function event()

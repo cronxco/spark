@@ -8,6 +8,7 @@ use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
+use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaywrightHealthMetrics;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -134,9 +135,15 @@ class FetchSingleUrl implements ShouldQueue
             // Store screenshot if available
             if ($screenshot) {
                 try {
-                    $webpage->addMediaFromBase64($screenshot)
-                        ->usingFileName('screenshot-' . now()->format('Y-m-d-His') . '.png')
-                        ->toMediaCollection('screenshots');
+                    $mediaHelper = app(MediaDownloadHelper::class);
+                    $fileName = 'screenshot-' . now()->format('Y-m-d-His') . '.png';
+
+                    $mediaHelper->attachMediaFromBase64(
+                        $screenshot,
+                        $webpage,
+                        $fileName,
+                        'screenshots'
+                    );
 
                     Log::debug('Fetch: Screenshot saved', ['url' => $this->url]);
                 } catch (Exception $e) {
@@ -253,9 +260,14 @@ class FetchSingleUrl implements ShouldQueue
         ]);
 
         try {
-            // Download and attach PDF using Laravel Media Library
-            $webpage->addMediaFromUrl($this->url)
-                ->toMediaCollection('PDFs');
+            // Download and attach PDF using Media Library with deduplication
+            $mediaHelper = app(MediaDownloadHelper::class);
+
+            $mediaHelper->downloadAndAttachMedia(
+                $this->url,
+                $webpage,
+                'pdfs'
+            );
 
             Log::info('Fetch: PDF downloaded successfully', [
                 'url' => $this->url,
