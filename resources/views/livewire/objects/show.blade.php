@@ -1310,14 +1310,14 @@ new class extends Component {
                             </x-metadata-row>
                             @if ($this->object->url)
                                 <x-metadata-row label="URL">
-                                    <a href="{{ $this->object->url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                    <a href="{{ $this->object->url }}" target="_blank" class="hover:underline">
                                         {{ $this->object->url }}
                                     </a>
                                 </x-metadata-row>
                             @endif
                             @if ($this->object->media_url)
                                 <x-metadata-row label="Media URL">
-                                    <a href="{{ $this->object->media_url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                    <a href="{{ $this->object->media_url }}" target="_blank" class="hover:underline">
                                         {{ $this->object->media_url }}
                                     </a>
                                 </x-metadata-row>
