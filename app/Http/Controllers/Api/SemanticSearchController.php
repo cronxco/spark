@@ -95,13 +95,13 @@ class SemanticSearchController extends Controller
      * Search events
      *
      * @param array $embedding
-     * @param int $userId
+     * @param string $userId
      * @param float $threshold
      * @param int $limit
      * @param float $temporalWeight
      * @return array
      */
-    private function searchEvents(array $embedding, int $userId, float $threshold, int $limit, float $temporalWeight): array
+    private function searchEvents(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
         $userIntegrationIds = \App\Models\Integration::where('user_id', $userId)->pluck('id')->toArray();
 
@@ -140,13 +140,13 @@ class SemanticSearchController extends Controller
      * Search blocks
      *
      * @param array $embedding
-     * @param int $userId
+     * @param string $userId
      * @param float $threshold
      * @param int $limit
      * @param float $temporalWeight
      * @return array
      */
-    private function searchBlocks(array $embedding, int $userId, float $threshold, int $limit, float $temporalWeight): array
+    private function searchBlocks(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
         $userIntegrationIds = \App\Models\Integration::where('user_id', $userId)->pluck('id')->toArray();
 
@@ -182,13 +182,13 @@ class SemanticSearchController extends Controller
      * Search objects
      *
      * @param array $embedding
-     * @param int $userId
+     * @param string $userId
      * @param float $threshold
      * @param int $limit
      * @param float $temporalWeight
      * @return array
      */
-    private function searchObjects(array $embedding, int $userId, float $threshold, int $limit, float $temporalWeight): array
+    private function searchObjects(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
         $objects = EventObject::semanticSearch($embedding, threshold: $threshold, limit: $limit, temporalWeight: $temporalWeight)
             ->where('user_id', $userId)

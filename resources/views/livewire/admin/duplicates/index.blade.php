@@ -19,7 +19,7 @@ $search = function () {
     $this->duplicates = [];
 
     $service = app(DuplicateDetectionService::class);
-    $userId = (int) auth()->id();
+    $userId = auth()->id();
 
     $results = match ($this->modelType) {
         'Event' => $service->findDuplicateEvents($userId, $this->threshold, $this->limit),
