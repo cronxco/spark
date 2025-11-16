@@ -109,7 +109,7 @@ class ReceiptDetail extends Component
         $this->mount($this->receipt->id); // Refresh data
     }
 
-    public function downloadOriginalEmail(): void
+    public function downloadOriginalEmail(): \Symfony\Component\HttpFoundation\StreamedResponse|null
     {
         $merchant = $this->receipt->target;
         $s3Key = $merchant?->metadata['s3_object_key'] ?? null;
@@ -120,7 +120,7 @@ class ReceiptDetail extends Component
                 'message' => 'Original email not available',
             ]);
 
-            return;
+            return null;
         }
 
         try {
@@ -131,7 +131,7 @@ class ReceiptDetail extends Component
                     'message' => 'Email file not found in storage',
                 ]);
 
-                return;
+                return null;
             }
 
             return response()->streamDownload(function () use ($disk, $s3Key) {
@@ -144,6 +144,8 @@ class ReceiptDetail extends Component
                 'type' => 'error',
                 'message' => 'Failed to download email: '.$e->getMessage(),
             ]);
+
+            return null;
         }
     }
 
