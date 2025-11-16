@@ -388,21 +388,21 @@ new class extends Component {
                         </x-metadata-row>
                         @if ($this->block->url)
                             <x-metadata-row label="URL">
-                                <a href="{{ $this->block->url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                <a href="{{ $this->block->url }}" target="_blank" class="hover:underline">
                                     {{ $this->block->url }}
                                 </a>
                             </x-metadata-row>
                         @endif
                         @if ($this->block->media_url)
                             <x-metadata-row label="Media URL">
-                                <a href="{{ $this->block->media_url }}" target="_blank" class="link link-primary text-sm truncate max-w-full block">
+                                <a href="{{ $this->block->media_url }}" target="_blank" class="hover:underline">
                                     {{ $this->block->media_url }}
                                 </a>
                             </x-metadata-row>
                         @endif
                         @if ($this->block->event)
                             <x-metadata-row label="Related Event">
-                                <a href="{{ route('events.show', $this->block->event->id) }}" class="link link-primary text-sm">
+                                <a href="{{ route('events.show', $this->block->event->id) }}" class="hover:underline">
                                     {{ format_action_title($this->block->event->action) }}
                                 </a>
                             </x-metadata-row>
