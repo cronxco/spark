@@ -92,7 +92,7 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(?Exception $exception): void
+    public function failed(?\Throwable $exception): void
     {
         Log::error('GenerateBlockEmbeddingJob failed after all retries', [
             'block_id' => $this->block->id,
