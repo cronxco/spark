@@ -1330,6 +1330,16 @@ new class extends Component {
                         </dl>
                     </div>
 
+                    <!-- Lock Object -->
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Lock Object</span>
+                            </div>
+                            <x-toggle wire:model.live="object.metadata.locked" wire:change="toggleLock" />
+                        </div>
+                    </div>
+
                     <!-- Tags -->
                     <div class="pb-4 border-b border-base-200">
                         <div class="flex items-center justify-between mb-3">
@@ -1488,16 +1498,6 @@ new class extends Component {
                                 <x-button type="submit" class="btn-primary btn-sm" label="Post" />
                             </div>
                         </x-form>
-                    </div>
-
-                    <!-- Lock Object -->
-                    <div class="pb-4 border-b border-base-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <span class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Lock Object</span>
-                            </div>
-                            <x-toggle wire:model.live="object.metadata.locked" wire:change="toggleLock" />
-                        </div>
                     </div>
 
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
