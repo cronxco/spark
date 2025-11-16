@@ -60,12 +60,15 @@ class ReceiptPluginTest extends TestCase
     {
         $blockTypes = $this->plugin->getBlockTypes();
 
-        $this->assertArrayHasKey('receipt_summary', $blockTypes);
         $this->assertArrayHasKey('receipt_line_item', $blockTypes);
+        $this->assertArrayHasKey('receipt_tax_summary', $blockTypes);
+        $this->assertArrayHasKey('receipt_payment_method', $blockTypes);
 
-        $summaryBlock = $blockTypes['receipt_summary'];
-        $this->assertEquals('Receipt Summary', $summaryBlock['display_name']);
-        $this->assertEquals('o-document-text', $summaryBlock['icon']);
+        $lineItemBlock = $blockTypes['receipt_line_item'];
+        $this->assertEquals('Line Item', $lineItemBlock['display_name']);
+        $this->assertEquals('o-list-bullet', $lineItemBlock['icon']);
+        $this->assertTrue($lineItemBlock['display_with_object']);
+        $this->assertEquals('GBP', $lineItemBlock['value_unit']);
     }
 
     /** @test */
@@ -73,10 +76,10 @@ class ReceiptPluginTest extends TestCase
     {
         $objectTypes = $this->plugin->getObjectTypes();
 
-        $this->assertArrayHasKey('merchant', $objectTypes);
+        $this->assertArrayHasKey('receipt_merchant', $objectTypes);
 
-        $merchant = $objectTypes['merchant'];
-        $this->assertEquals('Merchant', $merchant['display_name']);
+        $merchant = $objectTypes['receipt_merchant'];
+        $this->assertEquals('Receipt Merchant', $merchant['display_name']);
         $this->assertEquals('o-building-storefront', $merchant['icon']);
     }
 
