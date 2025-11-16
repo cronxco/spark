@@ -245,7 +245,7 @@ new class extends Component {
                     title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                     aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                     data-hotkey="d">
-                    <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
+                    <x-icon name="o-adjustments-horizontal" class="w-4 h-4" />
                 </x-button>
             </x-slot:actions>
         </x-header>

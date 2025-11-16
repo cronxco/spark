@@ -17,7 +17,7 @@
                         <x-button
                             wire:click="toggleSidebar"
                             class="btn-ghost btn-sm">
-                            <x-icon name="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-5 h-5" />
+                            <x-icon name="o-adjustments-horizontal" class="w-5 h-5" />
                         </x-button>
                     </div>
 
@@ -30,7 +30,7 @@
                                 </x-button>
                             </x-slot:trigger>
                             <x-menu-item title="Configure" icon="o-cog-6-tooth" link="{{ route('integrations.configure', $integration->id) }}" />
-                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" wire:click="toggleSidebar" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="o-adjustments-horizontal" wire:click="toggleSidebar" />
                         </x-dropdown>
                     </div>
                 </x-slot:actions>
