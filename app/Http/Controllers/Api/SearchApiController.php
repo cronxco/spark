@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\SearchLog;
 use App\Services\EmbeddingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,8 @@ class SearchApiController extends Controller
      */
     public function searchEvents(Request $request): JsonResponse
     {
+        $startTime = microtime(true);
+
         $validator = Validator::make($request->all(), [
             'query' => 'required|string|min:1|max:500',
             'integration_id' => 'nullable|uuid|exists:integrations,id',
@@ -76,6 +79,28 @@ class SearchApiController extends Controller
             ->with(['integration', 'actor', 'target', 'blocks'])
             ->get();
 
+        // Calculate metrics
+        $responseTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $similarities = $events->pluck('similarity')->filter()->map(fn ($s) => 1 - $s);
+        $avgSimilarity = $similarities->isNotEmpty() ? $similarities->avg() : null;
+        $topSimilarity = $similarities->isNotEmpty() ? $similarities->max() : null;
+
+        // Log the search
+        SearchLog::create([
+            'user_id' => $request->user()->id,
+            'query' => $query,
+            'type' => empty($filters) ? 'semantic' : 'hybrid',
+            'source' => 'api',
+            'results_count' => $events->count(),
+            'events_count' => $events->count(),
+            'blocks_count' => 0,
+            'avg_similarity' => $avgSimilarity,
+            'top_similarity' => $topSimilarity,
+            'threshold' => $threshold,
+            'response_time_ms' => $responseTimeMs,
+            'filters' => $filters,
+        ]);
+
         return response()->json([
             'data' => $events->map(function ($event) {
                 return [
@@ -123,6 +148,8 @@ class SearchApiController extends Controller
      */
     public function searchBlocks(Request $request): JsonResponse
     {
+        $startTime = microtime(true);
+
         $validator = Validator::make($request->all(), [
             'query' => 'required|string|min:1|max:500',
             'event_id' => 'nullable|uuid|exists:events,id',
@@ -173,6 +200,28 @@ class SearchApiController extends Controller
             ->with(['event.integration'])
             ->get();
 
+        // Calculate metrics
+        $responseTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $similarities = $blocks->pluck('similarity')->filter()->map(fn ($s) => 1 - $s);
+        $avgSimilarity = $similarities->isNotEmpty() ? $similarities->avg() : null;
+        $topSimilarity = $similarities->isNotEmpty() ? $similarities->max() : null;
+
+        // Log the search
+        SearchLog::create([
+            'user_id' => $request->user()->id,
+            'query' => $query,
+            'type' => empty($filters) ? 'semantic' : 'hybrid',
+            'source' => 'api',
+            'results_count' => $blocks->count(),
+            'events_count' => 0,
+            'blocks_count' => $blocks->count(),
+            'avg_similarity' => $avgSimilarity,
+            'top_similarity' => $topSimilarity,
+            'threshold' => $threshold,
+            'response_time_ms' => $responseTimeMs,
+            'filters' => $filters,
+        ]);
+
         return response()->json([
             'data' => $blocks->map(function ($block) {
                 return [
@@ -217,6 +266,8 @@ class SearchApiController extends Controller
      */
     public function searchAll(Request $request): JsonResponse
     {
+        $startTime = microtime(true);
+
         $validator = Validator::make($request->all(), [
             'query' => 'required|string|min:1|max:500',
             'threshold' => 'nullable|numeric|min:0|max:2',
@@ -275,6 +326,31 @@ class SearchApiController extends Controller
                 'similarity' => $block->similarity ?? 999,
             ]),
         ])->sortBy('similarity')->take($limit);
+
+        // Calculate metrics
+        $responseTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $allSimilarities = collect([
+            ...$events->pluck('similarity')->filter()->map(fn ($s) => 1 - $s),
+            ...$blocks->pluck('similarity')->filter()->map(fn ($s) => 1 - $s),
+        ]);
+        $avgSimilarity = $allSimilarities->isNotEmpty() ? $allSimilarities->avg() : null;
+        $topSimilarity = $allSimilarities->isNotEmpty() ? $allSimilarities->max() : null;
+
+        // Log the search
+        SearchLog::create([
+            'user_id' => $request->user()->id,
+            'query' => $query,
+            'type' => 'semantic',
+            'source' => 'api',
+            'results_count' => $combinedResults->count(),
+            'events_count' => $events->count(),
+            'blocks_count' => $blocks->count(),
+            'avg_similarity' => $avgSimilarity,
+            'top_similarity' => $topSimilarity,
+            'threshold' => $threshold,
+            'response_time_ms' => $responseTimeMs,
+            'filters' => [],
+        ]);
 
         return response()->json([
             'data' => $combinedResults->map(function ($result) {
