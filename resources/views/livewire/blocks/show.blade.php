@@ -235,7 +235,7 @@ new class extends Component {
 
 <div>
     @if ($this->block)
-    <div class="space-y-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Header -->
         <x-header title="Block Details" separator>
             <x-slot:actions>
@@ -325,7 +325,7 @@ new class extends Component {
                 <x-icon name="o-bolt" class="w-5 h-5" />
                 Related Event
             </h3>
-            <div class="border border-base-300 rounded-lg p-4 hover:bg-base-50 transition-colors">
+            <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
                 <a href="{{ route('events.show', $this->block->event->id) }}"
                     class="block hover:text-primary transition-colors">
                     <div class="flex items-start gap-3">
