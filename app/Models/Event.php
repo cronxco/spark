@@ -412,17 +412,58 @@ class Event extends Model
 
     /**
      * Get the searchable text for this event (used for embedding generation)
+     *
+     * Format: [Actor Title] [Action (Sentence Case)] [Target Title] [Value/Units OR Summary] — [Domain] [Service]
+     * Example: "John Smith Made Transaction Coffee Shop 50.00 GBP — Money Monzo"
+     * Or with summary: "John Smith Listened To Bohemian Rhapsody A 6-minute epic rock opera — Media Spotify"
      */
     public function getSearchableText(): string
     {
-        $parts = array_filter([
-            $this->service,
-            $this->domain,
-            $this->action,
-            $this->value && $this->value_unit ? "{$this->value} {$this->value_unit}" : null,
-        ]);
+        // Load relationships if not already loaded
+        $this->loadMissing(['actor', 'target', 'blocks']);
 
-        return implode(' ', $parts);
+        $parts = [];
+
+        // Actor title
+        if ($this->actor && $this->actor->title) {
+            $parts[] = $this->actor->title;
+        }
+
+        // Action in sentence case
+        if ($this->action) {
+            $parts[] = \Illuminate\Support\Str::headline($this->action);
+        }
+
+        // Target title
+        if ($this->target && $this->target->title) {
+            $parts[] = $this->target->title;
+        }
+
+        // Value/units OR summary block (prefer summary if it exists)
+        // Look for a block with substantial content (>20 chars)
+        $summaryBlock = $this->blocks
+            ->filter(function ($block) {
+                $content = $block->getContent();
+                return !empty($content) && strlen($content) > 20;
+            })
+            ->first();
+
+        if ($summaryBlock) {
+            // Use the block's content as context
+            $parts[] = $summaryBlock->getContent();
+        } elseif ($this->formatted_value !== null && $this->value_unit) {
+            // Use formatted value (value / value_multiplier)
+            $parts[] = $this->formatted_value . ' ' . $this->value_unit;
+        }
+
+        // Add domain and service at the end with separator
+        $suffix = array_filter([$this->domain, $this->service]);
+        if (!empty($suffix)) {
+            $parts[] = '—';
+            $parts = array_merge($parts, $suffix);
+        }
+
+        return implode(' ', array_filter($parts));
     }
 
     /**
