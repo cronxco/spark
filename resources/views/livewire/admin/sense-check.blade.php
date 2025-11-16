@@ -817,6 +817,7 @@ new class extends Component
                 @elseif ($section['key'] === 'embedding_health')
                 @php($health = $this->embeddingHealth)
 
+                @if (isset($health) && is_array($health) && isset($health['events']) && isset($health['blocks']) && isset($health['objects']))
                 {{-- Overall Stats --}}
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div class="stat bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg border border-warning/50">
@@ -867,7 +868,7 @@ new class extends Component
 
                 {{-- Missing Embeddings Summary --}}
                 @php
-                    $totalMissing = $health['events']['null_embeddings'] + $health['blocks']['null_embeddings'] + $health['objects']['null_embeddings'];
+                    $totalMissing = ($health['events']['null_embeddings'] ?? 0) + ($health['blocks']['null_embeddings'] ?? 0) + ($health['objects']['null_embeddings'] ?? 0);
                 @endphp
                 @if ($totalMissing > 0)
                 <div class="alert alert-warning mb-6">
@@ -875,9 +876,9 @@ new class extends Component
                     <div>
                         <div class="font-semibold">{{ number_format($totalMissing) }} records without embeddings</div>
                         <div class="text-sm">
-                            Events: {{ number_format($health['events']['null_embeddings']) }} |
-                            Blocks: {{ number_format($health['blocks']['null_embeddings']) }} |
-                            Objects: {{ number_format($health['objects']['null_embeddings']) }}
+                            Events: {{ number_format($health['events']['null_embeddings'] ?? 0) }} |
+                            Blocks: {{ number_format($health['blocks']['null_embeddings'] ?? 0) }} |
+                            Objects: {{ number_format($health['objects']['null_embeddings'] ?? 0) }}
                         </div>
                     </div>
                     <div>
@@ -971,11 +972,17 @@ new class extends Component
                 @endif
 
                 {{-- Embedding Age --}}
-                @if ($health['events']['avg_age_days'] !== null)
+                @if (isset($health['events']['avg_age_days']) && $health['events']['avg_age_days'] !== null)
                 <div class="stat bg-base-200 rounded-lg">
                     <div class="stat-title">Average Embedding Age</div>
                     <div class="stat-value text-sm">{{ $health['events']['avg_age_days'] }} days</div>
                     <div class="stat-desc">For events with generation timestamps</div>
+                </div>
+                @endif
+                @else
+                <div class="alert alert-error">
+                    <x-icon name="o-exclamation-circle" class="w-5 h-5" />
+                    <span>Failed to load embedding health data</span>
                 </div>
                 @endif
 
