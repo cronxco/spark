@@ -1,4 +1,4 @@
-@props(['label', 'value' => null, 'copyable' => false])
+@props(['label', 'value' => null, 'copyable' => true])
 
 <div class="flex justify-between items-start gap-4 py-2 border-b border-base-200 last:border-0 group relative">
     <dt class="text-sm font-medium text-base-content/60 flex-shrink-0">
