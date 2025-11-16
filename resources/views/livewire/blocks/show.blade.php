@@ -373,35 +373,35 @@ new class extends Component {
                         <x-metadata-row label="Title" :value="$this->block->title" />
                         <x-metadata-row label="Block Type" :value="Str::headline($this->block->block_type)" />
                         @if ($this->block->value)
-                            <x-metadata-row label="Value">
+                            <x-metadata-row label="Value" :copy-value="$this->block->formatted_value">
                                 {!! format_event_value_display($this->block->formatted_value, $this->block->value_unit, $this->block->event?->service, $this->block->block_type, 'block') !!}
                             </x-metadata-row>
                         @endif
-                        <x-metadata-row label="Time">
+                        <x-metadata-row label="Time" :copy-value="$this->block->time?->toIso8601String()">
                             <x-uk-date :date="$this->block->time" />
                         </x-metadata-row>
-                        <x-metadata-row label="Created">
+                        <x-metadata-row label="Created" :copy-value="$this->block->created_at?->toIso8601String()">
                             <x-uk-date :date="$this->block->created_at" />
                         </x-metadata-row>
-                        <x-metadata-row label="Last Updated">
+                        <x-metadata-row label="Last Updated" :copy-value="$this->block->updated_at?->toIso8601String()">
                             <x-uk-date :date="$this->block->updated_at" />
                         </x-metadata-row>
                         @if ($this->block->url)
-                            <x-metadata-row label="URL">
+                            <x-metadata-row label="URL" :copy-value="$this->block->url">
                                 <a href="{{ $this->block->url }}" target="_blank" class="hover:underline">
                                     {{ $this->block->url }}
                                 </a>
                             </x-metadata-row>
                         @endif
                         @if ($this->block->media_url)
-                            <x-metadata-row label="Media URL">
+                            <x-metadata-row label="Media URL" :copy-value="$this->block->media_url">
                                 <a href="{{ $this->block->media_url }}" target="_blank" class="hover:underline">
                                     {{ $this->block->media_url }}
                                 </a>
                             </x-metadata-row>
                         @endif
                         @if ($this->block->event)
-                            <x-metadata-row label="Related Event">
+                            <x-metadata-row label="Related Event" :copy-value="format_action_title($this->block->event->action)">
                                 <a href="{{ route('events.show', $this->block->event->id) }}" class="hover:underline">
                                     {{ format_action_title($this->block->event->action) }}
                                 </a>

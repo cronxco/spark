@@ -218,21 +218,21 @@
                         <x-metadata-row label="Integration ID" :value="$integration->id" copyable />
                         <x-metadata-row label="Service" :value="$integration->service" />
                         <x-metadata-row label="Instance Type" :value="$integration->instance_type" />
-                        <x-metadata-row label="Status">
+                        <x-metadata-row label="Status" :copy-value="$integration->isPaused() ? 'Paused' : 'Active'">
                             <span class="badge {{ $integration->isPaused() ? 'badge-neutral' : 'badge-success' }} badge-sm">
                                 {{ $integration->isPaused() ? 'Paused' : 'Active' }}
                             </span>
                         </x-metadata-row>
-                        <x-metadata-row label="Created">
+                        <x-metadata-row label="Created" :copy-value="$integration->created_at?->toIso8601String()">
                             <x-uk-date :date="$integration->created_at" />
                         </x-metadata-row>
                         @if ($integration->last_triggered_at)
-                            <x-metadata-row label="Last Triggered">
+                            <x-metadata-row label="Last Triggered" :copy-value="$integration->last_triggered_at?->toIso8601String()">
                                 <x-uk-date :date="$integration->last_triggered_at" />
                             </x-metadata-row>
                         @endif
                         @if ($integration->last_successful_update_at)
-                            <x-metadata-row label="Last Successful Update">
+                            <x-metadata-row label="Last Successful Update" :copy-value="$integration->last_successful_update_at?->toIso8601String()">
                                 <x-uk-date :date="$integration->last_successful_update_at" />
                             </x-metadata-row>
                         @endif
@@ -242,8 +242,7 @@
                 <!-- Configuration (Collapsible, Default Open) -->
                 <x-collapse wire:model="configOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Configuration
                         </div>
                     </x-slot:heading>
@@ -276,7 +275,7 @@
                             @endif
 
                             @if ($integration->getNextUpdateTime())
-                                <x-metadata-row label="Next Update">
+                                <x-metadata-row label="Next Update" :copy-value="$integration->getNextUpdateTime()?->toIso8601String()">
                                     <x-uk-date :date="$integration->getNextUpdateTime()" />
                                 </x-metadata-row>
                             @endif
@@ -296,8 +295,7 @@
                 <!-- Logs (Collapsible, Default Closed) -->
                 <x-collapse wire:model="logsOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-document-text" class="w-4 h-4" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Logs
                         </div>
                     </x-slot:heading>
