@@ -5,6 +5,7 @@ namespace App\Spotlight\Queries\Search;
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\EmbeddingService;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
@@ -57,6 +58,12 @@ class SemanticSearchQuery
                         $q->whereIn('integration_id', $userIntegrationIds);
                     })
                     ->with(['event.integration'])
+                    ->get();
+
+                // Search objects (limit to top 3 for Spotlight)
+                // Use temporal weighting to slightly boost recent objects
+                $objects = EventObject::semanticSearch($embedding, threshold: 0.8, limit: 3, temporalWeight: 0.01)
+                    ->where('user_id', auth()->id())
                     ->get();
 
                 // Combine results
@@ -156,6 +163,44 @@ class SemanticSearchQuery
                             ->setPriority(11) // Slightly lower priority than events
                             ->setAction('jump_to', ['path' => route('blocks.show', $block)])
                             ->setTokens(['block' => $block])
+                    );
+                }
+
+                // Format object results
+                foreach ($objects as $object) {
+                    $similarity = round((1 - ($object->similarity ?? 0)) * 100);
+
+                    // Build subtitle
+                    $subtitleParts = [];
+
+                    // Add concept and type
+                    if ($object->concept) {
+                        $subtitleParts[] = Str::headline($object->concept);
+                    }
+                    if ($object->type) {
+                        $subtitleParts[] = Str::headline($object->type);
+                    }
+
+                    // Add date if available
+                    if ($object->time) {
+                        $subtitleParts[] = $object->time->format('M j, g:ia');
+                    }
+
+                    // Add similarity score
+                    $subtitleParts[] = "{$similarity}% match";
+
+                    $subtitle = implode(' • ', $subtitleParts);
+
+                    $results->push(
+                        SpotlightResult::make()
+                            ->setTitle('🔍 ' . ($object->title ?? 'Untitled'))
+                            ->setSubtitle($subtitle)
+                            ->setTypeahead('Semantic: ' . ($object->title ?? 'Object'))
+                            ->setIcon('cube')
+                            ->setGroup('objects')
+                            ->setPriority(12) // Slightly lower priority than blocks
+                            ->setAction('jump_to', ['path' => route('objects.show', $object)])
+                            ->setTokens(['object' => $object])
                     );
                 }
 

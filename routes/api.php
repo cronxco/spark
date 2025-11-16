@@ -34,6 +34,7 @@ Route::middleware('sentry.api.logging')->group(function () {
         // Semantic Search API
         Route::post('search/events', [SearchApiController::class, 'searchEvents'])->name('api.search.events');
         Route::post('search/blocks', [SearchApiController::class, 'searchBlocks'])->name('api.search.blocks');
+        Route::post('search/objects', [SearchApiController::class, 'searchObjects'])->name('api.search.objects');
         Route::post('search', [SearchApiController::class, 'searchAll'])->name('api.search.all');
 
         // Generate API token

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\SearchLog;
 use App\Services\EmbeddingService;
 use Illuminate\Http\JsonResponse;
@@ -254,6 +255,105 @@ class SearchApiController extends Controller
                 'threshold' => $threshold,
                 'limit' => $limit,
                 'count' => $blocks->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Perform semantic search on objects
+     *
+     * @param  Request  $request
+     * @return JsonResponse
+     */
+    public function searchObjects(Request $request): JsonResponse
+    {
+        $startTime = microtime(true);
+
+        $validator = Validator::make($request->all(), [
+            'query' => 'required|string|min:1|max:500',
+            'concept' => 'nullable|string',
+            'type' => 'nullable|string',
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date',
+            'threshold' => 'nullable|numeric|min:0|max:2',
+            'limit' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $query = $request->input('query');
+        $threshold = $request->input('threshold', 1.0);
+        $limit = $request->input('limit', 20);
+
+        // Generate embedding for the search query
+        try {
+            $embedding = $this->embeddingService->embed($query);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to generate embedding for query',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+
+        // Build filters array
+        $filters = array_filter([
+            'concept' => $request->input('concept'),
+            'type' => $request->input('type'),
+            'from_date' => $request->input('from_date'),
+            'to_date' => $request->input('to_date'),
+        ]);
+
+        // Perform hybrid search (user-scoped)
+        $objects = EventObject::hybridSearch($embedding, $filters, $threshold, $limit)
+            ->where('user_id', $request->user()->id)
+            ->get();
+
+        // Calculate metrics
+        $responseTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $similarities = $objects->pluck('similarity')->filter()->map(fn ($s) => 1 - $s);
+        $avgSimilarity = $similarities->isNotEmpty() ? $similarities->avg() : null;
+        $topSimilarity = $similarities->isNotEmpty() ? $similarities->max() : null;
+
+        // Log the search
+        SearchLog::create([
+            'user_id' => $request->user()->id,
+            'query' => $query,
+            'type' => empty($filters) ? 'semantic' : 'hybrid',
+            'source' => 'api',
+            'results_count' => $objects->count(),
+            'events_count' => 0,
+            'blocks_count' => 0,
+            'avg_similarity' => $avgSimilarity,
+            'top_similarity' => $topSimilarity,
+            'threshold' => $threshold,
+            'response_time_ms' => $responseTimeMs,
+            'filters' => $filters,
+        ]);
+
+        return response()->json([
+            'data' => $objects->map(function ($object) {
+                return [
+                    'id' => $object->id,
+                    'concept' => $object->concept,
+                    'type' => $object->type,
+                    'title' => $object->title,
+                    'content' => $object->content,
+                    'url' => $object->url,
+                    'media_url' => $object->media_url,
+                    'time' => $object->time,
+                    'similarity' => round(1 - ($object->similarity ?? 0), 4), // Convert distance to similarity score
+                ];
+            }),
+            'meta' => [
+                'query' => $query,
+                'threshold' => $threshold,
+                'limit' => $limit,
+                'count' => $objects->count(),
             ],
         ]);
     }

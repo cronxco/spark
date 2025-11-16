@@ -4,8 +4,10 @@ namespace App\Console\Commands;
 
 use App\Jobs\GenerateBlockEmbeddingJob;
 use App\Jobs\GenerateEventEmbeddingJob;
+use App\Jobs\GenerateObjectEmbeddingJob;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -17,7 +19,7 @@ class GenerateEmbeddings extends Command
      * @var string
      */
     protected $signature = 'embeddings:generate
-                            {--type=all : Type of records to process (all, events, blocks)}
+                            {--type=all : Type of records to process (all, events, blocks, objects)}
                             {--force : Force regenerate embeddings even if they already exist}
                             {--batch=100 : Number of records to process in each batch}
                             {--limit= : Maximum number of records to process}';
@@ -27,7 +29,7 @@ class GenerateEmbeddings extends Command
      *
      * @var string
      */
-    protected $description = 'Generate embeddings for events and blocks';
+    protected $description = 'Generate embeddings for events, blocks, and objects';
 
     /**
      * Execute the console command.
@@ -50,6 +52,10 @@ class GenerateEmbeddings extends Command
 
         if ($type === 'all' || $type === 'blocks') {
             $this->generateBlockEmbeddings($force, $batchSize, $limit);
+        }
+
+        if ($type === 'all' || $type === 'objects') {
+            $this->generateObjectEmbeddings($force, $batchSize, $limit);
         }
 
         $this->info('Embedding generation completed!');
@@ -139,5 +145,47 @@ class GenerateEmbeddings extends Command
         $bar->finish();
         $this->newLine();
         $this->info("Dispatched {$processed} block embedding jobs to queue");
+    }
+
+    /**
+     * Generate embeddings for objects
+     */
+    private function generateObjectEmbeddings(bool $force, int $batchSize, ?int $limit): void
+    {
+        $this->info('Processing objects...');
+
+        $query = EventObject::query();
+
+        if (! $force) {
+            $query->whereNull('embeddings');
+        }
+
+        if ($limit) {
+            $query->limit($limit);
+        }
+
+        $total = $query->count();
+        $this->info("Found {$total} objects to process");
+
+        if ($total === 0) {
+            return;
+        }
+
+        $bar = $this->output->createProgressBar($total);
+        $bar->start();
+
+        $processed = 0;
+
+        $query->chunk($batchSize, function ($objects) use (&$processed, $bar) {
+            foreach ($objects as $object) {
+                GenerateObjectEmbeddingJob::dispatch($object);
+                $processed++;
+                $bar->advance();
+            }
+        });
+
+        $bar->finish();
+        $this->newLine();
+        $this->info("Dispatched {$processed} object embedding jobs to queue");
     }
 }
