@@ -7,7 +7,7 @@
     <dd class="text-sm text-base-content flex-1 pr-8 {{ $value ? 'text-right truncate' : 'flex justify-end' }}">
         {{ $value ?? $slot }}
     </dd>
-    @if($copyable && ($value || $copyValue || $slot->isNotEmpty()))
+    @if ($copyable && ($value || $copyValue || $slot->isNotEmpty()))
         <button
             type="button"
             class="absolute right-0 top-2 btn btn-ghost btn-xs opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity"
