@@ -4,7 +4,7 @@
     <dt class="text-sm font-medium text-base-content/60 flex-shrink-0">
         {{ $label }}
     </dt>
-    <dd class="text-sm text-base-content text-right break-words flex-1 {{ $copyable ? 'pr-8' : '' }}">
+    <dd class="text-sm text-base-content text-right break-words flex-1 pr-8">
         {{ $value ?? $slot }}
     </dd>
     @if($copyable && ($value || $slot))

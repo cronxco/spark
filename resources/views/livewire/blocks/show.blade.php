@@ -355,7 +355,7 @@ new class extends Component {
 
         <!-- Drawer for Technical Details -->
         <x-drawer wire:model="showSidebar" right title="Block Details" with-close-button separator class="w-11/12 lg:w-1/3">
-            <div class="space-y-6">
+            <div class="space-y-4">
                 <!-- Primary Information (Always Visible) -->
                 <div class="pb-4 border-b border-base-200">
                     <div class="flex items-center justify-between mb-3">
