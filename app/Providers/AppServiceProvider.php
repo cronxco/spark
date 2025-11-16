@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Block;
+use App\Models\Event as EventModel;
+use App\Models\EventObject;
+use App\Observers\BlockObserver;
+use App\Observers\EventObserver;
+use App\Observers\EventObjectObserver;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Support\Facades\Event;
@@ -33,9 +39,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Register model observers for automatic embedding generation
-        App\Models\Event::observe(App\Observers\EventObserver::class);
-        App\Models\Block::observe(App\Observers\BlockObserver::class);
-        App\Models\EventObject::observe(App\Observers\EventObjectObserver::class);
+        EventModel::observe(EventObserver::class);
+        Block::observe(BlockObserver::class);
+        EventObject::observe(EventObjectObserver::class);
 
         // Force HTTPS in development
         URL::forceScheme('https');
