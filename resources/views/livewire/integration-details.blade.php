@@ -17,7 +17,7 @@
                         <x-button
                             wire:click="toggleSidebar"
                             class="btn-ghost btn-sm">
-                            <x-icon name="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-5 h-5" />
+                            <x-icon name="o-adjustments-horizontal" class="w-5 h-5" />
                         </x-button>
                     </div>
 
@@ -30,7 +30,7 @@
                                 </x-button>
                             </x-slot:trigger>
                             <x-menu-item title="Configure" icon="o-cog-6-tooth" link="{{ route('integrations.configure', $integration->id) }}" />
-                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" wire:click="toggleSidebar" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="o-adjustments-horizontal" wire:click="toggleSidebar" />
                         </x-dropdown>
                     </div>
                 </x-slot:actions>
@@ -197,53 +197,100 @@
                     </div>
                 </x-card>
             @endif
+
+            <!-- Logs -->
+            <x-card class="bg-base-200 shadow">
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-document-text" class="w-5 h-5 text-base-content/60" />
+                    Logs
+                </h3>
+                <livewire:log-viewer type="integration" :entity-id="$integration->id" />
+            </x-card>
         </div>
 
         <!-- Drawer for Technical Details -->
         <x-drawer wire:model="showSidebar" right title="Integration Details" separator with-close-button class="w-11/12 lg:w-1/3">
-            <div class="space-y-4 lg:space-y-6">
-                <!-- Configuration Preview -->
+            <div class="space-y-4">
+                <!-- Primary Information (Always Visible) -->
+                <div class="pb-4 border-b border-base-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
+                        <button
+                            wire:click="exportAsJson"
+                            class="btn btn-ghost btn-xs gap-1"
+                            title="Export complete integration with configuration and recent events">
+                            <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                            <span class="hidden sm:inline">Export</span>
+                        </button>
+                    </div>
+                    <dl>
+                        <x-metadata-row label="Integration ID" :value="$integration->id" copyable />
+                        <x-metadata-row label="Service" :value="$integration->service" />
+                        <x-metadata-row label="Instance Type" :value="$integration->instance_type" />
+                        <x-metadata-row label="Status" :copy-value="$integration->isPaused() ? 'Paused' : 'Active'">
+                            <span class="badge {{ $integration->isPaused() ? 'badge-neutral' : 'badge-success' }} badge-sm">
+                                {{ $integration->isPaused() ? 'Paused' : 'Active' }}
+                            </span>
+                        </x-metadata-row>
+                        <x-metadata-row label="Created" :copy-value="$integration->created_at?->toIso8601String()">
+                            <x-uk-date :date="$integration->created_at" />
+                        </x-metadata-row>
+                        @if ($integration->last_triggered_at)
+                            <x-metadata-row label="Last Triggered" :copy-value="$integration->last_triggered_at?->toIso8601String()">
+                                <x-uk-date :date="$integration->last_triggered_at" />
+                            </x-metadata-row>
+                        @endif
+                        @if ($integration->last_successful_update_at)
+                            <x-metadata-row label="Last Successful Update" :copy-value="$integration->last_successful_update_at?->toIso8601String()">
+                                <x-uk-date :date="$integration->last_successful_update_at" />
+                            </x-metadata-row>
+                        @endif
+                    </dl>
+                </div>
+
+                <!-- Configuration (Collapsible, Default Open) -->
                 <x-collapse wire:model="configOpen">
                     <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-cog-6-tooth" class="w-5 h-5 text-primary" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Configuration
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        <div class="space-y-3 text-sm">
+                        <dl>
                             @if ($integration->getUpdateFrequencyMinutes())
-                            <div>
-                                <span class="text-base-content/70">Update Frequency:</span>
-                                <span class="font-medium">{{ $integration->getUpdateFrequencyMinutes() }} minutes</span>
-                            </div>
+                                <x-metadata-row
+                                    label="Update Frequency"
+                                    :value="$integration->getUpdateFrequencyMinutes() . ' minutes'"
+                                />
                             @endif
 
                             @if ($integration->useSchedule())
-                            <div>
-                                <span class="text-base-content/70">Schedule Times:</span>
-                                <span class="font-medium">{{ implode(', ', $integration->getScheduleTimes()) }}</span>
-                            </div>
-                            <div>
-                                <span class="text-base-content/70">Timezone:</span>
-                                <span class="font-medium">{{ $integration->getScheduleTimezone() }}</span>
-                            </div>
+                                <x-metadata-row
+                                    label="Schedule Times"
+                                    :value="implode(', ', $integration->getScheduleTimes())"
+                                />
+                                <x-metadata-row
+                                    label="Schedule Timezone"
+                                    :value="$integration->getScheduleTimezone()"
+                                />
                             @endif
-
-                            <div>
-                                <span class="text-base-content/70">Status:</span>
-                                <span class="font-medium">{{ $integration->isPaused() ? 'Paused' : 'Active' }}</span>
-                            </div>
 
                             @if ($integration->account_id)
-                            <div>
-                                <span class="text-base-content/70">Account ID:</span>
-                                <span class="font-mono text-xs">{{ $integration->account_id }}</span>
-                            </div>
+                                <x-metadata-row
+                                    label="Account ID"
+                                    :value="$integration->account_id"
+                                    copyable
+                                />
                             @endif
-                        </div>
 
-                        <div class="mt-4">
+                            @if ($integration->getNextUpdateTime())
+                                <x-metadata-row label="Next Update" :copy-value="$integration->getNextUpdateTime()?->toIso8601String()">
+                                    <x-uk-date :date="$integration->getNextUpdateTime()" />
+                                </x-metadata-row>
+                            @endif
+                        </dl>
+
+                        <div class="mt-4 pt-4 border-t border-base-200">
                             <x-button
                                 label="Edit Configuration"
                                 link="{{ route('integrations.configure', $integration->id) }}"
@@ -251,19 +298,6 @@
                                 icon="o-pencil"
                             />
                         </div>
-                    </x-slot:content>
-                </x-collapse>
-
-                <!-- Logs Section -->
-                <x-collapse wire:model="logsOpen">
-                    <x-slot:heading>
-                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-document-text" class="w-5 h-5 text-primary" />
-                            Logs
-                        </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <livewire:log-viewer type="integration" :entity-id="$integration->id" />
                     </x-slot:content>
                 </x-collapse>
             </div>

@@ -67,7 +67,7 @@ new class extends Component {
 
     public function getRelationships()
     {
-        return $this->object->relationships()->get();
+        return $this->object->allRelationships()->get();
     }
 
     public function getRelatedEvents()
@@ -129,10 +129,10 @@ new class extends Component {
     {
         if ($this->object->isLocked()) {
             $this->object->unlock();
-            $this->js('$wire.notifyCopied("Object unlocked")');
+            $this->notifyCopied('Object unlocked');
         } else {
             $this->object->lock();
-            $this->js('$wire.notifyCopied("Object locked")');
+            $this->notifyCopied('Object locked');
         }
     }
 
@@ -147,6 +147,60 @@ new class extends Component {
             return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }
         return $data;
+    }
+
+    public function getCompleteObjectData(): array
+    {
+        return [
+            'object' => $this->object->toArray(),
+            'tags' => $this->object->tags->toArray(),
+            'relationships' => $this->object->allRelationships()->get()->map(function ($rel) {
+                return [
+                    'type' => $rel->type,
+                    'from' => ['type' => $rel->from_type, 'id' => $rel->from_id],
+                    'to' => ['type' => $rel->to_type, 'id' => $rel->to_id],
+                    'value' => $rel->value,
+                    'value_unit' => $rel->value_unit,
+                    'metadata' => $rel->metadata,
+                ];
+            })->toArray(),
+            'related_events' => $this->getRelatedEvents()->toArray(),
+            'related_blocks' => $this->getRelatedBlocks()->toArray(),
+        ];
+    }
+
+    public function exportAsJson(): void
+    {
+        $data = $this->getCompleteObjectData();
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $this->js("
+            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'object-{$this->object->id}-" . now()->format('Y-m-d-His') . ".json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-top toast-center z-50';
+            toast.innerHTML = `
+                <div class='alert alert-success shadow-lg'>
+                    <svg xmlns='http://www.w3.org/2000/svg' class='stroke-current shrink-0 h-5 w-5' fill='none' viewBox='0 0 24 24'>
+                        <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />
+                    </svg>
+                    <span>Object exported!</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        ");
     }
 
     public function getObjectIcon($type, $concept, $service = null)
@@ -836,7 +890,23 @@ new class extends Component {
 
     public function notifyCopied(string $what): void
     {
-        $this->success($what . ' copied to clipboard!');
+        $this->js("
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-top toast-center z-50';
+            toast.innerHTML = `
+                <div class='alert alert-success shadow-lg'>
+                    <svg xmlns='http://www.w3.org/2000/svg' class='stroke-current shrink-0 h-5 w-5' fill='none' viewBox='0 0 24 24'>
+                        <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />
+                    </svg>
+                    <span>" . addslashes($what) . "</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        ");
     }
 
     public function openCreateTagModal(): void
@@ -932,7 +1002,7 @@ new class extends Component {
                         title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                         aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                         data-hotkey="d">
-                        <x-icon name="{{ $this->showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" class="w-4 h-4" />
+                        <x-icon name="o-adjustments-horizontal" class="w-4 h-4" />
                     </x-button>
                 </x-slot:actions>
             </x-header>
@@ -1227,19 +1297,76 @@ new class extends Component {
 
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Object Details" with-close-button separator class="w-11/12 lg:w-1/3">
-                <div class="space-y-4 lg:space-y-6">
-                    <!-- Tags Manager -->
-                    <x-card class="bg-base-100 shadow">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-tag" class="w-5 h-5" />
+                <div class="space-y-4">
+                    <!-- Primary Information (Always Visible) -->
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
+                            <button
+                                wire:click="exportAsJson"
+                                class="btn btn-ghost btn-xs gap-1"
+                                title="Export complete object with relationships and related data">
+                                <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                                <span class="hidden sm:inline">Export</span>
+                            </button>
+                        </div>
+                        <dl>
+                            <x-metadata-row label="Object ID" :value="$this->object->id" copyable />
+                            <x-metadata-row label="Title" :value="$this->object->title" />
+                            <x-metadata-row label="Concept" :value="Str::headline($this->object->concept)" />
+                            <x-metadata-row label="Type" :value="Str::headline($this->object->type)" />
+                            <x-metadata-row label="Time" :copy-value="$this->object->time?->toIso8601String()">
+                                <x-uk-date :date="$this->object->time" />
+                            </x-metadata-row>
+                            <x-metadata-row label="Created" :copy-value="$this->object->created_at?->toIso8601String()">
+                                <x-uk-date :date="$this->object->created_at" />
+                            </x-metadata-row>
+                            <x-metadata-row label="Last Updated" :copy-value="$this->object->updated_at?->toIso8601String()">
+                                <x-uk-date :date="$this->object->updated_at" />
+                            </x-metadata-row>
+                            @if ($this->object->url)
+                                <x-metadata-row label="URL" :copy-value="$this->object->url">
+                                    <a href="{{ $this->object->url }}" target="_blank" class="hover:underline">
+                                        {{ $this->object->url }}
+                                    </a>
+                                </x-metadata-row>
+                            @endif
+                            @if ($this->object->media_url)
+                                <x-metadata-row label="Media URL" :copy-value="$this->object->media_url">
+                                    <a href="{{ $this->object->media_url }}" target="_blank" class="hover:underline">
+                                        {{ $this->object->media_url }}
+                                    </a>
+                                </x-metadata-row>
+                            @endif
+                            <x-metadata-row label="Locked" :copy-value="$this->object->isLocked() ? 'Yes' : 'No'">
+                                <span class="badge {{ $this->object->isLocked() ? 'badge-warning' : 'badge-ghost' }} badge-sm">
+                                    {{ $this->object->isLocked() ? 'Yes' : 'No' }}
+                                </span>
+                            </x-metadata-row>
+                        </dl>
+                    </div>
+
+                    <!-- Lock Object -->
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Lock Object</span>
+                            </div>
+                            <x-toggle wire:model.live="object.metadata.locked" wire:change="toggleLock" />
+                        </div>
+                    </div>
+
+                    <!-- Tags -->
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Tags
                             </h3>
                             <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
                                 <x-icon name="o-plus" class="w-3 h-3" />
                             </button>
                         </div>
-                        <div class="space-y-2" wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
+                        <div wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
                             <input id="tag-input-{{ $this->object->id }}" data-tagify data-initial="tag-initial-{{ $this->object->id }}" data-suggestions-id="tag-suggestions-{{ $this->object->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" data-hotkey="t" />
                             <script type="application/json" id="tag-initial-{{ $this->object->id }}">
                                 {!! json_encode($this->object->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
@@ -1248,24 +1375,25 @@ new class extends Component {
                                 {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                         </div>
-                    </x-card>
+                    </div>
 
                     <!-- Relationships -->
-                    <x-card class="bg-base-100 shadow">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Relationships
                             </h3>
-                            <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
+                            <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
                                 <x-icon name="o-plus" class="w-3 h-3" />
                             </button>
                         </div>
                         @php $sidebarRelationships = $this->getRelationships(); @endphp
                         @if ($sidebarRelationships->isEmpty())
-                            <div class="text-center py-4 text-base-content/60 text-sm">
-                                No relationships yet
-                            </div>
+                            <x-empty-state
+                                icon="o-arrows-right-left"
+                                message="No relationships yet"
+                                actionEvent="handleOpenAddRelationshipModal"
+                                actionLabel="Add Relationship" />
                         @else
                             <div class="space-y-2 max-h-64 overflow-y-auto">
                                 @foreach ($sidebarRelationships->take(10) as $relationship)
@@ -1293,7 +1421,7 @@ new class extends Component {
                                         }
                                     @endphp
                                     <a href="{{ $route }}" class="flex items-center gap-2 p-2 rounded hover:bg-base-200 transition-colors">
-                                        <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 text-accent flex-shrink-0" />
+                                        <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 flex-shrink-0" />
                                         <x-icon name="{{ $icon }}" class="w-3 h-3 flex-shrink-0" />
                                         <span class="text-sm truncate flex-1">{{ $title }}</span>
                                     </a>
@@ -1301,26 +1429,29 @@ new class extends Component {
                             </div>
                             @if ($sidebarRelationships->count() > 10)
                                 <div class="text-center mt-2">
-                                    <button wire:click="handleOpenManageRelationshipsModal" class="text-xs text-accent hover:underline">
+                                    <button wire:click="handleOpenManageRelationshipsModal" class="text-xs hover:underline">
                                         View all {{ $sidebarRelationships->count() }}
                                     </button>
                                 </div>
                             @endif
                         @endif
-                    </x-card>
+                    </div>
 
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
-                            <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                                <x-icon name="o-clock" class="w-5 h-5" />
+                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Activity
                             </div>
                         </x-slot:heading>
                         <x-slot:content>
                             @php $activities = $this->getActivities(); @endphp
                             @if ($activities->isEmpty())
-                            <div class="text-sm text-base-content/70">No activity yet.</div>
+                            <x-empty-state
+                                icon="o-clock"
+                                message="No activity yet"
+                                actionEvent="addComment"
+                                actionLabel="Add Comment" />
                             @else
                             @php
                             $activities = $this->getActivities();
@@ -1372,38 +1503,25 @@ new class extends Component {
                         </x-slot:content>
                     </x-collapse>
 
-                    <!-- Add Comment -->
-                    <x-card class="bg-base-100 shadow">
-                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-5 h-5" />
+                    <!-- Comment -->
+                    <div class="pb-4 border-b border-base-200">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">
                             Comment
                         </h3>
                         <x-form wire:submit="addComment">
                             <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." />
-                            <div class="mt-3 flex justify-end">
+                            <div class="mt-2 flex justify-end">
                                 <x-button type="submit" class="btn-primary btn-sm" label="Post" />
                             </div>
                         </x-form>
-                    </x-card>
-
-                    <!-- Lock Object -->
-                    <x-card class="bg-base-100 shadow">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <x-icon name="{{ $this->object->isLocked() ? 'o-lock-closed' : 'o-lock-open' }}" class="w-5 h-5" />
-                                <span class="text-base font-medium">Lock Object</span>
-                            </div>
-                            <x-toggle wire:model.live="object.metadata.locked" wire:change="toggleLock" />
-                        </div>
-                    </x-card>
+                    </div>
 
                     @if ($this->object->metadata && count($this->object->metadata) > 0)
                     <x-collapse wire:model="objectMetaOpen">
                         <x-slot:heading>
-                            <div class="text-lg font-semibold text-base-content flex items-center justify-between gap-2">
-                                <div class="flex items-center gap-2">
-                                    <x-icon name="o-cog-6-tooth" class="w-5 h-5" />
-                                    Object Metadata
+                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between gap-2 w-full">
+                                <div>
+                                    Metadata
                                 </div>
                                 <script type="application/json" id="object-meta-json-{{ $this->object->id }}">
                                     {

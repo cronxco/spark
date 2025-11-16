@@ -58,7 +58,7 @@
                             <x-menu-item title="Archive Account" icon="o-archive-box" wire:click="openArchiveModal" />
                             @endif
                             <x-menu-item title="Back to Accounts" icon="o-arrow-left" link="{{ route('money') }}" />
-                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="{{ $showSidebar ? 'o-x-mark' : 'o-adjustments-horizontal' }}" wire:click="toggleSidebar" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="o-adjustments-horizontal" wire:click="toggleSidebar" />
                         </x-dropdown>
                     </div>
                 </x-slot:actions>

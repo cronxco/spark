@@ -39,7 +39,7 @@ class ManageRelationships extends Component
         $model = $this->getModel();
         $model->load(['relationshipsFrom.to', 'relationshipsTo.from']);
 
-        return $model->relationships()->get();
+        return $model->allRelationships()->get();
     }
 
     public function deleteRelationship(string $relationshipId): void
