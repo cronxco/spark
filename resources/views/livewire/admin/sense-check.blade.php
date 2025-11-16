@@ -47,7 +47,6 @@ new class extends Component
         'orphaned_objects' => false,
         'invalid_integrations' => false,
         'plugin_config_issues' => false,
-        'data_consistency_issues' => false,
         'block_types_custom_layouts' => false,
     ];
 
@@ -307,62 +306,6 @@ new class extends Component
     }
 
     /**
-     * @return array<int, array{issue: string, count: int, details?: array<string, mixed>}>
-     */
-    public function getDataConsistencyIssuesProperty(): array
-    {
-        $issues = [];
-
-        // Events with missing timestamps
-        $missingTime = Event::whereNull('time')->count();
-        if ($missingTime > 0) {
-            $issues[] = [
-                'issue' => 'Events with missing timestamps',
-                'count' => $missingTime,
-            ];
-        }
-
-        // Events with future timestamps (more than 1 day ahead)
-        $futureEvents = Event::where('time', '>', now()->addDay())->count();
-        if ($futureEvents > 0) {
-            $issues[] = [
-                'issue' => 'Events with future timestamps (>1 day ahead)',
-                'count' => $futureEvents,
-            ];
-        }
-
-        // Blocks without titles
-        $noTitle = Block::where(function ($q) {
-            $q->whereNull('title')
-                ->orWhere('title', '')
-                ->orWhere('title', 'like', '%null%');
-        })->count();
-        if ($noTitle > 0) {
-            $issues[] = [
-                'issue' => 'Blocks without proper titles',
-                'count' => $noTitle,
-            ];
-        }
-
-        // Duplicate events (same integration, service, action, time within 1 minute)
-        $duplicates = Event::selectRaw('COUNT(*) as count')
-            ->groupBy(['integration_id', 'service', 'action'])
-            ->havingRaw('COUNT(*) > 1')
-            ->get()
-            ->sum('count');
-
-        if ($duplicates > 0) {
-            $issues[] = [
-                'issue' => 'Potentially duplicate events',
-                'count' => $duplicates,
-                'details' => ['note' => 'Events with same integration, service, and action'],
-            ];
-        }
-
-        return $issues;
-    }
-
-    /**
      * Get all sense check sections organized with issues first, then clean sections
      *
      * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool}>
@@ -418,13 +361,6 @@ new class extends Component
                 'description' => 'Missing required methods, invalid domains, or configuration errors in plugins.',
                 'icon' => 'o-cog-6-tooth',
                 'issue_count' => count($this->pluginConfigIssues),
-            ],
-            [
-                'key' => 'data_consistency_issues',
-                'title' => 'Data consistency issues',
-                'description' => 'Missing timestamps, future dates, duplicate events, and other data quality issues.',
-                'icon' => 'o-clock',
-                'issue_count' => count($this->dataConsistencyIssues),
             ],
             [
                 'key' => 'block_types_custom_layouts',
@@ -754,26 +690,6 @@ new class extends Component
                             <li>• {{ $issue }}</li>
                             @endforeach
                         </ul>
-                    </div>
-                    @endforeach
-                </div>
-                @endif
-
-                @elseif ($section['key'] === 'data_consistency_issues')
-                @php($items = $this->dataConsistencyIssues)
-                @if (empty($items))
-                <div class="alert alert-success">No data consistency issues found 🎉</div>
-                @else
-                <div class="space-y-3">
-                    @foreach ($items as $item)
-                    <div class="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="font-semibold text-yellow-700">{{ $item['issue'] }}</div>
-                            <span class="badge badge-warning">{{ $item['count'] }} found</span>
-                        </div>
-                        @if (!empty($item['details']['note']))
-                        <div class="text-sm text-yellow-600">{{ $item['details']['note'] }}</div>
-                        @endif
                     </div>
                     @endforeach
                 </div>
