@@ -817,7 +817,7 @@ new class extends Component
                 @elseif ($section['key'] === 'embedding_health')
                 @php($health = $this->embeddingHealth)
 
-                @if (isset($health) && is_array($health) && isset($health['events']) && isset($health['blocks']) && isset($health['objects']))
+                @if (!empty($health) && isset($health['events'], $health['blocks'], $health['objects']))
                 {{-- Overall Stats --}}
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div class="stat bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg border border-warning/50">
@@ -979,6 +979,7 @@ new class extends Component
                     <div class="stat-desc">For events with generation timestamps</div>
                 </div>
                 @endif
+
                 @else
                 <div class="alert alert-error">
                     <x-icon name="o-exclamation-circle" class="w-5 h-5" />
