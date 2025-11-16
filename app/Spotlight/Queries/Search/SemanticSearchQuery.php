@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\EmbeddingService;
+use Exception;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -205,7 +206,7 @@ class SemanticSearchQuery
                 }
 
                 return $results;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Silently fail - don't interrupt user experience
                 // Log error for debugging
                 Log::warning('Semantic search in Spotlight failed', [

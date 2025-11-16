@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\EmbeddingService;
+use Exception;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -276,7 +277,7 @@ class SemanticModeQuery
                 }
 
                 return $results;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Show error in semantic mode (unlike default mode which fails silently)
                 Log::error('Semantic search mode failed', [
                     'error' => $e->getMessage(),
