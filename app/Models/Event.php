@@ -384,33 +384,6 @@ class Event extends Model
     }
 
     /**
-     * Log tag activity to the activity log
-     */
-    private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
-    {
-        // Determine tag name and type
-        if ($tag instanceof \Spatie\Tags\Tag) {
-            $tagName = $tag->name;
-            $tagType = $tag->type;
-        } else {
-            $tagName = $tag;
-            $tagType = $type;
-        }
-
-        // Format tag label
-        $tagLabel = $tagType && $tagType !== 'spark' && $tagType !== 'emoji'
-            ? "{$tagType}:{$tagName}"
-            : $tagName;
-
-        // Log to activity log
-        activity('changelog')
-            ->performedOn($this)
-            ->event("tag_{$action}")
-            ->withProperties(['tag' => $tagLabel, 'tag_name' => $tagName, 'tag_type' => $tagType])
-            ->log("{$action} tag \"{$tagLabel}\"");
-    }
-
-    /**
      * Get the searchable text for this event (used for embedding generation)
      *
      * Format: [Actor Title] [Action (Sentence Case)] [Target Title] [Value/Units OR Summary] — [Domain] [Service]
@@ -461,12 +434,14 @@ class Event extends Model
             }
 
             $blockType = strtolower($block->block_type);
+
             return str_contains($blockType, 'summary') || str_contains($blockType, 'details');
         });
 
         // Sort by priority order
         $summaryBlock = $candidateBlocks->sortBy(function ($block) use ($priorityOrder) {
             $index = array_search($block->block_type, $priorityOrder);
+
             return $index !== false ? $index : 999; // Priority blocks first, others last
         })->first();
 
@@ -480,7 +455,7 @@ class Event extends Model
 
         // Add domain and service at the end with separator
         $suffix = array_filter([$this->domain, $this->service]);
-        if (!empty($suffix)) {
+        if (! empty($suffix)) {
             $parts[] = '—';
             $parts = array_merge($parts, $suffix);
         }
@@ -584,5 +559,32 @@ class Event extends Model
         $orderColumn = $temporalWeight > 0 ? 'weighted_similarity' : 'similarity';
 
         return $query->orderBy($orderColumn, 'asc')->limit($limit);
+    }
+
+    /**
+     * Log tag activity to the activity log
+     */
+    private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
+    {
+        // Determine tag name and type
+        if ($tag instanceof \Spatie\Tags\Tag) {
+            $tagName = $tag->name;
+            $tagType = $tag->type;
+        } else {
+            $tagName = $tag;
+            $tagType = $type;
+        }
+
+        // Format tag label
+        $tagLabel = $tagType && $tagType !== 'spark' && $tagType !== 'emoji'
+            ? "{$tagType}:{$tagName}"
+            : $tagName;
+
+        // Log to activity log
+        activity('changelog')
+            ->performedOn($this)
+            ->event("tag_{$action}")
+            ->withProperties(['tag' => $tagLabel, 'tag_name' => $tagName, 'tag_type' => $tagType])
+            ->log("{$action} tag \"{$tagLabel}\"");
     }
 }
