@@ -204,7 +204,16 @@
             <div class="space-y-6">
                 <!-- Primary Information (Always Visible) -->
                 <div class="pb-4 border-b border-base-200">
-                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Primary Information</h3>
+                        <button
+                            wire:click="exportAsJson"
+                            class="btn btn-ghost btn-xs gap-1"
+                            title="Export complete integration with configuration and recent events">
+                            <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                            <span class="hidden sm:inline">Export JSON</span>
+                        </button>
+                    </div>
                     <dl>
                         <x-metadata-row label="Integration ID" :value="$integration->id" copyable />
                         <x-metadata-row label="Service" :value="$integration->service" />

@@ -149,6 +149,46 @@ new class extends Component {
         return $data;
     }
 
+    public function getCompleteObjectData(): array
+    {
+        return [
+            'object' => $this->object->toArray(),
+            'tags' => $this->object->tags->toArray(),
+            'relationships' => $this->object->relationships->map(function ($rel) {
+                return [
+                    'type' => $rel->type,
+                    'from' => ['type' => $rel->from_type, 'id' => $rel->from_id],
+                    'to' => ['type' => $rel->to_type, 'id' => $rel->to_id],
+                    'value' => $rel->value,
+                    'value_unit' => $rel->value_unit,
+                    'metadata' => $rel->metadata,
+                ];
+            })->toArray(),
+            'related_events' => $this->getRelatedEvents()->toArray(),
+            'related_blocks' => $this->getRelatedBlocks()->toArray(),
+        ];
+    }
+
+    public function exportAsJson(): void
+    {
+        $data = $this->getCompleteObjectData();
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $this->js("
+            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'object-{$this->object->id}-" . now()->format('Y-m-d-His') . ".json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        ");
+
+        $this->success('Object exported as JSON!');
+    }
+
     public function getObjectIcon($type, $concept, $service = null)
     {
         // Try to get icon from plugin configuration first if service is available
@@ -1230,7 +1270,16 @@ new class extends Component {
                 <div class="space-y-6">
                     <!-- Primary Information (Always Visible) -->
                     <div class="pb-4 border-b border-base-200">
-                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Primary Information</h3>
+                            <button
+                                wire:click="exportAsJson"
+                                class="btn btn-ghost btn-xs gap-1"
+                                title="Export complete object with relationships and related data">
+                                <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                                <span class="hidden sm:inline">Export JSON</span>
+                            </button>
+                        </div>
                         <dl>
                             <x-metadata-row label="Object ID" :value="$this->object->id" copyable />
                             <x-metadata-row label="Title" :value="$this->object->title" />

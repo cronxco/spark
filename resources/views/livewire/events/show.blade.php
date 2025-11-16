@@ -390,6 +390,52 @@ new class extends Component {
         ]);
     }
 
+    public function getCompleteEventData(): array
+    {
+        return [
+            'event' => $this->event->toArray(),
+            'actor' => $this->event->actor?->toArray(),
+            'target' => $this->event->target?->toArray(),
+            'blocks' => $this->event->blocks->toArray(),
+            'tags' => $this->event->tags->toArray(),
+            'relationships' => $this->event->relationships->map(function ($rel) {
+                return [
+                    'type' => $rel->type,
+                    'from' => ['type' => $rel->from_type, 'id' => $rel->from_id],
+                    'to' => ['type' => $rel->to_type, 'id' => $rel->to_id],
+                    'value' => $rel->value,
+                    'value_unit' => $rel->value_unit,
+                    'metadata' => $rel->metadata,
+                ];
+            })->toArray(),
+            'metadata' => [
+                'event' => $this->event->event_metadata ?? [],
+                'actor' => $this->event->actor_metadata ?? [],
+                'target' => $this->event->target_metadata ?? [],
+            ],
+        ];
+    }
+
+    public function exportAsJson(): void
+    {
+        $data = $this->getCompleteEventData();
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $this->js("
+            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'event-{$this->event->id}-" . now()->format('Y-m-d-His') . ".json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        ");
+
+        $this->success('Event exported as JSON!');
+    }
+
     public function handleOpenManageRelationshipsModal(): void
     {
         $this->showManageRelationshipsModal = true;
@@ -864,7 +910,16 @@ new class extends Component {
             <div class="space-y-6">
                 <!-- Primary Information (Always Visible) -->
                 <div class="pb-4 border-b border-base-200">
-                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Primary Information</h3>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Primary Information</h3>
+                        <button
+                            wire:click="exportAsJson"
+                            class="btn btn-ghost btn-xs gap-1"
+                            title="Export complete event with all related data">
+                            <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                            <span class="hidden sm:inline">Export JSON</span>
+                        </button>
+                    </div>
                     <dl>
                         <x-metadata-row label="Event ID" :value="$this->event->id" copyable />
                         <x-metadata-row label="Action" :value="$this->formatAction($this->event->action)" />
