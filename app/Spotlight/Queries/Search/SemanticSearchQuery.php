@@ -208,7 +208,7 @@ class SemanticSearchQuery
             } catch (\Exception $e) {
                 // Silently fail - don't interrupt user experience
                 // Log error for debugging
-                \Log::warning('Semantic search in Spotlight failed', [
+                Log::warning('Semantic search in Spotlight failed', [
                     'error' => $e->getMessage(),
                     'query' => $query,
                 ]);

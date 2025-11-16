@@ -264,13 +264,13 @@ new class extends Component
                 default => 500,
             };
 
-            \Illuminate\Support\Facades\Artisan::call('embeddings:generate', [
+            Illuminate\Support\Facades\Artisan::call('embeddings:generate', [
                 '--type' => $type,
                 '--batch' => 50,
                 '--limit' => $limit,
             ]);
 
-            $output = \Illuminate\Support\Facades\Artisan::output();
+            $output = Illuminate\Support\Facades\Artisan::output();
 
             $this->success("Started generating {$type} embeddings. Check queue for progress.");
         } catch (\Exception $e) {
