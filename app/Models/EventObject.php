@@ -49,7 +49,6 @@ class EventObject extends Model implements HasMedia
     protected $casts = [
         'time' => 'datetime',
         'metadata' => 'array',
-        'embeddings' => 'array', // You may need a custom cast for vector fields
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -473,6 +472,57 @@ class EventObject extends Model implements HasMedia
             ->performedOn($this)
             ->event('unlocked')
             ->log('unlocked object');
+    }
+
+    /**
+     * Set the embeddings attribute.
+     * Handles conversion to pgvector format.
+     */
+    public function setEmbeddingsAttribute($value)
+    {
+        if (is_null($value)) {
+            $this->attributes['embeddings'] = null;
+
+            return;
+        }
+
+        // If it's already a string in vector format [x,y,z], use it as-is
+        if (is_string($value)) {
+            // Remove any surrounding quotes if present
+            $value = trim($value, '"');
+            $this->attributes['embeddings'] = $value;
+
+            return;
+        }
+
+        // If it's an array, convert to vector format without quotes
+        if (is_array($value)) {
+            $this->attributes['embeddings'] = '[' . implode(',', $value) . ']';
+
+            return;
+        }
+
+        $this->attributes['embeddings'] = $value;
+    }
+
+    /**
+     * Get the embeddings attribute.
+     * Returns as array for easier usage.
+     */
+    public function getEmbeddingsAttribute($value)
+    {
+        if (is_null($value)) {
+            return null;
+        }
+
+        // If it's already in vector format [x,y,z], parse it to array
+        if (is_string($value)) {
+            $value = trim($value, '[]');
+
+            return ! empty($value) ? array_map('floatval', explode(',', $value)) : null;
+        }
+
+        return $value;
     }
 
     /**
