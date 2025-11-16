@@ -440,13 +440,35 @@ class Event extends Model
         }
 
         // Value/units OR summary block (prefer summary if it exists)
-        // Look for a block with substantial content (>20 chars)
-        $summaryBlock = $this->blocks
-            ->filter(function ($block) {
-                $content = $block->getContent();
-                return !empty($content) && strlen($content) > 20;
-            })
-            ->first();
+        // Prioritize specific block types with content
+        $priorityOrder = [
+            'fetch_summary_paragraph',
+            'fetch_summary_short',
+            'bookmark_summary',
+            'track_details',
+            'event_details',
+        ];
+
+        // Filter blocks to only those with "summary" or "details" in block_type
+        $candidateBlocks = $this->blocks->filter(function ($block) {
+            if (empty($block->block_type)) {
+                return false;
+            }
+
+            $content = $block->getContent();
+            if (empty($content) || strlen($content) <= 20) {
+                return false;
+            }
+
+            $blockType = strtolower($block->block_type);
+            return str_contains($blockType, 'summary') || str_contains($blockType, 'details');
+        });
+
+        // Sort by priority order
+        $summaryBlock = $candidateBlocks->sortBy(function ($block) use ($priorityOrder) {
+            $index = array_search($block->block_type, $priorityOrder);
+            return $index !== false ? $index : 999; // Priority blocks first, others last
+        })->first();
 
         if ($summaryBlock) {
             // Use the block's content as context
