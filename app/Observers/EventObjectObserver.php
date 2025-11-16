@@ -12,8 +12,10 @@ class EventObjectObserver
      */
     public function created(EventObject $object): void
     {
-        // Dispatch job to generate embedding asynchronously
-        GenerateObjectEmbeddingJob::dispatch($object);
+        // Only dispatch if embeddings are enabled (API key is configured)
+        if (config('services.openai.api_key')) {
+            GenerateObjectEmbeddingJob::dispatch($object);
+        }
     }
 
     /**
@@ -21,10 +23,13 @@ class EventObjectObserver
      */
     public function updated(EventObject $object): void
     {
-        // Check if relevant fields changed that would affect the embedding
-        if ($object->wasChanged(['concept', 'type', 'title', 'content', 'url'])) {
-            // Dispatch job to regenerate embedding
-            GenerateObjectEmbeddingJob::dispatch($object);
+        // Only dispatch if embeddings are enabled (API key is configured)
+        if (config('services.openai.api_key')) {
+            // Check if relevant fields changed that would affect the embedding
+            if ($object->wasChanged(['concept', 'type', 'title', 'content', 'url'])) {
+                // Dispatch job to regenerate embedding
+                GenerateObjectEmbeddingJob::dispatch($object);
+            }
         }
     }
 }
