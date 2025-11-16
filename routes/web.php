@@ -46,6 +46,10 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
 
+    // Media routes
+    Route::get('media', \App\Livewire\Media\Index::class)->name('media.index');
+    Route::get('media/{media}', \App\Livewire\Media\Show::class)->whereUuid('media')->name('media.show');
+
     // Metrics routes
     Route::get('metrics', \App\Livewire\MetricsOverview::class)->name('metrics.index');
     Route::get('metrics/{metric}', \App\Livewire\MetricDetail::class)->whereUuid('metric')->name('metrics.show');
