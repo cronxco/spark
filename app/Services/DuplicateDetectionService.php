@@ -13,9 +13,9 @@ class DuplicateDetectionService
     /**
      * Find potential duplicate events using semantic similarity
      *
-     * @param string $userId User ID (UUID) to scope the search
-     * @param float $similarityThreshold Similarity threshold (0-1), default 0.95 for 95% match
-     * @param int $limit Maximum number of duplicate pairs to return
+     * @param  string  $userId  User ID (UUID) to scope the search
+     * @param  float  $similarityThreshold  Similarity threshold (0-1), default 0.95 for 95% match
+     * @param  int  $limit  Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
     public function findDuplicateEvents(string $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
@@ -26,9 +26,9 @@ class DuplicateDetectionService
     /**
      * Find potential duplicate blocks using semantic similarity
      *
-     * @param string $userId User ID (UUID) to scope the search
-     * @param float $similarityThreshold Similarity threshold (0-1), default 0.95 for 95% match
-     * @param int $limit Maximum number of duplicate pairs to return
+     * @param  string  $userId  User ID (UUID) to scope the search
+     * @param  float  $similarityThreshold  Similarity threshold (0-1), default 0.95 for 95% match
+     * @param  int  $limit  Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
     public function findDuplicateBlocks(string $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
@@ -39,9 +39,9 @@ class DuplicateDetectionService
     /**
      * Find potential duplicate objects using semantic similarity
      *
-     * @param string $userId User ID (UUID) to scope the search
-     * @param float $similarityThreshold Similarity threshold (0-1), default 0.95 for 95% match
-     * @param int $limit Maximum number of duplicate pairs to return
+     * @param  string  $userId  User ID (UUID) to scope the search
+     * @param  float  $similarityThreshold  Similarity threshold (0-1), default 0.95 for 95% match
+     * @param  int  $limit  Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
     public function findDuplicateObjects(string $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
@@ -52,10 +52,10 @@ class DuplicateDetectionService
     /**
      * Generic duplicate finder using semantic similarity
      *
-     * @param string $modelClass Model class to search
-     * @param string $userId User ID (UUID) to scope the search
-     * @param float $similarityThreshold Similarity threshold (0-1)
-     * @param int $limit Maximum number of duplicate pairs to return
+     * @param  string  $modelClass  Model class to search
+     * @param  string  $userId  User ID (UUID) to scope the search
+     * @param  float  $similarityThreshold  Similarity threshold (0-1)
+     * @param  int  $limit  Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
     private function findDuplicates(string $modelClass, string $userId, float $similarityThreshold, int $limit): Collection
@@ -70,7 +70,7 @@ class DuplicateDetectionService
         // Build query to find pairs with high similarity
         // We use a self-join to find pairs and calculate similarity
         $query = DB::table($table . ' as t1')
-            ->join($table . ' as t2', function ($join) use ($table) {
+            ->join($table . ' as t2', function ($join) {
                 $join->on('t1.id', '<', 't2.id') // Avoid duplicate pairs (a,b) and (b,a)
                     ->whereNotNull('t1.embeddings')
                     ->whereNotNull('t2.embeddings');
@@ -93,12 +93,12 @@ class DuplicateDetectionService
         // So we need similarity > threshold => 1 - distance > threshold => distance < 1 - threshold
         $distanceThreshold = 1 - $similarityThreshold;
 
-        $query->selectRaw("
+        $query->selectRaw('
             t1.id as id1,
             t2.id as id2,
             1 - (t1.embeddings <=> t2.embeddings) as similarity
-        ")
-            ->whereRaw("(t1.embeddings <=> t2.embeddings) < ?", [$distanceThreshold])
+        ')
+            ->whereRaw('(t1.embeddings <=> t2.embeddings) < ?', [$distanceThreshold])
             ->orderByRaw('(t1.embeddings <=> t2.embeddings) ASC')
             ->limit($limit);
 
@@ -124,9 +124,6 @@ class DuplicateDetectionService
 
     /**
      * Get relationships to eager load for each model type
-     *
-     * @param string $modelClass
-     * @return array
      */
     private function getRelationships(string $modelClass): array
     {

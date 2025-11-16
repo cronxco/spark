@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class GenerateObjectEmbeddingJob implements ShouldQueue
 {
@@ -92,7 +93,7 @@ class GenerateObjectEmbeddingJob implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(?\Throwable $exception): void
+    public function failed(?Throwable $exception): void
     {
         Log::error('GenerateObjectEmbeddingJob failed after all retries', [
             'object_id' => $this->object->id,

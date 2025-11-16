@@ -39,11 +39,6 @@ class SearchLog extends Model
         'updated_at' => 'datetime',
     ];
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
     /**
      * Get popular queries for a user or all users
      */
@@ -81,5 +76,10 @@ class SearchLog extends Model
         }
 
         return $query->get();
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

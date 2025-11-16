@@ -9,7 +9,6 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class GenerateEmbeddings extends Command
 {

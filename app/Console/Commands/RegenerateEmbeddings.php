@@ -10,7 +10,6 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class RegenerateEmbeddings extends Command
 {
@@ -49,7 +48,7 @@ class RegenerateEmbeddings extends Command
         $filterValue = null;
         if ($filter) {
             $parts = explode(':', $filter);
-            if (count($parts) !== 2 || !in_array($parts[0], ['service', 'domain'])) {
+            if (count($parts) !== 2 || ! in_array($parts[0], ['service', 'domain'])) {
                 $this->error('Invalid filter format. Use service:value or domain:value');
 
                 return Command::FAILURE;
@@ -61,7 +60,7 @@ class RegenerateEmbeddings extends Command
         // Determine which models to process
         $models = [];
         if ($modelOption) {
-            if (!in_array($modelOption, ['Event', 'Block', 'EventObject'])) {
+            if (! in_array($modelOption, ['Event', 'Block', 'EventObject'])) {
                 $this->error('Invalid model. Choose Event, Block, or EventObject');
 
                 return Command::FAILURE;
@@ -110,7 +109,7 @@ class RegenerateEmbeddings extends Command
         // Apply filter
         if ($filterType === 'service') {
             if ($modelName === 'EventObject') {
-                $this->warn("Service filter not applicable to EventObject, skipping");
+                $this->warn('Service filter not applicable to EventObject, skipping');
 
                 return 0;
             }
@@ -124,7 +123,7 @@ class RegenerateEmbeddings extends Command
             }
         } elseif ($filterType === 'domain') {
             if ($modelName === 'EventObject') {
-                $this->warn("Domain filter not applicable to EventObject, skipping");
+                $this->warn('Domain filter not applicable to EventObject, skipping');
 
                 return 0;
             }
@@ -139,7 +138,7 @@ class RegenerateEmbeddings extends Command
         }
 
         // Apply force filter (regenerate all or only null embeddings)
-        if (!$force) {
+        if (! $force) {
             $query->whereNull('embeddings');
         }
 

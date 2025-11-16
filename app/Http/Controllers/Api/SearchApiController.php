@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\SearchLog;
 use App\Services\EmbeddingService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -20,9 +21,6 @@ class SearchApiController extends Controller
 
     /**
      * Perform semantic search on events
-     *
-     * @param  Request  $request
-     * @return JsonResponse
      */
     public function searchEvents(Request $request): JsonResponse
     {
@@ -54,7 +52,7 @@ class SearchApiController extends Controller
         // Generate embedding for the search query
         try {
             $embedding = $this->embeddingService->embed($query);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to generate embedding for query',
                 'message' => $e->getMessage(),
@@ -143,9 +141,6 @@ class SearchApiController extends Controller
 
     /**
      * Perform semantic search on blocks
-     *
-     * @param  Request  $request
-     * @return JsonResponse
      */
     public function searchBlocks(Request $request): JsonResponse
     {
@@ -175,7 +170,7 @@ class SearchApiController extends Controller
         // Generate embedding for the search query
         try {
             $embedding = $this->embeddingService->embed($query);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to generate embedding for query',
                 'message' => $e->getMessage(),
@@ -261,9 +256,6 @@ class SearchApiController extends Controller
 
     /**
      * Perform semantic search on objects
-     *
-     * @param  Request  $request
-     * @return JsonResponse
      */
     public function searchObjects(Request $request): JsonResponse
     {
@@ -293,7 +285,7 @@ class SearchApiController extends Controller
         // Generate embedding for the search query
         try {
             $embedding = $this->embeddingService->embed($query);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to generate embedding for query',
                 'message' => $e->getMessage(),
@@ -360,9 +352,6 @@ class SearchApiController extends Controller
 
     /**
      * Perform unified semantic search across both events and blocks
-     *
-     * @param  Request  $request
-     * @return JsonResponse
      */
     public function searchAll(Request $request): JsonResponse
     {
@@ -389,7 +378,7 @@ class SearchApiController extends Controller
         // Generate embedding for the search query
         try {
             $embedding = $this->embeddingService->embed($query);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to generate embedding for query',
                 'message' => $e->getMessage(),

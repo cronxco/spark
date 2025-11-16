@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\EmbeddingService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,9 +22,6 @@ class SemanticSearchController extends Controller
 
     /**
      * Perform semantic search across events, blocks, and objects
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function search(Request $request): JsonResponse
     {
@@ -84,7 +82,7 @@ class SemanticSearchController extends Controller
                 'limit' => $limit,
                 'results' => $results,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Search failed',
                 'message' => $e->getMessage(),
@@ -94,13 +92,6 @@ class SemanticSearchController extends Controller
 
     /**
      * Search events
-     *
-     * @param array $embedding
-     * @param string $userId
-     * @param float $threshold
-     * @param int $limit
-     * @param float $temporalWeight
-     * @return array
      */
     private function searchEvents(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
@@ -139,13 +130,6 @@ class SemanticSearchController extends Controller
 
     /**
      * Search blocks
-     *
-     * @param array $embedding
-     * @param string $userId
-     * @param float $threshold
-     * @param int $limit
-     * @param float $temporalWeight
-     * @return array
      */
     private function searchBlocks(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
@@ -181,13 +165,6 @@ class SemanticSearchController extends Controller
 
     /**
      * Search objects
-     *
-     * @param array $embedding
-     * @param string $userId
-     * @param float $threshold
-     * @param int $limit
-     * @param float $temporalWeight
-     * @return array
      */
     private function searchObjects(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
