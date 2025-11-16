@@ -411,10 +411,9 @@ new class extends Component {
                 </div>
 
                 <!-- Relationships -->
-                <div class="border border-base-200 rounded-lg p-4">
+                <div class="pb-4 border-b border-base-200">
                     <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-arrows-right-left" class="w-4 h-4" />
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Relationships
                         </h3>
                         <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
@@ -463,7 +462,7 @@ new class extends Component {
                     </div>
                     @if ($sidebarRelationships->count() > 10)
                     <div class="text-center mt-2">
-                        <button wire:click="handleOpenManageRelationshipsModal" class="text-xs text-accent hover:underline">
+                        <button wire:click="handleOpenManageRelationshipsModal" class="text-xs hover:underline">
                             View all {{ $sidebarRelationships->count() }}
                         </button>
                     </div>
@@ -474,8 +473,7 @@ new class extends Component {
                 <!-- Activity Timeline -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-clock" class="w-4 h-4" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Activity
                         </div>
                     </x-slot:heading>
@@ -538,10 +536,9 @@ new class extends Component {
                     </x-slot:content>
                 </x-collapse>
 
-                <!-- Add Comment -->
-                <div class="border border-base-200 rounded-lg p-4">
-                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3 flex items-center gap-2">
-                        <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
+                <!-- Comment -->
+                <div class="pb-4 border-b border-base-200">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">
                         Comment
                     </h3>
                     <x-form wire:submit="addComment">
@@ -558,8 +555,7 @@ new class extends Component {
                 <x-collapse wire:model="blockMetaOpen">
                     <x-slot:heading>
                         <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between gap-2 w-full">
-                            <div class="flex items-center gap-2">
-                                <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                            <div>
                                 Metadata
                             </div>
                             <script type="application/json" id="block-meta-json-{{ $this->block->id }}">

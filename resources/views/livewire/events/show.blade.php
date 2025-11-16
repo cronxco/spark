@@ -954,14 +954,14 @@ new class extends Component {
                         @endif
                         @if($this->event->actor)
                             <x-metadata-row label="Actor">
-                                <a href="{{ route('objects.show', $this->event->actor->id) }}" class="text-secondary hover:underline">
+                                <a href="{{ route('objects.show', $this->event->actor->id) }}" class="hover:underline">
                                     {{ $this->event->actor->title }}
                                 </a>
                             </x-metadata-row>
                         @endif
                         @if($this->event->target)
                             <x-metadata-row label="Target">
-                                <a href="{{ route('objects.show', $this->event->target->id) }}" class="text-accent hover:underline">
+                                <a href="{{ route('objects.show', $this->event->target->id) }}" class="hover:underline">
                                     {{ $this->event->target->title }}
                                 </a>
                             </x-metadata-row>
@@ -969,12 +969,10 @@ new class extends Component {
                     </dl>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4">
                     <!-- Tags -->
-                    <div class="border border-base-200 rounded-lg p-4">
+                    <div class="pb-4 border-b border-base-200">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                                <x-icon name="o-tag" class="w-4 h-4" />
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Tags
                             </h3>
                             <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
@@ -993,10 +991,9 @@ new class extends Component {
                     </div>
 
                     <!-- Relationships -->
-                    <div class="border border-base-200 rounded-lg p-4">
+                    <div class="pb-4 border-b border-base-200">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                                <x-icon name="o-arrows-right-left" class="w-4 h-4" />
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Relationships
                             </h3>
                             <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
@@ -1043,7 +1040,7 @@ new class extends Component {
                         </div>
                         @if ($sidebarRelationships->count() > 10)
                         <div class="text-center mt-2">
-                            <button wire:click="handleOpenManageRelationshipsModal" class="text-xs text-accent hover:underline">
+                            <button wire:click="handleOpenManageRelationshipsModal" class="text-xs hover:underline">
                                 View all {{ $sidebarRelationships->count() }}
                             </button>
                         </div>
@@ -1051,10 +1048,9 @@ new class extends Component {
                         @endif
                     </div>
 
-                    <!-- Add Comment -->
-                    <div class="border border-base-200 rounded-lg p-4">
-                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
+                    <!-- Comment -->
+                    <div class="pb-4 border-b border-base-200">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">
                             Comment
                         </h3>
                         <x-form wire:submit="addComment">
@@ -1068,8 +1064,7 @@ new class extends Component {
                 <!-- Activity Timeline (Collapsible, Default: Open) -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-clock" class="w-4 h-4" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Activity
                         </div>
                     </x-slot:heading>
@@ -1137,8 +1132,7 @@ new class extends Component {
                 @if ($this->event->actor || $this->event->target)
                 <x-collapse wire:model="detailsOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-cube" class="w-4 h-4" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Details
                         </div>
                     </x-slot:heading>
@@ -1146,7 +1140,6 @@ new class extends Component {
                         @if ($this->event->actor)
                         <div class="mb-6">
                             <div class="flex items-center gap-2 mb-3">
-                                <x-icon name="o-user" class="w-4 h-4 text-secondary" />
                                 <h4 class="text-sm font-semibold">Actor</h4>
                             </div>
                             <dl>
@@ -1159,7 +1152,7 @@ new class extends Component {
                                 @endif
                                 @if ($this->event->actor->url)
                                     <x-metadata-row label="URL">
-                                        <a href="{{ $this->event->actor->url }}" target="_blank" class="text-primary hover:underline">View</a>
+                                        <a href="{{ $this->event->actor->url }}" target="_blank" class="hover:underline">View</a>
                                     </x-metadata-row>
                                 @endif
                                 @if ($this->event->actor->tags->isNotEmpty())
@@ -1178,7 +1171,6 @@ new class extends Component {
                         @if ($this->event->target)
                         <div>
                             <div class="flex items-center gap-2 mb-3">
-                                <x-icon name="o-arrow-trending-up" class="w-4 h-4 text-accent" />
                                 <h4 class="text-sm font-semibold">Target</h4>
                             </div>
                             <dl>
@@ -1191,7 +1183,7 @@ new class extends Component {
                                 @endif
                                 @if ($this->event->target->url)
                                     <x-metadata-row label="URL">
-                                        <a href="{{ $this->event->target->url }}" target="_blank" class="text-primary hover:underline">View</a>
+                                        <a href="{{ $this->event->target->url }}" target="_blank" class="hover:underline">View</a>
                                     </x-metadata-row>
                                 @endif
                                 @if ($this->event->target->tags->isNotEmpty())
@@ -1218,8 +1210,7 @@ new class extends Component {
                 )
                 <x-collapse wire:model="technicalOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
-                            <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Metadata
                         </div>
                     </x-slot:heading>
@@ -1228,7 +1219,6 @@ new class extends Component {
                         <div class="mb-6">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-document-text" class="w-4 h-4 text-warning" />
                                     <h4 class="text-sm font-semibold">Event Metadata</h4>
                                 </div>
                                 <script type="application/json" id="event-meta-json-{{ $this->event->id }}">
@@ -1249,7 +1239,6 @@ new class extends Component {
                         <div class="mb-6">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-user" class="w-4 h-4 text-secondary" />
                                     <h4 class="text-sm font-semibold">Actor Metadata</h4>
                                 </div>
                                 <script type="application/json" id="actor-meta-json-{{ $this->event->id }}">
@@ -1270,7 +1259,6 @@ new class extends Component {
                         <div>
                             <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-arrow-trending-up" class="w-4 h-4 text-accent" />
                                     <h4 class="text-sm font-semibold">Target Metadata</h4>
                                 </div>
                                 <script type="application/json" id="target-meta-json-{{ $this->event->id }}">
