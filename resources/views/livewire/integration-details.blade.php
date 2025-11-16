@@ -211,7 +211,7 @@
                             class="btn btn-ghost btn-xs gap-1"
                             title="Export complete integration with configuration and recent events">
                             <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
-                            <span class="hidden sm:inline">Export JSON</span>
+                            <span class="hidden sm:inline">Export</span>
                         </button>
                     </div>
                     <dl>

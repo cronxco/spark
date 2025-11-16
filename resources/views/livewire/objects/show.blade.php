@@ -1291,7 +1291,7 @@ new class extends Component {
                                 class="btn btn-ghost btn-xs gap-1"
                                 title="Export complete object with relationships and related data">
                                 <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
-                                <span class="hidden sm:inline">Export JSON</span>
+                                <span class="hidden sm:inline">Export</span>
                             </button>
                         </div>
                         <dl>
