@@ -1,4 +1,4 @@
-@props(['label', 'value' => null, 'copyable' => true])
+@props(['label', 'value' => null, 'copyValue' => null, 'copyable' => true])
 
 <div class="flex justify-between items-start gap-4 py-2 border-b border-base-200 last:border-0 group relative">
     <dt class="text-sm font-medium text-base-content/60 flex-shrink-0">
@@ -7,11 +7,11 @@
     <dd class="text-sm text-base-content flex-1 pr-8 {{ $value ? 'text-right truncate' : 'flex justify-end' }}">
         {{ $value ?? $slot }}
     </dd>
-    @if($copyable && ($value || $slot))
+    @if($copyable && ($value || $copyValue || $slot))
         <button
             type="button"
             class="absolute right-0 top-2 btn btn-ghost btn-xs opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity"
-            onclick="navigator.clipboard.writeText('{{ addslashes($value ?? '') }}').then(() => {
+            onclick="navigator.clipboard.writeText('{{ addslashes($copyValue ?? $value ?? '') }}').then(() => {
                 const toast = document.createElement('div');
                 toast.className = 'toast toast-top toast-center z-50';
                 toast.innerHTML = `

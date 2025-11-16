@@ -1299,30 +1299,30 @@ new class extends Component {
                             <x-metadata-row label="Title" :value="$this->object->title" />
                             <x-metadata-row label="Concept" :value="Str::headline($this->object->concept)" />
                             <x-metadata-row label="Type" :value="Str::headline($this->object->type)" />
-                            <x-metadata-row label="Time">
+                            <x-metadata-row label="Time" :copy-value="$this->object->time?->toIso8601String()">
                                 <x-uk-date :date="$this->object->time" />
                             </x-metadata-row>
-                            <x-metadata-row label="Created">
+                            <x-metadata-row label="Created" :copy-value="$this->object->created_at?->toIso8601String()">
                                 <x-uk-date :date="$this->object->created_at" />
                             </x-metadata-row>
-                            <x-metadata-row label="Last Updated">
+                            <x-metadata-row label="Last Updated" :copy-value="$this->object->updated_at?->toIso8601String()">
                                 <x-uk-date :date="$this->object->updated_at" />
                             </x-metadata-row>
                             @if ($this->object->url)
-                                <x-metadata-row label="URL">
+                                <x-metadata-row label="URL" :copy-value="$this->object->url">
                                     <a href="{{ $this->object->url }}" target="_blank" class="hover:underline">
                                         {{ $this->object->url }}
                                     </a>
                                 </x-metadata-row>
                             @endif
                             @if ($this->object->media_url)
-                                <x-metadata-row label="Media URL">
+                                <x-metadata-row label="Media URL" :copy-value="$this->object->media_url">
                                     <a href="{{ $this->object->media_url }}" target="_blank" class="hover:underline">
                                         {{ $this->object->media_url }}
                                     </a>
                                 </x-metadata-row>
                             @endif
-                            <x-metadata-row label="Locked">
+                            <x-metadata-row label="Locked" :copy-value="$this->object->isLocked() ? 'Yes' : 'No'">
                                 <span class="badge {{ $this->object->isLocked() ? 'badge-warning' : 'badge-ghost' }} badge-sm">
                                     {{ $this->object->isLocked() ? 'Yes' : 'No' }}
                                 </span>

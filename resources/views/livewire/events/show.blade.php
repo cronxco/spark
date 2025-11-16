@@ -937,11 +937,11 @@ new class extends Component {
                     <dl>
                         <x-metadata-row label="Event ID" :value="$this->event->id" copyable />
                         <x-metadata-row label="Action" :value="$this->formatAction($this->event->action)" />
-                        <x-metadata-row label="Time">
+                        <x-metadata-row label="Time" :copy-value="$this->event->time?->toIso8601String()">
                             <x-uk-date :date="$this->event->time" />
                         </x-metadata-row>
                         @if($this->event->value)
-                            <x-metadata-row label="Value">
+                            <x-metadata-row label="Value" :copy-value="$this->event->formatted_value">
                                 {!! format_event_value_display($this->event->formatted_value, $this->event->value_unit, $this->event->service, $this->event->action, 'action') !!}
                             </x-metadata-row>
                         @endif
@@ -953,14 +953,14 @@ new class extends Component {
                             <x-metadata-row label="Integration" :value="$this->event->integration->name" />
                         @endif
                         @if($this->event->actor)
-                            <x-metadata-row label="Actor">
+                            <x-metadata-row label="Actor" :copy-value="$this->event->actor->title">
                                 <a href="{{ route('objects.show', $this->event->actor->id) }}" class="hover:underline">
                                     {{ $this->event->actor->title }}
                                 </a>
                             </x-metadata-row>
                         @endif
                         @if($this->event->target)
-                            <x-metadata-row label="Target">
+                            <x-metadata-row label="Target" :copy-value="$this->event->target->title">
                                 <a href="{{ route('objects.show', $this->event->target->id) }}" class="hover:underline">
                                     {{ $this->event->target->title }}
                                 </a>
@@ -1151,12 +1151,12 @@ new class extends Component {
                                     <x-metadata-row label="Concept" :value="$this->event->actor->concept" />
                                 @endif
                                 @if ($this->event->actor->url)
-                                    <x-metadata-row label="URL">
+                                    <x-metadata-row label="URL" :copy-value="$this->event->actor->url">
                                         <a href="{{ $this->event->actor->url }}" target="_blank" class="hover:underline">View</a>
                                     </x-metadata-row>
                                 @endif
                                 @if ($this->event->actor->tags->isNotEmpty())
-                                    <x-metadata-row label="Tags">
+                                    <x-metadata-row label="Tags" :copyable="false">
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($this->event->actor->tags as $tag)
                                                 <x-spark-tag :tag="$tag" size="xs" />
@@ -1182,12 +1182,12 @@ new class extends Component {
                                     <x-metadata-row label="Concept" :value="$this->event->target->concept" />
                                 @endif
                                 @if ($this->event->target->url)
-                                    <x-metadata-row label="URL">
+                                    <x-metadata-row label="URL" :copy-value="$this->event->target->url">
                                         <a href="{{ $this->event->target->url }}" target="_blank" class="hover:underline">View</a>
                                     </x-metadata-row>
                                 @endif
                                 @if ($this->event->target->tags->isNotEmpty())
-                                    <x-metadata-row label="Tags">
+                                    <x-metadata-row label="Tags" :copyable="false">
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($this->event->target->tags as $tag)
                                                 <x-spark-tag :tag="$tag" size="xs" />
