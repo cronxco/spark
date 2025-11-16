@@ -33,9 +33,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Register model observers for automatic embedding generation
-        \App\Models\Event::observe(\App\Observers\EventObserver::class);
-        \App\Models\Block::observe(\App\Observers\BlockObserver::class);
-        \App\Models\EventObject::observe(\App\Observers\EventObjectObserver::class);
+        App\Models\Event::observe(App\Observers\EventObserver::class);
+        App\Models\Block::observe(App\Observers\BlockObserver::class);
+        App\Models\EventObject::observe(App\Observers\EventObjectObserver::class);
 
         // Force HTTPS in development
         URL::forceScheme('https');

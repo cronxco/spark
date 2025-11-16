@@ -278,7 +278,7 @@ class SemanticModeQuery
                 return $results;
             } catch (\Exception $e) {
                 // Show error in semantic mode (unlike default mode which fails silently)
-                \Log::error('Semantic search mode failed', [
+                Log::error('Semantic search mode failed', [
                     'error' => $e->getMessage(),
                     'query' => $query,
                 ]);
