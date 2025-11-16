@@ -17,7 +17,7 @@ class SemanticModeQuery
      */
     public static function make(): SpotlightQuery
     {
-        return SpotlightQuery::asMode('semantic', function (string $query) {
+        return SpotlightQuery::forMode('semantic', function (string $query) {
             // Require at least 2 characters in semantic mode
             if (blank($query) || strlen($query) < 2) {
                 return collect();
