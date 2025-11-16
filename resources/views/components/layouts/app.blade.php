@@ -180,6 +180,8 @@
 
                 <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')" data-hotkey="g a">
                     <x-menu-item title="Sense Check" icon="fas.brain" link="{{ route('admin.sense-check.index') }}" :active="request()->routeIs('admin.sense-check.*')" />
+                    <x-menu-item title="Search Analytics" icon="fas.magnifying-glass-chart" link="{{ route('admin.search.index') }}" :active="request()->routeIs('admin.search.*')" />
+                    <x-menu-item title="Duplicates" icon="fas.copy" link="{{ route('admin.duplicates.index') }}" :active="request()->routeIs('admin.duplicates.*')" />
                     <x-menu-item title="Activity" icon="fas.history" link="{{ route('admin.activity.index') }}" :active="request()->routeIs('admin.activity.*')" />
                     <x-menu-item title="Events" icon="fas.list" link="{{ route('admin.events.index') }}" :active="request()->routeIs('admin.events.*')" />
                     <x-menu-item title="Objects" icon="fas.cube" link="{{ route('admin.objects.index') }}" :active="request()->routeIs('admin.objects.*')" />

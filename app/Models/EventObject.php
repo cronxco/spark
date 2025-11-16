@@ -340,6 +340,101 @@ class EventObject extends Model implements HasMedia
     }
 
     /**
+     * Scope for semantic search using vector embeddings with temporal weighting
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector
+     * @param  float  $threshold  Maximum cosine distance (lower = more strict)
+     * @param  int  $limit  Maximum number of results
+     * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        if ($temporalWeight > 0) {
+            // Apply temporal weighting: recent objects get a small boost
+            // Formula: similarity * (1 + (days_ago * temporal_weight))
+            // Example: 7 days ago with 0.01 weight = similarity * 1.07 (7% penalty)
+            return $query->selectRaw('
+                *,
+                (embeddings <=> ?) as similarity,
+                EXTRACT(EPOCH FROM (NOW() - time)) / 86400 as days_ago,
+                ((embeddings <=> ?) * (1 + (EXTRACT(EPOCH FROM (NOW() - time)) / 86400) * ?)) as weighted_similarity
+            ', [$embeddingString, $embeddingString, $temporalWeight])
+                ->whereNotNull('embeddings')
+                ->whereNotNull('time') // Only apply temporal weighting if time exists
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+                ->orderBy('weighted_similarity', 'asc')
+                ->limit($limit);
+        }
+
+        // No temporal weighting - use raw similarity
+        return $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+            ->orderBy('similarity', 'asc')
+            ->limit($limit);
+    }
+
+    /**
+     * Scope for hybrid search (semantic + metadata filters) with temporal weighting
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector
+     * @param  array  $filters  Additional metadata filters (concept, type, user_id, etc.)
+     * @param  float  $threshold  Maximum cosine distance
+     * @param  int  $limit  Maximum number of results
+     * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
+    {
+        // Start with semantic search
+        $query = $query->semanticSearch($embedding, $threshold, $limit, $temporalWeight);
+
+        // Apply metadata filters
+        if (isset($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+
+        if (isset($filters['concept'])) {
+            $query->where('concept', $filters['concept']);
+        }
+
+        if (isset($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
+        if (isset($filters['from_date'])) {
+            $query->where('time', '>=', $filters['from_date']);
+        }
+
+        if (isset($filters['to_date'])) {
+            $query->where('time', '<=', $filters['to_date']);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Get searchable text representation for embedding generation
+     */
+    public function getSearchableText(): string
+    {
+        $parts = array_filter([
+            $this->concept,
+            $this->type,
+            $this->title,
+            $this->content,
+            $this->url,
+        ]);
+
+        return implode(' ', $parts);
+    }
+
+    /**
      * Check if this object is locked (prevents title/content updates)
      */
     public function isLocked(): bool

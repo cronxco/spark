@@ -47,7 +47,7 @@ new class extends Component
         'orphaned_objects' => false,
         'invalid_integrations' => false,
         'plugin_config_issues' => false,
-        'data_consistency_issues' => false,
+        'embedding_health' => false,
         'block_types_custom_layouts' => false,
     ];
 
@@ -307,59 +307,85 @@ new class extends Component
     }
 
     /**
-     * @return array<int, array{issue: string, count: int, details?: array<string, mixed>}>
+     * Get embedding health statistics
+     *
+     * @return array{events: array, blocks: array, objects: array, overall_coverage: float, events_by_service: array, events_by_domain: array}
      */
-    public function getDataConsistencyIssuesProperty(): array
+    public function getEmbeddingHealthProperty(): array
     {
-        $issues = [];
+        // Events stats
+        $totalEvents = Event::count();
+        $eventsWithEmbeddings = Event::whereNotNull('embeddings')->count();
+        $eventsCoverage = $totalEvents > 0 ? round(($eventsWithEmbeddings / $totalEvents) * 100, 1) : 0;
 
-        // Events with missing timestamps
-        $missingTime = Event::whereNull('time')->count();
-        if ($missingTime > 0) {
-            $issues[] = [
-                'issue' => 'Events with missing timestamps',
-                'count' => $missingTime,
-            ];
-        }
+        // Blocks stats
+        $totalBlocks = Block::count();
+        $blocksWithEmbeddings = Block::whereNotNull('embeddings')->count();
+        $blocksCoverage = $totalBlocks > 0 ? round(($blocksWithEmbeddings / $totalBlocks) * 100, 1) : 0;
 
-        // Events with future timestamps (more than 1 day ahead)
-        $futureEvents = Event::where('time', '>', now()->addDay())->count();
-        if ($futureEvents > 0) {
-            $issues[] = [
-                'issue' => 'Events with future timestamps (>1 day ahead)',
-                'count' => $futureEvents,
-            ];
-        }
+        // Objects stats
+        $totalObjects = EventObject::count();
+        $objectsWithEmbeddings = EventObject::whereNotNull('embeddings')->count();
+        $objectsCoverage = $totalObjects > 0 ? round(($objectsWithEmbeddings / $totalObjects) * 100, 1) : 0;
 
-        // Blocks without titles
-        $noTitle = Block::where(function ($q) {
-            $q->whereNull('title')
-                ->orWhere('title', '')
-                ->orWhere('title', 'like', '%null%');
-        })->count();
-        if ($noTitle > 0) {
-            $issues[] = [
-                'issue' => 'Blocks without proper titles',
-                'count' => $noTitle,
-            ];
-        }
+        // Overall coverage
+        $totalAll = $totalEvents + $totalBlocks + $totalObjects;
+        $totalWithEmbeddings = $eventsWithEmbeddings + $blocksWithEmbeddings + $objectsWithEmbeddings;
+        $overallCoverage = $totalAll > 0 ? round(($totalWithEmbeddings / $totalAll) * 100, 1) : 0;
 
-        // Duplicate events (same integration, service, action, time within 1 minute)
-        $duplicates = Event::selectRaw('COUNT(*) as count')
-            ->groupBy(['integration_id', 'service', 'action'])
-            ->havingRaw('COUNT(*) > 1')
+        // Coverage by service
+        $eventsByService = Event::selectRaw('service, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
+            ->groupBy('service')
+            ->orderByDesc('total')
+            ->limit(10)
             ->get()
-            ->sum('count');
+            ->map(function ($row) {
+                $coverage = $row->total > 0 ? round(($row->with_embeddings / $row->total) * 100, 1) : 0;
+                return [
+                    'service' => $row->service,
+                    'total' => $row->total,
+                    'with_embeddings' => $row->with_embeddings,
+                    'coverage' => $coverage,
+                ];
+            })
+            ->toArray();
 
-        if ($duplicates > 0) {
-            $issues[] = [
-                'issue' => 'Potentially duplicate events',
-                'count' => $duplicates,
-                'details' => ['note' => 'Events with same integration, service, and action'],
-            ];
-        }
+        // Coverage by domain
+        $eventsByDomain = Event::selectRaw('domain, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
+            ->groupBy('domain')
+            ->orderByDesc('total')
+            ->get()
+            ->map(function ($row) {
+                $coverage = $row->total > 0 ? round(($row->with_embeddings / $row->total) * 100, 1) : 0;
+                return [
+                    'domain' => $row->domain,
+                    'total' => $row->total,
+                    'with_embeddings' => $row->with_embeddings,
+                    'coverage' => $coverage,
+                ];
+            })
+            ->toArray();
 
-        return $issues;
+        return [
+            'events' => [
+                'total' => $totalEvents,
+                'with_embeddings' => $eventsWithEmbeddings,
+                'coverage' => $eventsCoverage,
+            ],
+            'blocks' => [
+                'total' => $totalBlocks,
+                'with_embeddings' => $blocksWithEmbeddings,
+                'coverage' => $blocksCoverage,
+            ],
+            'objects' => [
+                'total' => $totalObjects,
+                'with_embeddings' => $objectsWithEmbeddings,
+                'coverage' => $objectsCoverage,
+            ],
+            'overall_coverage' => $overallCoverage,
+            'events_by_service' => $eventsByService,
+            'events_by_domain' => $eventsByDomain,
+        ];
     }
 
     /**
@@ -420,11 +446,11 @@ new class extends Component
                 'issue_count' => count($this->pluginConfigIssues),
             ],
             [
-                'key' => 'data_consistency_issues',
-                'title' => 'Data consistency issues',
-                'description' => 'Missing timestamps, future dates, duplicate events, and other data quality issues.',
-                'icon' => 'o-clock',
-                'issue_count' => count($this->dataConsistencyIssues),
+                'key' => 'embedding_health',
+                'title' => 'Embedding Health Dashboard',
+                'description' => 'Monitor semantic search embedding coverage across events, blocks, and objects.',
+                'icon' => 'o-sparkles',
+                'issue_count' => 0, // Informational only
             ],
             [
                 'key' => 'block_types_custom_layouts',
@@ -759,23 +785,103 @@ new class extends Component
                 </div>
                 @endif
 
-                @elseif ($section['key'] === 'data_consistency_issues')
-                @php($items = $this->dataConsistencyIssues)
-                @if (empty($items))
-                <div class="alert alert-success">No data consistency issues found 🎉</div>
-                @else
-                <div class="space-y-3">
-                    @foreach ($items as $item)
-                    <div class="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="font-semibold text-yellow-700">{{ $item['issue'] }}</div>
-                            <span class="badge badge-warning">{{ $item['count'] }} found</span>
+                @elseif ($section['key'] === 'embedding_health')
+                @php($health = $this->embeddingHealth)
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="stat bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg border border-warning/50">
+                        <div class="stat-title flex items-center gap-2">
+                            <x-icon name="o-sparkles" class="w-4 h-4 text-warning" />
+                            Overall Coverage
                         </div>
-                        @if (!empty($item['details']['note']))
-                        <div class="text-sm text-yellow-600">{{ $item['details']['note'] }}</div>
-                        @endif
+                        <div class="stat-value {{ $health['overall_coverage'] > 80 ? 'text-success' : ($health['overall_coverage'] > 50 ? 'text-warning' : 'text-error') }}">
+                            {{ $health['overall_coverage'] }}%
+                        </div>
+                        <div class="stat-desc">Across all models</div>
                     </div>
-                    @endforeach
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Events</div>
+                        <div class="stat-value text-primary text-2xl">{{ number_format($health['events']['with_embeddings']) }}</div>
+                        <div class="stat-desc">{{ $health['events']['coverage'] }}% of {{ number_format($health['events']['total']) }}</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Blocks</div>
+                        <div class="stat-value text-secondary text-2xl">{{ number_format($health['blocks']['with_embeddings']) }}</div>
+                        <div class="stat-desc">{{ $health['blocks']['coverage'] }}% of {{ number_format($health['blocks']['total']) }}</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Objects</div>
+                        <div class="stat-value text-accent text-2xl">{{ number_format($health['objects']['with_embeddings']) }}</div>
+                        <div class="stat-desc">{{ $health['objects']['coverage'] }}% of {{ number_format($health['objects']['total']) }}</div>
+                    </div>
+                </div>
+
+                @if (!empty($health['events_by_service']))
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2">
+                        <x-icon name="o-server-stack" class="w-4 h-4" />
+                        Coverage by Service (Top 10)
+                    </h4>
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th class="text-right">Total Events</th>
+                                    <th class="text-right">With Embeddings</th>
+                                    <th class="text-right">Coverage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($health['events_by_service'] as $serviceData)
+                                <tr class="hover">
+                                    <td>
+                                        @php($pluginClass = \App\Integrations\PluginRegistry::getPlugin($serviceData['service']))
+                                        @if ($pluginClass)
+                                        <div class="flex items-center gap-2">
+                                            <x-icon :name="$pluginClass::getIcon()" class="w-4 h-4" />
+                                            {{ $pluginClass::getDisplayName() }}
+                                        </div>
+                                        @else
+                                        {{ $serviceData['service'] }}
+                                        @endif
+                                    </td>
+                                    <td class="text-right">{{ number_format($serviceData['total']) }}</td>
+                                    <td class="text-right">{{ number_format($serviceData['with_embeddings']) }}</td>
+                                    <td class="text-right">
+                                        <span class="badge {{ $serviceData['coverage'] > 90 ? 'badge-success' : ($serviceData['coverage'] > 70 ? 'badge-warning' : 'badge-error') }} badge-sm">
+                                            {{ $serviceData['coverage'] }}%
+                                        </span>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @endif
+
+                @if (!empty($health['events_by_domain']))
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2">
+                        <x-icon name="o-globe-alt" class="w-4 h-4" />
+                        Coverage by Domain
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach ($health['events_by_domain'] as $domainData)
+                        <div class="border border-base-300 rounded-lg p-3 bg-base-100">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="badge badge-outline">{{ $domainData['domain'] }}</div>
+                                <span class="badge {{ $domainData['coverage'] > 90 ? 'badge-success' : ($domainData['coverage'] > 70 ? 'badge-warning' : 'badge-error') }} badge-sm">
+                                    {{ $domainData['coverage'] }}%
+                                </span>
+                            </div>
+                            <div class="text-sm text-base-content/70">
+                                {{ number_format($domainData['with_embeddings']) }} / {{ number_format($domainData['total']) }} events
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
                 </div>
                 @endif
 

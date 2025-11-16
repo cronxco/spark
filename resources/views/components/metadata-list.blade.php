@@ -8,8 +8,8 @@
 ])
 
 @if (is_array($data) && count($data) > 0)
-    <div class="{{ $level > 0 ? 'mt-2 pl-4 border-l-2 border-base-300' : '' }} w-full">
-        <dl class="space-y-0 w-full">
+    <div class="{{ $level > 0 ? 'mt-2 pl-4 border-l-2 border-base-300' : '' }} w-full min-w-0">
+        <dl class="space-y-0 w-full min-w-0">
             @foreach ($data as $k => $v)
                 @php
                     $label = is_int($k) ? "[$k]" : Str::title(str_replace('_', ' ', (string) $k));
