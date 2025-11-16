@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -10,14 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Update events table: TEXT -> vector(1536)
-        DB::statement('ALTER TABLE events ALTER COLUMN embeddings TYPE vector(1536) USING NULL');
+        $prefix = DB::getTablePrefix();
 
-        // Update blocks table: TEXT -> vector(1536)
-        DB::statement('ALTER TABLE blocks ALTER COLUMN embeddings TYPE vector(1536) USING NULL');
+        // Only run if tables exist (handles fresh migrations)
+        if (Schema::hasTable('events')) {
+            DB::statement("ALTER TABLE {$prefix}events ALTER COLUMN embeddings TYPE vector(1536) USING NULL");
+        }
 
-        // Update objects table: vector(3) -> vector(1536)
-        DB::statement('ALTER TABLE objects ALTER COLUMN embeddings TYPE vector(1536) USING NULL');
+        if (Schema::hasTable('blocks')) {
+            DB::statement("ALTER TABLE {$prefix}blocks ALTER COLUMN embeddings TYPE vector(1536) USING NULL");
+        }
+
+        if (Schema::hasTable('objects')) {
+            DB::statement("ALTER TABLE {$prefix}objects ALTER COLUMN embeddings TYPE vector(1536) USING NULL");
+        }
     }
 
     /**
@@ -25,13 +32,18 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert events table: vector(1536) -> TEXT
-        DB::statement('ALTER TABLE events ALTER COLUMN embeddings TYPE TEXT USING NULL');
+        $prefix = DB::getTablePrefix();
 
-        // Revert blocks table: vector(1536) -> TEXT
-        DB::statement('ALTER TABLE blocks ALTER COLUMN embeddings TYPE TEXT USING NULL');
+        if (Schema::hasTable('events')) {
+            DB::statement("ALTER TABLE {$prefix}events ALTER COLUMN embeddings TYPE TEXT USING NULL");
+        }
 
-        // Revert objects table: vector(1536) -> vector(3)
-        DB::statement('ALTER TABLE objects ALTER COLUMN embeddings TYPE vector(3) USING NULL');
+        if (Schema::hasTable('blocks')) {
+            DB::statement("ALTER TABLE {$prefix}blocks ALTER COLUMN embeddings TYPE TEXT USING NULL");
+        }
+
+        if (Schema::hasTable('objects')) {
+            DB::statement("ALTER TABLE {$prefix}objects ALTER COLUMN embeddings TYPE vector(3) USING NULL");
+        }
     }
 };
