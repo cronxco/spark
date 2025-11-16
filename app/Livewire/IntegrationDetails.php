@@ -13,7 +13,6 @@ class IntegrationDetails extends Component
 {
     public Integration $integration;
     public bool $showSidebar = false;
-    public bool $logsOpen = false;
     public bool $configOpen = true;
 
     public function mount(Integration $integration)

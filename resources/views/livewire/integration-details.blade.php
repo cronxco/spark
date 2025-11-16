@@ -197,6 +197,15 @@
                     </div>
                 </x-card>
             @endif
+
+            <!-- Logs -->
+            <x-card class="bg-base-200 shadow">
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-document-text" class="w-5 h-5 text-base-content/60" />
+                    Logs
+                </h3>
+                <livewire:log-viewer type="integration" :entity-id="$integration->id" />
+            </x-card>
         </div>
 
         <!-- Drawer for Technical Details -->
@@ -289,18 +298,6 @@
                                 icon="o-pencil"
                             />
                         </div>
-                    </x-slot:content>
-                </x-collapse>
-
-                <!-- Logs (Collapsible, Default Closed) -->
-                <x-collapse wire:model="logsOpen">
-                    <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
-                            Logs
-                        </div>
-                    </x-slot:heading>
-                    <x-slot:content>
-                        <livewire:log-viewer type="integration" :entity-id="$integration->id" />
                     </x-slot:content>
                 </x-collapse>
             </div>
