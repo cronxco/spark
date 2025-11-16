@@ -968,26 +968,26 @@ new class extends Component {
                         <x-metadata-row label="Time" :copy-value="$this->event->time?->toIso8601String()">
                             <x-uk-date :date="$this->event->time" />
                         </x-metadata-row>
-                        @if($this->event->value)
+                        @if ($this->event->value)
                             <x-metadata-row label="Value" :copy-value="$this->event->formatted_value">
                                 {!! format_event_value_display($this->event->formatted_value, $this->event->value_unit, $this->event->service, $this->event->action, 'action') !!}
                             </x-metadata-row>
                         @endif
                         <x-metadata-row label="Service" :value="str::headline($this->event->service)" />
-                        @if($this->event->domain)
+                        @if ($this->event->domain)
                             <x-metadata-row label="Domain" :value="str::headline($this->event->domain)" />
                         @endif
-                        @if($this->event->integration)
+                        @if ($this->event->integration)
                             <x-metadata-row label="Integration" :value="$this->event->integration->name" />
                         @endif
-                        @if($this->event->actor)
+                        @if ($this->event->actor)
                             <x-metadata-row label="Actor" :copy-value="$this->event->actor->title">
                                 <a href="{{ route('objects.show', $this->event->actor->id) }}" class="hover:underline">
                                     {{ $this->event->actor->title }}
                                 </a>
                             </x-metadata-row>
                         @endif
-                        @if($this->event->target)
+                        @if ($this->event->target)
                             <x-metadata-row label="Target" :copy-value="$this->event->target->title">
                                 <a href="{{ route('objects.show', $this->event->target->id) }}" class="hover:underline">
                                     {{ $this->event->target->title }}
@@ -1010,10 +1010,10 @@ new class extends Component {
                         <div wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
                             <input id="tag-input-{{ $this->event->id }}" data-tagify data-initial="tag-initial-{{ $this->event->id }}" data-suggestions-id="tag-suggestions-{{ $this->event->id }}" aria-label="Tags" class="input input-sm w-full" placeholder="Add tags" data-hotkey="t" />
                             <script type="application/json" id="tag-initial-{{ $this->event->id }}">
-                                {!!json_encode($this->event->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all())!!}
+                                {!! json_encode($this->event->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                             <script type="application/json" id="tag-suggestions-{{ $this->event->id }}">
-                                {!!json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all())!!}
+                                {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                         </div>
                     </div>
@@ -1250,7 +1250,7 @@ new class extends Component {
                                     <h4 class="text-sm font-semibold">Event Metadata</h4>
                                 </div>
                                 <script type="application/json" id="event-meta-json-{{ $this->event->id }}">
-                                    {!!json_encode($this->event->event_metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)!!}
+                                    {!! json_encode($this->event->event_metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
                                 </script>
                                 <x-button
                                     icon="o-clipboard"
@@ -1270,7 +1270,7 @@ new class extends Component {
                                     <h4 class="text-sm font-semibold">Actor Metadata</h4>
                                 </div>
                                 <script type="application/json" id="actor-meta-json-{{ $this->event->id }}">
-                                    {!!json_encode($this->event->actor->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)!!}
+                                    {!! json_encode($this->event->actor->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
                                 </script>
                                 <x-button
                                     icon="o-clipboard"
@@ -1290,7 +1290,7 @@ new class extends Component {
                                     <h4 class="text-sm font-semibold">Target Metadata</h4>
                                 </div>
                                 <script type="application/json" id="target-meta-json-{{ $this->event->id }}">
-                                    {!!json_encode($this->event->target->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)!!}
+                                    {!! json_encode($this->event->target->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
                                 </script>
                                 <x-button
                                     icon="o-clipboard"
