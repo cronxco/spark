@@ -25,6 +25,12 @@ class AdminNavigationQuery
                     'route' => 'admin.sense-check.index',
                 ],
                 [
+                    'title' => 'Search Analytics',
+                    'subtitle' => 'Monitor semantic search performance',
+                    'icon' => 'magnifying-glass',
+                    'route' => 'admin.search.index',
+                ],
+                [
                     'title' => 'Activity Log',
                     'subtitle' => 'View system activity and changes',
                     'icon' => 'clock',
