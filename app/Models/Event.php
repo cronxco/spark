@@ -384,6 +384,184 @@ class Event extends Model
     }
 
     /**
+     * Get the searchable text for this event (used for embedding generation)
+     *
+     * Format: [Actor Title] [Action (Sentence Case)] [Target Title] [Value/Units OR Summary] — [Domain] [Service]
+     * Example: "John Smith Made Transaction Coffee Shop 50.00 GBP — Money Monzo"
+     * Or with summary: "John Smith Listened To Bohemian Rhapsody A 6-minute epic rock opera — Media Spotify"
+     */
+    public function getSearchableText(): string
+    {
+        // Load relationships if not already loaded
+        $this->loadMissing(['actor', 'target', 'blocks']);
+
+        $parts = [];
+
+        // Actor title
+        if ($this->actor && $this->actor->title) {
+            $parts[] = $this->actor->title;
+        }
+
+        // Action in sentence case
+        if ($this->action) {
+            $parts[] = Str::headline($this->action);
+        }
+
+        // Target title
+        if ($this->target && $this->target->title) {
+            $parts[] = $this->target->title;
+        }
+
+        // Value/units OR summary block (prefer summary if it exists)
+        // Prioritize specific block types with content
+        $priorityOrder = [
+            'fetch_summary_paragraph',
+            'fetch_summary_short',
+            'bookmark_summary',
+            'track_details',
+            'event_details',
+        ];
+
+        // Filter blocks to only those with "summary" or "details" in block_type
+        $candidateBlocks = $this->blocks->filter(function ($block) {
+            if (empty($block->block_type)) {
+                return false;
+            }
+
+            $content = $block->getContent();
+            if (empty($content) || strlen($content) <= 20) {
+                return false;
+            }
+
+            $blockType = strtolower($block->block_type);
+
+            return str_contains($blockType, 'summary') || str_contains($blockType, 'details');
+        });
+
+        // Sort by priority order
+        $summaryBlock = $candidateBlocks->sortBy(function ($block) use ($priorityOrder) {
+            $index = array_search($block->block_type, $priorityOrder);
+
+            return $index !== false ? $index : 999; // Priority blocks first, others last
+        })->first();
+
+        if ($summaryBlock) {
+            // Use the block's content as context
+            $parts[] = $summaryBlock->getContent();
+        } elseif ($this->formatted_value !== null && $this->value_unit) {
+            // Use formatted value (value / value_multiplier)
+            $parts[] = $this->formatted_value . ' ' . $this->value_unit;
+        }
+
+        // Add domain and service at the end with separator
+        $suffix = array_filter([$this->domain, $this->service]);
+        if (! empty($suffix)) {
+            $parts[] = '—';
+            $parts = array_merge($parts, $suffix);
+        }
+
+        return implode(' ', array_filter($parts));
+    }
+
+    /**
+     * Scope for semantic search using vector similarity with temporal weighting
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector (1536 dimensions)
+     * @param  float  $threshold  Maximum cosine distance (0-2, lower is more similar)
+     * @param  int  $limit  Maximum number of results
+     * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day, higher = stronger recency bias)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        if ($temporalWeight > 0) {
+            // Apply temporal weighting: recent events get a small boost
+            // Formula: similarity * (1 + (days_ago * temporal_weight))
+            // Example: 7 days ago with 0.01 weight = similarity * 1.07 (7% penalty)
+            return $query->selectRaw('
+                *,
+                (embeddings <=> ?) as similarity,
+                EXTRACT(EPOCH FROM (NOW() - time)) / 86400 as days_ago,
+                ((embeddings <=> ?) * (1 + (EXTRACT(EPOCH FROM (NOW() - time)) / 86400) * ?)) as weighted_similarity
+            ', [$embeddingString, $embeddingString, $temporalWeight])
+                ->whereNotNull('embeddings')
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+                ->orderBy('weighted_similarity', 'asc')
+                ->limit($limit);
+        }
+
+        // No temporal weighting - use raw similarity
+        return $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+            ->orderBy('similarity', 'asc')
+            ->limit($limit);
+    }
+
+    /**
+     * Scope for hybrid search (semantic + metadata filters) with temporal weighting
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  array  $embedding  The query embedding vector
+     * @param  array  $filters  Additional metadata filters (service, domain, action, integration_id, etc.)
+     * @param  float  $threshold  Maximum cosine distance
+     * @param  int  $limit  Maximum number of results
+     * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
+    {
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        if ($temporalWeight > 0) {
+            $query->selectRaw('
+                *,
+                (embeddings <=> ?) as similarity,
+                EXTRACT(EPOCH FROM (NOW() - time)) / 86400 as days_ago,
+                ((embeddings <=> ?) * (1 + (EXTRACT(EPOCH FROM (NOW() - time)) / 86400) * ?)) as weighted_similarity
+            ', [$embeddingString, $embeddingString, $temporalWeight])
+                ->whereNotNull('embeddings')
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold]);
+        } else {
+            $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+                ->whereNotNull('embeddings')
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold]);
+        }
+
+        // Apply metadata filters
+        if (isset($filters['integration_id'])) {
+            $query->where('integration_id', $filters['integration_id']);
+        }
+
+        if (isset($filters['service'])) {
+            $query->where('service', $filters['service']);
+        }
+
+        if (isset($filters['domain'])) {
+            $query->where('domain', $filters['domain']);
+        }
+
+        if (isset($filters['action'])) {
+            $query->where('action', $filters['action']);
+        }
+
+        if (isset($filters['from_date'])) {
+            $query->where('time', '>=', $filters['from_date']);
+        }
+
+        if (isset($filters['to_date'])) {
+            $query->where('time', '<=', $filters['to_date']);
+        }
+
+        $orderColumn = $temporalWeight > 0 ? 'weighted_similarity' : 'similarity';
+
+        return $query->orderBy($orderColumn, 'asc')->limit($limit);
+    }
+
+    /**
      * Log tag activity to the activity log
      */
     private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
