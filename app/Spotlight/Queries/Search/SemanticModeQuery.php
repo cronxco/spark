@@ -5,6 +5,7 @@ namespace App\Spotlight\Queries\Search;
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\EmbeddingService;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
@@ -69,6 +70,11 @@ class SemanticModeQuery
                         $q->whereIn('integration_id', $userIntegrationIds);
                     })
                     ->with(['event.integration'])
+                    ->get();
+
+                // Search objects (limit to top 10)
+                $objects = EventObject::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0.015)
+                    ->where('user_id', auth()->id())
                     ->get();
 
                 // Combine results
@@ -204,6 +210,56 @@ class SemanticModeQuery
                             ->setPriority(2)
                             ->setAction('jump_to', ['path' => route('blocks.show', $block)])
                             ->setTokens(['block' => $block])
+                    );
+                }
+
+                // Format object results
+                foreach ($objects as $object) {
+                    $similarity = round((1 - ($object->similarity ?? 0)) * 100);
+
+                    // Build subtitle
+                    $subtitleParts = [];
+
+                    // Add concept and type
+                    if ($object->concept) {
+                        $subtitleParts[] = Str::headline($object->concept);
+                    }
+                    if ($object->type) {
+                        $subtitleParts[] = Str::headline($object->type);
+                    }
+
+                    // Add date if available
+                    if ($object->time) {
+                        $subtitleParts[] = $object->time->format('M j, g:ia');
+                    }
+
+                    // Add similarity score
+                    $subtitleParts[] = "✨ {$similarity}% match";
+
+                    // Show days ago if temporal weighting applied
+                    if (isset($object->days_ago) && $object->time) {
+                        $daysAgo = round($object->days_ago);
+                        if ($daysAgo === 0) {
+                            $subtitleParts[] = '🔥 Today';
+                        } elseif ($daysAgo === 1) {
+                            $subtitleParts[] = '⏰ Yesterday';
+                        } elseif ($daysAgo < 7) {
+                            $subtitleParts[] = "⏰ {$daysAgo}d ago";
+                        }
+                    }
+
+                    $subtitle = implode(' • ', $subtitleParts);
+
+                    $results->push(
+                        SpotlightResult::make()
+                            ->setTitle($object->title ?? 'Untitled')
+                            ->setSubtitle($subtitle)
+                            ->setTypeahead('Object: ' . ($object->title ?? 'Untitled'))
+                            ->setIcon('cube')
+                            ->setGroup('objects')
+                            ->setPriority(3)
+                            ->setAction('jump_to', ['path' => route('objects.show', $object)])
+                            ->setTokens(['object' => $object])
                     );
                 }
 
