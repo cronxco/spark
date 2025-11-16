@@ -93,7 +93,7 @@ new class extends Component {
         return [
             'block' => $this->block->toArray(),
             'event' => $this->block->event?->toArray(),
-            'relationships' => $this->block->relationships->map(function ($rel) {
+            'relationships' => $this->block->allRelationships()->get()->map(function ($rel) {
                 return [
                     'type' => $rel->type,
                     'from' => ['type' => $rel->from_type, 'id' => $rel->from_id],
