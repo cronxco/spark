@@ -979,7 +979,6 @@ new class extends Component
                     <div class="stat-desc">For events with generation timestamps</div>
                 </div>
                 @endif
-
                 @else
                 <div class="alert alert-error">
                     <x-icon name="o-exclamation-circle" class="w-5 h-5" />
@@ -1089,7 +1088,6 @@ new class extends Component
                     @endforeach
                 </div>
                 @endif
-
                 @endif
             </x-slot:content>
         </x-collapse>
