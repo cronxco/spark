@@ -306,7 +306,7 @@ new class extends Component {
 
                     @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
                     @if (!empty($meta))
-                    <div class="mt-3 overflow-hidden">
+                    <div class="mt-3 overflow-hidden min-w-0 w-full">
                         <x-metadata-list :data="$meta" />
                     </div>
                     @endif
