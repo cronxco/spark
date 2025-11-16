@@ -34,9 +34,19 @@ class EventFactory extends Factory
             'event_metadata' => [],
             'target_id' => $target->id,
             'target_metadata' => [],
-            'embeddings' => '',
+            'embeddings' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
+    }
+
+    /**
+     * Indicate that the event should have valid embeddings (1536 dimensions)
+     */
+    public function withEmbeddings(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'embeddings' => array_map(fn () => $this->faker->randomFloat(4, -1, 1), range(1, 1536)),
+        ]);
     }
 }
