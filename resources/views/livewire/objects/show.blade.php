@@ -154,7 +154,7 @@ new class extends Component {
         return [
             'object' => $this->object->toArray(),
             'tags' => $this->object->tags->toArray(),
-            'relationships' => $this->object->relationships->map(function ($rel) {
+            'relationships' => $this->object->allRelationships()->get()->map(function ($rel) {
                 return [
                     'type' => $rel->type,
                     'from' => ['type' => $rel->from_type, 'id' => $rel->from_id],

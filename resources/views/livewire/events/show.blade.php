@@ -398,7 +398,7 @@ new class extends Component {
             'target' => $this->event->target?->toArray(),
             'blocks' => $this->event->blocks->toArray(),
             'tags' => $this->event->tags->toArray(),
-            'relationships' => $this->event->relationships->map(function ($rel) {
+            'relationships' => $this->event->allRelationships()->get()->map(function ($rel) {
                 return [
                     'type' => $rel->type,
                     'from' => ['type' => $rel->from_type, 'id' => $rel->from_id],
