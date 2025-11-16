@@ -475,6 +475,57 @@ class EventObject extends Model implements HasMedia
     }
 
     /**
+     * Set the embeddings attribute.
+     * Handles conversion to pgvector format.
+     */
+    public function setEmbeddingsAttribute($value)
+    {
+        if (is_null($value)) {
+            $this->attributes['embeddings'] = null;
+
+            return;
+        }
+
+        // If it's already a string in vector format [x,y,z], use it as-is
+        if (is_string($value)) {
+            // Remove any surrounding quotes if present
+            $value = trim($value, '"');
+            $this->attributes['embeddings'] = $value;
+
+            return;
+        }
+
+        // If it's an array, convert to vector format without quotes
+        if (is_array($value)) {
+            $this->attributes['embeddings'] = '[' . implode(',', $value) . ']';
+
+            return;
+        }
+
+        $this->attributes['embeddings'] = $value;
+    }
+
+    /**
+     * Get the embeddings attribute.
+     * Returns as array for easier usage.
+     */
+    public function getEmbeddingsAttribute($value)
+    {
+        if (is_null($value)) {
+            return null;
+        }
+
+        // If it's already in vector format [x,y,z], parse it to array
+        if (is_string($value)) {
+            $value = trim($value, '[]');
+
+            return ! empty($value) ? array_map('floatval', explode(',', $value)) : null;
+        }
+
+        return $value;
+    }
+
+    /**
      * Log tag activity to the activity log
      */
     private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
@@ -499,52 +550,5 @@ class EventObject extends Model implements HasMedia
             ->event("tag_{$action}")
             ->withProperties(['tag' => $tagLabel, 'tag_name' => $tagName, 'tag_type' => $tagType])
             ->log("{$action} tag \"{$tagLabel}\"");
-    }
-
-    /**
-     * Set the embeddings attribute.
-     * Handles conversion to pgvector format.
-     */
-    public function setEmbeddingsAttribute($value)
-    {
-        if (is_null($value)) {
-            $this->attributes['embeddings'] = null;
-            return;
-        }
-
-        // If it's already a string in vector format [x,y,z], use it as-is
-        if (is_string($value)) {
-            // Remove any surrounding quotes if present
-            $value = trim($value, '"');
-            $this->attributes['embeddings'] = $value;
-            return;
-        }
-
-        // If it's an array, convert to vector format without quotes
-        if (is_array($value)) {
-            $this->attributes['embeddings'] = '[' . implode(',', $value) . ']';
-            return;
-        }
-
-        $this->attributes['embeddings'] = $value;
-    }
-
-    /**
-     * Get the embeddings attribute.
-     * Returns as array for easier usage.
-     */
-    public function getEmbeddingsAttribute($value)
-    {
-        if (is_null($value)) {
-            return null;
-        }
-
-        // If it's already in vector format [x,y,z], parse it to array
-        if (is_string($value)) {
-            $value = trim($value, '[]');
-            return !empty($value) ? array_map('floatval', explode(',', $value)) : null;
-        }
-
-        return $value;
     }
 }
