@@ -13,12 +13,12 @@ class DuplicateDetectionService
     /**
      * Find potential duplicate events using semantic similarity
      *
-     * @param int $userId User ID to scope the search
+     * @param string $userId User ID (UUID) to scope the search
      * @param float $similarityThreshold Similarity threshold (0-1), default 0.95 for 95% match
      * @param int $limit Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
-    public function findDuplicateEvents(int $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
+    public function findDuplicateEvents(string $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
     {
         return $this->findDuplicates(Event::class, $userId, $similarityThreshold, $limit);
     }
@@ -26,12 +26,12 @@ class DuplicateDetectionService
     /**
      * Find potential duplicate blocks using semantic similarity
      *
-     * @param int $userId User ID to scope the search
+     * @param string $userId User ID (UUID) to scope the search
      * @param float $similarityThreshold Similarity threshold (0-1), default 0.95 for 95% match
      * @param int $limit Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
-    public function findDuplicateBlocks(int $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
+    public function findDuplicateBlocks(string $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
     {
         return $this->findDuplicates(Block::class, $userId, $similarityThreshold, $limit);
     }
@@ -39,12 +39,12 @@ class DuplicateDetectionService
     /**
      * Find potential duplicate objects using semantic similarity
      *
-     * @param int $userId User ID to scope the search
+     * @param string $userId User ID (UUID) to scope the search
      * @param float $similarityThreshold Similarity threshold (0-1), default 0.95 for 95% match
      * @param int $limit Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
-    public function findDuplicateObjects(int $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
+    public function findDuplicateObjects(string $userId, float $similarityThreshold = 0.95, int $limit = 100): Collection
     {
         return $this->findDuplicates(EventObject::class, $userId, $similarityThreshold, $limit);
     }
@@ -53,12 +53,12 @@ class DuplicateDetectionService
      * Generic duplicate finder using semantic similarity
      *
      * @param string $modelClass Model class to search
-     * @param int $userId User ID to scope the search
+     * @param string $userId User ID (UUID) to scope the search
      * @param float $similarityThreshold Similarity threshold (0-1)
      * @param int $limit Maximum number of duplicate pairs to return
      * @return Collection Collection of duplicate pairs with similarity scores
      */
-    private function findDuplicates(string $modelClass, int $userId, float $similarityThreshold, int $limit): Collection
+    private function findDuplicates(string $modelClass, string $userId, float $similarityThreshold, int $limit): Collection
     {
         // Determine table name and user filter
         $table = match ($modelClass) {
