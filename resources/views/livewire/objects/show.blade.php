@@ -67,7 +67,7 @@ new class extends Component {
 
     public function getRelationships()
     {
-        return $this->object->relationships()->get();
+        return $this->object->allRelationships()->get();
     }
 
     public function getRelatedEvents()

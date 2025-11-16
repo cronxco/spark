@@ -43,7 +43,7 @@ new class extends Component {
 
     public function getRelationships()
     {
-        return $this->block->relationships()->get();
+        return $this->block->allRelationships()->get();
     }
 
     public function getRelatedBlocks()
