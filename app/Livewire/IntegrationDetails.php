@@ -55,6 +55,42 @@ class IntegrationDetails extends Component
         $this->redirect(route('integrations.details', $this->integration->id) . '#configuration');
     }
 
+    public function getCompleteIntegrationData(): array
+    {
+        return [
+            'integration' => $this->integration->toArray(),
+            'group' => $this->integration->group?->toArray(),
+            'configuration' => $this->integration->configuration ?? [],
+            'events_count' => Event::where('integration_id', $this->integration->id)->count(),
+            'recent_events' => Event::where('integration_id', $this->integration->id)
+                ->with(['actor', 'target', 'tags'])
+                ->orderBy('time', 'desc')
+                ->limit(10)
+                ->get()
+                ->toArray(),
+        ];
+    }
+
+    public function exportAsJson(): void
+    {
+        $data = $this->getCompleteIntegrationData();
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $this->js("
+            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'integration-{$this->integration->id}-" . now()->format('Y-m-d-His') . ".json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        ");
+
+        $this->dispatch('notify', ['message' => 'Integration exported as JSON!', 'type' => 'success']);
+    }
+
     public function getPluginClass()
     {
         return PluginRegistry::getPlugin($this->integration->service);
