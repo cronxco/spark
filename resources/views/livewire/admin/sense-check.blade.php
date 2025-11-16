@@ -1089,6 +1089,7 @@ new class extends Component
                     @endforeach
                 </div>
                 @endif
+
                 @endif
             </x-slot:content>
         </x-collapse>
