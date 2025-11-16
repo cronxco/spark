@@ -431,7 +431,7 @@ class Event extends Model
 
         // Action in sentence case
         if ($this->action) {
-            $parts[] = Illuminate\Support\Str::headline($this->action);
+            $parts[] = Str::headline($this->action);
         }
 
         // Target title
