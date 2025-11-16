@@ -364,16 +364,13 @@ new class extends Component {
                             </x-metadata-row>
                         @endif
                         <x-metadata-row label="Time">
-                            {{ to_user_timezone($this->block->time, auth()->user())->format('M j, Y g:i A') }}
-                            <span class="text-base-content/60">({{ to_user_timezone($this->block->time, auth()->user())->diffForHumans() }})</span>
+                            <x-uk-date :date="$this->block->time" />
                         </x-metadata-row>
                         <x-metadata-row label="Created">
-                            {{ to_user_timezone($this->block->created_at, auth()->user())->format('M j, Y g:i A') }}
-                            <span class="text-base-content/60">({{ to_user_timezone($this->block->created_at, auth()->user())->diffForHumans() }})</span>
+                            <x-uk-date :date="$this->block->created_at" />
                         </x-metadata-row>
                         <x-metadata-row label="Last Updated">
-                            {{ to_user_timezone($this->block->updated_at, auth()->user())->format('M j, Y g:i A') }}
-                            <span class="text-base-content/60">({{ to_user_timezone($this->block->updated_at, auth()->user())->diffForHumans() }})</span>
+                            <x-uk-date :date="$this->block->updated_at" />
                         </x-metadata-row>
                         @if ($this->block->url)
                             <x-metadata-row label="URL">
