@@ -368,6 +368,9 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
         // Fetch account information
         $this->fetchAccountInfoForGroup($group);
+
+        // After fetching account info, check for duplicate groups
+        $this->handleDuplicateGroups($group);
     }
 
     /**
@@ -992,5 +995,73 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 $event->delete();
             }
         }
+    }
+
+    /**
+     * Handle duplicate integration groups for the same Google account
+     *
+     * When a user completes OAuth for a Google account they've already connected,
+     * we want to reuse the existing group instead of creating a duplicate.
+     *
+     * @param  IntegrationGroup  $group  The newly created group from OAuth
+     * @return IntegrationGroup The group to use (either existing or new)
+     */
+    protected function handleDuplicateGroups(IntegrationGroup $group): IntegrationGroup
+    {
+        // Only proceed if we have an account_id
+        if (! $group->account_id) {
+            Log::warning('Google Calendar group has no account_id, cannot check for duplicates', [
+                'group_id' => $group->id,
+            ]);
+
+            return $group;
+        }
+
+        // Check if another group exists for this user, service, and account_id
+        $existingGroup = IntegrationGroup::query()
+            ->where('user_id', $group->user_id)
+            ->where('service', static::getIdentifier())
+            ->where('account_id', $group->account_id)
+            ->where('id', '!=', $group->id) // Exclude the current group
+            ->first();
+
+        if ($existingGroup) {
+            Log::info('Found existing Google Calendar group for this account, merging', [
+                'new_group_id' => $group->id,
+                'existing_group_id' => $existingGroup->id,
+                'account_id' => $group->account_id,
+                'user_id' => $group->user_id,
+            ]);
+
+            // Update the existing group with the latest tokens
+            // (they might have been refreshed during this OAuth flow)
+            $existingGroup->update([
+                'access_token' => $group->access_token,
+                'refresh_token' => $group->refresh_token ?? $existingGroup->refresh_token,
+                'expiry' => $group->expiry,
+                'refresh_expiry' => $group->refresh_expiry,
+            ]);
+
+            // Move any integrations from the new group to the existing group
+            // (this shouldn't happen in normal flow, but handle it just in case)
+            Integration::where('integration_group_id', $group->id)
+                ->update(['integration_group_id' => $existingGroup->id]);
+
+            // Delete the duplicate group
+            $group->delete();
+
+            Log::info('Deleted duplicate Google Calendar group', [
+                'deleted_group_id' => $group->id,
+                'using_group_id' => $existingGroup->id,
+            ]);
+
+            // Store the existing group ID in the request to update the redirect
+            request()->merge(['_merged_group_id' => $existingGroup->id]);
+
+            return $existingGroup;
+        }
+
+        // No duplicate found, use the new group
+        return $group;
     }
 }

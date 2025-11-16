@@ -276,6 +276,29 @@ class IntegrationController extends Controller
                 ]);
             }
 
+            // Check if the group was merged with an existing group (for duplicate account detection)
+            $mergedGroupId = $request->get('_merged_group_id');
+            if ($mergedGroupId) {
+                // Reload the group to get the existing one
+                $group = IntegrationGroup::find($mergedGroupId);
+                if (! $group) {
+                    Log::error('Merged group not found', [
+                        'merged_group_id' => $mergedGroupId,
+                        'service' => $service,
+                        'user_id' => $user->id,
+                    ]);
+
+                    return redirect()->route('integrations.index')
+                        ->with('error', 'Failed to complete integration setup');
+                }
+
+                Log::info('Using merged group after duplicate detection', [
+                    'service' => $service,
+                    'user_id' => $user->id,
+                    'merged_group_id' => $mergedGroupId,
+                ]);
+            }
+
             Log::info('Redirecting to onboarding', [
                 'service' => $service,
                 'user_id' => $user->id,
