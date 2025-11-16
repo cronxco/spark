@@ -366,7 +366,7 @@ Relationship::createRelationship([
 // Query relationships
 $object->relationshipsFrom()->get(); // Where this is "from"
 $object->relationshipsTo()->get();   // Where this is "to"
-$object->relationships()->get();     // All relationships
+$object->allRelationships()->get();  // All relationships
 
 // Get related entities
 $object->relatedObjects()->get();           // All related objects

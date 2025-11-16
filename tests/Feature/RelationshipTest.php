@@ -221,7 +221,7 @@ class RelationshipTest extends TestCase
 
         $this->assertEquals(1, $event->relationshipsFrom()->count());
         $this->assertEquals(0, $event->relationshipsTo()->count());
-        $this->assertEquals(1, $event->relationships()->count());
+        $this->assertEquals(1, $event->allRelationships()->count());
     }
 
     /** @test */

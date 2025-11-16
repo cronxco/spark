@@ -233,7 +233,7 @@ class Block extends Model implements HasMedia
     /**
      * Get all relationships for this block (both from and to).
      */
-    public function relationships()
+    public function allRelationships()
     {
         return Relationship::where(function ($query) {
             $query->where('from_type', self::class)
