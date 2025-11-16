@@ -72,7 +72,30 @@ new class extends Component {
 
     public function getRelatedEvents()
     {
-        // Find events where this object is either actor or target
+        // Use semantic search if embeddings exist
+        if (!empty($this->object->embeddings)) {
+            try {
+                $embedding = json_decode($this->object->embeddings, true);
+
+                if (is_array($embedding) && count($embedding) > 0) {
+                    // Get user's integration IDs for security
+                    $userIntegrationIds = auth()->user()->integrations()->pluck('id')->toArray();
+
+                    // Perform semantic search with temporal weighting
+                    return Event::semanticSearch($embedding, threshold: 1.2, limit: 5, temporalWeight: 0.015)
+                        ->whereIn('integration_id', $userIntegrationIds)
+                        ->with(['actor', 'target', 'integration', 'tags'])
+                        ->get();
+                }
+            } catch (\Exception $e) {
+                Log::warning('Semantic search failed for related events on object', [
+                    'object_id' => $this->object->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Fallback to original logic if embeddings don't exist or semantic search fails
         return Event::with(['actor', 'target', 'integration', 'tags'])
             ->whereHas('integration', function ($q) {
                 $userId = optional(auth()->guard('web')->user())->id;
@@ -93,7 +116,32 @@ new class extends Component {
 
     public function getRelatedBlocks()
     {
-        // Get blocks related to this object through relationships
+        // Use semantic search if embeddings exist
+        if (!empty($this->object->embeddings)) {
+            try {
+                $embedding = json_decode($this->object->embeddings, true);
+
+                if (is_array($embedding) && count($embedding) > 0) {
+                    // Get user's integration IDs for security
+                    $userIntegrationIds = auth()->user()->integrations()->pluck('id')->toArray();
+
+                    // Perform semantic search with temporal weighting
+                    return Block::semanticSearch($embedding, threshold: 1.2, limit: 5, temporalWeight: 0.015)
+                        ->whereHas('event', function ($q) use ($userIntegrationIds) {
+                            $q->whereIn('integration_id', $userIntegrationIds);
+                        })
+                        ->with(['event.integration'])
+                        ->get();
+                }
+            } catch (\Exception $e) {
+                Log::warning('Semantic search failed for related blocks on object', [
+                    'object_id' => $this->object->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Fallback to original logic if embeddings don't exist or semantic search fails
         return $this->object->relatedBlocks()
             ->with('event.integration')
             ->orderBy('time', 'desc')
@@ -1111,80 +1159,110 @@ new class extends Component {
 
             <!-- Related Blocks -->
             @if ($this->getRelatedBlocks()->isNotEmpty())
-            <div>
-                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
-                    Related Blocks ({{ $this->getRelatedBlocks()->count() }})
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @foreach ($this->getRelatedBlocks() as $block)
-                        <x-block-card :block="$block" />
-                    @endforeach
+            <div class="relative">
+                <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-squares-2x2" class="w-5 h-5 text-warning" />
+                        Related Blocks ({{ $this->getRelatedBlocks()->count() }})
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach ($this->getRelatedBlocks() as $block)
+                            <x-block-card :block="$block" />
+                        @endforeach
+                    </div>
+                </div>
+                <!-- AI Badge -->
+                <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                    <x-icon name="o-sparkles" class="w-3 h-3 text-warning-content" />
                 </div>
             </div>
             @endif
 
             <!-- Related Events -->
             @if ($this->getRelatedEvents()->isNotEmpty())
-            <x-card class="bg-base-200 shadow">
-                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="o-bolt" class="w-5 h-5" />
-                    Related Events ({{ $this->getRelatedEvents()->count() }})
-                </h3>
-                <div class="space-y-3">
-                    @foreach ($this->getRelatedEvents() as $event)
-                    <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                        <a href="{{ route('events.show', $event->id) }}"
-                            class="block hover:text-primary transition-colors">
-                            <div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0 mt-1">
-                                    <x-icon name="o-bolt" class="w-4 h-4" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-start justify-between gap-2 mb-1">
-                                        <span class="font-medium">
-                                            {{ $this->formatAction($event->action) }}
-                                            @if (should_display_action_with_object($event->action, $event->service))
-                                            @if ($event->target)
-                                            <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
-                                            @elseif ($event->actor)
-                                            <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
-                                            @endif
-                                            @endif
-                                        </span>
-                                        @if ($event->value)
-                                        <span class="text-sm font-semibold flex-shrink-0">
-                                            {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
-                                        </span>
-                                        @endif
+            <div class="relative">
+                <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="o-bolt" class="w-5 h-5 text-warning" />
+                        Related Events ({{ $this->getRelatedEvents()->count() }})
+                    </h3>
+                    <div class="space-y-3">
+                        @foreach ($this->getRelatedEvents() as $event)
+                        <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors bg-base-100">
+                            <a href="{{ route('events.show', $event->id) }}"
+                                class="block hover:text-primary transition-colors">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                        <x-icon name="o-bolt" class="w-4 h-4 text-primary" />
                                     </div>
-                                    <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                        <span>{{ $event->time->format('d/m/Y H:i') }}</span>
-                                        @if ($event->domain)
-                                        <span>·</span>
-                                        <x-badge :value="$event->domain" class="badge-xs badge-outline" />
-                                        @endif
-                                        <span>·</span>
-                                        <x-badge :value="$event->service" class="badge-xs badge-outline" />
-                                        @if ($event->integration)
-                                        <span>·</span>
-                                        <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
-                                        @endif
-                                        @if ($event->tags && count($event->tags) > 0)
-                                        <span>·</span>
-                                        @foreach ($event->tags as $tag)
-                                        <x-spark-tag :tag="$tag" size="xs" />
-                                        @endforeach
-                                        @endif
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-start justify-between gap-2 mb-1">
+                                            <span class="font-medium">
+                                                {{ $this->formatAction($event->action) }}
+                                                @if (should_display_action_with_object($event->action, $event->service))
+                                                @if ($event->target)
+                                                <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
+                                                @elseif ($event->actor)
+                                                <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
+                                                @endif
+                                                @endif
+                                            </span>
+                                            <div class="flex items-center gap-2 flex-shrink-0">
+                                                @if (isset($event->similarity))
+                                                @php
+                                                    $similarity = round((1 - $event->similarity) * 100);
+                                                    $daysAgo = isset($event->days_ago) ? round($event->days_ago) : null;
+                                                @endphp
+                                                <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
+                                                @if ($daysAgo !== null)
+                                                    @if ($daysAgo === 0)
+                                                        <span class="text-xs">🔥</span>
+                                                    @elseif ($daysAgo === 1)
+                                                        <span class="text-xs">⏰</span>
+                                                    @elseif ($daysAgo < 7)
+                                                        <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
+                                                    @endif
+                                                @endif
+                                                @endif
+                                                @if ($event->value)
+                                                <span class="text-sm font-semibold">
+                                                    {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                                </span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                            <span>{{ $event->time->format('d/m/Y H:i') }}</span>
+                                            @if ($event->domain)
+                                            <span>·</span>
+                                            <x-badge :value="$event->domain" class="badge-xs badge-outline" />
+                                            @endif
+                                            <span>·</span>
+                                            <x-badge :value="$event->service" class="badge-xs badge-outline" />
+                                            @if ($event->integration)
+                                            <span>·</span>
+                                            <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
+                                            @endif
+                                            @if ($event->tags && count($event->tags) > 0)
+                                            <span>·</span>
+                                            @foreach ($event->tags as $tag)
+                                            <x-spark-tag :tag="$tag" size="xs" />
+                                            @endforeach
+                                            @endif
+                                        </div>
                                     </div>
+                                    <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
                                 </div>
-                                <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
-                            </div>
-                        </a>
+                            </a>
+                        </div>
+                        @endforeach
                     </div>
-                    @endforeach
                 </div>
-            </x-card>
+                <!-- AI Badge -->
+                <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                    <x-icon name="o-sparkles" class="w-3 h-3 text-warning-content" />
+                </div>
+            </div>
             @endif
 
             <!-- Relationships -->
