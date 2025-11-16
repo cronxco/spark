@@ -61,14 +61,23 @@ class GenerateEventEmbeddingJob implements ShouldQueue
             // Generate embedding
             $embedding = $embeddingService->embed($searchableText);
 
-            // Store embedding in database
+            // Get embedding metadata
+            $embeddingMetadata = $embeddingService->getEmbeddingMetadata();
+
+            // Merge embedding metadata into event metadata
+            $metadata = $this->event->metadata ?? [];
+            $metadata = array_merge($metadata, $embeddingMetadata);
+
+            // Store embedding and metadata in database
             $this->event->update([
                 'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                'metadata' => $metadata,
             ]);
 
             Log::info('Generated embedding for event', [
                 'event_id' => $this->event->id,
                 'text_length' => strlen($searchableText),
+                'model' => $embeddingMetadata['embedding_model'],
             ]);
         } catch (Exception $e) {
             Log::error('Failed to generate embedding for event', [

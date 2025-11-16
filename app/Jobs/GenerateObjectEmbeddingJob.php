@@ -61,14 +61,23 @@ class GenerateObjectEmbeddingJob implements ShouldQueue
             // Generate embedding
             $embedding = $embeddingService->embed($searchableText);
 
-            // Store embedding in database
+            // Get embedding metadata
+            $embeddingMetadata = $embeddingService->getEmbeddingMetadata();
+
+            // Merge embedding metadata into object metadata
+            $metadata = $this->object->metadata ?? [];
+            $metadata = array_merge($metadata, $embeddingMetadata);
+
+            // Store embedding and metadata in database
             $this->object->update([
                 'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                'metadata' => $metadata,
             ]);
 
             Log::info('Generated embedding for object', [
                 'object_id' => $this->object->id,
                 'text_length' => strlen($searchableText),
+                'model' => $embeddingMetadata['embedding_model'],
             ]);
         } catch (Exception $e) {
             Log::error('Failed to generate embedding for object', [
