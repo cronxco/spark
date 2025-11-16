@@ -8,13 +8,18 @@ Semantic search allows users to search through events and blocks using natural l
 
 ### Key Features
 
-- **Full-text semantic search** across Events and Blocks
+- **Full-text semantic search** across Events, Blocks, and EventObjects
 - **Hybrid search** combining semantic similarity with metadata filters
 - **Automatic embedding generation** on create/update
 - **Background processing** via Laravel queues
 - **Multi-tenant security** ensuring users only search their own data
 - **OpenAI integration** using text-embedding-3-small model (1536 dimensions)
 - **pgvector indexes** for fast approximate nearest neighbor search
+- **Duplicate detection** using semantic similarity to identify duplicate content
+- **Batch re-embedding** with filtering, progress tracking, and forced regeneration
+- **Embedding health monitoring** dashboard for coverage metrics
+- **External API** for semantic search from external tools (Sanctum authenticated)
+- **Embedding versioning** tracking model, dimensions, and generation timestamps
 
 ## Architecture
 
@@ -29,18 +34,30 @@ Semantic search allows users to search through events and blocks using natural l
 2. **Queue Jobs**
    - `GenerateEventEmbeddingJob` - Generates embeddings for events
    - `GenerateBlockEmbeddingJob` - Generates embeddings for blocks
+   - `GenerateObjectEmbeddingJob` - Generates embeddings for EventObjects
 
 3. **Model Observers**
-   - `EventObserver` - Auto-generates embeddings when events are created/updated
-   - `BlockObserver` - Auto-generates embeddings when blocks are created/updated
+   - `EventObserver` - Auto-generates embeddings when events are created/updated (only if API key configured)
+   - `BlockObserver` - Auto-generates embeddings when blocks are created/updated (only if API key configured)
+   - `EventObjectObserver` - Auto-generates embeddings when objects are created/updated (only if API key configured)
 
-4. **Search API** (`app/Http/Controllers/Api/SearchApiController.php`)
-   - `POST /api/search/events` - Search events
-   - `POST /api/search/blocks` - Search blocks
-   - `POST /api/search` - Unified search across both
+4. **DuplicateDetectionService** (`app/Services/DuplicateDetectionService.php`)
+   - Finds semantic duplicates using vector similarity
+   - Supports Events, Blocks, and EventObjects
+   - Configurable similarity threshold (default 95%)
 
-5. **Artisan Command**
-   - `php artisan embeddings:generate` - Backfill embeddings for existing records
+5. **Search APIs**
+   - `SearchApiController` - Original search endpoints for internal use
+   - `SemanticSearchController` (`app/Http/Controllers/Api/SemanticSearchController.php`) - External API for third-party tools
+     - `POST /api/search/semantic` - Search across all models with Sanctum authentication
+
+6. **Artisan Commands**
+   - `php artisan embeddings:generate` - Backfill embeddings for existing records (legacy)
+   - `php artisan embeddings:regenerate` - Batch re-embedding with advanced filtering and progress tracking
+
+7. **Admin UI**
+   - **Embedding Health Dashboard** (`/admin/sense-check`) - Coverage metrics and health monitoring
+   - **Duplicate Detection** (`/admin/duplicates`) - Interactive UI for finding and managing duplicates
 
 ## Setup
 
@@ -103,6 +120,63 @@ php artisan queue:work
 # Or using Horizon (if configured)
 php artisan horizon
 ```
+
+## Embedding Versioning
+
+All embeddings include metadata tracking the model, dimensions, and generation timestamp. This metadata is stored in the model's `metadata` JSON column without requiring database schema changes.
+
+### Metadata Structure
+
+When an embedding is generated, the following metadata is automatically added to the model:
+
+```json
+{
+  "embedding_model": "text-embedding-3-small",
+  "embedding_dimensions": 1536,
+  "embedding_generated_at": "2025-11-16T15:30:45+00:00"
+}
+```
+
+### Querying by Embedding Version
+
+You can query models by their embedding metadata:
+
+```php
+use App\Models\Event;
+
+// Find events with specific embedding model
+$events = Event::whereNotNull('embeddings')
+    ->where('metadata->embedding_model', 'text-embedding-3-small')
+    ->get();
+
+// Find events missing embeddings or using old model
+$needsUpdate = Event::where(function ($query) {
+    $query->whereNull('embeddings')
+          ->orWhere('metadata->embedding_model', '!=', 'text-embedding-3-small');
+})->get();
+
+// Find events generated before a specific date
+$outdated = Event::whereNotNull('embeddings')
+    ->where('metadata->embedding_generated_at', '<', '2025-11-01')
+    ->get();
+```
+
+### Regenerating After Model Changes
+
+If you change the embedding model (e.g., upgrade to a newer version):
+
+1. Update `OPENAI_EMBEDDING_MODEL` in `.env`
+2. Run batch re-embedding to update all embeddings:
+
+```bash
+# Regenerate all embeddings with new model
+php artisan embeddings:regenerate --force
+
+# Or regenerate specific model type
+php artisan embeddings:regenerate --model=Event --force
+```
+
+The new metadata will automatically reflect the updated model version.
 
 ## Usage
 
@@ -169,7 +243,178 @@ Shows 10 fitness events and 10 related blocks, with recent workouts appearing fi
 
 ### API Usage
 
-### Search Events
+#### External Semantic Search API (Recommended)
+
+The `/api/search/semantic` endpoint provides unified semantic search across Events, Blocks, and EventObjects for external tools and applications.
+
+**Authentication:** Requires Sanctum token authentication
+
+**Endpoint:** `POST /api/search/semantic`
+
+**Request:**
+
+```bash
+POST /api/search/semantic
+Content-Type: application/json
+Authorization: Bearer {sanctum_token}
+
+{
+  "query": "workout data from last week",
+  "models": ["events", "blocks", "objects"],  // optional, defaults to all
+  "threshold": 1.0,         // optional, cosine distance (0-2, lower = more similar)
+  "limit": 20,              // optional, max results per model type (1-100)
+  "temporal_weight": 0.01   // optional, recency boost (0-1, default: 0.01)
+}
+```
+
+**Response:**
+
+```json
+{
+  "query": "workout data from last week",
+  "models": ["events", "blocks", "objects"],
+  "results": {
+    "events": [
+      {
+        "id": "event-uuid",
+        "service": "oura",
+        "domain": "health",
+        "action": "had_workout",
+        "value": 3500,
+        "value_unit": "calories",
+        "time": "2025-11-15T10:30:00Z",
+        "similarity": 0.8745,
+        "url": "https://spark.example.com/events/event-uuid",
+        "actor": {
+          "id": "object-uuid",
+          "title": "John Doe",
+          "type": "user"
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "block-uuid",
+        "block_type": "workout_summary",
+        "title": "Morning Workout",
+        "time": "2025-11-15T10:30:00Z",
+        "value": 45,
+        "value_unit": "minutes",
+        "similarity": 0.8523,
+        "url": "https://spark.example.com/blocks/block-uuid",
+        "event_id": "event-uuid"
+      }
+    ],
+    "objects": [
+      {
+        "id": "object-uuid",
+        "concept": "workout",
+        "type": "activity",
+        "title": "Running",
+        "time": "2025-11-15T10:30:00Z",
+        "similarity": 0.8234,
+        "url": "https://spark.example.com/objects/object-uuid"
+      }
+    ]
+  },
+  "counts": {
+    "events": 5,
+    "blocks": 3,
+    "objects": 2
+  }
+}
+```
+
+**Parameters:**
+
+- `query` (required): Natural language search query
+- `models` (optional): Array of model types to search - `["events", "blocks", "objects"]`
+  - Defaults to all three if not specified
+  - Can specify any combination: `["events"]`, `["events", "blocks"]`, etc.
+- `threshold` (optional): Cosine distance threshold (0-2, lower = more similar)
+  - Default: 1.0
+  - Recommended: 0.8-1.2 for most use cases
+- `limit` (optional): Maximum results per model type (1-100)
+  - Default: 10
+  - Applied independently to each model type
+- `temporal_weight` (optional): Recency boost factor (0-1)
+  - Default: 0.01 (1% penalty per day old)
+  - Set to 0 for no temporal weighting
+  - Higher values prioritize recent content more
+
+**Error Responses:**
+
+```json
+// Validation error
+{
+  "message": "The query field is required.",
+  "errors": {
+    "query": ["The query field is required."]
+  }
+}
+
+// Embedding service error
+{
+  "error": "Failed to generate embedding",
+  "message": "OpenAI API error: ..."
+}
+```
+
+**Example cURL Request:**
+
+```bash
+curl -X POST https://spark.example.com/api/search/semantic \
+  -H "Authorization: Bearer your-sanctum-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "payment failures last week",
+    "models": ["events"],
+    "threshold": 0.9,
+    "limit": 20,
+    "temporal_weight": 0.015
+  }'
+```
+
+**Example Python Usage:**
+
+```python
+import requests
+
+url = "https://spark.example.com/api/search/semantic"
+headers = {
+    "Authorization": "Bearer your-sanctum-token",
+    "Content-Type": "application/json"
+}
+payload = {
+    "query": "workout data from last week",
+    "models": ["events", "blocks"],
+    "threshold": 1.0,
+    "limit": 20
+}
+
+response = requests.post(url, json=payload, headers=headers)
+results = response.json()
+
+for event in results["results"]["events"]:
+    print(f"Event: {event['service']} - {event['action']}")
+    print(f"  Similarity: {event['similarity']:.1%}")
+    print(f"  URL: {event['url']}")
+```
+
+**Use Cases:**
+
+- **External dashboards** displaying Spark data with semantic search
+- **Mobile apps** querying user's Spark data
+- **Browser extensions** searching across integrations
+- **CLI tools** for power users
+- **Automation scripts** finding relevant events/blocks
+- **Analytics platforms** integrating Spark data
+
+### Internal Search APIs
+
+The original search endpoints are still available for internal use:
+
+#### Search Events
 
 Search for events using natural language:
 
@@ -368,6 +613,254 @@ Temporal weighting biases search results toward recent events:
 
 **Note:** Temporal weighting only applies when `time` field is present and not null.
 
+## Advanced Features
+
+### Batch Re-embedding Command
+
+The `embeddings:regenerate` command provides advanced batch re-embedding capabilities with filtering, progress tracking, and forced regeneration.
+
+#### Basic Usage
+
+```bash
+# Regenerate all embeddings for all models
+php artisan embeddings:regenerate
+
+# Regenerate only Events
+php artisan embeddings:regenerate --model=Event
+
+# Regenerate only Blocks
+php artisan embeddings:regenerate --model=Block
+
+# Regenerate only EventObjects
+php artisan embeddings:regenerate --model=EventObject
+```
+
+#### Advanced Options
+
+```bash
+# Force regenerate even if embeddings already exist
+php artisan embeddings:regenerate --force
+
+# Filter by service
+php artisan embeddings:regenerate --filter=service:fetch
+
+# Filter by domain
+php artisan embeddings:regenerate --filter=domain:health
+
+# Limit number of records to process
+php artisan embeddings:regenerate --limit=1000
+
+# Run synchronously (for testing/debugging)
+php artisan embeddings:regenerate --sync
+
+# Combine options
+php artisan embeddings:regenerate --model=Event --filter=service:monzo --force --limit=500
+```
+
+#### Progress Tracking
+
+The command provides real-time progress tracking via:
+
+- **Terminal progress bar** showing current progress
+- **ActionProgress model** for tracking in database
+- **Final summary** with total records processed
+
+Example output:
+
+```
+Regenerating embeddings for Event...
+Finding records to process...
+Found 1,523 records to process
+
+Processing...
+ 1523/1523 [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100%
+
+✓ Processed 1,523 Event records
+```
+
+#### Use Cases
+
+**After model upgrade:**
+```bash
+# Update .env with new model
+# OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+# Regenerate all embeddings with new model
+php artisan embeddings:regenerate --force
+```
+
+**Fixing missing embeddings:**
+```bash
+# Only process records without embeddings
+php artisan embeddings:regenerate
+```
+
+**Service-specific updates:**
+```bash
+# Regenerate only Monzo events
+php artisan embeddings:regenerate --model=Event --filter=service:monzo --force
+```
+
+**Testing before full run:**
+```bash
+# Test with small batch first
+php artisan embeddings:regenerate --limit=100 --sync
+```
+
+### Duplicate Detection
+
+The duplicate detection system uses semantic similarity to identify potential duplicate content across Events, Blocks, and EventObjects.
+
+#### Web UI
+
+Access the duplicate detection interface at `/admin/duplicates`:
+
+1. **Select Model Type:** Event, Block, or EventObject
+2. **Set Similarity Threshold:** 0.80 (80%) to 0.99 (99%) - default 0.95
+3. **Set Result Limit:** 10-200 results
+4. **Click "Search"** to find duplicates
+
+The UI displays:
+- Similarity percentage for each duplicate pair
+- Links to both items in the pair
+- Preview of titles and content
+- Color-coded similarity scores (high similarity = red badge)
+
+#### Programmatic Usage
+
+Use the `DuplicateDetectionService` in your code:
+
+```php
+use App\Services\DuplicateDetectionService;
+
+$service = app(DuplicateDetectionService::class);
+$userId = auth()->id();
+
+// Find duplicate events (95% similar or higher)
+$duplicates = $service->findDuplicateEvents($userId, similarityThreshold: 0.95, limit: 100);
+
+// Find duplicate blocks (98% similar or higher)
+$duplicates = $service->findDuplicateBlocks($userId, similarityThreshold: 0.98, limit: 50);
+
+// Find duplicate objects (90% similar or higher)
+$duplicates = $service->findDuplicateObjects($userId, similarityThreshold: 0.90, limit: 100);
+
+// Process results
+foreach ($duplicates as $duplicate) {
+    echo "Found duplicate pair:\n";
+    echo "  Item 1: {$duplicate['id1']}\n";
+    echo "  Item 2: {$duplicate['id2']}\n";
+    echo "  Similarity: " . round($duplicate['similarity'] * 100, 1) . "%\n";
+
+    // Access full models
+    $item1 = $duplicate['model1'];
+    $item2 = $duplicate['model2'];
+}
+```
+
+#### How It Works
+
+The service uses PostgreSQL vector similarity with self-joins:
+
+```sql
+SELECT
+    t1.id as id1,
+    t2.id as id2,
+    1 - (t1.embeddings <=> t2.embeddings) as similarity
+FROM events t1
+JOIN events t2 ON t1.id < t2.id
+WHERE (t1.embeddings <=> t2.embeddings) < 0.05  -- 95% threshold
+  AND t1.embeddings IS NOT NULL
+  AND t2.embeddings IS NOT NULL
+ORDER BY similarity DESC
+LIMIT 100
+```
+
+**Performance:** Uses HNSW indexes for efficient similarity search even with large datasets.
+
+#### Common Thresholds
+
+| Threshold | Use Case |
+|-----------|----------|
+| 0.99 (99%) | Find near-exact duplicates (typos, minor differences) |
+| 0.95 (95%) | Standard duplicate detection (recommended) |
+| 0.90 (90%) | Find similar but not identical content |
+| 0.85 (85%) | Broader similarity matching |
+| 0.80 (80%) | Very permissive (may include false positives) |
+
+### Embedding Health Dashboard
+
+Monitor embedding coverage and health at `/admin/sense-check` (scroll to "Embedding Health" section).
+
+#### Metrics Displayed
+
+**Overall Statistics:**
+- Total records across all models
+- Records with embeddings
+- Overall coverage percentage
+- Color-coded indicators (🟢 >90%, 🟡 70-90%, 🔴 <70%)
+
+**Per-Model Breakdown:**
+- Events: total, with embeddings, coverage %
+- Blocks: total, with embeddings, coverage %
+- EventObjects: total, with embeddings, coverage %
+
+**Coverage by Service (Top 10):**
+- Service name
+- Total events/blocks/objects
+- Count with embeddings
+- Coverage percentage
+- Visual progress bars
+
+**Coverage by Domain (Top 10):**
+- Domain name
+- Total events
+- Count with embeddings
+- Coverage percentage
+- Visual progress bars
+
+#### Example Output
+
+```
+Overall Coverage: 87.3% (🟡)
+  Total Records: 15,234
+  With Embeddings: 13,299
+
+Events: 92.1% (🟢)
+  Total: 8,456
+  With Embeddings: 7,789
+
+Blocks: 88.4% (🟡)
+  Total: 4,321
+  With Embeddings: 3,821
+
+EventObjects: 74.2% (🟡)
+  Total: 2,457
+  With Embeddings: 1,823
+
+Top Services by Volume:
+  monzo: 3,245 events (98.5% coverage) ▓▓▓▓▓▓▓▓▓▓
+  oura: 2,134 events (95.2% coverage) ▓▓▓▓▓▓▓▓▓░
+  spotify: 1,876 events (89.3% coverage) ▓▓▓▓▓▓▓▓░░
+```
+
+#### Use Cases
+
+**Identify coverage gaps:**
+- Find services/domains with low embedding coverage
+- Prioritize re-embedding efforts
+- Monitor progress after running `embeddings:regenerate`
+
+**Track embedding health over time:**
+- Check coverage after bulk imports
+- Verify new integrations are generating embeddings
+- Ensure API key is configured correctly
+
+**Debugging missing embeddings:**
+- If a service shows 0% coverage, check if API key is configured
+- If coverage is partial, check job failures: `php artisan queue:failed`
+- If coverage is decreasing, check observer configuration
+
 ## How It Works
 
 ### 1. Embedding Generation
@@ -494,6 +987,114 @@ Using OpenAI's `text-embedding-3-small` model:
 
 3. Consider reducing `limit` parameter or increasing `threshold`
 
+## Testing
+
+### Factory Configuration
+
+Model factories are configured to work with or without embeddings:
+
+```php
+use App\Models\Event;
+use App\Models\Block;
+use App\Models\EventObject;
+
+// Create without embeddings (default, fast)
+$event = Event::factory()->create();
+// embeddings field will be null
+
+// Create with embeddings (when needed for tests)
+$event = Event::factory()->withEmbeddings()->create();
+// embeddings field will contain 1536-dimension vector
+
+// Same pattern for all models
+$block = Block::factory()->withEmbeddings()->create();
+$object = EventObject::factory()->withEmbeddings()->create();
+```
+
+**Why this matters:**
+- Generating 1536-dimension vectors in tests is slow
+- Most tests don't need actual embeddings
+- Using `null` by default speeds up test suite significantly
+- Use `withEmbeddings()` only when testing semantic search features
+
+### Observer Behavior in Tests
+
+Model observers check for OpenAI API key before dispatching jobs:
+
+```php
+// In EventObserver, BlockObserver, EventObjectObserver
+public function created(Event $event): void
+{
+    // Only dispatch if embeddings are enabled (API key is configured)
+    if (config('services.openai.api_key')) {
+        GenerateEventEmbeddingJob::dispatch($event);
+    }
+}
+```
+
+**Benefits:**
+- Tests run without `OPENAI_API_KEY` configured
+- No job dispatch errors in test environment
+- No need to mock embedding service in most tests
+- Prevents accidental API calls during testing
+
+### Testing Semantic Search Features
+
+When testing semantic search functionality:
+
+```php
+use Tests\TestCase;
+use App\Models\Event;
+use App\Services\EmbeddingService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+class SemanticSearchTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_semantic_search_finds_similar_events()
+    {
+        // Create events with embeddings
+        $event1 = Event::factory()->withEmbeddings()->create([
+            'service' => 'test',
+            'action' => 'payment_success'
+        ]);
+
+        $event2 = Event::factory()->withEmbeddings()->create([
+            'service' => 'test',
+            'action' => 'payment_failed'
+        ]);
+
+        // Mock embedding service
+        $this->mock(EmbeddingService::class)
+            ->shouldReceive('embed')
+            ->andReturn($event1->embeddings);
+
+        // Test search
+        $embedding = app(EmbeddingService::class)->embed('payment');
+        $results = Event::semanticSearch($embedding, threshold: 1.0)->get();
+
+        $this->assertCount(2, $results);
+    }
+}
+```
+
+### Failed Job Handling
+
+Embedding jobs now accept `Throwable` instead of just `Exception`:
+
+```php
+public function failed(?\Throwable $exception): void
+{
+    Log::error('GenerateEventEmbeddingJob failed', [
+        'event_id' => $this->event->id,
+        'error' => $exception?->getMessage(),
+    ]);
+}
+```
+
+This handles both `Exception` and `Error` types (e.g., `TypeError`), ensuring robust error handling in production and tests.
+
 ## Security
 
 ### Multi-tenant Isolation
@@ -521,13 +1122,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Potential improvements:
 
-1. **Hybrid ranking** - Combine semantic similarity with metadata relevance
-2. **Re-ranking** - Use more powerful models for top-K results
-3. **Filters UI** - Add search interface to Livewire dashboard
-4. **Entity search** - Extend to EventObjects
-5. **Multi-modal search** - Include image/video content
-6. **Local models** - Self-hosted embeddings for privacy
-7. **Fine-tuning** - Domain-specific embedding models
+1. ✅ **Hybrid ranking** - ~~Combine semantic similarity with metadata relevance~~ (Implemented via `hybridSearch()` method)
+2. ✅ **Entity search** - ~~Extend to EventObjects~~ (Implemented with EventObjectObserver and semantic search)
+3. ✅ **Duplicate detection** - ~~Identify duplicate content~~ (Implemented via DuplicateDetectionService)
+4. ✅ **External API** - ~~API for third-party tools~~ (Implemented via SemanticSearchController)
+5. ✅ **Embedding versioning** - ~~Track model versions~~ (Implemented via metadata storage)
+6. ✅ **Health monitoring** - ~~Coverage dashboard~~ (Implemented in sense-check page)
+7. **Re-ranking** - Use more powerful models for top-K results
+8. **Advanced filters UI** - Rich search interface with faceted filtering in Livewire
+9. **Multi-modal search** - Include image/video content in embeddings
+10. **Local models** - Self-hosted embeddings for privacy (e.g., sentence-transformers)
+11. **Fine-tuning** - Domain-specific embedding models trained on user's data
+12. **Semantic clustering** - Group similar events/blocks automatically
+13. **Smart recommendations** - "Similar to this event" suggestions
+14. **Cross-model relationships** - Find related events, blocks, and objects in one query
 
 ## References
 
