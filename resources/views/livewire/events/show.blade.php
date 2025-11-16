@@ -991,9 +991,11 @@ new class extends Component {
                         </div>
                         @php $sidebarRelationships = $this->getRelationships(); @endphp
                         @if ($sidebarRelationships->isEmpty())
-                        <div class="text-center py-3 text-base-content/60 text-sm">
-                            No relationships yet
-                        </div>
+                        <x-empty-state
+                            icon="o-arrows-right-left"
+                            message="No relationships yet"
+                            actionEvent="handleOpenAddRelationshipModal"
+                            actionLabel="Add Relationship" />
                         @else
                         <div class="space-y-1.5 max-h-48 overflow-y-auto">
                             @foreach ($sidebarRelationships->take(10) as $relationship)
