@@ -235,7 +235,7 @@ new class extends Component {
 
 <div>
     @if ($this->block)
-    <div class="space-y-6">
+    <div class="space-y-4 lg:space-y-6">
         <!-- Header -->
         <x-header title="Block Details" separator>
             <x-slot:actions>
@@ -252,12 +252,12 @@ new class extends Component {
 
         <!-- Block Overview Card -->
         <x-card class="bg-base-200 shadow">
-            <div class="flex flex-col sm:flex-row items-start gap-4">
+            <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
                 <!-- Block Icon -->
                 <div class="flex-shrink-0 self-center sm:self-start">
-                    <div class="w-12 h-12 rounded-full bg-base-200 flex items-center justify-center">
+                    <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-base-200 flex items-center justify-center">
                         <x-icon name="{{ $this->getBlockIcon($this->block->block_type, $this->block->event?->service) }}"
-                            class="w-6 h-6" />
+                            class="w-6 h-6 sm:w-8 sm:h-8" />
                     </div>
                 </div>
 
@@ -279,7 +279,9 @@ new class extends Component {
 
                     @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
                     @if (!empty($meta))
-                    <x-metadata-list :data="$meta" />
+                    <div class="mt-3 overflow-hidden">
+                        <x-metadata-list :data="$meta" />
+                    </div>
                     @endif
 
                     <!-- Block Metadata -->
@@ -323,7 +325,7 @@ new class extends Component {
                 <x-icon name="o-bolt" class="w-5 h-5" />
                 Related Event
             </h3>
-            <div class="border border-base-300 rounded-lg p-4 hover:bg-base-50 transition-colors">
+            <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
                 <a href="{{ route('events.show', $this->block->event->id) }}"
                     class="block hover:text-primary transition-colors">
                     <div class="flex items-start gap-3">
@@ -486,6 +488,19 @@ new class extends Component {
                     @endif
                 </div>
 
+                <!-- Comment -->
+                <div class="pb-4 border-b border-base-200">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">
+                        Comment
+                    </h3>
+                    <x-form wire:submit="addComment">
+                        <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." />
+                        <div class="mt-2 flex justify-end">
+                            <x-button type="submit" class="btn-primary btn-sm" label="Post" />
+                        </div>
+                    </x-form>
+                </div>
+
                 <!-- Activity Timeline -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
@@ -552,19 +567,6 @@ new class extends Component {
                     </x-slot:content>
                 </x-collapse>
 
-                <!-- Comment -->
-                <div class="pb-4 border-b border-base-200">
-                    <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">
-                        Comment
-                    </h3>
-                    <x-form wire:submit="addComment">
-                        <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." />
-                        <div class="mt-2 flex justify-end">
-                            <x-button type="submit" class="btn-primary btn-sm" label="Post" />
-                        </div>
-                    </x-form>
-                </div>
-
                 <!-- Technical Metadata -->
                 @php $meta = is_array($this->block->metadata ?? null) ? $this->block->metadata : []; @endphp
                 @if (!empty($meta))
@@ -596,49 +598,17 @@ new class extends Component {
 
         <!-- Linked Blocks -->
         @if ($this->getRelatedBlocks()->isNotEmpty())
-        <x-card class="bg-base-200 shadow">
+        <div>
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="o-squares-2x2" class="w-5 h-5" />
+                <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
                 Linked Blocks ({{ $this->getRelatedBlocks()->count() }})
             </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach ($this->getRelatedBlocks() as $relatedBlock)
-                <div class="border border-base-300 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                    <div class="flex items-start justify-between gap-3 mb-2">
-                        <a href="{{ route('blocks.show', $relatedBlock->id) }}"
-                            class="font-semibold text-base-content hover:text-primary transition-colors text-base flex-1">
-                            {{ $relatedBlock->title }}
-                        </a>
-                        @if ($relatedBlock->value)
-                        <span class="text-lg font-bold flex-shrink-0">{!! format_event_value_display($relatedBlock->formatted_value, $relatedBlock->value_unit, $this->block->event?->service, $relatedBlock->block_type, 'block') !!}</span>
-                        @endif
-                    </div>
-                    @php $relMeta = is_array($relatedBlock->metadata ?? null) ? $relatedBlock->metadata : []; @endphp
-                    @if (!empty($relMeta))
-                    <div class="mb-2">
-                        <x-metadata-list :data="$relMeta" />
-                    </div>
-                    @endif
-                    <div class="flex items-center gap-2 text-xs text-base-content/60">
-                        @if ($relatedBlock->time)
-                        <div class="flex items-center gap-1">
-                            <x-icon name="o-clock" class="w-3 h-3" />
-                            {{ to_user_timezone($relatedBlock->time, auth()->user())->format('H:i') }}
-                        </div>
-                        @endif
-                        @if ($relatedBlock->url)
-                        <div class="flex items-center gap-1">
-                            <x-icon name="o-link" class="w-3 h-3" />
-                            <a href="{{ $relatedBlock->url }}" target="_blank" class="hover:underline">
-                                View
-                            </a>
-                        </div>
-                        @endif
-                    </div>
-                </div>
+                    <x-block-card :block="$relatedBlock" />
                 @endforeach
             </div>
-        </x-card>
+        </div>
         @endif
 
         <!-- Relationships -->
