@@ -55,6 +55,16 @@ class EventObject extends Model implements HasMedia
         'deleted_at' => 'datetime',
     ];
 
+    /**
+     * Attributes that should be hidden from serialization.
+     * The relationships() method returns a query builder, not a relationship instance.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'relationships',
+    ];
+
     protected static function booted()
     {
         static::creating(function ($model) {
