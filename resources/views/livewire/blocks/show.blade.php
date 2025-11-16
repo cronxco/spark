@@ -409,9 +409,11 @@ new class extends Component {
                     </div>
                     @php $sidebarRelationships = $this->getRelationships(); @endphp
                     @if ($sidebarRelationships->isEmpty())
-                    <div class="text-center py-4 text-base-content/60 text-sm">
-                        No relationships yet
-                    </div>
+                    <x-empty-state
+                        icon="o-arrows-right-left"
+                        message="No relationships yet"
+                        actionEvent="handleOpenAddRelationshipModal"
+                        actionLabel="Add Relationship" />
                     @else
                     <div class="space-y-2 max-h-64 overflow-y-auto">
                         @foreach ($sidebarRelationships->take(10) as $relationship)
@@ -466,7 +468,11 @@ new class extends Component {
                     <x-slot:content>
                         @php $activities = $this->getActivities(); @endphp
                         @if ($activities->isEmpty())
-                        <div class="text-sm text-base-content/70">No activity yet.</div>
+                        <x-empty-state
+                            icon="o-clock"
+                            message="No activity yet"
+                            actionEvent="addComment"
+                            actionLabel="Add Comment" />
                         @else
                         @php
                         $activities = $this->getActivities();
