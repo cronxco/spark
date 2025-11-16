@@ -508,17 +508,6 @@ new class extends Component {
             <!-- Header -->
             <x-header title="Event Details" separator>
                 <x-slot:actions>
-                    <script type="application/json" id="event-json-{{ $this->event->id }}">
-                        {
-                            !!json_encode($this - > event - > toArray(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                        }
-                    </script>
-                    <x-button
-                        icon="o-clipboard"
-                        class="btn-ghost btn-xs"
-                        label=""
-                        title="Copy event JSON"
-                        onclick="(function(){ var el=document.getElementById('event-json-{{ $this->event->id }}'); if(!el){return;} var text; try{ text=JSON.stringify(JSON.parse(el.textContent), null, 2);}catch(e){ text=el.textContent; } navigator.clipboard.writeText(text).then(function(){ $wire.notifyCopied('Event'); }); })()" />
                     <x-button
                         wire:click="toggleSidebar"
                         class="btn-ghost btn-sm"
