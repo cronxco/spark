@@ -924,8 +924,7 @@ new class extends Component {
                         <x-metadata-row label="Event ID" :value="$this->event->id" copyable />
                         <x-metadata-row label="Action" :value="$this->formatAction($this->event->action)" />
                         <x-metadata-row label="Time">
-                            {{ to_user_timezone($this->event->time, auth()->user())->format('M j, Y g:i A') }}
-                            <span class="text-base-content/60">({{ to_user_timezone($this->event->time, auth()->user())->diffForHumans() }})</span>
+                            <x-uk-date :date="$this->event->time" />
                         </x-metadata-row>
                         @if($this->event->value)
                             <x-metadata-row label="Value">

@@ -224,19 +224,16 @@
                             </span>
                         </x-metadata-row>
                         <x-metadata-row label="Created">
-                            {{ to_user_timezone($integration->created_at, auth()->user())->format('M j, Y g:i A') }}
-                            <span class="text-base-content/60">({{ to_user_timezone($integration->created_at, auth()->user())->diffForHumans() }})</span>
+                            <x-uk-date :date="$integration->created_at" />
                         </x-metadata-row>
                         @if ($integration->last_triggered_at)
                             <x-metadata-row label="Last Triggered">
-                                {{ to_user_timezone($integration->last_triggered_at, auth()->user())->format('M j, Y g:i A') }}
-                                <span class="text-base-content/60">({{ to_user_timezone($integration->last_triggered_at, auth()->user())->diffForHumans() }})</span>
+                                <x-uk-date :date="$integration->last_triggered_at" />
                             </x-metadata-row>
                         @endif
                         @if ($integration->last_successful_update_at)
                             <x-metadata-row label="Last Successful Update">
-                                {{ to_user_timezone($integration->last_successful_update_at, auth()->user())->format('M j, Y g:i A') }}
-                                <span class="text-base-content/60">({{ to_user_timezone($integration->last_successful_update_at, auth()->user())->diffForHumans() }})</span>
+                                <x-uk-date :date="$integration->last_successful_update_at" />
                             </x-metadata-row>
                         @endif
                     </dl>
@@ -280,8 +277,7 @@
 
                             @if ($integration->getNextUpdateTime())
                                 <x-metadata-row label="Next Update">
-                                    {{ $integration->getNextUpdateTime()->format('M j, Y g:i A') }}
-                                    <span class="text-base-content/60">({{ $integration->getNextUpdateTime()->diffForHumans() }})</span>
+                                    <x-uk-date :date="$integration->getNextUpdateTime()" />
                                 </x-metadata-row>
                             @endif
                         </dl>

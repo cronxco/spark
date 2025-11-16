@@ -1286,16 +1286,13 @@ new class extends Component {
                             <x-metadata-row label="Concept" :value="Str::headline($this->object->concept)" />
                             <x-metadata-row label="Type" :value="Str::headline($this->object->type)" />
                             <x-metadata-row label="Time">
-                                {{ to_user_timezone($this->object->time, auth()->user())->format('M j, Y g:i A') }}
-                                <span class="text-base-content/60">({{ to_user_timezone($this->object->time, auth()->user())->diffForHumans() }})</span>
+                                <x-uk-date :date="$this->object->time" />
                             </x-metadata-row>
                             <x-metadata-row label="Created">
-                                {{ to_user_timezone($this->object->created_at, auth()->user())->format('M j, Y g:i A') }}
-                                <span class="text-base-content/60">({{ to_user_timezone($this->object->created_at, auth()->user())->diffForHumans() }})</span>
+                                <x-uk-date :date="$this->object->created_at" />
                             </x-metadata-row>
                             <x-metadata-row label="Last Updated">
-                                {{ to_user_timezone($this->object->updated_at, auth()->user())->format('M j, Y g:i A') }}
-                                <span class="text-base-content/60">({{ to_user_timezone($this->object->updated_at, auth()->user())->diffForHumans() }})</span>
+                                <x-uk-date :date="$this->object->updated_at" />
                             </x-metadata-row>
                             @if ($this->object->url)
                                 <x-metadata-row label="URL">
