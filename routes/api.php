@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\FetchApiController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
+use App\Http\Controllers\Api\SemanticSearchController;
 use App\Http\Controllers\EventApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -36,6 +37,7 @@ Route::middleware('sentry.api.logging')->group(function () {
         Route::post('search/blocks', [SearchApiController::class, 'searchBlocks'])->name('api.search.blocks');
         Route::post('search/objects', [SearchApiController::class, 'searchObjects'])->name('api.search.objects');
         Route::post('search', [SearchApiController::class, 'searchAll'])->name('api.search.all');
+        Route::post('search/semantic', [SemanticSearchController::class, 'search'])->name('api.search.semantic');
 
         // Generate API token
         Route::post('tokens/create', function (Request $request) {

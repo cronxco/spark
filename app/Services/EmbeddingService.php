@@ -27,6 +27,20 @@ class EmbeddingService
     }
 
     /**
+     * Get metadata about the embedding configuration
+     *
+     * @return array
+     */
+    public function getEmbeddingMetadata(): array
+    {
+        return [
+            'embedding_model' => $this->model,
+            'embedding_dimensions' => $this->dimensions,
+            'embedding_generated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
      * Generate embeddings for a single text string
      *
      * @param string $text The text to embed

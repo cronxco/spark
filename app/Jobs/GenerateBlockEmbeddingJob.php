@@ -61,14 +61,23 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
             // Generate embedding
             $embedding = $embeddingService->embed($searchableText);
 
-            // Store embedding in database
+            // Get embedding metadata
+            $embeddingMetadata = $embeddingService->getEmbeddingMetadata();
+
+            // Merge embedding metadata into block metadata
+            $metadata = $this->block->metadata ?? [];
+            $metadata = array_merge($metadata, $embeddingMetadata);
+
+            // Store embedding and metadata in database
             $this->block->update([
                 'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                'metadata' => $metadata,
             ]);
 
             Log::info('Generated embedding for block', [
                 'block_id' => $this->block->id,
                 'text_length' => strlen($searchableText),
+                'model' => $embeddingMetadata['embedding_model'],
             ]);
         } catch (Exception $e) {
             Log::error('Failed to generate embedding for block', [
