@@ -53,7 +53,7 @@ new class extends Component {
 
     public function getRelationships()
     {
-        return $this->event->relationships()->get();
+        return $this->event->allRelationships()->get();
     }
 
     public function getRelatedEvents()
