@@ -17,8 +17,8 @@ class EmbeddingService
 
     public function __construct()
     {
-        $this->apiKey = config('services.openai.api_key', env('OPENAI_API_KEY'));
-        $this->organization = config('services.openai.organization', env('OPENAI_ORGANIZATION'));
+        $this->apiKey = config('services.openai.api_key');
+        $this->organization = config('services.openai.organization');
         $this->model = config('services.openai.embedding_model', 'text-embedding-3-small');
 
         if (empty($this->apiKey)) {
