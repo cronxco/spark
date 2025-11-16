@@ -24,9 +24,19 @@ class BlockFactory extends Factory
             'value' => $this->faker->randomNumber(),
             'value_multiplier' => $this->faker->randomDigit(),
             'value_unit' => $this->faker->word(),
-            'embeddings' => '',
+            'embeddings' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
+    }
+
+    /**
+     * Indicate that the block should have valid embeddings (1536 dimensions)
+     */
+    public function withEmbeddings(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'embeddings' => array_map(fn () => $this->faker->randomFloat(4, -1, 1), range(1, 1536)),
+        ]);
     }
 }
