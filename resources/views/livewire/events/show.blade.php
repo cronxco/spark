@@ -1060,7 +1060,7 @@ new class extends Component {
                             </div>
                         </x-form>
                     </div>
-                </div>
+
                 <!-- Activity Timeline (Collapsible, Default: Open) -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
@@ -1277,9 +1277,6 @@ new class extends Component {
                     </x-slot:content>
                 </x-collapse>
                 @endif
-            </div>
-            <div class="pt-2">
-                <x-button label="Close" class="btn-ghost btn-block" @click="$wire.showSidebar = false" />
             </div>
         </x-drawer>
     </div>
