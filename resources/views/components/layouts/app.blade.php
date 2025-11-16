@@ -167,6 +167,7 @@
                 <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks.index') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />
                 <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" data-hotkey="g m" />
                 <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" data-hotkey="g x" />
+                <x-menu-item title="Media" icon="fas.photo-film" link="{{ route('media.index') }}" :active="request()->routeIs('media.*')" data-hotkey="g g" />
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
 
                 <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')" data-hotkey="g s">
