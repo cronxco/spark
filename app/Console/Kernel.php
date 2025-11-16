@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\Data\Receipt\CleanupOldReceiptEmailsJob;
 use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
 use Illuminate\Console\Scheduling\Schedule;
@@ -36,6 +37,13 @@ class Kernel extends ConsoleKernel
         $schedule
             ->job(new RefreshExpiringCookies)
             ->dailyAt('02:00')
+            ->onOneServer()
+            ->withoutOverlapping();
+
+        // Clean up old receipt emails from S3 daily at 3am (30 day retention)
+        $schedule
+            ->job(new CleanupOldReceiptEmailsJob)
+            ->dailyAt('03:00')
             ->onOneServer()
             ->withoutOverlapping();
     }
