@@ -364,7 +364,14 @@ class Block extends Model implements HasMedia
      */
     public function getContent(): ?string
     {
-        return $this->metadata['content'] ?? null;
+        $content = $this->metadata['content'] ?? null;
+
+        // Ensure we always return a string or null, never an array
+        if (is_array($content)) {
+            return json_encode($content);
+        }
+
+        return $content;
     }
 
     /**
