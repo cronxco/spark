@@ -60,7 +60,7 @@
                     @php
                         $display = is_bool($v) ? ($v ? 'true' : 'false') : (is_null($v) ? '—' : (is_scalar($v) ? (string) $v : json_encode($v)));
                     @endphp
-                    <x-metadata-row :label="$label" :value="$display" :copyable="is_string($v) && strlen($v) > 10" />
+                    <x-metadata-row :label="$label" :value="$display" />
                 @endif
             @endforeach
         </dl>
