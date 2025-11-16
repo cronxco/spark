@@ -205,7 +205,7 @@
                 <!-- Primary Information (Always Visible) -->
                 <div class="pb-4 border-b border-base-200">
                     <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Primary Information</h3>
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
                         <button
                             wire:click="exportAsJson"
                             class="btn btn-ghost btn-xs gap-1"

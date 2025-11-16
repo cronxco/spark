@@ -86,9 +86,23 @@ class IntegrationDetails extends Component
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        ");
 
-        $this->dispatch('notify', ['message' => 'Integration exported as JSON!', 'type' => 'success']);
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-top toast-center z-50';
+            toast.innerHTML = `
+                <div class='alert alert-success shadow-lg'>
+                    <svg xmlns='http://www.w3.org/2000/svg' class='stroke-current shrink-0 h-5 w-5' fill='none' viewBox='0 0 24 24'>
+                        <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />
+                    </svg>
+                    <span>Integration exported as JSON!</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        ");
     }
 
     public function getPluginClass()

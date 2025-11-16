@@ -431,9 +431,23 @@ new class extends Component {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        ");
 
-        $this->success('Event exported as JSON!');
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-top toast-center z-50';
+            toast.innerHTML = `
+                <div class='alert alert-success shadow-lg'>
+                    <svg xmlns='http://www.w3.org/2000/svg' class='stroke-current shrink-0 h-5 w-5' fill='none' viewBox='0 0 24 24'>
+                        <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />
+                    </svg>
+                    <span>Event exported as JSON!</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        ");
     }
 
     public function handleOpenManageRelationshipsModal(): void
@@ -911,7 +925,7 @@ new class extends Component {
                 <!-- Primary Information (Always Visible) -->
                 <div class="pb-4 border-b border-base-200">
                     <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Primary Information</h3>
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
                         <button
                             wire:click="exportAsJson"
                             class="btn btn-ghost btn-xs gap-1"
@@ -959,8 +973,8 @@ new class extends Component {
                     <!-- Tags -->
                     <div class="border border-base-200 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-semibold flex items-center gap-2">
-                                <x-icon name="o-tag" class="w-4 h-4 text-primary" />
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                                <x-icon name="o-tag" class="w-4 h-4" />
                                 Tags
                             </h3>
                             <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
@@ -981,11 +995,11 @@ new class extends Component {
                     <!-- Relationships -->
                     <div class="border border-base-200 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-semibold flex items-center gap-2">
-                                <x-icon name="o-arrows-right-left" class="w-4 h-4 text-accent" />
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+                                <x-icon name="o-arrows-right-left" class="w-4 h-4" />
                                 Relationships
                             </h3>
-                            <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-outline" title="Manage relationships" data-hotkey="r">
+                            <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
                                 <x-icon name="o-plus" class="w-3 h-3" />
                             </button>
                         </div>
@@ -1021,7 +1035,7 @@ new class extends Component {
                             }
                             @endphp
                             <a href="{{ $route }}" class="flex items-center gap-2 p-2 rounded hover:bg-base-200 transition-colors">
-                                <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 text-accent flex-shrink-0" />
+                                <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-3 h-3 flex-shrink-0" />
                                 <x-icon name="{{ $icon }}" class="w-3 h-3 flex-shrink-0" />
                                 <span class="text-sm truncate flex-1">{{ $title }}</span>
                             </a>
@@ -1039,9 +1053,9 @@ new class extends Component {
 
                     <!-- Add Comment -->
                     <div class="border border-base-200 rounded-lg p-4">
-                        <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-4 h-4 text-primary" />
-                            Add Comment
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3 flex items-center gap-2">
+                            <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
+                            Comment
                         </h3>
                         <x-form wire:submit="addComment">
                             <x-textarea wire:model="comment" rows="2" placeholder="Add a comment..." class="textarea-sm" />
@@ -1125,7 +1139,7 @@ new class extends Component {
                     <x-slot:heading>
                         <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
                             <x-icon name="o-cube" class="w-4 h-4" />
-                            Entity Details
+                            Details
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
@@ -1206,7 +1220,7 @@ new class extends Component {
                     <x-slot:heading>
                         <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
                             <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
-                            Technical Metadata
+                            Metadata
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
