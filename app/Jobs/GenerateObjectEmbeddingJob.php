@@ -71,8 +71,8 @@ class GenerateObjectEmbeddingJob implements ShouldQueue
 
             // Store embedding and metadata in database
             // Use withoutEvents() to prevent observers from triggering on this internal update
-            $this->object->withoutEvents(function ($object) use ($embedding, $metadata) {
-                $object->update([
+            $this->object->withoutEvents(function () use ($embedding, $metadata) {
+                $this->object->update([
                     'embeddings' => EmbeddingService::formatForPostgres($embedding),
                     'metadata' => $metadata,
                 ]);
