@@ -14,7 +14,7 @@ class EventObserver
     {
         // Only dispatch if embeddings are enabled (API key is configured)
         if (config('services.openai.api_key')) {
-            GenerateEventEmbeddingJob::dispatch($event);
+            GenerateEventEmbeddingJob::dispatch($event)->onQueue('embeddings');
         }
     }
 
@@ -28,7 +28,7 @@ class EventObserver
             // Check if relevant fields changed that would affect the embedding
             if ($event->wasChanged(['service', 'domain', 'action', 'value', 'value_unit'])) {
                 // Dispatch job to regenerate embedding
-                GenerateEventEmbeddingJob::dispatch($event);
+                GenerateEventEmbeddingJob::dispatch($event)->onQueue('embeddings');
             }
         }
     }
