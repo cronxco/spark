@@ -186,7 +186,7 @@ class RegenerateEmbeddings extends Command
                     $job->handle(app(\App\Services\EmbeddingService::class));
                 } else {
                     // Queue job
-                    $jobClass::dispatch($record);
+                    $jobClass::dispatch($record)->onQueue('embeddings');
                 }
 
                 $processed++;

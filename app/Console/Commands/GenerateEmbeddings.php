@@ -93,7 +93,7 @@ class GenerateEmbeddings extends Command
 
         $query->chunk($batchSize, function ($events) use (&$processed, $bar) {
             foreach ($events as $event) {
-                GenerateEventEmbeddingJob::dispatch($event);
+                GenerateEventEmbeddingJob::dispatch($event)->onQueue('embeddings');
                 $processed++;
                 $bar->advance();
             }
@@ -135,7 +135,7 @@ class GenerateEmbeddings extends Command
 
         $query->chunk($batchSize, function ($blocks) use (&$processed, $bar) {
             foreach ($blocks as $block) {
-                GenerateBlockEmbeddingJob::dispatch($block);
+                GenerateBlockEmbeddingJob::dispatch($block)->onQueue('embeddings');
                 $processed++;
                 $bar->advance();
             }
@@ -177,7 +177,7 @@ class GenerateEmbeddings extends Command
 
         $query->chunk($batchSize, function ($objects) use (&$processed, $bar) {
             foreach ($objects as $object) {
-                GenerateObjectEmbeddingJob::dispatch($object);
+                GenerateObjectEmbeddingJob::dispatch($object)->onQueue('embeddings');
                 $processed++;
                 $bar->advance();
             }
