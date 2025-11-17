@@ -72,8 +72,8 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
             // Store embedding and metadata in database
             // Use withoutEvents() to prevent BlockObserver from triggering on this internal update
             // This prevents a circular dependency where updating metadata triggers re-embedding
-            $this->block->withoutEvents(function ($block) use ($embedding, $metadata) {
-                $block->update([
+            $this->block->withoutEvents(function () use ($embedding, $metadata) {
+                $this->block->update([
                     'embeddings' => EmbeddingService::formatForPostgres($embedding),
                     'metadata' => $metadata,
                 ]);
