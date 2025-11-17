@@ -15,6 +15,13 @@ class GenerateEventEmbeddingJob implements ShouldQueue
     use Queueable;
 
     /**
+     * The name of the queue the job should be sent to.
+     *
+     * @var string
+     */
+    public $queue = 'embeddings';
+
+    /**
      * The number of times the job may be attempted.
      *
      * @var int
