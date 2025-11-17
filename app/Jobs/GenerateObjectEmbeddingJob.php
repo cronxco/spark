@@ -15,11 +15,18 @@ class GenerateObjectEmbeddingJob implements ShouldQueue
     use Queueable;
 
     /**
+     * The name of the queue the job should be sent to.
+     *
+     * @var string
+     */
+    public $queue = 'embeddings';
+
+    /**
      * The number of times the job may be attempted.
      *
      * @var int
      */
-    public $tries = 3;
+    public $tries = 1;
 
     /**
      * The number of seconds to wait before retrying the job.
