@@ -70,10 +70,14 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
             $metadata = array_merge($metadata, $embeddingMetadata);
 
             // Store embedding and metadata in database
-            $this->block->update([
-                'embeddings' => EmbeddingService::formatForPostgres($embedding),
-                'metadata' => $metadata,
-            ]);
+            // Use withoutEvents() to prevent BlockObserver from triggering on this internal update
+            // This prevents a circular dependency where updating metadata triggers re-embedding
+            $this->block->withoutEvents(function ($block) use ($embedding, $metadata) {
+                $block->update([
+                    'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                    'metadata' => $metadata,
+                ]);
+            });
 
             Log::info('Generated embedding for block', [
                 'block_id' => $this->block->id,
