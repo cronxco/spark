@@ -70,10 +70,13 @@ class GenerateEventEmbeddingJob implements ShouldQueue
             $metadata = array_merge($metadata, $embeddingMetadata);
 
             // Store embedding and metadata in database
-            $this->event->update([
-                'embeddings' => EmbeddingService::formatForPostgres($embedding),
-                'metadata' => $metadata,
-            ]);
+            // Use withoutEvents() to prevent observers from triggering on this internal update
+            $this->event->withoutEvents(function ($event) use ($embedding, $metadata) {
+                $event->update([
+                    'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                    'metadata' => $metadata,
+                ]);
+            });
 
             Log::info('Generated embedding for event', [
                 'event_id' => $this->event->id,
