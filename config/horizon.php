@@ -65,7 +65,7 @@ return [
                 'balance' => 'auto',
                 'maxProcesses' => 5,
                 'memory' => 256,
-                'tries' => 3,
+                'tries' => 1,
             ],
         ],
 
@@ -92,7 +92,7 @@ return [
                 'balance' => 'auto',
                 'maxProcesses' => 5,
                 'memory' => 256,
-                'tries' => 3,
+                'tries' => 1,
             ],
         ],
 
@@ -119,7 +119,7 @@ return [
                 'balance' => 'auto',
                 'maxProcesses' => 5,
                 'memory' => 256,
-                'tries' => 3,
+                'tries' => 1,
             ],
         ],
     ],

@@ -26,7 +26,7 @@ class GenerateEventEmbeddingJob implements ShouldQueue
      *
      * @var int
      */
-    public $tries = 3;
+    public $tries = 1;
 
     /**
      * The number of seconds to wait before retrying the job.
