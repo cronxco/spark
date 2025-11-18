@@ -86,6 +86,28 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'label' => 'Include Album Art',
                 'description' => 'Create blocks with album artwork',
             ],
+            'track_podcasts' => [
+                'type' => 'boolean',
+                'label' => 'Track Podcast Listening',
+                'description' => 'Create events when you listen to podcast episodes',
+                'default' => true,
+            ],
+            'podcast_min_listen_minutes' => [
+                'type' => 'integer',
+                'label' => 'Minimum Listen Minutes',
+                'description' => 'Minimum minutes listened before creating event',
+                'min' => 1,
+                'max' => 60,
+                'default' => 5,
+            ],
+            'podcast_session_timeout_hours' => [
+                'type' => 'integer',
+                'label' => 'Session Timeout (hours)',
+                'description' => 'Hours of inactivity before starting a new listening session',
+                'min' => 1,
+                'max' => 24,
+                'default' => 4,
+            ],
         ];
     }
 
@@ -199,6 +221,22 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'episode_art' => [
+                'icon' => 'o-photo',
+                'display_name' => 'Episode Artwork',
+                'description' => 'Cover art for the podcast episode',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'episode_details' => [
+                'icon' => 'o-information-circle',
+                'display_name' => 'Episode Details',
+                'description' => 'Detailed information about the podcast episode',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -215,6 +253,12 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'icon' => 'o-musical-note',
                 'display_name' => 'Spotify Track',
                 'description' => 'A Spotify track',
+                'hidden' => false,
+            ],
+            'spotify_podcast_episode' => [
+                'icon' => 'o-microphone',
+                'display_name' => 'Podcast Episode',
+                'description' => 'A podcast episode on Spotify',
                 'hidden' => false,
             ],
         ];
@@ -464,6 +508,31 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             // Continue without recently played data
         }
 
+        // Fetch currently playing for podcast episodes
+        $trackPodcasts = $config['track_podcasts'] ?? true;
+
+        if ($trackPodcasts) {
+            try {
+                $currentlyPlaying = $this->getCurrentlyPlaying($integration);
+
+                if ($currentlyPlaying && ($currentlyPlaying['item']['type'] ?? null) === 'episode') {
+                    $listeningData['currently_playing_episode'] = $currentlyPlaying;
+
+                    Log::info('Spotify: Detected podcast episode playing', [
+                        'integration_id' => $integration->id,
+                        'episode_name' => $currentlyPlaying['item']['name'] ?? 'Unknown',
+                        'show_name' => $currentlyPlaying['item']['show']['name'] ?? 'Unknown',
+                        'progress_ms' => $currentlyPlaying['progress_ms'] ?? 0,
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::warning('Spotify: Failed to get currently playing for podcasts', [
+                    'integration_id' => $integration->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return $listeningData;
     }
 
@@ -628,6 +697,19 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'processed_count' => $processedCount,
             ]);
         }
+
+        // Process podcast episode if currently playing
+        if (! empty($listeningData['currently_playing_episode'])) {
+            try {
+                $this->processEpisodeListen($integration, $listeningData['currently_playing_episode']);
+            } catch (Exception $e) {
+                Log::error('Spotify: Failed to process podcast episode', [
+                    'integration_id' => $integration->id,
+                    'episode_id' => $listeningData['currently_playing_episode']['item']['id'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void
@@ -749,7 +831,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         ]);
     }
 
-    protected function getCurrentlyPlaying(Integration $integration): ?array
+    protected function getCurrentlyPlaying(Integration $integration, array $queryParams = []): ?array
     {
         try {
             $hub = SentrySdk::getCurrentHub();
@@ -764,13 +846,17 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 }
                 $token = $group->access_token;
             }
+
+            // Default to including episodes for podcast support
+            $params = array_merge(['additional_types' => 'episode'], $queryParams);
+
             // Log the API request
             $this->logApiRequest('GET', '/me/player/currently-playing', [
                 'Authorization' => '[REDACTED]',
-            ], [], $integration->id);
+            ], $params, $integration->id);
 
             $response = Http::withToken($token)
-                ->get($this->baseUrl . '/me/player/currently-playing');
+                ->get($this->baseUrl . '/me/player/currently-playing', $params);
             $span?->finish();
 
             // Log the API response
@@ -1075,6 +1161,262 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         if (! empty($contextType)) {
             $event->attachTag($contextType, 'spotify_context');
         }
+    }
+
+    /**
+     * Process a currently playing podcast episode
+     */
+    protected function processEpisodeListen(Integration $integration, array $episodeData): void
+    {
+        $episode = $episodeData['item'] ?? null;
+        if (! $episode || ($episode['type'] ?? null) !== 'episode') {
+            return;
+        }
+
+        $episodeId = $episode['id'];
+        $progressMs = $episodeData['progress_ms'] ?? 0;
+        $durationMs = $episode['duration_ms'] ?? 0;
+
+        if ($durationMs <= 0) {
+            Log::warning('Spotify: Episode has invalid duration', [
+                'integration_id' => $integration->id,
+                'episode_id' => $episodeId,
+            ]);
+
+            return;
+        }
+
+        $config = $integration->configuration ?? [];
+        $sessionTimeoutHours = $config['podcast_session_timeout_hours'] ?? 4;
+
+        // Look for existing event for this episode within session timeout
+        $existingEvent = Event::where('integration_id', $integration->id)
+            ->where('service', 'spotify')
+            ->where('action', 'listened_to')
+            ->where('event_metadata->type', 'episode')
+            ->where('event_metadata->episode_id', $episodeId)
+            ->where('time', '>=', now()->subHours($sessionTimeoutHours))
+            ->first();
+
+        if ($existingEvent) {
+            $this->updateEpisodeEvent($existingEvent, $progressMs, $durationMs);
+
+            return;
+        }
+
+        // Check if we should create event
+        $minMinutes = $config['podcast_min_listen_minutes'] ?? 5;
+        $listenMinutes = $progressMs / 60000;
+
+        if ($listenMinutes >= $minMinutes) {
+            $this->createPodcastEvent($integration, $episode, $progressMs);
+        } else {
+            Log::debug('Spotify: Episode below threshold, not creating event yet', [
+                'integration_id' => $integration->id,
+                'episode_id' => $episodeId,
+                'episode_name' => $episode['name'] ?? 'Unknown',
+                'listen_minutes' => round($listenMinutes, 1),
+                'min_minutes' => $minMinutes,
+            ]);
+        }
+    }
+
+    /**
+     * Update an existing podcast episode event with new progress
+     */
+    protected function updateEpisodeEvent(Event $event, int $progressMs, int $durationMs): void
+    {
+        $metadata = $event->event_metadata ?? [];
+        $currentMaxProgress = $metadata['max_progress_ms'] ?? 0;
+        $newMaxProgress = max($currentMaxProgress, $progressMs);
+
+        // Only update if progress increased
+        if ($newMaxProgress > $currentMaxProgress) {
+            $metadata['max_progress_ms'] = $newMaxProgress;
+            $metadata['progress_ms'] = $progressMs;
+
+            $event->update([
+                'value' => round($newMaxProgress / 60000), // Minutes listened
+                'event_metadata' => $metadata,
+            ]);
+
+            Log::debug('Spotify: Updated podcast episode progress', [
+                'event_id' => $event->id,
+                'episode_id' => $metadata['episode_id'] ?? 'unknown',
+                'progress_minutes' => round($newMaxProgress / 60000),
+            ]);
+        }
+    }
+
+    /**
+     * Create a new event for a podcast episode
+     */
+    protected function createPodcastEvent(Integration $integration, array $episode, int $progressMs): void
+    {
+        $user = $this->createOrUpdateUser($integration);
+        $episodeObject = $this->createOrUpdateEpisode($integration, $episode);
+
+        $sourceId = sprintf(
+            'spotify_podcast_%s_%s',
+            $episode['id'],
+            now()->format('Y-m-d')
+        );
+
+        // Check for existing event (defensive against race conditions)
+        if (Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->exists()) {
+            Log::debug('Spotify: Podcast event already exists', [
+                'integration_id' => $integration->id,
+                'source_id' => $sourceId,
+            ]);
+
+            return;
+        }
+
+        $durationMs = $episode['duration_ms'];
+        $listenMinutes = round($progressMs / 60000);
+
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => now(),
+            'integration_id' => $integration->id,
+            'actor_id' => $user->id,
+            'actor_metadata' => [
+                'spotify_user_id' => $integration->group?->account_id ?? $integration->account_id,
+            ],
+            'service' => 'spotify',
+            'domain' => self::getDomain(),
+            'action' => 'listened_to',
+            'value' => $listenMinutes,
+            'value_multiplier' => 1,
+            'value_unit' => 'minutes',
+            'event_metadata' => [
+                'type' => 'episode',
+                'episode_id' => $episode['id'],
+                'show_id' => $episode['show']['id'],
+                'show_name' => $episode['show']['name'],
+                'duration_ms' => $durationMs,
+                'progress_ms' => $progressMs,
+                'max_progress_ms' => $progressMs,
+            ],
+            'target_id' => $episodeObject->id,
+            'target_metadata' => [
+                'spotify_episode_id' => $episode['id'],
+                'spotify_show_id' => $episode['show']['id'],
+            ],
+        ]);
+
+        // Create blocks for rich content
+        $this->createEpisodeBlocks($event, $episode, $integration);
+
+        // Auto-tag the event
+        $this->autoTagPodcastEvent($event, $episode);
+
+        Log::info("Spotify: Created podcast event for: {$episode['name']}", [
+            'event_id' => $event->id,
+            'show' => $episode['show']['name'] ?? 'Unknown',
+            'listen_minutes' => $listenMinutes,
+        ]);
+    }
+
+    /**
+     * Create or update an EventObject for a podcast episode
+     */
+    protected function createOrUpdateEpisode(Integration $integration, array $episode): EventObject
+    {
+        $showName = $episode['show']['name'] ?? 'Unknown Podcast';
+        $durationFormatted = gmdate('H:i:s', ($episode['duration_ms'] ?? 0) / 1000);
+
+        return EventObject::updateOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'episode',
+                'type' => 'spotify_podcast_episode',
+                'title' => $episode['name'],
+            ],
+            [
+                'time' => now(),
+                'content' => "Episode: {$episode['name']}\nPodcast: {$showName}\nDuration: {$durationFormatted}",
+                'metadata' => [
+                    'spotify_episode_id' => $episode['id'],
+                    'spotify_show_id' => $episode['show']['id'],
+                    'show_name' => $showName,
+                    'publisher' => $episode['show']['publisher'] ?? null,
+                    'duration_ms' => $episode['duration_ms'] ?? 0,
+                    'release_date' => $episode['release_date'] ?? null,
+                ],
+                'url' => $episode['external_urls']['spotify'] ?? null,
+                'media_url' => $episode['images'][0]['url'] ?? $episode['show']['images'][0]['url'] ?? null,
+            ]
+        );
+    }
+
+    /**
+     * Create blocks for a podcast episode event
+     */
+    protected function createEpisodeBlocks(Event $event, array $episode, Integration $integration): void
+    {
+        $configuration = $integration->configuration ?? [];
+
+        // Episode art block
+        $images = $episode['images'] ?? $episode['show']['images'] ?? [];
+        $includeArt = $configuration['include_album_art'] ?? ['enabled'];
+
+        if (in_array('enabled', $includeArt) && ! empty($images)) {
+            $image = $images[0];
+            $event->createBlock([
+                'block_type' => 'episode_art',
+                'time' => $event->time,
+                'title' => 'Episode Artwork',
+                'metadata' => [
+                    'text' => "Artwork for {$episode['name']}",
+                ],
+                'url' => $episode['external_urls']['spotify'] ?? null,
+                'media_url' => $image['url'],
+                'value' => $image['width'] ?? 300,
+                'value_multiplier' => 1,
+                'value_unit' => 'pixels',
+            ]);
+        }
+
+        // Episode details block
+        $durationFormatted = gmdate('H:i:s', ($episode['duration_ms'] ?? 0) / 1000);
+
+        $event->createBlock([
+            'block_type' => 'episode_details',
+            'time' => $event->time,
+            'title' => 'Episode Details',
+            'metadata' => [
+                'episode' => $episode['name'],
+                'show' => $episode['show']['name'] ?? null,
+                'publisher' => $episode['show']['publisher'] ?? null,
+                'duration' => $durationFormatted,
+                'release_date' => $episode['release_date'] ?? null,
+            ],
+            'url' => $episode['external_urls']['spotify'] ?? null,
+            'media_url' => null,
+            'value' => $episode['duration_ms'] ?? 0,
+            'value_multiplier' => 60000,
+            'value_unit' => 'minutes',
+        ]);
+    }
+
+    /**
+     * Auto-tag a podcast episode event
+     */
+    protected function autoTagPodcastEvent(Event $event, array $episode): void
+    {
+        // Podcast/show name
+        if (! empty($episode['show']['name'])) {
+            $event->attachTag($episode['show']['name'], 'podcast_show');
+        }
+
+        // Publisher
+        if (! empty($episode['show']['publisher'])) {
+            $event->attachTag($episode['show']['publisher'], 'podcast_publisher');
+        }
+
+        // Context type
+        $event->attachTag('podcast', 'spotify_context');
     }
 
     /**
