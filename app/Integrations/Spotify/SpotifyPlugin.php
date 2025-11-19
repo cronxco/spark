@@ -1236,7 +1236,6 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             $metadata['progress_ms'] = $progressMs;
 
             $event->update([
-                'value' => round($newMaxProgress / 60000), // Minutes listened
                 'event_metadata' => $metadata,
             ]);
 
@@ -1286,9 +1285,6 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             'service' => 'spotify',
             'domain' => self::getDomain(),
             'action' => 'listened_to',
-            'value' => $listenMinutes,
-            'value_multiplier' => 1,
-            'value_unit' => 'minutes',
             'event_metadata' => [
                 'media_type' => 'episode',
                 'episode_id' => $episode['id'],
