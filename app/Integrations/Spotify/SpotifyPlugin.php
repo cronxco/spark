@@ -1329,7 +1329,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         return EventObject::updateOrCreate(
             [
                 'user_id' => $integration->user_id,
-                'concept' => 'episode',
+                'concept' => 'podcast_episode',
                 'type' => 'spotify_podcast_episode',
                 'title' => $episode['name'],
             ],
