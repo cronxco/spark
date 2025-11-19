@@ -1193,7 +1193,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         $existingEvent = Event::where('integration_id', $integration->id)
             ->where('service', 'spotify')
             ->where('action', 'listened_to')
-            ->where('event_metadata->type', 'episode')
+            ->where('event_metadata->media_type', 'episode')
             ->where('event_metadata->episode_id', $episodeId)
             ->where('time', '>=', now()->subHours($sessionTimeoutHours))
             ->first();
@@ -1290,7 +1290,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             'value_multiplier' => 1,
             'value_unit' => 'minutes',
             'event_metadata' => [
-                'type' => 'episode',
+                'media_type' => 'episode',
                 'episode_id' => $episode['id'],
                 'show_id' => $episode['show']['id'],
                 'show_name' => $episode['show']['name'],
