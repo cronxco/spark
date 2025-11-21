@@ -1,105 +1,14 @@
 # Spotlight Command Palette
 
-Spark uses [Wire Elements Pro Spotlight](https://wire-elements.dev/) as a keyboard-driven command palette that allows power users to navigate, search, and execute actions throughout the application without using the mouse.
+A keyboard-driven command palette powered by Wire Elements Pro that enables navigation, search, and action execution throughout the application.
 
-## Table of Contents
+## Overview
 
-1. [User Guide](#user-guide)
-2. [Developer Guide](#developer-guide)
-3. [Architecture](#architecture)
-4. [Adding Commands](#adding-commands)
-5. [Integration Plugin Support](#integration-plugin-support)
-6. [Troubleshooting](#troubleshooting)
+Spotlight provides power users with rapid access to all application features through keyboard shortcuts and search. Users can navigate to any page, search across events, objects, blocks, metrics, and integrations, execute context-aware commands, and leverage AI-powered semantic search. The system supports scoped navigation, allowing users to explore relationships between entities by pressing Tab on search results.
 
----
+## Architecture
 
-## User Guide
-
-### Opening Spotlight
-
-- **Keyboard Shortcut**: Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux)
-- **Click**: Click the "Search" button in the header
-
-### Search Modes
-
-Spotlight supports multiple modes triggered by prefix characters:
-
-| Mode         | Prefix   | Description                                                      |
-| ------------ | -------- | ---------------------------------------------------------------- |
-| Default      | _(none)_ | Search everything: navigation, events, objects, blocks, accounts |
-| Actions      | `>`      | Show available commands and actions                              |
-| Tags         | `#`      | Search tags by name or type                                      |
-| Metrics      | `$`      | Search metrics and trends                                        |
-| Integrations | `@`      | Search integrations and trigger updates                          |
-| Admin        | `!`      | Admin-only commands (destructive actions require confirmation)   |
-| Help         | `?`      | Help and tips                                                    |
-
-### Keyboard Shortcuts
-
-| Shortcut                  | Action                              |
-| ------------------------- | ----------------------------------- |
-| `Cmd+K` / `Ctrl+K`        | Open/close Spotlight                |
-| `Arrow Up` / `Arrow Down` | Navigate results                    |
-| `Enter`                   | Execute selected action             |
-| `Tab`                     | Apply token/scope to filter results |
-| `Escape`                  | Close Spotlight                     |
-| `Backspace` (when empty)  | Remove last token                   |
-| `Shift+Backspace`         | Clear all tokens                    |
-
-### Context-Aware Commands
-
-Spotlight shows different commands based on your current page:
-
-- **Metrics Overview**: "Calculate All Statistics", "Detect All Trends"
-- **Metric Detail**: "Acknowledge All Trends", "Calculate Statistics for This Metric"
-- **Financial Account Detail**: "Add Balance Update", "Archive Account", "Edit Account"
-- **Integration Detail**: "Trigger Update Now", "Pause/Resume Integration", "Configure Integration"
-- **Event Detail**: "Tag Event", "Edit Event", "Delete Event"
-- **Object Detail**: "Tag Object", "View Timeline", "Edit Object", "Delete Object"
-- **Block Detail**: "View Parent Event", "Edit Block", "Delete Block"
-- **Admin Bin**: "Clear Bin" (with confirmation)
-
-### Scoped Navigation
-
-When viewing detail pages for Events, Objects, or Blocks, Spotlight automatically shows related entities:
-
-**On Event Pages:**
-
-- Navigate to Actor Object (if present)
-- Navigate to Target Object (if present)
-- List all Blocks for this event
-- View Source Integration
-
-**On Object Pages:**
-
-- List recent Events (as actor or target)
-- Navigate to Source Integration
-
-**On Block Pages:**
-
-- Navigate to Parent Event
-- List Related Blocks from same event
-
-**Usage:**
-
-1. Visit an event/object/block detail page
-2. Open Spotlight (`Cmd+K`)
-3. See related entities automatically appear
-4. Or press `Tab` on any search result to scope into it and explore relationships
-
-### Tips
-
-- Start typing to filter results
-- Results are prioritized by: context → recency → usage frequency → alphabetical
-- Search results show up to 5 items per category
-- Recent items (from today or last week) appear first
-- Metrics with unacknowledged trends are boosted in search results
-
----
-
-## Developer Guide
-
-### Project Structure
+### Components
 
 ```
 app/Spotlight/
@@ -107,6 +16,7 @@ app/Spotlight/
 │   └── ClearBinAction.php
 ├── Queries/
 │   ├── Actions/                # Action command queries
+│   │   ├── BookmarkUrlQuery.php
 │   │   ├── ContextualActionsQuery.php
 │   │   └── GlobalActionsQuery.php
 │   ├── Integration/            # Integration-related queries
@@ -116,17 +26,30 @@ app/Spotlight/
 │   │   ├── AdminNavigationQuery.php
 │   │   ├── CoreNavigationQuery.php
 │   │   ├── DailyNavigationQuery.php
+│   │   ├── FetchNavigationQuery.php
 │   │   ├── HelpQuery.php
 │   │   └── SettingsNavigationQuery.php
 │   ├── Scoped/                 # Token-scoped relationship queries
+│   │   ├── AccountActionsQuery.php
+│   │   ├── AccountEventsQuery.php
+│   │   ├── AccountIntegrationQuery.php
+│   │   ├── BlockActionsQuery.php
+│   │   ├── BlockEventQuery.php
+│   │   ├── BlockRelatedBlocksQuery.php
+│   │   ├── EventActionsQuery.php
 │   │   ├── EventActorQuery.php
-│   │   ├── EventTargetQuery.php
 │   │   ├── EventBlocksQuery.php
 │   │   ├── EventIntegrationQuery.php
+│   │   ├── EventTargetQuery.php
+│   │   ├── IntegrationActionsQuery.php
+│   │   ├── IntegrationBlocksQuery.php
+│   │   ├── IntegrationObjectsQuery.php
+│   │   ├── MetricActionsQuery.php
+│   │   ├── MetricAnomaliesQuery.php
+│   │   ├── MetricEventsQuery.php
+│   │   ├── ObjectActionsQuery.php
 │   │   ├── ObjectEventsQuery.php
-│   │   ├── ObjectIntegrationQuery.php
-│   │   ├── BlockEventQuery.php
-│   │   └── BlockRelatedBlocksQuery.php
+│   │   └── ObjectIntegrationQuery.php
 │   └── Search/                 # Entity search queries
 │       ├── BlockSearchQuery.php
 │       ├── EventSearchQuery.php
@@ -135,155 +58,142 @@ app/Spotlight/
 │       ├── MetricSearchQuery.php
 │       ├── MetricTrendsQuery.php
 │       ├── ObjectSearchQuery.php
+│       ├── SemanticModeQuery.php
+│       ├── SemanticSearchQuery.php
 │       └── TagSearchQuery.php
-├── Scopes/                     # Context-aware scopes (auto-apply tokens)
-│   ├── BlockDetailScope.php
-│   ├── EventDetailScope.php
-│   ├── FinancialAccountScope.php
-│   ├── IntegrationDetailScope.php
-│   ├── MetricDetailScope.php
-│   └── ObjectDetailScope.php
-└── Helpers/                    # Shared utilities
+└── Scopes/                     # Context-aware scopes (auto-apply tokens)
+    ├── BlockDetailScope.php
+    ├── EventDetailScope.php
+    ├── FinancialAccountScope.php
+    ├── IntegrationDetailScope.php
+    ├── MetricDetailScope.php
+    └── ObjectDetailScope.php
 
 app/Providers/SpotlightServiceProvider.php   # Central registration point
 ```
 
-### Core Concepts
+### Data Flow
 
-#### 1. **Queries**
+1. **Registration**: All configuration occurs in `SpotlightServiceProvider::boot()` via `Spotlight::setup()`
+2. **Context Detection**: Spotlight determines current route, active mode, and applied tokens
+3. **Query Selection**: Chooses which queries to execute based on context
+4. **Result Collection**: Executes selected queries and collects results
+5. **Filtering**: Filters results by user search query
+6. **Prioritization**: Sorts by priority, recency, and context-relevance
+7. **Grouping**: Organizes results into registered categories
+8. **Display**: Renders results in the Spotlight dropdown
 
-Queries define searchable content and return `SpotlightResult` objects.
+## Usage
 
-**Query Types:**
+### Basic Usage
 
-- `SpotlightQuery::asDefault()` - Runs on all routes
-- `SpotlightQuery::forRoute('route.name')` - Route-specific
-- `SpotlightQuery::forMode('mode')` - Mode-specific (e.g., `#`, `$`, `@`)
-- `SpotlightQuery::forToken('token')` - Token-scoped
+**Opening Spotlight:**
+- Keyboard: Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux)
+- Mouse: Click the Search button in the header
 
-#### 2. **Results**
+**Keyboard Shortcuts:**
 
-Results are individual items shown in Spotlight dropdown.
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+K` / `Ctrl+K` | Open/close Spotlight |
+| `Arrow Up` / `Arrow Down` | Navigate results |
+| `Enter` | Execute selected action |
+| `Tab` | Apply token/scope to filter results |
+| `Escape` | Close Spotlight |
+| `Backspace` (when empty) | Remove last token |
+| `Shift+Backspace` | Clear all tokens |
 
-**Key Methods:**
+**Search Modes:**
 
-- `setTitle()` - Primary text (required)
-- `setSubtitle()` - Secondary text
-- `setTypeahead()` - Text shown when item is selected
-- `setIcon()` - Heroicon name
-- `setGroup()` - Result category
-- `setPriority()` - Higher = shown first
-- `setAction()` - What happens on Enter
+| Mode | Prefix | Description |
+|------|--------|-------------|
+| Default | (none) | Search everything: navigation, events, objects, blocks, accounts |
+| Actions | `>` | Show available commands and actions |
+| Tags | `#` | Search tags by name or type |
+| Metrics | `$` | Search metrics and trends |
+| Integrations | `@` | Search integrations and trigger updates |
+| Admin | `!` | Admin-only commands (destructive actions require confirmation) |
+| Semantic | `~` | AI-powered semantic search with boosted recent results |
+| Help | `?` | Help and tips |
 
-#### 3. **Actions**
+### Advanced Usage
 
-Actions define what happens when a result is selected.
+**Context-Aware Commands:**
 
-**Built-in Actions:**
+Spotlight shows different commands based on your current page:
 
-- `jump_to` - Navigate to a URL
-- `dispatch_event` - Trigger Livewire event
-- `replace_query` - Change search query
+- **Metrics Overview**: Calculate All Statistics, Detect All Trends
+- **Metric Detail**: Acknowledge All Trends, Calculate Statistics for This Metric
+- **Financial Account Detail**: Add Balance Update, Archive Account, Edit Account
+- **Integration Detail**: Trigger Update Now, Pause/Resume Integration, Configure Integration
+- **Event Detail**: Tag Event, Edit Event, Delete Event
+- **Object Detail**: Tag Object, View Timeline, Edit Object, Delete Object
+- **Block Detail**: View Parent Event, Edit Block, Delete Block
+- **Admin Bin**: Clear Bin (with confirmation)
 
-**Custom Actions:**
-Extend `SpotlightAction` class and register in `SpotlightServiceProvider`.
+**Scoped Navigation:**
 
-#### 4. **Modes**
+When viewing detail pages, Spotlight automatically shows related entities:
 
-Modes are search contexts triggered by prefix characters.
+On Event Pages:
+- Navigate to Actor Object (if present)
+- Navigate to Target Object (if present)
+- List all Blocks for this event
+- View Source Integration
 
-**Registration:**
+On Object Pages:
+- List recent Events (as actor or target)
+- Navigate to Source Integration
 
-```php
-SpotlightMode::make('tags', 'Search Tags')->setCharacter('#')
-```
+On Block Pages:
+- Navigate to Parent Event
+- List Related Blocks from same event
 
-#### 5. **Groups**
+**Using Scoped Navigation:**
+1. Visit an event/object/block detail page
+2. Open Spotlight (`Cmd+K`)
+3. Related entities appear automatically
+4. Press `Tab` on any result to scope into it and explore relationships
 
-Groups organize results into categories.
+## Configuration
 
-**Registration:**
+### Result Groups
 
-```php
-Spotlight::registerGroup('events', 'Events', 2);  // priority: 2
-```
+| Group | Priority | Description |
+|-------|----------|-------------|
+| commands | 1 | Action commands |
+| events | 2 | Event search results |
+| objects | 3 | Object search results |
+| accounts | 4 | Financial account results |
+| blocks | 5 | Block search results |
+| navigation | 6 | Navigation links |
+| tags | 7 | Tag search results |
+| metrics | 8 | Metric search results |
+| integrations | 9 | Integration results |
+| admin | 10 | Admin commands |
 
-#### 6. **Tokens & Scopes**
+### Registered Tokens
 
-**Tokens** represent contextual filters that scope search results to specific entities. Think of them as "I'm looking at this specific thing, show me related stuff."
+Tokens represent contextual filters that scope search results:
 
-**Registered Tokens:**
+| Token | Description | Auto-applied Route |
+|-------|-------------|-------------------|
+| `integration` | Scoped to a specific integration | `/integrations/{integration}/details` |
+| `metric` | Scoped to a specific metric | `/metrics/{metric}` |
+| `account` | Scoped to a financial account | `/accounts/{account}` |
+| `tag` | Scoped to a tag | - |
+| `event` | Scoped to an event | `/events/{event}` |
+| `object` | Scoped to an object (EventObject) | `/objects/{object}` |
+| `block` | Scoped to a block | `/blocks/{block}` |
 
-- `integration` - Scoped to a specific integration
-- `metric` - Scoped to a specific metric
-- `account` - Scoped to a financial account
-- `tag` - Scoped to a tag
-- `event` - Scoped to an event
-- `object` - Scoped to an object (EventObject)
-- `block` - Scoped to a block
+## Development
 
-**Scopes** automatically apply tokens when you visit certain routes:
+### Adding New Commands/Queries
 
-- Visit `/events/{event}` → `event` token auto-applied
-- Visit `/objects/{object}` → `object` token auto-applied
-- Visit `/blocks/{block}` → `block` token auto-applied
-- Visit `/metrics/{metric}` → `metric` token auto-applied
-- Visit `/integrations/{integration}/details` → `integration` token auto-applied
-
-**Usage Pattern:**
-
-```php
-// Define a scope (auto-applies token on route)
-SpotlightScope::forRoute('events.show', function ($scope, $request) {
-    $event = $request->route('event');
-    $scope->applyToken('event', ['id' => $event->id, ...]);
-});
-
-// Define a scoped query (only runs when token is active)
-SpotlightQuery::forToken('event', function ($eventToken, $query) {
-    $eventId = $eventToken->getParameter('id');
-    // Return results related to this event
-});
-```
-
----
-
-## Architecture
-
-### Registration Flow
-
-All Spotlight configuration happens in `SpotlightServiceProvider::boot()`:
-
-```php
-Spotlight::setup(function () {
-    $this->registerActions();     // Custom actions
-    $this->registerModes();        // Search modes
-    $this->registerGroups();       // Result categories
-    $this->registerTokens();       // Context tokens
-    $this->registerScopes();       // Auto-applied tokens
-    $this->registerQueries();      // Search & navigation
-    $this->registerTips();         // Footer tips
-});
-```
-
-### Query Execution Order
-
-1. **Context Detection**: Spotlight determines current route/mode/tokens
-2. **Query Selection**: Chooses which queries to run based on context
-3. **Result Collection**: Executes queries and collects results
-4. **Filtering**: Filters results by search query
-5. **Prioritization**: Sorts by priority, recency, context-relevance
-6. **Grouping**: Organizes into categories
-7. **Display**: Renders in Spotlight dropdown
-
----
-
-## Adding Commands
-
-### Example 1: Simple Navigation Command
+**Simple Navigation Command:**
 
 ```php
-// In a Query class's make() method:
+// In a Query class's make() method
 return SpotlightQuery::asDefault(function (string $query) {
     if (blank($query) || !str_contains('today', strtolower($query))) {
         return collect();
@@ -301,7 +211,7 @@ return SpotlightQuery::asDefault(function (string $query) {
 });
 ```
 
-### Example 2: Entity Search
+**Entity Search Query:**
 
 ```php
 return SpotlightQuery::asDefault(function (string $query) {
@@ -327,7 +237,7 @@ return SpotlightQuery::asDefault(function (string $query) {
 });
 ```
 
-### Example 3: Mode-Specific Query
+**Mode-Specific Query:**
 
 ```php
 // Only runs when user types "#"
@@ -345,7 +255,7 @@ return SpotlightQuery::forMode('tags', function (string $query) {
 });
 ```
 
-### Example 4: Context-Aware Action
+**Context-Aware Action:**
 
 ```php
 return SpotlightQuery::asDefault(function (string $query) {
@@ -369,10 +279,10 @@ return SpotlightQuery::asDefault(function (string $query) {
 });
 ```
 
-### Example 5: Custom Action with Confirmation
+**Custom Action with Confirmation:**
 
 ```php
-// 1. Create action class:
+// 1. Create action class
 class ClearBinAction extends SpotlightAction
 {
     public function description(): string
@@ -386,17 +296,14 @@ class ClearBinAction extends SpotlightAction
     }
 }
 
-// 2. Register in SpotlightServiceProvider:
-protected function registerActions(): void
-{
-    Spotlight::registerAction('clear_bin', ClearBinAction::class);
-}
+// 2. Register in SpotlightServiceProvider::registerActions()
+Spotlight::registerAction('clear_bin', ClearBinAction::class);
 
-// 3. Use in query:
+// 3. Use in query
 ->setAction('clear_bin', [])
 ```
 
-### Example 6: Scoped Navigation Query
+**Scoped Navigation Query:**
 
 ```php
 // Create a scope that auto-applies on route
@@ -432,34 +339,21 @@ class EventBlocksQuery
             return $event->blocks->map(function ($block) {
                 return SpotlightResult::make()
                     ->setTitle($block->title)
-                    ->setSubtitle('Block • ' . $block->block_type)
+                    ->setSubtitle('Block - ' . $block->block_type)
                     ->setIcon('squares-2x2')
                     ->setGroup('blocks')
                     ->setPriority(8)
                     ->setAction('jump_to', ['path' => route('blocks.show', $block)])
-                    ->setTokens(['block' => $block]);  // Allows Tab to scope into block
+                    ->setTokens(['block' => $block]);
             });
         });
     }
 }
 ```
 
-**Flow:**
+### Integration Plugin Commands
 
-1. User visits `/events/{event}`
-2. EventDetailScope auto-applies `event` token
-3. User opens Spotlight
-4. EventBlocksQuery automatically runs (because `event` token is active)
-5. User sees all blocks for this event
-6. User can press Tab on a block result to scope into that block
-
----
-
-## Integration Plugin Support
-
-Integration plugins can provide their own Spotlight commands by implementing `SupportsSpotlightCommands`.
-
-### Interface
+Plugins can provide Spotlight commands by implementing `SupportsSpotlightCommands`:
 
 ```php
 namespace App\Integrations\Contracts;
@@ -470,10 +364,9 @@ interface SupportsSpotlightCommands
 }
 ```
 
-### Example Implementation
+Example implementation:
 
 ```php
-// In SpotifyPlugin.php:
 use App\Integrations\Contracts\SupportsSpotlightCommands;
 
 class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
@@ -497,88 +390,82 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
 }
 ```
 
-### Automatic Registration
+Plugin commands are automatically discovered via `PluginRegistry::getSpotlightCommands()` - no manual registration required.
 
-Plugin commands are automatically discovered and registered by `PluginRegistry::getSpotlightCommands()`.
+### Query Types
 
-No manual registration required - just implement the interface!
+| Method | Description |
+|--------|-------------|
+| `SpotlightQuery::asDefault()` | Runs on all routes |
+| `SpotlightQuery::forRoute('route.name')` | Route-specific |
+| `SpotlightQuery::forMode('mode')` | Mode-specific (triggered by prefix character) |
+| `SpotlightQuery::forToken('token')` | Token-scoped (runs when token is active) |
 
----
+### Result Methods
 
-## Troubleshooting
+| Method | Description |
+|--------|-------------|
+| `setTitle()` | Primary text (required) |
+| `setSubtitle()` | Secondary text |
+| `setTypeahead()` | Text shown when item is selected |
+| `setIcon()` | Heroicon name |
+| `setGroup()` | Result category |
+| `setPriority()` | Higher values shown first |
+| `setAction()` | Action to execute on Enter |
+| `setTokens()` | Tokens applied when Tab is pressed |
 
-### Commands Not Appearing
+### Built-in Actions
 
-1. **Check registration**: Ensure query is registered in `SpotlightServiceProvider::registerQueries()`
-2. **Check filtering**: Query may be filtering out results (check `blank($query)` logic)
-3. **Check mode**: Mode-specific queries only run when mode character is typed
-4. **Check group**: Group must be registered in `registerGroups()`
-5. **Clear cache**: Run `php artisan config:clear` and rebuild assets
+| Action | Description |
+|--------|-------------|
+| `jump_to` | Navigate to a URL |
+| `dispatch_event` | Trigger Livewire event |
+| `replace_query` | Change search query |
 
-### Results Not Clickable
+### Best Practices
 
+1. **Keep queries fast**: Limit to 5 results, use indexes, eager load relationships
+2. **Prioritize contextually**: Boost priority for recent items and context-relevant results
+3. **Use descriptive typeahead**: Help users understand what they are selecting
+4. **Group logically**: Use appropriate groups for result organization
+5. **Handle empty states**: Return empty collection when query is too short
+6. **Test dark mode**: Verify styling works in both light and dark themes
+7. **Use confirmations**: Always confirm destructive actions
+8. **Leverage context**: Make commands context-aware when possible
+
+### Troubleshooting
+
+**Commands Not Appearing:**
+- Check query is registered in `SpotlightServiceProvider::registerQueries()`
+- Query may be filtering out results (check `blank($query)` logic)
+- Mode-specific queries only run when mode character is typed
+- Group must be registered in `registerGroups()`
+- Clear cache: `php artisan config:clear`
+
+**Results Not Clickable:**
 - Ensure `setAction()` is called on result
-- Check action parameters are valid (e.g., route exists)
+- Check action parameters are valid (route exists)
 - Verify custom action is registered in `registerActions()`
 
-### Styling Issues
-
-- Custom Spotlight CSS is in `resources/css/app.css` (lines 140-566)
+**Styling Issues:**
+- Custom Spotlight CSS is in `resources/css/app.css`
 - Uses Spark theme variables (`--color-primary`, `--color-accent`, etc.)
 - Dark mode automatically supported via theme system
-- Do not import Wire Elements CSS - custom styling replaces it
 
-### Performance Issues
-
+**Performance Issues:**
 - Limit database queries to 5 results per query
 - Use `blank($query) || strlen($query) < 2` to avoid searching on single characters
 - Add indexes to frequently searched columns
 - Use eager loading (`->with()`) to prevent N+1 queries
 
-### Icons Not Showing
-
-- Icons use Heroicons (via Mary UI / Blade Heroicons)
+**Icons Not Showing:**
+- Icons use Heroicons via Blade Heroicons
 - Icon names use format: `o-icon-name` (outline) or `s-icon-name` (solid)
 - Full list: https://heroicons.com
 
----
+## Related Documentation
 
-## Best Practices
-
-1. **Keep queries fast**: Limit to 5 results, use indexes, eager load relationships
-2. **Prioritize contextually**: Boost priority for recent items, context-relevant results
-3. **Use descriptive typeahead**: Help users understand what they're selecting
-4. **Group logically**: Use appropriate groups for result organization
-5. **Handle empty states**: Return empty collection when query is too short
-6. **Test dark mode**: Verify styling works in both light and dark themes
-7. **Document commands**: Add comments explaining what each command does
-8. **Use confirmations**: Always confirm destructive actions
-9. **Leverage context**: Make commands context-aware when possible
-10. **Format values**: Use existing helpers like `format_event_value_display()`
-
----
-
-## Future Enhancements
-
-Potential improvements for Spotlight:
-
-- ✅ ~~**Scoped search**: Implement tokens for filtering~~ (IMPLEMENTED - use Tab to scope into entities)
-- **Recent searches**: Remember and suggest recent searches
-- **Command history**: Track frequently used commands and boost their priority
-- **Fuzzy search**: Improve search matching with fuzzy algorithms
-- **Command aliases**: Allow multiple ways to trigger the same command
-- **Custom icons**: Support for custom icon sets beyond Heroicons
-- **Multi-select**: Enable bulk actions on search results
-- **Preview pane**: Show preview of result before navigating
-- **Search analytics**: Track what users search for to improve discoverability
-- **Breadcrumb navigation**: Visual token breadcrumbs showing scope chain
-- **Saved scopes**: Save frequently used scope combinations
-
----
-
-## Additional Resources
-
-- [Wire Elements Pro Documentation](https://wire-elements.dev/docs/getting-started/spotlight-component)
+- [Wire Elements Pro Spotlight](https://wire-elements.dev/docs/getting-started/spotlight-component)
 - [Heroicons](https://heroicons.com)
 - [daisyUI Colors](https://daisyui.com/docs/colors/)
 - [Livewire Events](https://livewire.laravel.com/docs/events)

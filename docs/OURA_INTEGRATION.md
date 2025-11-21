@@ -1,228 +1,278 @@
-# Oura Integration: Data Model Per Instance
+# Oura Integration
 
-This document describes what Spark creates per Oura instance type: event values, target objects, and blocks. Decimal precision is preserved by encoding decimals as integer `value` with a `value_multiplier` of 1000 when needed. Reconstruct using: real = value / value_multiplier.
+Sync health and wellness data from Oura Ring.
 
-## OAuth & Scopes
+## Overview
+
+The Oura integration connects to your Oura Ring account and syncs comprehensive health metrics including sleep data, readiness scores, activity levels, heart rate, SpO2, stress, and resilience. It supports multiple instance types for granular data collection and provides historical data migration.
+
+## Features
+
+- Daily scores (sleep, readiness, activity, stress, resilience)
+- Sleep records with detailed sleep stages
+- Heart rate monitoring with daily aggregates
+- SpO2 (blood oxygen) tracking
+- Workout and session tracking
+- User tags and enhanced tags
+- Cardiovascular age and VO2 Max
+- Sleep timing recommendations
+- Historical data migration support
+
+## Setup
+
+### Prerequisites
+
+- Oura Ring device
+- Oura developer account and OAuth application
+
+### Configuration
+
+1. Go to [Oura Developer Portal](https://cloud.ouraring.com/oauth/applications)
+2. Create a new application
+3. Add redirect URI: `https://yourdomain.com/integrations/oura/callback`
+4. Note your Client ID and Client Secret
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OURA_CLIENT_ID` | OAuth client ID | Yes |
+| `OURA_CLIENT_SECRET` | OAuth client secret | Yes |
+| `OURA_REDIRECT_URI` | OAuth callback URL | Yes |
+
+### OAuth Scopes
+
+The integration requests these scopes:
+
+- `email` - User email address
+- `personal` - Personal information (age, height, weight)
+- `daily` - Daily scores and summaries
+- `heartrate` - Heart rate data
+- `workout` - Workout data
+- `tag` - User tags
+- `session` - Mindfulness sessions
+- `spo2` - Blood oxygen data
+
+## Data Model
+
+### Instance Types
+
+| Type | Description | API Endpoint |
+|------|-------------|--------------|
+| `activity` | Daily activity scores | `/v2/usercollection/daily_activity` |
+| `sleep` | Daily sleep scores | `/v2/usercollection/daily_sleep` |
+| `sleep_records` | Detailed sleep records | `/v2/usercollection/sleep` |
+| `readiness` | Daily readiness scores | `/v2/usercollection/daily_readiness` |
+| `resilience` | Daily resilience scores | `/v2/usercollection/daily_resilience` |
+| `stress` | Daily stress levels | `/v2/usercollection/daily_stress` |
+| `workouts` | Workout activities | `/v2/usercollection/workout` |
+| `sessions` | Mindfulness sessions | `/v2/usercollection/session` |
+| `tags` | User-defined tags | `/v2/usercollection/tag` |
+| `heartrate` | Heart rate time series | `/v2/usercollection/heartrate` |
+| `spo2` | Blood oxygen levels | `/v2/usercollection/daily_spo2` |
+
+### Action Types
+
+| Action | Description | Value Unit |
+|--------|-------------|------------|
+| `had_activity_score` | Daily activity score | percent |
+| `had_sleep_score` | Daily sleep score | percent |
+| `slept_for` | Sleep duration | seconds |
+| `had_readiness_score` | Daily readiness score | percent |
+| `had_resilience_score` | Daily resilience level (1-5) | resilience_level |
+| `had_stress_score` | Daily stress level (1-3) | stress_level |
+| `did_workout` | Workout activity | kcal |
+| `had_mindfulness_session` | Mindfulness session | seconds |
+| `had_oura_tag` | User-defined tag | null |
+| `had_heart_rate` | Heart rate measurement | bpm |
+| `had_spo2` | Blood oxygen level | percent |
+| `had_cardiovascular_age` | Cardiovascular age | years |
+| `had_vo2_max` | VO2 Max | ml/kg/min |
+| `had_enhanced_tag` | Enhanced tag | seconds |
+| `had_sleep_recommendation` | Sleep timing recommendation | null |
+
+### Value Formatting
+
+The Oura integration uses custom value formatters for readable display:
+
+| Action | Formatter |
+|--------|-----------|
+| `had_resilience_score` | 5=Exceptional, 4=Strong, 3=Solid, 2=Adequate, 1=Limited |
+| `had_stress_score` | 3=Stressful, 2=Normal, 1=Restored |
+| `slept_for`, `had_mindfulness_session` | Uses `format_duration()` helper |
+
+### Object Types
+
+| Object Type | Description |
+|-------------|-------------|
+| `oura_user` | Oura user account |
+| `oura_daily_activity` | Daily activity metric |
+| `oura_daily_sleep` | Daily sleep metric |
+| `oura_sleep_record` | Individual sleep record |
+| `oura_daily_readiness` | Daily readiness metric |
+| `oura_daily_resilience` | Daily resilience metric |
+| `oura_daily_spo2` | Daily SpO2 metric |
+| `heartrate_series` | Heart rate time series |
+
+### Block Types
+
+Blocks are created for detailed contributor scores and metrics:
+
+- Sleep contributors (efficiency, latency, REM, restfulness, timing)
+- Activity contributors (meet daily targets, move every hour, stay active)
+- Readiness contributors
+- Resilience contributors
+- Sleep stages (deep, light, REM, awake)
+- Heart rate (min, max, average)
+- Workout details (calories, heart rate)
+
+## Usage
+
+### Connecting the Integration
+
+1. Navigate to Integrations in Spark
+2. Click "Connect" on Oura integration
+3. Authorize with Oura (grants required permissions)
+4. Select instance types to enable (each is independent)
+5. Configure update frequency per instance
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `update_frequency_minutes` | integer | 60 | Fetch interval |
+| Instance-specific | varies | - | Each instance type has its own configuration |
+
+### Manual Operations
+
+```bash
+# Fetch data for all Oura integrations
+sail artisan integrations:fetch --service=oura
+
+# Fetch specific instance type
+sail artisan tinker
+>>> $integration = App\Models\Integration::where('service', 'oura')->where('instance_type', 'sleep')->first();
+>>> App\Jobs\OAuth\Oura\OuraDailyPull::dispatch($integration);
+```
+
+## Precision Encoding
+
+The Oura integration preserves decimal precision using integer encoding:
+
+- Fractional values: `value = round(real * 1000)`, `value_multiplier = 1000`
+- Integer values: `value_multiplier = 1`
+- Reconstruct: `real = value / value_multiplier`
+
+Example:
+
+```php
+// Sleep efficiency of 94.5%
+$value = 94500;
+$value_multiplier = 1000;
+$real = $value / $value_multiplier; // 94.5
+```
+
+## Event Structure
+
+### Daily Score Event
+
+```json
+{
+  "source_id": "oura_activity_2024-01-15",
+  "time": "2024-01-15T00:00:00Z",
+  "service": "oura",
+  "domain": "health",
+  "action": "had_activity_score",
+  "value": 85,
+  "value_unit": "percent",
+  "event_metadata": {
+    "day": "2024-01-15",
+    "kind": "activity"
+  },
+  "target": {
+    "concept": "metric",
+    "type": "oura_daily_activity",
+    "title": "Activity"
+  }
+}
+```
+
+### Sleep Record Event
+
+```json
+{
+  "source_id": "oura_sleep_record_{id}",
+  "time": "2024-01-15T06:30:00Z",
+  "service": "oura",
+  "domain": "sleep",
+  "action": "slept_for",
+  "value": 28800,
+  "value_unit": "seconds",
+  "event_metadata": {
+    "end": "2024-01-15T06:30:00Z",
+    "efficiency": 92
+  }
+}
+```
+
+## API Reference
+
+### Base URL
+
+`https://api.ouraring.com/v2`
+
+### Authentication
+
+OAuth 2.0 with authorization code flow:
+
 - Authorization: `https://cloud.ouraring.com/oauth/authorize`
 - Token: `https://api.ouraring.com/oauth/token`
-- Scopes: `email personal daily heartrate workout tag session spo2`
 
-## Common Structures (applies to all instances)
-- Actor (created/updated once and reused):
-  - concept: `user`
-  - type: `oura_user`
-  - title: instance name (your chosen name)
-  - metadata: `{ user_id, email, age, height, weight, biological_sex, dominant_hand }`
-- Precision rule:
-  - If a metric is fractional, we store `value = round(real * 1000)` and `value_multiplier = 1000`.
-  - If integer, `value_multiplier = 1`.
+### Rate Limits
 
-## Instance Types
+Oura API has rate limits per endpoint. The integration handles these with:
 
-### 1) Daily Activity (instance_type: `activity`)
-- Source: `/v2/usercollection/daily_activity?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_activity_score`
-  - value: activity score (scaled if fractional)
-  - value_unit: `percent`
-  - event_metadata: `{ day, kind: "activity" }`
-- Target object
-  - concept: `metric`
-  - type: `oura_daily_activity`
-  - title: `Activity`
-  - metadata: full daily activity item
-- Blocks
-  - One per contributor in `contributors` (e.g., `Meet Daily Targets`, `Move Every Hour`, `Stay Active`)
-    - title: title-cased key
-    - content: `Contributor score`
-    - value: contributor score (scaled if fractional)
-    - value_unit: `percent`
-  - One per detail type (`steps`, `cal_total`, `equivalent_walking_distance`, `target_calories`, `non_wear_time` etc.)
-    - title: title-cased key
-    - value: detail value
-    - value_unit: relevant detail unit
+- Exponential backoff on rate limit errors
+- Configurable fetch intervals per instance
 
-### 2) Daily Sleep (instance_type: `sleep`)
-- Source: `/v2/usercollection/daily_sleep?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_sleep_score`
-  - value: sleep score (scaled if fractional)
-  - value_unit: `percent`
-  - event_metadata: `{ day, kind: "sleep" }`
-- Target object
-  - concept: `metric`
-  - type: `oura_daily_sleep`
-  - title: `Sleep`
-  - metadata: full daily sleep item
-- Blocks
-  - One per contributor in `contributors` (e.g., `Efficiency`, `Latency`, `REM`, `Restfulness`, `Timing`)
-    - value: contributor score (scaled if fractional)
-    - value_unit: `percent`
+## Troubleshooting
 
-### 3) Sleep Records (instance_type: `sleep_records`)
-- Source: `/v2/usercollection/sleep?start_date&end_date`
-- Event
-  - domain: `sleep`
-  - action: `slept_for`
-  - value: `duration` (seconds)
-  - value_unit: `seconds`
-  - event_metadata: `{ end, efficiency }`
-- Target object
-  - concept: `sleep`
-  - type: `oura_sleep_record`
-  - title: `Sleep Record`
-  - metadata: full sleep record item
-- Blocks
-  - Sleep stages: `Deep Sleep`, `Light Sleep`, `REM Sleep`, `Awake Time`
-    - value: stage seconds
-    - value_unit: `seconds`
-  - Average Heart Rate
-    - value: `average_heart_rate` (scaled if fractional)
-    - value_unit: `bpm`
+### Common Issues
 
-### 4) Daily Readiness (instance_type: `readiness`)
-- Source: `/v2/usercollection/daily_readiness?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_readiness_score`
-  - value: `percent` (scaled if fractional)
-  - value_unit: `percent`
-  - event_metadata: `{ day, kind: "readiness" }`
-- Target object
-  - concept: `metric`
-  - type: `oura_daily_readiness`
-  - title: `Readiness`
-  - metadata: full item
-- Blocks
-  - One per contributor in `contributors` (scaled if fractional)
+1. **OAuth Errors**
+   - Verify redirect URI matches exactly
+   - Check client ID and secret are correct
+   - Ensure all required scopes are requested
 
-### 5) Daily Resilience (instance_type: `resilience`)
-- Source: `/v2/usercollection/daily_resilience?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_resilience_score`
-  - value: `resilience_score` (scaled if fractional)
-  - value_unit: `percent`
-  - event_metadata: `{ day, kind: "resilience" }`
-- Target object
-  - concept: `metric`
-  - type: `oura_daily_resilience`
-  - title: `Resilience`
-  - metadata: full item
-- Blocks
-  - One per contributor in `contributors` (scaled if fractional)
+2. **No Data Appearing**
+   - Verify the Oura Ring has synced with the Oura app
+   - Check that the date range has data
+   - Some metrics require Oura membership
 
-### 6) Daily Stress (instance_type: `stress`)
-- Source: `/v2/usercollection/daily_stress?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_stress_score`
-  - value: `stress_score` (scaled if fractional)
-  - value_unit: `percent`
-  - event_metadata: `{ day, kind: "stress" }`
-- Target object
-  - concept: `metric`
-  - type: `oura_daily_stress`
-  - title: `Stress`
-  - metadata: full item
-- Blocks
-  - One per contributor in `contributors` (scaled if fractional)
+3. **Missing Instance Types**
+   - Some data types require Oura subscription
+   - VO2 Max and cardiovascular age require sufficient historical data
 
-### 7) Workouts (instance_type: `workouts`)
-- Source: `/v2/usercollection/workout?start_date&end_date`
-- Event
-  - domain: `fitness`
-  - action: `did_workout`
-  - value: `duration` (seconds)
-  - value_unit: `seconds`
-  - event_metadata: `{ end, calories }`
-- Target object
-  - concept: `workout`
-  - type: Oura activity name
-  - title: title-cased activity
-  - metadata: full workout item
-- Blocks
-  - Calories
-    - value: `calories` (scaled if fractional)
-    - value_unit: `kcal`
-  - Average Heart Rate (if present)
-    - value: `average_heart_rate` (scaled if fractional)
-    - value_unit: `bpm`
+4. **Stale Data**
+   - Check `last_triggered_at` on the integration
+   - Verify the queue worker is running
+   - Check for API errors in logs
 
-### 8) Sessions (instance_type: `sessions`)
-- Source: `/v2/usercollection/session?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_mindfulness_session`
-  - value: `duration` (seconds)
-  - value_unit: `seconds`
-- Target object
-  - concept: `mindfulness_session`
-  - type: Oura session type
-  - title: title-cased session type
-  - metadata: full item
-- Blocks (optional)
-  - State
-    - title: `State`
-    - content: textual state/mood
+### Debug Commands
 
-### 9) Tags (instance_type: `tags`)
-- Source: `/v2/usercollection/tag?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_oura_tag`
-  - value: null
-- Target: none
-- Blocks
-  - Tag
-    - title: `Tag`
-    - content: tag label/text
+```bash
+# Test Oura connection
+sail artisan tinker
+>>> $group = App\Models\IntegrationGroup::where('service', 'oura')->first();
+>>> $group->expiry;
+>>> $group->access_token ? 'Token present' : 'No token';
 
-### 10) Heart Rate Series (instance_type: `heartrate`)
-- Source: `/v2/usercollection/heartrate?start_datetime&end_datetime`
-- Aggregation: one event per day (summary from time-series points)
-- Event
-  - domain: `health`
-  - action: `had_heart_rate`
-  - value: avg bpm (scaled if fractional)
-  - value_unit: `bpm`
-  - event_metadata: `{ day, min_bpm, max_bpm, avg_bpm }`
-- Target object
-  - concept: `metric`
-  - type: `heartrate_series`
-  - title: `Heart Rate`
-  - metadata: `{ interval: "irregular" }`
-- Blocks
-  - Min Heart Rate
-    - value: min bpm (scaled if fractional)
-    - value_unit: `bpm`
-  - Max Heart Rate
-    - value: max bpm (scaled if fractional)
-    - value_unit: `bpm`
+# Check recent events
+>>> App\Models\Event::where('service', 'oura')->latest()->take(10)->get(['action', 'value', 'time']);
+```
 
-### 11) SpO2 (instance_type: `spo2`)
-- Source: `/v2/usercollection/daily_spo2?start_date&end_date`
-- Event
-  - domain: `health`
-  - action: `had_spo2`
-  - value: `spo2_average` (scaled if fractional)
-  - value_unit: `percent`
-  - event_metadata: `{ day, kind: "spo2" }`
-- Target object
-  - concept: `metric`
-  - type: `oura_daily_spo2`
-  - title: `SpO2`
-  - metadata: full item
+## Related Documentation
 
-## Instance Naming & Refresh Frequency
-- Default instance name: instance label (e.g., `Daily Sleep`, `Daily Activity`).
-- Onboarding: set a custom name and per-instance `update_frequency_minutes`.
-- Configure screen: change name and refresh frequency later as needed.
-
-## Notes
-- Duplicate prevention: unique `source_id` per integration ensures idempotency.
-- Tokens: access/refresh tokens live on the integration group; instances share auth.
-- Precision: decimals encoded by `(value, value_multiplier=1000)`.
-
+- [INTEGRATION_PLUGINS.md](INTEGRATION_PLUGINS.md) - Plugin architecture
+- [oura-api-v2-specification.md](oura-api-v2-specification.md) - Oura API reference
+- [README_JOBS.md](README_JOBS.md) - Job system overview

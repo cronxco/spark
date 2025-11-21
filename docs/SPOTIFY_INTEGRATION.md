@@ -1,81 +1,45 @@
 # Spotify Integration
 
-The Spotify integration allows users to connect their Spotify accounts and automatically create events whenever they listen to tracks. This integration leverages Spark's event system, blocks, and tags to provide rich, structured data about listening activity.
+Sync listening history from Spotify.
+
+## Overview
+
+The Spotify integration connects to your Spotify account and automatically creates events whenever you listen to tracks or podcast episodes. It tracks your recently played content, creates rich metadata blocks with album artwork and track details, and auto-tags events by artist, album, and context.
 
 ## Features
 
-### 🎵 **Real-time Track Monitoring**
+- Real-time listening activity tracking via API polling
+- Recently played tracks (up to 50 most recent)
+- Podcast episode listening with progress tracking
+- Album artwork and track details blocks
+- Auto-tagging by artist, album, and listening context
+- PKCE-based OAuth authentication
+- Historical data migration support
+- Spotlight command integration
 
-- Polls Spotify API every 30 seconds for currently playing tracks
-- Tracks recently played songs (last 50 tracks)
-- Creates events for each unique track listening
-- Prevents duplicate events for the same listen
+## Setup
 
-### 🏷️ **Automatic Tagging**
+### Prerequisites
 
-- **Artist tags** (type `music_artist`): Performing artist names
-- **Album tag** (type `music_album`): Album name
-- **Listening context** (type `spotify_context`): Source context such as `album`, `playlist`, etc.
+- Spotify Developer account
+- OAuth application configured in Spotify Developer Dashboard
 
-### 📦 **Rich Content Blocks**
-
-- **Album Art**: High-quality album artwork with metadata
-- **Track Details**: Comprehensive track information including duration, popularity
-- **Artist Info**: Artist details and Spotify links
-
-### ⚙️ **Configurable Settings**
-
-- **Polling Interval**: Adjustable from 30 seconds to 5 minutes
-- **Auto-tagging**: Enable/disable automatic tagging features
-- **Album Art**: Toggle album artwork inclusion
-
-## Architecture
-
-### OAuth Callback URL Consistency
-
-The Spotify integration uses the same OAuth callback URL pattern as other integrations in the application:
-
-- **URL Pattern**: `/integrations/{service}/callback`
-- **Spotify URL**: `/integrations/spotify/callback`
-- **GitHub URL**: `/integrations/github/callback`
-
-This ensures:
-
-- **Consistent routing** across all OAuth providers
-- **Simplified configuration** in external service dashboards
-- **Easier maintenance** and debugging
-- **Unified authentication flow** for all integrations
-
-### Event Structure
-
-Each track listen creates a structured event with:
-
-- **Actor**: Spotify User (the listener)
-- **Target**: Track being listened to
-- **Event**: Listening event with timestamp
-- **Blocks**: Rich content blocks (album art, track details, artist info)
-- **Tags**: Simplified typed tags (artist, album, context)
-
-### Data Flow
-
-1. **OAuth Authentication**: User connects Spotify account
-2. **Background Polling**: System polls Spotify API every 30 seconds
-3. **Event Creation**: New track plays create events with rich metadata
-4. **Block Generation**: Album art and track details create content blocks
-5. **Auto-tagging**: Events are automatically tagged for categorization
-
-## Setup Instructions
-
-### 1. Spotify Developer Setup
+### Configuration
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create a new application
 3. Add redirect URI: `https://yourdomain.com/integrations/spotify/callback`
 4. Note your Client ID and Client Secret
 
-### 2. Environment Configuration
+### Environment Variables
 
-Add these variables to your `.env` file:
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SPOTIFY_CLIENT_ID` | OAuth client ID from Spotify | Yes |
+| `SPOTIFY_CLIENT_SECRET` | OAuth client secret from Spotify | Yes |
+| `SPOTIFY_REDIRECT_URI` | OAuth callback URL | Yes |
+
+Add to your `.env` file:
 
 ```env
 SPOTIFY_CLIENT_ID=your_spotify_client_id
@@ -83,296 +47,268 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 SPOTIFY_REDIRECT_URI=https://yourdomain.com/integrations/spotify/callback
 ```
 
-**Note**: The callback URL follows the same pattern as other integrations: `/integrations/{service}/callback`. This ensures consistency across all OAuth providers in the application.
+### OAuth Scopes
 
-### 3. Database Migration
+The integration requests these scopes:
 
-The integration uses existing database tables:
+- `user-read-currently-playing` - Currently playing track
+- `user-read-recently-played` - Recently played tracks
+- `user-read-email` - User email address
+- `user-read-private` - User profile information
 
-- `integrations` - Stores OAuth tokens and configuration
-- `events` - Stores track play events
-- `objects` - Stores user and track objects
-- `blocks` - Stores album art and track details
-- `tags` - Stores automatic categorization tags
+## Data Model
 
-### 4. Queue Configuration
+### Instance Types
 
-For optimal performance, configure your queue system:
+| Type | Description |
+|------|-------------|
+| `listening` | Listening activity tracking |
 
-```env
-QUEUE_CONNECTION=redis
-```
+### Action Types
+
+| Action | Description | Value Unit |
+|--------|-------------|------------|
+| `listened_to` | A track or episode was listened to | `minutes` (podcasts) or null (tracks) |
+
+### Block Types
+
+| Block Type | Description |
+|------------|-------------|
+| `album_art` | Album cover artwork |
+| `track_details` | Track metadata (name, artists, album, duration, popularity) |
+| `artist` | Artist information and Spotify link |
+| `track_info` | Detailed track metadata |
+| `episode_art` | Podcast episode cover art |
+| `episode_details` | Episode metadata (show, publisher, duration, release date) |
+
+### Object Types
+
+| Object Type | Description |
+|-------------|-------------|
+| `spotify_user` | Spotify user account |
+| `spotify_track` | Spotify track |
+| `spotify_podcast_episode` | Podcast episode on Spotify |
 
 ## Usage
 
-### Connecting Spotify Account
+### Connecting the Integration
 
-1. Navigate to Integrations page
+1. Navigate to Integrations in Spark
 2. Click "Connect" on Spotify integration
 3. Authorize with Spotify (grants required permissions)
-4. Configure settings (polling interval, auto-tagging, etc.)
+4. Configure settings (update frequency, auto-tagging options)
 
-### Manual Data Fetching
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `update_frequency_minutes` | integer | 15 | Fetch interval (minimum 5 minutes) |
+| `auto_tag_genres` | boolean | false | Auto-tag events with track genres |
+| `auto_tag_artists` | boolean | false | Auto-tag events with artist names |
+| `include_album_art` | boolean | true | Create blocks with album artwork |
+| `track_podcasts` | boolean | true | Track podcast episode listening |
+| `podcast_min_listen_minutes` | integer | 5 | Minimum minutes before creating podcast event |
+| `podcast_session_timeout_hours` | integer | 4 | Hours of inactivity before new session |
+
+### Podcast Tracking
+
+When enabled, podcast listening creates events with:
+
+- Progress tracking (updates as you listen)
+- Minimum listen threshold (default 5 minutes)
+- Session-based deduplication
+- Show and publisher tags
+
+### Manual Operations
 
 ```bash
 # Fetch data for all Spotify integrations
-php artisan spotify:fetch
+sail artisan integrations:fetch --service=spotify
 
-# Fetch data for specific user
-php artisan spotify:fetch --user=123
-
-# Force fetch regardless of timing
-php artisan spotify:fetch --force
+# Run scheduled fetch via scheduler
+sail artisan spotify:schedule
 ```
 
-### Scheduled Fetching
+### Spotlight Commands
 
-Add to your `app/Console/Kernel.php`:
+| Command | Description |
+|---------|-------------|
+| Sync Recent Spotify Plays | Fetch latest listening history |
+| View Spotify Listening Stats | See music trends and top artists |
 
-```php
-protected function schedule(Schedule $schedule): void
-{
-    // Run every 30 seconds for real-time updates
-    $schedule->command('spotify:schedule')->everyThirtySeconds();
+## API Reference
 
-    // Or use the general integration command
-    $schedule->command('integrations:fetch --service=spotify')->everyMinute();
-}
-```
+### Endpoints Used
 
-### Background Processing
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /me/player/currently-playing` | Current playback state |
+| `GET /me/player/recently-played` | Last 50 played tracks |
+| `GET /me` | User profile information |
+| `POST /api/token` | OAuth token exchange/refresh |
 
-The integration supports background job processing:
-
-```php
-// Dispatch a job to process Spotify data
-ProcessSpotifyData::dispatch($integration);
-```
-
-## API Endpoints
-
-### Event Data
-
-All Spotify events are available through the standard Event API:
-
-```bash
-# Get all Spotify events
-GET /api/events?service=spotify
-
-# Get events for specific user
-GET /api/events?integration_id=uuid
-
-# Filter by tags
-GET /api/events?tags[]=artist_name&tags[]=album_name
-```
-
-### Event Structure
-
-```json
-{
-    "id": "event-uuid",
-    "source_id": "spotify_track_123_2023-12-01T10:30:00Z",
-    "time": "2023-12-01T10:30:00Z",
-    "service": "spotify",
-    "domain": "music",
-    "action": "listened_to",
-    "event_metadata": {
-        "source": "currently_playing",
-        "progress_ms": 90000,
-        "is_playing": true,
-        "track_id": "track_123",
-        "album_id": "album_123",
-        "artist_ids": ["artist_123"]
-    },
-    "actor": {
-        "id": "user-uuid",
-        "concept": "user",
-        "type": "spotify_user",
-        "title": "John Doe",
-        "content": "Spotify user account"
-    },
-    "target": {
-        "id": "track-uuid",
-        "concept": "track",
-        "type": "spotify_track",
-        "title": "Bohemian Rhapsody",
-        "content": "Track: Bohemian Rhapsody\nArtist: Queen\nAlbum: A Night at the Opera"
-    },
-    "blocks": [
-        {
-            "title": "Album Art",
-            "content": "Album artwork for A Night at the Opera",
-            "media_url": "https://i.scdn.co/image/ab67616d0000b273...",
-            "value": 300,
-            "value_unit": "pixels"
-        },
-        {
-            "title": "Track Details",
-            "content": "**Track:** Bohemian Rhapsody\n**Artist:** Queen\n**Album:** A Night at the Opera\n**Duration:** 05:55\n**Popularity:** 95/100",
-            "value": 95,
-            "value_unit": "popularity"
-        }
-    ],
-    "tags": [
-        { "name": "Queen", "slug": "queen", "type": "music_artist" },
-        {
-            "name": "A Night at the Opera",
-            "slug": "a-night-at-the-opera",
-            "type": "music_album"
-        },
-        { "name": "playlist", "slug": "playlist", "type": "spotify_context" }
-    ]
-}
-```
-
-## Configuration Options
-
-### Update Frequency
-
-- **1 minute**: Real-time updates (default, minimum)
-- **5 minutes**: Balanced performance
-- **15 minutes**: Conservative rate limiting
-- **30 minutes**: Minimal API usage
-
-### Auto-tagging Features
-
-- **Artist tags**: Tag events with artist names (configurable)
-- **Album tags**: Tag events with album names (always enabled)
-- **Year/Decade tags**: Tag events with release year and decade
-- **Popularity tags**: Tag events based on track popularity
-- **Explicit content**: Tag explicit tracks
-
-### Content Options
-
-- **Include Album Art**: Create blocks with album artwork (configurable)
-- **Track Details**: Include comprehensive track information (always included)
-- **Artist Info**: Include artist details and links (always included)
-
-### Configuration Interface
-
-The integration provides a user-friendly configuration interface where you can:
-
-- Set the update frequency in minutes
-- Enable/disable artist tagging
-- Enable/disable album art inclusion
-- All settings are saved automatically and applied immediately
-
-## Rate Limiting
+### Rate Limits
 
 Spotify API has rate limits:
 
-- **Currently Playing**: 450 requests per 15 minutes
-- **Recently Played**: 450 requests per 15 minutes
-- **User Profile**: 450 requests per 15 minutes
+- Approximately 450 requests per 15 minutes per endpoint
+- The integration respects these limits with minimum 5-minute fetch intervals
+- Exponential backoff on rate limit errors
 
-The integration respects these limits and includes exponential backoff for retries.
+## Event Structure
+
+### Track Listen Event
+
+```json
+{
+  "source_id": "spotify_{track_id}_{played_at}",
+  "time": "2024-01-15T10:30:00Z",
+  "service": "spotify",
+  "domain": "media",
+  "action": "listened_to",
+  "event_metadata": {
+    "source": "recently_played",
+    "progress_ms": 90000,
+    "is_playing": false,
+    "context_type": "playlist",
+    "track_id": "track_123",
+    "album_id": "album_123",
+    "artist_ids": ["artist_123"]
+  },
+  "actor": {
+    "concept": "user",
+    "type": "spotify_user",
+    "title": "User Name"
+  },
+  "target": {
+    "concept": "track",
+    "type": "spotify_track",
+    "title": "Track Name"
+  }
+}
+```
+
+### Podcast Episode Event
+
+```json
+{
+  "source_id": "spotify_podcast_{episode_id}_{date}",
+  "time": "2024-01-15T10:30:00Z",
+  "service": "spotify",
+  "domain": "media",
+  "action": "listened_to",
+  "value": 25,
+  "value_unit": "minutes",
+  "event_metadata": {
+    "media_type": "episode",
+    "episode_id": "episode_123",
+    "show_id": "show_123",
+    "show_name": "Podcast Name",
+    "duration_ms": 3600000,
+    "progress_ms": 1500000,
+    "max_progress_ms": 1500000
+  }
+}
+```
+
+## Auto-Tagging
+
+Events are automatically tagged based on content:
+
+### Track Tags
+
+| Tag Type | Source |
+|----------|--------|
+| `music_artist` | Artist names |
+| `music_album` | Album name |
+| `spotify_context` | Listening context (album, playlist, etc.) |
+
+### Podcast Tags
+
+| Tag Type | Source |
+|----------|--------|
+| `podcast_show` | Podcast/show name |
+| `podcast_publisher` | Publisher name |
+| `spotify_context` | Always "podcast" |
 
 ## Error Handling
 
 ### Token Refresh
 
-- Automatically refreshes expired access tokens
-- Handles refresh token rotation
-- Logs authentication failures
+- Automatically refreshes expired access tokens using refresh token
+- Handles token rotation when Spotify issues new refresh token
+- Logs authentication failures for debugging
 
 ### API Failures
 
 - Graceful handling of API errors
 - Retry logic with exponential backoff
-- Comprehensive error logging
+- Comprehensive error logging with sanitized data
 
 ### Duplicate Prevention
 
-- Unique source IDs prevent duplicate events
-- Checks existing events before creation
-- Handles edge cases in timing
-
-## Monitoring
-
-### Logs
-
-The integration logs all activities:
-
-- Authentication events
-- API requests and responses
-- Event creation
-- Error conditions
-
-### Metrics
-
-Track integration health:
-
-- Events created per day
-- API request success rate
-- Token refresh frequency
-- Error rates
+- Unique `source_id` prevents duplicate events (track_id + played_at timestamp)
+- Race condition protection using `updateOrCreate`
+- Podcast session-based deduplication
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **OAuth Errors**
-    - Verify redirect URI matches exactly: `https://yourdomain.com/integrations/spotify/callback`
-    - Check client ID and secret
-    - Ensure scopes are properly configured
-    - Confirm the callback URL follows the consistent pattern: `/integrations/spotify/callback`
+   - Verify redirect URI matches exactly: `https://yourdomain.com/integrations/spotify/callback`
+   - Check client ID and secret are correct
+   - Ensure all required scopes are configured
 
 2. **No Events Created**
-    - Check if user has played tracks recently
-    - Verify access token is valid
-    - Check polling schedule is running
+   - Check if user has played tracks recently
+   - Verify access token is valid (check `expiry` in IntegrationGroup)
+   - Confirm polling schedule is running
 
 3. **Rate Limiting**
-    - Reduce polling frequency
-    - Check API usage in Spotify dashboard
-    - Monitor error logs
+   - Increase `update_frequency_minutes` (minimum 5 minutes)
+   - Check API usage in Spotify Developer Dashboard
+   - Monitor error logs for 429 responses
+
+4. **Missing Podcast Events**
+   - Verify `track_podcasts` is enabled
+   - Check `podcast_min_listen_minutes` threshold
+   - Ensure currently-playing endpoint is being called
 
 ### Debug Commands
 
 ```bash
 # Test Spotify connection
-php artisan spotify:fetch --user=123 --force
+sail artisan tinker
+>>> $integration = App\Models\Integration::where('service', 'spotify')->first();
+>>> $plugin = new App\Integrations\Spotify\SpotifyPlugin();
+>>> $plugin->fetchData($integration);
 
-# Check integration status
-php artisan tinker
->>> App\Models\Integration::where('service', 'spotify')->get()
+# Check recent events
+>>> App\Models\Event::where('service', 'spotify')->latest()->take(5)->get();
 
-# View recent events
-php artisan tinker
->>> App\Models\Event::where('service', 'spotify')->latest()->take(5)->get()
+# View integration status
+>>> $integration->group->expiry;
+>>> $integration->last_triggered_at;
 ```
 
-## Future Enhancements
+## Migration Support
 
-### Planned Features
+The Spotify integration supports historical data migration:
 
-- **Genre Analysis**: Fetch and tag by track genres
-- **Playlist Integration**: Track playlist additions
-- **Listening Analytics**: Generate listening insights
-- **Social Features**: Share listening activity
-- **Recommendations**: Suggest similar tracks
+```php
+// Process historical recently played items
+$plugin = new SpotifyPlugin();
+$plugin->processRecentlyPlayedMigrationItem($integration, $playedItem);
 
-### API Improvements
+// Ensure token is fresh before migration
+$plugin->ensureFreshToken($group);
+```
 
-- **Webhook Support**: Real-time notifications (if Spotify adds support)
-- **Batch Processing**: Process multiple tracks efficiently
-- **Caching**: Cache track metadata to reduce API calls
+> **Note**: Spotify API only provides the last 50 recently played tracks. Historical data beyond this is not available via the API.
 
-## Contributing
+## Related Documentation
 
-To contribute to the Spotify integration:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-## Support
-
-For issues with the Spotify integration:
-
-1. Check the troubleshooting section
-2. Review error logs
-3. Verify Spotify API status
-4. Create an issue with detailed information
+- [INTEGRATION_PLUGINS.md](INTEGRATION_PLUGINS.md) - Plugin architecture
+- [README_JOBS.md](README_JOBS.md) - Job system overview
+- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Spark API reference
