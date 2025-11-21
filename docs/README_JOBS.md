@@ -1,335 +1,289 @@
-# Spark Integration Jobs
+# Integration Jobs
 
-This document provides information about the refactored integration job system.
+The job system handles asynchronous data fetching and processing for external service integrations.
 
 ## Overview
 
-The integration system has been refactored to use a job-based architecture that separates data fetching from processing. This improves scalability, maintainability, and error handling.
+Spark uses a job-based architecture that separates data fetching from processing. This separation improves scalability by allowing different worker pools for each job type, ensures reliability by preventing failed fetches from blocking successful data processing, and enables idempotent execution through unique job identifiers.
 
-## Key Features
+## Architecture
 
-- **Separation of Concerns**: Fetch jobs handle API calls, processing jobs handle data transformation
-- **Scalability**: Different worker pools for different job types
-- **Reliability**: Failed fetches don't block processing of successful data
-- **Idempotency**: Jobs can be safely retried without duplicates
-- **Monitoring**: Comprehensive logging and error tracking
+### Job Types
 
-## Getting Started
+The system uses four distinct job types, each with a specific purpose:
 
-### Prerequisites
-
-- Laravel Sail (Docker environment)
-- PHP 8.1+
-- Composer
-- Node.js & npm
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-
-    ```bash
-    composer install
-    npm install
-    ```
-
-3. Set up the environment:
-
-    ```bash
-    cp .env.example .env
-    php artisan key:generate
-    ```
-
-4. Start Laravel Sail:
-
-    ```bash
-    ./vendor/bin/sail up -d
-    ```
-
-5. Run migrations:
-    ```bash
-    sail artisan migrate
-    ```
-
-### Running Jobs
-
-#### Queue Worker
-
-```bash
-sail artisan queue:work
-```
-
-#### Scheduler (for periodic integration updates)
-
-```bash
-sail artisan schedule:work
-```
-
-#### Manual Job Dispatch
-
-```bash
-# Dispatch a specific integration update
-sail artisan tinker
-```
-
-```php
-use App\Jobs\CheckIntegrationUpdates;
-CheckIntegrationUpdates::dispatch();
-```
-
-## Job Structure
+| Job Type | Purpose | Timeout | Tries | Backoff |
+|----------|---------|---------|-------|---------|
+| Fetch | Pull data from external APIs (OAuth) | 120s | 3 | 60s, 300s, 600s |
+| Processing | Transform and store fetched data | 300s | 2 | 120s, 300s |
+| Webhook | Process incoming webhook payloads | 60s | 3 | 30s, 120s, 300s |
+| Initialization | One-time historical data backfills | 600s | 1 | None |
 
 ### Base Classes
 
-- `App\Jobs\Base\BaseFetchJob` - For OAuth data fetching
-- `App\Jobs\Base\BaseProcessingJob` - For data processing
-- `App\Jobs\Base\BaseWebhookHookJob` - For webhook splitting
-- `App\Jobs\Base\BaseInitializationJob` - For initial setup
+All jobs extend from base classes located in `app/Jobs/Base/`:
 
-### Implemented Jobs
+**BaseFetchJob**
 
-#### Monzo (OAuth)
+Template for OAuth data fetching. Handles Sentry tracing, error logging, retry logic, and user notifications on permanent failure.
 
-- **Fetch**: `MonzoAccountPull`, `MonzoTransactionPull`, `MonzoPotPull`, `MonzoBalancePull`
-- **Process**: `MonzoAccountData`, `MonzoTransactionData`, `MonzoPotData`, `MonzoBalanceData`
-- **Init**: `MonzoHistoricalData`
+```php
+abstract class BaseFetchJob implements ShouldQueue
+{
+    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
 
-#### Apple Health (Webhook)
-
-- **Hook**: `AppleHealthWebhookHook`
-- **Process**: `AppleHealthWorkoutData`, `AppleHealthMetricData`
-
-## Testing
-
-### Running Tests
-
-```bash
-# Run all tests
-sail artisan test
-
-# Run specific test file
-sail artisan test tests/Unit/Jobs/BaseFetchJobTest.php
-
-# Run with coverage
-sail artisan test --coverage
+    abstract protected function getServiceName(): string;
+    abstract protected function getJobType(): string;
+    abstract protected function fetchData(): array;
+    abstract protected function dispatchProcessingJobs(array $rawData): void;
+}
 ```
 
-### Test Structure
+**BaseProcessingJob**
 
+Template for data transformation. Includes helper methods for creating events, objects, and blocks with duplicate detection.
+
+```php
+abstract class BaseProcessingJob implements ShouldQueue
+{
+    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
+
+    abstract protected function getServiceName(): string;
+    abstract protected function getJobType(): string;
+    abstract protected function process(): void;
+}
 ```
-tests/
-├── Unit/
-│   └── Jobs/
-│       ├── BaseFetchJobTest.php
-│       └── MonzoAccountPullTest.php
-└── Feature/
-    └── Integration/
-        └── MonzoIntegrationTest.php
+
+**BaseWebhookHookJob**
+
+Template for webhook processing. Validates signatures, splits payloads into chunks, and dispatches processing jobs.
+
+```php
+abstract class BaseWebhookHookJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    abstract protected function getServiceName(): string;
+    abstract protected function getJobType(): string;
+    abstract protected function validateWebhook(): void;
+    abstract protected function splitWebhookData(): array;
+    abstract protected function dispatchProcessingJobs(array $processingData): void;
+}
 ```
 
-### Writing Tests
+**BaseInitializationJob**
 
-#### Unit Test Example
+Template for one-time setup tasks. Runs with a single attempt and longer timeout for historical data imports.
+
+```php
+abstract class BaseInitializationJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    abstract protected function getServiceName(): string;
+    abstract protected function getJobType(): string;
+    abstract protected function initialize(): void;
+}
+```
+
+### Queue Configuration
+
+Horizon manages three supervisor pools with different queues:
+
+| Queue | Purpose | Max Processes | Memory |
+|-------|---------|---------------|--------|
+| pull | Fetch and processing jobs | 5 | 256MB |
+| migration | Data migration jobs | 1 | 256MB |
+| embeddings | Embedding generation | 5 | 256MB |
+
+## Implementation
+
+### Creating a Fetch Job
 
 ```php
 <?php
 
-namespace Tests\Unit\Jobs;
+namespace App\Jobs\OAuth\ExampleService;
 
-use App\Jobs\OAuth\Monzo\MonzoAccountPull;
+use App\Jobs\Base\BaseFetchJob;
 use App\Models\Integration;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
-use Tests\TestCase;
 
-class MonzoAccountPullTest extends TestCase
+class ExampleDataPull extends BaseFetchJob
 {
-    use RefreshDatabase;
-
-    public function test_dispatches_processing_jobs()
+    protected function getServiceName(): string
     {
-        Queue::fake();
+        return 'example_service';
+    }
 
-        $integration = Integration::factory()->create();
-        $accounts = [['id' => 'acc_123', 'type' => 'uk_retail']];
+    protected function getJobType(): string
+    {
+        return 'example_data';
+    }
 
-        $job = new MonzoAccountPull($integration);
-        $job->dispatchProcessingJobs($accounts);
+    protected function fetchData(): array
+    {
+        // Make API request using integration credentials
+        $client = new ExampleClient($this->integration);
+        return $client->getData();
+    }
 
-        Queue::assertPushed(MonzoAccountData::class);
+    protected function dispatchProcessingJobs(array $rawData): void
+    {
+        ExampleDataProcess::dispatch($this->integration, $rawData);
     }
 }
 ```
 
-#### Feature Test Example
+### Creating a Processing Job
 
 ```php
 <?php
 
-namespace Tests\Feature\Integration;
+namespace App\Jobs\Data\ExampleService;
 
-use App\Models\Integration;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+use App\Jobs\Base\BaseProcessingJob;
 
-class MonzoIntegrationTest extends TestCase
+class ExampleDataProcess extends BaseProcessingJob
 {
-    use RefreshDatabase;
-
-    public function test_full_integration_flow()
+    protected function getServiceName(): string
     {
-        $user = User::factory()->create();
-        $integration = Integration::factory()->create([
-            'user_id' => $user->id,
-            'service' => 'monzo',
-        ]);
-
-        // Test the complete flow from fetch to processing
-        // ... test implementation
+        return 'example_service';
     }
+
+    protected function getJobType(): string
+    {
+        return 'example_data';
+    }
+
+    protected function process(): void
+    {
+        $events = [];
+
+        foreach ($this->rawData as $item) {
+            $events[] = [
+                'source_id' => $item['id'],
+                'time' => $item['timestamp'],
+                'domain' => 'example',
+                'action' => 'example_action',
+                'value' => $item['value'],
+                'actor' => [
+                    'concept' => 'user',
+                    'type' => 'example_user',
+                    'title' => $item['user_name'],
+                ],
+                'target' => [
+                    'concept' => 'item',
+                    'type' => 'example_item',
+                    'title' => $item['item_name'],
+                ],
+            ];
+        }
+
+        $this->createEvents($events);
+    }
+}
+```
+
+### Idempotency
+
+Jobs use the `EnhancedIdempotency` trait which provides:
+
+- **Unique job IDs**: Based on service, job type, integration ID, and date/data hash
+- **Duplicate detection**: Cache-based tracking of recently processed jobs
+- **Content hashing**: MD5-based detection of duplicate event content
+- **Circuit breaker**: Stops retries after 5 consecutive failures within an hour
+
+```php
+// Unique ID format for fetch jobs
+public function uniqueId(): string
+{
+    return $this->serviceName . '_' . $this->getJobType() . '_' . $this->integration->id . '_' . now()->toDateString();
+}
+
+// Unique ID format for processing jobs (includes data hash)
+public function uniqueId(): string
+{
+    return $this->serviceName . '_' . $this->getJobType() . '_' . $this->integration->id . '_' . md5(serialize($this->rawData));
 }
 ```
 
 ## Configuration
 
-### Queue Configuration
+### Horizon Settings
 
-Jobs are configured in `config/queue.php`. You can set up different queues for different priorities:
+The Horizon configuration is in `config/horizon.php`:
 
 ```php
-'connections' => [
-    'database' => [
-        'table' => 'jobs',
-        'queue' => ['fetch', 'process', 'webhook', 'init'],
-        // ...
+'environments' => [
+    'production' => [
+        'supervisor-1' => [
+            'connection' => 'redis',
+            'queue' => ['pull'],
+            'balance' => 'auto',
+            'maxProcesses' => 5,
+            'memory' => 256,
+            'tries' => 3,
+        ],
+        'supervisor-2' => [
+            'connection' => 'redis',
+            'queue' => ['migration'],
+            'balance' => 'auto',
+            'maxProcesses' => 1,
+            'memory' => 256,
+            'tries' => 1,
+        ],
+        'supervisor-3' => [
+            'connection' => 'redis',
+            'queue' => ['embeddings'],
+            'balance' => 'auto',
+            'maxProcesses' => 5,
+            'memory' => 256,
+            'tries' => 1,
+        ],
     ],
 ],
 ```
 
-### Environment Variables
+### Retry Settings by Job Type
 
-Set these in your `.env` file:
+| Job Type | Tries | Backoff Intervals |
+|----------|-------|-------------------|
+| BaseFetchJob | 3 | 1 min, 5 min, 10 min |
+| BaseProcessingJob | 2 | 2 min, 5 min |
+| BaseWebhookHookJob | 3 | 30 sec, 2 min, 5 min |
+| BaseInitializationJob | 1 | None |
 
-```env
-# Queue
-QUEUE_CONNECTION=database
+### Non-Retryable Exceptions
 
-# Monzo OAuth
-MONZO_CLIENT_ID=your_client_id
-MONZO_CLIENT_SECRET=your_client_secret
+The circuit breaker skips retries for authentication and validation errors:
 
-# Apple Health Webhook
-APPLE_HEALTH_WEBHOOK_SECRET=your_webhook_secret
-```
+- `AuthenticationException`
+- `AuthorizationException`
+- `ValidationException`
+- Messages containing: "invalid api key", "unauthorized", "forbidden", "invalid credentials", "access denied"
 
-## Monitoring
-
-### Queue Status
+### Running Jobs
 
 ```bash
+# Start Horizon (recommended)
+sail artisan horizon
+
 # Check queue status
-sail artisan queue:status
+sail artisan queue:monitor
 
 # List failed jobs
 sail artisan queue:failed
 
 # Retry failed jobs
 sail artisan queue:retry all
+
+# Clear failed jobs
+sail artisan queue:flush
 ```
 
-### Laravel Horizon (Recommended)
+## Related Documentation
 
-Install Laravel Horizon for advanced queue monitoring:
-
-```bash
-composer require laravel/horizon
-php artisan horizon:install
-```
-
-Access the dashboard at `/horizon` in your application.
-
-## Troubleshooting
-
-### Common Issues
-
-#### Job Timeouts
-
-- Check API response times
-- Adjust job timeouts in job classes
-- Monitor network connectivity
-
-#### Memory Issues
-
-- Process data in smaller chunks
-- Use pagination for large datasets
-- Monitor memory usage in logs
-
-#### Duplicate Processing
-
-- Ensure proper idempotency implementation
-- Check unique job IDs
-- Monitor for duplicate events
-
-### Debugging
-
-#### Logs
-
-Check Laravel logs:
-
-```bash
-tail -f storage/logs/laravel.log
-```
-
-#### Queue Monitoring
-
-```bash
-# Check pending jobs
-sail artisan queue:pending
-
-# Check active jobs
-sail artisan queue:active
-```
-
-#### Sentry Integration
-
-Jobs include Sentry integration for error tracking. Check your Sentry dashboard for detailed error information.
-
-## Development
-
-### Adding New Integrations
-
-1. **Create Base Classes** (if needed)
-2. **Create Fetch Jobs** for OAuth integrations
-3. **Create Processing Jobs** for data transformation
-4. **Create Hook Jobs** for webhooks (if applicable)
-5. **Update CheckIntegrationUpdates** to dispatch your jobs
-6. **Add Tests** for all new jobs
-7. **Update Documentation**
-
-### Code Standards
-
-- Use typed properties
-- Follow PSR-12
-- Use relative imports (`App\...` not `\App\...`)
-- Add comprehensive logging
-- Write tests for all jobs
-
-### Performance Tips
-
-- Use batch processing for high-volume data
-- Implement proper caching where appropriate
-- Monitor job queue lengths
-- Use appropriate job priorities
-
-## Contributing
-
-1. Follow the established job patterns
-2. Add comprehensive tests
-3. Update documentation
-4. Test with Laravel Sail
-5. Monitor performance impact
-
-## License
-
-This project is licensed under the MIT License.
+- `CLAUDE.md`: Main project documentation including plugin system architecture
+- `app/Jobs/Base/`: Base job class implementations
+- `app/Jobs/Concerns/EnhancedIdempotency.php`: Idempotency trait
+- `config/horizon.php`: Queue worker configuration
