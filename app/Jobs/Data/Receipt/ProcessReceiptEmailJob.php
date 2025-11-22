@@ -9,6 +9,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use Carbon\Carbon;
 use Exception;
+use Html2Text\Html2Text;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,6 +18,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PhpMimeMailParser\Parser as MimeParser;
+use Smalot\PdfParser\Parser as PdfParser;
 
 class ProcessReceiptEmailJob implements ShouldQueue
 {
@@ -112,7 +115,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
     {
         try {
             // Use PhpMimeMailParser to parse the email
-            $parser = new \PhpMimeMailParser\Parser();
+            $parser = new MimeParser;
             $parser->setText($emailContent);
 
             // Extract basic fields
@@ -173,7 +176,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
     private function htmlToText(string $html): string
     {
         try {
-            $converter = new \Html2Text\Html2Text($html);
+            $converter = new Html2Text($html);
 
             return $converter->getText();
         } catch (Exception $e) {
@@ -191,7 +194,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
     private function extractPdfText(string $pdfContent): string
     {
         try {
-            $parser = new \Smalot\PdfParser\Parser();
+            $parser = new PdfParser;
             $pdf = $parser->parseContent($pdfContent);
             $text = $pdf->getText();
 
