@@ -166,11 +166,17 @@ self.addEventListener('fetch', (event) => {
 
 // Handle push subscription change
 self.addEventListener('pushsubscriptionchange', (event) => {
+    // Only resubscribe if we had a previous subscription
+    if (!event.oldSubscription) {
+        console.log('No old subscription to resubscribe');
+        return;
+    }
+
     event.waitUntil(
         self.registration.pushManager.subscribe(event.oldSubscription.options)
             .then((subscription) => {
                 // Re-register the new subscription with the server
-                return fetch('/api/push/subscribe', {
+                return fetch('/push/subscribe', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -178,6 +184,9 @@ self.addEventListener('pushsubscriptionchange', (event) => {
                     body: JSON.stringify(subscription.toJSON()),
                     credentials: 'same-origin',
                 });
+            })
+            .catch((error) => {
+                console.error('Failed to resubscribe:', error);
             })
     );
 });
