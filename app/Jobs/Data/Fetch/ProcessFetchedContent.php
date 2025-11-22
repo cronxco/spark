@@ -178,6 +178,11 @@ class ProcessFetchedContent implements ShouldQueue
                 ]),
             ]);
 
+            // If this is a discovered URL with a source object, also attach the article image to the source
+            if ($sourceObjectId && $this->webpage->hasMedia('article_images')) {
+                $this->attachArticleImageToSourceObject($sourceObjectId);
+            }
+
             if ($shouldDisable) {
                 Log::info('Fetch: One-time bookmark fetched successfully and disabled', [
                     'url' => $this->webpage->url,
@@ -223,6 +228,46 @@ class ProcessFetchedContent implements ShouldQueue
             ]);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Attach the article image from the webpage to the source object.
+     * This allows discovered URLs to share their article image with the source.
+     */
+    private function attachArticleImageToSourceObject(string $sourceObjectId): void
+    {
+        try {
+            $sourceObject = EventObject::find($sourceObjectId);
+            if (! $sourceObject) {
+                return;
+            }
+
+            // Get the article image from the webpage
+            $articleImage = $this->webpage->getFirstMedia('article_images');
+            if (! $articleImage) {
+                return;
+            }
+
+            // Use deduplication service to attach the same image to source object
+            $deduplicationService = app(\App\Services\Media\MediaDeduplicationService::class);
+            $deduplicationService->attachMediaToModel(
+                $articleImage,
+                $sourceObject,
+                'article_images'
+            );
+
+            Log::debug('Fetch: Article image attached to source object', [
+                'webpage_id' => $this->webpage->id,
+                'source_object_id' => $sourceObjectId,
+                'media_uuid' => $articleImage->uuid,
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Fetch: Failed to attach article image to source object', [
+                'webpage_id' => $this->webpage->id,
+                'source_object_id' => $sourceObjectId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }
