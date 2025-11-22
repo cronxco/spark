@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Notifications\TestPushNotification;
+use Exception;
 use Illuminate\Console\Command;
 
 class SendTestPushNotification extends Command
@@ -76,7 +77,7 @@ class SendTestPushNotification extends Command
             $this->info('Test notification sent successfully!');
 
             return self::SUCCESS;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error("Failed to send notification: {$e->getMessage()}");
             $this->error($e->getTraceAsString());
 
@@ -109,7 +110,7 @@ class SendTestPushNotification extends Command
             try {
                 $user->notify(new TestPushNotification);
                 $successCount++;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $failCount++;
             }
         });

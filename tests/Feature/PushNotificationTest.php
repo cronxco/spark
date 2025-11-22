@@ -20,7 +20,10 @@ class PushNotificationTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    public function test_vapid_public_key_endpoint_returns_key(): void
+    /**
+     * @test
+     */
+    public function vapid_public_key_endpoint_returns_key(): void
     {
         config(['webpush.vapid.public_key' => 'test-public-key']);
 
@@ -30,7 +33,10 @@ class PushNotificationTest extends TestCase
             ->assertJson(['publicKey' => 'test-public-key']);
     }
 
-    public function test_subscribe_requires_authentication(): void
+    /**
+     * @test
+     */
+    public function subscribe_requires_authentication(): void
     {
         $response = $this->postJson('/api/push/subscribe', [
             'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-token',
@@ -43,7 +49,10 @@ class PushNotificationTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    public function test_subscribe_creates_push_subscription(): void
+    /**
+     * @test
+     */
+    public function subscribe_creates_push_subscription(): void
     {
         $response = $this->actingAs($this->user)
             ->postJson('/api/push/subscribe', [
@@ -65,7 +74,10 @@ class PushNotificationTest extends TestCase
         ]);
     }
 
-    public function test_subscribe_updates_existing_subscription(): void
+    /**
+     * @test
+     */
+    public function subscribe_updates_existing_subscription(): void
     {
         // Create initial subscription
         $this->user->updatePushSubscription(
@@ -92,7 +104,10 @@ class PushNotificationTest extends TestCase
         $this->assertEquals(1, $this->user->pushSubscriptions()->count());
     }
 
-    public function test_unsubscribe_removes_subscription(): void
+    /**
+     * @test
+     */
+    public function unsubscribe_removes_subscription(): void
     {
         $this->user->updatePushSubscription(
             'https://fcm.googleapis.com/fcm/send/test-token',
@@ -112,7 +127,10 @@ class PushNotificationTest extends TestCase
         $this->assertEquals(0, $this->user->pushSubscriptions()->count());
     }
 
-    public function test_unsubscribe_returns_404_for_unknown_endpoint(): void
+    /**
+     * @test
+     */
+    public function unsubscribe_returns_404_for_unknown_endpoint(): void
     {
         $response = $this->actingAs($this->user)
             ->postJson('/api/push/unsubscribe', [
@@ -122,7 +140,10 @@ class PushNotificationTest extends TestCase
         $response->assertNotFound();
     }
 
-    public function test_status_returns_subscription_status(): void
+    /**
+     * @test
+     */
+    public function status_returns_subscription_status(): void
     {
         $this->user->updatePushSubscription(
             'https://fcm.googleapis.com/fcm/send/test-token',
@@ -141,7 +162,10 @@ class PushNotificationTest extends TestCase
             ]);
     }
 
-    public function test_list_returns_all_subscriptions(): void
+    /**
+     * @test
+     */
+    public function list_returns_all_subscriptions(): void
     {
         $this->user->updatePushSubscription(
             'https://fcm.googleapis.com/fcm/send/test-token-1',
@@ -163,7 +187,10 @@ class PushNotificationTest extends TestCase
             ->assertJsonCount(2, 'subscriptions');
     }
 
-    public function test_destroy_removes_specific_subscription(): void
+    /**
+     * @test
+     */
+    public function destroy_removes_specific_subscription(): void
     {
         $this->user->updatePushSubscription(
             'https://fcm.googleapis.com/fcm/send/test-token',
@@ -183,7 +210,10 @@ class PushNotificationTest extends TestCase
         $this->assertEquals(0, $this->user->pushSubscriptions()->count());
     }
 
-    public function test_test_notification_requires_subscription(): void
+    /**
+     * @test
+     */
+    public function test_notification_requires_subscription(): void
     {
         $response = $this->actingAs($this->user)
             ->postJson('/api/push/test');
@@ -192,7 +222,10 @@ class PushNotificationTest extends TestCase
             ->assertJson(['message' => 'No push subscriptions found']);
     }
 
-    public function test_test_notification_sends_notification(): void
+    /**
+     * @test
+     */
+    public function test_notification_sends_notification(): void
     {
         Notification::fake();
 
@@ -212,7 +245,10 @@ class PushNotificationTest extends TestCase
         Notification::assertSentTo($this->user, TestPushNotification::class);
     }
 
-    public function test_user_push_notification_preferences(): void
+    /**
+     * @test
+     */
+    public function user_push_notification_preferences(): void
     {
         // Test enabling push notifications globally
         $this->user->enablePushNotifications();
