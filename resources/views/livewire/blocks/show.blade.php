@@ -182,7 +182,7 @@ new class extends Component {
         }
 
         // Fallback to default icon if plugin doesn't have this block type
-        return 'fas.grip';
+        return 'o-squares-2x2';
     }
 
     public function notifyCopied(string $what): void
@@ -262,8 +262,11 @@ new class extends Component {
 
 <div>
     @if ($this->block)
-    <div class="space-y-4 lg:space-y-6">
-        <!-- Header -->
+    <!-- Two-column layout: main content + optional drawer -->
+    <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        <!-- Main Content Area -->
+        <div class="flex-1 space-y-4 lg:space-y-6">
+            <!-- Header -->
         <x-header title="Block Details" separator>
             <x-slot:actions>
                 <x-button
@@ -272,7 +275,7 @@ new class extends Component {
                     title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                     aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                     data-hotkey="d">
-                    <x-icon name="fas.sliders" class="w-4 h-4" />
+                    <x-icon name="o-adjustments-horizontal" class="w-4 h-4" />
                 </x-button>
             </x-slot:actions>
         </x-header>
@@ -315,7 +318,7 @@ new class extends Component {
                     <div class="flex flex-wrap items-center gap-2 text-sm">
                         @if ($this->block->time)
                         <div class="flex items-center gap-2">
-                            <x-icon name="fas.clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                            <x-icon name="o-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
                             <span class="text-base-content/70">{{ to_user_timezone($this->block->time, auth()->user())->format('d/m/Y H:i') }}</span>
                         </div>
                         @endif
@@ -324,7 +327,7 @@ new class extends Component {
                         @endif
                         @if ($this->block->url)
                         <div class="flex items-center gap-2">
-                            <x-icon name="fas.link" class="w-4 h-4 text-base-content/60" />
+                            <x-icon name="o-link" class="w-4 h-4 text-base-content/60" />
                             <span class="text-base-content/70">URL:</span>
                             <a href="{{ $this->block->url }}" target="_blank" class="font-medium hover:underline">
                                 View
@@ -333,7 +336,7 @@ new class extends Component {
                         @endif
                         @if ($this->block->media_url)
                         <div class="flex items-center gap-2">
-                            <x-icon name="fas.image" class="w-4 h-4 text-base-content/60" />
+                            <x-icon name="o-photo" class="w-4 h-4 text-base-content/60" />
                             <span class="text-base-content/70">Media:</span>
                             <a href="{{ $this->block->media_url }}" target="_blank" class="font-medium hover:underline">
                                 View
@@ -349,7 +352,7 @@ new class extends Component {
         @if ($this->block->event)
         <x-card class="bg-base-200 shadow">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="fas.bolt" class="w-5 h-5" />
+                <x-icon name="o-bolt" class="w-5 h-5" />
                 Related Event
             </h3>
             <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
@@ -357,7 +360,7 @@ new class extends Component {
                     class="block hover:text-primary transition-colors">
                     <div class="flex items-start gap-3">
                         <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0 mt-1">
-                            <x-icon name="fas.bolt" class="w-4 h-4" />
+                            <x-icon name="o-bolt" class="w-4 h-4" />
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-2 mb-1">
@@ -391,12 +394,149 @@ new class extends Component {
                                 @endif
                             </div>
                         </div>
-                        <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                        <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
                     </div>
                 </a>
             </div>
         </x-card>
         @endif
+
+        <!-- Linked Blocks -->
+        @if ($this->getRelatedBlocks()->isNotEmpty())
+        <x-card class="bg-base-200 shadow">
+            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                Related Blocks
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                @foreach ($this->getRelatedBlocks() as $relatedBlock)
+                <a href="{{ route('blocks.show', $relatedBlock) }}"
+                    class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
+                            <x-icon name="{{ $this->getBlockIcon($relatedBlock->block_type, $relatedBlock->event?->service) }}"
+                                class="w-4 h-4 text-info" />
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-sm line-clamp-1">{{ $relatedBlock->title }}</div>
+                            <div class="text-xs text-base-content/70">
+                                {{ $relatedBlock->block_type }}
+                                @if ($relatedBlock->time)
+                                · {{ $relatedBlock->time->diffForHumans() }}
+                                @endif
+                            </div>
+                            @if ($relatedBlock->value)
+                            <div class="text-sm font-semibold text-info mt-1">
+                                {!! format_event_value_display($relatedBlock->formatted_value, $relatedBlock->value_unit, $relatedBlock->event?->service, $relatedBlock->block_type, 'block') !!}
+                            </div>
+                            @endif
+                        </div>
+                    </div>
+                </a>
+                @endforeach
+            </div>
+        </x-card>
+        @endif
+
+        <!-- Relationships Section -->
+        @php $relationships = $this->getRelationships(); @endphp
+        @if ($relationships->isNotEmpty())
+        <x-card class="bg-base-200 shadow">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+                    <x-icon name="o-link" class="w-5 h-5 text-accent" />
+                    Relationships ({{ $relationships->count() }})
+                </h3>
+                <div class="flex items-center gap-2">
+                    <x-button wire:click="handleOpenAddRelationshipModal" class="btn-xs btn-ghost" title="Add relationship">
+                        <x-icon name="o-plus" class="w-4 h-4" />
+                    </x-button>
+                    <x-button wire:click="handleOpenManageRelationshipsModal" class="btn-xs btn-ghost" title="Manage relationships">
+                        <x-icon name="o-pencil" class="w-4 h-4" />
+                    </x-button>
+                </div>
+            </div>
+            <div class="space-y-2">
+                @foreach ($relationships->take(5) as $relationship)
+                @php
+                // Determine which entity is the "other" one
+                $isFrom = $relationship->from_type === get_class($this->block) && $relationship->from_id == $this->block->id;
+                $relatedModel = $isFrom ? $relationship->toModel : $relationship->fromModel;
+                $direction = $isFrom ? '→' : '←';
+
+                // Determine icon and route based on model type
+                $icon = 'o-document';
+                $title = 'Unknown';
+                $subtitle = '';
+                $route = '#';
+                $badgeText = '';
+                $badgeClass = '';
+
+                if ($relatedModel instanceof \App\Models\Event) {
+                $icon = 'o-bolt';
+                $title = $relatedModel->action;
+                $subtitle = $relatedModel->time?->format('M j, Y');
+                $route = route('events.show', $relatedModel);
+                $badgeText = 'Event';
+                $badgeClass = 'badge-primary';
+                } elseif ($relatedModel instanceof \App\Models\EventObject) {
+                $icon = 'o-cube';
+                $title = $relatedModel->title;
+                $subtitle = $relatedModel->concept;
+                $route = route('objects.show', $relatedModel);
+                $badgeText = 'Object';
+                $badgeClass = 'badge-secondary';
+                } elseif ($relatedModel instanceof \App\Models\Block) {
+                $icon = 'o-squares-2x2';
+                $title = $relatedModel->type;
+                $subtitle = $relatedModel->time?->format('M j, Y');
+                $route = route('blocks.show', $relatedModel);
+                $badgeText = 'Block';
+                $badgeClass = 'badge-accent';
+                }
+                @endphp
+
+                <div class="flex items-center gap-2 p-3 rounded-lg bg-base-100">
+                    <div class="tooltip" data-tip="{{ \App\Services\RelationshipTypeRegistry::getDisplayName($relationship->type) }}">
+                        <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-4 h-4 text-accent" />
+                    </div>
+                    @if (\App\Services\RelationshipTypeRegistry::isDirectional($relationship->type))
+                    <span class="text-base-content/40 text-sm">{{ $direction }}</span>
+                    @else
+                    <span class="text-base-content/40 text-sm">↔</span>
+                    @endif
+                    <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
+                        <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
+                        <div class="min-w-0 flex-1">
+                            <div class="font-medium truncate text-sm">{{ $title }}</div>
+                            @if ($subtitle)
+                            <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
+                            @endif
+                        </div>
+                    </a>
+                    <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
+                    @if ($relationship->value !== null)
+                    <div class="text-xs font-mono text-info">
+                        @if ($relationship->value_unit)
+                        {{ $relationship->value_unit }}
+                        @endif
+                        {{ number_format($relationship->value / ($relationship->value_multiplier ?? 1), 2) }}
+                    </div>
+                    @endif
+                </div>
+                @endforeach
+
+                @if ($relationships->count() > 5)
+                <div class="text-center pt-2">
+                    <button wire:click="handleOpenManageRelationshipsModal" class="text-sm text-accent hover:underline">
+                        View all {{ $relationships->count() }} relationships
+                    </button>
+                </div>
+                @endif
+            </div>
+        </x-card>
+        @endif
+        </div>
 
         <!-- Drawer for Technical Details -->
         <x-drawer wire:model="showSidebar" right title="Block Details" with-close-button separator class="w-11/12 lg:w-1/3">
@@ -409,7 +549,7 @@ new class extends Component {
                             wire:click="exportAsJson"
                             class="btn btn-ghost btn-xs gap-1"
                             title="Export complete block with event and relationships">
-                            <x-icon name="fas.download" class="w-3 h-3" />
+                            <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
                             <span class="hidden sm:inline">Export</span>
                         </button>
                     </div>
@@ -462,13 +602,13 @@ new class extends Component {
                             Relationships
                         </h3>
                         <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
-                            <x-icon name="fas.plus" class="w-3 h-3" />
+                            <x-icon name="o-plus" class="w-3 h-3" />
                         </button>
                     </div>
                     @php $sidebarRelationships = $this->getRelationships(); @endphp
                     @if ($sidebarRelationships->isEmpty())
                     <x-empty-state
-                        icon="fas.right-left"
+                        icon="o-arrows-right-left"
                         message="No relationships yet"
                         actionEvent="handleOpenAddRelationshipModal"
                         actionLabel="Add Relationship" />
@@ -485,7 +625,7 @@ new class extends Component {
                         $route = '#';
 
                         if ($relatedModel instanceof \App\Models\Event) {
-                        $icon = 'fas.calendar';
+                        $icon = 'o-calendar';
                         $title = $relatedModel->action;
                         $route = route('events.show', $relatedModel);
                         } elseif ($relatedModel instanceof \App\Models\EventObject) {
@@ -493,7 +633,7 @@ new class extends Component {
                         $title = $relatedModel->title;
                         $route = route('objects.show', $relatedModel);
                         } elseif ($relatedModel instanceof \App\Models\Block) {
-                        $icon = 'fas.grip';
+                        $icon = 'o-squares-2x2';
                         $title = $relatedModel->type;
                         $route = route('blocks.show', $relatedModel);
                         }
@@ -539,7 +679,7 @@ new class extends Component {
                         @php $activities = $this->getActivities(); @endphp
                         @if ($activities->isEmpty())
                         <x-empty-state
-                            icon="fas.clock"
+                            icon="o-clock"
                             message="No activity yet"
                             actionEvent="addComment"
                             actionLabel="Add Comment" />
@@ -622,138 +762,10 @@ new class extends Component {
                 @endif
             </div>
         </x-drawer>
-
-        <!-- Linked Blocks -->
-        @if ($this->getRelatedBlocks()->isNotEmpty())
-        <div class="relative">
-            <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
-                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="fas.grip" class="w-5 h-5 text-warning" />
-                    Linked Blocks ({{ $this->getRelatedBlocks()->count() }})
-                </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @foreach ($this->getRelatedBlocks() as $relatedBlock)
-                        <x-block-card :block="$relatedBlock" />
-                    @endforeach
-                </div>
-            </div>
-            <!-- AI Badge -->
-            <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
-            </div>
-        </div>
-        @endif
-
-        <!-- Relationships -->
-        @php $relationships = $this->getRelationships(); @endphp
-        @if ($relationships->isNotEmpty())
-        <x-card class="bg-base-200/50 border-2 border-accent/10">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold flex items-center gap-2">
-                    <x-icon name="fas.right-left" class="w-5 h-5 text-accent" />
-                    Relationships ({{ $relationships->count() }})
-                </h3>
-                <x-button
-                    icon="fas.gear"
-                    class="btn-sm btn-ghost"
-                    wire:click="handleOpenManageRelationshipsModal"
-                    label="Manage" />
-            </div>
-
-            <div class="space-y-3">
-                @foreach ($relationships->take(5) as $relationship)
-                @php
-                // Determine if this block is "from" or "to" in the relationship
-                $isFrom = $relationship->from_type === get_class($block) && $relationship->from_id === $block->id;
-                $relatedModel = $isFrom ? $relationship->to : $relationship->from;
-                $direction = $isFrom ? '→' : '←';
-
-                // Get display info for related model
-                // Initialize defaults
-                $icon = 'o-question-mark-circle';
-                $title = 'Unknown';
-                $subtitle = null;
-                $route = '#';
-                $badgeText = 'Unknown';
-                $badgeClass = 'badge-ghost';
-
-                if ($relatedModel instanceof \App\Models\Event) {
-                $icon = 'fas.calendar';
-                $title = $relatedModel->action;
-                $subtitle = $relatedModel->time?->format('M j, Y g:i A');
-                $route = route('events.show', $relatedModel);
-                $badgeText = 'Event';
-                $badgeClass = 'badge-primary';
-                } elseif ($relatedModel instanceof \App\Models\EventObject) {
-                $icon = 'o-cube';
-                $title = $relatedModel->title;
-                $subtitle = $relatedModel->concept;
-                $route = route('objects.show', $relatedModel);
-                $badgeText = 'Object';
-                $badgeClass = 'badge-secondary';
-                } elseif ($relatedModel instanceof \App\Models\Block) {
-                $icon = 'fas.grip';
-                $title = $relatedModel->type;
-                $subtitle = $relatedModel->time?->format('M j, Y');
-                $route = route('blocks.show', $relatedModel);
-                $badgeText = 'Block';
-                $badgeClass = 'badge-accent';
-                }
-                @endphp
-
-                <div class="flex items-center gap-2 p-3 rounded-lg bg-base-100">
-                    <!-- Relationship Type Icon -->
-                    <div class="tooltip" data-tip="{{ \App\Services\RelationshipTypeRegistry::getDisplayName($relationship->type) }}">
-                        <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($relationship->type) }}" class="w-4 h-4 text-accent" />
-                    </div>
-
-                    <!-- Direction -->
-                    @if (\App\Services\RelationshipTypeRegistry::isDirectional($relationship->type))
-                    <span class="text-base-content/40 text-sm">{{ $direction }}</span>
-                    @else
-                    <span class="text-base-content/40 text-sm">↔</span>
-                    @endif
-
-                    <!-- Related Entity -->
-                    <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
-                        <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
-                        <div class="min-w-0 flex-1">
-                            <div class="font-medium truncate text-sm">{{ $title }}</div>
-                            @if ($subtitle)
-                            <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
-                            @endif
-                        </div>
-                    </a>
-
-                    <!-- Badge -->
-                    <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
-
-                    <!-- Value (if present) -->
-                    @if ($relationship->value !== null)
-                    <div class="text-xs font-mono text-info">
-                        @if ($relationship->value_unit)
-                        {{ $relationship->value_unit }}
-                        @endif
-                        {{ number_format($relationship->value / ($relationship->value_multiplier ?? 1), 2) }}
-                    </div>
-                    @endif
-                </div>
-                @endforeach
-
-                @if ($relationships->count() > 5)
-                <div class="text-center pt-2">
-                    <button wire:click="handleOpenManageRelationshipsModal" class="text-sm text-accent hover:underline">
-                        View all {{ $relationships->count() }} relationships
-                    </button>
-                </div>
-                @endif
-            </div>
-        </x-card>
-        @endif
     </div>
     @else
     <div class="text-center py-12">
-        <x-icon name="fas.triangle-exclamation" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
+        <x-icon name="o-exclamation-triangle" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
         <h3 class="text-lg font-medium text-base-content mb-2">Block Not Found</h3>
         <p class="text-base-content/70 mb-6">The requested block could not be found.</p>
         <x-button href="{{ route('events.index') }}" class="btn-primary">
