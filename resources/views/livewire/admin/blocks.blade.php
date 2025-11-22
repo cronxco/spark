@@ -195,7 +195,7 @@ new class extends Component
                 @if (count($selectedBlocks) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
                     onclick="return confirm('Are you sure you want to delete {{ count($selectedBlocks) }} block(s)? This action cannot be undone.')">
-                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedBlocks) }})
                 </button>
                 @endif
@@ -252,7 +252,7 @@ new class extends Component
                         <span class="label-text">&nbsp;</span>
                     </label>
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
@@ -266,7 +266,7 @@ new class extends Component
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters
                     @if ($search || $blockTypeFilter || $serviceFilter)
                     <x-badge value="Active" class="badge-primary badge-xs" />
@@ -316,7 +316,7 @@ new class extends Component
                     <!-- Clear Filters Button -->
                     @if ($search || $blockTypeFilter || $serviceFilter)
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif
@@ -389,7 +389,7 @@ new class extends Component
 
                 <x-slot:empty>
                     <div class="text-center py-12">
-                        <x-icon name="o-squares-2x2" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                        <x-icon name="fas.grip" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                         <p class="font-medium text-base-content mb-2">No blocks found</p>
                         @if ($search || $blockTypeFilter || $serviceFilter)
                         <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>

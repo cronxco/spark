@@ -79,7 +79,7 @@ class RedditPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'o-bookmark';
+        return 'fab.reddit';
     }
 
     public static function getAccentColor(): string
@@ -96,7 +96,7 @@ class RedditPlugin extends OAuthPlugin
     {
         return [
             'bookmarked' => [
-                'icon' => 'o-bookmark',
+                'icon' => 'fas.bookmark',
                 'display_name' => 'Bookmarked',
                 'description' => 'A saved post or comment on Reddit',
                 'display_with_object' => true,
@@ -110,7 +110,7 @@ class RedditPlugin extends OAuthPlugin
     {
         return [
             'image' => [
-                'icon' => 'o-photo',
+                'icon' => 'fas.image',
                 'display_name' => 'Image',
                 'description' => 'Image contained in the post',
                 'display_with_object' => true,
@@ -118,7 +118,7 @@ class RedditPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'url' => [
-                'icon' => 'o-link',
+                'icon' => 'fas.link',
                 'display_name' => 'URL',
                 'description' => 'Link referenced in the content',
                 'display_with_object' => false,
@@ -132,25 +132,25 @@ class RedditPlugin extends OAuthPlugin
     {
         return [
             'reddit_account' => [
-                'icon' => 'o-user',
+                'icon' => 'fas.user',
                 'display_name' => 'Reddit Account',
                 'description' => 'A Reddit user account',
                 'hidden' => false,
             ],
             'reddit_post' => [
-                'icon' => 'o-document',
+                'icon' => 'fas.file-lines',
                 'display_name' => 'Reddit Post',
                 'description' => 'A post on Reddit',
                 'hidden' => false,
             ],
             'reddit_comment' => [
-                'icon' => 'o-chat-bubble-left-right',
+                'icon' => 'fas.comments',
                 'display_name' => 'Reddit Comment',
                 'description' => 'A comment on Reddit',
                 'hidden' => false,
             ],
             'reddit_image' => [
-                'icon' => 'o-photo',
+                'icon' => 'fas.image',
                 'display_name' => 'Reddit Image',
                 'description' => 'An image contained in a Reddit post',
                 'hidden' => true,

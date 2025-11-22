@@ -804,17 +804,133 @@ if (! function_exists('get_domain_from_url')) {
 
 if (! function_exists('normalize_icon_for_spotlight')) {
     /**
-     * Normalize MaryUI icon names to Wire Elements Spotlight format.
-     * MaryUI uses 'o-' prefix for outline icons (e.g., 'o-banknotes'),
-     * but Spotlight expects plain icon names (e.g., 'banknotes').
+     * Normalize icon names to Wire Elements Spotlight format.
+     * Strips library prefixes from both Heroicons and FontAwesome icons.
      *
-     * @param  string  $icon  The icon name (possibly with MaryUI prefix)
-     * @return string The normalized icon name for Spotlight
+     * @param  string|null  $icon  The icon name (possibly with prefix)
+     * @return string|null The normalized icon name for Spotlight
      */
-    function normalize_icon_for_spotlight(string $icon): string
+    function normalize_icon_for_spotlight(?string $icon): ?string
     {
-        // Strip 'o-' (outline) or 's-' (solid) prefixes used by MaryUI
+        if (! $icon) {
+            return null;
+        }
+
+        // FontAwesome: fas-icon-name, far-icon-name, fab-icon-name -> icon-name
+        if (preg_match('/^fa[srb]-(.+)$/', $icon, $matches)) {
+            return $matches[1];
+        }
+
+        // Legacy FontAwesome: fas.icon-name -> icon-name
+        if (str_contains($icon, '.')) {
+            return explode('.', $icon, 2)[1];
+        }
+
+        // Heroicons: o-icon-name or s-icon-name -> icon-name
         return preg_replace('/^[os]-/', '', $icon);
+    }
+}
+
+if (! function_exists('heroicon_to_fontawesome')) {
+    /**
+     * Convert a Heroicon name to its FontAwesome equivalent.
+     *
+     * @param  string  $heroiconName  The Heroicon name (e.g., 'fas-heart')
+     * @return string The FontAwesome icon name (e.g., 'fas-heart')
+     */
+    function heroicon_to_fontawesome(string $heroiconName): string
+    {
+        static $mappings = null;
+
+        if ($mappings === null) {
+            $mappings = config('icons.heroicon_to_fontawesome_map', []);
+        }
+
+        // Check explicit mapping first
+        if (isset($mappings[$heroiconName])) {
+            return $mappings[$heroiconName];
+        }
+
+        // Auto-convert: o-icon-name -> fas.icon-name
+        $baseName = preg_replace('/^[os]-/', '', $heroiconName);
+
+        return 'fas.' . $baseName;
+    }
+}
+
+if (! function_exists('icon_name')) {
+    /**
+     * Get the appropriate icon name based on current library preference.
+     * Converts between Heroicon and FontAwesome formats as needed.
+     *
+     * @param  string  $name  The icon name (any format)
+     * @return string The icon name in the preferred format
+     */
+    function icon_name(string $name): string
+    {
+        $library = config('icons.default_library', 'fontawesome');
+
+        // Already in correct format (dot notation for FontAwesome: fas.icon-name)
+        if ($library === 'fontawesome' && preg_match('/^fa[srb]\./', $name)) {
+            return $name;
+        }
+        if ($library === 'heroicons' && preg_match('/^[os]-/', $name)) {
+            return $name;
+        }
+
+        // Convert Heroicon to FontAwesome if needed
+        if ($library === 'fontawesome' && preg_match('/^[os]-/', $name)) {
+            return heroicon_to_fontawesome($name);
+        }
+
+        return $name;
+    }
+}
+
+if (! function_exists('get_card_brand_icon')) {
+    /**
+     * Get the FontAwesome brand icon for a payment card scheme.
+     *
+     * @param  string|null  $cardScheme  The card scheme (e.g., 'mastercard', 'visa')
+     * @return string The FontAwesome icon name
+     */
+    function get_card_brand_icon(?string $cardScheme): string
+    {
+        $brands = config('icons.card_brand_icons', []);
+        $scheme = strtolower($cardScheme ?? '');
+
+        return $brands[$scheme] ?? $brands['default'] ?? 'fas-credit-card';
+    }
+}
+
+if (! function_exists('get_financial_icon')) {
+    /**
+     * Get a financial-specific FontAwesome icon.
+     *
+     * @param  string  $type  The financial icon type (e.g., 'piggy_bank', 'wallet')
+     * @return string The FontAwesome icon name
+     */
+    function get_financial_icon(string $type): string
+    {
+        $icons = config('icons.financial_icons', []);
+
+        return $icons[$type] ?? 'fas-money-bill';
+    }
+}
+
+if (! function_exists('get_integration_brand_icon')) {
+    /**
+     * Get the brand icon for a third-party integration.
+     *
+     * @param  string  $service  The service identifier (e.g., 'github', 'spotify')
+     * @return string|null The FontAwesome brand icon or null if not available
+     */
+    function get_integration_brand_icon(string $service): ?string
+    {
+        $brands = config('icons.integration_brand_icons', []);
+        $service = strtolower($service);
+
+        return $brands[$service] ?? null;
     }
 }
 

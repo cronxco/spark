@@ -264,7 +264,7 @@ class OutlinePlugin extends ManualPlugin
 
     public static function getIcon(): string
     {
-        return 'o-document-text';
+        return 'fas.file-lines';
     }
 
     public static function getAccentColor(): string
@@ -286,7 +286,7 @@ class OutlinePlugin extends ManualPlugin
     {
         return [
             'had_day_note' => [
-                'icon' => 'o-calendar',
+                'icon' => 'fas.calendar-day',
                 'display_name' => 'Had Day Note',
                 'description' => 'A Day Note existed for the day',
                 'display_with_object' => true,
@@ -294,7 +294,7 @@ class OutlinePlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'created' => [
-                'icon' => 'o-plus-circle',
+                'icon' => 'fas.circle-plus',
                 'display_name' => 'Created Document',
                 'description' => 'An Outline document was created',
                 'display_with_object' => true,
@@ -308,7 +308,7 @@ class OutlinePlugin extends ManualPlugin
     {
         return [
             'day_task' => [
-                'icon' => 'o-check-circle',
+                'icon' => 'fas.circle-check',
                 'display_name' => 'Day Task',
                 'description' => 'A task extracted from a Day Note',
                 'display_with_object' => true,
@@ -316,7 +316,7 @@ class OutlinePlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'doc_task' => [
-                'icon' => 'o-check-circle',
+                'icon' => 'fas.circle-check',
                 'display_name' => 'Document Task',
                 'description' => 'A task extracted from a document',
                 'display_with_object' => true,
@@ -330,19 +330,19 @@ class OutlinePlugin extends ManualPlugin
     {
         return [
             'outline_collection' => [
-                'icon' => 'o-rectangle-stack',
+                'icon' => 'fas.layer-group',
                 'display_name' => 'Outline Collection',
                 'description' => 'An Outline collection',
                 'hidden' => false,
             ],
             'outline_document' => [
-                'icon' => 'o-document',
+                'icon' => 'fas.file',
                 'display_name' => 'Outline Document',
                 'description' => 'An Outline document',
                 'hidden' => false,
             ],
             'outline_user' => [
-                'icon' => 'o-user-circle',
+                'icon' => 'fas.user-circle',
                 'display_name' => 'Outline User',
                 'description' => 'An Outline user',
                 'hidden' => true,

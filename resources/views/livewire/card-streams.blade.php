@@ -514,7 +514,7 @@ on(['open-card-stream' => function (string $streamId, string $date) {
         <!-- Close button -->
         <div class="absolute top-4 right-4 z-10">
             <button wire:click="close" class="btn btn-circle btn-ghost btn-sm">
-                <x-icon name="o-x-mark" class="w-5 h-5" />
+                <x-icon name="fas.xmark" class="w-5 h-5" />
             </button>
         </div>
 
@@ -545,7 +545,7 @@ on(['open-card-stream' => function (string $streamId, string $date) {
             <div class="flex items-center gap-2">
                 @if ($currentIndex > 0)
                 <button @click="$dispatch('previous-card')" class="flex items-center gap-1">
-                    <x-icon name="o-chevron-left" class="w-4 h-4" />
+                    <x-icon name="fas.chevron-left" class="w-4 h-4" />
                     <span>Previous</span>
                 </button>
                 @endif
@@ -557,12 +557,12 @@ on(['open-card-stream' => function (string $streamId, string $date) {
                 @if ($currentIndex < $this->cards->count() - 1)
                 <button @click="$dispatch('next-card')" class="flex items-center gap-1">
                     <span>Next</span>
-                    <x-icon name="o-chevron-right" class="w-4 h-4" />
+                    <x-icon name="fas.chevron-right" class="w-4 h-4" />
                 </button>
                 @else
                 <button wire:click="close" class="flex items-center gap-1">
                     <span>Done</span>
-                    <x-icon name="o-check" class="w-4 h-4" />
+                    <x-icon name="fas.check" class="w-4 h-4" />
                 </button>
                 @endif
             </div>
@@ -603,7 +603,7 @@ on(['open-card-stream' => function (string $streamId, string $date) {
                 <!-- Close button -->
                 <div class="absolute top-4 right-4 z-10">
                     <button wire:click="close" class="btn btn-circle btn-ghost btn-sm">
-                        <x-icon name="o-x-mark" class="w-5 h-5" />
+                        <x-icon name="fas.xmark" class="w-5 h-5" />
                     </button>
                 </div>
 
@@ -634,7 +634,7 @@ on(['open-card-stream' => function (string $streamId, string $date) {
                     <div class="flex items-center gap-2">
                         @if ($currentIndex > 0)
                         <button @click="$dispatch('previous-card')" class="flex items-center gap-1 hover:text-base-content">
-                            <x-icon name="o-chevron-left" class="w-4 h-4" />
+                            <x-icon name="fas.chevron-left" class="w-4 h-4" />
                             <span>Previous</span>
                         </button>
                         @endif
@@ -646,12 +646,12 @@ on(['open-card-stream' => function (string $streamId, string $date) {
                         @if ($currentIndex < $this->cards->count() - 1)
                         <button @click="$dispatch('next-card')" class="flex items-center gap-1 hover:text-base-content">
                             <span>Next</span>
-                            <x-icon name="o-chevron-right" class="w-4 h-4" />
+                            <x-icon name="fas.chevron-right" class="w-4 h-4" />
                         </button>
                         @else
                         <button wire:click="close" class="flex items-center gap-1 hover:text-base-content">
                             <span>Done</span>
-                            <x-icon name="o-check" class="w-4 h-4" />
+                            <x-icon name="fas.check" class="w-4 h-4" />
                         </button>
                         @endif
                     </div>

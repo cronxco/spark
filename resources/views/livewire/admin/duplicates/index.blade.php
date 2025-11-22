@@ -75,7 +75,7 @@ $search = function () {
                     wire:click="search"
                     class="btn-primary w-full"
                     :loading="$loading"
-                    icon="o-magnifying-glass" />
+                    icon="fas.magnifying-glass" />
             </div>
         </div>
     </x-card>
@@ -251,7 +251,7 @@ $search = function () {
     @else
     <x-card>
         <div class="text-center py-12">
-            <x-icon name="o-magnifying-glass" class="w-16 h-16 text-base-content/40 mx-auto mb-4" />
+            <x-icon name="fas.magnifying-glass" class="w-16 h-16 text-base-content/40 mx-auto mb-4" />
             <h3 class="text-lg font-medium text-base-content/70 mb-2">No duplicates found</h3>
             <p class="text-base-content/60">Click "Find Duplicates" to search for similar records</p>
         </div>

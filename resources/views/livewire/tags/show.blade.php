@@ -108,7 +108,7 @@ new class extends Component {
                 <!-- Desktop: Full buttons -->
                 <div class="hidden sm:flex gap-2">
                     <a href="{{ route('tags.index') }}" class="btn btn-outline">
-                        <x-icon name="o-arrow-left" class="w-4 h-4" />
+                        <x-icon name="fas.arrow-left" class="w-4 h-4" />
                         All Tags
                     </a>
                 </div>
@@ -118,10 +118,10 @@ new class extends Component {
                     <x-dropdown>
                         <x-slot:trigger>
                             <x-button class="btn-ghost btn-sm">
-                                <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                                <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                             </x-button>
                         </x-slot:trigger>
-                        <x-menu-item title="All Tags" icon="o-arrow-left" link="{{ route('tags.index') }}" />
+                        <x-menu-item title="All Tags" icon="fas.arrow-left" link="{{ route('tags.index') }}" />
                     </x-dropdown>
                 </div>
             </x-slot:actions>
@@ -133,7 +133,7 @@ new class extends Component {
                 <!-- Large tag icon -->
                 <div class="flex-shrink-0 self-center sm:self-start">
                     <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                        <x-icon name="o-tag" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+                        <x-icon name="fas.tag" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                     </div>
                 </div>
 
@@ -179,7 +179,7 @@ new class extends Component {
                     <button
                         wire:click="setFilter('events')"
                         class="btn btn-sm {{ $filterType === 'events' ? 'btn-primary' : 'btn-outline' }}">
-                        <x-icon name="o-bolt" class="w-4 h-4" />
+                        <x-icon name="fas.bolt" class="w-4 h-4" />
                         Events ({{ $this->getEventCount() }})
                     </button>
                     <button
@@ -199,7 +199,7 @@ new class extends Component {
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
                             Tagged Events
                         </h3>
                         <div class="space-y-3">
@@ -209,7 +209,7 @@ new class extends Component {
                                        class="block">
                                         <div class="flex items-center gap-3">
                                             <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                <x-icon name="o-bolt" class="w-4 h-4 text-primary" />
+                                                <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
                                             </div>
                                             <div class="flex-1 min-w-0">
                                                 <div class="mb-1">
@@ -240,7 +240,7 @@ new class extends Component {
                                                     </div>
                                                 @endif
                                             </div>
-                                            <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                                            <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
                                         </div>
                                     </a>
                                 </div>
@@ -255,7 +255,7 @@ new class extends Component {
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
                         <div class="text-center py-12">
-                            <x-icon name="o-bolt" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
+                            <x-icon name="fas.bolt" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
                             <h3 class="text-lg font-medium text-base-content mb-2">No Events Found</h3>
                             <p class="text-base-content/70">No events are tagged with "{{ $tag->name }}"</p>
                         </div>
@@ -303,7 +303,7 @@ new class extends Component {
                                                     </div>
                                                 @endif
                                             </div>
-                                            <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                                            <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
                                         </div>
                                     </a>
                                 </div>

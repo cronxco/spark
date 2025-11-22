@@ -1310,7 +1310,7 @@ new class extends Component
     <x-header title="Fetch Bookmarks" subtitle="Monitor URLs, extract content, and get AI-powered summaries" separator>
         <x-slot:actions>
             <a href="{{ route('integrations.configure', $integration->id) }}" class="btn btn-outline btn-sm">
-                <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                <x-icon name="fas.gear" class="w-4 h-4" />
                 Settings
             </a>
         </x-slot:actions>
@@ -1319,7 +1319,7 @@ new class extends Component
     <!-- Tabs -->
     <x-tabs wire:model="activeTab">
         <!-- Subscribed URLs Tab -->
-        <x-tab name="urls" label="Subscribed URLs" icon="o-bookmark">
+        <x-tab name="urls" label="Subscribed URLs" icon="fas.bookmark">
             <!-- Add URL Section -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
@@ -1339,7 +1339,7 @@ new class extends Component
                             @enderror
                         </div>
                         <x-button type="submit" class="btn-primary">
-                            <x-icon name="o-plus" class="w-4 h-4" />
+                            <x-icon name="fas.plus" class="w-4 h-4" />
                             Subscribe
                         </x-button>
                     </form>
@@ -1384,7 +1384,7 @@ new class extends Component
                         </div>
                         @if (!empty($urlSearch) || !empty($domainFilter) || $statusFilter !== 'all')
                         <x-button wire:click="clearFilters" class="btn-outline">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            <x-icon name="fas.xmark" class="w-4 h-4" />
                         </x-button>
                         @endif
                     </div>
@@ -1416,18 +1416,18 @@ new class extends Component
                                 </h3>
                                 <div class="flex flex-wrap gap-2 items-center text-sm text-base-content/70">
                                     <span class="flex items-center gap-1">
-                                        <x-icon name="o-globe-alt" class="w-3 h-3" />
+                                        <x-icon name="fas.globe" class="w-3 h-3" />
                                         {{ $url['domain'] }}
                                     </span>
                                     @if ($url['last_checked_at'])
                                     <span class="flex items-center gap-1">
-                                        <x-icon name="o-clock" class="w-3 h-3" />
+                                        <x-icon name="fas.clock" class="w-3 h-3" />
                                         Checked {{ \Carbon\Carbon::parse($url['last_checked_at'])->diffForHumans() }}
                                     </span>
                                     @endif
                                     @if ($url['last_changed_at'])
                                     <span class="flex items-center gap-1">
-                                        <x-icon name="o-pencil" class="w-3 h-3" />
+                                        <x-icon name="fas.pen" class="w-3 h-3" />
                                         Changed {{ \Carbon\Carbon::parse($url['last_changed_at'])->diffForHumans() }}
                                     </span>
                                     @endif
@@ -1454,24 +1454,24 @@ new class extends Component
                                 <!-- Actions Dropdown -->
                                 <x-dropdown position="dropdown-end">
                                     <x-slot:trigger>
-                                        <x-button icon="o-ellipsis-vertical" class="btn-ghost btn-sm" />
+                                        <x-button icon="fas.ellipsis-vertical" class="btn-ghost btn-sm" />
                                     </x-slot:trigger>
                                     <x-menu-item
                                         title="Fetch Now"
-                                        icon="o-arrow-path"
+                                        icon="fas.rotate"
                                         wire:click="fetchNow('{{ $url['id'] }}')" />
                                     <x-menu-item
                                         title="Force Refresh"
-                                        icon="o-arrow-path-rounded-square"
+                                        icon="fas.repeat"
                                         wire:click="fetchNow('{{ $url['id'] }}', true)" />
                                     <x-menu-separator />
                                     <x-menu-item
                                         title="{{ $url['enabled'] ? 'Disable' : 'Enable' }}"
-                                        icon="o-power"
+                                        icon="fas.power-off"
                                         wire:click="toggleUrl('{{ $url['id'] }}')" />
                                     <x-menu-item
                                         title="Delete"
-                                        icon="o-trash"
+                                        icon="fas.trash"
                                         wire:click="deleteUrl('{{ $url['id'] }}')"
                                         class="text-error" />
                                 </x-dropdown>
@@ -1481,7 +1481,7 @@ new class extends Component
                         <!-- Error Message -->
                         @if ($url['last_error'])
                         <div class="alert alert-error mt-4">
-                            <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                            <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                             <span class="text-sm">
                                 {{ $url['last_error']['message'] ?? 'Unknown error' }}
                                 @if (isset($url['last_error']['timestamp']))
@@ -1499,7 +1499,7 @@ new class extends Component
                             <x-collapse>
                                 <x-slot:heading>
                                     <div class="flex items-center gap-2">
-                                        <x-icon name="o-clock" class="w-4 h-4" />
+                                        <x-icon name="fas.clock" class="w-4 h-4" />
                                         <span class="text-sm font-medium">Fetch History ({{ count($url['playwright_history']) }} entries)</span>
                                     </div>
                                 </x-slot:heading>
@@ -1572,7 +1572,7 @@ new class extends Component
             <div class="card bg-base-200 shadow">
                 <div class="card-body">
                     <div class="text-center py-12">
-                        <x-icon name="o-bookmark" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <x-icon name="fas.bookmark" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No URLs subscribed</h3>
                         <p class="text-base-content/70">
                             @if ($urlSearch || $domainFilter || $statusFilter !== 'all')
@@ -1588,7 +1588,7 @@ new class extends Component
         </x-tab>
 
         <!-- Cookie Management Tab -->
-        <x-tab name="cookies" label="Cookies" icon="o-lock-closed">
+        <x-tab name="cookies" label="Cookies" icon="fas.lock">
             <!-- Add Cookies Section -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
@@ -1628,21 +1628,21 @@ new class extends Component
                         </div>
                         <div class="flex gap-2">
                             <x-button type="submit" class="btn-primary">
-                                <x-icon name="o-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 Add Cookies
                             </x-button>
                         </div>
                     </form>
 
                     @if ($playwrightEnabled && $playwrightAvailable)
-                    <x-alert icon="o-information-circle" class="alert-info alert-soft mt-4">
+                    <x-alert icon="fas.circle-info" class="alert-info alert-soft mt-4">
                         <div>
                             <p class="font-semibold">Need to access a logged-in site?</p>
                             <p class="text-sm"><a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="link link-primary text-sm">Open the browser</a>, log in to any site, then come back here to save your session cookies.</p>
                         </div>
                         <x-slot:actions>
                             <x-button type="button" wire:click="extractCookiesFromBrowser" class="btn-info btn-outline">
-                                <x-icon name="o-globe-alt" class="w-4 h-4" />
+                                <x-icon name="fas.globe" class="w-4 h-4" />
                                 Extract from Browser
                             </x-button>
                         </x-slot:actions>
@@ -1717,13 +1717,13 @@ new class extends Component
                                 <x-button
                                     wire:click="testDomain('{{ $domain['domain'] }}')"
                                     class="btn-outline btn-sm">
-                                    <x-icon name="o-beaker" class="w-4 h-4" />
+                                    <x-icon name="fas.flask" class="w-4 h-4" />
                                     Test
                                 </x-button>
                                 <x-button
                                     wire:click="deleteCookies('{{ $domain['domain'] }}')"
                                     class="btn-error btn-outline btn-sm">
-                                    <x-icon name="o-trash" class="w-4 h-4" />
+                                    <x-icon name="fas.trash" class="w-4 h-4" />
                                     Delete
                                 </x-button>
                             </div>
@@ -1742,7 +1742,7 @@ new class extends Component
                                         <span class="text-sm font-medium">Auto-refresh cookies before expiry</span>
                                     </label>
                                     <div class="tooltip" data-tip="Automatically refresh cookies before they expire using Playwright">
-                                        <x-icon name="o-information-circle" class="w-4 h-4 text-base-content/50" />
+                                        <x-icon name="fas.circle-info" class="w-4 h-4 text-base-content/50" />
                                     </div>
                                 </div>
                             </div>
@@ -1752,13 +1752,13 @@ new class extends Component
                             <div class="mt-2 flex flex-wrap gap-3 text-xs text-base-content/70">
                                 @if ($domain['updated_at'])
                                 <span class="flex items-center gap-1">
-                                    <x-icon name="o-clock" class="w-3 h-3" />
+                                    <x-icon name="fas.clock" class="w-3 h-3" />
                                     Auto-updated {{ \Carbon\Carbon::parse($domain['updated_at'])->diffForHumans() }}
                                 </span>
                                 @endif
                                 @if ($domain['last_refreshed_at'])
                                 <span class="flex items-center gap-1">
-                                    <x-icon name="o-arrow-path" class="w-3 h-3" />
+                                    <x-icon name="fas.rotate" class="w-3 h-3" />
                                     Last refreshed {{ \Carbon\Carbon::parse($domain['last_refreshed_at'])->diffForHumans() }}
                                 </span>
                                 @endif
@@ -1773,7 +1773,7 @@ new class extends Component
             <div class="card bg-base-200 shadow">
                 <div class="card-body">
                     <div class="text-center py-12">
-                        <x-icon name="o-lock-closed" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <x-icon name="fas.lock" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No saved sessions yet</h3>
                         <p class="text-base-content/70">
                             Add cookies to access sites that require login.
@@ -1785,7 +1785,7 @@ new class extends Component
         </x-tab>
 
         <!-- Discovery Settings Tab -->
-        <x-tab name="discovery" label="Discovery" icon="o-magnifying-glass">
+        <x-tab name="discovery" label="Discovery" icon="fas.magnifying-glass">
             <!-- Filters -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
@@ -1807,7 +1807,7 @@ new class extends Component
                         <div class="form-control content-end">
                             <label class="label"><span class="label-text">&nbsp;</span></label>
                             <button class="btn btn-outline" wire:click="clearDiscoveryFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4" />
+                                <x-icon name="fas.xmark" class="w-4 h-4" />
                                 Clear
                             </button>
                         </div>
@@ -1826,7 +1826,7 @@ new class extends Component
                             class="btn btn-error btn-sm"
                             wire:click="clearAllDiscoveredUrls"
                             wire:confirm="Are you sure you want to clear all discovered URLs? This action cannot be undone.">
-                            <x-icon name="o-trash" class="w-4 h-4" />
+                            <x-icon name="fas.trash" class="w-4 h-4" />
                             Clear All
                         </button>
                     </div>
@@ -1841,7 +1841,7 @@ new class extends Component
                         striped>
                         <x-slot:empty>
                             <div class="text-center py-12">
-                                <x-icon name="o-magnifying-glass" class="w-16 h-16 mx-auto mb-4 text-base-content/30" />
+                                <x-icon name="fas.magnifying-glass" class="w-16 h-16 mx-auto mb-4 text-base-content/30" />
                                 <h3 class="text-lg font-medium text-base-content mb-2">
                                     @if ($discoverySearch || $discoveryStatusFilter)
                                     No URLs match your filters
@@ -1919,12 +1919,12 @@ new class extends Component
                         @endphp
                         @if ($status === 'pending')
                         <span class="badge badge-sm badge-warning gap-1">
-                            <x-icon name="o-clock" class="w-3 h-3" />
+                            <x-icon name="fas.clock" class="w-3 h-3" />
                             Pending
                         </span>
                         @elseif ($status === 'fetched')
                         <span class="badge badge-sm badge-success gap-1">
-                            <x-icon name="o-check-circle" class="w-3 h-3" />
+                            <x-icon name="fas.circle-check" class="w-3 h-3" />
                             Fetched
                         </span>
                         @elseif ($status === 'error')
@@ -1951,18 +1951,18 @@ new class extends Component
                         @scope('cell_actions', $url)
                         <div class="dropdown dropdown-end">
                             <button tabindex="0" class="btn btn-ghost btn-xs">
-                                <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                                <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                             </button>
                             <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
                                 <li>
                                     <a wire:click="fetchNow('{{ $url->id }}')">
-                                        <x-icon name="o-arrow-path" class="w-4 h-4" />
+                                        <x-icon name="fas.rotate" class="w-4 h-4" />
                                         Fetch Now
                                     </a>
                                 </li>
                                 <li>
                                     <a wire:click="ignoreDiscoveredUrl('{{ $url->id }}')" class="text-warning">
-                                        <x-icon name="o-eye-slash" class="w-4 h-4" />
+                                        <x-icon name="fas.eye-slash" class="w-4 h-4" />
                                         Ignore
                                     </a>
                                 </li>
@@ -1971,7 +1971,7 @@ new class extends Component
                                         wire:click="removeDiscoveredUrl('{{ $url->id }}')"
                                         wire:confirm="Are you sure you want to remove this URL?"
                                         class="text-error">
-                                        <x-icon name="o-trash" class="w-4 h-4" />
+                                        <x-icon name="fas.trash" class="w-4 h-4" />
                                         Delete
                                     </a>
                                 </li>
@@ -2041,7 +2041,7 @@ new class extends Component
 
                     @if (empty($this->availableIntegrations))
                     <div class="alert alert-info">
-                        <x-icon name="o-information-circle" class="w-6 h-6" />
+                        <x-icon name="fas.circle-info" class="w-6 h-6" />
                         <span>Add integrations to get started.</span>
                     </div>
                     @else
@@ -2074,7 +2074,7 @@ new class extends Component
                             type="button"
                             class="btn btn-success"
                             wire:click="updateMonitoredIntegrations">
-                            <x-icon name="o-check" class="w-4 h-4" />
+                            <x-icon name="fas.check" class="w-4 h-4" />
                             Save
                         </button>
 
@@ -2083,7 +2083,7 @@ new class extends Component
                             class="btn btn-secondary btn-outline"
                             wire:click="triggerDiscovery"
                             @if (empty($monitoredIntegrations)) disabled @endif>
-                            <x-icon name="o-magnifying-glass" class="w-4 h-4" />
+                            <x-icon name="fas.magnifying-glass" class="w-4 h-4" />
                             Scan Now
                         </button>
                     </div>
@@ -2111,7 +2111,7 @@ new class extends Component
                             type="button"
                             class="btn btn-primary"
                             wire:click="addExcludedDomain">
-                            <x-icon name="o-plus" class="w-4 h-4" />
+                            <x-icon name="fas.plus" class="w-4 h-4" />
                             Add Domain
                         </button>
                     </div>
@@ -2119,7 +2119,7 @@ new class extends Component
                     <!-- Excluded Domains List -->
                     @if (empty($excludedDomains))
                     <div class="alert">
-                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                        <x-icon name="fas.circle-info" class="w-5 h-5" />
                         <span>No domains excluded. Add domains above to filter them from discovery.</span>
                     </div>
                     @else
@@ -2127,7 +2127,7 @@ new class extends Component
                         @foreach ($excludedDomains as $domain)
                         <div class="flex items-center justify-between p-3 rounded-lg border border-base-300 bg-base-100">
                             <div class="flex items-center gap-2 flex-1 min-w-0">
-                                <x-icon name="o-no-symbol" class="w-4 h-4 text-base-content/50 flex-shrink-0" />
+                                <x-icon name="fas.ban" class="w-4 h-4 text-base-content/50 flex-shrink-0" />
                                 <span class="font-mono text-sm truncate">{{ $domain }}</span>
                             </div>
                             <button
@@ -2135,7 +2135,7 @@ new class extends Component
                                 class="btn btn-ghost btn-sm btn-circle flex-shrink-0"
                                 wire:click="removeExcludedDomain('{{ $domain }}')"
                                 title="Remove">
-                                <x-icon name="o-x-mark" class="w-4 h-4" />
+                                <x-icon name="fas.xmark" class="w-4 h-4" />
                             </button>
                         </div>
                         @endforeach
@@ -2146,7 +2146,7 @@ new class extends Component
         </x-tab>
 
         <!-- Stats Tab -->
-        <x-tab name="stats" label="Stats" icon="o-chart-bar">
+        <x-tab name="stats" label="Stats" icon="fas.chart-simple">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
@@ -2199,7 +2199,7 @@ new class extends Component
 
         <!-- Playwright Settings Tab -->
         @if ($playwrightEnabled)
-        <x-tab name="playwright" label="Playwright" icon="o-computer-desktop">
+        <x-tab name="playwright" label="Playwright" icon="fas.desktop">
             <div class="space-y-6" wire:poll.30s="refreshMetrics">
                 <!-- Status Card -->
                 <div class="card bg-base-200 shadow">
@@ -2239,7 +2239,7 @@ new class extends Component
                             @endif
                             @if ($playwrightAvailable)
                             <a href="{{ config('services.playwright.chrome_vnc_url') }}" target="_blank" class="btn btn-primary btn-sm">
-                                <x-icon name="o-computer-desktop" class="w-4 h-4" />
+                                <x-icon name="fas.desktop" class="w-4 h-4" />
                                 Open Browser (VNC)
                             </a>
                             @endif
@@ -2247,7 +2247,7 @@ new class extends Component
 
                         @if (!$playwrightAvailable)
                         <div class="alert alert-warning mt-4">
-                            <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                            <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                             <div>
                                 <p class="font-semibold">Browser automation unavailable</p>
                                 <p class="text-sm">To enable, run: <code class="bg-base-300 px-2 py-1 rounded">sail up -d --profile playwright</code></p>
@@ -2404,7 +2404,7 @@ new class extends Component
                             </div>
                         </div>
                         <div class="alert alert-info mt-4">
-                            <x-icon name="o-information-circle" class="w-5 h-5" />
+                            <x-icon name="fas.circle-info" class="w-5 h-5" />
                             <div class="text-sm">
                                 <p>Cookie auto-refresh uses Playwright to automatically update cookies before they expire.</p>
                                 <p class="mt-1">Enable it per-domain in the <strong>Cookies</strong> tab.</p>
@@ -2440,20 +2440,20 @@ new class extends Component
         @endif
 
         <!-- API Tab -->
-        <x-tab name="api" label="API & Share" icon="o-key">
+        <x-tab name="api" label="API & Share" icon="fas.key">
             <!-- API Tokens Section -->
             <div class="card bg-base-200 shadow mb-6">
                 <div class="card-body">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold">API Access Tokens</h3>
                         <x-button wire:click="$set('showTokenCreateModal', true)" class="btn-primary btn-sm">
-                            <x-icon name="o-plus" class="w-4 h-4" />
+                            <x-icon name="fas.plus" class="w-4 h-4" />
                             Create Token
                         </x-button>
                     </div>
 
                     <div class="alert alert-warning mb-4">
-                        <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                        <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                         <div class="text-sm">
                             <p class="font-semibold">Keep your tokens secure!</p>
                             <p>Treat API tokens like passwords. Anyone with your token can save bookmarks to your account.</p>
@@ -2471,12 +2471,12 @@ new class extends Component
                                         <h4 class="font-medium">{{ $token['name'] }}</h4>
                                         <div class="flex flex-wrap gap-3 text-sm text-base-content/70 mt-1">
                                             <span class="flex items-center gap-1">
-                                                <x-icon name="o-calendar" class="w-3 h-3" />
+                                                <x-icon name="fas.calendar" class="w-3 h-3" />
                                                 Created {{ \Carbon\Carbon::parse($token['created_at'])->format('M j, Y') }}
                                             </span>
                                             @if ($token['last_used_at'])
                                             <span class="flex items-center gap-1">
-                                                <x-icon name="o-clock" class="w-3 h-3" />
+                                                <x-icon name="fas.clock" class="w-3 h-3" />
                                                 Last used {{ \Carbon\Carbon::parse($token['last_used_at'])->diffForHumans() }}
                                             </span>
                                             @else
@@ -2488,7 +2488,7 @@ new class extends Component
                                         wire:click="revokeApiToken({{ $token['id'] }})"
                                         wire:confirm="Are you sure you want to revoke this token? This cannot be undone."
                                         class="btn-error btn-outline btn-sm">
-                                        <x-icon name="o-trash" class="w-4 h-4" />
+                                        <x-icon name="fas.trash" class="w-4 h-4" />
                                         Revoke
                                     </x-button>
                                 </div>
@@ -2498,7 +2498,7 @@ new class extends Component
                     </div>
                     @else
                     <div class="text-center py-8 bg-base-100 rounded-lg">
-                        <x-icon name="o-key" class="w-12 h-12 mx-auto text-base-content/50 mb-3" />
+                        <x-icon name="fas.key" class="w-12 h-12 mx-auto text-base-content/50 mb-3" />
                         <p class="text-base-content/70">No API tokens created yet.</p>
                         <p class="text-sm text-base-content/50 mt-1">Create one to start using the API.</p>
                     </div>
@@ -2573,7 +2573,7 @@ new class extends Component
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                <x-icon name="o-device-phone-mobile" class="w-5 h-5 text-primary" />
+                                <x-icon name="fas.mobile-screen" class="w-5 h-5 text-primary" />
                             </div>
                             <h3 class="text-lg font-semibold">Apple Shortcuts</h3>
                         </div>
@@ -2581,7 +2581,7 @@ new class extends Component
                         <x-collapse>
                             <x-slot:heading>
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-information-circle" class="w-5 h-5" />
+                                    <x-icon name="fas.circle-info" class="w-5 h-5" />
                                     Setup Instructions
                                 </div>
                             </x-slot:heading>
@@ -2589,7 +2589,7 @@ new class extends Component
                                 <div class="prose prose-sm max-w-none">
                                     @if ($temporaryTokenValue)
                                     <div class="alert alert-success mb-4">
-                                        <x-icon name="o-sparkles" class="w-5 h-5" />
+                                        <x-icon name="fas.wand-magic-sparkles" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>✨ Auto-populated!</strong> Your new token is ready to use below.</p>
                                             <p class="text-xs opacity-70 mt-1">The actual token value is showing in all examples (will reset on page refresh)</p>
@@ -2597,7 +2597,7 @@ new class extends Component
                                     </div>
                                     @elseif (!empty($apiTokens))
                                     <div class="alert alert-info mb-4">
-                                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                                        <x-icon name="fas.circle-info" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>Using your token:</strong> {{ $this->latestTokenName() }}</p>
                                             <p class="text-xs opacity-70 mt-1">Paste your actual token value in place of the placeholder</p>
@@ -2629,7 +2629,7 @@ new class extends Component
                                         <li>Enable <strong>"Show in Share Sheet"</strong> in settings</li>
                                     </ol>
                                     <div class="alert alert-info mt-4">
-                                        <x-icon name="o-light-bulb" class="w-5 h-5" />
+                                        <x-icon name="fas.lightbulb" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>Pro tip:</strong> You can now use the Share Sheet from Safari or any app to save URLs directly to Fetch!</p>
                                         </div>
@@ -2645,7 +2645,7 @@ new class extends Component
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                                <x-icon name="o-globe-alt" class="w-5 h-5 text-secondary" />
+                                <x-icon name="fas.globe" class="w-5 h-5 text-secondary" />
                             </div>
                             <h3 class="text-lg font-semibold">Browser Bookmarklet</h3>
                         </div>
@@ -2653,7 +2653,7 @@ new class extends Component
                         <x-collapse>
                             <x-slot:heading>
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-information-circle" class="w-5 h-5" />
+                                    <x-icon name="fas.circle-info" class="w-5 h-5" />
                                     Setup Instructions
                                 </div>
                             </x-slot:heading>
@@ -2661,7 +2661,7 @@ new class extends Component
                                 <div class="prose prose-sm max-w-none">
                                     @if ($temporaryTokenValue)
                                     <div class="alert alert-success mb-4">
-                                        <x-icon name="o-sparkles" class="w-5 h-5" />
+                                        <x-icon name="fas.wand-magic-sparkles" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>✨ Auto-populated!</strong> Your new token is ready to use below.</p>
                                             <p class="text-xs opacity-70 mt-1">The actual token value is showing (will reset on page refresh)</p>
@@ -2669,7 +2669,7 @@ new class extends Component
                                     </div>
                                     @elseif (!empty($apiTokens))
                                     <div class="alert alert-info mb-4">
-                                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                                        <x-icon name="fas.circle-info" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>Using your token:</strong> {{ $this->latestTokenName() }}</p>
                                             <p class="text-xs opacity-70 mt-1">Paste your actual token value in place of the placeholder</p>
@@ -2713,7 +2713,7 @@ new class extends Component
 
                                     @if (empty($apiTokens))
                                     <div class="alert alert-warning mt-4">
-                                        <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                                        <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p>Create a token above first, then come back to get your personalized bookmarklet code!</p>
                                         </div>
@@ -2738,7 +2738,7 @@ new class extends Component
                         <x-collapse>
                             <x-slot:heading>
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-code-bracket" class="w-5 h-5" />
+                                    <x-icon name="fas.code" class="w-5 h-5" />
                                     Example Request
                                 </div>
                             </x-slot:heading>
@@ -2746,7 +2746,7 @@ new class extends Component
                                 <div class="prose prose-sm max-w-none">
                                     @if ($temporaryTokenValue)
                                     <div class="alert alert-success mb-4">
-                                        <x-icon name="o-sparkles" class="w-5 h-5" />
+                                        <x-icon name="fas.wand-magic-sparkles" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>✨ Auto-populated!</strong> Your new token is in the command below.</p>
                                             <p class="text-xs opacity-70 mt-1">Copy and run it directly! (resets on page refresh)</p>
@@ -2754,7 +2754,7 @@ new class extends Component
                                     </div>
                                     @elseif (!empty($apiTokens))
                                     <div class="alert alert-info mb-4">
-                                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                                        <x-icon name="fas.circle-info" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>Using your token:</strong> {{ $this->latestTokenName() }}</p>
                                             <p class="text-xs opacity-70 mt-1">Replace the placeholder with your actual token</p>
@@ -2807,7 +2807,7 @@ new class extends Component
                         <x-collapse>
                             <x-slot:heading>
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-code-bracket" class="w-5 h-5" />
+                                    <x-icon name="fas.code" class="w-5 h-5" />
                                     Example Code
                                 </div>
                             </x-slot:heading>
@@ -2815,7 +2815,7 @@ new class extends Component
                                 <div class="prose prose-sm max-w-none">
                                     @if ($temporaryTokenValue)
                                     <div class="alert alert-success mb-4">
-                                        <x-icon name="o-sparkles" class="w-5 h-5" />
+                                        <x-icon name="fas.wand-magic-sparkles" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>✨ Auto-populated!</strong> Your new token is in the code below.</p>
                                             <p class="text-xs opacity-70 mt-1">Ready to use! (resets on page refresh)</p>
@@ -2823,7 +2823,7 @@ new class extends Component
                                     </div>
                                     @elseif (!empty($apiTokens))
                                     <div class="alert alert-info mb-4">
-                                        <x-icon name="o-information-circle" class="w-5 h-5" />
+                                        <x-icon name="fas.circle-info" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>Using your token:</strong> {{ $this->latestTokenName() }}</p>
                                             <p class="text-xs opacity-70 mt-1">Replace the placeholder with your actual token</p>
@@ -2878,7 +2878,7 @@ saveToFetch('https://example.com/article')
   .catch(error => console.error('Failed:', error));</code></pre>
 
                                     <div class="alert alert-info mt-4">
-                                        <x-icon name="o-light-bulb" class="w-5 h-5" />
+                                        <x-icon name="fas.lightbulb" class="w-5 h-5" />
                                         <div class="text-sm">
                                             <p><strong>Browser Extension Tip:</strong> You can use this code in a Chrome/Firefox extension to add a "Save to Fetch" button to your toolbar!</p>
                                         </div>
@@ -2941,7 +2941,7 @@ saveToFetch('https://example.com/article')
             <h3 class="font-bold text-lg mb-4">Token Created Successfully!</h3>
 
             <div class="alert alert-warning mb-4">
-                <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                 <div class="text-sm">
                     <p class="font-semibold">Copy this token now!</p>
                     <p>For security reasons, you won't be able to see it again.</p>

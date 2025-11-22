@@ -124,7 +124,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'o-calendar';
+        return 'fab.google';
     }
 
     public static function getAccentColor(): string
@@ -146,7 +146,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
     {
         return [
             'had_event' => [
-                'icon' => 'o-calendar',
+                'icon' => 'fas.calendar',
                 'display_name' => 'Had Event',
                 'description' => 'A timed calendar event',
                 'display_with_object' => true,
@@ -155,7 +155,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'had_all_day_event' => [
-                'icon' => 'o-calendar-days',
+                'icon' => 'fas.calendar-week',
                 'display_name' => 'Had All-Day Event',
                 'description' => 'An all-day calendar event',
                 'display_with_object' => true,
@@ -170,7 +170,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
     {
         return [
             'event_details' => [
-                'icon' => 'o-information-circle',
+                'icon' => 'fas.circle-info',
                 'display_name' => 'Event Details',
                 'description' => 'Detailed information about the calendar event',
                 'display_with_object' => true,
@@ -178,7 +178,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'event_attendees' => [
-                'icon' => 'o-user-group',
+                'icon' => 'fas.user-group',
                 'display_name' => 'Attendees',
                 'description' => 'Event attendees and their responses',
                 'display_with_object' => true,
@@ -186,7 +186,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'event_location' => [
-                'icon' => 'o-map-pin',
+                'icon' => 'fas.location-dot',
                 'display_name' => 'Location',
                 'description' => 'Event location or meeting link',
                 'display_with_object' => true,
@@ -194,7 +194,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'event_time' => [
-                'icon' => 'o-clock',
+                'icon' => 'fas.clock',
                 'display_name' => 'Event Time',
                 'description' => 'Start or end time of the event',
                 'display_with_object' => true,
@@ -208,13 +208,13 @@ class GoogleCalendarPlugin extends OAuthPlugin
     {
         return [
             'google_calendar' => [
-                'icon' => 'o-calendar',
+                'icon' => 'fas.calendar',
                 'display_name' => 'Google Calendar',
                 'description' => 'A Google Calendar',
                 'hidden' => false,
             ],
             'calendar_event' => [
-                'icon' => 'o-calendar-days',
+                'icon' => 'fas.calendar-check',
                 'display_name' => 'Calendar Event',
                 'description' => 'A calendar event',
                 'hidden' => false,

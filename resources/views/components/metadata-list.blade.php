@@ -43,7 +43,7 @@
                         <details class="block w-full min-w-0" {{ $level === 0 ? 'open' : '' }}>
                             <summary class="cursor-pointer list-none flex items-center gap-2 min-w-0 hover:bg-base-200/50 -mx-2 px-2 py-1 rounded transition-colors">
                                 <div class="flex items-center gap-2 flex-1 min-w-0">
-                                    <x-icon name="o-chevron-right" class="w-3 h-3 transition-transform [[open]>&]:rotate-90" />
+                                    <x-icon name="fas.chevron-right" class="w-3 h-3 transition-transform [[open]>&]:rotate-90" />
                                     <span class="text-sm font-medium text-base-content/60">{{ $label }}</span>
                                     <x-badge :value="($isList ? 'List' : 'Object') . ': ' . $count" class="badge-ghost badge-xs" />
                                 </div>

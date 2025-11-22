@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas.grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $imageUrl = get_media_url($block, 'downloaded_images', 'medium')
@@ -36,13 +36,13 @@ $subreddit = $block->metadata['subreddit'] ?? null;
         </div>
         @else
         <div class="w-full h-48 rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
-            <x-icon name="o-photo" class="w-12 h-12 text-base-content/30" />
+            <x-icon name="fas.image" class="w-12 h-12 text-base-content/30" />
         </div>
         @endif
 
         @if ($subreddit)
         <div class="flex items-center gap-2 text-xs text-base-content/60">
-            <x-icon name="o-user-group" class="w-3 h-3" />
+            <x-icon name="fas.users" class="w-3 h-3" />
             r/{{ $subreddit }}
         </div>
         @endif
@@ -58,12 +58,12 @@ $subreddit = $block->metadata['subreddit'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas.eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>

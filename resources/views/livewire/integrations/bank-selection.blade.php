@@ -10,13 +10,13 @@
                 </div>
 
                 @if (session('success'))
-                    <x-alert title="Success" icon="o-check-circle" class="alert-success">
+                    <x-alert title="Success" icon="fas.circle-check" class="alert-success">
                         {{ session('success') }}
                     </x-alert>
                 @endif
 
                 @if (session('error'))
-                    <x-alert title="Error" icon="o-exclamation-triangle" class="alert-error">
+                    <x-alert title="Error" icon="fas.triangle-exclamation" class="alert-error">
                         {{ session('error') }}
                     </x-alert>
                 @endif
@@ -42,14 +42,14 @@
 
                         @error('institution_id')
                             <div class="text-sm text-error">
-                                <x-icon name="o-exclamation-triangle" class="w-4 h-4 inline mr-1" />
+                                <x-icon name="fas.triangle-exclamation" class="w-4 h-4 inline mr-1" />
                                 {{ $message }}
                             </div>
                         @enderror
 
                         @if (empty(session('gocardless_institutions_'.$group->id, [])))
                             <div class="text-sm text-error">
-                                <x-icon name="o-exclamation-triangle" class="w-4 h-4 inline mr-1" />
+                                <x-icon name="fas.triangle-exclamation" class="w-4 h-4 inline mr-1" />
                                 Unable to load banks from GoCardless API. This could be due to:
                                 <ul class="list-disc list-inside mt-1 ml-2">
                                     <li>API credentials not configured correctly</li>

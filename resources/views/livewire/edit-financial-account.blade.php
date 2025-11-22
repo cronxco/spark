@@ -1,7 +1,7 @@
 <div>
     @if (!in_array($account->type, ['manual_account']))
         <div class="alert alert-info mb-6">
-            <x-icon name="o-information-circle" class="w-5 h-5" />
+            <x-icon name="fas.circle-info" class="w-5 h-5" />
             <span>This is a {{ ucfirst(str_replace('_', ' ', $account->type)) }}. You can edit the display name and metadata, but the account will continue to sync data from the integration.</span>
         </div>
     @endif
@@ -182,7 +182,7 @@
         <!-- Form Actions -->
         <div class="flex gap-3 mt-8">
             <button type="submit" class="btn btn-primary">
-                <x-icon name="o-check" class="w-4 h-4" />
+                <x-icon name="fas.check" class="w-4 h-4" />
                 Save Changes
             </button>
             <button type="button" wire:click="$dispatch('close-modal')" class="btn btn-outline">

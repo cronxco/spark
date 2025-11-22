@@ -64,7 +64,7 @@ class GoogleCalendarIntegrationTest extends TestCase
         $this->assertEquals('Sync events from your Google Calendar with filtering support.', GoogleCalendarPlugin::getDescription());
         $this->assertEquals('oauth', GoogleCalendarPlugin::getServiceType());
         $this->assertEquals('knowledge', GoogleCalendarPlugin::getDomain());
-        $this->assertEquals('o-calendar', GoogleCalendarPlugin::getIcon());
+        $this->assertEquals('fab.google', GoogleCalendarPlugin::getIcon());
         $this->assertEquals('info', GoogleCalendarPlugin::getAccentColor());
     }
 

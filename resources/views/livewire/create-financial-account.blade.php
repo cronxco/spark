@@ -175,11 +175,11 @@
         <!-- Form Actions -->
         <div class="flex gap-3 mt-8">
             <button type="button" wire:click="saveAndContinue" class="btn btn-primary">
-                <x-icon name="o-plus" class="w-4 h-4" />
+                <x-icon name="fas.plus" class="w-4 h-4" />
                 Save & Continue
             </button>
             <button type="submit" class="btn btn-outline">
-                <x-icon name="o-check" class="w-4 h-4" />
+                <x-icon name="fas.check" class="w-4 h-4" />
                 Save & Close
             </button>
             <button type="button" wire:click="$dispatch('close-create-account-modal')" class="btn btn-ghost">

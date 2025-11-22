@@ -251,11 +251,11 @@ new class extends Component {
                 <x-dropdown>
                     <x-slot:trigger>
                         <x-button class="btn-ghost btn-sm">
-                            <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                            <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                         </x-button>
                     </x-slot:trigger>
-                    <x-menu-item title="Save" icon="o-check" wire:click="updateConfiguration" />
-                    <x-menu-item title="Cancel" icon="o-x-mark" link="{{ route('integrations.index') }}" />
+                    <x-menu-item title="Save" icon="fas.check" wire:click="updateConfiguration" />
+                    <x-menu-item title="Cancel" icon="fas.xmark" link="{{ route('integrations.index') }}" />
                 </x-dropdown>
             </div>
         </x-slot:actions>

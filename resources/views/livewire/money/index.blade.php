@@ -6,11 +6,11 @@
                 <x-dropdown position="dropdown-end">
                     <x-slot:trigger>
                         <x-button class="btn-ghost btn-sm" aria-label="Actions" title="Actions">
-                            <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                            <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                         </x-button>
                     </x-slot:trigger>
-                    <x-menu-item title="Add Account" icon="o-plus" wire:click="openCreateAccountModal" />
-                    <x-menu-item title="Add Balance Update" icon="o-banknotes" wire:click="openAddBalanceModal" />
+                    <x-menu-item title="Add Account" icon="fas.plus" wire:click="openCreateAccountModal" />
+                    <x-menu-item title="Add Balance Update" icon="fas.money-bills" wire:click="openAddBalanceModal" />
                 </x-dropdown>
             </div>
 
@@ -19,13 +19,13 @@
                 <x-button
                     wire:click="openCreateAccountModal"
                     class="btn-primary btn-sm">
-                    <x-icon name="o-plus" class="w-4 h-4" />
+                    <x-icon name="fas.plus" class="w-4 h-4" />
                     Add Account
                 </x-button>
                 <x-button
                     wire:click="openAddBalanceModal"
                     class="btn-outline btn-sm">
-                    <x-icon name="o-banknotes" class="w-4 h-4" />
+                    <x-icon name="fas.money-bills" class="w-4 h-4" />
                     Add Balance Update
                 </x-button>
             </div>
@@ -107,7 +107,7 @@
                         <span class="label-text">&nbsp;</span>
                     </label>
                     <button wire:click="clearFilters" class="btn btn-outline">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
@@ -119,7 +119,7 @@
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters
                     @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchived || !$showEmptyAccounts)
                     <x-badge value="Active" class="badge-primary badge-xs" />
@@ -191,7 +191,7 @@
                     <!-- Clear Filters -->
                     @if (!empty($search) || !empty($accountTypeFilter) || !empty($providerFilter) || $showArchived || !$showEmptyAccounts)
                     <button wire:click="clearFilters" class="btn btn-outline">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif
@@ -202,7 +202,7 @@
 
     <!-- Accounts List -->
     <x-tabs wire:model="viewMode" selected="cards">
-        <x-tab name="cards" label="Cards" icon="o-squares-2x2">
+        <x-tab name="cards" label="Cards" icon="fas.grip">
             <!-- Cards View -->
             @if (count($groupedAccounts) > 0)
             @foreach ($groupedAccounts as $group)
@@ -345,7 +345,7 @@
             <div class="card bg-base-200 shadow">
                 <div class="card-body">
                     <div class="text-center py-12">
-                        <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <x-icon name="fas.sterling-sign" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No accounts found</h3>
                         <p class="text-base-content/70 mb-6">
                             @if ($search || $accountTypeFilter || $providerFilter)
@@ -356,7 +356,7 @@
                         </p>
                         @if (!$search && !$accountTypeFilter && !$providerFilter)
                         <button wire:click="openCreateAccountModal" class="btn btn-primary">
-                            <x-icon name="o-plus" class="w-4 h-4" />
+                            <x-icon name="fas.plus" class="w-4 h-4" />
                             Add Your First Account
                         </button>
                         @endif
@@ -523,7 +523,7 @@
 
                         <x-slot:empty>
                             <div class="text-center py-12">
-                                <x-icon name="o-currency-pound" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                                <x-icon name="fas.sterling-sign" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                                 <h3 class="text-lg font-medium text-base-content mb-2">No accounts found</h3>
                                 <p class="text-base-content/70 mb-6">
                                     @if ($search || $accountTypeFilter || $providerFilter)
@@ -534,7 +534,7 @@
                                 </p>
                                 @if (!$search && !$accountTypeFilter && !$providerFilter)
                                 <button wire:click="openCreateAccountModal" class="btn btn-primary">
-                                    <x-icon name="o-plus" class="w-4 h-4" />
+                                    <x-icon name="fas.plus" class="w-4 h-4" />
                                     Add Your First Account
                                 </button>
                                 @endif

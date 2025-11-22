@@ -8,7 +8,7 @@
                 </button>
 
                 <button wire:click="detectTrends" class="btn btn-outline btn-sm">
-                    <x-icon name="o-chart-bar" class="h-4 w-4" />
+                    <x-icon name="fas.chart-simple" class="h-4 w-4" />
                     Detect Trends
                 </button>
 
@@ -35,7 +35,7 @@
     {{-- Recent Trends Summary --}}
     @if ($recentTrends->count() > 0)
         <div class="alert alert-info">
-            <x-icon name="o-information-circle" class="h-5 w-5" />
+            <x-icon name="fas.circle-info" class="h-5 w-5" />
             <div>
                 <h3 class="font-bold">{{ $recentTrends->count() }} Unacknowledged {{ Str::plural('Trend', $recentTrends->count()) }}</h3>
                 <div class="text-sm">
@@ -50,7 +50,7 @@
         <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <div class="text-center py-12">
-                    <x-icon name="o-chart-bar" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                    <x-icon name="fas.chart-simple" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                     <h3 class="text-lg font-medium text-base-content mb-2">No Metrics Available</h3>
                     <p class="text-base-content/70 mb-6">
                         Metrics require at least 30 days of event data. Keep using your integrations and check back soon!
@@ -119,11 +119,11 @@
                             <div class="flex-1">
                                 <div class="flex items-center gap-2">
                                     @if ($trend->getDirection() === 'up')
-                                        <x-icon name="o-arrow-trending-up" class="h-5 w-5 text-success" />
+                                        <x-icon name="fas.arrow-trend-up" class="h-5 w-5 text-success" />
                                     @elseif ($trend->getDirection() === 'down')
-                                        <x-icon name="o-arrow-trending-down" class="h-5 w-5 text-error" />
+                                        <x-icon name="fas.arrow-trend-down" class="h-5 w-5 text-error" />
                                     @else
-                                        <x-icon name="o-minus" class="h-5 w-5 text-gray-500" />
+                                        <x-icon name="fas.minus" class="h-5 w-5 text-gray-500" />
                                     @endif
 
                                     <div>

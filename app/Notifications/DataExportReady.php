@@ -20,7 +20,7 @@ class DataExportReady extends SparkNotification
 
     public function getIcon(): string
     {
-        return 'o-arrow-down-tray';
+        return 'fas.download';
     }
 
     public function getColor(): string

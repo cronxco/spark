@@ -272,7 +272,7 @@ new class extends Component {
             </div>
 
             <div class="alert alert-info mt-4">
-                <x-icon name="o-information-circle" class="w-5 h-5" />
+                <x-icon name="fas.circle-info" class="w-5 h-5" />
                 <span class="text-xs">
                     {{ __('Priority notifications (failures, system maintenance) are always sent immediately regardless of these settings.') }}
                 </span>

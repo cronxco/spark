@@ -32,20 +32,20 @@
                 @if ($levelFilter !== 'all' || $search)
                 <div class="form-control">
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
                 @endif
                 <div class="form-control">
                     <button wire:click="refreshLogs" class="btn btn-ghost">
-                        <x-icon name="o-arrow-path" class="w-4 h-4" />
+                        <x-icon name="fas.rotate" class="w-4 h-4" />
                         Refresh
                     </button>
                 </div>
                 <div class="form-control">
                     <button wire:click="downloadLog" class="btn btn-primary">
-                        <x-icon name="o-arrow-down-tray" class="w-4 h-4" />
+                        <x-icon name="fas.download" class="w-4 h-4" />
                         Download
                     </button>
                 </div>
@@ -58,7 +58,7 @@
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters & Actions
                     @if ($levelFilter !== 'all' || $search)
                     <x-badge value="Active" class="badge-primary badge-xs" />
@@ -95,17 +95,17 @@
                     </div>
                     @if ($levelFilter !== 'all' || $search)
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif
                     <div class="flex gap-2">
                         <button wire:click="refreshLogs" class="btn btn-ghost flex-1">
-                            <x-icon name="o-arrow-path" class="w-4 h-4" />
+                            <x-icon name="fas.rotate" class="w-4 h-4" />
                             Refresh
                         </button>
                         <button wire:click="downloadLog" class="btn btn-primary flex-1">
-                            <x-icon name="o-arrow-down-tray" class="w-4 h-4" />
+                            <x-icon name="fas.download" class="w-4 h-4" />
                             Download
                         </button>
                     </div>
@@ -142,7 +142,7 @@
 
                 <x-slot:empty>
                     <div class="text-center py-12">
-                        <x-icon name="o-document-text" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                        <x-icon name="fas.file-lines" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">No Log Entries</h3>
                         <p class="text-base-content/70">
                             @if (empty($search) && $levelFilter === 'all')

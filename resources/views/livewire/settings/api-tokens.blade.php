@@ -222,14 +222,14 @@ new class extends Component {
                         wire:confirm="{{ __('Are you sure you want to revoke this token?') }}" />
                     <x-button
                         class="btn-sm btn-error md:hidden"
-                        icon="o-trash"
+                        icon="fas.trash"
                         wire:click="revokeToken({{ $token['id'] }})"
                         wire:confirm="{{ __('Are you sure you want to revoke this token?') }}" />
                     @endscope
 
                     <x-slot:empty>
                         <div class="text-center py-8">
-                            <x-icon name="o-key" class="w-12 h-12 mx-auto text-base-content/30 mb-4" />
+                            <x-icon name="fas.key" class="w-12 h-12 mx-auto text-base-content/30 mb-4" />
                             <h3 class="mt-2 text-sm font-medium">{{ __('No tokens') }}</h3>
                             <p class="mt-1 text-sm text-base-content/70">{{ __('Get started by creating a new API token.') }}</p>
                         </div>

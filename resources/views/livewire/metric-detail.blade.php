@@ -5,17 +5,17 @@
         </x-slot:title>
         <x-slot:subtitle>
             <x-button link="{{ route('metrics.index') }}" wire:navigate class="btn-ghost btn-xs">
-                <x-icon name="o-arrow-left" class="w-4 h-4" />
+                <x-icon name="fas.arrow-left" class="w-4 h-4" />
                 Back to Metrics
             </x-button>
         </x-slot:subtitle>
         <x-slot:actions>
             <button wire:click="toggleTracking" class="btn btn-outline btn-sm">
                 @if ($isTrackingDisabled)
-                    <x-icon name="o-play" class="h-4 w-4" />
+                    <x-icon name="fas.play" class="h-4 w-4" />
                     Enable Tracking
                 @else
-                    <x-icon name="o-pause" class="h-4 w-4" />
+                    <x-icon name="fas.pause" class="h-4 w-4" />
                     Disable Tracking
                 @endif
             </button>
@@ -24,7 +24,7 @@
 
     @if ($isTrackingDisabled)
         <div class="alert alert-warning">
-            <x-icon name="o-exclamation-triangle" class="h-5 w-5" />
+            <x-icon name="fas.triangle-exclamation" class="h-5 w-5" />
             <div>
                 <h3 class="font-bold">Tracking Disabled</h3>
                 <div class="text-sm">
@@ -40,7 +40,7 @@
             {{-- Large icon --}}
             <div class="flex-shrink-0 self-center sm:self-start">
                 <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <x-icon name="o-chart-bar" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+                    <x-icon name="fas.chart-simple" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                 </div>
             </div>
 
@@ -179,9 +179,9 @@
                         <div class="flex items-center justify-between py-3">
                             <div class="flex items-center gap-3">
                                 @if ($trend->getDirection() === 'up')
-                                    <x-icon name="o-arrow-trending-up" class="h-6 w-6 text-success" />
+                                    <x-icon name="fas.arrow-trend-up" class="h-6 w-6 text-success" />
                                 @else
-                                    <x-icon name="o-arrow-trending-down" class="h-6 w-6 text-error" />
+                                    <x-icon name="fas.arrow-trend-down" class="h-6 w-6 text-error" />
                                 @endif
 
                                 <div>
@@ -218,7 +218,7 @@
         <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <div class="text-center py-12">
-                    <x-icon name="o-check-circle" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                    <x-icon name="fas.circle-check" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                     <h3 class="text-lg font-medium text-base-content mb-2">No Trends or Anomalies Detected</h3>
                     <p class="text-base-content/70">
                         Your {{ strtolower($metric->getDisplayName()) }} is stable with no significant deviations.

@@ -233,7 +233,7 @@ class NotificationSystemTest extends TestCase
         $notification = new IntegrationCompleted($integration, ['events_synced' => 100]);
 
         $this->assertEquals('integration_completed', $notification->getNotificationType());
-        $this->assertEquals('o-check-circle', $notification->getIcon());
+        $this->assertEquals('fas.circle-check', $notification->getIcon());
         $this->assertEquals('success', $notification->getColor());
         $this->assertFalse($notification->isPriority());
         $this->assertStringContainsString('completed successfully', $notification->getMessage());
@@ -247,7 +247,7 @@ class NotificationSystemTest extends TestCase
         $notification = new IntegrationFailed($integration, 'API error');
 
         $this->assertTrue($notification->isPriority());
-        $this->assertEquals('o-x-circle', $notification->getIcon());
+        $this->assertEquals('fas.circle-xmark', $notification->getIcon());
         $this->assertEquals('error', $notification->getColor());
     }
 
@@ -259,7 +259,7 @@ class NotificationSystemTest extends TestCase
         $notification = new DataExportReady('User Data', $downloadUrl);
 
         $this->assertEquals($downloadUrl, $notification->getActionUrl());
-        $this->assertEquals('o-arrow-down-tray', $notification->getIcon());
+        $this->assertEquals('fas.download', $notification->getIcon());
         $this->assertEquals('info', $notification->getColor());
     }
 
@@ -269,7 +269,7 @@ class NotificationSystemTest extends TestCase
         $notification = new SystemMaintenance('Update', 'System will be down');
 
         $this->assertTrue($notification->isPriority());
-        $this->assertEquals('o-wrench-screwdriver', $notification->getIcon());
+        $this->assertEquals('fas.screwdriver-wrench', $notification->getIcon());
         $this->assertEquals('warning', $notification->getColor());
     }
 
@@ -478,7 +478,7 @@ class NotificationSystemTest extends TestCase
         );
 
         $this->assertTrue($notification->isPriority());
-        $this->assertEquals('o-exclamation-triangle', $notification->getIcon());
+        $this->assertEquals('fas.triangle-exclamation', $notification->getIcon());
         $this->assertEquals('error', $notification->getColor());
         $this->assertEquals('migration_failed', $notification->getNotificationType());
         $this->assertStringContainsString('failed', $notification->getMessage());

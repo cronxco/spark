@@ -73,7 +73,7 @@
         {{-- Right side actions --}}
         <x-slot:actions>
             <label for="main-drawer" class="btn btn-ghost btn-sm lg:hidden" title="Menu" aria-label="Menu" data-hotkey="b">
-                <x-icon name="o-bars-3" class="w-5 h-5" />
+                <x-icon name="fas.bars" class="w-5 h-5" />
             </label>
 
             {{-- Global Progress Indicator --}}
@@ -101,7 +101,7 @@
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                     <x-menu-item
                         title="Reset Card Views"
-                        icon="o-arrow-path"
+                        icon="fas.rotate"
                         x-data
                         @click.prevent="
                             if (confirm('Reset all card view history? This will show all cards again.')) {

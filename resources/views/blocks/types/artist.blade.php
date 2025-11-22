@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas.grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $artistName = $block->metadata['artist'] ?? 'Unknown Artist';
@@ -27,7 +27,7 @@ $followers = $block->metadata['followers'] ?? null;
 
         {{-- Artist Display --}}
         <div class="flex items-center justify-center gap-3 py-2">
-            <x-icon name="o-musical-note" class="w-10 h-10 text-success" />
+            <x-icon name="fas.music" class="w-10 h-10 text-success" />
             <div class="flex-1">
                 <div class="text-xl font-bold">
                     {{ $artistName }}
@@ -46,12 +46,12 @@ $followers = $block->metadata['followers'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas.eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>

@@ -26,7 +26,7 @@ class MigrationFailed extends SparkNotification
 
     public function getIcon(): string
     {
-        return 'o-exclamation-triangle';
+        return 'fas.triangle-exclamation';
     }
 
     public function getColor(): string

@@ -6,7 +6,7 @@
                 @if (count($selectedItems) > 0)
                     <x-button
                         label="Delete Selected ({{ count($selectedItems) }})"
-                        icon="o-trash"
+                        icon="fas.trash"
                         class="btn-error btn-sm"
                         wire:click="bulkDelete"
                         onclick="return confirm('Delete {{ count($selectedItems) }} media item(s)? This cannot be undone.')"
@@ -80,7 +80,7 @@
                                 <span class="label-text">&nbsp;</span>
                             </label>
                             <button class="btn btn-outline" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4" />
+                                <x-icon name="fas.xmark" class="w-4 h-4" />
                                 Clear
                             </button>
                         </div>
@@ -94,7 +94,7 @@
             <x-collapse separator class="bg-base-200">
                 <x-slot:heading>
                     <div class="flex items-center gap-2">
-                        <x-icon name="o-funnel" class="w-5 h-5" />
+                        <x-icon name="fas.filter" class="w-5 h-5" />
                         Filters
                         @if ($search || !empty($modelFilter) || !empty($collectionFilter) || !empty($mimeFilter))
                             <x-badge value="Active" class="badge-primary badge-xs" />
@@ -150,7 +150,7 @@
 
                         @if ($search || !empty($modelFilter) || !empty($collectionFilter) || !empty($mimeFilter))
                             <button class="btn btn-outline" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4" />
+                                <x-icon name="fas.xmark" class="w-4 h-4" />
                                 Clear Filters
                             </button>
                         @endif
@@ -197,7 +197,7 @@
                 <div class="card-body">
                     <div class="flex flex-col items-center text-center py-12">
                         <div class="w-16 h-16 rounded-full bg-base-300 flex items-center justify-center mb-4">
-                            <x-icon name="o-photo" class="w-8 h-8 text-base-content/50" />
+                            <x-icon name="fas.image" class="w-8 h-8 text-base-content/50" />
                         </div>
                         <h3 class="text-xl font-semibold mb-2">No media found</h3>
                         <p class="text-base-content/70 mb-4">
@@ -209,7 +209,7 @@
                         </p>
                         @if ($search || !empty($modelFilter) || !empty($collectionFilter) || !empty($mimeFilter))
                             <button class="btn btn-primary btn-sm" wire:click="clearFilters">
-                                <x-icon name="o-x-mark" class="w-4 h-4" />
+                                <x-icon name="fas.xmark" class="w-4 h-4" />
                                 Clear Filters
                             </button>
                         @endif

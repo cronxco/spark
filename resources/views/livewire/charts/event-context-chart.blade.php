@@ -2,7 +2,7 @@
     @if ($chartData && $chartData->isNotEmpty())
         <x-card class="bg-base-200/50 border-2 border-primary/10">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="o-chart-bar" class="w-5 h-5 text-primary" />
+                <x-icon name="fas.chart-simple" class="w-5 h-5 text-primary" />
                 Recent Trend: {{ $metricName }}
             </h3>
 

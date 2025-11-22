@@ -43,7 +43,7 @@ class DailyCheckinPlugin extends ManualPlugin
 
     public static function getIcon(): string
     {
-        return 'o-clipboard-document-check';
+        return 'fas.clipboard-check';
     }
 
     public static function getAccentColor(): string
@@ -60,7 +60,7 @@ class DailyCheckinPlugin extends ManualPlugin
     {
         return [
             'had_morning_checkin' => [
-                'icon' => 'o-sun',
+                'icon' => 'fas.sun',
                 'display_name' => 'Morning Check-in',
                 'description' => 'Morning energy levels recorded',
                 'display_with_object' => false,
@@ -69,7 +69,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'had_afternoon_checkin' => [
-                'icon' => 'o-moon',
+                'icon' => 'fas.moon',
                 'display_name' => 'Afternoon Check-in',
                 'description' => 'Afternoon energy levels recorded',
                 'display_with_object' => false,
@@ -84,7 +84,7 @@ class DailyCheckinPlugin extends ManualPlugin
     {
         return [
             'physical_energy' => [
-                'icon' => 'o-bolt',
+                'icon' => 'fas.bolt',
                 'display_name' => 'Physical Energy',
                 'description' => 'Physical energy rating (1-5)',
                 'display_with_object' => false,
@@ -92,7 +92,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'mental_energy' => [
-                'icon' => 'o-light-bulb',
+                'icon' => 'fas.lightbulb',
                 'display_name' => 'Mental Energy',
                 'description' => 'Mental energy rating (1-5)',
                 'display_with_object' => false,
@@ -106,13 +106,13 @@ class DailyCheckinPlugin extends ManualPlugin
     {
         return [
             'day' => [
-                'icon' => 'o-calendar',
+                'icon' => 'fas.calendar-day',
                 'display_name' => 'Day',
                 'description' => 'A calendar day',
                 'hidden' => false,
             ],
             'user' => [
-                'icon' => 'o-user',
+                'icon' => 'fas.user',
                 'display_name' => 'User',
                 'description' => 'The user performing the check-in',
                 'hidden' => false,

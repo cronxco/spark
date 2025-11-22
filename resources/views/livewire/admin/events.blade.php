@@ -209,7 +209,7 @@ new class extends Component {
                 @if (count($selectedEvents) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
                     onclick="return confirm('Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.')">
-                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedEvents) }})
                 </button>
                 @endif
@@ -257,7 +257,7 @@ new class extends Component {
                     <div class="form-control content-end">
                         <label class="label"><span class="label-text">&nbsp;</span></label>
                         <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            <x-icon name="fas.xmark" class="w-4 h-4" />
                             Clear
                         </button>
                     </div>
@@ -271,7 +271,7 @@ new class extends Component {
             <x-collapse separator class="bg-base-200">
                 <x-slot:heading>
                     <div class="flex items-center gap-2">
-                        <x-icon name="o-funnel" class="w-5 h-5" />
+                        <x-icon name="fas.filter" class="w-5 h-5" />
                         Filters
                         @if ($search || $serviceFilter || $domainFilter || $actionFilter)
                         <x-badge value="Active" class="badge-primary badge-xs" />
@@ -313,7 +313,7 @@ new class extends Component {
                         </div>
                         @if ($search || $serviceFilter || $domainFilter || $actionFilter)
                         <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            <x-icon name="fas.xmark" class="w-4 h-4" />
                             Clear Filters
                         </button>
                         @endif
@@ -340,7 +340,7 @@ new class extends Component {
                     class="[&_table]:!static [&_td]:!static">
                     <x-slot:empty>
                         <div class="text-center py-12">
-                            <x-icon name="o-calendar" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <x-icon name="fas.calendar" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                             <h3 class="text-lg font-medium text-base-content mb-2">No events found</h3>
                             <p class="text-base-content/70">
                                 @if ($search || $serviceFilter || $domainFilter || $actionFilter)
