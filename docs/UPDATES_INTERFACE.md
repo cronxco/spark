@@ -1,29 +1,35 @@
-# Integration & Task Updates Interface
+# Integration and Task Updates Interface
 
-The Integration Updates interface provides a centralized way to monitor and manage integration data updates.
+A centralized interface for monitoring and managing integration data updates with real-time status tracking.
+
+## Overview
+
+The Updates interface provides visibility into the state of all integrations and tasks, allowing users to monitor update schedules, trigger manual updates, and track processing status. It uses Livewire polling for real-time feedback without WebSocket complexity.
+
+## Status States
+
+| Status | Description |
+|--------|-------------|
+| Up to Date | Successfully updated within its frequency window |
+| Needs Update | Due for an update based on frequency settings |
+| Processing | Currently being updated (job is running) |
+| Paused | Instance is paused and will not run |
 
 ## Features
 
-### 1. View Status
+### Manual Update Triggering
 
-- **Up to Date**: Integration has been successfully updated within its frequency window
-- **Needs Update**: Integration is due for an update based on its frequency settings
-- **Processing**: Integration is currently being updated (job is running)
-- **Paused**: Instance is paused and won't run
-
-### 2. Manual Update Triggering
-
-- Click "Update Now" to manually trigger an update for any integration
+- Click "Update Now" to trigger an update for any integration
 - Updates are processed as background jobs with retry logic
 - Real-time status updates with polling every 5 seconds
 
-### 3. Update Monitoring
+### Update Monitoring
 
-- Shows last successful update time
-- Shows next scheduled update time (frequency or schedule override)
-- Displays update frequency or schedule summary (times + timezone)
-- Indicates if an integration is currently processing
-- Filter by All / Integrations / Tasks, and run job for task instances
+- Last successful update time
+- Next scheduled update time (frequency or schedule override)
+- Update frequency or schedule summary (times + timezone)
+- Current processing indicator
+- Filter by All / Integrations / Tasks
 
 ## How It Works
 
@@ -37,23 +43,25 @@ The Integration Updates interface provides a centralized way to monitor and mana
 
 ### Status Detection
 
-- **Processing**: `last_triggered_at` is more recent than `last_successful_update_at`
-- **Needs Update**: Based on `update_frequency_minutes` and `last_successful_update_at`
-- **Up to Date**: Not processing and not due for update
+| Status | Detection Logic |
+|--------|-----------------|
+| Processing | `last_triggered_at` is more recent than `last_successful_update_at` |
+| Needs Update | Based on `update_frequency_minutes` and `last_successful_update_at` |
+| Up to Date | Not processing and not due for update |
 
 ### Real-time Updates
 
-- The interface polls every 5 seconds to refresh status
+- Interface polls every 5 seconds to refresh status
 - Manual refresh button available
 - Automatic status updates when jobs complete
 
 ## Navigation
 
-The Updates interface is accessible via:
-
-- **URL**: `/updates`
-- **Navigation**: Sidebar menu item "Updates" with cloud-arrow-down icon
-- **Route**: `updates.index`
+| Access Method | Value |
+|---------------|-------|
+| URL | `/updates` |
+| Sidebar | "Updates" with cloud-arrow-down icon |
+| Route Name | `updates.index` |
 
 ## Integration with Existing System
 
@@ -69,13 +77,3 @@ The Updates interface is accessible via:
 - Jobs are retried automatically with exponential backoff
 - User-friendly error messages for manual triggers
 - Graceful handling of missing integrations or plugins
-
-## Future Enhancements
-
-Potential improvements could include:
-
-- Real-time WebSocket updates instead of polling
-- Detailed job progress tracking
-- Update history and logs
-- Bulk update operations
-- Integration health metrics

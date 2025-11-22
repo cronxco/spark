@@ -1,1359 +1,440 @@
-# Integration Plugins Architecture
+# Integration Plugins
 
-## ⚠️ Block Creation Best Practices
-
-### Always Use `createBlock()` Instead of `blocks()->create()`
-
-**❌ DEPRECATED - Don't use:**
-
-```php
-// This creates duplicate blocks!
-$event->blocks()->create([
-    'title' => 'Heart Rate',
-    'block_type' => 'biometric',
-    'value' => 75,
-]);
-```
-
-**✅ CORRECT - Use instead:**
-
-```php
-// This prevents duplicates and updates existing blocks
-$event->createBlock([
-    'title' => 'Heart Rate',
-    'block_type' => 'biometric',
-    'value' => 75,
-    'value_unit' => 'bpm',
-]);
-```
-
-### Why `createBlock()` is Required
-
-1. **Prevents Duplicate Blocks**: The `createBlock()` method ensures only one block exists per `(event_id, title, block_type)` combination
-2. **Updates Existing Data**: When new data comes in, existing blocks are updated instead of creating duplicates
-3. **Database Constraints**: A unique constraint prevents duplicates even in race conditions
-4. **Memory Efficiency**: Eliminates redundant storage of duplicate block data
-
-### Block Creation Rules
-
-- **Always specify `block_type`**: This helps categorize and deduplicate blocks properly
-- **Use descriptive titles**: The `title` field is part of the uniqueness constraint
-- **Include all relevant data**: Values, units, metadata, URLs, etc.
-- **Let the system handle deduplication**: Don't try to check for existing blocks manually
-
-### Examples
-
-```php
-// Health metrics
-$event->createBlock([
-    'title' => 'Average Heart Rate',
-    'block_type' => 'heart_rate',
-    'value' => 75,
-    'value_unit' => 'bpm',
-    'metadata' => ['type' => 'average', 'context' => 'workout'],
-]);
-
-// Activity data
-$event->createBlock([
-    'title' => 'Steps',
-    'block_type' => 'activity_metric',
-    'value' => 10000,
-    'value_unit' => 'count',
-    'metadata' => ['source' => 'pedometer'],
-]);
-
-// Financial transaction details
-$event->createBlock([
-    'title' => 'Merchant',
-    'block_type' => 'transaction_details',
-    'metadata' => [
-        'merchant_name' => 'Coffee Shop',
-        'category' => 'food_drink',
-        'address' => '123 Main St',
-    ],
-    'media_url' => 'https://logo.example.com/merchant.png',
-]);
-```
-
----
-
-## Multi-instance with instance groups
-
-Integrations can now create multiple instances that share the same authentication. Tokens and account metadata are stored on `integration_groups` and each logical instance is an `integrations` row with its own `instance_type` and `configuration`.
-
-Key changes:
-
-- New table: `integration_groups` (owns OAuth/webhook credentials)
-- `integrations` now includes `integration_group_id` and `instance_type`; token fields were removed from `integrations`
-- Plugins expose instance types via `getInstanceTypes()`
-- OAuth/Webhook plugins initialize a group first, then instances are created during onboarding
+The integration plugin system provides a flexible architecture for connecting external services and converting their data into Spark's standardized event/object/block format.
 
 ## Overview
 
-### Task Plugin
+Spark uses a plugin-based architecture where each external service (Monzo, Oura, Spotify, GitHub, etc.) is implemented as a self-contained plugin. Plugins are registered via the `PluginRegistry` and managed through a group-first lifecycle where OAuth tokens and credentials are stored on `IntegrationGroup`, while individual configurations live on `Integration` instances.
 
-Spark includes a `Task` plugin for global/special tasks and also supports per-integration task instances using `instance_type='task'`.
+## Architecture
 
-Configuration keys (stored per instance in `configuration`):
+### Plugin Types
 
-- `task_mode`: `artisan` or `job`
-- `task_command` or `task_job_class` (one required per mode)
-- `task_payload`: associative array parameters
-- `task_queue`: queue name (defaults to `pull`)
-- `use_schedule`, `schedule_times`, `schedule_timezone`, `paused`
+Plugins are categorized by their service type, which determines how they authenticate and receive data:
 
-Security:
+| Type | Description | Data Flow |
+|------|-------------|-----------|
+| `oauth` | OAuth 2.0 authentication with external APIs | Polling via scheduled jobs |
+| `webhook` | Receives data via HTTP webhooks | Push-based, real-time |
+| `manual` | User-entered data, no external API | Direct user input |
+| `apikey` | API key authentication | Polling via scheduled jobs |
 
-- Allowed commands: `config('app.allowed_task_commands')`
-- Allowed job classes: `config('app.allowed_task_jobs')`
+### Base Classes
 
-The Spark integration plugin system provides a flexible architecture for connecting external services and converting their data into our standardized event/object/block format. The system supports both OAuth-based APIs and webhook-based integrations.
+Base classes in `app/Integrations/Base/` provide common functionality:
 
-## Architecture Components
+| Class | Service Type | Key Features |
+|-------|--------------|--------------|
+| `OAuthPlugin` | `oauth` | PKCE flow, token refresh, authenticated requests |
+| `WebhookPlugin` | `webhook` | Signature verification, webhook URL generation |
+| `ManualPlugin` | `manual` | No external API, user data entry |
 
-### 1. Base Plugin Interface
+### Plugin Registry
+
+The `PluginRegistry` (`app/Integrations/PluginRegistry.php`) maintains all available plugins:
 
 ```php
-<?php
+use App\Integrations\PluginRegistry;
 
-namespace App\Integrations\Contracts;
+// Get a plugin class by identifier
+$pluginClass = PluginRegistry::getPlugin('spotify');
 
-use App\Models\Integration;
-use App\Models\IntegrationGroup;
-use App\Models\User;
-use Illuminate\Http\Request;
+// Get a plugin instance
+$plugin = PluginRegistry::getPluginInstance('spotify');
 
+// Get all plugins of a specific type
+$oauthPlugins = PluginRegistry::getOAuthPlugins();
+$webhookPlugins = PluginRegistry::getWebhookPlugins();
+$manualPlugins = PluginRegistry::getManualPlugins();
+$apiKeyPlugins = PluginRegistry::getApiKeyPlugins();
+
+// Get all plugins with their configuration metadata
+$pluginsWithConfig = PluginRegistry::getPluginsWithConfig();
+```
+
+### Data Model Hierarchy
+
+```
+IntegrationGroup (stores OAuth tokens/credentials)
+  |-> Integration (specific instance with configuration)
+      |-> EventObject (entities: bank account, playlist, device)
+          |-> Event (timestamped data points)
+              |-> Block (data visualizations)
+```
+
+## Implementation
+
+### IntegrationPlugin Contract
+
+All plugins must implement the `IntegrationPlugin` contract:
+
+```php
 interface IntegrationPlugin
 {
-    /**
-     * Get the unique identifier for this integration
-     */
+    // Identity
     public static function getIdentifier(): string;
-
-    /**
-     * Get the display name for this integration
-     */
     public static function getDisplayName(): string;
-
-    /**
-     * Get the description for this integration
-     */
     public static function getDescription(): string;
-
-    /**
-     * Get the service type (oauth, webhook, etc.)
-     */
     public static function getServiceType(): string;
 
-    /**
-     * Get the configuration schema for this integration
-     */
+    // Display
+    public static function getIcon(): string;
+    public static function getAccentColor(): string;
+    public static function getDomain(): string;
+
+    // Configuration
     public static function getConfigurationSchema(): array;
-
-    /**
-     * Each plugin returns available instance types and their schemas
-     * e.g. ['sleep' => ['label' => 'Sleep', 'schema' => [...]], ...]
-     */
     public static function getInstanceTypes(): array;
+    public static function getActionTypes(): array;
+    public static function getBlockTypes(): array;
+    public static function getObjectTypes(): array;
 
-    /**
-     * Initialize the integration for a user
-     */
+    // Lifecycle
+    public static function supportsMigration(): bool;
+    public static function getTimeUntilStaleMinutes(): ?int;
+
     // Group-first lifecycle
     public function initializeGroup(User $user): IntegrationGroup;
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration;
+    public function createInstance(
+        IntegrationGroup $group,
+        string $instanceType,
+        array $initialConfig = [],
+        bool $withMigration = false
+    ): Integration;
 
-    /**
-     * Handle OAuth callback
-     */
+    // Data handling
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void;
-
-    /**
-     * Handle webhook payload
-     */
     public function handleWebhook(Request $request, Integration $integration): void;
-
-    /**
-     * Fetch data from external API
-     */
     public function fetchData(Integration $integration): void;
-
-    /**
-     * Convert external data to our format
-     */
     public function convertData(array $externalData, Integration $integration): array;
 }
 ```
 
-### 2. OAuth Plugin Base Class (Group-first lifecycle)
+### Creating an OAuth Plugin
 
 ```php
-<?php
-
-namespace App\Integrations\Base;
-
-use App\Integrations\Contracts\IntegrationPlugin;
-use App\Models\Integration;
-use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-
-abstract class OAuthPlugin implements IntegrationPlugin
-{
-    protected string $baseUrl;
-    protected string $clientId;
-    protected string $clientSecret;
-    protected string $redirectUri;
-
-    public static function getServiceType(): string
-    {
-        return 'oauth';
-    }
-
-    // Group-first lifecycle
-    public function initializeGroup(User $user): IntegrationGroup
-    {
-        return IntegrationGroup::create([
-            'user_id' => $user->id,
-            'service' => static::getIdentifier(),
-            'account_id' => null,
-            'access_token' => null,
-            'refresh_token' => null,
-            'expiry' => null,
-            'refresh_expiry' => null,
-        ]);
-    }
-
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
-    {
-        return Integration::create([
-            'user_id' => $group->user_id,
-            'integration_group_id' => $group->id,
-            'service' => static::getIdentifier(),
-            'name' => static::getDisplayName(),
-            'instance_type' => $instanceType,
-            'configuration' => $initialConfig,
-        ]);
-    }
-
-    public function getOAuthUrl(IntegrationGroup $group): string
-    {
-        $state = encrypt([
-            'group_id' => $group->id,
-            'user_id' => $group->user_id,
-        ]);
-
-        $params = [
-            'client_id' => $this->clientId,
-            'redirect_uri' => $this->redirectUri,
-            'response_type' => 'code',
-            'scope' => $this->getRequiredScopes(),
-            'state' => $state,
-        ];
-
-        return $this->baseUrl . '/oauth/authorize?' . http_build_query($params);
-    }
-
-    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
-    {
-        $code = $request->get('code');
-        $state = $request->get('state');
-
-        // Verify state
-        $stateData = decrypt($state);
-        if ($stateData['group_id'] !== $group->id) {
-            throw new \Exception('Invalid state parameter');
-        }
-
-        // Exchange code for tokens
-        $response = Http::post($this->baseUrl . '/oauth/token', [
-            'client_id' => $this->clientId,
-            'client_secret' => $this->clientSecret,
-            'code' => $code,
-            'grant_type' => 'authorization_code',
-            'redirect_uri' => $this->redirectUri,
-        ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('Failed to exchange code for tokens');
-        }
-
-        $tokenData = $response->json();
-
-        // Update group with tokens
-        $group->update([
-            'access_token' => $tokenData['access_token'] ?? null,
-            'refresh_token' => $tokenData['refresh_token'] ?? null,
-            'expiry' => isset($tokenData['expires_in']) ? now()->addSeconds($tokenData['expires_in']) : null,
-        ]);
-
-        // Fetch account information
-        $this->fetchAccountInfoForGroup($group);
-    }
-
-    protected function refreshToken(IntegrationGroup $group): void
-    {
-        $response = Http::post($this->baseUrl . '/oauth/token', [
-            'client_id' => $this->clientId,
-            'client_secret' => $this->clientSecret,
-            'refresh_token' => $group->refresh_token,
-            'grant_type' => 'refresh_token',
-        ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('Failed to refresh token');
-        }
-
-        $tokenData = $response->json();
-
-        $group->update([
-            'access_token' => $tokenData['access_token'],
-            'refresh_token' => $tokenData['refresh_token'] ?? $group->refresh_token,
-            'expiry' => isset($tokenData['expires_in']) ? now()->addSeconds($tokenData['expires_in']) : null,
-        ]);
-    }
-
-    protected function makeAuthenticatedRequest(string $endpoint, Integration $integration): array
-    {
-        $group = $integration->group;
-        $token = $integration->access_token;
-        if ($group) {
-            if ($group->expiry && $group->expiry->isPast()) {
-                $this->refreshToken($group);
-            }
-            $token = $group->access_token;
-        }
-
-        $response = Http::withToken($token)
-            ->get($this->baseUrl . $endpoint);
-
-        if (!$response->successful()) {
-            throw new \Exception('API request failed: ' . $response->body());
-        }
-
-        return $response->json();
-    }
-
-    abstract protected function getRequiredScopes(): string;
-    abstract protected function fetchAccountInfoForGroup(IntegrationGroup $group): void;
-}
-```
-
-### 3. Webhook Plugin Base Class (Group-first aware)
-
-```php
-<?php
-
-namespace App\Integrations\Base;
-
-use App\Integrations\Contracts\IntegrationPlugin;
-use App\Models\Integration;
-use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-
-abstract class WebhookPlugin implements IntegrationPlugin
-{
-    public static function getServiceType(): string
-    {
-        return 'webhook';
-    }
-
-    public function initializeGroup(User $user): IntegrationGroup
-    {
-        $webhookSecret = Str::random(32);
-        return IntegrationGroup::create([
-            'user_id' => $user->id,
-            'service' => static::getIdentifier(),
-            'account_id' => $webhookSecret, // used as signing secret
-        ]);
-    }
-
-    public function createInstance(IntegrationGroup $group, string $instanceType, array $initialConfig = []): Integration
-    {
-        return Integration::create([
-            'user_id' => $group->user_id,
-            'integration_group_id' => $group->id,
-            'service' => static::getIdentifier(),
-            'name' => static::getDisplayName(),
-            'instance_type' => $instanceType,
-            'configuration' => $initialConfig,
-        ]);
-    }
-
-    public function handleWebhook(Request $request, Integration $integration): void
-    {
-        // Verify webhook signature if required
-        if (!$this->verifyWebhookSignature($request, $integration)) {
-            abort(401, 'Invalid webhook signature');
-        }
-
-        // Process the webhook payload
-        $payload = $request->all();
-        $convertedData = $this->convertData($payload, $integration);
-
-        // Create events, objects, and blocks
-        $this->createEventsFromWebhook($convertedData, $integration);
-    }
-
-    protected function verifyWebhookSignature(Request $request, Integration $integration): bool
-    {
-        // Override in child classes if signature verification is needed
-        return true;
-    }
-
-    protected function createEventsFromWebhook(array $convertedData, Integration $integration): void
-    {
-        foreach ($convertedData['events'] ?? [] as $eventData) {
-            // Create actor object
-            $actor = $this->createOrUpdateObject($eventData['actor'], $integration);
-
-            // Create target object
-            $target = $this->createOrUpdateObject($eventData['target'], $integration);
-
-            // Create event
-            $event = $integration->user->events()->create([
-                'source_id' => $eventData['source_id'],
-                'time' => $eventData['time'],
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'actor_metadata' => $eventData['actor_metadata'] ?? [],
-                'service' => $integration->service,
-                'domain' => $eventData['domain'],
-                'action' => $eventData['action'],
-                'value' => $eventData['value'] ?? null,
-                'value_multiplier' => $eventData['value_multiplier'] ?? 1,
-                'value_unit' => $eventData['value_unit'] ?? null,
-                'event_metadata' => $eventData['event_metadata'] ?? [],
-                'target_id' => $target->id,
-                'target_metadata' => $eventData['target_metadata'] ?? [],
-                'embeddings' => $eventData['embeddings'] ?? null,
-            ]);
-
-            // Create blocks if any - Use createBlock() to prevent duplicates
-            foreach ($eventData['blocks'] ?? [] as $blockData) {
-                $event->createBlock([
-                    'time' => $blockData['time'] ?? now(),
-                    'block_type' => $blockData['block_type'] ?? 'general',
-                    'title' => $blockData['title'],
-                    'metadata' => $blockData['metadata'] ?? ['content' => $blockData['content'] ?? ''],
-                    'url' => $blockData['url'] ?? null,
-                    'media_url' => $blockData['media_url'] ?? null,
-                    'value' => $blockData['value'] ?? null,
-                    'value_multiplier' => $blockData['value_multiplier'] ?? 1,
-                    'value_unit' => $blockData['value_unit'] ?? null,
-                    'embeddings' => $blockData['embeddings'] ?? null,
-                ]);
-            }
-        }
-    }
-
-    protected function createOrUpdateObject(array $objectData, Integration $integration): EventObject
-    {
-        return EventObject::updateOrCreate(
-            [
-                'integration_id' => $integration->id,
-                'concept' => $objectData['concept'],
-                'type' => $objectData['type'],
-                'title' => $objectData['title'],
-            ],
-            [
-                'time' => $objectData['time'] ?? now(),
-                'content' => $objectData['content'] ?? null,
-                'metadata' => $objectData['metadata'] ?? [],
-                'url' => $objectData['url'] ?? null,
-                'image_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
-            ]
-        );
-    }
-}
-```
-
-### 4. Plugin Registry
-
-```php
-<?php
-
-namespace App\Integrations;
-
-use App\Integrations\Contracts\IntegrationPlugin;
-use Illuminate\Support\Collection;
-
-class PluginRegistry
-{
-    private static array $plugins = [];
-
-    public static function register(string $pluginClass): void
-    {
-        if (!is_subclass_of($pluginClass, IntegrationPlugin::class)) {
-            throw new \InvalidArgumentException("Class must implement IntegrationPlugin");
-        }
-
-        $identifier = $pluginClass::getIdentifier();
-        self::$plugins[$identifier] = $pluginClass;
-    }
-
-    public static function getPlugin(string $identifier): ?string
-    {
-        return self::$plugins[$identifier] ?? null;
-    }
-
-    public static function getAllPlugins(): Collection
-    {
-        return collect(self::$plugins);
-    }
-
-    public static function getOAuthPlugins(): Collection
-    {
-        return self::getAllPlugins()->filter(function ($pluginClass) {
-            return $pluginClass::getServiceType() === 'oauth';
-        });
-    }
-
-    public static function getWebhookPlugins(): Collection
-    {
-        return self::getAllPlugins()->filter(function ($pluginClass) {
-            return $pluginClass::getServiceType() === 'webhook';
-        });
-    }
-}
-```
-
-### 5. Example OAuth Plugin Implementation (Group-first)
-
-```php
-<?php
-
-namespace App\Integrations\GitHub;
+namespace App\Integrations\Example;
 
 use App\Integrations\Base\OAuthPlugin;
 use App\Models\Integration;
-use Illuminate\Http\Request;
+use App\Models\IntegrationGroup;
 
-class GitHubPlugin extends OAuthPlugin
+class ExamplePlugin extends OAuthPlugin
 {
-    protected string $baseUrl = 'https://api.github.com';
+    protected string $baseUrl = 'https://api.example.com';
     protected string $clientId;
     protected string $clientSecret;
     protected string $redirectUri;
 
     public function __construct()
     {
-        $this->clientId = config('services.github.client_id');
-        $this->clientSecret = config('services.github.client_secret');
-        $this->redirectUri = config('services.github.redirect') ?? route('integrations.oauth.callback', ['service' => 'github']);
+        $this->clientId = config('services.example.client_id');
+        $this->clientSecret = config('services.example.client_secret');
+        $this->redirectUri = route('integrations.oauth.callback', ['service' => 'example']);
     }
 
     public static function getIdentifier(): string
     {
-        return 'github';
+        return 'example';
     }
 
     public static function getDisplayName(): string
     {
-        return 'GitHub';
+        return 'Example Service';
     }
 
     public static function getDescription(): string
     {
-        return 'Connect your GitHub account to track repository activity';
+        return 'Connect your Example account to track activity.';
     }
 
-    public static function getConfigurationSchema(): array
+    public static function getIcon(): string
     {
-        return [
-            'repositories' => [
-                'type' => 'array',
-                'label' => 'Repositories to track',
-                'description' => 'Select which repositories to monitor',
-                'required' => true,
-            ],
-            'events' => [
-                'type' => 'array',
-                'label' => 'Events to track',
-                'options' => [
-                    'push' => 'Push events',
-                    'pull_request' => 'Pull request events',
-                    'issue' => 'Issue events',
-                    'commit_comment' => 'Commit comments',
-                ],
-                'required' => true,
-            ],
-        ];
+        return 'o-cube';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'online'; // health, money, media, knowledge, online
     }
 
     protected function getRequiredScopes(): string
     {
-        return 'repo read:user';
+        return 'read write';
     }
 
     protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
     {
-        // Create a temp Integration bound to the group to reuse HTTP helper
+        // Fetch and store account information after OAuth
         $temp = new Integration();
         $temp->setRelation('group', $group);
         $userData = $this->makeAuthenticatedRequest('/user', $temp);
-        $group->update(['account_id' => $userData['login']]);
+        $group->update(['account_id' => $userData['id']]);
     }
 
     public function fetchData(Integration $integration): void
     {
-        $config = $integration->configuration ?? [];
-        $repositories = $config['repositories'] ?? [];
-        $events = $config['events'] ?? ['push', 'pull_request'];
-
-        foreach ($repositories as $repo) {
-            $this->fetchRepositoryEvents($repo, $events, $integration);
-        }
-    }
-
-    protected function fetchRepositoryEvents(string $repo, array $events, Integration $integration): void
-    {
-        foreach ($events as $eventType) {
-            $endpoint = "/repos/{$repo}/events";
-            $eventsData = $this->makeAuthenticatedRequest($endpoint, $integration);
-
-            foreach ($eventsData as $eventData) {
-                $convertedData = $this->convertData($eventData, $integration);
-                $this->createEventFromData($convertedData, $integration);
-            }
-        }
+        // Implement data fetching logic
     }
 
     public function convertData(array $externalData, Integration $integration): array
     {
-        $eventType = $externalData['type'];
-
-        switch ($eventType) {
-            case 'PushEvent':
-                return $this->convertPushEvent($externalData, $integration);
-            case 'PullRequestEvent':
-                return $this->convertPullRequestEvent($externalData, $integration);
-            case 'IssuesEvent':
-                return $this->convertIssueEvent($externalData, $integration);
-            default:
-                return [];
-        }
-    }
-
-    protected function convertPushEvent(array $data, Integration $integration): array
-    {
-        $actor = [
-            'concept' => 'user',
-            'type' => 'github_user',
-            'title' => $data['actor']['login'],
-            'content' => $data['actor']['login'],
-            'metadata' => [
-                'github_id' => $data['actor']['id'],
-                'avatar_url' => $data['actor']['avatar_url'],
-            ],
-            'url' => $data['actor']['html_url'],
-            'image_url' => $data['actor']['avatar_url'],
-        ];
-
-        $target = [
-            'concept' => 'repository',
-            'type' => 'github_repo',
-            'title' => $data['repo']['name'],
-            'content' => $data['repo']['description'] ?? '',
-            'metadata' => [
-                'github_id' => $data['repo']['id'],
-                'full_name' => $data['repo']['full_name'],
-            ],
-            'url' => $data['repo']['html_url'],
-        ];
-
-        $commits = $data['payload']['commits'] ?? [];
-        $blocks = [];
-
-        foreach ($commits as $commit) {
-            $blocks[] = [
-                'title' => 'Commit: ' . substr($commit['sha'], 0, 7),
-                'content' => $commit['message'],
-                'url' => $commit['url'],
-                'value' => 1,
-                'value_unit' => 'commit',
-            ];
-        }
-
-        return [
-            'events' => [[
-                'source_id' => $data['id'],
-                'time' => $data['created_at'],
-                'actor' => $actor,
-                'target' => $target,
-                'domain' => 'repository',
-                'action' => 'push',
-                'value' => count($commits),
-                'value_unit' => 'commits',
-                'event_metadata' => [
-                    'ref' => $data['payload']['ref'],
-                    'before' => $data['payload']['before'],
-                    'after' => $data['payload']['after'],
-                ],
-                'blocks' => $blocks,
-            ]],
-        ];
-    }
-
-    protected function convertPullRequestEvent(array $data, Integration $integration): array
-    {
-        $actor = [
-            'concept' => 'user',
-            'type' => 'github_user',
-            'title' => $data['actor']['login'],
-            'content' => $data['actor']['login'],
-            'metadata' => [
-                'github_id' => $data['actor']['id'],
-                'avatar_url' => $data['actor']['avatar_url'],
-            ],
-            'url' => $data['actor']['html_url'],
-            'image_url' => $data['actor']['avatar_url'],
-        ];
-
-        $pr = $data['payload']['pull_request'];
-        $target = [
-            'concept' => 'pull_request',
-            'type' => 'github_pr',
-            'title' => $pr['title'],
-            'content' => $pr['body'] ?? '',
-            'metadata' => [
-                'github_id' => $pr['id'],
-                'number' => $pr['number'],
-                'state' => $pr['state'],
-                'repository' => $data['repo']['full_name'],
-            ],
-            'url' => $pr['html_url'],
-        ];
-
-        return [
-            'events' => [[
-                'source_id' => $data['id'],
-                'time' => $data['created_at'],
-                'actor' => $actor,
-                'target' => $target,
-                'domain' => 'pull_request',
-                'action' => $data['payload']['action'],
-                'value' => 1,
-                'value_unit' => 'pull_request',
-                'event_metadata' => [
-                    'repository' => $data['repo']['full_name'],
-                    'number' => $pr['number'],
-                ],
-            ]],
-        ];
-    }
-
-    protected function convertIssueEvent(array $data, Integration $integration): array
-    {
-        $actor = [
-            'concept' => 'user',
-            'type' => 'github_user',
-            'title' => $data['actor']['login'],
-            'content' => $data['actor']['login'],
-            'metadata' => [
-                'github_id' => $data['actor']['id'],
-                'avatar_url' => $data['actor']['avatar_url'],
-            ],
-            'url' => $data['actor']['html_url'],
-            'image_url' => $data['actor']['avatar_url'],
-        ];
-
-        $issue = $data['payload']['issue'];
-        $target = [
-            'concept' => 'issue',
-            'type' => 'github_issue',
-            'title' => $issue['title'],
-            'content' => $issue['body'] ?? '',
-            'metadata' => [
-                'github_id' => $issue['id'],
-                'number' => $issue['number'],
-                'state' => $issue['state'],
-                'repository' => $data['repo']['full_name'],
-            ],
-            'url' => $issue['html_url'],
-        ];
-
-        return [
-            'events' => [[
-                'source_id' => $data['id'],
-                'time' => $data['created_at'],
-                'actor' => $actor,
-                'target' => $target,
-                'domain' => 'issue',
-                'action' => $data['payload']['action'],
-                'value' => 1,
-                'value_unit' => 'issue',
-                'event_metadata' => [
-                    'repository' => $data['repo']['full_name'],
-                    'number' => $issue['number'],
-                ],
-            ]],
-        ];
+        // Convert external data to Spark format
+        return [];
     }
 }
 ```
 
-### 6. Example Webhook Plugin Implementation
+### Creating a Webhook Plugin
 
 ```php
-<?php
-
-namespace App\Integrations\Slack;
+namespace App\Integrations\Example;
 
 use App\Integrations\Base\WebhookPlugin;
 use App\Models\Integration;
-use Illuminate\Http\Request;
 
-class SlackPlugin extends WebhookPlugin
+class ExampleWebhookPlugin extends WebhookPlugin
 {
     public static function getIdentifier(): string
     {
-        return 'slack';
+        return 'example-webhook';
     }
 
     public static function getDisplayName(): string
     {
-        return 'Slack';
+        return 'Example Webhook';
     }
 
     public static function getDescription(): string
     {
-        return 'Receive Slack events via webhook';
+        return 'Receive events via webhook.';
     }
 
-    public static function getConfigurationSchema(): array
+    public static function getIcon(): string
     {
-        return [
-            'events' => [
-                'type' => 'array',
-                'label' => 'Events to track',
-                'options' => [
-                    'message' => 'Message events',
-                    'reaction_added' => 'Reaction events',
-                    'file_shared' => 'File sharing events',
-                ],
-                'required' => true,
-            ],
-        ];
+        return 'o-bolt';
     }
 
-    public function handleWebhook(Request $request, Integration $integration): void
+    public static function getAccentColor(): string
     {
-        $payload = $request->all();
-
-        // Verify Slack signature
-        if (!$this->verifySlackSignature($request, $integration)) {
-            abort(401, 'Invalid Slack signature');
-        }
-
-        // Handle Slack URL verification
-        if ($payload['type'] === 'url_verification') {
-            return response()->json(['challenge' => $payload['challenge']]);
-        }
-
-        // Process the event
-        $convertedData = $this->convertData($payload, $integration);
-        $this->createEventsFromWebhook($convertedData, $integration);
+        return 'warning';
     }
 
-    protected function verifySlackSignature(Request $request, Integration $integration): bool
+    public static function getDomain(): string
     {
-        $signature = $request->header('X-Slack-Signature');
-        $timestamp = $request->header('X-Slack-Request-Timestamp');
-        $body = $request->getContent();
-
-        $baseString = "v0:{$timestamp}:{$body}";
-        $expectedSignature = 'v0=' . hash_hmac('sha256', $baseString, $integration->account_id);
-
-        return hash_equals($expectedSignature, $signature);
+        return 'online';
     }
 
     public function convertData(array $externalData, Integration $integration): array
     {
-        $event = $externalData['event'] ?? [];
-        $eventType = $event['type'] ?? '';
-
-        switch ($eventType) {
-            case 'message':
-                return $this->convertMessageEvent($externalData, $integration);
-            case 'reaction_added':
-                return $this->convertReactionEvent($externalData, $integration);
-            case 'file_shared':
-                return $this->convertFileEvent($externalData, $integration);
-            default:
-                return [];
-        }
-    }
-
-    protected function convertMessageEvent(array $data, Integration $integration): array
-    {
-        $event = $data['event'];
-
-        $actor = [
-            'concept' => 'user',
-            'type' => 'slack_user',
-            'title' => $event['user'] ?? 'Unknown User',
-            'content' => $event['user'] ?? 'Unknown User',
-            'metadata' => [
-                'slack_user_id' => $event['user'] ?? null,
-                'channel' => $event['channel'] ?? null,
-            ],
-            'url' => null,
-        ];
-
-        $target = [
-            'concept' => 'message',
-            'type' => 'slack_message',
-            'title' => 'Message in ' . ($event['channel'] ?? 'unknown channel'),
-            'content' => $event['text'] ?? '',
-            'metadata' => [
-                'slack_message_id' => $event['ts'] ?? null,
-                'channel' => $event['channel'] ?? null,
-                'thread_ts' => $event['thread_ts'] ?? null,
-            ],
-            'url' => null,
-        ];
-
         return [
             'events' => [[
-                'source_id' => $data['event_id'],
-                'time' => date('Y-m-d H:i:s', $event['ts'] ?? time()),
-                'actor' => $actor,
-                'target' => $target,
-                'domain' => 'message',
-                'action' => 'sent',
+                'source_id' => $externalData['id'],
+                'time' => $externalData['timestamp'],
+                'actor' => [
+                    'concept' => 'user',
+                    'type' => 'example_user',
+                    'title' => $externalData['user']['name'],
+                ],
+                'target' => [
+                    'concept' => 'item',
+                    'type' => 'example_item',
+                    'title' => $externalData['item']['name'],
+                ],
+                'domain' => 'online',
+                'action' => 'created',
                 'value' => 1,
-                'value_unit' => 'message',
-                'event_metadata' => [
-                    'channel' => $event['channel'] ?? null,
-                    'subtype' => $event['subtype'] ?? null,
-                ],
-            ]],
-        ];
-    }
-
-    protected function convertReactionEvent(array $data, Integration $integration): array
-    {
-        $event = $data['event'];
-
-        $actor = [
-            'concept' => 'user',
-            'type' => 'slack_user',
-            'title' => $event['user'] ?? 'Unknown User',
-            'content' => $event['user'] ?? 'Unknown User',
-            'metadata' => [
-                'slack_user_id' => $event['user'] ?? null,
-            ],
-            'url' => null,
-        ];
-
-        $target = [
-            'concept' => 'reaction',
-            'type' => 'slack_reaction',
-            'title' => 'Reaction: ' . $event['reaction'],
-            'content' => $event['reaction'],
-            'metadata' => [
-                'reaction' => $event['reaction'],
-                'item_type' => $event['item']['type'] ?? null,
-                'item_id' => $event['item']['ts'] ?? null,
-            ],
-            'url' => null,
-        ];
-
-        return [
-            'events' => [[
-                'source_id' => $data['event_id'],
-                'time' => date('Y-m-d H:i:s', $event['event_ts'] ?? time()),
-                'actor' => $actor,
-                'target' => $target,
-                'domain' => 'reaction',
-                'action' => 'added',
-                'value' => 1,
-                'value_unit' => 'reaction',
-                'event_metadata' => [
-                    'reaction' => $event['reaction'],
-                ],
-            ]],
-        ];
-    }
-
-    protected function convertFileEvent(array $data, Integration $integration): array
-    {
-        $event = $data['event'];
-        $file = $event['file'] ?? [];
-
-        $actor = [
-            'concept' => 'user',
-            'type' => 'slack_user',
-            'title' => $file['user'] ?? 'Unknown User',
-            'content' => $file['user'] ?? 'Unknown User',
-            'metadata' => [
-                'slack_user_id' => $file['user'] ?? null,
-            ],
-            'url' => null,
-        ];
-
-        $target = [
-            'concept' => 'file',
-            'type' => 'slack_file',
-            'title' => $file['name'] ?? 'Unknown File',
-            'content' => $file['title'] ?? '',
-            'metadata' => [
-                'slack_file_id' => $file['id'] ?? null,
-                'file_type' => $file['filetype'] ?? null,
-                'size' => $file['size'] ?? null,
-            ],
-            'url' => $file['url_private'] ?? null,
-        ];
-
-        return [
-            'events' => [[
-                'source_id' => $data['event_id'],
-                'time' => date('Y-m-d H:i:s', $file['timestamp'] ?? time()),
-                'actor' => $actor,
-                'target' => $target,
-                'domain' => 'file',
-                'action' => 'shared',
-                'value' => $file['size'] ?? 1,
-                'value_unit' => 'bytes',
-                'event_metadata' => [
-                    'file_type' => $file['filetype'] ?? null,
-                    'channels' => $file['channels'] ?? [],
-                ],
+                'value_unit' => 'item',
             ]],
         ];
     }
 }
 ```
 
-### 7. Plugin Service Provider
+### Registering Plugins
+
+Register plugins in `IntegrationServiceProvider`:
 
 ```php
-<?php
-
 namespace App\Providers;
 
 use App\Integrations\PluginRegistry;
-use App\Integrations\GitHub\GitHubPlugin;
-use App\Integrations\Slack\SlackPlugin;
+use App\Integrations\Example\ExamplePlugin;
 use Illuminate\Support\ServiceProvider;
 
 class IntegrationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Register plugins
-        PluginRegistry::register(GitHubPlugin::class);
-        PluginRegistry::register(SlackPlugin::class);
-    }
-
-    public function boot(): void
-    {
-        // Register routes
-        $this->registerRoutes();
-    }
-
-    protected function registerRoutes(): void
-    {
-        // OAuth routes
-        Route::middleware(['auth'])->group(function () {
-            Route::get('/integrations/{service}/oauth', [IntegrationController::class, 'oauth'])
-                ->name('integrations.oauth');
-            Route::get('/integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])
-                ->name('integrations.oauth.callback');
-        });
-
-        // Webhook routes
-        Route::post('/webhook/{service}/{secret}', [WebhookController::class, 'handle'])
-            ->name('webhook.handle');
+        PluginRegistry::register(ExamplePlugin::class);
     }
 }
 ```
 
-### 8. Integration Controller
+## Configuration
+
+### Configuration Schema
+
+The configuration schema defines user-configurable options:
 
 ```php
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Integrations\PluginRegistry;
-use App\Models\Integration;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-
-class IntegrationController extends Controller
+public static function getConfigurationSchema(): array
 {
-    public function index()
+    return [
+        'update_frequency_minutes' => [
+            'type' => 'integer',
+            'label' => 'Update Frequency (minutes)',
+            'description' => 'How often to check for new data',
+            'required' => true,
+            'min' => 5,
+            'default' => 15,
+        ],
+        'auto_tag' => [
+            'type' => 'boolean',
+            'label' => 'Auto-tag Events',
+            'description' => 'Automatically tag events',
+            'default' => false,
+        ],
+        'categories' => [
+            'type' => 'array',
+            'label' => 'Categories to Track',
+            'options' => [
+                'category_a' => 'Category A',
+                'category_b' => 'Category B',
+            ],
+            'required' => true,
+        ],
+    ];
+}
+```
+
+### Instance Types
+
+Instance types allow multiple configurations per integration group:
+
+```php
+public static function getInstanceTypes(): array
+{
+    return [
+        'activity' => [
+            'label' => 'Activity Tracking',
+            'schema' => self::getConfigurationSchema(),
+        ],
+        'metrics' => [
+            'label' => 'Metrics Dashboard',
+            'schema' => [
+                'metrics_to_track' => [
+                    'type' => 'array',
+                    'label' => 'Metrics',
+                    'required' => true,
+                ],
+            ],
+        ],
+    ];
+}
+```
+
+### Action Types
+
+Action types define event actions with display settings:
+
+```php
+public static function getActionTypes(): array
+{
+    return [
+        'listened_to' => [
+            'icon' => 'o-play',
+            'display_name' => 'Listened to Track',
+            'description' => 'A track that was listened to',
+            'display_with_object' => true,
+            'value_unit' => null,
+            'hidden' => false,
+        ],
+    ];
+}
+```
+
+### Block Types
+
+Block types define data visualization blocks:
+
+```php
+public static function getBlockTypes(): array
+{
+    return [
+        'album_art' => [
+            'icon' => 'o-photo',
+            'display_name' => 'Album Artwork',
+            'description' => 'Album cover artwork',
+            'display_with_object' => true,
+            'value_unit' => null,
+            'hidden' => false,
+        ],
+    ];
+}
+```
+
+### Object Types
+
+Object types define entities the integration manages:
+
+```php
+public static function getObjectTypes(): array
+{
+    return [
+        'spotify_track' => [
+            'icon' => 'o-musical-note',
+            'display_name' => 'Spotify Track',
+            'description' => 'A Spotify track',
+            'hidden' => false,
+        ],
+    ];
+}
+```
+
+### Valid Domains
+
+Plugins must use one of these domains:
+
+- `health` - Health and fitness data
+- `money` - Financial data
+- `media` - Media consumption
+- `knowledge` - Knowledge and notes
+- `online` - Online activity
+
+### Spotlight Commands
+
+Plugins can provide Spotlight commands by implementing `SupportsSpotlightCommands`:
+
+```php
+use App\Integrations\Contracts\SupportsSpotlightCommands;
+
+class ExamplePlugin extends OAuthPlugin implements SupportsSpotlightCommands
+{
+    public static function getSpotlightCommands(): array
     {
-        $plugins = PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
-            return [
-                'identifier' => $pluginClass::getIdentifier(),
-                'name' => $pluginClass::getDisplayName(),
-                'description' => $pluginClass::getDescription(),
-                'type' => $pluginClass::getServiceType(),
-                'configuration_schema' => $pluginClass::getConfigurationSchema(),
-            ];
-        });
-
-        $userIntegrations = Auth::user()->integrations()->with('user')->get();
-
-        return view('integrations.index', compact('plugins', 'userIntegrations'));
-    }
-
-    public function oauth(string $service)
-    {
-        $pluginClass = PluginRegistry::getPlugin($service);
-        if (!$pluginClass) {
-            abort(404);
-        }
-
-        $plugin = new $pluginClass();
-        $user = Auth::user();
-
-        // Check if integration already exists
-        $integration = $user->integrations()
-            ->where('service', $service)
-            ->first();
-
-        if (!$integration) {
-            $integration = $plugin->initialize($user);
-        }
-
-        $oauthUrl = $plugin->getOAuthUrl($integration);
-
-        return redirect($oauthUrl);
-    }
-
-    public function oauthCallback(Request $request, string $service)
-    {
-        $pluginClass = PluginRegistry::getPlugin($service);
-        if (!$pluginClass) {
-            abort(404);
-        }
-
-        $plugin = new $pluginClass();
-        $user = Auth::user();
-
-        $integration = $user->integrations()
-            ->where('service', $service)
-            ->firstOrFail();
-
-        $plugin->handleOAuthCallback($request, $integration);
-
-        return redirect()->route('integrations.index')
-            ->with('success', 'Integration connected successfully!');
-    }
-
-    public function configure(Request $request, Integration $integration)
-    {
-        $pluginClass = PluginRegistry::getPlugin($integration->service);
-        if (!$pluginClass) {
-            abort(404);
-        }
-
-        $schema = $pluginClass::getConfigurationSchema();
-
-        $validated = $request->validate($this->buildValidationRules($schema));
-
-        $integration->update([
-            'configuration' => $validated,
-        ]);
-
-        return redirect()->route('integrations.index')
-            ->with('success', 'Integration configured successfully!');
-    }
-
-    protected function buildValidationRules(array $schema): array
-    {
-        $rules = [];
-
-        foreach ($schema as $field => $config) {
-            $fieldRules = [];
-
-            if ($config['required'] ?? false) {
-                $fieldRules[] = 'required';
-            } else {
-                $fieldRules[] = 'nullable';
-            }
-
-            switch ($config['type']) {
-                case 'array':
-                    $fieldRules[] = 'array';
-                    break;
-                case 'string':
-                    $fieldRules[] = 'string';
-                    break;
-                case 'integer':
-                    $fieldRules[] = 'integer';
-                    break;
-            }
-
-            $rules[$field] = $fieldRules;
-        }
-
-        return $rules;
+        return [
+            'sync-now' => [
+                'title' => 'Sync Example Now',
+                'subtitle' => 'Trigger an immediate sync',
+                'icon' => 'o-arrow-path',
+                'action' => 'dispatch_event',
+                'actionParams' => ['name' => 'sync-example', 'close' => true],
+                'priority' => 5,
+            ],
+        ];
     }
 }
 ```
 
-### 9. Webhook Controller
+## Related Documentation
 
-```php
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Integrations\PluginRegistry;
-use App\Models\Integration;
-use Illuminate\Http\Request;
-
-class WebhookController extends Controller
-{
-    public function handle(Request $request, string $service, string $secret)
-    {
-        $pluginClass = PluginRegistry::getPlugin($service);
-        if (!$pluginClass) {
-            abort(404);
-        }
-
-        $integration = Integration::where('service', $service)
-            ->where('account_id', $secret)
-            ->first();
-
-        if (!$integration) {
-            abort(404);
-        }
-
-        $plugin = new $pluginClass();
-        $plugin->handleWebhook($request, $integration);
-
-        return response()->json(['status' => 'success']);
-    }
-}
-```
-
-### 10. Scheduled Jobs
-
-```php
-<?php
-
-namespace App\Console\Commands;
-
-use App\Integrations\PluginRegistry;
-use App\Models\Integration;
-use Illuminate\Console\Command;
-
-class FetchIntegrationData extends Command
-{
-    protected $signature = 'integrations:fetch';
-    protected $description = 'Fetch data from all OAuth integrations';
-
-    public function handle(): int
-    {
-        $oauthIntegrations = Integration::whereHas('user')
-            ->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
-            ->get();
-
-        foreach ($oauthIntegrations as $integration) {
-            try {
-                $pluginClass = PluginRegistry::getPlugin($integration->service);
-                $plugin = new $pluginClass();
-
-                $this->info("Fetching data for {$integration->service} integration {$integration->id}");
-                $plugin->fetchData($integration);
-
-            } catch (\Exception $e) {
-                $this->error("Failed to fetch data for integration {$integration->id}: " . $e->getMessage());
-            }
-        }
-
-        return 0;
-    }
-}
-```
-
-### 11. Database Migrations
-
-```php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::table('integrations', function (Blueprint $table) {
-            $table->json('configuration')->nullable()->after('refresh_expiry');
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('integrations', function (Blueprint $table) {
-            $table->dropColumn('configuration');
-        });
-    }
-};
-```
-
-## Usage Examples
-
-### Registering a Plugin
-
-```php
-// In your service provider
-PluginRegistry::register(GitHubPlugin::class);
-```
-
-### Initializing and Creating Instances
-
-```php
-$user = Auth::user();
-$plugin = new GitHubPlugin();
-$group = $plugin->initializeGroup($user);
-
-// After OAuth callback succeeds, create instances during onboarding
-$instance = $plugin->createInstance($group, 'activity', [
-    'repositories' => ['owner/repo'],
-    'events' => ['push','pull_request'],
-]);
-```
-
-### Handling OAuth Callback (Group)
-
-```php
-$plugin = new GitHubPlugin();
-$plugin->handleOAuthCallback($request, $group);
-```
-
-### Processing Webhooks
-
-```php
-$plugin = new SlackPlugin();
-$plugin->handleWebhook($request, $integration);
-```
-
-### Scheduling Data Fetching
-
-```bash
-# Add to your crontab
-* * * * * php artisan integrations:fetch
-```
-
-## Benefits of This Architecture
-
-1. **Modular**: Each integration is self-contained
-2. **Extensible**: Easy to add new integrations
-3. **Type-safe**: Strong typing with interfaces
-4. **Testable**: Each component can be tested independently
-5. **Flexible**: Supports both OAuth and webhook patterns
-6. **Maintainable**: Clear separation of concerns
-7. **Scalable**: Can handle multiple integration types
-
-This architecture provides a solid foundation for building a comprehensive integration system that can grow with your needs.
+- `CLAUDE.md` - Main development guide with plugin system overview
+- `app/Integrations/Contracts/IntegrationPlugin.php` - Full contract definition
+- `app/Integrations/Base/` - Base class implementations
+- `app/Providers/IntegrationServiceProvider.php` - Plugin registration

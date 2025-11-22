@@ -1,286 +1,115 @@
-# Soft Deletes Implementation
+# Soft Deletes
 
-Soft deletes have been successfully implemented across all models in the application. This allows records to be "deleted" without actually removing them from the database, making data recovery possible and maintaining referential integrity.
+Soft deletes allow records to be marked as deleted without removing them from the database, enabling data recovery and maintaining referential integrity.
 
-## Implementation Status
+## Overview
 
-✅ **Migrations Updated**: All model migrations now include `deleted_at` columns  
-✅ **Models Updated**: All models now use the `SoftDeletes` trait  
-✅ **Relationships Updated**: All relationships handle soft deleted models properly  
-✅ **Controllers Updated**: Delete operations now perform soft deletes  
-✅ **Functionality Verified**: Soft delete operations tested and confirmed working  
+All core models use Laravel's `SoftDeletes` trait. When a record is deleted, the `deleted_at` timestamp is set instead of removing the row. Relationships are configured with `withTrashed()` to maintain referential integrity.
 
-## Models with Soft Deletes
+## Supported Models
 
-The following models now support soft deletes:
+| Model | Description |
+|-------|-------------|
+| Integration | User integrations with external services |
+| EventObject | Objects that participate in events (actors/targets) |
+| Event | Events that occur in the system |
+| Block | Content blocks associated with events |
 
-1. **Integration** - User integrations with external services
-2. **EventObject** - Objects that participate in events (actors/targets)
-3. **Event** - Events that occur in the system
-4. **Block** - Content blocks associated with events
+## Database Schema
 
-## Database Schema Changes
-
-All model tables now include a `deleted_at` column:
+All model tables include a `deleted_at` column:
 
 ```sql
--- Example for events table
 ALTER TABLE events ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE NULL;
-```
-
-The `deleted_at` column is:
-- `TIMESTAMP WITH TIME ZONE` (PostgreSQL)
-- `NULL` by default
-- Set to the current timestamp when a record is soft deleted
-
-## Model Updates
-
-### Integration Model
-```php
-use Illuminate\Database\Eloquent\SoftDeletes;
-
-class Integration extends Model
-{
-    use HasFactory, SoftDeletes;
-    
-    protected $casts = [
-        'deleted_at' => 'datetime',
-        // ... other casts
-    ];
-}
-```
-
-### EventObject Model
-```php
-use Illuminate\Database\Eloquent\SoftDeletes;
-
-class EventObject extends Model
-{
-    use HasFactory, HasTags, SoftDeletes;
-    
-    protected $casts = [
-        'deleted_at' => 'datetime',
-        // ... other casts
-    ];
-}
-```
-
-### Event Model
-```php
-use Illuminate\Database\Eloquent\SoftDeletes;
-
-class Event extends Model
-{
-    use HasFactory, HasTags, SoftDeletes;
-    
-    protected $casts = [
-        'deleted_at' => 'datetime',
-        // ... other casts
-    ];
-}
-```
-
-### Block Model
-```php
-use Illuminate\Database\Eloquent\SoftDeletes;
-
-class Block extends Model
-{
-    use HasFactory, SoftDeletes;
-    
-    protected $casts = [
-        'deleted_at' => 'datetime',
-        // ... other casts
-    ];
-}
-```
-
-## Relationship Updates
-
-All relationships have been updated to handle soft deleted models using `withTrashed()`:
-
-### Event Relationships
-```php
-public function integration()
-{
-    return $this->belongsTo(Integration::class)->withTrashed();
-}
-
-public function actor()
-{
-    return $this->belongsTo(EventObject::class, 'actor_id')->withTrashed();
-}
-
-public function target()
-{
-    return $this->belongsTo(EventObject::class, 'target_id')->withTrashed();
-}
-
-public function blocks()
-{
-    return $this->hasMany(Block::class)->withTrashed();
-}
-```
-
-### EventObject Relationships
-```php
-public function integration()
-{
-    return $this->belongsTo(Integration::class)->withTrashed();
-}
-```
-
-### Block Relationships
-```php
-public function event()
-{
-    return $this->belongsTo(Event::class)->withTrashed();
-}
-
-public function integration()
-{
-    return $this->belongsTo(Integration::class)->withTrashed();
-}
 ```
 
 ## Available Methods
 
-All models now have access to these soft delete methods:
+### Basic Operations
 
-### Basic Soft Delete Operations
-- `delete()` - Soft delete a model (sets `deleted_at` timestamp)
-- `forceDelete()` - Permanently delete a model from the database
-- `restore()` - Restore a soft deleted model (sets `deleted_at` to null)
+| Method | Description |
+|--------|-------------|
+| `delete()` | Soft delete (sets `deleted_at`) |
+| `forceDelete()` | Permanently remove from database |
+| `restore()` | Restore soft deleted record |
+| `trashed()` | Check if model is soft deleted |
 
 ### Query Scopes
-- `withTrashed()` - Include soft deleted records in queries
-- `onlyTrashed()` - Query only soft deleted records
-- `withoutTrashed()` - Exclude soft deleted records (default behavior)
 
-### Helper Methods
-- `trashed()` - Check if a model is soft deleted
-- `isForceDeleting()` - Check if a model is being force deleted
+| Scope | Description |
+|-------|-------------|
+| `withTrashed()` | Include soft deleted records |
+| `onlyTrashed()` | Query only soft deleted records |
+| `withoutTrashed()` | Exclude soft deleted records (default) |
 
 ## Usage Examples
 
-### Soft Deleting Records
-```php
-// Soft delete an integration
-$integration = Integration::find($id);
-$integration->delete(); // Sets deleted_at timestamp
+### Soft Delete
 
-// Soft delete an event
+```php
 $event = Event::find($id);
-$event->delete(); // Sets deleted_at timestamp
+$event->delete();
 ```
 
-### Querying Soft Deleted Records
+### Query Deleted Records
+
 ```php
-// Find only active records (default behavior)
-$activeIntegrations = Integration::all();
+// Include deleted
+$all = Integration::withTrashed()->get();
 
-// Include soft deleted records
-$allIntegrations = Integration::withTrashed()->get();
-
-// Find only soft deleted records
-$deletedIntegrations = Integration::onlyTrashed()->get();
+// Only deleted
+$deleted = Integration::onlyTrashed()->get();
 ```
 
-### Restoring Soft Deleted Records
-```php
-// Restore a soft deleted integration
-$deletedIntegration = Integration::onlyTrashed()->find($id);
-$deletedIntegration->restore();
+### Restore
 
-// Or restore multiple records
-Integration::onlyTrashed()->restore();
+```php
+$deleted = Integration::onlyTrashed()->find($id);
+$deleted->restore();
 ```
 
-### Force Deleting Records
+### Force Delete
+
 ```php
-// Permanently delete a record
-$integration = Integration::withTrashed()->find($id);
-$integration->forceDelete(); // Removes from database permanently
+$record = Integration::withTrashed()->find($id);
+$record->forceDelete();
 ```
 
-### Checking Soft Delete Status
+## Relationship Handling
+
+All relationships use `withTrashed()` to preserve referential integrity:
+
 ```php
-$integration = Integration::withTrashed()->find($id);
-
-if ($integration->trashed()) {
-    echo "This integration has been soft deleted";
-}
-
-if ($integration->deleted_at) {
-    echo "Deleted at: " . $integration->deleted_at;
+public function integration()
+{
+    return $this->belongsTo(Integration::class)->withTrashed();
 }
 ```
 
-## API Integration
+## API Behavior
 
-The Event API controller has been updated to perform soft deletes:
+The Event API performs soft deletes in transactions:
 
 ```php
-// In EventApiController::destroy()
 DB::transaction(function () use ($event) {
-    // Soft delete associated blocks
     $event->blocks()->delete();
-    
-    // Soft delete the event
     $event->delete();
-    
-    // Note: We don't delete actor/target objects as they might be used by other events
+    // Actor/target objects are preserved for other events
 });
 ```
 
-## Testing
+## Considerations
 
-The soft delete functionality has been tested and verified working. You can test it manually using Laravel Tinker:
-
-```bash
-./vendor/bin/sail artisan tinker
-```
-
-```php
-// Test basic soft delete functionality
-$user = App\Models\User::factory()->create();
-$integration = App\Models\Integration::factory()->create(['user_id' => $user->id]);
-$actor = App\Models\EventObject::factory()->create(['integration_id' => $integration->id]);
-$target = App\Models\EventObject::factory()->create(['integration_id' => $integration->id]);
-$event = App\Models\Event::factory()->create([
-    'integration_id' => $integration->id,
-    'actor_id' => $actor->id,
-    'target_id' => $target->id,
-]);
-
-echo 'Event created with ID: ' . $event->id;
-$event->delete();
-echo 'Event soft deleted';
-
-$deletedEvent = App\Models\Event::withTrashed()->find($event->id);
-echo 'Found deleted event: ' . ($deletedEvent ? 'Yes' : 'No');
-echo 'Deleted at: ' . $deletedEvent->deleted_at;
-```
+| Concern | Notes |
+|---------|-------|
+| Storage | Soft deleted records consume database space |
+| Performance | Consider indexing `deleted_at` for large datasets |
+| Cleanup | Implement periodic cleanup of old soft deleted records |
+| Compliance | Helps meet data retention requirements |
 
 ## Benefits
 
-1. **Data Recovery**: Soft deleted records can be restored if needed
-2. **Referential Integrity**: Foreign key relationships remain intact
-3. **Audit Trail**: Maintains history of deleted records
-4. **Safe Operations**: Reduces risk of accidental data loss
-5. **Compliance**: Helps meet data retention requirements
-
-## Considerations
-
-1. **Storage**: Soft deleted records still consume database space
-2. **Performance**: Queries may need to be optimized for large datasets
-3. **Cleanup**: Consider implementing a cleanup strategy for old soft deleted records
-4. **Indexing**: Consider adding indexes on `deleted_at` columns for better performance
-
-## Next Steps
-
-1. **Cleanup Strategy**: Implement automated cleanup of old soft deleted records
-2. **UI Integration**: Add restore/force delete options to the frontend
-3. **Bulk Operations**: Add bulk restore/force delete functionality
-4. **Audit Logging**: Track who performed soft delete operations
-5. **Data Retention Policy**: Define how long soft deleted records should be kept
+- Data recovery capability
+- Referential integrity maintained
+- Audit trail of deleted records
+- Safe operations reducing accidental data loss

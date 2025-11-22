@@ -1,90 +1,116 @@
 # Hevy Integration
 
-Connect your Hevy account to import workouts. Each exercise set is represented as a Block attached to a workout Event. This enables fine-grained analysis of volume, reps, and intensity over time.
+Connect your Hevy account to import workout data, with each exercise set represented as a Block for detailed training analysis.
 
 ## Overview
 
-- Service: `hevy`
-- Type: API-key (`App\Integrations\Hevy\HevyPlugin`)
-- Instances: `workouts`
-- Core mapping:
-    - Workout → Event (service `hevy`, domain `fitness`, action `completed_workout`)
-    - Exercise Set → Block (title: "{Exercise} - Set {n}")
-    - Exercise Summary (optional) → Block (title: "{Exercise} - Total Volume")
+The Hevy integration syncs workout data from the Hevy fitness tracking app using API key authentication. Each workout creates an Event with exercise sets stored as Blocks, enabling fine-grained analysis of volume, reps, and intensity over time. The integration supports automatic periodic sweeps to catch any missed data.
+
+## Features
+
+- Import completed workouts with full exercise details
+- Track individual exercise sets with weight, reps, and RPE
+- Generate per-exercise volume summary blocks
+- Support for both metric (kg) and imperial (lb) units
+- Automatic deduplication prevents duplicate workout entries
+- Configurable fetch window and update frequency
+- Automatic weekly data sweeps for data integrity
 
 ## Setup
 
-1. Obtain an API key from Hevy.
-2. Configure environment variables:
+### Prerequisites
 
-```env
-HEVY_API_KEY=your_api_key
-```
+- A Hevy account with workout data
+- Hevy API key (obtainable from Hevy app/website)
 
-3. Ensure the plugin is registered (done in `app/Providers/IntegrationServiceProvider.php`).
-4. Navigate to `/integrations` and add Hevy using the API key.
+### Configuration
 
-## Configuration
+1. Obtain an API key from Hevy
+2. Navigate to `/integrations` in Spark
+3. Add the Hevy integration using your API key
+4. Configure the workouts instance with your preferences
 
-The `workouts` instance supports:
+### Environment Variables
 
-- `update_frequency_minutes` (default: 30)
-- `days_back` (default: 14)
-- `units`: `kg` or `lb` (default: `kg`)
-- `include_exercise_summary_blocks`: optional array; include `enabled` to create per-exercise volume summary blocks
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `HEVY_API_KEY` | No | Global fallback API key (per-instance keys are preferred) |
 
-## Scopes
+## Data Model
 
-Hevy API key provides access to:
+### Instance Types
 
-- Profile information
-- Workout data
+| Type | Label | Description |
+|------|-------|-------------|
+| `workouts` | Workouts | Syncs workout sessions and exercise data |
 
-## Data model
+### Action Types
 
-- Event (workout):
-    - `service`: `hevy`
-    - `domain`: `fitness`
-    - `action`: `completed_workout`
-    - `value`: total volume (encoded int) and `value_unit`: `kg`/`lb`
-    - `event_metadata`: `duration_seconds`, `end`
-- Block (set):
-    - `title`: `{Exercise} - Set {n}`
-    - `content`: exercise, set number, reps, weight, optional RPE/rest
-    - `value`: set weight (encoded) and `value_unit`: `kg`/`lb`
-- Block (exercise summary):
-    - `title`: `{Exercise} - Total Volume`
-    - `value`: sum of (weight × reps)
+| Action | Display Name | Description | Value Unit |
+|--------|--------------|-------------|------------|
+| `completed_workout` | Completed Workout | A workout session that has been completed in Hevy | kcal |
 
-## Sync behavior
+### Block Types
 
-- Fetch window: `days_back` days ending today.
-- De-duplication: `source_id` of form `hevy_workout_{integration_id}_{workout_id}` prevents duplicates.
-- Authentication: uses API key stored in integration configuration.
+| Type | Display Name | Description | Value Unit |
+|------|--------------|-------------|------------|
+| `exercise` | Exercise | A specific exercise performed during a workout | - |
+| `exercise_summary` | Exercise Summary | Summary statistics for an exercise in a workout | kg |
+
+### Object Types
+
+| Type | Display Name | Description |
+|------|--------------|-------------|
+| `hevy_workout` | Hevy Workout | A workout from Hevy app |
+| `hevy_user` | Hevy User | A Hevy user account |
+
+## Usage
+
+### Connecting
+
+1. Go to the Integrations page
+2. Click "Add Integration" and select Hevy
+3. Enter your Hevy API key
+4. Create a "Workouts" instance
+5. Configure update frequency and other options
+
+### Configuration Options
+
+| Option | Type | Default | Range | Description |
+|--------|------|---------|-------|-------------|
+| `api_key` | string | - | - | Hevy API key (overrides global key) |
+| `update_frequency_minutes` | integer | 30 | 5-1440 | Minutes between sync operations |
+| `days_back` | integer | 14 | 1-90 | Number of days to fetch on each run |
+| `units` | select | kg | kg, lb | Preferred weight unit for display |
+| `include_exercise_summary_blocks` | array | enabled | - | Create per-exercise volume summary blocks |
+
+### Manual Operations
+
+Workouts are synced automatically based on the configured update frequency. The integration also performs automatic weekly sweeps (every 6 days) to fetch any missed data from the past 30 days.
+
+## API Reference
+
+The integration uses the Hevy REST API:
+
+- **Base URL**: `https://api.hevyapp.com`
+- **Authentication**: API key via `api-key` header
+- **Endpoints used**:
+  - `GET /v1/workouts` - Fetch workout history
+  - `GET /v1/me` - Fetch user profile
 
 ## Troubleshooting
 
-- Invalid credentials: verify `HEVY_API_KEY` env value.
-- 401/403: confirm API key validity in Hevy console.
-- No workouts: expand `days_back` and check user actually has workouts in the period.
+### Common Issues
 
-## Testing
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Invalid credentials | API key is incorrect or expired | Verify API key in Hevy console and update integration configuration |
+| 401/403 errors | API key lacks required permissions | Confirm API key validity and regenerate if necessary |
+| No workouts syncing | Fetch window too narrow | Increase `days_back` value or check that workouts exist in the time period |
+| Missing exercise data | Workout has no exercises recorded | Verify workout contains exercise sets in Hevy app |
 
-Run via Sail:
+## Related Documentation
 
-```bash
-./vendor/bin/sail up -d
-./vendor/bin/sail artisan test --filter=HevyIntegrationTest
-```
-
-The test `tests/Feature/HevyIntegrationTest.php` fakes Hevy API responses and asserts:
-
-- Metadata/scopes
-- Initialization of group and instance
-- Workout fetch creates a workout Event and Blocks per set with an exercise summary block
-
-## Extending
-
-- Add additional blocks (e.g., tempo, failure, notes) if Hevy surfaces them.
-- Add per-workout summary blocks (e.g., total sets, avg RPE).
-- Auto-tag exercises or muscle groups from Hevy taxonomy.
+- [CLAUDE.md](/CLAUDE.md) - Plugin system architecture
+- [Integration Plugin System](/CLAUDE.md#integration-plugin-system) - How plugins work
+- [Job Architecture](/CLAUDE.md#job-architecture) - Background job processing
