@@ -3,7 +3,6 @@
 namespace App\Services\TransactionLinking;
 
 use App\Models\Event;
-use App\Models\PendingTransactionLink;
 use App\Models\Relationship;
 use App\Services\TransactionLinking\Contracts\LinkingStrategy;
 use App\Services\TransactionLinking\Strategies\BacsRecordStrategy;
@@ -136,26 +135,26 @@ class TransactionLinkingService
      */
     public function getPendingStats(string $userId): array
     {
+        $baseQuery = Relationship::where('user_id', $userId)
+            ->where('from_type', Event::class)
+            ->where('to_type', Event::class)
+            ->pending();
+
         return [
-            'total' => PendingTransactionLink::where('user_id', $userId)->pending()->count(),
-            'by_strategy' => PendingTransactionLink::where('user_id', $userId)
-                ->pending()
-                ->selectRaw('detection_strategy, COUNT(*) as count')
-                ->groupBy('detection_strategy')
-                ->pluck('count', 'detection_strategy')
+            'total' => (clone $baseQuery)->count(),
+            'by_strategy' => (clone $baseQuery)
+                ->selectRaw("metadata->>'detection_strategy' as strategy, COUNT(*) as count")
+                ->groupByRaw("metadata->>'detection_strategy'")
+                ->pluck('count', 'strategy')
                 ->toArray(),
             'by_confidence' => [
-                'high' => PendingTransactionLink::where('user_id', $userId)
-                    ->pending()
-                    ->where('confidence', '>=', 80)
+                'high' => (clone $baseQuery)->aboveConfidence(80)->count(),
+                'medium' => (clone $baseQuery)
+                    ->whereRaw("(metadata->>'confidence')::numeric >= 50")
+                    ->whereRaw("(metadata->>'confidence')::numeric < 80")
                     ->count(),
-                'medium' => PendingTransactionLink::where('user_id', $userId)
-                    ->pending()
-                    ->whereBetween('confidence', [50, 80])
-                    ->count(),
-                'low' => PendingTransactionLink::where('user_id', $userId)
-                    ->pending()
-                    ->where('confidence', '<', 50)
+                'low' => (clone $baseQuery)
+                    ->whereRaw("(metadata->>'confidence')::numeric < 50")
                     ->count(),
             ],
         ];
@@ -173,29 +172,23 @@ class TransactionLinkingService
     ): string {
         $targetEvent = $link['target_event'];
 
-        // Check if relationship already exists
+        // Check if relationship already exists (either direction, confirmed or pending)
         $existingRelationship = Relationship::where('user_id', $userId)
-            ->where('from_type', Event::class)
-            ->where('from_id', $sourceEvent->id)
-            ->where('to_type', Event::class)
-            ->where('to_id', $targetEvent->id)
             ->where('type', $link['relationship_type'])
+            ->betweenEvents($sourceEvent->id, $targetEvent->id)
             ->exists();
 
         if ($existingRelationship) {
             return 'skipped';
         }
 
-        // Check if pending link already exists
-        $existingPending = PendingTransactionLink::where('user_id', $userId)
-            ->where('source_event_id', $sourceEvent->id)
-            ->where('target_event_id', $targetEvent->id)
-            ->where('relationship_type', $link['relationship_type'])
-            ->exists();
-
-        if ($existingPending) {
-            return 'skipped';
-        }
+        // Build metadata for the relationship
+        $metadata = [
+            'auto_linked' => true,
+            'detection_strategy' => $strategy->getIdentifier(),
+            'confidence' => $link['confidence'],
+            'matching_criteria' => $link['matching_criteria'],
+        ];
 
         // Auto-approve high confidence links
         if ($link['confidence'] >= $autoApproveThreshold) {
@@ -209,29 +202,26 @@ class TransactionLinkingService
                 'value' => $link['value'],
                 'value_multiplier' => $link['value_multiplier'],
                 'value_unit' => $link['value_unit'],
-                'metadata' => [
-                    'auto_linked' => true,
-                    'detection_strategy' => $strategy->getIdentifier(),
-                    'confidence' => $link['confidence'],
-                    'matching_criteria' => $link['matching_criteria'],
-                ],
+                'metadata' => $metadata,
             ]);
 
             return 'created';
         }
 
-        // Create pending link for manual review
-        PendingTransactionLink::create([
+        // Create pending relationship for manual review
+        $metadata['pending'] = true;
+
+        Relationship::createRelationship([
             'user_id' => $userId,
-            'source_event_id' => $sourceEvent->id,
-            'target_event_id' => $targetEvent->id,
-            'relationship_type' => $link['relationship_type'],
-            'confidence' => $link['confidence'],
-            'detection_strategy' => $strategy->getIdentifier(),
-            'matching_criteria' => $link['matching_criteria'],
+            'from_type' => Event::class,
+            'from_id' => $sourceEvent->id,
+            'to_type' => Event::class,
+            'to_id' => $targetEvent->id,
+            'type' => $link['relationship_type'],
             'value' => $link['value'],
             'value_multiplier' => $link['value_multiplier'],
             'value_unit' => $link['value_unit'],
+            'metadata' => $metadata,
         ]);
 
         return 'pending';
