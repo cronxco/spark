@@ -2425,7 +2425,7 @@ new class extends Component
                             $jsDomains = array_filter(array_map('trim', explode(',', config('services.playwright.js_required_domains', ''))));
                             @endphp
                             @forelse ($jsDomains as $domain)
-                            <x-badge value="{{ $domain }}" class="badge-primary" />
+                            <x-badge value="{{ $domain }}" class="badge-outline" />
                             @empty
                             <p class="text-sm text-base-content/50">No domains configured</p>
                             @endforelse

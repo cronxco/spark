@@ -39,21 +39,21 @@
                                     $subtitle = $relatedModel->time?->format('M j, Y g:i A');
                                     $route = route('events.show', $relatedModel);
                                     $badgeText = 'Event';
-                                    $badgeClass = 'badge-primary';
+                                    $badgeClass = 'badge-outline';
                                 } elseif ($relatedModel instanceof \App\Models\EventObject) {
                                     $icon = 'o-cube';
                                     $title = $relatedModel->title;
                                     $subtitle = $relatedModel->concept . ' / ' . $relatedModel->type;
                                     $route = route('objects.show', $relatedModel);
                                     $badgeText = 'Object';
-                                    $badgeClass = 'badge-secondary';
+                                    $badgeClass = 'badge-outline';
                                 } elseif ($relatedModel instanceof \App\Models\Block) {
                                     $icon = 'fas.grip';
                                     $title = $relatedModel->type;
                                     $subtitle = $relatedModel->time?->format('M j, Y');
                                     $route = route('blocks.show', $relatedModel);
                                     $badgeText = 'Block';
-                                    $badgeClass = 'badge-accent';
+                                    $badgeClass = 'badge-outline';
                                 } else {
                                     $icon = 'o-question-mark-circle';
                                     $title = 'Unknown';
