@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Media;
 
-use Illuminate\Database\Eloquent\Builder;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -84,8 +84,8 @@ class Index extends Component
         // Search filter
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('name', 'ilike', '%'.$this->search.'%')
-                    ->orWhere('file_name', 'ilike', '%'.$this->search.'%');
+                $q->where('name', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('file_name', 'ilike', '%' . $this->search . '%');
             });
         }
 
@@ -168,8 +168,8 @@ class Index extends Component
             $this->success("Successfully deleted {$count} media item(s).");
             $this->selectedItems = [];
             $this->resetPage();
-        } catch (\Exception $e) {
-            $this->error('Failed to delete: '.$e->getMessage());
+        } catch (Exception $e) {
+            $this->error('Failed to delete: ' . $e->getMessage());
         }
     }
 

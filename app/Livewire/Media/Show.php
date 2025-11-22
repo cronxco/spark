@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Media;
 
-use Illuminate\Support\Facades\Storage;
+use Exception;
 use Livewire\Component;
 use Mary\Traits\Toast;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -87,8 +87,8 @@ class Show extends Component
             $this->success('Media updated successfully.');
             $this->showEditModal = false;
             $this->dispatch('media-updated');
-        } catch (\Exception $e) {
-            $this->error('Failed to update media: '.$e->getMessage());
+        } catch (Exception $e) {
+            $this->error('Failed to update media: ' . $e->getMessage());
         }
     }
 
@@ -111,8 +111,8 @@ class Show extends Component
             $this->success('Media deleted successfully.');
             $this->dispatch('media-deleted', mediaId: $mediaId);
             $this->redirect(route('media.index'), navigate: true);
-        } catch (\Exception $e) {
-            $this->error('Failed to delete media: '.$e->getMessage());
+        } catch (Exception $e) {
+            $this->error('Failed to delete media: ' . $e->getMessage());
         }
     }
 
@@ -123,8 +123,8 @@ class Show extends Component
             $this->media->regenerateConversions();
 
             $this->success('Conversion regeneration queued. This may take a few moments.');
-        } catch (\Exception $e) {
-            $this->error('Failed to regenerate conversions: '.$e->getMessage());
+        } catch (Exception $e) {
+            $this->error('Failed to regenerate conversions: ' . $e->getMessage());
         }
     }
 
