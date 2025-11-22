@@ -10,7 +10,8 @@ class SendTestPushNotification extends Command
 {
     protected $signature = 'push:test
                             {--user= : The user ID or email to send the notification to}
-                            {--all : Send to all users with push subscriptions}';
+                            {--all : Send to all users with push subscriptions}
+                            {--sync : Send synchronously (bypass queue) for debugging}';
 
     protected $description = 'Send a test push notification to verify the push notification system';
 
@@ -63,12 +64,21 @@ class SendTestPushNotification extends Command
         $this->info("  - {$subscriptionCount} device(s) registered");
 
         try {
-            $user->notify(new TestPushNotification);
+            $notification = new TestPushNotification;
+
+            if ($this->option('sync')) {
+                $this->info('  - Sending synchronously (--sync mode)');
+                $user->notifyNow($notification);
+            } else {
+                $user->notify($notification);
+            }
+
             $this->info('Test notification sent successfully!');
 
             return self::SUCCESS;
         } catch (\Exception $e) {
             $this->error("Failed to send notification: {$e->getMessage()}");
+            $this->error($e->getTraceAsString());
 
             return self::FAILURE;
         }
