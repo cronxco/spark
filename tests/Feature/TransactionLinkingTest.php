@@ -364,7 +364,7 @@ class TransactionLinkingTest extends TestCase
     // ==========================================
 
     /** @test */
-    public function service_creates_pending_link_for_low_confidence_match(): void
+    public function service_auto_approves_high_confidence_links(): void
     {
         $service = app(TransactionLinkingService::class);
 
@@ -387,8 +387,8 @@ class TransactionLinkingTest extends TestCase
 
         $result = $service->processEvent($sourceEvent);
 
-        // High confidence matches should be auto-approved
-        $this->assertEquals(1, $result['auto_approved']);
+        // High confidence matches should be auto-approved (created)
+        $this->assertEquals(1, $result['created']);
         $this->assertEquals(0, $result['pending']);
 
         // Check relationship was created
@@ -415,6 +415,7 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'triggered_by',
             'confidence' => 90,
             'detection_strategy' => 'test',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'pending',
         ]);
 
@@ -425,6 +426,7 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'funded_by',
             'confidence' => 60,
             'detection_strategy' => 'test',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'pending',
         ]);
 
@@ -435,6 +437,7 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'payment_for',
             'confidence' => 40,
             'detection_strategy' => 'test',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'pending',
         ]);
 
@@ -463,6 +466,7 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'triggered_by',
             'confidence' => 75,
             'detection_strategy' => 'test',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'pending',
         ]);
 
@@ -471,7 +475,7 @@ class TransactionLinkingTest extends TestCase
         $pendingLink->approve();
 
         $this->assertEquals('approved', $pendingLink->fresh()->status);
-        $this->assertNotNull($pendingLink->fresh()->approved_at);
+        $this->assertNotNull($pendingLink->fresh()->reviewed_at);
 
         // Check relationship was created
         $this->assertDatabaseHas('relationships', [
@@ -497,13 +501,14 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'triggered_by',
             'confidence' => 75,
             'detection_strategy' => 'test',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'pending',
         ]);
 
         $pendingLink->reject();
 
         $this->assertEquals('rejected', $pendingLink->fresh()->status);
-        $this->assertNotNull($pendingLink->fresh()->rejected_at);
+        $this->assertNotNull($pendingLink->fresh()->reviewed_at);
 
         // Verify no relationship was created
         $this->assertDatabaseMissing('relationships', [
@@ -525,6 +530,7 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'triggered_by',
             'confidence' => 90,
             'detection_strategy' => 'explicit_reference',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'pending',
         ]);
 
@@ -535,6 +541,7 @@ class TransactionLinkingTest extends TestCase
             'relationship_type' => 'funded_by',
             'confidence' => 50,
             'detection_strategy' => 'bacs_record',
+            'matching_criteria' => ['type' => 'test'],
             'status' => 'approved',
         ]);
 
