@@ -8,20 +8,20 @@
                     <x-slot:actions>
                         <div class="flex items-center gap-2">
                             <x-button
-                                icon="fas-pen"
+                                icon="fas.pen"
                                 class="btn-ghost btn-sm"
                                 wire:click="openEditModal"
                                 title="Edit media"
                             />
                             <x-button
-                                icon="fas-download"
+                                icon="fas.download"
                                 class="btn-ghost btn-sm"
                                 link="{{ $mediaUrl }}"
                                 external
                                 title="Download"
                             />
                             <x-button
-                                icon="fas-trash"
+                                icon="fas.trash"
                                 class="btn-ghost btn-sm text-error"
                                 wire:click="openDeleteConfirm"
                                 title="Delete media"
@@ -32,7 +32,7 @@
                                 title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                                 data-hotkey="d"
                             >
-                                <x-icon name="fas-sliders" class="w-4 h-4" />
+                                <x-icon name="fas.sliders" class="w-4 h-4" />
                             </x-button>
                         </div>
                     </x-slot:actions>
@@ -44,13 +44,13 @@
                         <div class="flex-shrink-0">
                             <div class="w-16 h-16 rounded-full bg-base-300 flex items-center justify-center">
                                 @if (str_starts_with($this->media->mime_type, 'image/'))
-                                    <x-icon name="fas-image" class="w-8 h-8" />
+                                    <x-icon name="fas.image" class="w-8 h-8" />
                                 @elseif (str_starts_with($this->media->mime_type, 'video/'))
                                     <x-icon name="o-video-camera" class="w-8 h-8" />
                                 @elseif (str_starts_with($this->media->mime_type, 'application/pdf'))
-                                    <x-icon name="fas-file-lines" class="w-8 h-8" />
+                                    <x-icon name="fas.file-lines" class="w-8 h-8" />
                                 @else
-                                    <x-icon name="fas-file" class="w-8 h-8" />
+                                    <x-icon name="fas.file" class="w-8 h-8" />
                                 @endif
                             </div>
                         </div>
@@ -62,13 +62,13 @@
 
                             <div class="flex flex-wrap items-center gap-3 mb-4">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="fas-clock" class="w-4 h-4 text-base-content/60" />
+                                    <x-icon name="fas.clock" class="w-4 h-4 text-base-content/60" />
                                     <span class="text-base-content/70 text-sm">
                                         <x-uk-date :date="$this->media->created_at" :show-time="true" />
                                     </span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="fas-download" class="w-4 h-4 text-base-content/60" />
+                                    <x-icon name="fas.download" class="w-4 h-4 text-base-content/60" />
                                     <span class="text-base-content/70 text-sm">{{ $this->media->humanReadableSize }}</span>
                                 </div>
                             </div>
@@ -94,7 +94,7 @@
                 {{-- Media Preview --}}
                 <x-card class="bg-base-100 shadow">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas-eye" class="w-5 h-5 text-info" />
+                        <x-icon name="fas.eye" class="w-5 h-5 text-info" />
                         Preview
                     </h3>
 
@@ -131,7 +131,7 @@
                         @else
                             {{-- Generic Document --}}
                             <div class="flex flex-col items-center justify-center py-12">
-                                <x-icon name="fas-file" class="w-16 h-16 text-base-content/30 mb-4" />
+                                <x-icon name="fas.file" class="w-16 h-16 text-base-content/30 mb-4" />
                                 <p class="text-base-content/70 mb-4">Preview not available for this file type</p>
                                 <a href="{{ $mediaUrl }}" target="_blank" class="btn btn-primary btn-sm">
                                     <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
@@ -146,7 +146,7 @@
                 @if ($this->media->model)
                     <x-card class="bg-base-100 shadow">
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="fas-link" class="w-5 h-5 text-warning" />
+                            <x-icon name="fas.link" class="w-5 h-5 text-warning" />
                             Related {{ class_basename($this->media->model_type) }}
                         </h3>
 
@@ -176,17 +176,17 @@
                                 <div>
                                     @if ($this->media->model instanceof \App\Models\EventObject)
                                         <a href="{{ route('objects.show', $this->media->model->id) }}" wire:navigate class="btn btn-sm btn-primary">
-                                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
+                                            <x-icon name="fas.arrow-right" class="w-4 h-4" />
                                             View Object
                                         </a>
                                     @elseif ($this->media->model instanceof \App\Models\Block)
                                         <a href="{{ route('blocks.show', $this->media->model->id) }}" wire:navigate class="btn btn-sm btn-primary">
-                                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
+                                            <x-icon name="fas.arrow-right" class="w-4 h-4" />
                                             View Block
                                         </a>
                                     @elseif ($this->media->model instanceof \App\Models\Event)
                                         <a href="{{ route('events.show', $this->media->model->id) }}" wire:navigate class="btn btn-sm btn-primary">
-                                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
+                                            <x-icon name="fas.arrow-right" class="w-4 h-4" />
                                             View Event
                                         </a>
                                     @endif
@@ -200,7 +200,7 @@
                 @if ($conversions->isNotEmpty())
                     <x-card class="bg-base-100 shadow">
                         <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                            <x-icon name="fas-image" class="w-5 h-5 text-success" />
+                            <x-icon name="fas.image" class="w-5 h-5 text-success" />
                             Image Conversions ({{ $conversions->count() }})
                         </h3>
 
@@ -226,7 +226,7 @@
 
                         <div class="mt-4">
                             <button wire:click="regenerateConversions" class="btn btn-sm btn-outline">
-                                <x-icon name="fas-rotate" class="w-4 h-4" />
+                                <x-icon name="fas.rotate" class="w-4 h-4" />
                                 Regenerate Conversions
                             </button>
                         </div>
@@ -248,7 +248,7 @@
                     <x-collapse wire:model="detailsOpen">
                         <x-slot:heading>
                             <div class="flex items-center gap-2">
-                                <x-icon name="fas-circle-info" class="w-5 h-5" />
+                                <x-icon name="fas.circle-info" class="w-5 h-5" />
                                 File Information
                             </div>
                         </x-slot:heading>
@@ -290,7 +290,7 @@
                     <x-collapse wire:model="technicalOpen">
                         <x-slot:heading>
                             <div class="flex items-center gap-2">
-                                <x-icon name="fas-gear" class="w-5 h-5" />
+                                <x-icon name="fas.gear" class="w-5 h-5" />
                                 Technical Details
                             </div>
                         </x-slot:heading>
@@ -334,7 +334,7 @@
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
                             <div class="flex items-center gap-2">
-                                <x-icon name="fas-clock" class="w-5 h-5" />
+                                <x-icon name="fas.clock" class="w-5 h-5" />
                                 Timeline
                             </div>
                         </x-slot:heading>
@@ -360,7 +360,7 @@
         </div>
     @else
         <div class="text-center py-12">
-            <x-icon name="fas-triangle-exclamation" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
+            <x-icon name="fas.triangle-exclamation" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
             <h3 class="text-lg font-medium text-base-content mb-2">Media Not Found</h3>
             <a href="{{ route('media.index') }}" wire:navigate class="btn btn-primary btn-sm mt-4">
                 Back to Gallery

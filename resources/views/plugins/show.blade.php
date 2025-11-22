@@ -19,13 +19,13 @@
                             <form method="POST" action="{{ route('integrations.initialize', ['service' => $identifier]) }}">
                                 @csrf
                                 <button type="submit" class="btn btn-primary">
-                                    <x-icon name="fas-plus" class="w-4 h-4" />
+                                    <x-icon name="fas.plus" class="w-4 h-4" />
                                     Add Instance
                                 </button>
                             </form>
                         @else
                             <a href="{{ route('integrations.oauth', $identifier) }}" class="btn btn-primary">
-                                <x-icon name="fas-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 Add Instance
                             </a>
                         @endif
@@ -33,13 +33,13 @@
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $identifier]) }}">
                             @csrf
                             <button type="submit" class="btn btn-primary">
-                                <x-icon name="fas-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 Add Instance
                             </button>
                         </form>
                     @endif
                     <a href="{{ route('integrations.index') }}" class="btn btn-outline">
-                        <x-icon name="fas-arrow-left" class="w-4 h-4" />
+                        <x-icon name="fas.arrow-left" class="w-4 h-4" />
                         Back
                     </a>
                 </div>
@@ -49,11 +49,11 @@
                     <x-dropdown>
                         <x-slot:trigger>
                             <x-button class="btn-ghost btn-sm">
-                                <x-icon name="fas-ellipsis-vertical" class="w-5 h-5" />
+                                <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                             </x-button>
                         </x-slot:trigger>
-                        <x-menu-item title="Add Instance" icon="fas-plus" link="{{ route('integrations.oauth', $pluginClass::getIdentifier()) }}" />
-                        <x-menu-item title="Back to Integrations" icon="fas-arrow-left" link="{{ route('integrations.index') }}" />
+                        <x-menu-item title="Add Instance" icon="fas.plus" link="{{ route('integrations.oauth', $pluginClass::getIdentifier()) }}" />
+                        <x-menu-item title="Back to Integrations" icon="fas.arrow-left" link="{{ route('integrations.index') }}" />
                     </x-dropdown>
                 </div>
             </x-slot:actions>
@@ -86,13 +86,13 @@
                         </div>
                         <span class="hidden sm:inline">·</span>
                         <div class="flex items-center gap-2">
-                            <x-icon name="fas-tag" class="w-4 h-4" />
+                            <x-icon name="fas.tag" class="w-4 h-4" />
                             <span>{{ ucfirst($pluginClass::getDomain()) }}</span>
                         </div>
                         @if ($group)
                             <span class="hidden sm:inline">·</span>
                             <div class="flex items-center gap-2">
-                                <x-icon name="fas-circle-check" class="w-4 h-4 text-success" />
+                                <x-icon name="fas.circle-check" class="w-4 h-4 text-success" />
                                 <span class="text-success font-medium">{{ $group->integrations->count() }} active {{ Str::plural('instance', $group->integrations->count()) }}</span>
                             </div>
                         @endif
@@ -105,7 +105,7 @@
         @if ($group && $group->integrations->count() > 0)
         <x-card class="bg-base-200/50 border-2 border-info/10">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="fas-link" class="w-5 h-5 text-info" />
+                <x-icon name="fas.link" class="w-5 h-5 text-info" />
                 Your Instances ({{ $group->integrations->count() }})
             </h3>
             <div class="space-y-3">
@@ -127,7 +127,7 @@
                                 </div>
                             </div>
                         </div>
-                        <x-icon name="fas-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                        <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
                     </div>
                 </a>
                 @endforeach
@@ -139,7 +139,7 @@
         @if (count($pluginClass::getActionTypes()) > 0)
         <x-card class="bg-base-200 shadow">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="fas-bolt" class="w-5 h-5 text-primary" />
+                <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
                 Action Types
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -187,7 +187,7 @@
         @if (count($pluginClass::getObjectTypes()) > 0)
         <x-card class="bg-base-200 shadow">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="fas-grip" class="w-5 h-5 text-info" />
+                <x-icon name="fas.grip" class="w-5 h-5 text-info" />
                 Object Types
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -311,7 +311,7 @@
         @if ($group)
         <x-card class="bg-base-200 shadow">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="fas-file-lines" class="w-5 h-5 text-primary" />
+                <x-icon name="fas.file-lines" class="w-5 h-5 text-primary" />
                 Logs
             </h3>
             <p class="text-base-content/70 mb-4">View logs for all {{ $pluginClass::getDisplayName() }} integrations</p>

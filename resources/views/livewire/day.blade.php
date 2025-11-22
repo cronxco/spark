@@ -880,7 +880,7 @@ $availableStreams = computed(function () {
             <div class="flex items-center gap-2 sm:gap-3 w-full">
                 <div class="join">
                     <x-button class="join-item btn-ghost btn-sm" wire:click="previousDay">
-                        <x-icon name="fas-chevron-left" class="w-4 h-4" />
+                        <x-icon name="fas.chevron-left" class="w-4 h-4" />
                     </x-button>
                     <label class="join-item">
                         <input
@@ -890,7 +890,7 @@ $availableStreams = computed(function () {
                             @change="$wire.call('navigateToDate')" />
                     </label>
                     <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">
-                        <x-icon name="fas-chevron-right" class="w-4 h-4" />
+                        <x-icon name="fas.chevron-right" class="w-4 h-4" />
                     </x-button>
                 </div>
 
@@ -927,7 +927,7 @@ $availableStreams = computed(function () {
         <x-collapse x-model="dayNoteOpenState" separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="fas-calendar" />
+                    <x-icon name="fas.calendar" />
                     <span>
                         {{ \Carbon\Carbon::parse($this->date)->format('j F Y') }}
                         @if ($this->dayNoteSaving)
@@ -940,11 +940,11 @@ $availableStreams = computed(function () {
                     <span class="ml-auto">
                         @if ($this->checkinStatus === 'green')
                         <div class="badge badge-success badge-sm gap-1">
-                            <x-icon name="fas-circle-check" class="w-3 h-3" />
+                            <x-icon name="fas.circle-check" class="w-3 h-3" />
                         </div>
                         @elseif ($this->checkinStatus === 'amber')
                         <div class="badge badge-warning badge-sm gap-1">
-                            <x-icon name="fas-clock" class="w-3 h-3" />
+                            <x-icon name="fas.clock" class="w-3 h-3" />
                         </div>
                         @else
                         <div class="badge badge-error badge-sm gap-1">
@@ -971,7 +971,7 @@ $availableStreams = computed(function () {
                     </div>
                 </x-card>
                 @else
-                <x-alert title="No Day Note found for this date" icon="fas-book-open" />
+                <x-alert title="No Day Note found for this date" icon="fas.book-open" />
                 @endif
             </x-slot:content>
         </x-collapse>
@@ -981,7 +981,7 @@ $availableStreams = computed(function () {
         @if ($this->events->isEmpty())
         <x-card class="bg-base-200 shadow">
             <div class="text-center py-8">
-                <x-icon name="fas-calendar" class="w-12 h-12 text-base-content mx-auto mb-4" />
+                <x-icon name="fas.calendar" class="w-12 h-12 text-base-content mx-auto mb-4" />
                 <h3 class="text-lg font-semibold text-base-content mb-2">No events found for this date</h3>
             </div>
         </x-card>
@@ -1250,7 +1250,7 @@ $availableStreams = computed(function () {
         <!-- Multiple streams: flower FAB -->
         <div class="dropdown dropdown-top dropdown-end">
             <div tabindex="0" role="button" class="btn btn-circle btn-lg btn-primary shadow-lg m-1">
-                <x-icon name="fas-layer-group" class="w-6 h-6" />
+                <x-icon name="fas.layer-group" class="w-6 h-6" />
             </div>
             <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow-xl mb-2">
                 @foreach ($this->availableStreams as $stream)

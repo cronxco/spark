@@ -21,9 +21,12 @@ class IconServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Override the @svg directive to handle FontAwesome icons properly
-        Blade::directive('svg', function ($expression) {
-            return "<?php echo app('" . static::class . "')->renderSvg({$expression}); ?>";
+        // Override the @svg directive AFTER all other providers have booted
+        // This ensures we override blade-icons' directive registration
+        $this->app->booted(function () {
+            Blade::directive('svg', function ($expression) {
+                return "<?php echo app('" . static::class . "')->renderSvg({$expression}); ?>";
+            });
         });
     }
 

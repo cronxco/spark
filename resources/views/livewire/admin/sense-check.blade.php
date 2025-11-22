@@ -791,7 +791,7 @@ new class extends Component
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div class="stat bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg border border-warning/50">
                         <div class="stat-title flex items-center gap-2">
-                            <x-icon name="fas-wand-magic-sparkles" class="w-4 h-4 text-warning" />
+                            <x-icon name="fas.wand-magic-sparkles" class="w-4 h-4 text-warning" />
                             Overall Coverage
                         </div>
                         <div class="stat-value {{ $health['overall_coverage'] > 80 ? 'text-success' : ($health['overall_coverage'] > 50 ? 'text-warning' : 'text-error') }}">
@@ -864,7 +864,7 @@ new class extends Component
                 @if (!empty($health['events_by_domain']))
                 <div class="mb-6">
                     <h4 class="font-semibold mb-3 flex items-center gap-2">
-                        <x-icon name="fas-globe" class="w-4 h-4" />
+                        <x-icon name="fas.globe" class="w-4 h-4" />
                         Coverage by Domain
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

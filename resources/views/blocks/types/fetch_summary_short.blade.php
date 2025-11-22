@@ -35,19 +35,19 @@ $model = $block->metadata['model'] ?? null;
             </div>
             {{-- AI Badge --}}
             <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                <x-icon name="fas-wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
             </div>
         </div>
 
         {{-- Stats --}}
         <div class="flex items-center gap-4 text-xs text-base-content/60">
             <div class="flex items-center gap-1">
-                <x-icon name="fas-file-lines" class="w-3 h-3" />
+                <x-icon name="fas.file-lines" class="w-3 h-3" />
                 {{ $wordCount }} words
             </div>
             @if (isset($block->metadata['model']))
             <div class="flex items-center gap-1">
-                <x-icon name="fas-microchip" class="w-3 h-3" />
+                <x-icon name="fas.microchip" class="w-3 h-3" />
                 {{ $block->metadata['model'] }}
             </div>
             @endif
@@ -64,12 +64,12 @@ $model = $block->metadata['model'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="fas-eye" class="w-4 h-4" />
+                            <x-icon name="fas.eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>

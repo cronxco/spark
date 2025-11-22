@@ -270,7 +270,7 @@ new class extends Component {
             @if ($step === 1)
             <div x-transition>
                 <div class="space-y-4">
-                    <x-alert icon="fas-triangle-exclamation" class="alert-warning">
+                    <x-alert icon="fas.triangle-exclamation" class="alert-warning">
                         <div class="font-semibold">Warning: This action cannot be undone!</div>
                         <div class="mt-2">
                             You are about to permanently delete the entire <strong>{{ $deletionSummary['service_name'] ?? '' }}</strong>
@@ -339,7 +339,7 @@ new class extends Component {
 
                     @if ($confirmationText && !$this->validateConfirmationText())
                         <div class="text-warning text-sm text-center">
-                            <x-icon name="fas-triangle-exclamation" class="w-4 h-4 inline mr-1" />
+                            <x-icon name="fas.triangle-exclamation" class="w-4 h-4 inline mr-1" />
                             Service name doesn't match. Please check and try again.
                         </div>
                     @endif
@@ -361,7 +361,7 @@ new class extends Component {
                     <div class="card bg-error/10 border border-error/20">
                         <div class="card-body">
                             <div class="flex items-start space-x-3">
-                                <x-icon name="fas-triangle-exclamation" class="w-6 h-6 text-error mt-0.5" />
+                                <x-icon name="fas.triangle-exclamation" class="w-6 h-6 text-error mt-0.5" />
                                 <div>
                                     <h4 class="font-semibold text-error mb-2">What happens next:</h4>
                                     <ul class="text-sm space-y-1">
@@ -398,7 +398,7 @@ new class extends Component {
                     @if ($step > 1)
                         <x-button
                             label="Back"
-                            icon="fas-arrow-left"
+                            icon="fas.arrow-left"
                             class="btn-outline"
                             wire:click="previousStep"
                             :disabled="$isDeleting"
@@ -417,7 +417,7 @@ new class extends Component {
                     @if ($step < 3)
                         <x-button
                             label="Continue"
-                            icon="fas-arrow-right"
+                            icon="fas.arrow-right"
                             class="btn-primary"
                             wire:click="nextStep"
                             :disabled="($step === 2 && !$this->validateConfirmationText()) || $isDeleting"
@@ -490,23 +490,23 @@ new class extends Component {
                 <div class="text-sm text-base-content/70">
                     @switch($progressStep)
                         @case('starting')
-                            <x-icon name="fas-play" class="w-6 h-6 text-primary mx-auto mb-2" />
+                            <x-icon name="fas.play" class="w-6 h-6 text-primary mx-auto mb-2" />
                             <p>Initializing deletion process...</p>
                             @break
                         @case('analyzing')
-                            <x-icon name="fas-magnifying-glass" class="w-6 h-6 text-info mx-auto mb-2" />
+                            <x-icon name="fas.magnifying-glass" class="w-6 h-6 text-info mx-auto mb-2" />
                             <p>Analyzing data to be deleted...</p>
                             @break
                         @case('deleting_blocks')
-                            <x-icon name="fas-trash" class="w-6 h-6 text-warning mx-auto mb-2" />
+                            <x-icon name="fas.trash" class="w-6 h-6 text-warning mx-auto mb-2" />
                             <p>Deleting content blocks...</p>
                             @break
                         @case('deleting_events')
-                            <x-icon name="fas-calendar" class="w-6 h-6 text-warning mx-auto mb-2" />
+                            <x-icon name="fas.calendar" class="w-6 h-6 text-warning mx-auto mb-2" />
                             <p>Deleting events...</p>
                             @break
                         @case('finding_orphans')
-                            <x-icon name="fas-magnifying-glass" class="w-6 h-6 text-info mx-auto mb-2" />
+                            <x-icon name="fas.magnifying-glass" class="w-6 h-6 text-info mx-auto mb-2" />
                             <p>Finding orphaned objects...</p>
                             @break
                         @case('deleting_objects')
@@ -514,27 +514,27 @@ new class extends Component {
                             <p>Deleting orphaned objects...</p>
                             @break
                         @case('cleaning_logs')
-                            <x-icon name="fas-file-lines" class="w-6 h-6 text-warning mx-auto mb-2" />
+                            <x-icon name="fas.file-lines" class="w-6 h-6 text-warning mx-auto mb-2" />
                             <p>Cleaning up activity logs...</p>
                             @break
                         @case('deleting_integrations')
-                            <x-icon name="fas-link" class="w-6 h-6 text-warning mx-auto mb-2" />
+                            <x-icon name="fas.link" class="w-6 h-6 text-warning mx-auto mb-2" />
                             <p>Deleting integration instances...</p>
                             @break
                         @case('deleting_group')
-                            <x-icon name="fas-folder" class="w-6 h-6 text-warning mx-auto mb-2" />
+                            <x-icon name="fas.folder" class="w-6 h-6 text-warning mx-auto mb-2" />
                             <p>Deleting integration group...</p>
                             @break
                         @case('completed')
-                            <x-icon name="fas-circle-check" class="w-6 h-6 text-success mx-auto mb-2" />
+                            <x-icon name="fas.circle-check" class="w-6 h-6 text-success mx-auto mb-2" />
                             <p>Deletion completed successfully!</p>
                             @break
                         @case('failed')
-                            <x-icon name="fas-circle-xmark" class="w-6 h-6 text-error mx-auto mb-2" />
+                            <x-icon name="fas.circle-xmark" class="w-6 h-6 text-error mx-auto mb-2" />
                             <p>Deletion failed</p>
                             @break
                         @default
-                            <x-icon name="fas-gear" class="w-6 h-6 text-primary mx-auto mb-2" />
+                            <x-icon name="fas.gear" class="w-6 h-6 text-primary mx-auto mb-2" />
                             <p>Processing...</p>
                     @endswitch
                 </div>

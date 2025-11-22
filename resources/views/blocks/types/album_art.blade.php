@@ -37,7 +37,7 @@ $artist = $block->metadata['artist'] ?? null;
         </div>
         @else
         <div class="w-full aspect-square rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
-            <x-icon name="fas-music" class="w-16 h-16 text-base-content/30" />
+            <x-icon name="fas.music" class="w-16 h-16 text-base-content/30" />
         </div>
         @endif
 
@@ -63,12 +63,12 @@ $artist = $block->metadata['artist'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="fas-eye" class="w-4 h-4" />
+                            <x-icon name="fas.eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>
@@ -83,7 +83,7 @@ $artist = $block->metadata['artist'] ?? null;
                     @if ($imageUrl)
                     <li>
                         <a href="{{ $imageUrl }}" target="_blank" rel="noopener noreferrer">
-                            <x-icon name="fas-image" class="w-4 h-4" />
+                            <x-icon name="fas.image" class="w-4 h-4" />
                             View Full Image
                         </a>
                     </li>

@@ -6,7 +6,7 @@
                 label="URL"
                 wire:model="url"
                 placeholder="https://example.com/article"
-                icon="fas-link"
+                icon="fas.link"
                 hint="The URL to bookmark"
                 required
             />

@@ -3,7 +3,7 @@
         @if ($relationships->isEmpty())
             <!-- Empty State -->
             <div class="text-center py-8">
-                <x-icon name="fas-right-left" class="w-12 h-12 text-base-content/30 mx-auto mb-2" />
+                <x-icon name="fas.right-left" class="w-12 h-12 text-base-content/30 mx-auto mb-2" />
                 <p class="text-base-content/60">No relationships yet</p>
                 <p class="text-sm text-base-content/40 mt-1">Create connections to other events, objects, or blocks</p>
             </div>
@@ -17,9 +17,9 @@
                         <span class="font-semibold text-base-content">{{ $this->getRelationshipDisplayName($type) }}</span>
                         <span class="text-xs text-base-content/50">({{ $rels->count() }})</span>
                         @if ($this->isDirectional($type))
-                            <x-icon name="fas-arrow-right" class="w-3 h-3 text-base-content/40 ml-1" />
+                            <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40 ml-1" />
                         @else
-                            <x-icon name="fas-right-left" class="w-3 h-3 text-base-content/40 ml-1" />
+                            <x-icon name="fas.right-left" class="w-3 h-3 text-base-content/40 ml-1" />
                         @endif
                     </div>
 
@@ -104,7 +104,7 @@
                                     class="btn btn-ghost btn-sm btn-circle"
                                     title="Delete relationship"
                                 >
-                                    <x-icon name="fas-trash" class="w-4 h-4 text-error" />
+                                    <x-icon name="fas.trash" class="w-4 h-4 text-error" />
                                 </button>
                             </div>
                         @endforeach
@@ -116,7 +116,7 @@
 
     <!-- Actions -->
     <div class="flex gap-3 mt-6">
-        <x-button label="Add Relationship" icon="fas-plus" class="btn-accent" wire:click="openAddRelationshipModal" />
+        <x-button label="Add Relationship" icon="fas.plus" class="btn-accent" wire:click="openAddRelationshipModal" />
         <x-button label="Close" class="btn btn-outline" @click="$wire.dispatch('close-modal')" />
     </div>
 </div>
