@@ -154,22 +154,28 @@ class ReceiptTransactionMatcher
         float $confidence,
         string $method
     ): Relationship {
-        $relationship = Relationship::findOrCreateRelationship([
-            'user_id' => $receipt->integration->user_id,
-            'from_type' => Event::class,
-            'from_id' => $receipt->id,
-            'to_type' => Event::class,
-            'to_id' => $transaction->id,
-            'type' => 'receipt_for',
-            'value' => $receipt->value,
-            'value_multiplier' => 100,
-            'value_unit' => $receipt->value_unit ?? 'GBP',
-            'metadata' => [
-                'match_confidence' => $confidence,
-                'match_method' => $method, // 'automatic' or 'manual'
-                'matched_at' => now()->toIso8601String(),
+        $relationship = Relationship::findOrCreateRelationship(
+            // Lookup attributes (used for finding existing relationship)
+            [
+                'user_id' => $receipt->integration->user_id,
+                'from_type' => Event::class,
+                'from_id' => $receipt->id,
+                'to_type' => Event::class,
+                'to_id' => $transaction->id,
+                'type' => 'receipt_for',
             ],
-        ]);
+            // Values to set when creating (not used for lookup to avoid JSON comparison)
+            [
+                'value' => $receipt->value,
+                'value_multiplier' => 100,
+                'value_unit' => $receipt->value_unit ?? 'GBP',
+                'metadata' => [
+                    'match_confidence' => $confidence,
+                    'match_method' => $method, // 'automatic' or 'manual'
+                    'matched_at' => now()->toIso8601String(),
+                ],
+            ]
+        );
 
         // Update receipt merchant EventObject metadata
         $receiptObject = $receipt->target;
