@@ -48,7 +48,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Media routes
     Route::get('media', \App\Livewire\Media\Index::class)->name('media.index');
-    Route::get('media/{media}', \App\Livewire\Media\Show::class)->whereUuid('media')->name('media.show');
+    Route::get('media/{media:uuid}', \App\Livewire\Media\Show::class)->name('media.show');
 
     // Metrics routes
     Route::get('metrics', \App\Livewire\MetricsOverview::class)->name('metrics.index');

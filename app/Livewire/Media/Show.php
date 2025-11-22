@@ -128,6 +128,35 @@ class Show extends Component
         }
     }
 
+    /**
+     * Check if we're using S3 storage
+     */
+    public function isS3(): bool
+    {
+        return config('media-library.disk_name') === 's3';
+    }
+
+    /**
+     * Get URL for media (signed for S3, direct for local)
+     */
+    public function getMediaUrl(?string $conversion = null): string
+    {
+        if ($this->isS3()) {
+            $expiry = now()->addMinutes(60);
+
+            return $conversion
+                ? $this->media->getTemporaryUrl($expiry, $conversion)
+                : $this->media->getTemporaryUrl($expiry);
+        }
+
+        return $conversion
+            ? $this->media->getUrl($conversion)
+            : $this->media->getUrl();
+    }
+
+    /**
+     * Get conversions with appropriate URLs
+     */
     public function getConversions()
     {
         $conversions = [];
@@ -137,7 +166,7 @@ class Show extends Component
             if ($this->media->hasGeneratedConversion($conversion)) {
                 $conversions[] = [
                     'name' => $conversion,
-                    'url' => $this->media->getUrl($conversion),
+                    'url' => $this->getMediaUrl($conversion),
                     'path' => $this->media->getPath($conversion),
                 ];
             }
@@ -150,6 +179,8 @@ class Show extends Component
     {
         return view('livewire.media.show', [
             'conversions' => $this->getConversions(),
+            'mediaUrl' => $this->getMediaUrl(),
+            'isS3' => $this->isS3(),
         ]);
     }
 }

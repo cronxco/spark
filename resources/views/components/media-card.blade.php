@@ -1,5 +1,26 @@
 @props(['media'])
 
+@php
+    // Use temporary URLs for S3 (private bucket), regular URLs for local storage
+    $isS3 = config('media-library.disk_name') === 's3';
+    $urlExpiry = now()->addMinutes(60);
+
+    $thumbnailUrl = null;
+    $fullUrl = null;
+
+    if ($isS3) {
+        $thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
+            ? $media->getTemporaryUrl($urlExpiry, 'thumbnail')
+            : $media->getTemporaryUrl($urlExpiry);
+        $fullUrl = $media->getTemporaryUrl($urlExpiry);
+    } else {
+        $thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
+            ? $media->getUrl('thumbnail')
+            : $media->getUrl();
+        $fullUrl = $media->getUrl();
+    }
+@endphp
+
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all group">
     <div class="card-body p-4 gap-3">
         {{-- Header: Collection Badge and Date --}}
@@ -22,14 +43,14 @@
         </div>
 
         {{-- Media Preview --}}
-        <a href="{{ route('media.show', $media->id) }}" wire:navigate class="block">
+        <a href="{{ route('media.show', $media->uuid) }}" wire:navigate class="block">
             <div class="w-full h-48 rounded-lg overflow-hidden bg-base-300 relative">
                 @if (str_starts_with($media->mime_type, 'video/'))
                     {{-- Video Preview --}}
                     <div class="relative w-full h-full">
                         @if ($media->hasGeneratedConversion('thumbnail'))
                             <img
-                                src="{{ $media->getUrl('thumbnail') }}"
+                                src="{{ $thumbnailUrl }}"
                                 alt="{{ $media->name }}"
                                 class="w-full h-full object-cover"
                                 loading="lazy"
@@ -47,21 +68,12 @@
                     </div>
                 @elseif (str_starts_with($media->mime_type, 'image/'))
                     {{-- Image Preview --}}
-                    @if ($media->hasGeneratedConversion('thumbnail'))
-                        <img
-                            src="{{ $media->getUrl('thumbnail') }}"
-                            alt="{{ $media->name }}"
-                            class="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            loading="lazy"
-                        />
-                    @else
-                        <img
-                            src="{{ $media->getUrl() }}"
-                            alt="{{ $media->name }}"
-                            class="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            loading="lazy"
-                        />
-                    @endif
+                    <img
+                        src="{{ $thumbnailUrl }}"
+                        alt="{{ $media->name }}"
+                        class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                    />
                 @elseif (str_starts_with($media->mime_type, 'application/pdf'))
                     {{-- PDF Preview --}}
                     <div class="flex flex-col items-center justify-center w-full h-full">
@@ -80,7 +92,7 @@
 
         {{-- Title --}}
         <h3 class="font-semibold text-sm leading-snug line-clamp-2">
-            <a href="{{ route('media.show', $media->id) }}" wire:navigate class="link link-hover">
+            <a href="{{ route('media.show', $media->uuid) }}" wire:navigate class="link link-hover">
                 {{ $media->name ?: $media->file_name }}
             </a>
         </h3>
@@ -106,7 +118,7 @@
 
             {{-- Quick Download --}}
             <a
-                href="{{ $media->getUrl() }}"
+                href="{{ $fullUrl }}"
                 download="{{ $media->file_name }}"
                 class="btn btn-ghost btn-xs btn-square"
                 title="Download"
@@ -121,7 +133,7 @@
                 </label>
                 <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-52">
                     <li>
-                        <a href="{{ route('media.show', $media->id) }}" wire:navigate class="text-sm gap-2">
+                        <a href="{{ route('media.show', $media->uuid) }}" wire:navigate class="text-sm gap-2">
                             <x-icon name="o-eye" class="w-4 h-4" />
                             View Details
                         </a>
@@ -147,21 +159,15 @@
                         </li>
                     @endif
                     <li>
-                        <a href="{{ $media->getUrl() }}" target="_blank" class="text-sm gap-2">
+                        <a href="{{ $fullUrl }}" target="_blank" class="text-sm gap-2">
                             <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
                             Open in New Tab
                         </a>
                     </li>
                     <li>
-                        <button onclick="navigator.clipboard.writeText('{{ $media->getUrl() }}')" class="text-sm gap-2">
-                            <x-icon name="o-clipboard" class="w-4 h-4" />
-                            Copy URL
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="navigator.clipboard.writeText('{{ $media->id }}')" class="text-sm gap-2">
+                        <button onclick="navigator.clipboard.writeText('{{ $media->uuid }}')" class="text-sm gap-2">
                             <x-icon name="o-hashtag" class="w-4 h-4" />
-                            Copy ID
+                            Copy UUID
                         </button>
                     </li>
                 </ul>
