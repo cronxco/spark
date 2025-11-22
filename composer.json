@@ -16,6 +16,7 @@
         "icehouse-ventures/laravel-chartjs": "^4.2",
         "intervention/image": "^3.11",
         "jenssegers/agent": "^2.6",
+        "laravel-notification-channels/webpush": "^10.3",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.30.3",
         "laravel/sanctum": "^4.0",
@@ -31,15 +32,15 @@
         "revolution/laravel-bluesky": "^1.1",
         "robsontenorio/mary": "dev-main",
         "sentry/sentry-laravel": "^4.9",
-        "smalot/pdfparser": "^2.11",
+        "smalot/pdfparser": "^2.12",
         "socialiteproviders/authelia": "^4.0",
         "spatie/laravel-activitylog": "^4",
         "spatie/laravel-medialibrary": "^11.17",
         "spatie/laravel-tags": "^4.10",
         "symfony/emoji": "^7.3",
-        "zbateson/mail-mime-parser": "^3.0",
         "willscottuk/monzo-php": "dev-master",
-        "wire-elements/pro": "^4.0"
+        "wire-elements/pro": "^4.0",
+        "zbateson/mail-mime-parser": "^3.0"
     },
     "require-dev": {
         "deployer/deployer": "^7.5",
