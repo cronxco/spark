@@ -27,7 +27,7 @@ class PushNotificationTest extends TestCase
     {
         config(['webpush.vapid.public_key' => 'test-public-key']);
 
-        $response = $this->getJson('/api/push/vapid-public-key');
+        $response = $this->getJson('/push/vapid-public-key');
 
         $response->assertOk()
             ->assertJson(['publicKey' => 'test-public-key']);
@@ -38,7 +38,7 @@ class PushNotificationTest extends TestCase
      */
     public function subscribe_requires_authentication(): void
     {
-        $response = $this->postJson('/api/push/subscribe', [
+        $response = $this->postJson('/push/subscribe', [
             'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-token',
             'keys' => [
                 'p256dh' => 'test-p256dh-key',
@@ -46,7 +46,8 @@ class PushNotificationTest extends TestCase
             ],
         ]);
 
-        $response->assertUnauthorized();
+        // Web routes redirect to login, so expect redirect or unauthorized
+        $response->assertStatus(401);
     }
 
     /**
@@ -55,7 +56,7 @@ class PushNotificationTest extends TestCase
     public function subscribe_creates_push_subscription(): void
     {
         $response = $this->actingAs($this->user)
-            ->postJson('/api/push/subscribe', [
+            ->postJson('/push/subscribe', [
                 'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-token',
                 'keys' => [
                     'p256dh' => 'test-p256dh-key',
@@ -89,7 +90,7 @@ class PushNotificationTest extends TestCase
 
         // Update with new keys
         $response = $this->actingAs($this->user)
-            ->postJson('/api/push/subscribe', [
+            ->postJson('/push/subscribe', [
                 'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-token',
                 'keys' => [
                     'p256dh' => 'new-p256dh-key',
@@ -117,7 +118,7 @@ class PushNotificationTest extends TestCase
         );
 
         $response = $this->actingAs($this->user)
-            ->postJson('/api/push/unsubscribe', [
+            ->postJson('/push/unsubscribe', [
                 'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-token',
             ]);
 
@@ -133,7 +134,7 @@ class PushNotificationTest extends TestCase
     public function unsubscribe_returns_404_for_unknown_endpoint(): void
     {
         $response = $this->actingAs($this->user)
-            ->postJson('/api/push/unsubscribe', [
+            ->postJson('/push/unsubscribe', [
                 'endpoint' => 'https://unknown-endpoint.com/test',
             ]);
 
@@ -153,7 +154,7 @@ class PushNotificationTest extends TestCase
         );
 
         $response = $this->actingAs($this->user)
-            ->getJson('/api/push/status?endpoint=' . urlencode('https://fcm.googleapis.com/fcm/send/test-token'));
+            ->getJson('/push/status?endpoint=' . urlencode('https://fcm.googleapis.com/fcm/send/test-token'));
 
         $response->assertOk()
             ->assertJson([
@@ -181,7 +182,7 @@ class PushNotificationTest extends TestCase
         );
 
         $response = $this->actingAs($this->user)
-            ->getJson('/api/push/subscriptions');
+            ->getJson('/push/subscriptions');
 
         $response->assertOk()
             ->assertJsonCount(2, 'subscriptions');
@@ -202,7 +203,7 @@ class PushNotificationTest extends TestCase
         $subscription = $this->user->pushSubscriptions()->first();
 
         $response = $this->actingAs($this->user)
-            ->deleteJson("/api/push/subscriptions/{$subscription->id}");
+            ->deleteJson("/push/subscriptions/{$subscription->id}");
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -216,7 +217,7 @@ class PushNotificationTest extends TestCase
     public function test_notification_requires_subscription(): void
     {
         $response = $this->actingAs($this->user)
-            ->postJson('/api/push/test');
+            ->postJson('/push/test');
 
         $response->assertBadRequest()
             ->assertJson(['message' => 'No push subscriptions found']);
@@ -237,7 +238,7 @@ class PushNotificationTest extends TestCase
         );
 
         $response = $this->actingAs($this->user)
-            ->postJson('/api/push/test');
+            ->postJson('/push/test');
 
         $response->assertOk()
             ->assertJson(['success' => true]);
