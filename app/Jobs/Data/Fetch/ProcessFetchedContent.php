@@ -160,10 +160,13 @@ class ProcessFetchedContent implements ShouldQueue
             $shouldDisable = ($fetchMode === 'once' && $newFetchCount >= 1);
 
             // Update webpage EventObject
+            // Prefer ArticleImageExtractor's media_url over Readability's extraction
+            $mediaUrl = $this->webpage->media_url ?: $this->extracted['image'];
+
             $this->webpage->update([
                 'title' => $this->extracted['title'],
                 'content' => $this->extracted['excerpt'],
-                'media_url' => $this->extracted['image'],
+                'media_url' => $mediaUrl,
                 'metadata' => array_merge($metadata, [
                     'last_checked_at' => now()->toIso8601String(),
                     'last_changed_at' => now()->toIso8601String(),
