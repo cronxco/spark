@@ -156,7 +156,7 @@ new class extends Component {
     <div class="flex items-center justify-between">
         <label class="label text-sm text-base-content/70">Tags</label>
         <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
-            <x-icon name="fas-plus" class="w-3 h-3" />
+            <x-icon name="fas.plus" class="w-3 h-3" />
         </button>
     </div>
     <div class="w-full" wire:ignore>

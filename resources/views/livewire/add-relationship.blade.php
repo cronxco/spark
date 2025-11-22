@@ -51,7 +51,7 @@
                 <x-input
                     wire:model.live.debounce.300ms="searchQuery"
                     placeholder="Type to search..."
-                    icon="fas-magnifying-glass"
+                    icon="fas.magnifying-glass"
                     :disabled="!$toType || $selectedTarget"
                 />
             </div>
@@ -89,7 +89,7 @@
                     </div>
                     <span class="badge badge-accent">{{ $badge }}</span>
                     <button type="button" wire:click="clearSelection" class="btn btn-ghost btn-sm btn-circle">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                     </button>
                 </div>
             </div>
@@ -141,7 +141,7 @@
             @elseif ($toType && !$selectedTarget && filled($searchQuery))
                 <div class="h-64 flex items-center justify-center text-base-content/60 rounded-lg border border-base-300">
                     <div class="text-center">
-                        <x-icon name="fas-magnifying-glass" class="w-8 h-8 mx-auto mb-2 text-base-content/30" />
+                        <x-icon name="fas.magnifying-glass" class="w-8 h-8 mx-auto mb-2 text-base-content/30" />
                         <p class="text-sm">No results found</p>
                     </div>
                 </div>

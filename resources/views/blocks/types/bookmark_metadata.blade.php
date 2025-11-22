@@ -52,13 +52,13 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
             <div class="flex items-center gap-2 text-xs text-base-content/60">
                 @if (isset($block->metadata['author']))
                     <div class="flex items-center gap-1">
-                        <x-icon name="fas-user" class="w-3 h-3" />
+                        <x-icon name="fas.user" class="w-3 h-3" />
                         {{ $block->metadata['author'] }}
                     </div>
                 @endif
                 @if (isset($block->metadata['site_name']))
                     <div class="flex items-center gap-1">
-                        <x-icon name="fas-globe" class="w-3 h-3" />
+                        <x-icon name="fas.globe" class="w-3 h-3" />
                         {{ $block->metadata['site_name'] }}
                     </div>
                 @endif
@@ -68,7 +68,7 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="fas-bookmark" class="w-3 h-3" />
+                <x-icon name="fas.bookmark" class="w-3 h-3" />
                 Preview Card
             </div>
 
@@ -76,12 +76,12 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="fas-eye" class="w-4 h-4" />
+                            <x-icon name="fas.eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>

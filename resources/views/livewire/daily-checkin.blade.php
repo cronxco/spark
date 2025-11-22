@@ -240,14 +240,14 @@ $completionStatus = computed(function () {
                 role="tab"
                 class="tab tab-sm gap-1.5 {{ $activeView === 'am' ? 'tab-active' : '' }}"
                 wire:click="switchView('am')">
-                <x-icon name="fas-sun" class="w-3.5 h-3.5" />
+                <x-icon name="fas.sun" class="w-3.5 h-3.5" />
                 AM
             </a>
             <a
                 role="tab"
                 class="tab tab-sm gap-1.5 {{ $activeView === 'pm' ? 'tab-active' : '' }}"
                 wire:click="switchView('pm')">
-                <x-icon name="fas-moon" class="w-3.5 h-3.5" />
+                <x-icon name="fas.moon" class="w-3.5 h-3.5" />
                 PM
             </a>
         </div>
@@ -256,14 +256,14 @@ $completionStatus = computed(function () {
     <!-- Morning View -->
     @if ($activeView === 'am')
         <div class="flex items-center gap-2 flex-1 justify-center">
-            <x-icon name="fas-bolt" class="w-4 h-4 text-warning" x-tooltip="Physical Energy" />
+            <x-icon name="fas.bolt" class="w-4 h-4 text-warning" x-tooltip="Physical Energy" />
             <x-rating wire:model.live="amPhysical" />
         </div>
         <div class="flex items-center gap-2 flex-1 justify-center">
-            <x-icon name="fas-lightbulb" class="w-4 h-4 text-info" x-tooltip="Mental Energy" />
+            <x-icon name="fas.lightbulb" class="w-4 h-4 text-info" x-tooltip="Mental Energy" />
             <x-rating wire:model.live="amMental" />
             @if ($amPhysical && $amMental)
-                <x-icon name="fas-circle-check" class="w-4 h-4 text-success ml-1" x-tooltip="Complete" />
+                <x-icon name="fas.circle-check" class="w-4 h-4 text-success ml-1" x-tooltip="Complete" />
             @endif
             @if ($saving)
                 <span class="loading loading-spinner loading-xs text-info ml-1"></span>
@@ -274,14 +274,14 @@ $completionStatus = computed(function () {
     <!-- Afternoon View -->
     @if ($activeView === 'pm')
         <div class="flex items-center gap-2 flex-1 justify-center">
-            <x-icon name="fas-bolt" class="w-4 h-4 text-warning" x-tooltip="Physical Energy" />
+            <x-icon name="fas.bolt" class="w-4 h-4 text-warning" x-tooltip="Physical Energy" />
             <x-rating wire:model.live="pmPhysical" />
         </div>
         <div class="flex items-center gap-2 flex-1 justify-center">
-            <x-icon name="fas-lightbulb" class="w-4 h-4 text-info" x-tooltip="Mental Energy" />
+            <x-icon name="fas.lightbulb" class="w-4 h-4 text-info" x-tooltip="Mental Energy" />
             <x-rating wire:model.live="pmMental" />
             @if ($pmPhysical && $pmMental)
-                <x-icon name="fas-circle-check" class="w-4 h-4 text-success ml-1" x-tooltip="Complete" />
+                <x-icon name="fas.circle-check" class="w-4 h-4 text-success ml-1" x-tooltip="Complete" />
             @endif
             @if ($saving)
                 <span class="loading loading-spinner loading-xs text-info ml-1"></span>

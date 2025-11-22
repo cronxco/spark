@@ -181,7 +181,7 @@ new class extends Component {
     <x-header title="Tags" subtitle="Browse and manage all tags across events and objects" separator>
         <x-slot:actions>
             <button wire:click="openCreateModal" class="btn btn-primary">
-                <x-icon name="fas-plus" class="w-4 h-4" />
+                <x-icon name="fas.plus" class="w-4 h-4" />
                 Create Tag
             </button>
         </x-slot:actions>
@@ -210,7 +210,7 @@ new class extends Component {
                         <span class="label-text">&nbsp;</span>
                     </label>
                     <button wire:click="clearFilters" class="btn btn-outline">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
@@ -222,7 +222,7 @@ new class extends Component {
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="fas-filter" class="w-5 h-5" />
+                    <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters
                     @if (!empty($searchQuery))
                     <x-badge value="Active" class="badge-primary badge-xs" />
@@ -246,7 +246,7 @@ new class extends Component {
                     <!-- Clear Filters -->
                     @if (!empty($searchQuery))
                     <button wire:click="clearFilters" class="btn btn-outline">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif
@@ -258,7 +258,7 @@ new class extends Component {
     @if (empty($tagsByType))
     <x-card>
         <div class="text-center py-8">
-            <x-icon name="fas-tag" class="w-12 h-12 text-base-content/40 mx-auto mb-4" />
+            <x-icon name="fas.tag" class="w-12 h-12 text-base-content/40 mx-auto mb-4" />
             <h3 class="text-lg font-semibold text-base-content mb-2">No Tags Found</h3>
             <p class="text-base-content/70">
                 @if ($searchQuery !== '')

@@ -252,7 +252,7 @@ new class extends Component {
                 @if (!empty($this->search) || $this->filter !== 'all')
                 <div class="form-control">
                     <button wire:click="clearFilters" class="btn btn-outline btn-sm">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
@@ -266,7 +266,7 @@ new class extends Component {
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="fas-filter" class="w-5 h-5" />
+                    <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters
                     @if (!empty($this->search) || $this->filter !== 'all')
                         <x-badge value="Active" class="badge-primary badge-xs" />
@@ -302,7 +302,7 @@ new class extends Component {
 
                     @if (!empty($this->search) || $this->filter !== 'all')
                     <button wire:click="clearFilters" class="btn btn-outline btn-sm">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif
@@ -371,7 +371,7 @@ new class extends Component {
                                                 @click="editing = true; $nextTick(() => $refs.nameInput.focus())"
                                                 class="opacity-0 group-hover:opacity-100 hover:text-primary transition-opacity p-0.5"
                                                 title="Edit name">
-                                                <x-icon name="fas-pen" class="w-3 h-3" />
+                                                <x-icon name="fas.pen" class="w-3 h-3" />
                                             </button>
                                         </div>
                                         <div x-show="editing" class="flex items-center gap-2">
@@ -384,12 +384,12 @@ new class extends Component {
                                                 @keydown.escape="editing = false; name = {{ json_encode($integration['name'] ?: $integration['service']) }}"
                                                 placeholder="Enter name" />
                                             <x-button
-                                                icon="fas-check"
+                                                icon="fas.check"
                                                 class="btn-ghost btn-xs flex-shrink-0"
                                                 @click="$wire.updateIntegrationNameFromIndex('{{ $integration['id'] }}', name); editing = false"
                                                 title="Save" />
                                             <x-button
-                                                icon="fas-xmark"
+                                                icon="fas.xmark"
                                                 class="btn-ghost btn-xs flex-shrink-0"
                                                 @click="editing = false; name = {{ json_encode($integration['name'] ?: $integration['service']) }}"
                                                 title="Cancel" />
@@ -398,13 +398,13 @@ new class extends Component {
                                 </div>
                                 <x-dropdown>
                                     <x-slot:trigger>
-                                        <x-button icon="fas-ellipsis-vertical" class="btn-ghost btn-sm" />
+                                        <x-button icon="fas.ellipsis-vertical" class="btn-ghost btn-sm" />
                                     </x-slot:trigger>
-                                    <x-menu-item title="{{ __('Configure') }}" link="{{ route('integrations.configure', $integration['id']) }}" icon="fas-gear" />
-                                    <x-menu-item title="{{ __('View Details') }}" link="{{ route('integrations.details', $integration['id']) }}" icon="fas-eye" />
+                                    <x-menu-item title="{{ __('Configure') }}" link="{{ route('integrations.configure', $integration['id']) }}" icon="fas.gear" />
+                                    <x-menu-item title="{{ __('View Details') }}" link="{{ route('integrations.details', $integration['id']) }}" icon="fas.eye" />
                                     <x-menu-item
                                         title="{{ __('Delete') }}"
-                                        icon="fas-trash"
+                                        icon="fas.trash"
                                         wire:click="deleteIntegration('{{ $integration['id'] }}')"
                                         class="text-error" />
                                 </x-dropdown>
@@ -419,7 +419,7 @@ new class extends Component {
                             <div class="text-sm text-base-content/70 flex items-center gap-2">
                                 @if ($lastUpdate)
                                     <div class="flex items-center gap-1">
-                                        <x-icon name="fas-clock" class="w-3 h-3" />
+                                        <x-icon name="fas.clock" class="w-3 h-3" />
                                         <span>{{ \Carbon\Carbon::parse($lastUpdate)->diffForHumans() }}</span>
                                     </div>
                                     @if ($needsUpdate)
@@ -427,7 +427,7 @@ new class extends Component {
                                     @endif
                                 @else
                                     <div class="flex items-center gap-1 text-warning">
-                                        <x-icon name="fas-triangle-exclamation" class="w-3 h-3" />
+                                        <x-icon name="fas.triangle-exclamation" class="w-3 h-3" />
                                         <span>Never updated</span>
                                     </div>
                                 @endif
@@ -460,14 +460,14 @@ new class extends Component {
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
                             @csrf
                             <button type="submit" class="btn btn-outline btn-sm w-full">
-                                <x-icon name="fas-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 {{ __('Add Another') }}
                             </button>
                         </form>
                         @else
                         <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
                             class="btn btn-outline btn-sm w-full">
-                            <x-icon name="fas-plus" class="w-4 h-4" />
+                            <x-icon name="fas.plus" class="w-4 h-4" />
                             {{ __('Add Another') }}
                         </a>
                         @endif
@@ -475,7 +475,7 @@ new class extends Component {
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
                             @csrf
                             <button type="submit" class="btn btn-outline btn-sm w-full">
-                                <x-icon name="fas-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 {{ __('Add Another') }}
                             </button>
                         </form>
@@ -484,7 +484,7 @@ new class extends Component {
                         <button
                             wire:click="confirmDeleteGroup('{{ $group['id'] }}')"
                             class="btn btn-outline btn-sm w-full text-error hover:bg-error hover:text-error-content">
-                            <x-icon name="fas-trash" class="w-4 h-4" />
+                            <x-icon name="fas.trash" class="w-4 h-4" />
                             {{ __('Delete Integration') }}
                         </button>
                     </div>
@@ -549,14 +549,14 @@ new class extends Component {
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
                             @csrf
                             <button type="submit" class="btn btn-outline btn-primary w-full">
-                                <x-icon name="fas-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 {{ __('Connect') }}
                             </button>
                         </form>
                         @else
                         <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
                             class="btn btn-outline btn-primary w-full">
-                            <x-icon name="fas-plus" class="w-4 h-4" />
+                            <x-icon name="fas.plus" class="w-4 h-4" />
                             {{ __('Connect') }}
                         </a>
                         @endif
@@ -564,7 +564,7 @@ new class extends Component {
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
                             @csrf
                             <button type="submit" class="btn btn-outline btn-primary w-full">
-                                <x-icon name="fas-plus" class="w-4 h-4" />
+                                <x-icon name="fas.plus" class="w-4 h-4" />
                                 {{ __('Connect') }}
                             </button>
                         </form>
@@ -582,13 +582,13 @@ new class extends Component {
     <!-- Empty state when no results after filtering -->
     @if ($filteredPlugins->count() === 0)
     <div class="text-center py-12">
-        <x-icon name="fas-magnifying-glass" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+        <x-icon name="fas.magnifying-glass" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
         <h3 class="text-lg font-medium text-base-content mb-2">No integrations found</h3>
         <p class="text-base-content/70 mb-6">
             Try adjusting your filters or search terms.
         </p>
         <x-button wire:click="clearFilters" class="btn-outline">
-            <x-icon name="fas-xmark" class="w-4 h-4" />
+            <x-icon name="fas.xmark" class="w-4 h-4" />
             Clear Filters
         </x-button>
     </div>

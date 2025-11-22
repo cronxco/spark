@@ -26,7 +26,7 @@
 
     @if ($chartData->isEmpty())
         <div class="text-center py-8">
-            <x-icon name="fas-chart-simple" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+            <x-icon name="fas.chart-simple" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
             <h3 class="text-lg font-medium text-base-content mb-2">No data available</h3>
             <p class="text-base-content/70">No events found for the selected time range</p>
         </div>

@@ -42,18 +42,18 @@ $amount = $block->formatted_value ?? 0;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="fas-eye" class="w-4 h-4" />
+                            <x-icon name="fas.eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>
                     <li>
                         <a href="{{ route('events.show', $block->event) }}" wire:navigate>
-                            <x-icon name="fas-calendar" class="w-4 h-4" />
+                            <x-icon name="fas.calendar" class="w-4 h-4" />
                             View Event
                         </a>
                     </li>

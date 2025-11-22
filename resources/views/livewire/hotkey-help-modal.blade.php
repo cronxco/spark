@@ -4,7 +4,7 @@
             {{-- Navigation --}}
             <div>
                 <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <x-icon name="fas-map" class="w-5 h-5" />
+                    <x-icon name="fas.map" class="w-5 h-5" />
                     Navigation
                 </h3>
                 <div class="overflow-x-auto">
@@ -74,7 +74,7 @@
             {{-- UI Controls --}}
             <div>
                 <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <x-icon name="fas-arrow-pointer" class="w-5 h-5" />
+                    <x-icon name="fas.arrow-pointer" class="w-5 h-5" />
                     UI Controls
                 </h3>
                 <div class="overflow-x-auto">
@@ -119,7 +119,7 @@
             {{-- Detail Page Actions --}}
             <div>
                 <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <x-icon name="fas-file-lines" class="w-5 h-5" />
+                    <x-icon name="fas.file-lines" class="w-5 h-5" />
                     Detail Page Actions
                 </h3>
                 <div class="overflow-x-auto">

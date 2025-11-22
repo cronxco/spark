@@ -172,7 +172,7 @@ new class extends Component
                 @if (count($selectedObjects) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
                     onclick="return confirm('Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.')">
-                    <x-icon name="fas-trash" class="w-4 h-4 mr-1" />
+                    <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedObjects) }})
                 </button>
                 @endif
@@ -229,7 +229,7 @@ new class extends Component
                         <span class="label-text">&nbsp;</span>
                     </label>
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
@@ -243,7 +243,7 @@ new class extends Component
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="fas-filter" class="w-5 h-5" />
+                    <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters
                     @if ($search || $conceptFilter || $typeFilter)
                     <x-badge value="Active" class="badge-primary badge-xs" />
@@ -293,7 +293,7 @@ new class extends Component
                     <!-- Clear Filters Button -->
                     @if ($search || $conceptFilter || $typeFilter)
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas-xmark" class="w-4 h-4" />
+                        <x-icon name="fas.xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif

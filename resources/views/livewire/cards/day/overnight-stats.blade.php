@@ -10,7 +10,7 @@
             @if ($sleepScore)
             <div class="card bg-base-200">
                 <div class="card-body items-center text-center p-4">
-                    <x-icon name="fas-moon" class="w-8 h-8 text-info mb-2" />
+                    <x-icon name="fas.moon" class="w-8 h-8 text-info mb-2" />
                     <div class="text-3xl font-bold text-info">{{ $sleepScore }}</div>
                     <div class="text-sm text-base-content/70">Sleep Score</div>
                 </div>
@@ -20,7 +20,7 @@
             @if ($readinessScore)
             <div class="card bg-base-200">
                 <div class="card-body items-center text-center p-4">
-                    <x-icon name="fas-bolt" class="w-8 h-8 text-success mb-2" />
+                    <x-icon name="fas.bolt" class="w-8 h-8 text-success mb-2" />
                     <div class="text-3xl font-bold text-success">{{ $readinessScore }}</div>
                     <div class="text-sm text-base-content/70">Readiness</div>
                 </div>

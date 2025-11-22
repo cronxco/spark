@@ -2,7 +2,7 @@
     <form wire:submit="archive">
         <div class="space-y-4">
             <!-- Warning Alert -->
-            <x-alert icon="fas-triangle-exclamation" class="alert-warning">
+            <x-alert icon="fas.triangle-exclamation" class="alert-warning">
                 <span class="font-semibold">Warning:</span> Archiving this account will create a final balance event with a zero balance. This action cannot be easily undone.
             </x-alert>
 
@@ -50,7 +50,7 @@
                 <x-button
                     type="submit"
                     class="btn-error">
-                    <x-icon name="fas-box-archive" class="w-4 h-4" />
+                    <x-icon name="fas.box-archive" class="w-4 h-4" />
                     Archive
                 </x-button>
             </div>

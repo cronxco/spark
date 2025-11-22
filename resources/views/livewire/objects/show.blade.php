@@ -1050,7 +1050,7 @@ new class extends Component {
                         title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                         aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                         data-hotkey="d">
-                        <x-icon name="fas-sliders" class="w-4 h-4" />
+                        <x-icon name="fas.sliders" class="w-4 h-4" />
                     </x-button>
                 </x-slot:actions>
             </x-header>
@@ -1073,7 +1073,7 @@ new class extends Component {
                                 <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content leading-tight flex items-center gap-2">
                                     {{ $this->object->title }}
                                     @if ($this->object->isLocked())
-                                        <x-icon name="fas-lock" class="w-5 h-5 text-base-content/60" title="This object is locked" />
+                                        <x-icon name="fas.lock" class="w-5 h-5 text-base-content/60" title="This object is locked" />
                                     @endif
                                 </h2>
                             </div>
@@ -1082,7 +1082,7 @@ new class extends Component {
                         <!-- Key Metadata -->
                         <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text">
                             <div class="flex items-center gap-2">
-                                <x-icon name="fas-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                <x-icon name="fas.clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
                                 <span class="text-base-content/70">{{ $this->object->time->format('d/m/Y H:i') }} · {{ $this->object->time->diffForHumans() }}</span>
                             </div>
                             <span class="hidden sm:inline">·</span>
@@ -1096,7 +1096,7 @@ new class extends Component {
                             </x-badge>
                             @endif
                             @if ($this->object->type)
-                            <x-icon name="fas-arrow-right" class="w-3 h-3 text-base-content/40" />
+                            <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge badge-outline">
                                 <x-slot:value>
                                     <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
@@ -1113,14 +1113,14 @@ new class extends Component {
                                 @if ($this->object->url)
                                 <a href="{{ $this->object->url }}" target="_blank"
                                     class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors">
-                                    <x-icon name="fas-link" class="w-4 h-4" />
+                                    <x-icon name="fas.link" class="w-4 h-4" />
                                     <span>{{ $this->object->url }}</span>
                                 </a>
                                 @endif
                                 @if ($this->object->media_url)
                                 <a href="{{ $this->object->media_url }}" target="_blank"
                                     class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors">
-                                    <x-icon name="fas-image" class="w-4 h-4" />
+                                    <x-icon name="fas.image" class="w-4 h-4" />
                                     <span>{{ $this->object->media_url }}</span>
                                 </a>
                                 @endif
@@ -1147,7 +1147,7 @@ new class extends Component {
             <x-card class="bg-base-100 shadow">
                 <div class="max-w-prose mx-auto">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas-file-lines" class="w-5 h-5 text-info" />
+                        <x-icon name="fas.file-lines" class="w-5 h-5 text-info" />
                         Content
                     </h3>
                     <div class="prose dark:prose-invert prose-base lg:prose-lg">
@@ -1162,7 +1162,7 @@ new class extends Component {
             <div class="relative">
                 <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas-grip" class="w-5 h-5 text-warning" />
+                        <x-icon name="fas.grip" class="w-5 h-5 text-warning" />
                         Related Blocks ({{ $this->getRelatedBlocks()->count() }})
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1173,7 +1173,7 @@ new class extends Component {
                 </div>
                 <!-- AI Badge -->
                 <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                    <x-icon name="fas-wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                    <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
                 </div>
             </div>
             @endif
@@ -1183,7 +1183,7 @@ new class extends Component {
             <div class="relative">
                 <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas-bolt" class="w-5 h-5 text-warning" />
+                        <x-icon name="fas.bolt" class="w-5 h-5 text-warning" />
                         Related Events ({{ $this->getRelatedEvents()->count() }})
                     </h3>
                     <div class="space-y-3">
@@ -1193,7 +1193,7 @@ new class extends Component {
                                 class="block hover:text-primary transition-colors">
                                 <div class="flex items-start gap-3">
                                     <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                        <x-icon name="fas-bolt" class="w-4 h-4 text-primary" />
+                                        <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-start justify-between gap-2 mb-1">
@@ -1251,7 +1251,7 @@ new class extends Component {
                                             @endif
                                         </div>
                                     </div>
-                                    <x-icon name="fas-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                                    <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
                                 </div>
                             </a>
                         </div>
@@ -1260,7 +1260,7 @@ new class extends Component {
                 </div>
                 <!-- AI Badge -->
                 <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                    <x-icon name="fas-wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                    <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
                 </div>
             </div>
             @endif
@@ -1271,11 +1271,11 @@ new class extends Component {
             <x-card class="bg-base-200/50 border-2 border-accent/10">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold flex items-center gap-2">
-                        <x-icon name="fas-right-left" class="w-5 h-5 text-accent" />
+                        <x-icon name="fas.right-left" class="w-5 h-5 text-accent" />
                         Relationships ({{ $relationships->count() }})
                     </h3>
                     <x-button
-                        icon="fas-gear"
+                        icon="fas.gear"
                         class="btn-sm btn-ghost"
                         wire:click="handleOpenManageRelationshipsModal"
                         label="Manage"
@@ -1384,7 +1384,7 @@ new class extends Component {
                                 wire:click="exportAsJson"
                                 class="btn btn-ghost btn-xs gap-1"
                                 title="Export complete object with relationships and related data">
-                                <x-icon name="fas-download" class="w-3 h-3" />
+                                <x-icon name="fas.download" class="w-3 h-3" />
                                 <span class="hidden sm:inline">Export</span>
                             </button>
                         </div>
@@ -1441,7 +1441,7 @@ new class extends Component {
                                 Tags
                             </h3>
                             <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
-                                <x-icon name="fas-plus" class="w-3 h-3" />
+                                <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
                         <div wire:key="object-tags-{{ $this->object->id }}" wire:ignore>
@@ -1462,13 +1462,13 @@ new class extends Component {
                                 Relationships
                             </h3>
                             <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
-                                <x-icon name="fas-plus" class="w-3 h-3" />
+                                <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
                         @php $sidebarRelationships = $this->getRelationships(); @endphp
                         @if ($sidebarRelationships->isEmpty())
                             <x-empty-state
-                                icon="fas-right-left"
+                                icon="fas.right-left"
                                 message="No relationships yet"
                                 actionEvent="handleOpenAddRelationshipModal"
                                 actionLabel="Add Relationship" />
@@ -1526,7 +1526,7 @@ new class extends Component {
                             @php $activities = $this->getActivities(); @endphp
                             @if ($activities->isEmpty())
                             <x-empty-state
-                                icon="fas-clock"
+                                icon="fas.clock"
                                 message="No activity yet"
                                 actionEvent="addComment"
                                 actionLabel="Add Comment" />
@@ -1623,7 +1623,7 @@ new class extends Component {
         </div>
         @else
         <div class="text-center py-12">
-            <x-icon name="fas-triangle-exclamation" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
+            <x-icon name="fas.triangle-exclamation" class="w-16 h-16 text-base-content/70 mx-auto mb-4" />
             <h3 class="text-lg font-medium text-base-content mb-2">Object Not Found</h3>
             <p class="text-base-content/70">The requested object could not be found.</p>
         </div>
