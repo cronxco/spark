@@ -173,24 +173,44 @@ class TransactionLinkingService
     ): string {
         $targetEvent = $link['target_event'];
 
-        // Check if relationship already exists
+        // Check if relationship already exists (either direction)
         $existingRelationship = Relationship::where('user_id', $userId)
-            ->where('from_type', Event::class)
-            ->where('from_id', $sourceEvent->id)
-            ->where('to_type', Event::class)
-            ->where('to_id', $targetEvent->id)
             ->where('type', $link['relationship_type'])
+            ->where(function ($query) use ($sourceEvent, $targetEvent) {
+                $query->where(function ($q) use ($sourceEvent, $targetEvent) {
+                    // Check A -> B
+                    $q->where('from_type', Event::class)
+                        ->where('from_id', $sourceEvent->id)
+                        ->where('to_type', Event::class)
+                        ->where('to_id', $targetEvent->id);
+                })->orWhere(function ($q) use ($sourceEvent, $targetEvent) {
+                    // Check B -> A
+                    $q->where('from_type', Event::class)
+                        ->where('from_id', $targetEvent->id)
+                        ->where('to_type', Event::class)
+                        ->where('to_id', $sourceEvent->id);
+                });
+            })
             ->exists();
 
         if ($existingRelationship) {
             return 'skipped';
         }
 
-        // Check if pending link already exists
+        // Check if pending link already exists (either direction)
         $existingPending = PendingTransactionLink::where('user_id', $userId)
-            ->where('source_event_id', $sourceEvent->id)
-            ->where('target_event_id', $targetEvent->id)
             ->where('relationship_type', $link['relationship_type'])
+            ->where(function ($query) use ($sourceEvent, $targetEvent) {
+                $query->where(function ($q) use ($sourceEvent, $targetEvent) {
+                    // Check A -> B
+                    $q->where('source_event_id', $sourceEvent->id)
+                        ->where('target_event_id', $targetEvent->id);
+                })->orWhere(function ($q) use ($sourceEvent, $targetEvent) {
+                    // Check B -> A
+                    $q->where('source_event_id', $targetEvent->id)
+                        ->where('target_event_id', $sourceEvent->id);
+                });
+            })
             ->exists();
 
         if ($existingPending) {
