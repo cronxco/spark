@@ -55,6 +55,36 @@ class RelationshipTypeRegistry
                 'supports_value' => true,
                 'default_value_unit' => 'GBP',
             ],
+            'triggered_by' => [
+                'display_name' => 'Triggered By',
+                'icon' => 'o-bolt',
+                'is_directional' => true,
+                'description' => 'Transaction was automatically triggered by another (e.g., coin jar, rewards)',
+                'supports_value' => false,
+            ],
+            'funded_by' => [
+                'display_name' => 'Funded By',
+                'icon' => 'o-currency-pound',
+                'is_directional' => true,
+                'description' => 'Transaction was funded by a pot withdrawal or transfer',
+                'supports_value' => true,
+                'default_value_unit' => 'GBP',
+            ],
+            'payment_for' => [
+                'display_name' => 'Payment For',
+                'icon' => 'o-credit-card',
+                'is_directional' => true,
+                'description' => 'Cross-provider payment relationship (e.g., direct debit paying off credit card)',
+                'supports_value' => true,
+                'default_value_unit' => 'GBP',
+            ],
+            'settles' => [
+                'display_name' => 'Settles',
+                'icon' => 'o-check-circle',
+                'is_directional' => true,
+                'description' => 'Transaction settles a pending authorisation',
+                'supports_value' => false,
+            ],
         ];
     }
 
