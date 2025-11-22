@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $lineNumber = $block->metadata['line_number'] ?? null;
@@ -29,7 +29,7 @@ $documentId = $block->metadata['outline_document_id'] ?? null;
             <div class="flex-shrink-0 mt-1">
                 @if ($checked)
                 <div class="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                    <x-icon name="o-check" class="w-4 h-4 text-primary-content" />
+                    <x-icon name="fas-check" class="w-4 h-4 text-primary-content" />
                 </div>
                 @else
                 <div class="w-6 h-6 rounded-full border-2 border-base-content/30"></div>
@@ -50,7 +50,7 @@ $documentId = $block->metadata['outline_document_id'] ?? null;
         {{-- Footer --}}
         <div class="flex items-center gap-2 pt-2 border-t border-base-300">
             <div class="badge badge-ghost badge-sm gap-1">
-                <x-icon name="o-calendar" class="w-3 h-3" />
+                <x-icon name="fas-calendar" class="w-3 h-3" />
                 Daily Task
             </div>
 
@@ -58,12 +58,12 @@ $documentId = $block->metadata['outline_document_id'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas-eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>

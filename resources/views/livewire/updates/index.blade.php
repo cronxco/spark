@@ -489,7 +489,7 @@ new class extends Component {
                                         <div class="space-y-3">
                                             @if (count($pluginData['groups']) > 1)
                                                 <div class="flex items-center space-x-2 text-xs sm:text-sm text-base-content/70">
-                                                    <x-icon name="o-folder" class="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                                    <x-icon name="fas-folder" class="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                                                     <span class="font-medium truncate">{{ $groupName }}</span>
                                                     <span class="text-xs flex-shrink-0">({{ count($groupData['integrations']) }} {{ Str::plural('instance', count($groupData['integrations'])) }})</span>
                                                 </div>
@@ -569,32 +569,32 @@ new class extends Component {
                                                 <div class="flex items-center space-x-1 sm:space-x-2">
                                                     <x-loading class="loading-spinner loading-xs sm:loading-sm" />
                                                     <x-badge value="{{ __('Processing') }}" class="badge-info badge-xs sm:badge-sm">
-                                                        <x-icon name="o-arrow-path" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                        <x-icon name="fas-rotate" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
                                                 </div>
                                             @elseif ($showScheduledUpdates)
                                                 @if ($integration['status'] === 'needs_update')
                                                     <x-badge value="{{ __('Needs Update') }}" class="badge-error badge-xs sm:badge-sm">
-                                                        <x-icon name="o-exclamation-triangle" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                        <x-icon name="fas-triangle-exclamation" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
                                                 @elseif ($integration['status'] === 'pending_update')
                                                     <x-badge value="{{ __('Pending Update') }}" class="badge-warning badge-xs sm:badge-sm">
-                                                        <x-icon name="o-clock" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                        <x-icon name="fas-clock" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
                                                 @else
                                                     <x-badge value="{{ __('Up to Date') }}" class="badge-success badge-xs sm:badge-sm">
-                                                        <x-icon name="o-check-circle" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                        <x-icon name="fas-circle-check" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
                                                 @endif
                                                 @if ($integration['is_paused'])
                                                     <x-badge value="Paused" class="badge-neutral badge-xs sm:badge-sm">
-                                                        <x-icon name="o-pause" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                        <x-icon name="fas-pause" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
                                                 @endif
                                             @else
                                                 @if ($isWebhook)
                                                     <x-badge value="{{ __('Push') }}" class="badge-info badge-xs sm:badge-sm">
-                                                        <x-icon name="o-arrow-down-tray" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                                                        <x-icon name="fas-download" class="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
                                                     </x-badge>
                                                 @elseif ($isManual)
                                                     <x-badge value="{{ __('Manual') }}" class="badge-success badge-xs sm:badge-sm">
@@ -643,7 +643,7 @@ new class extends Component {
                                             @if ($showScheduledUpdates && !$integration['is_processing'] && !$integration['is_paused'] && in_array($integration['status'], ['needs_update', 'pending_update']))
                                                 <x-button
                                                     label="{{ __('Update') }}"
-                                                    icon="o-arrow-path"
+                                                    icon="fas-rotate"
                                                     wire:click="triggerUpdate('{{ $integration['id'] }}')"
                                                     :disabled="$integration['is_processing']"
                                                     class="btn btn-xs sm:btn-sm hover:btn-success"
@@ -651,7 +651,7 @@ new class extends Component {
                                             @endif
                                             <x-button
                                                 label="{{ $integration['is_paused'] ? __('Resume') : __('Pause') }}"
-                                                icon="o-pause"
+                                                icon="fas-pause"
                                                 wire:click="togglePause('{{ $integration['id'] }}')"
                                                 class="btn btn-xs sm:btn-sm btn-ghost"
                                             />

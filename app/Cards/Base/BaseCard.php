@@ -60,7 +60,7 @@ abstract class BaseCard implements StreamCard
      */
     public function getIcon(): string
     {
-        return 'o-rectangle-stack';
+        return 'fas-layer-group';
     }
 
     /**

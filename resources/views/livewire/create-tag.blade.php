@@ -60,7 +60,7 @@
         <!-- Form Actions -->
         <div class="flex gap-3 mt-8">
             <button type="submit" class="btn btn-primary">
-                <x-icon name="o-plus" class="w-4 h-4" />
+                <x-icon name="fas-plus" class="w-4 h-4" />
                 Create Tag
             </button>
             <button type="button" wire:click="$set('showModal', false)" class="btn btn-ghost">

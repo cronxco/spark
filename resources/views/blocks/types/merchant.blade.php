@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $merchantInfo = $block->metadata['merchant'] ?? [];
@@ -34,7 +34,7 @@ $logo = is_array($merchantInfo) ? ($merchantInfo['logo'] ?? null) : null;
             </div>
             @else
             <div class="w-12 h-12 rounded-lg bg-base-300 flex items-center justify-center flex-shrink-0">
-                <x-icon name="o-building-storefront" class="w-6 h-6 text-base-content/40" />
+                <x-icon name="fas-store" class="w-6 h-6 text-base-content/40" />
             </div>
             @endif
             <div class="flex-1 min-w-0">
@@ -47,7 +47,7 @@ $logo = is_array($merchantInfo) ? ($merchantInfo['logo'] ?? null) : null;
 
         @if ($address)
         <div class="text-xs text-base-content/60">
-            <x-icon name="o-map-pin" class="w-3 h-3 inline" />
+            <x-icon name="fas-location-dot" class="w-3 h-3 inline" />
             @if (is_array($address))
                 {{ implode(', ', array_filter([$address['short_formatted'] ?? $address['formatted'] ?? null])) }}
             @else
@@ -67,18 +67,18 @@ $logo = is_array($merchantInfo) ? ($merchantInfo['logo'] ?? null) : null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas-eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>
                     <li>
                         <a href="{{ route('events.show', $block->event) }}" wire:navigate>
-                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            <x-icon name="fas-calendar" class="w-4 h-4" />
                             View Event
                         </a>
                     </li>

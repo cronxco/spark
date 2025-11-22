@@ -287,25 +287,25 @@ new class extends Component
             <div class="flex items-center gap-2">
                 <div class="dropdown dropdown-end">
                     <label tabindex="0" class="btn btn-primary btn-sm">
-                        <x-icon name="o-sparkles" class="w-4 h-4 mr-1" />
+                        <x-icon name="fas-wand-magic-sparkles" class="w-4 h-4 mr-1" />
                         Generate Embeddings
                     </label>
                     <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-200 rounded-box w-52 mt-2">
                         <li>
                             <button wire:click="generateEmbeddings('events')" class="text-sm">
-                                <x-icon name="o-calendar" class="w-4 h-4" />
+                                <x-icon name="fas-calendar" class="w-4 h-4" />
                                 Events Only
                             </button>
                         </li>
                         <li>
                             <button wire:click="generateEmbeddings('blocks')" class="text-sm">
-                                <x-icon name="o-squares-2x2" class="w-4 h-4" />
+                                <x-icon name="fas-grip" class="w-4 h-4" />
                                 Blocks Only
                             </button>
                         </li>
                         <li>
                             <button wire:click="generateEmbeddings('all')" class="text-sm">
-                                <x-icon name="o-bolt" class="w-4 h-4" />
+                                <x-icon name="fas-bolt" class="w-4 h-4" />
                                 All (Events + Blocks)
                             </button>
                         </li>
@@ -370,7 +370,7 @@ new class extends Component
                     <div class="form-control content-end">
                         <label class="label"><span class="label-text">&nbsp;</span></label>
                         <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            <x-icon name="fas-xmark" class="w-4 h-4" />
                             Clear
                         </button>
                     </div>
@@ -394,7 +394,7 @@ new class extends Component
                     class="[&_table]:!static [&_td]:!static">
                     <x-slot:empty>
                         <div class="text-center py-12">
-                            <x-icon name="o-magnifying-glass" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <x-icon name="fas-magnifying-glass" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                             <h3 class="text-lg font-medium text-base-content mb-2">No searches found</h3>
                             <p class="text-base-content/70">
                                 @if ($search || $typeFilter || $sourceFilter)
@@ -503,7 +503,7 @@ new class extends Component
         <x-collapse wire:model="collapse.popular_queries" separator class="bg-base-100">
             <x-slot:heading>
                 <div class="flex items-center gap-3 w-full" wire:click="toggle('popular_queries')">
-                    <x-icon name="o-fire" class="w-5 h-5" />
+                    <x-icon name="fas-fire" class="w-5 h-5" />
                     <span class="flex-1 text-left">Popular Queries & Zero Results</span>
                     <x-badge :value="count($this->popularQueries) + count($this->zeroResultQueries)" class="badge-ghost" />
                 </div>
@@ -551,7 +551,7 @@ new class extends Component
         <x-collapse wire:model="collapse.performance_metrics" separator class="bg-base-100">
             <x-slot:heading>
                 <div class="flex items-center gap-3 w-full" wire:click="toggle('performance_metrics')">
-                    <x-icon name="o-chart-bar" class="w-5 h-5" />
+                    <x-icon name="fas-chart-simple" class="w-5 h-5" />
                     <span class="flex-1 text-left">Performance & Cost Metrics</span>
                     <x-badge value="Info" class="badge-ghost" />
                 </div>
@@ -581,7 +581,7 @@ new class extends Component
         <x-collapse wire:model="collapse.quality_insights" separator class="bg-base-100">
             <x-slot:heading>
                 <div class="flex items-center gap-3 w-full" wire:click="toggle('quality_insights')">
-                    <x-icon name="o-light-bulb" class="w-5 h-5" />
+                    <x-icon name="fas-lightbulb" class="w-5 h-5" />
                     <span class="flex-1 text-left">Search Quality Insights</span>
                     @if ($this->qualityInsights['low_similarity_count'] > 0 || $this->qualityInsights['no_embeddings_count'] > 0)
                     <x-badge :value="$this->qualityInsights['low_similarity_count'] + $this->qualityInsights['no_embeddings_count']" class="badge-warning" />
@@ -594,21 +594,21 @@ new class extends Component
                 <div class="space-y-3">
                     @if ($this->qualityInsights['low_similarity_count'] > 0)
                     <div class="alert alert-warning">
-                        <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                        <x-icon name="fas-triangle-exclamation" class="w-5 h-5" />
                         <span><strong>{{ $this->qualityInsights['low_similarity_count'] }}</strong> searches with low match quality (&lt;60% similarity)</span>
                     </div>
                     @endif
 
                     @if ($this->qualityInsights['no_embeddings_count'] > 0)
                     <div class="alert alert-warning">
-                        <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                        <x-icon name="fas-triangle-exclamation" class="w-5 h-5" />
                         <span><strong>{{ $this->qualityInsights['no_embeddings_count'] }}</strong> searches returned zero results (possible missing embeddings)</span>
                     </div>
                     @endif
 
                     @if ($this->qualityInsights['low_similarity_count'] === 0 && $this->qualityInsights['no_embeddings_count'] === 0)
                     <div class="alert alert-success">
-                        <x-icon name="o-check-circle" class="w-5 h-5" />
+                        <x-icon name="fas-circle-check" class="w-5 h-5" />
                         <span>No quality issues detected in the last 30 days 🎉</span>
                     </div>
                     @endif

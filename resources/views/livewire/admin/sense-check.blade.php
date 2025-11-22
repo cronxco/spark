@@ -400,7 +400,7 @@ new class extends Component
                 'key' => 'undefined_actions',
                 'title' => 'Actions present in database but not defined in plugin files',
                 'description' => 'Distinct `events.action` that have no corresponding entry in plugin `getActionTypes()`.',
-                'icon' => 'o-exclamation-triangle',
+                'icon' => 'fas-triangle-exclamation',
                 'issue_count' => count($this->undefinedActions),
             ],
             [
@@ -421,42 +421,42 @@ new class extends Component
                 'key' => 'undefined_object_types',
                 'title' => 'Object types present in events but not defined in plugin files',
                 'description' => 'Distinct `objects.type` used as actor/target per service with no corresponding entry in plugin `getObjectTypes()`.',
-                'icon' => 'o-tag',
+                'icon' => 'fas-tag',
                 'issue_count' => count($this->undefinedObjectTypes),
             ],
             [
                 'key' => 'orphaned_events',
                 'title' => 'Orphaned database records',
                 'description' => 'Events without integrations, blocks without events, and objects without references.',
-                'icon' => 'o-trash',
+                'icon' => 'fas-trash',
                 'issue_count' => $this->orphanedEvents['count'] + $this->orphanedBlocks['count'] + $this->orphanedObjects['count'],
             ],
             [
                 'key' => 'invalid_integrations',
                 'title' => 'Invalid integration records',
                 'description' => 'Integrations with missing groups or unknown services.',
-                'icon' => 'o-x-circle',
+                'icon' => 'fas-circle-xmark',
                 'issue_count' => count($this->invalidIntegrations),
             ],
             [
                 'key' => 'plugin_config_issues',
                 'title' => 'Plugin configuration issues',
                 'description' => 'Missing required methods, invalid domains, or configuration errors in plugins.',
-                'icon' => 'o-cog-6-tooth',
+                'icon' => 'fas-gear',
                 'issue_count' => count($this->pluginConfigIssues),
             ],
             [
                 'key' => 'embedding_health',
                 'title' => 'Embedding Health Dashboard',
                 'description' => 'Monitor semantic search embedding coverage across events, blocks, and objects.',
-                'icon' => 'o-sparkles',
+                'icon' => 'fas-wand-magic-sparkles',
                 'issue_count' => 0, // Informational only
             ],
             [
                 'key' => 'block_types_custom_layouts',
                 'title' => 'Block Types with Custom Layouts',
                 'description' => 'Coverage of custom card layouts for block types across all plugins. Shows which block types have custom layouts and highlights high-volume types (>100 blocks) that could benefit from custom layouts.',
-                'icon' => 'o-rectangle-stack',
+                'icon' => 'fas-layer-group',
                 'issue_count' => 0, // Informational only
             ],
         ];
@@ -791,7 +791,7 @@ new class extends Component
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div class="stat bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg border border-warning/50">
                         <div class="stat-title flex items-center gap-2">
-                            <x-icon name="o-sparkles" class="w-4 h-4 text-warning" />
+                            <x-icon name="fas-wand-magic-sparkles" class="w-4 h-4 text-warning" />
                             Overall Coverage
                         </div>
                         <div class="stat-value {{ $health['overall_coverage'] > 80 ? 'text-success' : ($health['overall_coverage'] > 50 ? 'text-warning' : 'text-error') }}">
@@ -864,7 +864,7 @@ new class extends Component
                 @if (!empty($health['events_by_domain']))
                 <div class="mb-6">
                     <h4 class="font-semibold mb-3 flex items-center gap-2">
-                        <x-icon name="o-globe-alt" class="w-4 h-4" />
+                        <x-icon name="fas-globe" class="w-4 h-4" />
                         Coverage by Domain
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

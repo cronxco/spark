@@ -21,7 +21,7 @@
 
         @if ($blocks->isEmpty())
             <div class="alert alert-info">
-                <x-icon name="o-information-circle" class="w-5 h-5" />
+                <x-icon name="fas-circle-info" class="w-5 h-5" />
                 <span>No blocks found in the database.</span>
             </div>
         @else

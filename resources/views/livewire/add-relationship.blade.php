@@ -51,7 +51,7 @@
                 <x-input
                     wire:model.live.debounce.300ms="searchQuery"
                     placeholder="Type to search..."
-                    icon="o-magnifying-glass"
+                    icon="fas-magnifying-glass"
                     :disabled="!$toType || $selectedTarget"
                 />
             </div>
@@ -66,7 +66,7 @@
                 <div class="flex items-center gap-3 p-4 rounded-lg bg-accent/10 border-2 border-accent">
                     @php
                         if ($selectedTarget instanceof \App\Models\Event) {
-                            $icon = 'o-calendar';
+                            $icon = 'fas-calendar';
                             $title = $selectedTarget->action;
                             $subtitle = $selectedTarget->time?->format('j M Y H:i');
                             $badge = 'Event';
@@ -76,7 +76,7 @@
                             $subtitle = $selectedTarget->concept . ' / ' . $selectedTarget->type;
                             $badge = 'Object';
                         } elseif ($selectedTarget instanceof \App\Models\Block) {
-                            $icon = 'o-squares-2x2';
+                            $icon = 'fas-grip';
                             $title = $selectedTarget->type;
                             $subtitle = $selectedTarget->time?->format('j M Y');
                             $badge = 'Block';
@@ -89,7 +89,7 @@
                     </div>
                     <span class="badge badge-accent">{{ $badge }}</span>
                     <button type="button" wire:click="clearSelection" class="btn btn-ghost btn-sm btn-circle">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas-xmark" class="w-4 h-4" />
                     </button>
                 </div>
             </div>
@@ -105,7 +105,7 @@
                     @foreach ($searchResults as $result)
                         @php
                             if ($result instanceof \App\Models\Event) {
-                                $icon = 'o-calendar';
+                                $icon = 'fas-calendar';
                                 $title = $result->action;
                                 $subtitle = $result->time?->format('M j, Y g:i A');
                                 $badge = 'Event';
@@ -117,7 +117,7 @@
                                 $badge = 'Object';
                                 $badgeClass = 'badge-secondary';
                             } elseif ($result instanceof \App\Models\Block) {
-                                $icon = 'o-squares-2x2';
+                                $icon = 'fas-grip';
                                 $title = $result->type;
                                 $subtitle = $result->time?->format('M j, Y');
                                 $badge = 'Block';
@@ -141,7 +141,7 @@
             @elseif ($toType && !$selectedTarget && filled($searchQuery))
                 <div class="h-64 flex items-center justify-center text-base-content/60 rounded-lg border border-base-300">
                     <div class="text-center">
-                        <x-icon name="o-magnifying-glass" class="w-8 h-8 mx-auto mb-2 text-base-content/30" />
+                        <x-icon name="fas-magnifying-glass" class="w-8 h-8 mx-auto mb-2 text-base-content/30" />
                         <p class="text-sm">No results found</p>
                     </div>
                 </div>

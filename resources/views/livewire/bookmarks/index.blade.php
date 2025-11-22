@@ -168,7 +168,7 @@ new class extends \Livewire\Volt\Component
             <div class="card-body">
                 <div class="flex flex-col items-center text-center py-8">
                     <div class="w-16 h-16 rounded-full bg-base-300 flex items-center justify-center mb-4">
-                        <x-icon name="o-bookmark" class="w-8 h-8 text-base-content/50" />
+                        <x-icon name="fas-bookmark" class="w-8 h-8 text-base-content/50" />
                     </div>
                     <h3 class="text-xl font-semibold mb-2">No bookmarks yet</h3>
                     <p class="text-base-content/70 max-w-md">
@@ -188,7 +188,7 @@ new class extends \Livewire\Volt\Component
                 <div class="card-body">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0">
-                            <x-icon name="o-shield-check" class="w-5 h-5 text-info" />
+                            <x-icon name="fas-shield-halved" class="w-5 h-5 text-info" />
                         </div>
                         <div class="flex-1 min-w-0">
                             <h3 class="text-lg font-semibold">Fetch</h3>
@@ -199,7 +199,7 @@ new class extends \Livewire\Volt\Component
                     </p>
                     <div class="flex items-center gap-2 text-sm text-primary">
                         <span>Manage URLs</span>
-                        <x-icon name="o-arrow-right" class="w-4 h-4" />
+                        <x-icon name="fas-arrow-right" class="w-4 h-4" />
                     </div>
                 </div>
             </a>
@@ -210,7 +210,7 @@ new class extends \Livewire\Volt\Component
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center flex-shrink-0">
-                                <x-icon name="o-chat-bubble-left-right" class="w-5 h-5 text-error" />
+                                <x-icon name="fas-comments" class="w-5 h-5 text-error" />
                             </div>
                             <div class="flex-1 min-w-0">
                                 <h3 class="text-lg font-semibold">Reddit</h3>
@@ -221,7 +221,7 @@ new class extends \Livewire\Volt\Component
                         </p>
                         <div class="flex items-center gap-2 text-sm text-primary">
                             <span>Manage</span>
-                            <x-icon name="o-arrow-right" class="w-4 h-4" />
+                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
                         </div>
                     </div>
                 </a>
@@ -233,7 +233,7 @@ new class extends \Livewire\Volt\Component
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center flex-shrink-0">
-                                <x-icon name="o-bookmark" class="w-5 h-5 text-warning" />
+                                <x-icon name="fas-bookmark" class="w-5 h-5 text-warning" />
                             </div>
                             <div class="flex-1 min-w-0">
                                 <h3 class="text-lg font-semibold">Karakeep</h3>
@@ -244,7 +244,7 @@ new class extends \Livewire\Volt\Component
                         </p>
                         <div class="flex items-center gap-2 text-sm text-primary">
                             <span>Manage</span>
-                            <x-icon name="o-arrow-right" class="w-4 h-4" />
+                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
                         </div>
                     </div>
                 </a>
@@ -256,7 +256,7 @@ new class extends \Livewire\Volt\Component
                     <div class="card-body">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <x-icon name="o-cloud" class="w-5 h-5 text-primary" />
+                                <x-icon name="fas-cloud" class="w-5 h-5 text-primary" />
                             </div>
                             <div class="flex-1 min-w-0">
                                 <h3 class="text-lg font-semibold">BlueSky</h3>
@@ -267,7 +267,7 @@ new class extends \Livewire\Volt\Component
                         </p>
                         <div class="flex items-center gap-2 text-sm text-primary">
                             <span>Manage</span>
-                            <x-icon name="o-arrow-right" class="w-4 h-4" />
+                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
                         </div>
                     </div>
                 </a>
@@ -278,7 +278,7 @@ new class extends \Livewire\Volt\Component
                 <div class="card-body">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                            <x-icon name="o-key" class="w-5 h-5 text-accent" />
+                            <x-icon name="fas-key" class="w-5 h-5 text-accent" />
                         </div>
                         <div class="flex-1 min-w-0">
                             <h3 class="text-lg font-semibold">API & Share</h3>
@@ -289,7 +289,7 @@ new class extends \Livewire\Volt\Component
                     </p>
                     <div class="flex items-center gap-2 text-sm text-primary">
                         <span>Setup & Docs</span>
-                        <x-icon name="o-arrow-right" class="w-4 h-4" />
+                        <x-icon name="fas-arrow-right" class="w-4 h-4" />
                     </div>
                 </div>
             </a>
@@ -299,7 +299,7 @@ new class extends \Livewire\Volt\Component
                 <div class="card-body">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-lg bg-base-200 flex items-center justify-center flex-shrink-0">
-                            <x-icon name="o-plus-circle" class="w-5 h-5 text-base-content/50" />
+                            <x-icon name="fas-circle-plus" class="w-5 h-5 text-base-content/50" />
                         </div>
                         <div class="flex-1 min-w-0">
                             <h3 class="text-lg font-semibold text-base-content/70">Add more sources</h3>
@@ -310,7 +310,7 @@ new class extends \Livewire\Volt\Component
                     </p>
                     <div class="flex items-center gap-2 text-sm text-primary">
                         <span>Browse integrations</span>
-                        <x-icon name="o-arrow-right" class="w-4 h-4" />
+                        <x-icon name="fas-arrow-right" class="w-4 h-4" />
                     </div>
                 </div>
             </a>
