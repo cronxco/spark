@@ -5,7 +5,6 @@ namespace App\Integrations\Receipt;
 use App\Integrations\Base\WebhookPlugin;
 use App\Jobs\Data\Receipt\ProcessReceiptEmailJob;
 use App\Models\Integration;
-use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -168,6 +167,7 @@ class ReceiptPlugin extends WebhookPlugin
             Log::info('Receipt: SNS subscription confirmation received', [
                 'subscribe_url' => $payload['SubscribeURL'] ?? null,
             ]);
+
             // This should be handled by the route, not here
             return null;
         }

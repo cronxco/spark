@@ -4,11 +4,10 @@ namespace App\Livewire;
 
 use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
-use App\Models\EventObject;
 use App\Models\Relationship;
+use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Attributes\Title;
 use Livewire\Component;
 
 class ReceiptDetail extends Component
@@ -66,23 +65,6 @@ class ReceiptDetail extends Component
         $this->mount($this->receipt->id); // Refresh data
     }
 
-    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        $score = 0.5; // Base score for manual match
-
-        // Amount match
-        if ($receipt->value === $transaction->value) {
-            $score += 0.3;
-        }
-
-        // Time proximity (within same day)
-        if ($receipt->time->isSameDay($transaction->time)) {
-            $score += 0.2;
-        }
-
-        return min(1.0, $score);
-    }
-
     public function removeMatch(): void
     {
         // Find and delete the receipt_for relationship
@@ -109,7 +91,7 @@ class ReceiptDetail extends Component
         $this->mount($this->receipt->id); // Refresh data
     }
 
-    public function downloadOriginalEmail(): \Symfony\Component\HttpFoundation\StreamedResponse|null
+    public function downloadOriginalEmail(): ?\Symfony\Component\HttpFoundation\StreamedResponse
     {
         $merchant = $this->receipt->target;
         $s3Key = $merchant?->metadata['s3_object_key'] ?? null;
@@ -139,10 +121,10 @@ class ReceiptDetail extends Component
             }, basename($s3Key), [
                 'Content-Type' => 'message/rfc822',
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->dispatch('notify', [
                 'type' => 'error',
-                'message' => 'Failed to download email: '.$e->getMessage(),
+                'message' => 'Failed to download email: ' . $e->getMessage(),
             ]);
 
             return null;
@@ -189,6 +171,23 @@ class ReceiptDetail extends Component
         return view('livewire.receipt-detail', [
             'matchedTransaction' => $this->matchedTransaction,
             'candidateMatches' => $this->candidateMatches,
-        ])->title('Receipt Details - '.$this->receipt->target?->title ?? 'Receipt');
+        ])->title('Receipt Details - ' . $this->receipt->target?->title ?? 'Receipt');
+    }
+
+    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
+    {
+        $score = 0.5; // Base score for manual match
+
+        // Amount match
+        if ($receipt->value === $transaction->value) {
+            $score += 0.3;
+        }
+
+        // Time proximity (within same day)
+        if ($receipt->time->isSameDay($transaction->time)) {
+            $score += 0.2;
+        }
+
+        return min(1.0, $score);
     }
 }

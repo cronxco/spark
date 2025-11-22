@@ -3,12 +3,9 @@
 namespace Tests\Unit\Integrations;
 
 use App\Integrations\Receipt\ReceiptPlugin;
-use App\Jobs\Data\Receipt\ProcessReceiptEmailJob;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ReceiptPluginTest extends TestCase

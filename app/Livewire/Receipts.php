@@ -6,7 +6,6 @@ use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
 use App\Models\Relationship;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -88,7 +87,7 @@ class Receipts extends Component
             return;
         }
 
-        $matcher = new ReceiptTransactionMatcher();
+        $matcher = new ReceiptTransactionMatcher;
         $confidence = $this->calculateMatchConfidence($receipt, $transaction);
 
         $matcher->createReceiptRelationship(
@@ -104,24 +103,6 @@ class Receipts extends Component
         ]);
 
         $this->closeMatchModal();
-    }
-
-    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        // Simple confidence calculation for manual matches
-        $score = 0.5; // Base score for manual match
-
-        // Amount match
-        if ($receipt->value === $transaction->value) {
-            $score += 0.3;
-        }
-
-        // Time proximity (within same day)
-        if ($receipt->time->isSameDay($transaction->time)) {
-            $score += 0.2;
-        }
-
-        return min(1.0, $score);
     }
 
     public function removeMatch(string $receiptId): void
@@ -219,5 +200,23 @@ class Receipts extends Component
         return view('livewire.receipts', [
             'receipts' => $this->receipts,
         ]);
+    }
+
+    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
+    {
+        // Simple confidence calculation for manual matches
+        $score = 0.5; // Base score for manual match
+
+        // Amount match
+        if ($receipt->value === $transaction->value) {
+            $score += 0.3;
+        }
+
+        // Time proximity (within same day)
+        if ($receipt->time->isSameDay($transaction->time)) {
+            $score += 0.2;
+        }
+
+        return min(1.0, $score);
     }
 }

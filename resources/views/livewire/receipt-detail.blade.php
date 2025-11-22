@@ -24,7 +24,7 @@ use function Livewire\Volt\{state};
         <x-slot:actions>
             <x-button label="Back to Receipts" icon="fas.arrow-left" link="{{ route('receipts.index') }}" class="btn-ghost" />
 
-            @if($isMatched)
+            @if ($isMatched)
                 <x-button label="Remove Match" icon="fas.xmark" wire:click="removeMatch" class="btn-warning"
                     wire:confirm="Are you sure you want to remove this match?" />
             @else
@@ -61,12 +61,12 @@ use function Livewire\Volt\{state};
                 <div class="card-body">
                     <h2 class="card-title">
                         Receipt Summary
-                        @if($isMatched)
+                        @if ($isMatched)
                             <div class="badge badge-success gap-1">
                                 <x-icon name="fas.circle-check" class="w-3 h-3" />
                                 Matched
                             </div>
-                        @elseif($needsReview)
+                        @elseif ($needsReview)
                             <div class="badge badge-warning gap-1">
                                 <x-icon name="fas.triangle-exclamation" class="w-3 h-3" />
                                 Needs Review
@@ -104,7 +104,7 @@ use function Livewire\Volt\{state};
             </div>
 
             {{-- Line Items --}}
-            @if(count($lineItems) > 0)
+            @if (count($lineItems) > 0)
                 <div class="card bg-base-100 shadow-xl">
                     <div class="card-body">
                         <h2 class="card-title">Line Items</h2>
@@ -120,11 +120,11 @@ use function Livewire\Volt\{state};
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($lineItems as $item)
+                                    @foreach ($lineItems as $item)
                                         <tr>
                                             <td>
                                                 <div class="font-medium">{{ $item['description'] ?? 'Unknown Item' }}</div>
-                                                @if(!empty($item['category']))
+                                                @if (!empty($item['category']))
                                                     <div class="badge badge-sm badge-ghost">{{ $item['category'] }}</div>
                                                 @endif
                                             </td>
@@ -145,17 +145,17 @@ use function Livewire\Volt\{state};
             @endif
 
             {{-- Tax Breakdown --}}
-            @if(count($taxBreakdown) > 0)
+            @if (count($taxBreakdown) > 0)
                 <div class="card bg-base-100 shadow-xl">
                     <div class="card-body">
                         <h2 class="card-title">Tax Breakdown</h2>
 
                         <div class="space-y-2">
-                            @foreach($taxBreakdown as $tax)
+                            @foreach ($taxBreakdown as $tax)
                                 <div class="flex justify-between items-center">
                                     <div>
                                         <span class="font-medium">{{ $tax['description'] ?? 'Tax' }}</span>
-                                        @if(!empty($tax['rate']))
+                                        @if (!empty($tax['rate']))
                                             <span class="text-sm text-base-content/60">({{ number_format($tax['rate'], 1) }}%)</span>
                                         @endif
                                     </div>
@@ -170,27 +170,27 @@ use function Livewire\Volt\{state};
             @endif
 
             {{-- Payment Information --}}
-            @if(!empty($paymentInfo))
+            @if (!empty($paymentInfo))
                 <div class="card bg-base-100 shadow-xl">
                     <div class="card-body">
                         <h2 class="card-title">Payment Information</h2>
 
                         <div class="grid grid-cols-2 gap-4">
-                            @if(!empty($paymentInfo['method']))
+                            @if (!empty($paymentInfo['method']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Payment Method</div>
                                     <div class="font-medium">{{ $paymentInfo['method'] }}</div>
                                 </div>
                             @endif
 
-                            @if(!empty($paymentInfo['last_four']))
+                            @if (!empty($paymentInfo['last_four']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Card</div>
                                     <div class="font-mono">•••• {{ $paymentInfo['last_four'] }}</div>
                                 </div>
                             @endif
 
-                            @if(!empty($paymentInfo['card_type']))
+                            @if (!empty($paymentInfo['card_type']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Card Type</div>
                                     <div>{{ $paymentInfo['card_type'] }}</div>
@@ -205,7 +205,7 @@ use function Livewire\Volt\{state};
         {{-- Sidebar --}}
         <div class="space-y-6">
             {{-- Match Status --}}
-            @if($matchedTransaction)
+            @if ($matchedTransaction)
                 <div class="card bg-success/10 border border-success">
                     <div class="card-body">
                         <h3 class="card-title text-success">
@@ -238,7 +238,7 @@ use function Livewire\Volt\{state};
                                 <div class="badge badge-sm">{{ ucfirst($matchedTransaction->service) }}</div>
                             </div>
 
-                            @if(!empty($metadata['match_confidence']))
+                            @if (!empty($metadata['match_confidence']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Confidence</div>
                                     <div class="flex items-center gap-2">
@@ -249,7 +249,7 @@ use function Livewire\Volt\{state};
                                 </div>
                             @endif
 
-                            @if(!empty($metadata['match_method']))
+                            @if (!empty($metadata['match_method']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Match Type</div>
                                     <div class="badge badge-sm badge-success">{{ ucfirst($metadata['match_method']) }}</div>
@@ -258,7 +258,7 @@ use function Livewire\Volt\{state};
                         </div>
                     </div>
                 </div>
-            @elseif($needsReview && count($candidateMatches) > 0)
+            @elseif ($needsReview && count($candidateMatches) > 0)
                 <div class="card bg-warning/10 border border-warning">
                     <div class="card-body">
                         <h3 class="card-title text-warning">
@@ -271,12 +271,12 @@ use function Livewire\Volt\{state};
                         </p>
 
                         <div class="space-y-2 mt-4">
-                            @foreach($candidateMatches as $candidate)
+                            @foreach ($candidateMatches as $candidate)
                                 @php
                                     $transaction = \App\Models\Event::find($candidate['transaction_id']);
                                     $confidence = $candidate['confidence'] ?? 0;
                                 @endphp
-                                @if($transaction)
+                                @if ($transaction)
                                     <div class="card bg-base-100 border border-base-300 hover:border-warning cursor-pointer"
                                         wire:click="createManualMatch('{{ $transaction->id }}')">
                                         <div class="card-body p-3">
@@ -323,13 +323,13 @@ use function Livewire\Volt\{state};
             @endif
 
             {{-- Matching Hints --}}
-            @if(!empty($matchingHints))
+            @if (!empty($matchingHints))
                 <div class="card bg-base-100 shadow-xl">
                     <div class="card-body">
                         <h3 class="card-title text-sm">Matching Hints</h3>
 
                         <div class="space-y-2 text-sm">
-                            @if(!empty($matchingHints['suggested_amount']))
+                            @if (!empty($matchingHints['suggested_amount']))
                                 <div>
                                     <div class="text-base-content/60">Suggested Amount</div>
                                     <div class="font-mono font-semibold">
@@ -338,25 +338,25 @@ use function Livewire\Volt\{state};
                                 </div>
                             @endif
 
-                            @if(!empty($matchingHints['suggested_merchant_names']))
+                            @if (!empty($matchingHints['suggested_merchant_names']))
                                 <div>
                                     <div class="text-base-content/60">Merchant Aliases</div>
                                     <div class="flex flex-wrap gap-1">
-                                        @foreach($matchingHints['suggested_merchant_names'] as $name)
+                                        @foreach ($matchingHints['suggested_merchant_names'] as $name)
                                             <div class="badge badge-sm badge-ghost">{{ $name }}</div>
                                         @endforeach
                                     </div>
                                 </div>
                             @endif
 
-                            @if(!empty($matchingHints['card_last_four']))
+                            @if (!empty($matchingHints['card_last_four']))
                                 <div>
                                     <div class="text-base-content/60">Card Last 4</div>
                                     <div class="font-mono">•••• {{ $matchingHints['card_last_four'] }}</div>
                                 </div>
                             @endif
 
-                            @if(!empty($matchingHints['time_window_minutes']))
+                            @if (!empty($matchingHints['time_window_minutes']))
                                 <div>
                                     <div class="text-base-content/60">Time Window</div>
                                     <div>± {{ $matchingHints['time_window_minutes'] }} minutes</div>
@@ -383,7 +383,7 @@ use function Livewire\Volt\{state};
                             <div>{{ $receipt->created_at->diffForHumans() }}</div>
                         </div>
 
-                        @if(!empty($metadata['original_language']) && $metadata['original_language'] !== 'en')
+                        @if (!empty($metadata['original_language']) && $metadata['original_language'] !== 'en')
                             <div>
                                 <div class="text-base-content/60">Original Language</div>
                                 <div>{{ strtoupper($metadata['original_language']) }}</div>
@@ -397,7 +397,7 @@ use function Livewire\Volt\{state};
     </div>
 
     {{-- Manual Match Modal --}}
-    @if($showMatchModal)
+    @if ($showMatchModal)
         <x-modal wire:model="showMatchModal" title="Match Receipt to Transaction" class="backdrop-blur">
             <div class="space-y-4">
                 {{-- Search Transactions --}}

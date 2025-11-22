@@ -84,68 +84,6 @@ class ReceiptTransactionMatcher
     }
 
     /**
-     * Calculate match confidence between receipt and transaction
-     */
-    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        $score = 0.0;
-
-        // Amount match (40% weight)
-        $amountDiff = abs($receipt->value - $transaction->value);
-        $amountScore = 1 - min(1, $amountDiff / max(1, $receipt->value));
-        $score += $amountScore * 0.4;
-
-        // Time proximity (20% weight)
-        $timeDiff = abs($receipt->time->diffInMinutes($transaction->time));
-        $timeScore = max(0, 1 - ($timeDiff / 120)); // 2-hour window
-        $score += $timeScore * 0.2;
-
-        // Merchant name fuzzy match (30% weight)
-        $receiptMerchant = $receipt->target->metadata['normalized_name'] ?? strtolower($receipt->target->title ?? '');
-        $txnMerchant = strtolower($transaction->target->title ?? '');
-        $merchantScore = $this->fuzzyMatch($receiptMerchant, $txnMerchant);
-        $score += $merchantScore * 0.3;
-
-        // Card hint match (10% weight)
-        $hints = $receipt->event_metadata['matching_hints'] ?? [];
-        $cardHint = $hints['card_hint'] ?? null;
-        if ($cardHint) {
-            // Check if transaction metadata contains card info
-            $txnMetadata = $transaction->event_metadata ?? [];
-            $txnCardLast4 = $txnMetadata['card_last_4'] ?? null;
-
-            if ($txnCardLast4 && $txnCardLast4 === $cardHint) {
-                $score += 0.1;
-            }
-        }
-
-        Log::debug('Receipt: Calculated match confidence', [
-            'receipt_id' => $receipt->id,
-            'transaction_id' => $transaction->id,
-            'confidence' => $score,
-            'amount_score' => $amountScore * 0.4,
-            'time_score' => $timeScore * 0.2,
-            'merchant_score' => $merchantScore * 0.3,
-        ]);
-
-        return $score;
-    }
-
-    /**
-     * Fuzzy string matching using similar_text
-     */
-    private function fuzzyMatch(string $a, string $b): float
-    {
-        if (empty($a) || empty($b)) {
-            return 0.0;
-        }
-
-        similar_text($a, $b, $percent);
-
-        return $percent / 100;
-    }
-
-    /**
      * Create a receipt_for relationship between receipt and transaction
      */
     public function createReceiptRelationship(
@@ -229,5 +167,67 @@ class ReceiptTransactionMatcher
             'receipt_id' => $receipt->id,
             'candidate_count' => $candidates->count(),
         ]);
+    }
+
+    /**
+     * Calculate match confidence between receipt and transaction
+     */
+    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
+    {
+        $score = 0.0;
+
+        // Amount match (40% weight)
+        $amountDiff = abs($receipt->value - $transaction->value);
+        $amountScore = 1 - min(1, $amountDiff / max(1, $receipt->value));
+        $score += $amountScore * 0.4;
+
+        // Time proximity (20% weight)
+        $timeDiff = abs($receipt->time->diffInMinutes($transaction->time));
+        $timeScore = max(0, 1 - ($timeDiff / 120)); // 2-hour window
+        $score += $timeScore * 0.2;
+
+        // Merchant name fuzzy match (30% weight)
+        $receiptMerchant = $receipt->target->metadata['normalized_name'] ?? strtolower($receipt->target->title ?? '');
+        $txnMerchant = strtolower($transaction->target->title ?? '');
+        $merchantScore = $this->fuzzyMatch($receiptMerchant, $txnMerchant);
+        $score += $merchantScore * 0.3;
+
+        // Card hint match (10% weight)
+        $hints = $receipt->event_metadata['matching_hints'] ?? [];
+        $cardHint = $hints['card_hint'] ?? null;
+        if ($cardHint) {
+            // Check if transaction metadata contains card info
+            $txnMetadata = $transaction->event_metadata ?? [];
+            $txnCardLast4 = $txnMetadata['card_last_4'] ?? null;
+
+            if ($txnCardLast4 && $txnCardLast4 === $cardHint) {
+                $score += 0.1;
+            }
+        }
+
+        Log::debug('Receipt: Calculated match confidence', [
+            'receipt_id' => $receipt->id,
+            'transaction_id' => $transaction->id,
+            'confidence' => $score,
+            'amount_score' => $amountScore * 0.4,
+            'time_score' => $timeScore * 0.2,
+            'merchant_score' => $merchantScore * 0.3,
+        ]);
+
+        return $score;
+    }
+
+    /**
+     * Fuzzy string matching using similar_text
+     */
+    private function fuzzyMatch(string $a, string $b): float
+    {
+        if (empty($a) || empty($b)) {
+            return 0.0;
+        }
+
+        similar_text($a, $b, $percent);
+
+        return $percent / 100;
     }
 }

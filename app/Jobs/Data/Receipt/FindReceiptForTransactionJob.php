@@ -5,7 +5,6 @@ namespace App\Jobs\Data\Receipt;
 use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -76,7 +75,7 @@ class FindReceiptForTransactionJob implements ShouldQueue
                 'receipt_count' => $unmatchedReceipts->count(),
             ]);
 
-            $matcher = new ReceiptTransactionMatcher();
+            $matcher = new ReceiptTransactionMatcher;
             $autoMatchThreshold = config('services.receipt.auto_match_threshold', 0.8);
 
             // Try to match each receipt

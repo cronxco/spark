@@ -36,7 +36,7 @@ class MatchReceiptToTransactionJob implements ShouldQueue
         ]);
 
         try {
-            $matcher = new ReceiptTransactionMatcher();
+            $matcher = new ReceiptTransactionMatcher;
             $candidates = $matcher->findCandidateMatches($this->receiptEvent);
 
             if ($candidates->isEmpty()) {
