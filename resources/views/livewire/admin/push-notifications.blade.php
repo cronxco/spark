@@ -2,8 +2,10 @@
 
 use App\Models\User;
 use App\Notifications\AdminPushNotification;
+use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
+use NotificationChannels\WebPush\PushSubscription;
 
 use function Livewire\Volt\layout;
 
@@ -37,7 +39,7 @@ new class extends Component
 
     public function getTotalSubscriptionsProperty(): int
     {
-        return \NotificationChannels\WebPush\PushSubscription::count();
+        return PushSubscription::count();
     }
 
     public function sendNotification(): void
@@ -71,7 +73,7 @@ new class extends Component
                 $successCount++;
             } catch (\Exception $e) {
                 $failCount++;
-                \Log::error("Failed to send push to {$user->email}: " . $e->getMessage());
+                Log::error("Failed to send push to {$user->email}: " . $e->getMessage());
             }
         }
 

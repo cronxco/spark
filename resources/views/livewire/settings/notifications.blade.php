@@ -1,5 +1,6 @@
 <?php
 
+use App\Notifications\TestPushNotification;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
@@ -144,7 +145,7 @@ new class extends Component {
             return;
         }
 
-        $user->notify(new \App\Notifications\TestPushNotification());
+        $user->notify(new TestPushNotification);
         $this->success('Test notification sent!');
     }
 
