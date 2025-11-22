@@ -16,6 +16,7 @@ use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Outline\OutlinePlugin;
 use App\Integrations\PluginRegistry;
+use App\Integrations\Receipt\ReceiptPlugin;
 use App\Integrations\Reddit\RedditPlugin;
 use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
@@ -47,6 +48,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(DailyCheckinPlugin::class);
         PluginRegistry::register(GoogleCalendarPlugin::class);
         PluginRegistry::register(BlueSkyPlugin::class);
+        PluginRegistry::register(ReceiptPlugin::class);
     }
 
     /**

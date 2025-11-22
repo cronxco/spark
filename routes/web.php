@@ -92,6 +92,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');
     Route::get('money/{account}', \App\Livewire\FinancialAccountShow::class)->name('money.show');
 
+    // Receipts routes
+    Route::get('money/receipts', \App\Livewire\Receipts::class)->name('receipts.index');
+    Route::get('money/receipts/{id}', \App\Livewire\ReceiptDetail::class)->whereUuid('id')->name('receipts.show');
+
     // Bookmarks routes
     Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks.index');
     Volt::route('bookmarks/fetch', 'bookmarks.fetch.index')->name('bookmarks.fetch');
