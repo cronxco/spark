@@ -1,230 +1,174 @@
-## Monzo Integration
+# Monzo Integration
 
-This integration connects your Monzo account to Spark, creating events and objects for transactions, pots and daily balances. It uses OAuth, runs under Laravel Sail, and leverages Laravel Horizon with a dedicated `migration` queue for historical backfill.
+Connect your Monzo bank account to sync transactions, balances, and pot activity.
 
-### Installation
+## Overview
 
-1. Dependencies
+The Monzo integration uses OAuth 2.0 to connect to your Monzo account and import financial data. It creates events for transactions, daily balances, and pot balances, along with EventObjects for accounts, pots, and counterparties. The integration supports historical backfill via the migration system and incremental updates via scheduled polling.
 
-- Composer includes `willscottuk/monzo-php` and the Spark integration framework.
+## Features
 
-2. Environment
+- OAuth 2.0 authentication with automatic token refresh
+- Transaction sync with merchant details, foreign exchange rates, and categorization
+- Daily balance snapshots with spend tracking
+- Pot balance monitoring for savings goals
+- Automatic counterparty detection and merchant enrichment
+- Support for multiple account types (Current, Joint, Flex, Rewards)
+- Historical data migration with 89-day windowed backfill
+- Salary detection based on configurable employer name
 
-Add the following to your `.env`:
+## Setup
 
-```
-MONZO_CLIENT_ID=your_client_id
-MONZO_CLIENT_SECRET=your_client_secret
-MONZO_REDIRECT_URI=https://yourapp.test/integrations/monzo/callback
-MONZO_SALARY_NAME=
-```
+### Prerequisites
 
-3. Config
+- Monzo developer account with OAuth client credentials
+- Redis connection for queue processing
+- Laravel Horizon for background job management
 
-`config/services.php` includes `monzo` keys and is read by `App\Integrations\Monzo\MonzoPlugin`.
+### Configuration
 
-4. Queues (Horizon)
+1. Register an OAuth client at the Monzo Developer Portal
+2. Configure the redirect URI to match your application callback URL
+3. Add environment variables to your `.env` file
+4. Ensure Horizon is running with the `migration` queue enabled
 
-Horizon is configured with a dedicated `migration` queue (see `config/horizon.php`). Start it via Sail:
+### Environment Variables
 
-```
-./vendor/bin/sail up -d
-./vendor/bin/sail artisan horizon
-```
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `MONZO_CLIENT_ID` | OAuth client ID from Monzo Developer Portal | Yes |
+| `MONZO_CLIENT_SECRET` | OAuth client secret from Monzo Developer Portal | Yes |
+| `MONZO_REDIRECT_URI` | OAuth callback URL (defaults to `/integrations/monzo/callback`) | No |
+| `MONZO_SALARY_NAME` | Employer name for salary detection (BACS payments > 1500 GBP) | No |
 
-### Onboarding
+## Data Model
 
-1. Navigate to `/integrations` and choose Monzo
-2. Click “Connect” to start OAuth and approve scopes
-3. After callback, create instances for any of:
+### Instance Types
 
-- transactions
-- pots
-- balances
+| Type | Label | Description |
+|------|-------|-------------|
+| `accounts` | Accounts (Master) | Seeds shared account and pot objects; does not create events |
+| `transactions` | Transactions | Syncs transaction events from all accounts |
+| `pots` | Pots | Syncs pot balance snapshots |
+| `balances` | Balances | Syncs daily account balance snapshots |
 
-Each instance type will ingest its own data set.
+### Action Types
 
-### Historical Migration (Backfill)
+| Action | Display Name | Description | Hidden |
+|--------|--------------|-------------|--------|
+| `had_balance` | Balance Update | Account balance was updated | Yes |
+| `salary_received_from` | Salary Received | Salary payment received from employer | No |
+| `declined_payment_to` | Declined Payment | Card payment was declined | No |
+| `card_payment_to` | Card Payment | Payment made with Monzo card | No |
+| `card_refund_from` | Card Refund | Refund received on Monzo card | No |
+| `pot_transfer_to` | Pot Transfer | Money transferred to a Monzo pot | No |
+| `pot_withdrawal_to` | Pot Withdrawal | Money withdrawn from a Monzo pot | No |
+| `interest_repaid` | Interest Repaid | Interest payment made | No |
+| `interest_earned` | Interest Earned | Interest received | No |
+| `monzo_flex_payment` | Monzo Flex Payment | Payment made for Monzo Flex | No |
+| `monzo_flex_loan` | Monzo Flex Loan | Money borrowed via Monzo Flex | No |
+| `direct_debit_to` | Direct Debit | Direct debit payment | No |
+| `direct_credit_from` | Direct Credit | Direct credit received | No |
+| `monzo_me_to` | Monzo Me Sent | Money sent via Monzo Me | No |
+| `monzo_me_from` | Monzo Me Received | Money received via Monzo Me | No |
+| `bank_transfer_to` | Bank Transfer Sent | Money sent via bank transfer | No |
+| `bank_transfer_from` | Bank Transfer Received | Money received via bank transfer | No |
+| `fee_paid_for` | Fee Paid | Fee charged by Monzo | No |
+| `fee_refunded_for` | Fee Refunded | Fee refunded by Monzo | No |
+| `other_debit_to` | Other Debit | Other outgoing transaction | No |
+| `other_credit_from` | Other Credit | Other incoming transaction | No |
 
-The migration runs in two clear phases on the `migration` queue, prioritising downloading all historical data before any processing:
+### Block Types
 
-1. Seed (runs once at migration start)
+| Type | Display Name | Description | Value Unit |
+|------|--------------|-------------|------------|
+| `balance` | Balance | Account balance information | - |
+| `spent_today` | Spent Today | Amount spent today for this account | GBP |
+| `balance_change` | Balance Change | Change in balance since previous day | GBP |
+| `pot` | Pot | Monzo savings pot information | - |
+| `foreign_exchange` | Foreign Exchange | Local vs transaction currency breakdown | - |
+| `virtual_card` | Virtual Card | Virtual card details used for payment | - |
+| `bank_transfer` | Bank Transfer | External bank transfer details | GBP |
+| `transaction` | Transaction | Transaction information | - |
+| `merchant` | Merchant | Merchant information for transaction | - |
+| `pot_transfer` | Pot Transfer | Money transfer to or from a Monzo pot | GBP |
 
-- Ensures a single master instance `accounts` exists for the group and seeds Monzo account and pot objects (no events) using `SeedMonzoAccounts`.
-- These master objects are shared across all other instances to avoid duplication.
+### Object Types
 
-2. Fetch phase
+| Type | Display Name | Description |
+|------|--------------|-------------|
+| `monzo_account` | Monzo Account | A Monzo bank account (Current, Joint, Flex, etc.) |
+| `monzo_pot` | Monzo Pot | An active Monzo savings pot |
+| `monzo_archived_pot` | Archived Monzo Pot | A deleted or archived Monzo savings pot |
+| `monzo_counterparty` | Counterparty | A transaction counterparty (merchant or recipient) |
+| `day` | Day | A calendar day used as target for balance events |
 
-- Transactions: enqueues 89‑day windows going backwards until no data is returned. Windows are recorded in cache for deterministic processing later.
-- Balances: records the latest balance date (one cut‑off) in cache.
-- Pots: marks as fetched in cache (processing creates a snapshot later).
-- The fetch phase stops automatically when a window returns no transactions across all accounts.
+## Usage
 
-3. Processing phase
+### Connecting
 
-- Starts automatically when the fetch batch completes.
-- Creates one processing job per recorded transaction window, plus a single pots snapshot job and a single balances snapshot job.
-- Batch progress is accurate because it reflects the total number of processing jobs.
+1. Navigate to `/integrations` and select Monzo
+2. Click "Connect" to initiate OAuth flow
+3. Approve the required scopes in the Monzo app
+4. After callback, create instances for the data types you want to sync
 
-Trigger manually (typically done during onboarding):
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `update_frequency_minutes` | Integer | 30 | Polling interval for incremental updates (min: 5) |
+| `include_pot_transfers` | Array | - | Enable processing of pot transfer transactions (transactions instance only) |
+
+### Manual Operations
+
+**Trigger historical migration:**
 
 ```php
-$i = \App\Models\Integration::where('service', 'monzo')->first();
-dispatch(new \App\Jobs\Migrations\StartIntegrationMigration($i))
-    ->onConnection('redis')->onQueue('migration');
+$integration = \App\Models\Integration::where('service', 'monzo')->first();
+dispatch(new \App\Jobs\Migrations\StartIntegrationMigration($integration))
+    ->onConnection('redis')
+    ->onQueue('migration');
 ```
 
-Monitor progress at `/horizon`.
+**Monitor migration progress:**
 
-### Ongoing Updates (Polling)
+Visit `/horizon` to view job processing status.
 
-`MonzoPlugin::fetchData()` can be invoked by your scheduled “pull” jobs to keep up with recent changes. It fetches:
+## API Reference
 
-- Recent transactions (last 7 days)
-- Current balance
-- Current pots snapshot
+- **Base URL**: `https://api.monzo.com`
+- **Auth URL**: `https://auth.monzo.com`
+- **OAuth Scopes**: `accounts:read`, `transactions:read`, `balance:read`, `pots:read`
 
-### Testing
+### Endpoints Used
 
-Run tests:
+| Endpoint | Description |
+|----------|-------------|
+| `GET /accounts` | List all accounts |
+| `GET /balance` | Get account balance |
+| `GET /pots` | List pots for an account |
+| `GET /transactions` | List transactions with merchant expansion |
+| `POST /oauth2/token` | Exchange code for tokens / refresh tokens |
 
-```
-./vendor/bin/sail artisan test
-```
+### Money Encoding
 
-Feature tests for Monzo migration live at `tests/Feature/MonzoMigrationTest.php`. They use `Http::fake()` to mock `api.monzo.com` endpoints and assert that events/objects are created correctly for transactions, pots, and balances.
+All monetary values are stored as integer pence with `value_multiplier=100` and `value_unit=GBP` to avoid floating point errors.
 
-Example snippet:
+## Troubleshooting
 
-```php
-Http::fake([
-    'api.monzo.com/transactions*' => Http::response([
-        'transactions' => [[
-          'id' => 'tx_1',
-          'amount' => -500,
-          'currency' => 'GBP',
-          'local_amount' => -550,
-          'local_currency' => 'EUR',
-          'merchant' => [ 'id' => 'merch_1', 'name' => 'Test Store', 'logo' => 'https://example.com/logo.png' ],
-        ]],
-    ], 200),
-]);
+### Common Issues
 
-dispatch_sync(new ProcessIntegrationPage($integration, [[
-    'kind' => 'transactions_window',
-    'since' => now()->subDays(1)->toIso8601String(),
-    'before' => now()->toIso8601String(),
-]], [ 'service' => 'monzo', 'instance_type' => 'transactions' ]));
+| Issue | Solution |
+|-------|----------|
+| OAuth callback fails | Verify `MONZO_REDIRECT_URI` matches the value configured in Monzo Developer Portal |
+| Horizon not processing jobs | Check `QUEUE_CONNECTION=redis`, verify Horizon supervisors include `migration` queue, ensure Redis is available |
+| No data created | Use `Http::fake()` in tests to validate processing; confirm OAuth credentials are correct |
+| Token refresh fails | Ensure `MONZO_CLIENT_SECRET` is set; check Monzo API status; re-authenticate if refresh token is revoked |
+| Duplicate events | Events are deduplicated by `source_id`; database unique index prevents race conditions |
 
-$event = Event::with('blocks')->where('source_id', 'tx_1')->first();
-// Merchant and FX blocks are created
-```
+## Related Documentation
 
-### Troubleshooting
-
-- OAuth callback fails: verify `MONZO_REDIRECT_URI` matches the value configured on Monzo developer portal
-- Horizon not processing: check `QUEUE_CONNECTION=redis`, Horizon supervisors include `migration` queue, and Redis is available in Sail
-- No data created: use `Http::fake()` in tests to validate processing and confirm credentials in development
-
-### References
-
-## Data model: objects, events, blocks, tags
-
-### Objects
-
-- `monzo_account` (concept: `account`, stored on the master `accounts` instance)
-    - One per Monzo account (e.g., Current Account, Joint Account, Flex)
-    - `metadata.account_id` holds the Monzo account id; full raw account details are stored under `metadata.raw`
-
-- `monzo_pot` (concept: `account`, stored on the master `accounts` instance)
-    - One per Monzo Pot
-    - `metadata.pot_id` holds the Monzo pot id; `metadata.deleted` is a boolean
-
-- `counterparty` (concept: `counterparty`, stored on the master `accounts` instance)
-    - Created only when the B‑party is not a pot
-    - Title is the merchant name (if available) or description fallback
-    - `metadata.merchant_id`, `metadata.category`, `metadata.currency`
-
-- `day` (concept: `day`, type: `day`, stored per integration)
-    - Synthetic object used as the target for daily balance events
-    - Title is the date (`YYYY-MM-DD`)
-
-### Events
-
-- Transaction events (domain: `money`, service: `monzo`)
-    - `action`: `debit` if `amount < 0`, else `credit`
-    - `actor`: `monzo_account` object (the account that made/received the transaction)
-    - `target`: either a `monzo_pot` object when the counterparty is a Pot, or a `counterparty` object otherwise
-    - `value`: integer cents (e.g., 128 for £1.28)
-    - `value_multiplier`: `100` (money is encoded as integer cents + multiplier)
-    - `value_unit`: `GBP`
-    - `event_metadata`: `{ category, scheme, notes }`
-    - `source_id`: Monzo transaction id
-
-- Balance events (domain: `money`, service: `monzo`)
-    - `action`: `had_balance`
-    - `actor`: `monzo_account` object
-    - `target`: `day` object for the event date
-    - `value`: integer cents; `value_multiplier`: `100`; `value_unit`: `GBP`
-    - `event_metadata`: `{ spent_today, snapshot_date? }`
-    - `source_id`: `monzo_balance_{account_id}_{YYYY-MM-DD}`
-
-### Blocks
-
-Blocks enrich events with contextual content and values for better UI rendering. The Monzo integration adds the following blocks:
-
-- Merchant
-    - For card transactions with `merchant` data (using `expand[]=merchant`), adds name, merchant category, and formatted address. Includes `media_url` for the merchant logo when present.
-
-- FX
-    - When a transaction contains different `local_currency` and `currency`, adds a breakdown like: `Local: 12.34 EUR → 10.56 GBP (rate 0.856927)`.
-
-- Pot Transfer
-    - For `uk_retail_pot` scheme transactions, shows transfer direction (To/From) and pot name when resolved.
-
-- Joint Account
-    - Indicates the transaction occurred on a joint account.
-
-- Bank Transfer
-    - For Faster Payments (`payport_faster_payments`), shows counterparty name and sort-code/account-number when available.
-
-- Virtual Card
-    - Indicates a virtual card was used.
-
-- Spent Today (Balance events)
-    - On daily balance events, adds a block with value equal to `abs(spent_today)` in integer cents (`value_multiplier=100`).
-
-- Balance Change (Balance events)
-    - Compares the latest balance against the previous day’s balance for the same account. Adds a block showing direction (Up/Down) and absolute delta in integer cents (`value_multiplier=100`).
-
-### Tags
-
-- None currently created by this integration. If you need tags (e.g., by category or currency) they can be added later in processing.
-
-## Implementation details
-
-- Master `accounts` instance
-    - Only seeds shared account/pot objects; never creates events.
-    - All other instances (`transactions`, `pots`, `balances`) refer to these master objects.
-
-- Idempotency and de‑duplication
-    - Database unique index on `events (integration_id, source_id)` ensures event idempotency and prevents duplicates under race.
-    - Counterparties link to existing `monzo_pot` objects when the B‑party is a Pot; only fallback to `counterparty` objects for non‑pot B‑parties.
-
-- Money encoding
-    - All monetary values are stored as integer cents with `value_multiplier=100` and `value_unit=GBP` to avoid float errors.
-
-- Migration caches
-    - `monzo:migration:{integration_id}:tx_windows` — array of 89‑day windows to process
-    - `monzo:migration:{integration_id}:fetched_back_to` — earliest start date fetched by transactions
-    - `monzo:migration:{integration_id}:balances_last_date` — last balance date captured
-
-- Updates page
-    - Shows a progress bar; indeterminate while fetching, precise during processing
-    - “Fetched to” date is shown only while migration is running; hidden at 100%
-    - Shows a green “Migrated” pill when complete
-    - Auto refreshes every 10 seconds
-
-- Monzo API: `https://docs.monzo.com/`
-- Monzo OAuth: `https://developers.monzo.com/apps`
-- Laravel Horizon: `https://laravel.com/docs/horizon`
+- [Monzo API Documentation](https://docs.monzo.com/)
+- [Monzo Developer Portal](https://developers.monzo.com/apps)
+- [Laravel Horizon](https://laravel.com/docs/horizon)
+- [CLAUDE.md - Integration Plugin System](/CLAUDE.md#integration-plugin-system)

@@ -1,5 +1,11 @@
 # Action Progress System - Quick Reference
 
+A quick reference guide for tracking long-running operations using the ActionProgress model.
+
+## Overview
+
+The ActionProgress system provides real-time progress tracking for asynchronous operations like deletions, migrations, syncs, and exports. It integrates with Livewire for UI updates and supports automatic history tracking.
+
 ## Quick Start
 
 ### 1. Create Progress Record
@@ -127,18 +133,18 @@ class MyLongRunningJob implements ShouldQueue
 
 ## Common Action Types
 
-| Action Type        | Description              | Example Action ID           |
-| ------------------ | ------------------------ | --------------------------- |
-| `deletion`         | Data deletion operations | `integration_group_123`     |
-| `migration`        | Database migrations      | `add_users_table`           |
-| `sync`             | Data synchronization     | `github_integration_456`    |
-| `backup`           | Backup operations        | `daily_backup_2024_01_15`   |
-| `export`           | Data export              | `user_data_export_789`      |
-| `import`           | Data import              | `csv_import_batch_001`      |
-| `bulk_operation`   | Bulk user operations     | `role_update_batch_002`     |
-| `report`           | Report generation        | `monthly_analytics_2024_01` |
-| `maintenance`      | System maintenance       | `cache_cleanup_2024_01_15`  |
-| `integration_test` | API testing              | `github_api_test_003`       |
+| Action Type | Description | Example Action ID |
+|-------------|-------------|-------------------|
+| `deletion` | Data deletion operations | `integration_group_123` |
+| `migration` | Database migrations | `add_users_table` |
+| `sync` | Data synchronization | `github_integration_456` |
+| `backup` | Backup operations | `daily_backup_2024_01_15` |
+| `export` | Data export | `user_data_export_789` |
+| `import` | Data import | `csv_import_batch_001` |
+| `bulk_operation` | Bulk user operations | `role_update_batch_002` |
+| `report` | Report generation | `monthly_analytics_2024_01` |
+| `maintenance` | System maintenance | `cache_cleanup_2024_01_15` |
+| `integration_test` | API testing | `github_api_test_003` |
 
 ## Utility Methods
 
@@ -184,11 +190,11 @@ $this->assertTrue($progress->isFailed());
 
 ## Best Practices
 
-1. **Always create progress record at job start**
-2. **Use descriptive step names and messages**
-3. **Include relevant details in progress updates**
-4. **Handle both success and failure cases**
-5. **Clean up old progress records regularly**
-6. **Use consistent action_type naming**
-7. **Stop polling when operation completes**
-8. **Test both success and failure scenarios**
+1. Always create progress record at job start
+2. Use descriptive step names and messages
+3. Include relevant details in progress updates
+4. Handle both success and failure cases
+5. Clean up old progress records regularly
+6. Use consistent action_type naming
+7. Stop polling when operation completes
+8. Test both success and failure scenarios

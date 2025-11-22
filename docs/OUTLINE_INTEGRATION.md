@@ -1,108 +1,148 @@
 # Outline Integration
 
-This integration connects your Outline workspace to Spark. It syncs collections and documents, represents Day Notes as first-class objects, and extracts Markdown checkbox tasks into blocks. It also provides task jobs to generate Day Notes and pin today's note in Outline.
+Sync documents and tasks from your Outline knowledge base workspace.
+
+## Overview
+
+The Outline integration connects to your self-hosted or cloud Outline workspace to sync collections, documents, and day notes. It extracts Markdown checkbox tasks into blocks for tracking and provides automated task jobs to generate and manage day notes.
+
+## Features
+
+- Sync recent day notes from a designated collection
+- Sync recent documents across all collections
+- Extract Markdown checkbox tasks (`- [ ]` and `- [x]`) as blocks
+- Track task completion status changes
+- Automated day note generation for entire years
+- Auto-pin today's day note at midnight
+- Full migration support for historical data
 
 ## Setup
 
-- Environment variables (defaults shown):
-    - `OUTLINE_URL` (no default) – e.g. `https://outline.example.com`
-    - `OUTLINE_ACCESS_TOKEN` (no default) – Outline API token
-    - `OUTLINE_DAYNOTES_COLLECTION_ID=5622670a-e725-437d-b747-a17905038df8`
+### Prerequisites
 
-In the UI, create an Outline integration instance (service `outline`):
+- An Outline workspace (self-hosted or cloud)
+- An API access token from Outline (Settings > API)
+- The collection ID for your day notes (found in the collection URL)
 
-- Instance type `recent_daynotes`: syncs 5 most recent day notes every 15 minutes (recommended)
-- Instance type `recent_documents`: syncs 10 most recent documents every 2 hours
-- Optional task instances (see Tasks below)
+### Configuration
 
-Reference: Outline API docs (`https://www.getoutline.com/developers`).
+1. Add required environment variables to your `.env` file
+2. Create an Outline integration group in the UI
+3. Add an instance of the desired type (`recent_daynotes` recommended)
 
-## Instance Types
+### Environment Variables
 
-### Recent Day Notes (`recent_daynotes`)
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OUTLINE_URL` | Yes | - | Base URL of your Outline instance (e.g., `https://outline.example.com`) |
+| `OUTLINE_ACCESS_TOKEN` | Yes | - | Your Outline API access token |
+| `OUTLINE_DAYNOTES_COLLECTION_ID` | Yes | - | UUID of the collection containing day notes |
 
-- **Purpose**: Syncs the most recently edited documents from the day notes collection
-- **Frequency**: Every 15 minutes (configurable: 5-60 minutes)
-- **Document Limit**: 5 documents (configurable: 1-20)
-- **Use Case**: Keep day notes and tasks up-to-date for active users
+## Data Model
 
-### Recent Documents (`recent_documents`)
+### Instance Types
 
-- **Purpose**: Syncs the most recently updated documents across all collections
-- **Frequency**: Every 2 hours (configurable: 1-24 hours)
-- **Document Limit**: 10 documents (configurable: 1-50)
-- **Use Case**: Keep general document activity up-to-date
+| Type | Label | Description | Default Frequency |
+|------|-------|-------------|-------------------|
+| `recent_daynotes` | Recent Day Notes | Syncs most recently edited day notes | 15 minutes |
+| `recent_documents` | Recent Documents | Syncs most recently updated documents across all collections | 2 hours |
+| `task` | Outline Task | Runs specific Outline tasks (Pin Day Note, Generate Day Notes) | Scheduled |
 
-### Task (`task`)
+### Action Types
 
-- **Purpose**: Run specific Outline tasks (Pin Day Note, Generate Day Notes)
-- **Configuration**: Task-specific settings and scheduling
-- **Use Case**: Automated day note management
+| Action | Display Name | Description | Icon |
+|--------|--------------|-------------|------|
+| `had_day_note` | Had Day Note | A Day Note existed for the day | `o-calendar` |
+| `created` | Created Document | An Outline document was created | `o-plus-circle` |
 
-## Data Mapping
+### Block Types
 
-- Objects
-    - Collections: `concept=category`, `type=outline_collection`
-    - Documents: `concept=document`, `type=outline_document`
-    - Day Notes: `concept=day_note` when in configured collection and title matches `YYYY-MM-DD: DayName`
-    - Users (actors): `concept=user`, `type=outline_user`
-- Events
-    - Day Notes: `action=had_day_note`, time is start of the day (UTC)
-    - Other documents: `action=created`, time is Outline `createdAt`
-- Blocks (tasks)
-    - Extracted from document text lines that match `- [ ]` or `- [x]`
-    - Day Notes: `block_type=day_task`
-    - Other docs: `block_type=doc_task`
-    - Metadata: `{ outline_document_id, line_number, checked, hash }`
-    - URL: document URL
+| Type | Display Name | Description | Icon |
+|------|--------------|-------------|------|
+| `day_task` | Day Task | A task extracted from a Day Note | `o-check-circle` |
+| `doc_task` | Document Task | A task extracted from a document | `o-check-circle` |
 
-## Processing & Idempotency
+### Object Types
 
-- **Recent Day Notes**: `OutlinePullRecentDayNotes` retrieves recent day notes from the configured collection
-- **Recent Documents**: `OutlinePullRecentDocuments` retrieves recent documents across all collections
-- **Migration**: `OutlineMigrationPull` handles chunked migration in 50-document increments
-- **Processing**: `OutlineData` upserts objects, creates/upserts events, and extracts task blocks
-- **Task reconciliation** on re-runs:
-    - New tasks: created as new blocks
-    - Changed tasks: block updated (title/checked)
-    - Deleted tasks: block soft-deleted and metadata augmented with `removed=true`, `removed_at=UTC ISO`
+| Type | Display Name | Concept | Description | Hidden |
+|------|--------------|---------|-------------|--------|
+| `outline_collection` | Outline Collection | `category` | An Outline collection | No |
+| `outline_document` | Outline Document | `document` | An Outline document | No |
+| `outline_user` | Outline User | `user` | An Outline user | Yes |
 
-## Scheduling
+## Usage
 
-- **Recent Day Notes**: CheckIntegrationUpdates dispatches every 15 minutes (configurable: 5-60 minutes)
-- **Recent Documents**: CheckIntegrationUpdates dispatches every 2 hours (configurable: 1-24 hours)
-- **Tasks**: Can be scheduled using `use_schedule` on task instances for explicit run times
-- **Migration**: Handled separately through the migration system for initial data loading
+### Connecting
 
-## Tasks
+1. Navigate to Integrations in the Spark UI
+2. Create a new Outline integration group
+3. Enter your API URL, access token, and day notes collection ID
+4. Create an instance with the desired type
 
-- Generate Day Notes (job: `App\\Jobs\\Outline\\GenerateDayNotes`)
-    - Creates Year (`YYYY`), Month (`YYYY-MM: MonthName`), and Day (`YYYY-MM-DD: DayName`) documents in the configured Day Notes collection
-- Pin Today’s Day Note (job: `App\\Jobs\\Outline\\PinTodayDayNote`)
-    - Unpins any Day Notes in the collection and pins today’s document based on UTC title
+### Configuration Options
 
-Both tasks can be run as Task instances (instance type `task`) using `task_mode=job` and `task_job_class` configured, with queue `pull`.
+**Recent Day Notes Instance:**
 
-## Migration
+| Option | Type | Default | Range | Description |
+|--------|------|---------|-------|-------------|
+| `update_frequency_minutes` | integer | 15 | 5-60 | How often to sync recent day notes |
+| `document_limit` | integer | 5 | 1-20 | Number of most recent day notes to sync |
 
-- **Initial Migration**: Use the migration system to perform full data sync in 50-document chunks
-- **Migration Job**: `OutlineMigrationPull` handles chunked migration with automatic progression
-- **Migration Status**: Tracked in integration configuration (`migration_status`, `migration_started_at`, `migration_completed_at`)
-- **After Migration**: Use `recent_daynotes` or `recent_documents` instance types for ongoing sync
-- **Recommended**: Start with `recent_daynotes` instance type for active day note users
+**Recent Documents Instance:**
 
-## Limitations
+| Option | Type | Default | Range | Description |
+|--------|------|---------|-------|-------------|
+| `update_frequency_minutes` | integer | 120 | 60-1440 | How often to sync recent documents |
+| `document_limit` | integer | 10 | 1-50 | Number of most recent documents to sync |
 
-- **No webhooks**: Polling-based integration
-- **API Rate Limits**: Migration uses 2-second delays between chunks to respect API limits
-- **Document Limits**: Recent sync jobs are limited to prevent API overload
-- **Outline API pagination**: Followed using `nextPath` for migration jobs
-- **Legacy Support**: Old `pull` instance type still supported but not recommended for new integrations
+**Task Instance Presets:**
+
+| Preset | Job Class | Description |
+|--------|-----------|-------------|
+| Pin Day Note | `App\Jobs\Outline\PinTodayDayNote` | Unpins existing day notes and pins today's note (runs at 00:05 UTC) |
+| Generate Day Notes | `App\Jobs\Outline\GenerateDayNotes` | Creates Year, Month, and Day documents for the current year |
+
+### Manual Operations
+
+**Running a migration:**
+
+Use the migration system to perform a full historical data sync. The migration processes documents in 50-document chunks with 2-second delays to respect API rate limits.
+
+**Task reconciliation:**
+
+On each sync, tasks are reconciled:
+- New tasks are created as blocks
+- Changed tasks have their title/checked status updated
+- Deleted tasks are soft-deleted with `removed=true` and `removed_at` in metadata
+
+## API Reference
+
+Outline API documentation: https://www.getoutline.com/developers
+
+**Jobs:**
+
+| Job | Queue | Description |
+|-----|-------|-------------|
+| `OutlinePullRecentDayNotes` | pull | Retrieves recent day notes from configured collection |
+| `OutlinePullRecentDocuments` | pull | Retrieves recent documents across all collections |
+| `OutlineMigrationPull` | migration | Handles chunked migration in 50-document increments |
+| `OutlineData` | data | Processes fetched data, upserts objects/events, extracts tasks |
+| `GenerateDayNotes` | pull | Creates year/month/day document hierarchy |
+| `PinTodayDayNote` | pull | Pins today's day note in Outline |
 
 ## Troubleshooting
 
-- **Authentication**: Ensure tokens and URL are correct; 401/403 responses indicate auth/config issues
-- **Tasks Not Appearing**: Confirm the document content includes Markdown checkboxes and the job ran
-- **Migration Issues**: Check migration status in integration configuration; failed migrations can be restarted
-- **Performance**: Use `recent_daynotes` for active users, `recent_documents` for general monitoring
-- **Pin Issues**: Pin Day Note task now includes better error handling and verification
+### Common Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| 401/403 responses | Invalid or expired access token | Regenerate your API token in Outline Settings > API |
+| Tasks not appearing | Document lacks Markdown checkboxes | Ensure tasks use `- [ ]` or `- [x]` format |
+| Day notes not syncing | Incorrect collection ID | Verify `daynotes_collection_id` matches your collection URL |
+| Migration stuck | API rate limiting | Check migration status in integration configuration; restart if needed |
+| Pin task failing | No matching day note | Ensure day note exists with title format `YYYY-MM-DD: DayName` |
+
+## Related Documentation
+
+- [CLAUDE.md](/CLAUDE.md) - Integration plugin system architecture
+- [Outline API Documentation](https://www.getoutline.com/developers)

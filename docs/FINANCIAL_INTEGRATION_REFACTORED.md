@@ -1,116 +1,88 @@
-# Financial Integration (Refactored)
+# Financial Integration
 
-The Financial Integration has been refactored to use the existing event-driven architecture instead of custom tables and models. This follows the same pattern used by Monzo, GoCardless, and other integrations.
+A manual account tracking system for managing financial accounts and balance updates using the event-driven architecture.
 
-## Architecture Overview
+## Overview
 
-### Event-Driven Design
+The Financial Integration allows users to manually track financial accounts and their balances over time. It uses the same event-driven architecture as other integrations (Monzo, GoCardless), storing accounts as EventObjects and balance updates as Events. This ensures consistency across the application and enables seamless integration with dashboards and analytics.
 
-- **Financial Accounts** are stored as `EventObject` instances with `concept: 'account'` and `type: 'manual_account'`
-- **Balance Updates** are stored as `Event` instances with `service: manual_account'`, `domain: 'money'`, and `action: 'had_balance'`
-- **Day Objects** are created as targets for balance events, following the same pattern as Monzo integration
+## Features
 
-### Data Structure
+- Manual creation and management of financial accounts
+- Support for multiple account types (current, savings, mortgage, investment, credit card, loan, pension)
+- Multi-currency support (GBP, USD, EUR)
+- Balance history tracking with timestamps and notes
+- Negative balance account support for debts and liabilities
+- Integration with existing event queries and filtering tools
+- Compatibility with Monzo and GoCardless account aggregation
 
-#### Financial Account Object
+## Setup
 
-```php
-EventObject {
-    concept: 'account',
-    type: 'manual_account',
-    title: 'Account Name',
-    metadata: {
-        name: 'Main Current Account',
-        account_type: 'current_account',
-        provider: 'Barclays',
-        account_number: '12345678',
-        sort_code: '20-00-00',
-        currency: 'GBP',
-        interest_rate: 2.5,
-        start_date: '2020-01-01'
-    }
-}
-```
+### Prerequisites
 
-#### Balance Event
+- Active user account in Spark
+- No external API keys or OAuth tokens required
 
-```php
-Event {
-    service: manual_account',
-    domain: 'money',
-    action: 'had_balance',
-    actor_id: 'account-object-id',
-    target_id: 'day-object-id',
-    value: 1500.00,
-    value_unit: 'GBP',
-    event_metadata: {
-        balance: 1500.00,
-        notes: 'Monthly salary received',
-        account_name: 'Main Current Account',
-        account_type: 'current_account',
-        provider: 'Barclays'
-    }
-}
-```
+### Configuration
 
-## Implementation Details
+The Financial Integration is a manual plugin that requires no external service configuration. Accounts are created and managed directly through the Spark interface.
 
-### FinancialPlugin Class
+### Environment Variables
 
-The `FinancialPlugin` extends `ManualPlugin` and provides methods for:
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| N/A | No environment variables required | - | - |
 
-- `upsertAccountObject()` - Create or update financial account objects
-- `createBalanceEvent()` - Create balance update events
-- `getFinancialAccounts()` - Retrieve all financial accounts for a user
-- `getBalanceEvents()` - Get balance events for a specific account
-- `getLatestBalance()` - Get the most recent balance for an account
+## Data Model
 
-### Livewire Components
+### Instance Types
 
-All components have been refactored to work with the event system:
+| Type | Label | Description |
+|------|-------|-------------|
+| `accounts` | Accounts | Financial account entities with metadata |
+| `balances` | Balance Updates | Point-in-time balance records |
 
-- **FinancialAccounts** - Lists accounts using `EventObject` queries
-- **CreateFinancialAccount** - Creates account objects via the plugin
-- **AddBalanceUpdate** - Creates balance events via the plugin
+### Action Types
 
-### Data Access Patterns
+| Action | Display Name | Icon | Description | Value Unit |
+|--------|--------------|------|-------------|------------|
+| `had_balance` | Balance Update | `o-currency-pound` | Account balance was updated | GBP |
 
-Instead of direct model relationships, data is accessed through:
+### Block Types
 
-1. **Plugin Methods** - Use the plugin's helper methods for common operations
-2. **Metadata Access** - Account details are stored in `EventObject.metadata`
-3. **Event Queries** - Balance information comes from `Event` queries
-4. **Collection Filtering** - Use Laravel collection methods for filtering and pagination
+No block types are defined for this integration.
 
-## Benefits of the Refactored System
+### Object Types
 
-### Consistency
+| Type | Display Name | Icon | Description |
+|------|--------------|------|-------------|
+| `manual_account` | Manual Account | `o-credit-card` | A manually entered financial account |
+| `day` | Day | `o-calendar` | A calendar day used as event target |
 
-- Follows the same pattern as all other integrations
-- Uses the existing `events` and `objects` tables
-- Integrates seamlessly with the dashboard and analytics
+## Usage
 
-### Flexibility
+### Connecting
 
-- Financial data appears alongside other integration data
-- Can use existing event querying and filtering tools
-- Supports the same tagging and categorization system
+1. Navigate to the Financial Accounts section in Spark
+2. Create a new manual account with required details
+3. Add balance updates as needed to track account history
 
-### Scalability
+### Configuration Options
 
-- No additional database tables required
-- Leverages existing indexing and optimization
-- Can easily add new financial event types
+| Option | Type | Description | Required | Default |
+|--------|------|-------------|----------|---------|
+| `account_type` | select | Type of account (current, savings, mortgage, etc.) | Yes | - |
+| `provider` | text | Bank or financial institution name | Yes | - |
+| `account_number` | text | Account number or identifier | No | - |
+| `sort_code` | text | Sort code for UK bank accounts | No | - |
+| `currency` | select | Currency for the account (GBP, USD, EUR) | Yes | GBP |
+| `interest_rate` | number | Annual interest rate percentage | No | - |
+| `start_date` | date | Date account was opened | No | - |
+| `is_negative_balance` | boolean | Enable for accounts where higher balances are worse | No | false |
 
-### Integration
+### Manual Operations
 
-- Works with existing event display components
-- Integrates with the updates and notifications system
-- Can be analyzed using existing event analytics tools
-
-## Usage Examples
-
-### Creating an Account
+**Creating an Account:**
 
 ```php
 $plugin = new FinancialPlugin();
@@ -125,7 +97,7 @@ $accountData = [
 $accountObject = $plugin->upsertAccountObject($integration, $accountData);
 ```
 
-### Adding a Balance Update
+**Adding a Balance Update:**
 
 ```php
 $balanceData = [
@@ -137,52 +109,42 @@ $balanceData = [
 $balanceEvent = $plugin->createBalanceEvent($integration, $accountObject, $balanceData);
 ```
 
-### Retrieving Accounts
+**Retrieving Accounts:**
 
 ```php
+// Get all financial accounts (manual, Monzo, GoCardless) excluding archived
 $accounts = $plugin->getFinancialAccounts($user);
-foreach ($accounts as $account) {
-    $metadata = $account->metadata;
-    echo $metadata['name'] . ' - ' . $metadata['provider'];
-}
+
+// Get only manual accounts
+$manualAccounts = $plugin->getManualFinancialAccounts($user);
+
+// Get all accounts including archived
+$allAccounts = $plugin->getAllFinancialAccounts($user);
 ```
 
-### Getting Balance History
+**Getting Balance History:**
 
 ```php
 $balanceEvents = $plugin->getBalanceEvents($accountObject);
 $latestBalance = $plugin->getLatestBalance($accountObject);
+
+// For pagination
+$query = $plugin->getBalanceEventsQuery($accountObject);
 ```
 
-## Migration from Custom Tables
+## Troubleshooting
 
-The refactored system eliminates the need for:
+### Common Issues
 
-- `manual_accounts` table
-- `financial_balances` table
-- `FinancialAccount` model
-- `FinancialBalance` model
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Account not appearing | Account may be marked as deleted/archived | Check metadata for `deleted` flag |
+| Balance not updating | Duplicate source_id for same date | Each account can only have one balance per day |
+| Currency mismatch | Account currency differs from displayed | Verify account metadata currency setting |
+| Missing balance history | Events queried with wrong service | Balance events support `manual_account`, `monzo`, and `gocardless` services |
 
-All data is now stored in the existing `events` and `objects` tables, making the system more consistent and maintainable.
+## Related Documentation
 
-## Testing
-
-The refactored system includes comprehensive tests in `tests/Feature/FinancialIntegrationEventTest.php` that verify:
-
-- Account object creation
-- Balance event creation
-- Data retrieval methods
-- Plugin functionality
-- Error handling for unsupported operations
-
-## Future Enhancements
-
-With the event-driven architecture, it's easy to add:
-
-- **Transaction Events** - Track individual transactions
-- **Transfer Events** - Track money movements between accounts
-- **Interest Events** - Track interest accrual
-- **Fee Events** - Track account fees and charges
-- **Goal Events** - Track progress toward financial goals
-
-All new event types will automatically integrate with the existing dashboard, analytics, and reporting systems.
+- [CLAUDE.md](/home/user/spark/CLAUDE.md) - Integration Plugin System architecture
+- [app/Integrations/Financial/FinancialPlugin.php](/home/user/spark/app/Integrations/Financial/FinancialPlugin.php) - Plugin implementation
+- [tests/Feature/FinancialIntegrationEventTest.php](/home/user/spark/tests/Feature/FinancialIntegrationEventTest.php) - Integration tests
