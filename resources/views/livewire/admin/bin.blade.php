@@ -581,7 +581,7 @@ new class extends Component
                 </button>
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
                     onclick="return confirm('Are you sure you want to permanently delete {{ count($selectedItems) }} item(s)? This action cannot be undone.')">
-                    <x-icon name="o-trash" class="w-4 h-4 mr-1" />
+                    <x-icon name="fas-trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedItems) }})
                 </button>
                 @endif
@@ -589,7 +589,7 @@ new class extends Component
                 <!-- Delete All Button -->
                 <button class="btn btn-error btn-sm" wire:click="deleteAll"
                     onclick="return confirm('Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.')">
-                    <x-icon name="o-fire" class="w-4 h-4 mr-1" />
+                    <x-icon name="fas-fire" class="w-4 h-4 mr-1" />
                     Delete All
                 </button>
             </div>
@@ -632,7 +632,7 @@ new class extends Component
                         <span class="label-text">&nbsp;</span>
                     </label>
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas-xmark" class="w-4 h-4" />
                         Clear
                     </button>
                 </div>
@@ -646,7 +646,7 @@ new class extends Component
         <x-collapse separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="o-funnel" class="w-5 h-5" />
+                    <x-icon name="fas-filter" class="w-5 h-5" />
                     Filters
                     @if ($search || $typeFilter)
                     <x-badge value="Active" class="badge-primary badge-xs" />
@@ -683,7 +683,7 @@ new class extends Component
                     <!-- Clear Filters Button -->
                     @if ($search || $typeFilter)
                     <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="o-x-mark" class="w-4 h-4" />
+                        <x-icon name="fas-xmark" class="w-4 h-4" />
                         Clear Filters
                     </button>
                     @endif
@@ -748,14 +748,14 @@ new class extends Component
                         wire:confirm="Are you sure you want to permanently delete this item? This action cannot be undone."
                         class="btn btn-error btn-xs"
                         title="Delete Permanently">
-                        <x-icon name="o-trash" class="w-3 h-3" />
+                        <x-icon name="fas-trash" class="w-3 h-3" />
                     </button>
                 </div>
                 @endscope
 
                 <x-slot:empty>
                     <div class="text-center py-12">
-                        <x-icon name="o-trash" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                        <x-icon name="fas-trash" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                         <p class="font-medium text-base-content mb-2">No deleted items found</p>
                         @if ($search || $typeFilter)
                         <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>

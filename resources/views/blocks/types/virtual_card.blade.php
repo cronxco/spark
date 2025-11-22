@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $name = $block->metadata['name'] ?? 'Virtual Card';
@@ -27,7 +27,7 @@ $created = $block->metadata['created'] ?? null;
         {{-- Card Display --}}
         <div class="bg-gradient-to-br from-primary to-primary/60 rounded-lg p-4 text-primary-content shadow-md">
             <div class="flex items-start justify-between mb-3">
-                <x-icon name="o-credit-card" class="w-8 h-8 opacity-80" />
+                <x-icon name="fas-credit-card" class="w-8 h-8 opacity-80" />
                 <div class="badge badge-sm bg-primary-content/20 text-primary-content border-0">Virtual</div>
             </div>
             <div class="space-y-2">
@@ -51,18 +51,18 @@ $created = $block->metadata['created'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas-eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>
                     <li>
                         <a href="{{ route('events.show', $block->event) }}" wire:navigate>
-                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            <x-icon name="fas-calendar" class="w-4 h-4" />
                             View Event
                         </a>
                     </li>

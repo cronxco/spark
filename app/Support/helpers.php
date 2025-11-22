@@ -835,7 +835,7 @@ if (! function_exists('heroicon_to_fontawesome')) {
     /**
      * Convert a Heroicon name to its FontAwesome equivalent.
      *
-     * @param  string  $heroiconName  The Heroicon name (e.g., 'o-heart')
+     * @param  string  $heroiconName  The Heroicon name (e.g., 'fas-heart')
      * @return string The FontAwesome icon name (e.g., 'fas-heart')
      */
     function heroicon_to_fontawesome(string $heroiconName): string

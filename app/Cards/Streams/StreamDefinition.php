@@ -23,14 +23,14 @@ class StreamDefinition
             'day' => new self(
                 id: 'day',
                 name: 'Day',
-                icon: 'o-calendar',
+                icon: 'fas-calendar',
                 color: 'primary',
                 description: 'Daily check-ins, stats, and reflections',
             ),
             'health' => new self(
                 id: 'health',
                 name: 'Health',
-                icon: 'o-heart',
+                icon: 'fas-heart',
                 color: 'error',
                 description: 'Deep-dive into your health data',
             ),

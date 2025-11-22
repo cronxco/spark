@@ -1,5 +1,5 @@
 <div class="flex flex-col items-center justify-center h-full text-center p-8">
-    <x-icon name="o-sun" class="w-24 h-24 text-warning mb-6" />
+    <x-icon name="fas-sun" class="w-24 h-24 text-warning mb-6" />
 
     <h1 class="text-4xl font-bold mb-2">
         {{ $greeting }}

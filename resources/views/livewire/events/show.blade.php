@@ -191,41 +191,41 @@ new class extends Component {
 
         // Fallback to hardcoded icons if plugin doesn't have this action type
         $icons = [
-            'create' => 'o-plus-circle',
-            'update' => 'o-arrow-path',
-            'delete' => 'o-trash',
-            'move' => 'o-arrow-right',
-            'copy' => 'o-document-duplicate',
-            'share' => 'o-share',
-            'like' => 'o-heart',
-            'comment' => 'o-chat-bubble-left',
-            'follow' => 'o-user-plus',
-            'unfollow' => 'o-user-minus',
-            'join' => 'o-user-group',
-            'leave' => 'o-user-group',
-            'start' => 'o-play',
-            'stop' => 'o-stop',
-            'pause' => 'o-pause',
-            'resume' => 'o-play',
-            'complete' => 'o-check-circle',
-            'fail' => 'o-x-circle',
-            'cancel' => 'o-x-mark',
-            'approve' => 'o-check',
-            'reject' => 'o-x-mark',
-            'publish' => 'o-globe-alt',
-            'unpublish' => 'o-eye-slash',
-            'archive' => 'o-archive-box',
-            'restore' => 'o-arrow-path',
-            'login' => 'o-arrow-right-on-rectangle',
-            'logout' => 'o-arrow-left-on-rectangle',
+            'create' => 'fas-circle-plus',
+            'update' => 'fas-rotate',
+            'delete' => 'fas-trash',
+            'move' => 'fas-arrow-right',
+            'copy' => 'fas-copy',
+            'share' => 'fas-share',
+            'like' => 'fas-heart',
+            'comment' => 'fas-comment',
+            'follow' => 'fas-user-plus',
+            'unfollow' => 'fas-user-minus',
+            'join' => 'fas-users',
+            'leave' => 'fas-users',
+            'start' => 'fas-play',
+            'stop' => 'fas-stop',
+            'pause' => 'fas-pause',
+            'resume' => 'fas-play',
+            'complete' => 'fas-circle-check',
+            'fail' => 'fas-circle-xmark',
+            'cancel' => 'fas-xmark',
+            'approve' => 'fas-check',
+            'reject' => 'fas-xmark',
+            'publish' => 'fas-globe',
+            'unpublish' => 'fas-eye-slash',
+            'archive' => 'fas-box-archive',
+            'restore' => 'fas-rotate',
+            'login' => 'fas-right-from-bracket',
+            'logout' => 'fas-right-to-bracket',
             'purchase' => 'o-shopping-cart',
-            'refund' => 'o-arrow-path',
-            'transfer' => 'o-arrow-right',
-            'withdraw' => 'o-arrow-down',
-            'deposit' => 'o-arrow-up',
+            'refund' => 'fas-rotate',
+            'transfer' => 'fas-arrow-right',
+            'withdraw' => 'fas-arrow-down',
+            'deposit' => 'fas-arrow-up',
         ];
 
-        return $icons[strtolower($action)] ?? 'o-bolt';
+        return $icons[strtolower($action)] ?? 'fas-bolt';
     }
 
     public function getEventColor($action)
@@ -608,7 +608,7 @@ new class extends Component {
                         title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                         aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
                         data-hotkey="d">
-                        <x-icon name="o-adjustments-horizontal" class="w-4 h-4" />
+                        <x-icon name="fas-sliders" class="w-4 h-4" />
                     </x-button>
                 </x-slot:actions>
             </x-header>
@@ -650,7 +650,7 @@ new class extends Component {
                         <!-- Key Metadata -->
                         <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-sm">
                             <div class="flex items-center gap-2">
-                                <x-icon name="o-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                                <x-icon name="fas-clock" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
                                 <span class="text-base-content/70">{{ to_user_timezone($this->event->time, auth()->user())->format('d/m/Y H:i') }} · {{ to_user_timezone($this->event->time, auth()->user())->diffForHumans() }}</span>
                             </div>
                             <span class="hidden sm:inline">·</span>
@@ -662,7 +662,7 @@ new class extends Component {
                                     {{ str::Headline($this->event->domain) }}
                                 </x-slot:value>
                             </x-badge>
-                            <x-icon name="o-arrow-right" class="w-3 h-3 text-base-content/40" />
+                            <x-icon name="fas-arrow-right" class="w-3 h-3 text-base-content/40" />
                             @endif
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
@@ -671,7 +671,7 @@ new class extends Component {
                                 </x-slot:value>
                             </x-badge>
                             @if ($this->event->integration && (str::Headline($this->event->integration->instance_type) !== str::Headline($this->event->integration->name)))
-                            <x-icon name="o-arrow-right" class="w-3 h-3 text-base-content/40" />
+                            <x-icon name="fas-arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
                                     <x-icon name="fas.font-awesome" class="w-3 h-3 text-base-content/40" />
@@ -680,7 +680,7 @@ new class extends Component {
                             </x-badge>
                             @endif
                             @if ($this->event->integration)
-                            <x-icon name="o-arrow-right" class="w-3 h-3 text-base-content/40" />
+                            <x-icon name="fas-arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
                                     <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
@@ -697,7 +697,7 @@ new class extends Component {
                                 @if ($this->event->actor)
                                 <div class="flex items-center gap-2">
                                     <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-                                        <x-icon name="o-user" class="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
+                                        <x-icon name="fas-user" class="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
                                     </div>
                                     <a href="{{ route('objects.show', $this->event->actor->id) }}"
                                         class="font-medium text-secondary hover:underline text-sm sm:text-base">
@@ -708,18 +708,18 @@ new class extends Component {
 
                                 @if ($this->event->actor && $this->event->target)
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
-                                    <x-icon name="o-arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
+                                    <x-icon name="fas-arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
+                                    <x-icon name="fas-arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
                                     <span class="text-sm text-base-content/70 font-medium">{{ $this->formatAction($this->event->action) }}</span>
-                                    <x-icon name="o-arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
-                                    <x-icon name="o-arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
+                                    <x-icon name="fas-arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
+                                    <x-icon name="fas-arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
                                 </div>
                                 @endif
 
                                 @if ($this->event->target)
                                 <div class="flex items-center gap-2">
                                     <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                                        <x-icon name="o-arrow-trending-up" class="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
+                                        <x-icon name="fas-arrow-trend-up" class="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                     </div>
                                     <a href="{{ route('objects.show', $this->event->target->id) }}"
                                         class="font-medium text-accent hover:underline text-sm sm:text-base">
@@ -750,7 +750,7 @@ new class extends Component {
             @if ($anomalies->isNotEmpty())
             <x-card class="bg-warning/5 border-2 border-warning/30">
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="o-exclamation-triangle" class="w-5 h-5 text-warning" />
+                    <x-icon name="fas-triangle-exclamation" class="w-5 h-5 text-warning" />
                     Anomaly Detected
                 </h3>
                 <div class="space-y-3">
@@ -760,9 +760,9 @@ new class extends Component {
                             <div class="flex-1">
                                 <div class="flex items-center gap-2 mb-2">
                                     @if ($anomaly->getDirection() === 'up')
-                                    <x-icon name="o-arrow-trending-up" class="h-5 w-5 text-warning" />
+                                    <x-icon name="fas-arrow-trend-up" class="h-5 w-5 text-warning" />
                                     @else
-                                    <x-icon name="o-arrow-trending-down" class="h-5 w-5 text-warning" />
+                                    <x-icon name="fas-arrow-trend-down" class="h-5 w-5 text-warning" />
                                     @endif
                                     <span class="font-semibold text-warning">{{ $anomaly->getTypeLabel() }}</span>
                                 </div>
@@ -816,7 +816,7 @@ new class extends Component {
                 <x-collapse wire:model="targetContentOpen">
                     <x-slot:heading>
                         <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-document-text" class="w-5 h-5 text-info" />
+                            <x-icon name="fas-file-lines" class="w-5 h-5 text-info" />
                             {{ $this->event->target->title }}
                         </div>
                     </x-slot:heading>
@@ -835,7 +835,7 @@ new class extends Component {
             @if ($this->event->blocks->isNotEmpty())
             <div>
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                    <x-icon name="fas-grip" class="w-5 h-5 text-info" />
                     Linked Blocks ({{ $this->event->blocks->count() }})
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -851,7 +851,7 @@ new class extends Component {
             <div class="relative">
                 <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-arrow-path" class="w-5 h-5 text-warning" />
+                        <x-icon name="fas-rotate" class="w-5 h-5 text-warning" />
                         Related Events
                     </h3>
                     <div class="space-y-3">
@@ -930,7 +930,7 @@ new class extends Component {
                                             @endif
                                         </div>
                                     </div>
-                                    <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                                    <x-icon name="fas-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
                                 </div>
                             </a>
                         </div>
@@ -939,7 +939,7 @@ new class extends Component {
                 </div>
                 <!-- AI Badge -->
                 <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                    <x-icon name="o-sparkles" class="w-3 h-3 text-warning-content" />
+                    <x-icon name="fas-wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
                 </div>
             </div>
             @endif
@@ -950,11 +950,11 @@ new class extends Component {
             <x-card class="bg-base-200/50 border-2 border-accent/10">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold flex items-center gap-2">
-                        <x-icon name="o-arrows-right-left" class="w-5 h-5 text-accent" />
+                        <x-icon name="fas-right-left" class="w-5 h-5 text-accent" />
                         Relationships ({{ $relationships->count() }})
                     </h3>
                     <x-button
-                        icon="o-cog-6-tooth"
+                        icon="fas-gear"
                         class="btn-sm btn-ghost"
                         wire:click="handleOpenManageRelationshipsModal"
                         label="Manage" />
@@ -978,7 +978,7 @@ new class extends Component {
                     $badgeClass = 'badge-ghost';
 
                     if ($relatedModel instanceof \App\Models\Event) {
-                    $icon = 'o-calendar';
+                    $icon = 'fas-calendar';
                     $title = $relatedModel->action;
                     $subtitle = $relatedModel->time?->format('M j, Y g:i A');
                     $route = route('events.show', $relatedModel);
@@ -992,7 +992,7 @@ new class extends Component {
                     $badgeText = 'Object';
                     $badgeClass = 'badge-secondary';
                     } elseif ($relatedModel instanceof \App\Models\Block) {
-                    $icon = 'o-squares-2x2';
+                    $icon = 'fas-grip';
                     $title = $relatedModel->type;
                     $subtitle = $relatedModel->time?->format('M j, Y');
                     $route = route('blocks.show', $relatedModel);
@@ -1064,14 +1064,14 @@ new class extends Component {
                                 wire:click="copyEventWithoutEmbeddings"
                                 class="btn btn-ghost btn-xs gap-1"
                                 title="Copy event data to clipboard (without embeddings)">
-                                <x-icon name="o-clipboard-document" class="w-3 h-3" />
+                                <x-icon name="fas.clipboard" class="w-3 h-3" />
                                 <span class="hidden sm:inline">Copy</span>
                             </button>
                             <button
                                 wire:click="exportAsJson"
                                 class="btn btn-ghost btn-xs gap-1"
                                 title="Export complete event with all related data">
-                                <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                                <x-icon name="fas.download" class="w-3 h-3" />
                                 <span class="hidden sm:inline">Export</span>
                             </button>
                         </div>
@@ -1118,7 +1118,7 @@ new class extends Component {
                                 Tags
                             </h3>
                             <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
-                                <x-icon name="o-plus" class="w-3 h-3" />
+                                <x-icon name="fas-plus" class="w-3 h-3" />
                             </button>
                         </div>
                         <div wire:key="event-tags-{{ $this->event->id }}" wire:ignore>
@@ -1139,13 +1139,13 @@ new class extends Component {
                                 Relationships
                             </h3>
                             <button type="button" wire:click="handleOpenManageRelationshipsModal" class="btn btn-xs btn-ghost btn-circle" title="Manage relationships" data-hotkey="r">
-                                <x-icon name="o-plus" class="w-3 h-3" />
+                                <x-icon name="fas-plus" class="w-3 h-3" />
                             </button>
                         </div>
                         @php $sidebarRelationships = $this->getRelationships(); @endphp
                         @if ($sidebarRelationships->isEmpty())
                         <x-empty-state
-                            icon="o-arrows-right-left"
+                            icon="fas-right-left"
                             message="No relationships yet"
                             actionEvent="handleOpenAddRelationshipModal"
                             actionLabel="Add Relationship" />
@@ -1160,7 +1160,7 @@ new class extends Component {
                             $route = '#';
 
                             if ($relatedModel instanceof \App\Models\Event) {
-                                $icon = 'o-calendar';
+                                $icon = 'fas-calendar';
                                 $title = $relatedModel->action;
                                 $route = route('events.show', $relatedModel);
                             } elseif ($relatedModel instanceof \App\Models\EventObject) {
@@ -1168,7 +1168,7 @@ new class extends Component {
                                 $title = $relatedModel->title;
                                 $route = route('objects.show', $relatedModel);
                             } elseif ($relatedModel instanceof \App\Models\Block) {
-                                $icon = 'o-squares-2x2';
+                                $icon = 'fas-grip';
                                 $title = $relatedModel->type;
                                 $route = route('blocks.show', $relatedModel);
                             }
@@ -1425,7 +1425,7 @@ new class extends Component {
     @endif
     @if (! $this->event)
     <div class="text-center py-8">
-        <x-icon name="o-exclamation-triangle" class="w-12 h-12 text-warning mx-auto mb-4" />
+        <x-icon name="fas-triangle-exclamation" class="w-12 h-12 text-warning mx-auto mb-4" />
         <h3 class="text-lg font-semibold text-base-content mb-2">Event Not Found</h3>
         <p class="text-base-content/70">The requested event could not be found.</p>
     </div>

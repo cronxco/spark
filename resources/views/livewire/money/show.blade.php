@@ -10,7 +10,7 @@
                 </x-slot:title>
                 <x-slot:subtitle>
                     <x-button link="{{ route('money') }}" class="btn-ghost btn-xs">
-                        <x-icon name="o-arrow-left" class="w-4 h-4" />
+                        <x-icon name="fas-arrow-left" class="w-4 h-4" />
                         Back to Accounts
                     </x-button>
                 </x-slot:subtitle>
@@ -19,24 +19,24 @@
                     <div class="hidden sm:flex gap-2">
                         @if ($account->type === 'manual_account')
                         <x-button wire:click="openAddBalanceModal" class="btn-primary btn-sm">
-                            <x-icon name="o-banknotes" class="w-4 h-4" />
+                            <x-icon name="fas-money-bills" class="w-4 h-4" />
                             Add Balance
                         </x-button>
                         @endif
                         @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
                         <x-button wire:click="openEditModal" class="btn-outline btn-sm">
-                            <x-icon name="o-pencil" class="w-4 h-4" />
+                            <x-icon name="fas-pen" class="w-4 h-4" />
                             Edit Account
                         </x-button>
                         @endif
                         @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'bank_account']) && !($account->metadata['deleted'] ?? false))
                         <x-button wire:click="openArchiveModal" class="btn-outline btn-error btn-sm">
-                            <x-icon name="o-archive-box" class="w-4 h-4" />
+                            <x-icon name="fas-box-archive" class="w-4 h-4" />
                             Archive
                         </x-button>
                         @endif
                         <x-button wire:click="toggleSidebar" class="btn-ghost btn-sm">
-                            <x-icon name="{{ 'o-adjustments-horizontal' }}" class="w-5 h-5" />
+                            <x-icon name="{{ 'fas-sliders' }}" class="w-5 h-5" />
                         </x-button>
                     </div>
 
@@ -45,20 +45,20 @@
                         <x-dropdown>
                             <x-slot:trigger>
                                 <x-button class="btn-ghost btn-sm">
-                                    <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                                    <x-icon name="fas-ellipsis-vertical" class="w-5 h-5" />
                                 </x-button>
                             </x-slot:trigger>
                             @if ($account->type === 'manual_account')
-                            <x-menu-item title="Add Balance" icon="o-banknotes" wire:click="openAddBalanceModal" />
+                            <x-menu-item title="Add Balance" icon="fas-money-bills" wire:click="openAddBalanceModal" />
                             @endif
                             @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'monzo_archived_pot', 'bank_account']))
-                            <x-menu-item title="Edit Account" icon="o-pencil" wire:click="openEditModal" />
+                            <x-menu-item title="Edit Account" icon="fas-pen" wire:click="openEditModal" />
                             @endif
                             @if (in_array($account->type, ['manual_account', 'monzo_account', 'monzo_pot', 'bank_account']) && !($account->metadata['deleted'] ?? false))
-                            <x-menu-item title="Archive Account" icon="o-archive-box" wire:click="openArchiveModal" />
+                            <x-menu-item title="Archive Account" icon="fas-box-archive" wire:click="openArchiveModal" />
                             @endif
-                            <x-menu-item title="Back to Accounts" icon="o-arrow-left" link="{{ route('money') }}" />
-                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="o-adjustments-horizontal" wire:click="toggleSidebar" />
+                            <x-menu-item title="Back to Accounts" icon="fas-arrow-left" link="{{ route('money') }}" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="fas-sliders" wire:click="toggleSidebar" />
                         </x-dropdown>
                     </div>
                 </x-slot:actions>
@@ -70,7 +70,7 @@
                     <!-- Large icon -->
                     <div class="flex-shrink-0 self-center sm:self-start">
                         <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-accent/10 flex items-center justify-center">
-                            <x-icon name="o-currency-pound" class="w-6 h-6 sm:w-8 sm:h-8 text-accent" />
+                            <x-icon name="fas-sterling-sign" class="w-6 h-6 sm:w-8 sm:h-8 text-accent" />
                         </div>
                     </div>
 
@@ -134,7 +134,7 @@
             <div class="card bg-base-200 shadow">
                 <div class="card-body">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-chart-bar" class="w-5 h-5 text-primary" />
+                        <x-icon name="fas-chart-simple" class="w-5 h-5 text-primary" />
                         Balance History
                     </h3>
 
@@ -207,7 +207,7 @@
 
                                 <x-slot:empty>
                                     <div class="text-center py-8">
-                                        <x-icon name="o-chart-bar" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                                        <x-icon name="fas-chart-simple" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                                         <h3 class="text-lg font-medium text-base-content mb-2">No balance history</h3>
                                         <p class="text-base-content/70 mb-6">
                                             @if ($account->type === 'manual_account')
@@ -220,7 +220,7 @@
                                         </p>
                                         @if ($account->type === 'manual_account')
                                         <button wire:click="openAddBalanceModal" class="btn">
-                                            <x-icon name="o-plus" class="w-4 h-4" />
+                                            <x-icon name="fas-plus" class="w-4 h-4" />
                                             Add Balance
                                         </button>
                                         @endif
@@ -259,11 +259,11 @@
                 <x-card class="bg-base-100 shadow">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-tag" class="w-5 h-5" />
+                            <x-icon name="fas-tag" class="w-5 h-5" />
                             Tags
                         </h3>
                         <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
-                            <x-icon name="o-plus" class="w-3 h-3" />
+                            <x-icon name="fas-plus" class="w-3 h-3" />
                         </button>
                     </div>
                     <div class="space-y-2" wire:key="object-tags-{{ $account->id }}" wire:ignore>
@@ -279,7 +279,7 @@
                 <!-- Account Information -->
                 <div>
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-building-library" class="w-5 h-5 text-primary" />
+                        <x-icon name="fas-building-columns" class="w-5 h-5 text-primary" />
                         Account Information
                     </h3>
                     <div class="space-y-3 text-sm">
@@ -399,7 +399,7 @@
                 <x-collapse wire:model="metadataOpen">
                     <x-slot:heading>
                         <div class="text-lg font-semibold text-base-content flex items-center gap-2">
-                            <x-icon name="o-code-bracket" class="w-5 h-5 text-primary" />
+                            <x-icon name="fas-code" class="w-5 h-5 text-primary" />
                             Raw Metadata
                         </div>
                     </x-slot:heading>
@@ -414,7 +414,7 @@
                         wire:click="deleteAccount"
                         wire:confirm="Are you sure you want to delete this account? This will also delete all balance history."
                         class="btn btn-error btn-outline w-full">
-                        <x-icon name="o-trash" class="w-4 h-4" />
+                        <x-icon name="fas-trash" class="w-4 h-4" />
                         Delete Account
                     </button>
                 </div>

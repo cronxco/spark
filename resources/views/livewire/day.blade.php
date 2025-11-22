@@ -385,86 +385,86 @@ $getEventIcon = function ($action, $service) {
 
     // Fallback to hardcoded icons if plugin doesn't have this action type
     $icons = [
-        'create' => 'o-plus-circle',
-        'update' => 'o-arrow-path',
-        'delete' => 'o-trash',
-        'move' => 'o-arrow-right',
-        'copy' => 'o-document-duplicate',
-        'share' => 'o-share',
-        'like' => 'o-heart',
-        'comment' => 'o-chat-bubble-left',
-        'follow' => 'o-user-plus',
-        'unfollow' => 'o-user-minus',
-        'join' => 'o-user-group',
-        'leave' => 'o-user-group',
-        'start' => 'o-play',
-        'stop' => 'o-stop',
-        'pause' => 'o-pause',
-        'resume' => 'o-play',
-        'complete' => 'o-check-circle',
-        'fail' => 'o-x-circle',
-        'cancel' => 'o-x-mark',
-        'approve' => 'o-check',
-        'reject' => 'o-x-mark',
-        'publish' => 'o-globe-alt',
-        'unpublish' => 'o-eye-slash',
-        'archive' => 'o-archive-box',
-        'restore' => 'o-arrow-path',
-        'login' => 'o-arrow-right-on-rectangle',
-        'logout' => 'o-arrow-left-on-rectangle',
+        'create' => 'fas-circle-plus',
+        'update' => 'fas-rotate',
+        'delete' => 'fas-trash',
+        'move' => 'fas-arrow-right',
+        'copy' => 'fas-copy',
+        'share' => 'fas-share',
+        'like' => 'fas-heart',
+        'comment' => 'fas-comment',
+        'follow' => 'fas-user-plus',
+        'unfollow' => 'fas-user-minus',
+        'join' => 'fas-users',
+        'leave' => 'fas-users',
+        'start' => 'fas-play',
+        'stop' => 'fas-stop',
+        'pause' => 'fas-pause',
+        'resume' => 'fas-play',
+        'complete' => 'fas-circle-check',
+        'fail' => 'fas-circle-xmark',
+        'cancel' => 'fas-xmark',
+        'approve' => 'fas-check',
+        'reject' => 'fas-xmark',
+        'publish' => 'fas-globe',
+        'unpublish' => 'fas-eye-slash',
+        'archive' => 'fas-box-archive',
+        'restore' => 'fas-rotate',
+        'login' => 'fas-right-from-bracket',
+        'logout' => 'fas-right-to-bracket',
         'purchase' => 'o-shopping-cart',
-        'refund' => 'o-arrow-path',
-        'transfer' => 'o-arrow-right',
-        'withdraw' => 'o-arrow-down',
-        'deposit' => 'o-arrow-up',
-        'listen' => 'o-musical-note',
+        'refund' => 'fas-rotate',
+        'transfer' => 'fas-arrow-right',
+        'withdraw' => 'fas-arrow-down',
+        'deposit' => 'fas-arrow-up',
+        'listen' => 'fas-music',
         'watch' => 'o-video-camera',
-        'read' => 'o-book-open',
-        'write' => 'o-pencil',
-        'send' => 'o-paper-airplane',
-        'receive' => 'o-inbox',
-        'download' => 'o-arrow-down-tray',
-        'upload' => 'o-arrow-up-tray',
-        'save' => 'o-bookmark',
-        'bookmark' => 'o-bookmark',
-        'favorite' => 'o-heart',
-        'rate' => 'o-star',
-        'review' => 'o-chat-bubble-left-ellipsis',
-        'subscribe' => 'o-bell',
-        'unsubscribe' => 'o-bell-slash',
-        'block' => 'o-no-symbol',
-        'unblock' => 'o-check-circle',
-        'mute' => 'o-speaker-x-mark',
-        'unmute' => 'o-speaker-wave',
-        'pin' => 'o-map-pin',
-        'unpin' => 'o-map-pin',
-        'lock' => 'o-lock-closed',
-        'unlock' => 'o-lock-open',
-        'hide' => 'o-eye-slash',
-        'show' => 'o-eye',
-        'enable' => 'o-check',
-        'disable' => 'o-x-mark',
-        'activate' => 'o-power',
-        'deactivate' => 'o-power',
-        'connect' => 'o-link',
+        'read' => 'fas-book-open',
+        'write' => 'fas-pen',
+        'send' => 'fas-paper-plane',
+        'receive' => 'fas-inbox',
+        'download' => 'fas-download',
+        'upload' => 'fas-upload',
+        'save' => 'fas-bookmark',
+        'bookmark' => 'fas-bookmark',
+        'favorite' => 'fas-heart',
+        'rate' => 'fas-star',
+        'review' => 'fas-comment-dots',
+        'subscribe' => 'fas-bell',
+        'unsubscribe' => 'fas-bell-slash',
+        'block' => 'fas-ban',
+        'unblock' => 'fas-circle-check',
+        'mute' => 'fas-volume-xmark',
+        'unmute' => 'fas-volume-high',
+        'pin' => 'fas-location-dot',
+        'unpin' => 'fas-location-dot',
+        'lock' => 'fas-lock',
+        'unlock' => 'fas-lock-open',
+        'hide' => 'fas-eye-slash',
+        'show' => 'fas-eye',
+        'enable' => 'fas-check',
+        'disable' => 'fas-xmark',
+        'activate' => 'fas-power-off',
+        'deactivate' => 'fas-power-off',
+        'connect' => 'fas-link',
         'disconnect' => 'o-link-slash',
-        'sync' => 'o-arrow-path',
-        'backup' => 'o-archive-box',
-        'restore' => 'o-arrow-path',
-        'export' => 'o-arrow-down-tray',
-        'import' => 'o-arrow-up-tray',
-        'install' => 'o-arrow-down',
-        'uninstall' => 'o-trash',
-        'upgrade' => 'o-arrow-trending-up',
-        'downgrade' => 'o-arrow-trending-down',
-        'pot' => 'o-arrow-right',
-        'add' => 'o-plus',
-        'remove' => 'o-minus',
-        'increase' => 'o-arrow-trending-up',
-        'decrease' => 'o-arrow-trending-down',
+        'sync' => 'fas-rotate',
+        'backup' => 'fas-box-archive',
+        'restore' => 'fas-rotate',
+        'export' => 'fas-download',
+        'import' => 'fas-upload',
+        'install' => 'fas-arrow-down',
+        'uninstall' => 'fas-trash',
+        'upgrade' => 'fas-arrow-trend-up',
+        'downgrade' => 'fas-arrow-trend-down',
+        'pot' => 'fas-arrow-right',
+        'add' => 'fas-plus',
+        'remove' => 'fas-minus',
+        'increase' => 'fas-arrow-trend-up',
+        'decrease' => 'fas-arrow-trend-down',
     ];
 
-    return $icons[strtolower($action)] ?? 'o-bolt';
+    return $icons[strtolower($action)] ?? 'fas-bolt';
 };
 
 $getEventColor = function ($action) {
@@ -880,7 +880,7 @@ $availableStreams = computed(function () {
             <div class="flex items-center gap-2 sm:gap-3 w-full">
                 <div class="join">
                     <x-button class="join-item btn-ghost btn-sm" wire:click="previousDay">
-                        <x-icon name="o-chevron-left" class="w-4 h-4" />
+                        <x-icon name="fas-chevron-left" class="w-4 h-4" />
                     </x-button>
                     <label class="join-item">
                         <input
@@ -890,7 +890,7 @@ $availableStreams = computed(function () {
                             @change="$wire.call('navigateToDate')" />
                     </label>
                     <x-button class="join-item btn-ghost btn-sm" wire:click="nextDay">
-                        <x-icon name="o-chevron-right" class="w-4 h-4" />
+                        <x-icon name="fas-chevron-right" class="w-4 h-4" />
                     </x-button>
                 </div>
 
@@ -915,7 +915,7 @@ $availableStreams = computed(function () {
                         wire:click="togglePollMode"
                         aria-label="{{ $this->pollMode === 'keep' ? 'Switch to visible polling' : 'Switch to keep-alive polling' }}"
                         title="{{ $this->pollMode === 'keep' ? 'Polling: keep-alive' : 'Polling: visible' }}">
-                        <x-icon name="{{ $this->pollMode === 'keep' ? 'o-bolt' : 'o-eye' }}" class="w-4 h-4" />
+                        <x-icon name="{{ $this->pollMode === 'keep' ? 'fas-bolt' : 'fas-eye' }}" class="w-4 h-4" />
                     </x-button>
                 </div>
             </div>
@@ -927,7 +927,7 @@ $availableStreams = computed(function () {
         <x-collapse x-model="dayNoteOpenState" separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
-                    <x-icon name="o-calendar" />
+                    <x-icon name="fas-calendar" />
                     <span>
                         {{ \Carbon\Carbon::parse($this->date)->format('j F Y') }}
                         @if ($this->dayNoteSaving)
@@ -940,11 +940,11 @@ $availableStreams = computed(function () {
                     <span class="ml-auto">
                         @if ($this->checkinStatus === 'green')
                         <div class="badge badge-success badge-sm gap-1">
-                            <x-icon name="o-check-circle" class="w-3 h-3" />
+                            <x-icon name="fas-circle-check" class="w-3 h-3" />
                         </div>
                         @elseif ($this->checkinStatus === 'amber')
                         <div class="badge badge-warning badge-sm gap-1">
-                            <x-icon name="o-clock" class="w-3 h-3" />
+                            <x-icon name="fas-clock" class="w-3 h-3" />
                         </div>
                         @else
                         <div class="badge badge-error badge-sm gap-1">
@@ -971,7 +971,7 @@ $availableStreams = computed(function () {
                     </div>
                 </x-card>
                 @else
-                <x-alert title="No Day Note found for this date" icon="o-book-open" />
+                <x-alert title="No Day Note found for this date" icon="fas-book-open" />
                 @endif
             </x-slot:content>
         </x-collapse>
@@ -981,7 +981,7 @@ $availableStreams = computed(function () {
         @if ($this->events->isEmpty())
         <x-card class="bg-base-200 shadow">
             <div class="text-center py-8">
-                <x-icon name="o-calendar" class="w-12 h-12 text-base-content mx-auto mb-4" />
+                <x-icon name="fas-calendar" class="w-12 h-12 text-base-content mx-auto mb-4" />
                 <h3 class="text-lg font-semibold text-base-content mb-2">No events found for this date</h3>
             </div>
         </x-card>
@@ -1250,7 +1250,7 @@ $availableStreams = computed(function () {
         <!-- Multiple streams: flower FAB -->
         <div class="dropdown dropdown-top dropdown-end">
             <div tabindex="0" role="button" class="btn btn-circle btn-lg btn-primary shadow-lg m-1">
-                <x-icon name="o-rectangle-stack" class="w-6 h-6" />
+                <x-icon name="fas-layer-group" class="w-6 h-6" />
             </div>
             <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow-xl mb-2">
                 @foreach ($this->availableStreams as $stream)

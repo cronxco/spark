@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $value = number_format($block->formatted_value ?? 0, 2);
@@ -25,7 +25,7 @@ $unit = $block->value_unit ?? 'km';
 
         {{-- Distance Display --}}
         <div class="flex items-center justify-center gap-3 py-2">
-            <x-icon name="o-map" class="w-10 h-10 text-accent" />
+            <x-icon name="fas-map" class="w-10 h-10 text-accent" />
             <div>
                 <div class="text-4xl font-bold text-accent">
                     {{ $value }} <span class="text-base">{{ $unit }}</span>
@@ -44,18 +44,18 @@ $unit = $block->value_unit ?? 'km';
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas-eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>
                     <li>
                         <a href="{{ route('events.show', $block->event) }}" wire:navigate>
-                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            <x-icon name="fas-calendar" class="w-4 h-4" />
                             View Event
                         </a>
                     </li>

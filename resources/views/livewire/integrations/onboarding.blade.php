@@ -77,7 +77,7 @@ use Carbon\Carbon;
                                 @if (collect($availableAccounts)->contains('status', 'rate_limited'))
                                     <div class="mt-2 p-3 bg-warning/20 border border-warning/30 rounded-lg">
                                         <div class="flex items-center gap-2">
-                                            <x-icon name="o-exclamation-triangle" class="text-warning" />
+                                            <x-icon name="fas-triangle-exclamation" class="text-warning" />
                                             <div class="text-sm">
                                                 <div class="font-medium text-warning">Rate Limit Notice</div>
                                                 <div class="text-warning/80">Some account details are limited due to API rate limits. Full details will be available after the rate limit resets.</div>

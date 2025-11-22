@@ -12,12 +12,12 @@
                             label="Configure"
                             link="{{ route('integrations.configure', $integration->id) }}"
                             class="btn-outline"
-                            icon="o-cog-6-tooth"
+                            icon="fas-gear"
                         />
                         <x-button
                             wire:click="toggleSidebar"
                             class="btn-ghost btn-sm">
-                            <x-icon name="o-adjustments-horizontal" class="w-5 h-5" />
+                            <x-icon name="fas-sliders" class="w-5 h-5" />
                         </x-button>
                     </div>
 
@@ -26,11 +26,11 @@
                         <x-dropdown>
                             <x-slot:trigger>
                                 <x-button class="btn-ghost btn-sm">
-                                    <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                                    <x-icon name="fas-ellipsis-vertical" class="w-5 h-5" />
                                 </x-button>
                             </x-slot:trigger>
-                            <x-menu-item title="Configure" icon="o-cog-6-tooth" link="{{ route('integrations.configure', $integration->id) }}" />
-                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="o-adjustments-horizontal" wire:click="toggleSidebar" />
+                            <x-menu-item title="Configure" icon="fas-gear" link="{{ route('integrations.configure', $integration->id) }}" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="fas-sliders" wire:click="toggleSidebar" />
                         </x-dropdown>
                     </div>
                 </x-slot:actions>
@@ -43,7 +43,7 @@
                     <div class="flex-shrink-0 self-center sm:self-start">
                         @php
                             $pluginClass = $this->getPluginClass();
-                            $icon = $pluginClass ? $pluginClass::getIcon() : 'o-link';
+                            $icon = $pluginClass ? $pluginClass::getIcon() : 'fas-link';
                         @endphp
                         <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
                             <x-icon name="{{ $icon }}" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
@@ -65,12 +65,12 @@
                         <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-sm">
                             @if ($integration->last_successful_update_at)
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-clock" class="w-4 h-4 text-base-content/60" />
+                                    <x-icon name="fas-clock" class="w-4 h-4 text-base-content/60" />
                                     <span class="text-base-content/70">Last update: {{ $integration->last_successful_update_at->diffForHumans() }}</span>
                                 </div>
                             @else
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 text-warning" />
+                                    <x-icon name="fas-triangle-exclamation" class="w-4 h-4 text-warning" />
                                     <span class="text-warning">Never updated</span>
                                 </div>
                             @endif
@@ -88,7 +88,7 @@
                         @if ($integration->getNextUpdateTime())
                             <div class="mt-4 p-3 lg:p-4 rounded-lg bg-base-300/50 border border-base-300">
                                 <div class="flex items-center gap-2 text-sm">
-                                    <x-icon name="o-arrow-path" class="w-4 h-4 text-base-content/60" />
+                                    <x-icon name="fas-rotate" class="w-4 h-4 text-base-content/60" />
                                     <span class="text-base-content/70">Next update: {{ $integration->getNextUpdateTime()->diffForHumans() }}</span>
                                 </div>
                             </div>
@@ -102,7 +102,7 @@
                 @if ($this->getActionTypes()->count() > 0)
                 <x-card class="bg-base-200 shadow">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-bolt" class="w-5 h-5 text-primary" />
+                        <x-icon name="fas-bolt" class="w-5 h-5 text-primary" />
                         Action Types
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -132,7 +132,7 @@
                 @if ($this->getObjectTypes()->count() > 0)
                 <x-card class="bg-base-200 shadow">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                        <x-icon name="fas-grip" class="w-5 h-5 text-info" />
                         Object Types
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -191,7 +191,7 @@
                 <!-- No plugin configuration -->
                 <x-card class="bg-base-200 shadow">
                     <div class="text-center py-8">
-                        <x-icon name="o-exclamation-triangle" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <x-icon name="fas-triangle-exclamation" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
                         <h3 class="text-lg font-medium text-base-content mb-2">Plugin Configuration Not Found</h3>
                         <p class="text-base-content/70">Plugin configuration not found for this integration.</p>
                     </div>
@@ -201,7 +201,7 @@
             <!-- Logs -->
             <x-card class="bg-base-200 shadow">
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="o-document-text" class="w-5 h-5 text-base-content/60" />
+                    <x-icon name="fas-file-lines" class="w-5 h-5 text-base-content/60" />
                     Logs
                 </h3>
                 <livewire:log-viewer type="integration" :entity-id="$integration->id" />
@@ -219,7 +219,7 @@
                             wire:click="exportAsJson"
                             class="btn btn-ghost btn-xs gap-1"
                             title="Export complete integration with configuration and recent events">
-                            <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                            <x-icon name="fas-download" class="w-3 h-3" />
                             <span class="hidden sm:inline">Export</span>
                         </button>
                     </div>
@@ -295,7 +295,7 @@
                                 label="Edit Configuration"
                                 link="{{ route('integrations.configure', $integration->id) }}"
                                 class="btn-outline btn-sm w-full"
-                                icon="o-pencil"
+                                icon="fas-pen"
                             />
                         </div>
                     </x-slot:content>

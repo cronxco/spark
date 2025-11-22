@@ -45,7 +45,7 @@ class OvernightStatsCard extends BaseCard
 
     public function getIcon(): string
     {
-        return 'o-moon';
+        return 'fas-moon';
     }
 
     public function getViewPath(): string

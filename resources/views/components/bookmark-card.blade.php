@@ -13,12 +13,12 @@
     }
 
     $serviceIcon = match($displayService) {
-        'fetch' => 'o-shield-check',
-        'spark' => 'o-sparkles',
-        'karakeep' => 'o-bookmark',
-        'bluesky' => 'o-cloud',
-        'reddit' => 'o-chat-bubble-left-right',
-        default => 'o-link'
+        'fetch' => 'fas-shield-halved',
+        'spark' => 'fas-wand-magic-sparkles',
+        'karakeep' => 'fas-bookmark',
+        'bluesky' => 'fas-cloud',
+        'reddit' => 'fas-comments',
+        default => 'fas-link'
     };
 
     $accentColor = match($displayService) {
@@ -121,12 +121,12 @@
             <!-- Actions dropdown -->
             <div class="dropdown dropdown-end">
                 <label tabindex="0" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
                 </label>
                 <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-52">
                     <li>
                         <a href="{{ route('events.show', $event->id) }}" wire:navigate class="text-sm gap-2">
-                            <x-icon name="o-arrow-right" class="w-4 h-4" />
+                            <x-icon name="fas-arrow-right" class="w-4 h-4" />
                             View
                         </a>
                     </li>

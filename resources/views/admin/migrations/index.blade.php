@@ -40,7 +40,7 @@
                                     @csrf
                                     <button type="submit" class="btn btn-primary"
                                             onclick="return confirm('Are you sure you want to migrate all Oura integrations? This may take several minutes.')">
-                                        <x-icon name="o-arrow-path" class="w-4 h-4" />
+                                        <x-icon name="fas-rotate" class="w-4 h-4" />
                                         Migrate All
                                     </button>
                                 </form>
@@ -74,7 +74,7 @@
                                             </select>
                                         </div>
                                         <button type="submit" class="btn btn-secondary">
-                                            <x-icon name="o-arrow-path" class="w-4 h-4" />
+                                            <x-icon name="fas-rotate" class="w-4 h-4" />
                                             Migrate Selected
                                         </button>
                                     </form>
@@ -150,7 +150,7 @@
                         </div>
 
                         <div class="alert alert-info">
-                            <x-icon name="o-information-circle" class="w-5 h-5" />
+                            <x-icon name="fas-circle-info" class="w-5 h-5" />
                             <div>
                                 <h4 class="font-semibold">Note:</h4>
                                 <p class="text-sm">This migration is safe to run multiple times. It will only update events that haven't been migrated yet.</p>

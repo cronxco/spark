@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'o-squares-2x2';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $exerciseName = $block->metadata['exercise_name'] ?? 'Exercise';
@@ -37,7 +37,7 @@ $formula = $block->metadata['volume_formula'] ?? null;
         <div class="flex items-center justify-center gap-4 text-xs text-base-content/60">
             @if ($setsCount)
             <div class="flex items-center gap-1">
-                <x-icon name="o-squares-2x2" class="w-3 h-3" />
+                <x-icon name="fas-grip" class="w-3 h-3" />
                 {{ $setsCount }} sets
             </div>
             @endif
@@ -54,18 +54,18 @@ $formula = $block->metadata['volume_formula'] ?? null;
 
             <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square">
-                    <x-icon name="o-ellipsis-vertical" class="w-4 h-4" />
+                    <x-icon name="fas-ellipsis-vertical" class="w-4 h-4" />
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
                     <li>
                         <a href="{{ route('blocks.show', $block) }}" wire:navigate>
-                            <x-icon name="o-eye" class="w-4 h-4" />
+                            <x-icon name="fas-eye" class="w-4 h-4" />
                             View Block
                         </a>
                     </li>
                     <li>
                         <a href="{{ route('events.show', $block->event) }}" wire:navigate>
-                            <x-icon name="o-calendar" class="w-4 h-4" />
+                            <x-icon name="fas-calendar" class="w-4 h-4" />
                             View Event
                         </a>
                     </li>

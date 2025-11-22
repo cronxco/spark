@@ -5,7 +5,7 @@
             <label class="label">
                 <span class="label-text">Tags</span>
                 <button type="button" wire:click="openCreateTagModal" class="btn btn-xs btn-ghost btn-circle" title="Create new tag">
-                    <x-icon name="o-plus" class="w-3 h-3" />
+                    <x-icon name="fas-plus" class="w-3 h-3" />
                 </button>
             </label>
             <div wire:key="event-tags-modal-{{ $event->id }}" wire:ignore>

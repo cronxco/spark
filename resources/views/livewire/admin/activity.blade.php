@@ -349,7 +349,7 @@ new class extends Component
                             <span class="label-text">&nbsp;</span>
                         </label>
                         <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            <x-icon name="fas-xmark" class="w-4 h-4" />
                             Clear
                         </button>
                     </div>
@@ -363,7 +363,7 @@ new class extends Component
             <x-collapse separator class="bg-base-200">
                 <x-slot:heading>
                     <div class="flex items-center gap-2">
-                        <x-icon name="o-funnel" class="w-5 h-5" />
+                        <x-icon name="fas-filter" class="w-5 h-5" />
                         Filters
                         @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
                         <x-badge value="Active" class="badge-primary badge-xs" />
@@ -426,7 +426,7 @@ new class extends Component
                         <!-- Clear Filters Button -->
                         @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
                         <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="o-x-mark" class="w-4 h-4" />
+                            <x-icon name="fas-xmark" class="w-4 h-4" />
                             Clear Filters
                         </button>
                         @endif
@@ -449,7 +449,7 @@ new class extends Component
                     class="[&_table]:!static [&_td]:!static">
                     <x-slot:empty>
                         <div class="text-center py-12">
-                            <x-icon name="o-list-bullet" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <x-icon name="fas-list" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                             <h3 class="text-lg font-medium text-base-content mb-2">No activities found</h3>
                             <p class="text-base-content/70">
                                 @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
@@ -523,7 +523,7 @@ new class extends Component
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-bold text-lg">Activity Details</h3>
                 <button class="btn btn-sm btn-circle" wire:click="closeModal">
-                    <x-icon name="o-x-mark" class="w-4 h-4" />
+                    <x-icon name="fas-xmark" class="w-4 h-4" />
                 </button>
             </div>
 
@@ -605,7 +605,7 @@ new class extends Component
                 <div class="card bg-base-200">
                     <div class="card-body">
                         <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide flex items-center gap-2">
-                            <x-icon name="o-arrow-path" class="w-4 h-4" />
+                            <x-icon name="fas-rotate" class="w-4 h-4" />
                             Changes
                         </h4>
                         <div class="mt-3">
@@ -619,7 +619,7 @@ new class extends Component
                 <div class="card bg-base-200">
                     <div class="card-body">
                         <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide flex items-center gap-2">
-                            <x-icon name="o-chat-bubble-left" class="w-4 h-4" />
+                            <x-icon name="fas-comment" class="w-4 h-4" />
                             Comment
                         </h4>
                         <div class="mt-2">
@@ -633,7 +633,7 @@ new class extends Component
                 <div class="card bg-base-200">
                     <div class="card-body">
                         <h4 class="font-semibold text-sm text-base-content/70 uppercase tracking-wide flex items-center gap-2">
-                            <x-icon name="o-document-text" class="w-4 h-4" />
+                            <x-icon name="fas-file-lines" class="w-4 h-4" />
                             Raw Properties
                         </h4>
                         <div class="mt-2">
