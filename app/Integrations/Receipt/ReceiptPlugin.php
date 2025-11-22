@@ -43,7 +43,7 @@ class ReceiptPlugin extends WebhookPlugin
 
     public static function getIcon(): string
     {
-        return 'o-document-text';
+        return 'fas.receipt';
     }
 
     public static function getAccentColor(): string
@@ -60,7 +60,7 @@ class ReceiptPlugin extends WebhookPlugin
     {
         return [
             'receipt_received_from' => [
-                'icon' => 'o-document-text',
+                'icon' => 'fas.receipt',
                 'display_name' => 'Receipt',
                 'description' => 'Receipt received from merchant',
                 'display_with_object' => true,
@@ -75,7 +75,7 @@ class ReceiptPlugin extends WebhookPlugin
     {
         return [
             'receipt_line_item' => [
-                'icon' => 'o-list-bullet',
+                'icon' => 'fas.list',
                 'display_name' => 'Line Item',
                 'description' => 'Individual receipt line item',
                 'display_with_object' => true,
@@ -83,7 +83,7 @@ class ReceiptPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'receipt_tax_summary' => [
-                'icon' => 'o-calculator',
+                'icon' => 'fas.calculator',
                 'display_name' => 'Tax Summary',
                 'description' => 'Tax breakdown',
                 'display_with_object' => true,
@@ -91,7 +91,7 @@ class ReceiptPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'receipt_payment_method' => [
-                'icon' => 'o-credit-card',
+                'icon' => 'fas.credit-card',
                 'display_name' => 'Payment Method',
                 'description' => 'How the receipt was paid',
                 'display_with_object' => true,
@@ -105,7 +105,7 @@ class ReceiptPlugin extends WebhookPlugin
     {
         return [
             'receipt_merchant' => [
-                'icon' => 'o-building-storefront',
+                'icon' => 'fas.store',
                 'display_name' => 'Receipt Merchant',
                 'description' => 'Merchant from receipt',
                 'hidden' => false,

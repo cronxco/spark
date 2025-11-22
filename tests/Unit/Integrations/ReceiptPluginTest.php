@@ -66,7 +66,7 @@ class ReceiptPluginTest extends TestCase
 
         $lineItemBlock = $blockTypes['receipt_line_item'];
         $this->assertEquals('Line Item', $lineItemBlock['display_name']);
-        $this->assertEquals('o-list-bullet', $lineItemBlock['icon']);
+        $this->assertEquals('fas.list', $lineItemBlock['icon']);
         $this->assertTrue($lineItemBlock['display_with_object']);
         $this->assertEquals('GBP', $lineItemBlock['value_unit']);
     }
@@ -80,7 +80,7 @@ class ReceiptPluginTest extends TestCase
 
         $merchant = $objectTypes['receipt_merchant'];
         $this->assertEquals('Receipt Merchant', $merchant['display_name']);
-        $this->assertEquals('o-building-storefront', $merchant['icon']);
+        $this->assertEquals('fas.store', $merchant['icon']);
     }
 
     /** @test */

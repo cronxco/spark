@@ -87,7 +87,7 @@ class RelationshipTypeRegistry
             ],
             'receipt_for' => [
                 'display_name' => 'Receipt For',
-                'icon' => 'o-document-text',
+                'icon' => 'fas.receipt',
                 'is_directional' => true,
                 'description' => 'Receipt evidence for financial transaction',
                 'supports_value' => true,

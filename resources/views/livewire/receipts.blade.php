@@ -9,10 +9,10 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
 <div>
     <x-header title="Receipts" separator>
         <x-slot:middle class="!justify-end">
-            <x-input placeholder="Search receipts..." wire:model.live.debounce="search" icon="o-magnifying-glass" clearable />
+            <x-input placeholder="Search receipts..." wire:model.live.debounce="search" icon="fas.search" clearable />
         </x-slot:middle>
         <x-slot:actions>
-            <x-button label="Clear Filters" icon="o-x-mark" wire:click="clearFilters" class="btn-ghost btn-sm" />
+            <x-button label="Clear Filters" icon="fas.xmark" wire:click="clearFilters" class="btn-ghost btn-sm" />
         </x-slot:actions>
     </x-header>
 
@@ -21,7 +21,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
         <div class="stats shadow">
             <div class="stat">
                 <div class="stat-figure text-primary">
-                    <x-icon name="o-document-text" class="w-8 h-8" />
+                    <x-icon name="fas.receipt" class="w-8 h-8" />
                 </div>
                 <div class="stat-title">Total Receipts</div>
                 <div class="stat-value text-primary">{{ $receipts->total() }}</div>
@@ -31,7 +31,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
         <div class="stats shadow">
             <div class="stat">
                 <div class="stat-figure text-success">
-                    <x-icon name="o-check-circle" class="w-8 h-8" />
+                    <x-icon name="fas.circle-check" class="w-8 h-8" />
                 </div>
                 <div class="stat-title">Matched</div>
                 <div class="stat-value text-success">
@@ -45,7 +45,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
         <div class="stats shadow">
             <div class="stat">
                 <div class="stat-figure text-warning">
-                    <x-icon name="o-exclamation-triangle" class="w-8 h-8" />
+                    <x-icon name="fas.triangle-exclamation" class="w-8 h-8" />
                 </div>
                 <div class="stat-title">Needs Review</div>
                 <div class="stat-value text-warning">
@@ -59,7 +59,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
         <div class="stats shadow">
             <div class="stat">
                 <div class="stat-figure text-info">
-                    <x-icon name="o-clock" class="w-8 h-8" />
+                    <x-icon name="fas.clock" class="w-8 h-8" />
                 </div>
                 <div class="stat-title">Unmatched</div>
                 <div class="stat-value text-info">
@@ -85,13 +85,13 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
             class="btn-sm {{ $statusFilter === 'all' ? 'btn-primary' : 'btn-ghost' }}" />
         <x-button label="Matched" wire:click="$set('statusFilter', 'matched')"
             class="btn-sm {{ $statusFilter === 'matched' ? 'btn-success' : 'btn-ghost' }}"
-            icon="o-check-circle" />
+            icon="fas.circle-check" />
         <x-button label="Needs Review" wire:click="$set('statusFilter', 'review')"
             class="btn-sm {{ $statusFilter === 'review' ? 'btn-warning' : 'btn-ghost' }}"
-            icon="o-exclamation-triangle" />
+            icon="fas.triangle-exclamation" />
         <x-button label="Unmatched" wire:click="$set('statusFilter', 'unmatched')"
             class="btn-sm {{ $statusFilter === 'unmatched' ? 'btn-info' : 'btn-ghost' }}"
-            icon="o-clock" />
+            icon="fas.clock" />
     </div>
 
     {{-- Receipts Table --}}
@@ -105,7 +105,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                 <button wire:click="sortByColumn('time')" class="flex items-center gap-1">
                                     Date
                                     @if($sortBy['column'] === 'time')
-                                        <x-icon name="o-chevron-{{ $sortBy['direction'] === 'asc' ? 'up' : 'down' }}" class="w-4 h-4" />
+                                        <x-icon name="fas.chevron-{{ $sortBy['direction'] === 'asc' ? 'up' : 'down' }}" class="w-4 h-4" />
                                     @endif
                                 </button>
                             </th>
@@ -114,7 +114,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                 <button wire:click="sortByColumn('value')" class="flex items-center gap-1">
                                     Amount
                                     @if($sortBy['column'] === 'value')
-                                        <x-icon name="o-chevron-{{ $sortBy['direction'] === 'asc' ? 'up' : 'down' }}" class="w-4 h-4" />
+                                        <x-icon name="fas.chevron-{{ $sortBy['direction'] === 'asc' ? 'up' : 'down' }}" class="w-4 h-4" />
                                     @endif
                                 </button>
                             </th>
@@ -142,7 +142,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                 </td>
                                 <td>
                                     <div class="flex items-center gap-2">
-                                        <x-icon name="o-building-storefront" class="w-4 h-4 text-base-content/60" />
+                                        <x-icon name="fas.store" class="w-4 h-4 text-base-content/60" />
                                         <a href="{{ route('objects.show', $merchant) }}" class="link link-hover font-medium">
                                             {{ $merchant?->title ?? 'Unknown Merchant' }}
                                         </a>
@@ -156,17 +156,17 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                 <td>
                                     @if($isMatched)
                                         <div class="badge badge-success gap-1">
-                                            <x-icon name="o-check-circle" class="w-3 h-3" />
+                                            <x-icon name="fas.circle-check" class="w-3 h-3" />
                                             Matched
                                         </div>
                                     @elseif($needsReview)
                                         <div class="badge badge-warning gap-1">
-                                            <x-icon name="o-exclamation-triangle" class="w-3 h-3" />
+                                            <x-icon name="fas.triangle-exclamation" class="w-3 h-3" />
                                             Review
                                         </div>
                                     @else
                                         <div class="badge badge-info gap-1">
-                                            <x-icon name="o-clock" class="w-3 h-3" />
+                                            <x-icon name="fas.clock" class="w-3 h-3" />
                                             Unmatched
                                         </div>
                                     @endif
@@ -176,24 +176,24 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                 </td>
                                 <td class="text-right">
                                     <div class="flex gap-1 justify-end">
-                                        <x-button icon="o-eye" link="{{ route('receipts.show', $receipt->id) }}"
+                                        <x-button icon="fas.eye" link="{{ route('receipts.show', $receipt->id) }}"
                                             class="btn-ghost btn-xs" tooltip="View Details" />
 
                                         @if($needsReview)
-                                            <x-button icon="o-link" wire:click="openMatchModal('{{ $receipt->id }}')"
+                                            <x-button icon="fas.link" wire:click="openMatchModal('{{ $receipt->id }}')"
                                                 class="btn-warning btn-xs" tooltip="Review Matches" />
                                         @endif
 
                                         @if($isMatched)
-                                            <x-button icon="o-x-mark" wire:click="removeMatch('{{ $receipt->id }}')"
+                                            <x-button icon="fas.xmark" wire:click="removeMatch('{{ $receipt->id }}')"
                                                 class="btn-ghost btn-xs" tooltip="Remove Match"
                                                 wire:confirm="Are you sure you want to remove this match?" />
                                         @else
-                                            <x-button icon="o-link" wire:click="openMatchModal('{{ $receipt->id }}')"
+                                            <x-button icon="fas.link" wire:click="openMatchModal('{{ $receipt->id }}')"
                                                 class="btn-ghost btn-xs" tooltip="Manual Match" />
                                         @endif
 
-                                        <x-button icon="o-trash" wire:click="deleteReceipt('{{ $receipt->id }}')"
+                                        <x-button icon="fas.trash" wire:click="deleteReceipt('{{ $receipt->id }}')"
                                             class="btn-error btn-xs" tooltip="Delete Receipt"
                                             wire:confirm="Are you sure you want to delete this receipt? This cannot be undone." />
                                     </div>
@@ -203,7 +203,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                             <tr>
                                 <td colspan="6" class="text-center py-8">
                                     <div class="flex flex-col items-center gap-2">
-                                        <x-icon name="o-inbox" class="w-12 h-12 text-base-content/30" />
+                                        <x-icon name="fas.inbox" class="w-12 h-12 text-base-content/30" />
                                         <p class="text-base-content/60">No receipts found</p>
                                         @if($search || $statusFilter !== 'all')
                                             <x-button label="Clear Filters" wire:click="clearFilters" class="btn-sm btn-ghost" />
@@ -295,7 +295,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                     </div>
                 @else
                     <div class="text-center py-4 text-base-content/60">
-                        <x-icon name="o-magnifying-glass" class="w-8 h-8 mx-auto mb-2" />
+                        <x-icon name="fas.search" class="w-8 h-8 mx-auto mb-2" />
                         <p>No matching transactions found</p>
                         <p class="text-sm">You can manually search for a transaction below</p>
                     </div>
@@ -304,7 +304,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 {{-- Manual Search --}}
                 <div>
                     <h3 class="font-semibold mb-2">Search Transactions</h3>
-                    <x-input placeholder="Search by merchant, amount, or date..." icon="o-magnifying-glass" />
+                    <x-input placeholder="Search by merchant, amount, or date..." icon="fas.search" />
                     <p class="text-xs text-base-content/60 mt-1">Feature coming soon</p>
                 </div>
             </div>

@@ -22,29 +22,29 @@ use function Livewire\Volt\{state};
             {{ $receipt->time->format('F j, Y \a\t g:i A') }}
         </x-slot:subtitle>
         <x-slot:actions>
-            <x-button label="Back to Receipts" icon="o-arrow-left" link="{{ route('receipts.index') }}" class="btn-ghost" />
+            <x-button label="Back to Receipts" icon="fas.arrow-left" link="{{ route('receipts.index') }}" class="btn-ghost" />
 
             @if($isMatched)
-                <x-button label="Remove Match" icon="o-x-mark" wire:click="removeMatch" class="btn-warning"
+                <x-button label="Remove Match" icon="fas.xmark" wire:click="removeMatch" class="btn-warning"
                     wire:confirm="Are you sure you want to remove this match?" />
             @else
-                <x-button label="Match Transaction" icon="o-link" wire:click="openMatchModal" class="btn-primary" />
+                <x-button label="Match Transaction" icon="fas.link" wire:click="openMatchModal" class="btn-primary" />
             @endif
 
             <div class="dropdown dropdown-end">
                 <label tabindex="0" class="btn btn-ghost btn-circle">
-                    <x-icon name="o-ellipsis-vertical" class="w-5 h-5" />
+                    <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                 </label>
                 <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
                     <li>
                         <a wire:click="downloadOriginalEmail">
-                            <x-icon name="o-arrow-down-tray" class="w-4 h-4" />
+                            <x-icon name="fas.download" class="w-4 h-4" />
                             Download Original Email
                         </a>
                     </li>
                     <li>
                         <a wire:click="deleteReceipt" wire:confirm="Are you sure you want to delete this receipt? This cannot be undone." class="text-error">
-                            <x-icon name="o-trash" class="w-4 h-4" />
+                            <x-icon name="fas.trash" class="w-4 h-4" />
                             Delete Receipt
                         </a>
                     </li>
@@ -63,17 +63,17 @@ use function Livewire\Volt\{state};
                         Receipt Summary
                         @if($isMatched)
                             <div class="badge badge-success gap-1">
-                                <x-icon name="o-check-circle" class="w-3 h-3" />
+                                <x-icon name="fas.circle-check" class="w-3 h-3" />
                                 Matched
                             </div>
                         @elseif($needsReview)
                             <div class="badge badge-warning gap-1">
-                                <x-icon name="o-exclamation-triangle" class="w-3 h-3" />
+                                <x-icon name="fas.triangle-exclamation" class="w-3 h-3" />
                                 Needs Review
                             </div>
                         @else
                             <div class="badge badge-info gap-1">
-                                <x-icon name="o-clock" class="w-3 h-3" />
+                                <x-icon name="fas.clock" class="w-3 h-3" />
                                 Unmatched
                             </div>
                         @endif
@@ -209,7 +209,7 @@ use function Livewire\Volt\{state};
                 <div class="card bg-success/10 border border-success">
                     <div class="card-body">
                         <h3 class="card-title text-success">
-                            <x-icon name="o-check-circle" class="w-5 h-5" />
+                            <x-icon name="fas.circle-check" class="w-5 h-5" />
                             Matched Transaction
                         </h3>
 
@@ -262,7 +262,7 @@ use function Livewire\Volt\{state};
                 <div class="card bg-warning/10 border border-warning">
                     <div class="card-body">
                         <h3 class="card-title text-warning">
-                            <x-icon name="o-exclamation-triangle" class="w-5 h-5" />
+                            <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                             Needs Review
                         </h3>
 
@@ -302,14 +302,14 @@ use function Livewire\Volt\{state};
                             @endforeach
                         </div>
 
-                        <x-button label="Match Manually" icon="o-link" wire:click="openMatchModal" class="btn-warning btn-sm mt-2" />
+                        <x-button label="Match Manually" icon="fas.link" wire:click="openMatchModal" class="btn-warning btn-sm mt-2" />
                     </div>
                 </div>
             @else
                 <div class="card bg-info/10 border border-info">
                     <div class="card-body">
                         <h3 class="card-title text-info">
-                            <x-icon name="o-clock" class="w-5 h-5" />
+                            <x-icon name="fas.clock" class="w-5 h-5" />
                             Not Matched
                         </h3>
 
@@ -317,7 +317,7 @@ use function Livewire\Volt\{state};
                             No matching transaction found. You can manually match this receipt to a transaction.
                         </p>
 
-                        <x-button label="Match Transaction" icon="o-link" wire:click="openMatchModal" class="btn-primary btn-sm mt-4" />
+                        <x-button label="Match Transaction" icon="fas.link" wire:click="openMatchModal" class="btn-primary btn-sm mt-4" />
                     </div>
                 </div>
             @endif
@@ -403,7 +403,7 @@ use function Livewire\Volt\{state};
                 {{-- Search Transactions --}}
                 <div>
                     <h3 class="font-semibold mb-2">Search Transactions</h3>
-                    <x-input placeholder="Search by merchant, amount, or date..." icon="o-magnifying-glass" />
+                    <x-input placeholder="Search by merchant, amount, or date..." icon="fas.search" />
                     <p class="text-xs text-base-content/60 mt-1">Feature coming soon - use the receipts list page for now</p>
                 </div>
             </div>
