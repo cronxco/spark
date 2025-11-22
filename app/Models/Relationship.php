@@ -202,4 +202,126 @@ class Relationship extends Model
             ->where('type', $this->type)
             ->first();
     }
+
+    // ==========================================
+    // Pending Relationship Support
+    // ==========================================
+
+    /**
+     * Check if this relationship is pending review.
+     */
+    public function isPending(): bool
+    {
+        return ($this->metadata['pending'] ?? false) === true;
+    }
+
+    /**
+     * Check if this relationship is confirmed (not pending).
+     */
+    public function isConfirmed(): bool
+    {
+        return ! $this->isPending();
+    }
+
+    /**
+     * Get the confidence score for pending relationships.
+     */
+    public function getConfidence(): ?float
+    {
+        return $this->metadata['confidence'] ?? null;
+    }
+
+    /**
+     * Get the detection strategy for pending relationships.
+     */
+    public function getDetectionStrategy(): ?string
+    {
+        return $this->metadata['detection_strategy'] ?? null;
+    }
+
+    /**
+     * Get the matching criteria for pending relationships.
+     */
+    public function getMatchingCriteria(): ?array
+    {
+        return $this->metadata['matching_criteria'] ?? null;
+    }
+
+    /**
+     * Approve a pending relationship.
+     */
+    public function approve(): self
+    {
+        $metadata = $this->metadata ?? [];
+        unset($metadata['pending']);
+        $metadata['approved_at'] = now()->toIso8601String();
+
+        $this->update(['metadata' => $metadata]);
+
+        return $this;
+    }
+
+    /**
+     * Reject a pending relationship (soft delete it).
+     */
+    public function reject(): void
+    {
+        $metadata = $this->metadata ?? [];
+        $metadata['rejected_at'] = now()->toIso8601String();
+        $this->update(['metadata' => $metadata]);
+
+        $this->delete();
+    }
+
+    /**
+     * Scope to get only pending relationships.
+     */
+    public function scopePending($query)
+    {
+        return $query->whereRaw("(metadata->>'pending')::boolean = true");
+    }
+
+    /**
+     * Scope to get only confirmed (non-pending) relationships.
+     */
+    public function scopeConfirmed($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('metadata')
+                ->orWhereRaw("metadata->>'pending' IS NULL")
+                ->orWhereRaw("(metadata->>'pending')::boolean = false");
+        });
+    }
+
+    /**
+     * Scope to get relationships above a confidence threshold.
+     */
+    public function scopeAboveConfidence($query, float $threshold)
+    {
+        return $query->whereRaw("(metadata->>'confidence')::numeric >= ?", [$threshold]);
+    }
+
+    /**
+     * Scope to get relationships for a specific detection strategy.
+     */
+    public function scopeForStrategy($query, string $strategy)
+    {
+        return $query->whereRaw("metadata->>'detection_strategy' = ?", [$strategy]);
+    }
+
+    /**
+     * Scope to get relationships between two events (either direction).
+     */
+    public function scopeBetweenEvents($query, string $eventAId, string $eventBId)
+    {
+        return $query->where('from_type', Event::class)
+            ->where('to_type', Event::class)
+            ->where(function ($q) use ($eventAId, $eventBId) {
+                $q->where(function ($inner) use ($eventAId, $eventBId) {
+                    $inner->where('from_id', $eventAId)->where('to_id', $eventBId);
+                })->orWhere(function ($inner) use ($eventAId, $eventBId) {
+                    $inner->where('from_id', $eventBId)->where('to_id', $eventAId);
+                });
+            });
+    }
 }
