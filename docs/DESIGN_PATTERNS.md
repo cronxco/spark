@@ -838,6 +838,15 @@ Use badges sparingly for:
 <x-badge value="Needs Update" class="badge-warning" />
 <x-badge value="Failed" class="badge-error" />
 
+<!-- Entity type badges (outline, neutral) -->
+<x-badge value="Event" class="badge-outline badge-xs" />
+<x-badge value="Object" class="badge-outline badge-xs" />
+<x-badge value="Block" class="badge-outline badge-xs" />
+
+<!-- Count/indicator badges (info, for numbers) -->
+<x-badge value="5" class="badge-info badge-sm" />
+<span class="indicator-item badge badge-info badge-xs">{{ $count }}</span>
+
 <!-- Category badges (outline, neutral) -->
 <x-badge value="Current Account" class="badge-outline" />
 <x-badge value="OAuth" class="badge-outline" />
@@ -859,7 +868,9 @@ Use badges sparingly for:
 
 - Most badges should be outline style
 - Filled badges only for important status (success/warning/error)
-- Use `badge-xs` for metadata
+- Entity type badges (Event/Object/Block) use `badge-outline` for neutral identification
+- Count badges use `badge-info` for informational numbers
+- Use `badge-xs` for metadata and entity types
 - Use `badge-sm` for categories (default)
 - Avoid stacking too many badges (causes visual noise)
 
