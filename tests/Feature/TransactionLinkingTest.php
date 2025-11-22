@@ -403,6 +403,88 @@ class TransactionLinkingTest extends TestCase
     }
 
     /** @test */
+    public function service_skips_when_reverse_relationship_exists(): void
+    {
+        $service = app(TransactionLinkingService::class);
+
+        $eventA = $this->createMonzoEvent([
+            'source_id' => 'tx_event_a',
+            'action' => 'card_payment_to',
+        ]);
+
+        $eventB = $this->createMonzoEvent([
+            'source_id' => 'tx_event_b',
+            'action' => 'reward_from',
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'transaction_id' => 'tx_event_a',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create relationship in reverse direction (B -> A)
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $eventA->id,
+            'to_type' => Event::class,
+            'to_id' => $eventB->id,
+            'type' => 'triggered_by',
+        ]);
+
+        // Try to process eventB which would create B -> A link
+        $result = $service->processEvent($eventB);
+
+        // Should be skipped because reverse relationship exists
+        $this->assertEquals(0, $result['created']);
+        $this->assertEquals(1, $result['skipped']);
+    }
+
+    /** @test */
+    public function service_skips_when_reverse_pending_link_exists(): void
+    {
+        $service = app(TransactionLinkingService::class);
+
+        $eventA = $this->createMonzoEvent([
+            'source_id' => 'tx_pending_a',
+            'action' => 'card_payment_to',
+        ]);
+
+        $eventB = $this->createMonzoEvent([
+            'source_id' => 'tx_pending_b',
+            'action' => 'reward_from',
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'transaction_id' => 'tx_pending_a',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create pending link in reverse direction (A -> B)
+        PendingTransactionLink::create([
+            'user_id' => $this->user->id,
+            'source_event_id' => $eventA->id,
+            'target_event_id' => $eventB->id,
+            'relationship_type' => 'triggered_by',
+            'confidence' => 75,
+            'detection_strategy' => 'test',
+            'matching_criteria' => ['type' => 'test'],
+            'status' => 'pending',
+        ]);
+
+        // Try to process eventB which would create B -> A link
+        $result = $service->processEvent($eventB);
+
+        // Should be skipped because reverse pending link exists
+        $this->assertEquals(0, $result['created']);
+        $this->assertEquals(1, $result['skipped']);
+    }
+
+    /** @test */
     public function service_returns_stats(): void
     {
         $service = app(TransactionLinkingService::class);
