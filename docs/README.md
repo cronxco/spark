@@ -33,8 +33,8 @@ Welcome to the Spark documentation. This directory contains comprehensive docume
 |----------|-------------|
 | [SPOTLIGHT.md](SPOTLIGHT.md) | Command palette search system |
 | [SEMANTIC_SEARCH.md](SEMANTIC_SEARCH.md) | Vector embedding search with pgvector |
-| [CARD_STREAMS.md](../CARD_STREAMS.md) | Instagram Stories-like card UI system |
-| [DESIGN_PATTERNS.md](../DESIGN_PATTERNS.md) | UI consistency and visual hierarchy |
+| [CARD_STREAMS.md](CARD_STREAMS.md) | Instagram Stories-like card UI system |
+| [DESIGN_PATTERNS.md](DESIGN_PATTERNS.md) | UI consistency and visual hierarchy |
 | [NOTIFICATIONS.md](NOTIFICATIONS.md) | Notification system |
 | [TAGS_USAGE.md](TAGS_USAGE.md) | Tag system usage |
 
@@ -104,7 +104,13 @@ Welcome to the Spark documentation. This directory contains comprehensive docume
 | Document | Description |
 |----------|-------------|
 | [aws-s3-setup.md](aws-s3-setup.md) | AWS S3 media storage configuration |
+
+### QA & Testing
+
+| Document | Description |
+|----------|-------------|
 | [TESTING.md](TESTING.md) | Testing guide and patterns |
+| [SPOTLIGHT_TEST.md](SPOTLIGHT_TEST.md) | Spotlight feature testing checklist |
 
 ### Reference
 
