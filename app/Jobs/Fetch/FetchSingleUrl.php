@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Fetch;
 
+use App\Integrations\Fetch\ArticleImageExtractor;
 use App\Integrations\Fetch\ContentExtractor;
 use App\Integrations\Fetch\FetchEngineManager;
 use App\Jobs\Data\Fetch\ProcessFetchedContent;
@@ -132,27 +133,8 @@ class FetchSingleUrl implements ShouldQueue
                 'method' => $method,
             ]);
 
-            // Store screenshot if available
-            if ($screenshot) {
-                try {
-                    $mediaHelper = app(MediaDownloadHelper::class);
-                    $fileName = 'screenshot-' . now()->format('Y-m-d-His') . '.png';
-
-                    $mediaHelper->attachMediaFromBase64(
-                        $screenshot,
-                        $webpage,
-                        $fileName,
-                        'screenshots'
-                    );
-
-                    Log::debug('Fetch: Screenshot saved', ['url' => $this->url]);
-                } catch (Exception $e) {
-                    Log::warning('Fetch: Failed to save screenshot', [
-                        'url' => $this->url,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
+            // Handle images based on fetch mode
+            $this->handleImages($webpage, $html, $screenshot);
 
             // Update webpage metadata with fetch method
             $metadata = $webpage->metadata ?? [];
@@ -323,5 +305,75 @@ class FetchSingleUrl implements ShouldQueue
         }
 
         $webpage->update(['metadata' => $metadata]);
+    }
+
+    /**
+     * Handle image extraction and storage based on fetch mode.
+     *
+     * - For 'once' (fetch-once): Save screenshot AND extract article image (article image is primary)
+     * - For 'recurring' (subscribed): Only extract article image, no screenshots
+     */
+    private function handleImages(EventObject $webpage, string $html, ?string $screenshot): void
+    {
+        $fetchMode = $webpage->metadata['fetch_mode'] ?? 'once';
+        $mediaHelper = app(MediaDownloadHelper::class);
+
+        Log::debug('Fetch: Handling images', [
+            'url' => $this->url,
+            'fetch_mode' => $fetchMode,
+            'has_screenshot' => ! empty($screenshot),
+        ]);
+
+        // Extract article image (for both fetch modes)
+        $articleImageUrl = ArticleImageExtractor::extract($html, $this->url);
+
+        if ($articleImageUrl) {
+            try {
+                $media = $mediaHelper->downloadAndAttachMedia(
+                    $articleImageUrl,
+                    $webpage,
+                    'article_images'
+                );
+
+                if ($media) {
+                    Log::info('Fetch: Article image saved', [
+                        'url' => $this->url,
+                        'image_url' => $articleImageUrl,
+                        'media_uuid' => $media->uuid,
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::warning('Fetch: Failed to save article image', [
+                    'url' => $this->url,
+                    'image_url' => $articleImageUrl,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } else {
+            Log::debug('Fetch: No article image found', ['url' => $this->url]);
+        }
+
+        // Store screenshot only for 'once' fetch mode (fetch-once bookmarks)
+        if ($fetchMode === 'once' && $screenshot) {
+            try {
+                $fileName = 'screenshot-' . now()->format('Y-m-d-His') . '.png';
+
+                $mediaHelper->attachMediaFromBase64(
+                    $screenshot,
+                    $webpage,
+                    $fileName,
+                    'screenshots'
+                );
+
+                Log::debug('Fetch: Screenshot saved', ['url' => $this->url]);
+            } catch (Exception $e) {
+                Log::warning('Fetch: Failed to save screenshot', [
+                    'url' => $this->url,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } elseif ($fetchMode === 'recurring' && $screenshot) {
+            Log::debug('Fetch: Skipping screenshot for recurring fetch mode', ['url' => $this->url]);
+        }
     }
 }
