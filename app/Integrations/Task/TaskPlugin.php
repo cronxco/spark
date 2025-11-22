@@ -29,7 +29,7 @@ class TaskPlugin extends ManualPlugin
 
     public static function getIcon(): string
     {
-        return 'fas.clock';
+        return 'fas-clock';
     }
 
     public static function getAccentColor(): string
