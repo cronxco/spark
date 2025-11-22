@@ -75,7 +75,7 @@ new class extends Component {
         // Use semantic search if embeddings exist
         if (!empty($this->object->embeddings)) {
             try {
-                $embedding = json_decode($this->object->embeddings, true);
+                $embedding = $this->object->embeddings;
 
                 if (is_array($embedding) && count($embedding) > 0) {
                     // Get user's integration IDs for security
@@ -119,7 +119,7 @@ new class extends Component {
         // Use semantic search if embeddings exist
         if (!empty($this->object->embeddings)) {
             try {
-                $embedding = json_decode($this->object->embeddings, true);
+                $embedding = $this->object->embeddings;
 
                 if (is_array($embedding) && count($embedding) > 0) {
                     // Get user's integration IDs for security
