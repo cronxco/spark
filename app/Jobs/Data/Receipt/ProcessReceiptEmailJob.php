@@ -51,7 +51,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
             $parsedEmail = $this->parseEmail($emailContent);
 
             // Extract receipt data using OpenAI
-            $extractor = new ReceiptExtractor();
+            $extractor = new ReceiptExtractor;
             $receiptData = $extractor->extract(
                 $parsedEmail['combined_text'],
                 $parsedEmail['subject'],

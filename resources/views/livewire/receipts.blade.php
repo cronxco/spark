@@ -104,7 +104,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                             <th>
                                 <button wire:click="sortByColumn('time')" class="flex items-center gap-1">
                                     Date
-                                    @if($sortBy['column'] === 'time')
+                                    @if ($sortBy['column'] === 'time')
                                         <x-icon name="fas.chevron-{{ $sortBy['direction'] === 'asc' ? 'up' : 'down' }}" class="w-4 h-4" />
                                     @endif
                                 </button>
@@ -113,7 +113,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                             <th>
                                 <button wire:click="sortByColumn('value')" class="flex items-center gap-1">
                                     Amount
-                                    @if($sortBy['column'] === 'value')
+                                    @if ($sortBy['column'] === 'value')
                                         <x-icon name="fas.chevron-{{ $sortBy['direction'] === 'asc' ? 'up' : 'down' }}" class="w-4 h-4" />
                                     @endif
                                 </button>
@@ -124,7 +124,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($receipts as $receipt)
+                        @forelse ($receipts as $receipt)
                             @php
                                 $merchant = $receipt->target;
                                 $metadata = $merchant?->metadata ?? [];
@@ -154,12 +154,12 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                     </span>
                                 </td>
                                 <td>
-                                    @if($isMatched)
+                                    @if ($isMatched)
                                         <div class="badge badge-success gap-1">
                                             <x-icon name="fas.circle-check" class="w-3 h-3" />
                                             Matched
                                         </div>
-                                    @elseif($needsReview)
+                                    @elseif ($needsReview)
                                         <div class="badge badge-warning gap-1">
                                             <x-icon name="fas.triangle-exclamation" class="w-3 h-3" />
                                             Review
@@ -179,12 +179,12 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                         <x-button icon="fas.eye" link="{{ route('receipts.show', $receipt->id) }}"
                                             class="btn-ghost btn-xs" tooltip="View Details" />
 
-                                        @if($needsReview)
+                                        @if ($needsReview)
                                             <x-button icon="fas.link" wire:click="openMatchModal('{{ $receipt->id }}')"
                                                 class="btn-warning btn-xs" tooltip="Review Matches" />
                                         @endif
 
-                                        @if($isMatched)
+                                        @if ($isMatched)
                                             <x-button icon="fas.xmark" wire:click="removeMatch('{{ $receipt->id }}')"
                                                 class="btn-ghost btn-xs" tooltip="Remove Match"
                                                 wire:confirm="Are you sure you want to remove this match?" />
@@ -205,7 +205,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                     <div class="flex flex-col items-center gap-2">
                                         <x-icon name="fas.inbox" class="w-12 h-12 text-base-content/30" />
                                         <p class="text-base-content/60">No receipts found</p>
-                                        @if($search || $statusFilter !== 'all')
+                                        @if ($search || $statusFilter !== 'all')
                                             <x-button label="Clear Filters" wire:click="clearFilters" class="btn-sm btn-ghost" />
                                         @endif
                                     </div>
@@ -224,7 +224,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
     </div>
 
     {{-- Manual Match Modal --}}
-    @if($showMatchModal && $selectedReceiptId)
+    @if ($showMatchModal && $selectedReceiptId)
         <x-modal wire:model="showMatchModal" title="Match Receipt to Transaction" class="backdrop-blur">
             <div class="space-y-4">
                 @php
@@ -258,16 +258,16 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 </div>
 
                 {{-- Candidate Transactions --}}
-                @if(count($candidates) > 0)
+                @if (count($candidates) > 0)
                     <div>
                         <h3 class="font-semibold mb-2">Suggested Matches</h3>
                         <div class="space-y-2">
-                            @foreach($candidates as $candidate)
+                            @foreach ($candidates as $candidate)
                                 @php
                                     $transaction = \App\Models\Event::find($candidate['transaction_id']);
                                     $confidence = $candidate['confidence'] ?? 0;
                                 @endphp
-                                @if($transaction)
+                                @if ($transaction)
                                     <div class="card bg-base-100 border border-base-300 hover:border-primary cursor-pointer"
                                         wire:click="createManualMatch('{{ $selectedReceiptId }}', '{{ $transaction->id }}')">
                                         <div class="card-body p-3">
