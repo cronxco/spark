@@ -8,11 +8,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, HasPushSubscriptions, Notifiable;
 
     /**
      * Indicates if the IDs are auto-incrementing.
@@ -227,6 +228,90 @@ class User extends Authenticatable
 
         $emailEnabled[$notificationType] = false;
         $notifications['email_enabled'] = $emailEnabled;
+        $settings['notifications'] = $notifications;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Check if push notifications are globally enabled for this user
+     */
+    public function hasPushNotificationsEnabled(): bool
+    {
+        $preferences = $this->getNotificationPreferences();
+
+        return $preferences['push_enabled'] ?? true;
+    }
+
+    /**
+     * Enable push notifications globally
+     */
+    public function enablePushNotifications(): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+        $notifications['push_enabled'] = true;
+        $settings['notifications'] = $notifications;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Disable push notifications globally
+     */
+    public function disablePushNotifications(): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+        $notifications['push_enabled'] = false;
+        $settings['notifications'] = $notifications;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Check if push notifications are enabled for a specific notification type
+     */
+    public function hasPushNotificationsEnabledForType(string $notificationType): bool
+    {
+        if (! $this->hasPushNotificationsEnabled()) {
+            return false;
+        }
+
+        $preferences = $this->getNotificationPreferences();
+        $pushTypes = $preferences['push_types'] ?? [];
+
+        // Default to true if not explicitly set
+        return $pushTypes[$notificationType] ?? true;
+    }
+
+    /**
+     * Enable push notifications for a specific notification type
+     */
+    public function enablePushNotificationsForType(string $notificationType): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+        $pushTypes = $notifications['push_types'] ?? [];
+
+        $pushTypes[$notificationType] = true;
+        $notifications['push_types'] = $pushTypes;
+        $settings['notifications'] = $notifications;
+
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Disable push notifications for a specific notification type
+     */
+    public function disablePushNotificationsForType(string $notificationType): void
+    {
+        $settings = $this->settings ?? [];
+        $notifications = $settings['notifications'] ?? [];
+        $pushTypes = $notifications['push_types'] ?? [];
+
+        $pushTypes[$notificationType] = false;
+        $notifications['push_types'] = $pushTypes;
         $settings['notifications'] = $notifications;
 
         $this->update(['settings' => $settings]);

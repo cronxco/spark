@@ -85,6 +85,14 @@ class RelationshipTypeRegistry
                 'description' => 'Transaction settles a pending authorisation',
                 'supports_value' => false,
             ],
+            'receipt_for' => [
+                'display_name' => 'Receipt For',
+                'icon' => 'fas.receipt',
+                'is_directional' => true,
+                'description' => 'Receipt evidence for financial transaction',
+                'supports_value' => true,
+                'default_value_unit' => 'GBP',
+            ],
         ];
     }
 

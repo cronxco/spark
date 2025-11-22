@@ -158,4 +158,14 @@ return [
         'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
     ],
 
+    'receipt' => [
+        'domain' => env('RECEIPT_DOMAIN', 'spark.cronx.co'),
+        'email_address' => env('RECEIPT_EMAIL_ADDRESS', 'receipts@spark.cronx.co'),
+        's3_bucket' => env('AWS_BUCKET_RECEIPTS', 'spark-receipts-emails'),
+        'sns_topic_arn' => env('AWS_SNS_RECEIPT_TOPIC_ARN'),
+        'retention_days' => 30,
+        'auto_match_threshold' => 0.8,
+        'review_threshold' => 0.5,
+    ],
+
 ];
