@@ -131,7 +131,7 @@ class MigrateIconsToFontAwesome extends Command
         $replacements = [];
 
         foreach ($mappings as $heroicon => $fontawesome) {
-            // Pattern 1: 'o-icon-name' or "o-icon-name" in strings
+            // Pattern 1: heroicon names in quoted strings (e.g., o-heart)
             $pattern = "/(['\"])(" . preg_quote($heroicon, '/') . ")(['\"])/";
             $replacement = '$1' . $fontawesome . '$3';
 
