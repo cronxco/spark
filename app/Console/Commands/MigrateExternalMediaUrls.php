@@ -6,6 +6,7 @@ use App\Jobs\Media\MigrateExternalMediaUrlJob;
 use App\Models\ActionProgress;
 use App\Models\Block;
 use App\Models\EventObject;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -14,9 +15,12 @@ class MigrateExternalMediaUrls extends Command
     protected $signature = 'media:migrate-external-urls
                             {--model= : The model to migrate (EventObject, Block, or both)}
                             {--limit= : Limit the number of records to migrate}
+                            {--user= : User ID to associate with progress tracking (required)}
                             {--dry-run : Show what would be migrated without actually migrating}';
 
     protected $description = 'Migrate external media URLs to Media Library with deduplication';
+
+    protected ?int $userId = null;
 
     public function handle(): int
     {
@@ -26,6 +30,32 @@ class MigrateExternalMediaUrls extends Command
         $modelOption = $this->option('model');
         $limit = $this->option('limit');
         $dryRun = $this->option('dry-run');
+        $userOption = $this->option('user');
+
+        // Validate user for non-dry-run
+        if (! $dryRun) {
+            if (! $userOption) {
+                // Try to get the first user if none specified
+                $user = User::first();
+                if (! $user) {
+                    $this->error('No users found. Please create a user first or specify --user=ID');
+
+                    return self::FAILURE;
+                }
+                $this->userId = $user->id;
+                $this->warn("No --user specified, using first user: {$user->name} (ID: {$user->id})");
+            } else {
+                $user = User::find($userOption);
+                if (! $user) {
+                    $this->error("User with ID {$userOption} not found.");
+
+                    return self::FAILURE;
+                }
+                $this->userId = $user->id;
+                $this->info("Using user: {$user->name} (ID: {$user->id})");
+            }
+            $this->newLine();
+        }
 
         if ($dryRun) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
@@ -72,7 +102,7 @@ class MigrateExternalMediaUrls extends Command
 
         $this->newLine();
         $this->info("✅ Migration started. Dispatched {$totalJobs} jobs to the migration queue.");
-        $this->info('💡 Monitor progress with: php artisan queue:monitor');
+        $this->info('💡 Monitor progress with: php artisan queue:work --queue=migration');
 
         return self::SUCCESS;
     }
@@ -137,7 +167,10 @@ class MigrateExternalMediaUrls extends Command
 
         // Create progress tracker
         $progress = ActionProgress::create([
-            'name' => "migrate_media_urls_{$modelName}",
+            'user_id' => $this->userId,
+            'action_type' => 'media_migration',
+            'action_id' => "migrate_media_urls_{$modelName}_" . now()->format('Y-m-d_H-i-s'),
+            'step' => 'dispatching',
             'total' => 0, // Will be updated as we dispatch jobs
             'processed' => 0,
             'status' => 'in_progress',
