@@ -6,38 +6,33 @@
 @if ($name)
     @php
         $iconClass = $attributes->merge(['class' => $size])->get('class');
-
-        // Determine icon library and normalize name
-        $library = 'heroicons'; // Default fallback
         $svgName = $name;
 
-        if (str_starts_with($name, 'fas-') || str_starts_with($name, 'far-') || str_starts_with($name, 'fab-')) {
-            // FontAwesome format: fas-icon-name, far-icon-name, fab-icon-name
-            $library = 'fontawesome';
-            $svgName = $name;
-        } elseif (str_contains($name, '.')) {
-            // Legacy FontAwesome format: fas.icon-name -> fas-icon-name
-            $library = 'fontawesome';
-            $parts = explode('.', $name, 2);
+        // Handle legacy FontAwesome format: fas.icon-name -> fas-icon-name
+        if (str_contains($svgName, '.')) {
+            $parts = explode('.', $svgName, 2);
             $svgName = $parts[0] . '-' . $parts[1];
-        } elseif (str_starts_with($name, 'o-') || str_starts_with($name, 's-')) {
-            // Heroicons format
-            $library = 'heroicons';
-            $svgName = $name;
-        } elseif (config('icons.default_library', 'heroicons') === 'fontawesome') {
-            // Bare name with FontAwesome as default -> fas-icon-name
-            $library = 'fontawesome';
-            $svgName = 'fas-' . $name;
-        } else {
-            // Bare name with Heroicons as default -> o-icon-name
-            $library = 'heroicons';
-            $svgName = 'o-' . $name;
         }
+
+        // Use the icon_name() helper to normalize icon names based on default library
+        // This handles heroicon-to-fontawesome conversion when fontawesome is the default
+        $svgName = icon_name($svgName);
+
+        // Handle bare names (no prefix) - add default prefix based on library
+        if (!preg_match('/^(fa[srbldt]|[os])-/', $svgName)) {
+            $defaultLibrary = config('icons.default_library', 'fontawesome');
+            $svgName = $defaultLibrary === 'fontawesome' ? 'fas-' . $svgName : 'o-' . $svgName;
+        }
+
+        // Determine if this is a FontAwesome or Heroicon
+        $isFontAwesome = preg_match('/^fa[srbldt]-/', $svgName);
     @endphp
 
-    @if ($library === 'fontawesome')
-        @svg($svgName, $iconClass)
+    @if ($isFontAwesome)
+        {{-- Use blade-fontawesome component syntax for FontAwesome icons --}}
+        <x-dynamic-component :component="$svgName" :class="$iconClass" />
     @else
+        {{-- Use @svg() for Heroicons (which works with blade-heroicons) --}}
         @svg($svgName, $iconClass)
     @endif
 @endif
