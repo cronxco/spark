@@ -26,7 +26,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertEquals('Karakeep', KarakeepPlugin::getDisplayName());
         $this->assertEquals('apikey', KarakeepPlugin::getServiceType());
         $this->assertEquals('knowledge', KarakeepPlugin::getDomain());
-        $this->assertEquals('o-bookmark', KarakeepPlugin::getIcon());
+        $this->assertEquals('fas.bookmark', KarakeepPlugin::getIcon());
         $this->assertEquals('warning', KarakeepPlugin::getAccentColor());
         $this->assertTrue(KarakeepPlugin::supportsMigration());
     }

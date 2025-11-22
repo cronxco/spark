@@ -25,7 +25,7 @@ class SystemMaintenance extends SparkNotification
 
     public function getIcon(): string
     {
-        return 'o-wrench-screwdriver';
+        return 'fas.screwdriver-wrench';
     }
 
     public function getColor(): string
