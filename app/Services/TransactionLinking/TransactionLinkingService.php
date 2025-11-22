@@ -9,7 +9,7 @@ use App\Services\TransactionLinking\Contracts\LinkingStrategy;
 use App\Services\TransactionLinking\Strategies\BacsRecordStrategy;
 use App\Services\TransactionLinking\Strategies\CrossProviderStrategy;
 use App\Services\TransactionLinking\Strategies\ExplicitReferenceStrategy;
-use Illuminate\Support\Collection;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class TransactionLinkingService
@@ -84,7 +84,7 @@ class TransactionLinkingService
                     $result = $this->processLink($event, $link, $userId, $strategy, $autoApproveThreshold);
                     $stats[$result]++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error('Transaction linking strategy failed', [
                     'strategy' => $strategy->getIdentifier(),
                     'event_id' => $event->id,
@@ -94,6 +94,71 @@ class TransactionLinkingService
         }
 
         return $stats;
+    }
+
+    /**
+     * Process all events for a user (batch operation).
+     *
+     * @return array{created: int, pending: int, skipped: int, processed: int}
+     */
+    public function processAllEventsForUser(
+        string $userId,
+        ?int $limit = null,
+        float $autoApproveThreshold = self::DEFAULT_AUTO_APPROVE_THRESHOLD
+    ): array {
+        $stats = ['created' => 0, 'pending' => 0, 'skipped' => 0, 'processed' => 0];
+
+        $query = Event::whereHas('integration', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->where('domain', 'money')
+            ->orderBy('time', 'desc');
+
+        if ($limit) {
+            $query->limit($limit);
+        }
+
+        $query->chunk(100, function ($events) use (&$stats, $autoApproveThreshold) {
+            foreach ($events as $event) {
+                $result = $this->processEvent($event, $autoApproveThreshold);
+                $stats['created'] += $result['created'];
+                $stats['pending'] += $result['pending'];
+                $stats['skipped'] += $result['skipped'];
+                $stats['processed']++;
+            }
+        });
+
+        return $stats;
+    }
+
+    /**
+     * Get statistics about pending links for a user.
+     */
+    public function getPendingStats(string $userId): array
+    {
+        return [
+            'total' => PendingTransactionLink::where('user_id', $userId)->pending()->count(),
+            'by_strategy' => PendingTransactionLink::where('user_id', $userId)
+                ->pending()
+                ->selectRaw('detection_strategy, COUNT(*) as count')
+                ->groupBy('detection_strategy')
+                ->pluck('count', 'detection_strategy')
+                ->toArray(),
+            'by_confidence' => [
+                'high' => PendingTransactionLink::where('user_id', $userId)
+                    ->pending()
+                    ->where('confidence', '>=', 80)
+                    ->count(),
+                'medium' => PendingTransactionLink::where('user_id', $userId)
+                    ->pending()
+                    ->whereBetween('confidence', [50, 80])
+                    ->count(),
+                'low' => PendingTransactionLink::where('user_id', $userId)
+                    ->pending()
+                    ->where('confidence', '<', 50)
+                    ->count(),
+            ],
+        ];
     }
 
     /**
@@ -170,70 +235,5 @@ class TransactionLinkingService
         ]);
 
         return 'pending';
-    }
-
-    /**
-     * Process all events for a user (batch operation).
-     *
-     * @return array{created: int, pending: int, skipped: int, processed: int}
-     */
-    public function processAllEventsForUser(
-        string $userId,
-        ?int $limit = null,
-        float $autoApproveThreshold = self::DEFAULT_AUTO_APPROVE_THRESHOLD
-    ): array {
-        $stats = ['created' => 0, 'pending' => 0, 'skipped' => 0, 'processed' => 0];
-
-        $query = Event::whereHas('integration', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        })
-            ->where('domain', 'money')
-            ->orderBy('time', 'desc');
-
-        if ($limit) {
-            $query->limit($limit);
-        }
-
-        $query->chunk(100, function ($events) use (&$stats, $autoApproveThreshold) {
-            foreach ($events as $event) {
-                $result = $this->processEvent($event, $autoApproveThreshold);
-                $stats['created'] += $result['created'];
-                $stats['pending'] += $result['pending'];
-                $stats['skipped'] += $result['skipped'];
-                $stats['processed']++;
-            }
-        });
-
-        return $stats;
-    }
-
-    /**
-     * Get statistics about pending links for a user.
-     */
-    public function getPendingStats(string $userId): array
-    {
-        return [
-            'total' => PendingTransactionLink::where('user_id', $userId)->pending()->count(),
-            'by_strategy' => PendingTransactionLink::where('user_id', $userId)
-                ->pending()
-                ->selectRaw('detection_strategy, COUNT(*) as count')
-                ->groupBy('detection_strategy')
-                ->pluck('count', 'detection_strategy')
-                ->toArray(),
-            'by_confidence' => [
-                'high' => PendingTransactionLink::where('user_id', $userId)
-                    ->pending()
-                    ->where('confidence', '>=', 80)
-                    ->count(),
-                'medium' => PendingTransactionLink::where('user_id', $userId)
-                    ->pending()
-                    ->whereBetween('confidence', [50, 80])
-                    ->count(),
-                'low' => PendingTransactionLink::where('user_id', $userId)
-                    ->pending()
-                    ->where('confidence', '<', 50)
-                    ->count(),
-            ],
-        ];
     }
 }
