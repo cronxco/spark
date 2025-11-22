@@ -155,14 +155,23 @@ class TransactionLinkingTest extends TestCase
     }
 
     /** @test */
-    public function explicit_strategy_only_processes_monzo_events(): void
+    public function explicit_strategy_only_processes_monzo_events_with_metadata(): void
     {
         $strategy = new ExplicitReferenceStrategy;
 
-        $monzoEvent = $this->createMonzoEvent();
-        $otherEvent = $this->createEvent(['service' => 'other_service']);
+        $monzoEventWithMetadata = $this->createMonzoEvent([
+            'event_metadata' => ['raw' => ['some' => 'data']],
+        ]);
+        $monzoEventWithoutMetadata = $this->createMonzoEvent([
+            'event_metadata' => [],
+        ]);
+        $otherEvent = $this->createEvent([
+            'service' => 'other_service',
+            'event_metadata' => ['raw' => ['some' => 'data']],
+        ]);
 
-        $this->assertTrue($strategy->canProcess($monzoEvent));
+        $this->assertTrue($strategy->canProcess($monzoEventWithMetadata));
+        $this->assertFalse($strategy->canProcess($monzoEventWithoutMetadata));
         $this->assertFalse($strategy->canProcess($otherEvent));
     }
 
