@@ -15,7 +15,7 @@ class MigrateIconsToFontAwesome extends Command
     protected $signature = 'icons:migrate-to-fontawesome
                             {--dry-run : Preview changes without modifying files}
                             {--path= : Specific path to scan (default: app,resources)}
-                            {--verbose : Show detailed changes for each file}';
+                            {--details : Show detailed changes for each file}';
 
     /**
      * The console command description.
@@ -30,7 +30,7 @@ class MigrateIconsToFontAwesome extends Command
     public function handle(): int
     {
         $dryRun = $this->option('dry-run');
-        $verbose = $this->option('verbose');
+        $showDetails = $this->option('details');
         $paths = $this->option('path')
             ? [$this->option('path')]
             : ['app', 'resources'];
@@ -87,7 +87,7 @@ class MigrateIconsToFontAwesome extends Command
             return 0;
         }
 
-        $this->displayResults($changes, $verbose);
+        $this->displayResults($changes, $showDetails);
 
         $this->newLine();
         $this->info("Summary: {$totalReplacements} icon references in " . count($changes) . ' files');
@@ -161,7 +161,7 @@ class MigrateIconsToFontAwesome extends Command
     /**
      * Display the results in a formatted way
      */
-    private function displayResults(array $changes, bool $verbose): void
+    private function displayResults(array $changes, bool $showDetails): void
     {
         $this->info('Files with icon changes:');
         $this->newLine();
@@ -172,7 +172,7 @@ class MigrateIconsToFontAwesome extends Command
         foreach ($changes as $file => $result) {
             $this->line("<fg=yellow>{$file}</> ({$result['count']} changes)");
 
-            if ($verbose && ! empty($result['replacements'])) {
+            if ($showDetails && ! empty($result['replacements'])) {
                 foreach ($result['replacements'] as $from => $details) {
                     $this->line("  <fg=gray>  {$from} -> {$details['to']} ({$details['count']}x)</>");
                 }
