@@ -4,6 +4,7 @@ return [
     App\Providers\AppServiceProvider::class,
     App\Providers\CardServiceProvider::class,
     App\Providers\HorizonServiceProvider::class,
+    App\Providers\IconServiceProvider::class,
     App\Providers\IntegrationServiceProvider::class,
     App\Providers\SpotlightServiceProvider::class,
     App\Providers\VoltServiceProvider::class,
