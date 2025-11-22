@@ -12,18 +12,23 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('integrations', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+        $isPgsql = DB::connection()->getDriverName() === 'pgsql';
+
+        Schema::create('integrations', function (Blueprint $table) use ($isPgsql) {
+            if ($isPgsql) {
+                $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            } else {
+                $table->uuid('id')->primary();
+            }
             $table->uuid('user_id');
             $table->text('service')->nullable();
             $table->text('name')->nullable();
             $table->text('account_id')->nullable();
             $table->text('access_token')->nullable();
             $table->text('refresh_token')->nullable();
-            $table->timestampTz('expiry')->nullable();
-            $table->timestampTz('refresh_expiry')->nullable();
-            $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestamp('expiry')->nullable();
+            $table->timestamp('refresh_expiry')->nullable();
+            $table->timestamps();
             $table->foreign('user_id')->references('id')->on('users');
         });
     }

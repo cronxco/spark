@@ -12,12 +12,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('events', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+        $isPgsql = DB::connection()->getDriverName() === 'pgsql';
+
+        Schema::create('events', function (Blueprint $table) use ($isPgsql) {
+            if ($isPgsql) {
+                $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            } else {
+                $table->uuid('id')->primary();
+            }
             $table->text('source_id');
-            $table->timestampTz('time')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestamp('time')->useCurrent();
             $table->uuid('integration_id');
-            $table->uuid('actor_id');
+            $table->uuid('actor_id')->nullable();
             $table->json('actor_metadata')->nullable();
             $table->text('service');
             $table->text('domain');
@@ -26,11 +32,10 @@ return new class extends Migration
             $table->integer('value_multiplier')->nullable();
             $table->text('value_unit')->nullable();
             $table->json('event_metadata')->nullable();
-            $table->uuid('target_id');
+            $table->uuid('target_id')->nullable();
             $table->json('target_metadata')->nullable();
             $table->text('embeddings')->nullable();
-            $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestamps();
             $table->foreign('target_id')->references('id')->on('objects');
             $table->foreign('actor_id')->references('id')->on('objects');
             $table->foreign('integration_id')->references('id')->on('integrations');

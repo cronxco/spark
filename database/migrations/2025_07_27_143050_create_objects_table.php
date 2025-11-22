@@ -12,9 +12,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('objects', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
-            $table->timestampTz('time')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+        $isPgsql = DB::connection()->getDriverName() === 'pgsql';
+
+        Schema::create('objects', function (Blueprint $table) use ($isPgsql) {
+            if ($isPgsql) {
+                $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+                $table->vector('embeddings', 3)->nullable();
+            } else {
+                $table->uuid('id')->primary();
+                $table->text('embeddings')->nullable();
+            }
+            $table->timestamp('time')->useCurrent();
             $table->uuid('integration_id');
             $table->text('concept');
             $table->text('type');
@@ -23,9 +31,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->text('url')->nullable();
             $table->text('media_url')->nullable();
-            $table->vector('embeddings', 3)->nullable();
-            $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestamps();
             $table->foreign('integration_id')->references('id')->on('integrations');
         });
     }

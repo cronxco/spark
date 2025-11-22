@@ -12,10 +12,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('blocks', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+        $isPgsql = DB::connection()->getDriverName() === 'pgsql';
+
+        Schema::create('blocks', function (Blueprint $table) use ($isPgsql) {
+            if ($isPgsql) {
+                $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            } else {
+                $table->uuid('id')->primary();
+            }
             $table->uuid('event_id')->nullable();
-            $table->timestampTz('time')->nullable();
+            $table->timestamp('time')->nullable();
             $table->uuid('integration_id');
             $table->text('title')->nullable();
             $table->text('content')->nullable();
@@ -25,8 +31,7 @@ return new class extends Migration
             $table->integer('value_multiplier')->nullable();
             $table->text('value_unit')->nullable();
             $table->text('embeddings')->nullable();
-            $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
+            $table->timestamps();
             $table->foreign('event_id')->references('id')->on('events');
             $table->foreign('integration_id')->references('id')->on('integrations');
         });
