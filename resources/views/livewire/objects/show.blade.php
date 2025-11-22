@@ -1090,7 +1090,7 @@ new class extends Component {
                             @if ($this->object->concept)
                             <x-badge class="badge badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="o-building-office" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.layer-group" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->object->concept) }}
                                 </x-slot:value>
                             </x-badge>
@@ -1099,7 +1099,7 @@ new class extends Component {
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="o-tag" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.tag" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->object->type) }}
                                 </x-slot:value>
                             </x-badge>
