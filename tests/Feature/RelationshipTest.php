@@ -330,7 +330,7 @@ class RelationshipTest extends TestCase
         $config = $relationship->getTypeConfig();
         $this->assertNotNull($config);
         $this->assertEquals('Linked To', $config['display_name']);
-        $this->assertEquals('o-link', $config['icon']);
+        $this->assertEquals('fas.link', $config['icon']);
         $this->assertTrue($config['is_directional']);
     }
 }

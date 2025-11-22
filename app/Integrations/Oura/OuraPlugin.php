@@ -613,7 +613,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'hidden' => false,
             ],
             'badminton' => [
-                'icon' => 'fas.shuttlecock',
+                'icon' => 'fas.table-tennis-paddle-ball',
                 'display_name' => 'Badminton',
                 'description' => 'Badminton workout activity',
                 'hidden' => false,
