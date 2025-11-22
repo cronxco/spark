@@ -269,7 +269,7 @@ new class extends Component {
                     <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters
                     @if (!empty($this->search) || $this->filter !== 'all')
-                        <x-badge value="Active" class="badge-primary badge-xs" />
+                        <x-badge value="Active" class="badge-success badge-xs" />
                     @endif
                 </div>
             </x-slot:heading>
@@ -534,7 +534,7 @@ new class extends Component {
                                     </a>
                                 </h3>
                                 @if (isset($instanceCounts[$plugin['identifier']]) && $instanceCounts[$plugin['identifier']] > 0)
-                                <x-badge value="{{ $instanceCounts[$plugin['identifier']] }}" class="badge-primary badge-sm" />
+                                <x-badge value="{{ $instanceCounts[$plugin['identifier']] }}" class="badge-info badge-sm" />
                                 @endif
                             </div>
                         </div>

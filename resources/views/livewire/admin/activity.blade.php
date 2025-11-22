@@ -366,7 +366,7 @@ new class extends Component
                         <x-icon name="fas.filter" class="w-5 h-5" />
                         Filters
                         @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
-                        <x-badge value="Active" class="badge-primary badge-xs" />
+                        <x-badge value="Active" class="badge-success badge-xs" />
                         @endif
                     </div>
                 </x-slot:heading>
