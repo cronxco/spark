@@ -109,19 +109,19 @@
                                 $title = $result->action;
                                 $subtitle = $result->time?->format('M j, Y g:i A');
                                 $badge = 'Event';
-                                $badgeClass = 'badge-primary';
+                                $badgeClass = 'badge-outline';
                             } elseif ($result instanceof \App\Models\EventObject) {
                                 $icon = 'o-cube';
                                 $title = $result->title;
                                 $subtitle = $result->concept . ' / ' . $result->type;
                                 $badge = 'Object';
-                                $badgeClass = 'badge-secondary';
+                                $badgeClass = 'badge-outline';
                             } elseif ($result instanceof \App\Models\Block) {
                                 $icon = 'fas.grip';
                                 $title = $result->type;
                                 $subtitle = $result->time?->format('M j, Y');
                                 $badge = 'Block';
-                                $badgeClass = 'badge-accent';
+                                $badgeClass = 'badge-outline';
                             }
                         @endphp
                         <button

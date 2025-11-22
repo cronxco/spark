@@ -75,7 +75,7 @@
 
                             {{-- Badges --}}
                             @if ($metric->unacknowledged_trends_count > 0)
-                                <div class="badge badge-primary badge-sm">
+                                <div class="badge badge-info badge-sm">
                                     {{ $metric->unacknowledged_trends_count }}
                                 </div>
                             @endif
