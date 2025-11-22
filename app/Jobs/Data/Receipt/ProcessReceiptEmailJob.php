@@ -18,8 +18,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PhpMimeMailParser\Parser as MimeParser;
 use Smalot\PdfParser\Parser as PdfParser;
+use ZBateson\MailMimeParser\MailMimeParser;
 
 class ProcessReceiptEmailJob implements ShouldQueue
 {
@@ -109,23 +109,23 @@ class ProcessReceiptEmailJob implements ShouldQueue
     /**
      * Parse email content to extract text, subject, from, etc.
      *
-     * This uses php-mime-mail-parser to parse the MIME structure
+     * This uses zbateson/mail-mime-parser to parse the MIME structure
      */
     private function parseEmail(string $emailContent): array
     {
         try {
-            // Use PhpMimeMailParser to parse the email
-            $parser = new MimeParser;
-            $parser->setText($emailContent);
+            // Use MailMimeParser to parse the email
+            $parser = new MailMimeParser;
+            $message = $parser->parse($emailContent, false);
 
             // Extract basic fields
-            $subject = $parser->getHeader('subject') ?: 'No Subject';
-            $from = $parser->getHeader('from') ?: '';
-            $date = $parser->getHeader('date') ?: now()->toRfc2822String();
+            $subject = $message->getHeaderValue('subject') ?: 'No Subject';
+            $from = $message->getHeaderValue('from') ?: '';
+            $date = $message->getHeaderValue('date') ?: now()->toRfc2822String();
 
             // Extract text content
-            $textPlain = $parser->getMessageBody('text') ?: '';
-            $textHtml = $parser->getMessageBody('html') ?: '';
+            $textPlain = $message->getTextContent() ?: '';
+            $textHtml = $message->getHtmlContent() ?: '';
 
             // Convert HTML to plain text if needed
             if ($textHtml && ! $textPlain) {
@@ -134,7 +134,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
 
             // Extract PDF attachments and parse them
             $pdfText = '';
-            $attachments = $parser->getAttachments();
+            $attachments = $message->getAllAttachmentParts();
             foreach ($attachments as $attachment) {
                 if ($attachment->getContentType() === 'application/pdf') {
                     $pdfContent = $attachment->getContent();
