@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     outputs:
       commit_sha: ${{ steps.get_sha.outputs.sha }}
     steps:
@@ -53,6 +54,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: CI
     needs: duster
+    permissions:
+      contents: read
+      pull-requests: write
 
     services:
       postgres:
@@ -85,6 +89,18 @@ jobs:
           tools: composer:v2
           coverage: xdebug
 
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -92,16 +108,13 @@ jobs:
           cache: "npm"
 
       - name: Install Node Dependencies
-        run: npm i
+        run: npm ci
 
       - name: Add Wire Credentials Loaded From ENV
         run: composer config http-basic.wire-elements-pro.composer.sh ${{ secrets.WIRE_SECRET}}
 
       - name: Copy Environment File
         run: cp .env.example .env
-
-      - name: Update composer
-        run: composer update
 
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
