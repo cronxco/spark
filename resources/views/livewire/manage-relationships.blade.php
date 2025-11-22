@@ -34,7 +34,7 @@
 
                                 // Get display info for related model
                                 if ($relatedModel instanceof \App\Models\Event) {
-                                    $icon = 'fas-calendar';
+                                    $icon = 'fas.calendar';
                                     $title = $relatedModel->action;
                                     $subtitle = $relatedModel->time?->format('M j, Y g:i A');
                                     $route = route('events.show', $relatedModel);
@@ -48,7 +48,7 @@
                                     $badgeText = 'Object';
                                     $badgeClass = 'badge-secondary';
                                 } elseif ($relatedModel instanceof \App\Models\Block) {
-                                    $icon = 'fas-grip';
+                                    $icon = 'fas.grip';
                                     $title = $relatedModel->type;
                                     $subtitle = $relatedModel->time?->format('M j, Y');
                                     $route = route('blocks.show', $relatedModel);

@@ -123,7 +123,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'fas-building-columns';
+        return 'fas.building-columns';
     }
 
     public static function getAccentColor(): string
@@ -145,7 +145,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         return [
             'made_transaction' => [
-                'icon' => 'fas-right-left',
+                'icon' => 'fas.right-left',
                 'display_name' => 'Transaction',
                 'description' => 'A bank transaction occurred',
                 'display_with_object' => true,
@@ -154,7 +154,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'payment_to' => [
-                'icon' => 'fas-arrow-right-from-bracket',
+                'icon' => 'fas.arrow-right-from-bracket',
                 'display_name' => 'Payment Out',
                 'description' => 'Money was sent from the account',
                 'display_with_object' => true,
@@ -163,7 +163,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'payment_from' => [
-                'icon' => 'fas-arrow-right-to-bracket',
+                'icon' => 'fas.arrow-right-to-bracket',
                 'display_name' => 'Payment In',
                 'description' => 'Money was received into the account',
                 'display_with_object' => true,
@@ -172,7 +172,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'had_balance' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Balance Update',
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
@@ -187,7 +187,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         return [
             'balance_snapshot' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Account Balance',
                 'description' => 'Current account balance snapshot',
                 'display_with_object' => true,
@@ -196,7 +196,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'balance_change' => [
-                'icon' => 'fas-chart-line',
+                'icon' => 'fas.chart-line',
                 'display_name' => 'Balance Change',
                 'description' => 'Details about a balance change transaction',
                 'display_with_object' => true,
@@ -205,7 +205,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'balance_info' => [
-                'icon' => 'fas-circle-info',
+                'icon' => 'fas.circle-info',
                 'display_name' => 'Balance Information',
                 'description' => 'Detailed balance information and metadata',
                 'display_with_object' => true,
@@ -214,7 +214,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'transaction_status' => [
-                'icon' => 'fas-clock',
+                'icon' => 'fas.clock',
                 'display_name' => 'Transaction Status',
                 'description' => 'Status information for transaction processing',
                 'display_with_object' => true,
@@ -228,25 +228,25 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         return [
             'day' => [
-                'icon' => 'fas-calendar-day',
+                'icon' => 'fas.calendar-day',
                 'display_name' => 'Day',
                 'description' => 'A calendar day',
                 'hidden' => false,
             ],
             'balance_snapshot' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Balance Snapshot',
                 'description' => 'A snapshot of account balance',
                 'hidden' => false,
             ],
             'bank_account' => [
-                'icon' => 'fas-credit-card',
+                'icon' => 'fas.credit-card',
                 'display_name' => 'Bank Account',
                 'description' => 'A bank account',
                 'hidden' => false,
             ],
             'transaction_counterparty' => [
-                'icon' => 'fas-user',
+                'icon' => 'fas.user',
                 'display_name' => 'Transaction Counterparty',
                 'description' => 'A transaction counterparty',
                 'hidden' => false,

@@ -20,7 +20,7 @@ class IntegrationCompleted extends SparkNotification
 
     public function getIcon(): string
     {
-        return 'fas-circle-check';
+        return 'fas.circle-check';
     }
 
     public function getColor(): string

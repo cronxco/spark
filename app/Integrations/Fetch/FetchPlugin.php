@@ -103,7 +103,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
 
     public static function getIcon(): string
     {
-        return 'fas-globe';
+        return 'fas.globe';
     }
 
     public static function getAccentColor(): string
@@ -125,7 +125,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
     {
         return [
             'fetched' => [
-                'icon' => 'fas-download',
+                'icon' => 'fas.download',
                 'display_name' => 'Fetched',
                 'description' => 'URL content was fetched',
                 'display_with_object' => true,
@@ -133,7 +133,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => true,
             ],
             'bookmarked' => [
-                'icon' => 'fas-bookmark',
+                'icon' => 'fas.bookmark',
                 'display_name' => 'Fetched',
                 'description' => 'URL was bookmarked',
                 'display_with_object' => true,
@@ -141,7 +141,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'updated' => [
-                'icon' => 'fas-rotate',
+                'icon' => 'fas.rotate',
                 'display_name' => 'Updated',
                 'description' => 'URL content was updated',
                 'display_with_object' => true,
@@ -157,7 +157,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
     {
         return [
             'fetch_summary_tweet' => [
-                'icon' => 'fas-comment',
+                'icon' => 'fas.comment',
                 'display_name' => 'Tweet Summary',
                 'description' => 'Ultra-concise 280 character summary',
                 'display_with_object' => true,
@@ -165,7 +165,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'fetch_summary_short' => [
-                'icon' => 'fas-file-lines',
+                'icon' => 'fas.file-lines',
                 'display_name' => 'Short Summary',
                 'description' => '40 word summary',
                 'display_with_object' => true,
@@ -173,7 +173,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'fetch_summary_paragraph' => [
-                'icon' => 'fas-file',
+                'icon' => 'fas.file',
                 'display_name' => 'Paragraph Summary',
                 'description' => '150 word detailed summary',
                 'display_with_object' => true,
@@ -181,7 +181,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'fetch_key_takeaways' => [
-                'icon' => 'fas-list',
+                'icon' => 'fas.list',
                 'display_name' => 'Key Takeaways',
                 'description' => '3-5 actionable bullet points',
                 'display_with_object' => true,
@@ -189,7 +189,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'fetch_tldr' => [
-                'icon' => 'fas-bolt',
+                'icon' => 'fas.bolt',
                 'display_name' => 'TL;DR',
                 'description' => 'One sentence summary',
                 'display_with_object' => true,
@@ -203,13 +203,13 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
     {
         return [
             'fetch_webpage' => [
-                'icon' => 'fas-globe',
+                'icon' => 'fas.globe',
                 'display_name' => 'Webpage',
                 'description' => 'A fetched webpage',
                 'hidden' => false,
             ],
             'fetch_user' => [
-                'icon' => 'fas-user-circle',
+                'icon' => 'fas.user-circle',
                 'display_name' => 'Fetch User',
                 'description' => 'Fetch system user',
                 'hidden' => true,

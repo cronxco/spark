@@ -36,7 +36,7 @@
                         </x-button>
                         @endif
                         <x-button wire:click="toggleSidebar" class="btn-ghost btn-sm">
-                            <x-icon name="{{ 'fas-sliders' }}" class="w-5 h-5" />
+                            <x-icon name="{{ 'fas.sliders' }}" class="w-5 h-5" />
                         </x-button>
                     </div>
 

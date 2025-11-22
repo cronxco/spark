@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas.grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $artistName = $block->metadata['artist'] ?? 'Unknown Artist';

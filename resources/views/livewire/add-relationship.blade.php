@@ -66,7 +66,7 @@
                 <div class="flex items-center gap-3 p-4 rounded-lg bg-accent/10 border-2 border-accent">
                     @php
                         if ($selectedTarget instanceof \App\Models\Event) {
-                            $icon = 'fas-calendar';
+                            $icon = 'fas.calendar';
                             $title = $selectedTarget->action;
                             $subtitle = $selectedTarget->time?->format('j M Y H:i');
                             $badge = 'Event';
@@ -76,7 +76,7 @@
                             $subtitle = $selectedTarget->concept . ' / ' . $selectedTarget->type;
                             $badge = 'Object';
                         } elseif ($selectedTarget instanceof \App\Models\Block) {
-                            $icon = 'fas-grip';
+                            $icon = 'fas.grip';
                             $title = $selectedTarget->type;
                             $subtitle = $selectedTarget->time?->format('j M Y');
                             $badge = 'Block';
@@ -105,7 +105,7 @@
                     @foreach ($searchResults as $result)
                         @php
                             if ($result instanceof \App\Models\Event) {
-                                $icon = 'fas-calendar';
+                                $icon = 'fas.calendar';
                                 $title = $result->action;
                                 $subtitle = $result->time?->format('M j, Y g:i A');
                                 $badge = 'Event';
@@ -117,7 +117,7 @@
                                 $badge = 'Object';
                                 $badgeClass = 'badge-secondary';
                             } elseif ($result instanceof \App\Models\Block) {
-                                $icon = 'fas-grip';
+                                $icon = 'fas.grip';
                                 $title = $result->type;
                                 $subtitle = $result->time?->format('M j, Y');
                                 $badge = 'Block';

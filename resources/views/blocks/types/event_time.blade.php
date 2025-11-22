@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-calendar';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas.calendar';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $time = $block->metadata['time'] ?? null;
@@ -27,7 +27,7 @@ $isStart = str_contains(strtolower($block->title), 'start');
         {{-- Time Display --}}
         @if ($time)
         <div class="flex items-center justify-center gap-3 py-2">
-            <x-icon name="{{ $isStart ? 'fas-play' : 'fas-stop' }}" class="w-10 h-10 text-info" />
+            <x-icon name="{{ $isStart ? 'fas.play' : 'fas.stop' }}" class="w-10 h-10 text-info" />
             <div>
                 <div class="text-3xl font-bold">
                     {{ \Carbon\Carbon::parse($time)->format('g:i A') }}

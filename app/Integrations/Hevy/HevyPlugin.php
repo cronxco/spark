@@ -98,7 +98,7 @@ class HevyPlugin implements IntegrationPlugin
 
     public static function getIcon(): string
     {
-        return 'fas-dumbbell';
+        return 'fas.dumbbell';
     }
 
     public static function getAccentColor(): string
@@ -120,7 +120,7 @@ class HevyPlugin implements IntegrationPlugin
     {
         return [
             'completed_workout' => [
-                'icon' => 'fas-dumbbell',
+                'icon' => 'fas.dumbbell',
                 'display_name' => 'Completed Workout',
                 'description' => 'A workout session that has been completed in Hevy',
                 'display_with_object' => true,
@@ -134,7 +134,7 @@ class HevyPlugin implements IntegrationPlugin
     {
         return [
             'exercise' => [
-                'icon' => 'fas-bolt',
+                'icon' => 'fas.bolt',
                 'display_name' => 'Exercise',
                 'description' => 'A specific exercise performed during a workout',
                 'display_with_object' => true,
@@ -142,7 +142,7 @@ class HevyPlugin implements IntegrationPlugin
                 'hidden' => false,
             ],
             'exercise_summary' => [
-                'icon' => 'fas-chart-simple',
+                'icon' => 'fas.chart-simple',
                 'display_name' => 'Exercise Summary',
                 'description' => 'Summary statistics for an exercise in a workout',
                 'display_with_object' => true,
@@ -156,13 +156,13 @@ class HevyPlugin implements IntegrationPlugin
     {
         return [
             'hevy_workout' => [
-                'icon' => 'fas-dumbbell',
+                'icon' => 'fas.dumbbell',
                 'display_name' => 'Hevy Workout',
                 'description' => 'A workout from Hevy app',
                 'hidden' => false,
             ],
             'hevy_user' => [
-                'icon' => 'fas-user',
+                'icon' => 'fas.user',
                 'display_name' => 'Hevy User',
                 'description' => 'A Hevy user account',
                 'hidden' => false,

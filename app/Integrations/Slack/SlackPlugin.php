@@ -53,7 +53,7 @@ class SlackPlugin extends WebhookPlugin
 
     public static function getIcon(): string
     {
-        return 'fab-slack';
+        return 'fab.slack';
     }
 
     public static function getAccentColor(): string
@@ -70,7 +70,7 @@ class SlackPlugin extends WebhookPlugin
     {
         return [
             'sent' => [
-                'icon' => 'fas-comment',
+                'icon' => 'fas.comment',
                 'display_name' => 'Message Sent',
                 'description' => 'A message was sent in Slack',
                 'display_with_object' => true,
@@ -78,7 +78,7 @@ class SlackPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'added' => [
-                'icon' => 'fas-heart',
+                'icon' => 'fas.heart',
                 'display_name' => 'Reaction Added',
                 'description' => 'A reaction was added to a message',
                 'display_with_object' => true,
@@ -86,7 +86,7 @@ class SlackPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'shared' => [
-                'icon' => 'fas-file',
+                'icon' => 'fas.file',
                 'display_name' => 'File Shared',
                 'description' => 'A file was shared in Slack',
                 'display_with_object' => true,
@@ -105,25 +105,25 @@ class SlackPlugin extends WebhookPlugin
     {
         return [
             'slack_user' => [
-                'icon' => 'fas-user',
+                'icon' => 'fas.user',
                 'display_name' => 'Slack User',
                 'description' => 'A Slack user account',
                 'hidden' => false,
             ],
             'slack_message' => [
-                'icon' => 'fas-comment',
+                'icon' => 'fas.comment',
                 'display_name' => 'Slack Message',
                 'description' => 'A Slack message',
                 'hidden' => false,
             ],
             'slack_reaction' => [
-                'icon' => 'fas-heart',
+                'icon' => 'fas.heart',
                 'display_name' => 'Slack Reaction',
                 'description' => 'A Slack reaction',
                 'hidden' => false,
             ],
             'slack_file' => [
-                'icon' => 'fas-file',
+                'icon' => 'fas.file',
                 'display_name' => 'Slack File',
                 'description' => 'A Slack file',
                 'hidden' => false,

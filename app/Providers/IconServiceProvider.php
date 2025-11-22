@@ -21,14 +21,14 @@ class IconServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Override the @svg directive to handle FontAwesome icons via our custom component
+        // Override the @svg directive to handle FontAwesome icons properly
         Blade::directive('svg', function ($expression) {
             return "<?php echo app('" . static::class . "')->renderSvg({$expression}); ?>";
         });
     }
 
     /**
-     * Render an SVG icon, routing FontAwesome icons through our custom handling.
+     * Render an SVG icon, routing FontAwesome icons through blade-fontawesome components.
      */
     public function renderSvg(string $name, string|array $class = ''): string
     {
@@ -37,27 +37,31 @@ class IconServiceProvider extends ServiceProvider
             $class = implode(' ', $class);
         }
 
-        // Handle legacy FontAwesome format: fas.icon-name -> fas-icon-name
-        if (str_contains($name, '.')) {
+        // Use the icon_name() helper to normalize icon names based on default library
+        // This handles heroicon-to-fontawesome conversion when fontawesome is the default
+        $name = icon_name($name);
+
+        // Convert FontAwesome dot notation to dash notation for component rendering
+        // e.g., fas.bars -> fas-bars (required by blade-fontawesome)
+        if (str_contains($name, '.') && preg_match('/^fa[srbldt]\./', $name)) {
             $parts = explode('.', $name, 2);
             $name = $parts[0] . '-' . $parts[1];
         }
 
-        // Use the icon_name() helper to normalize icon names based on default library
-        $name = icon_name($name);
-
         // Handle bare names (no prefix) - add default prefix based on library
-        if (! preg_match('/^(fa[srbldt]|[os]|heroicon)-/', $name)) {
+        if (! preg_match('/^(fa[srbldt][\.-]|[os]-)/', $name)) {
             $defaultLibrary = config('icons.default_library', 'fontawesome');
             $name = $defaultLibrary === 'fontawesome' ? 'fas-' . $name : 'o-' . $name;
         }
 
         // Check if this is a FontAwesome icon
         if (preg_match('/^fa[srbldt]-/', $name)) {
-            // Use blade-fontawesome's svg helper directly
-            // The blade-fontawesome package registers components like <x-fas-icon>
-            // We can render it as a component
-            return view('components.icon', ['name' => $name, 'size' => $class])->render();
+            // Render FontAwesome icons using Blade component syntax
+            // This bypasses blade-icons factory and uses blade-fontawesome components directly
+            // e.g., fas-bars becomes <x-fas-bars class="..." />
+            $classAttr = $class ? ' class="' . e($class) . '"' : '';
+
+            return Blade::render('<x-' . $name . $classAttr . ' />');
         }
 
         // For heroicons and other icons, use the default blade-icons factory

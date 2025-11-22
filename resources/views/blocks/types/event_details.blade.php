@@ -4,7 +4,7 @@
 use App\Integrations\PluginRegistry;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-calendar';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas.calendar';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 $status = $block->metadata['status'] ?? null;

@@ -115,7 +115,7 @@ class MonzoPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'fas-credit-card';
+        return 'fas.credit-card';
     }
 
     public static function getAccentColor(): string
@@ -137,7 +137,7 @@ class MonzoPlugin extends OAuthPlugin
     {
         return [
             'had_balance' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Balance Update',
                 'description' => 'Account balance was updated',
                 'display_with_object' => true,
@@ -146,7 +146,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => true,
             ],
             'salary_received_from' => [
-                'icon' => 'fas-money-bills',
+                'icon' => 'fas.money-bills',
                 'display_name' => 'Salary Received',
                 'description' => 'Salary payment received from employer',
                 'display_with_object' => true,
@@ -155,7 +155,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'declined_payment_to' => [
-                'icon' => 'fas-circle-xmark',
+                'icon' => 'fas.circle-xmark',
                 'display_name' => 'Declined Payment',
                 'description' => 'Card payment was declined',
                 'display_with_object' => true,
@@ -164,7 +164,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'card_payment_to' => [
-                'icon' => 'fas-credit-card',
+                'icon' => 'fas.credit-card',
                 'display_name' => 'Card Payment',
                 'description' => 'Payment made with Monzo card',
                 'display_with_object' => true,
@@ -173,7 +173,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'card_refund_from' => [
-                'icon' => 'fas-rotate-left',
+                'icon' => 'fas.rotate-left',
                 'display_name' => 'Card Refund',
                 'description' => 'Refund received on Monzo card',
                 'display_with_object' => true,
@@ -182,7 +182,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'pot_transfer_to' => [
-                'icon' => 'fas-piggy-bank',
+                'icon' => 'fas.piggy-bank',
                 'display_name' => 'Pot Transfer',
                 'description' => 'Money transferred to a Monzo pot',
                 'display_with_object' => true,
@@ -191,7 +191,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'pot_withdrawal_to' => [
-                'icon' => 'fas-piggy-bank',
+                'icon' => 'fas.piggy-bank',
                 'display_name' => 'Pot Withdrawal',
                 'description' => 'Money withdrawn from a Monzo pot',
                 'display_with_object' => true,
@@ -200,7 +200,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'interest_repaid' => [
-                'icon' => 'fas-percent',
+                'icon' => 'fas.percent',
                 'display_name' => 'Interest Repaid',
                 'description' => 'Interest payment made',
                 'display_with_object' => true,
@@ -209,7 +209,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'interest_earned' => [
-                'icon' => 'fas-percent',
+                'icon' => 'fas.percent',
                 'display_name' => 'Interest Earned',
                 'description' => 'Interest received',
                 'display_with_object' => true,
@@ -218,7 +218,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'monzo_flex_payment' => [
-                'icon' => 'fas-money-bill-transfer',
+                'icon' => 'fas.money-bill-transfer',
                 'display_name' => 'Monzo Flex Payment',
                 'description' => 'Payment made for Monzo Flex',
                 'display_with_object' => true,
@@ -227,7 +227,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'monzo_flex_loan' => [
-                'icon' => 'fas-hand-holding-dollar',
+                'icon' => 'fas.hand-holding-dollar',
                 'display_name' => 'Monzo Flex Loan',
                 'description' => 'Money borrowed via Monzo Flex',
                 'display_with_object' => true,
@@ -236,7 +236,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'direct_debit_to' => [
-                'icon' => 'fas-repeat',
+                'icon' => 'fas.repeat',
                 'display_name' => 'Direct Debit',
                 'description' => 'Direct debit payment',
                 'display_with_object' => true,
@@ -245,7 +245,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'direct_credit_from' => [
-                'icon' => 'fas-money-bill-transfer',
+                'icon' => 'fas.money-bill-transfer',
                 'display_name' => 'Direct Credit',
                 'description' => 'Direct credit received',
                 'display_with_object' => true,
@@ -254,7 +254,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'monzo_me_to' => [
-                'icon' => 'fas-user-minus',
+                'icon' => 'fas.user-minus',
                 'display_name' => 'Monzo Me Sent',
                 'description' => 'Money sent via Monzo Me',
                 'display_with_object' => true,
@@ -263,7 +263,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'monzo_me_from' => [
-                'icon' => 'fas-user-plus',
+                'icon' => 'fas.user-plus',
                 'display_name' => 'Monzo Me Received',
                 'description' => 'Money received via Monzo Me',
                 'display_with_object' => true,
@@ -272,7 +272,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'bank_transfer_to' => [
-                'icon' => 'fas-building-columns',
+                'icon' => 'fas.building-columns',
                 'display_name' => 'Bank Transfer Sent',
                 'description' => 'Money sent via bank transfer',
                 'display_with_object' => true,
@@ -281,7 +281,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'bank_transfer_from' => [
-                'icon' => 'fas-building-columns',
+                'icon' => 'fas.building-columns',
                 'display_name' => 'Bank Transfer Received',
                 'description' => 'Money received via bank transfer',
                 'display_with_object' => true,
@@ -290,7 +290,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'fee_paid_for' => [
-                'icon' => 'fas-circle-minus',
+                'icon' => 'fas.circle-minus',
                 'display_name' => 'Fee Paid',
                 'description' => 'Fee charged by Monzo',
                 'display_with_object' => true,
@@ -299,7 +299,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'fee_refunded_for' => [
-                'icon' => 'fas-circle-plus',
+                'icon' => 'fas.circle-plus',
                 'display_name' => 'Fee Refunded',
                 'description' => 'Fee refunded by Monzo',
                 'display_with_object' => true,
@@ -308,7 +308,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'other_debit_to' => [
-                'icon' => 'fas-minus',
+                'icon' => 'fas.minus',
                 'display_name' => 'Other Debit',
                 'description' => 'Other outgoing transaction',
                 'display_with_object' => true,
@@ -317,7 +317,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'other_credit_from' => [
-                'icon' => 'fas-plus',
+                'icon' => 'fas.plus',
                 'display_name' => 'Other Credit',
                 'description' => 'Other incoming transaction',
                 'display_with_object' => true,
@@ -332,7 +332,7 @@ class MonzoPlugin extends OAuthPlugin
     {
         return [
             'balance' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Balance',
                 'description' => 'Account balance information',
                 'display_with_object' => true,
@@ -340,7 +340,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'spent_today' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Spent Today',
                 'description' => 'Amount spent today for this account',
                 'display_with_object' => true,
@@ -349,7 +349,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'balance_change' => [
-                'icon' => 'fas-rotate',
+                'icon' => 'fas.rotate',
                 'display_name' => 'Balance Change',
                 'description' => 'Change in balance since previous day',
                 'display_with_object' => true,
@@ -358,7 +358,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'pot' => [
-                'icon' => 'fas-piggy-bank',
+                'icon' => 'fas.piggy-bank',
                 'display_name' => 'Pot',
                 'description' => 'Monzo savings pot information',
                 'display_with_object' => true,
@@ -366,7 +366,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'foreign_exchange' => [
-                'icon' => 'fas-globe',
+                'icon' => 'fas.globe',
                 'display_name' => 'Foreign Exchange',
                 'description' => 'Local vs transaction currency breakdown',
                 'display_with_object' => true,
@@ -374,7 +374,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'virtual_card' => [
-                'icon' => 'fas-credit-card',
+                'icon' => 'fas.credit-card',
                 'display_name' => 'Virtual Card',
                 'description' => 'Virtual card details used for this payment',
                 'display_with_object' => true,
@@ -382,7 +382,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'bank_transfer' => [
-                'icon' => 'fas-building-columns',
+                'icon' => 'fas.building-columns',
                 'display_name' => 'Bank Transfer',
                 'description' => 'External bank transfer details',
                 'display_with_object' => true,
@@ -391,7 +391,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'transaction' => [
-                'icon' => 'fas-rotate',
+                'icon' => 'fas.rotate',
                 'display_name' => 'Transaction',
                 'description' => 'Transaction information',
                 'display_with_object' => true,
@@ -399,7 +399,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'merchant' => [
-                'icon' => 'fas-store',
+                'icon' => 'fas.store',
                 'display_name' => 'Merchant',
                 'description' => 'Merchant information for transaction',
                 'display_with_object' => true,
@@ -407,7 +407,7 @@ class MonzoPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'pot_transfer' => [
-                'icon' => 'fas-piggy-bank',
+                'icon' => 'fas.piggy-bank',
                 'display_name' => 'Pot Transfer',
                 'description' => 'Money transfer to or from a Monzo pot',
                 'display_with_object' => true,
@@ -422,31 +422,31 @@ class MonzoPlugin extends OAuthPlugin
     {
         return [
             'monzo_counterparty' => [
-                'icon' => 'fas-user',
+                'icon' => 'fas.user',
                 'display_name' => 'Counterparty',
                 'description' => 'A Monzo transaction counterparty',
                 'hidden' => false,
             ],
             'monzo_account' => [
-                'icon' => 'fas-credit-card',
+                'icon' => 'fas.credit-card',
                 'display_name' => 'Monzo Account',
                 'description' => 'A Monzo bank account',
                 'hidden' => false,
             ],
             'day' => [
-                'icon' => 'fas-calendar-day',
+                'icon' => 'fas.calendar-day',
                 'display_name' => 'Day',
                 'description' => 'A calendar day',
                 'hidden' => false,
             ],
             'monzo_pot' => [
-                'icon' => 'fas-piggy-bank',
+                'icon' => 'fas.piggy-bank',
                 'display_name' => 'Monzo Pot',
                 'description' => 'An active Monzo savings pot',
                 'hidden' => false,
             ],
             'monzo_archived_pot' => [
-                'icon' => 'fas-box-archive',
+                'icon' => 'fas.box-archive',
                 'display_name' => 'Archived Monzo Pot',
                 'description' => 'A deleted or archived Monzo savings pot',
                 'hidden' => false,

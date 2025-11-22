@@ -26,7 +26,7 @@ class IntegrationFailed extends SparkNotification
 
     public function getIcon(): string
     {
-        return 'fas-circle-xmark';
+        return 'fas.circle-xmark';
     }
 
     public function getColor(): string

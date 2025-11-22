@@ -13,12 +13,12 @@
     }
 
     $serviceIcon = match($displayService) {
-        'fetch' => 'fas-shield-halved',
-        'spark' => 'fas-wand-magic-sparkles',
-        'karakeep' => 'fas-bookmark',
-        'bluesky' => 'fas-cloud',
-        'reddit' => 'fas-comments',
-        default => 'fas-link'
+        'fetch' => 'fas.shield-halved',
+        'spark' => 'fas.wand-magic-sparkles',
+        'karakeep' => 'fas.bookmark',
+        'bluesky' => 'fas.cloud',
+        'reddit' => 'fas.comments',
+        default => 'fas.link'
     };
 
     $accentColor = match($displayService) {

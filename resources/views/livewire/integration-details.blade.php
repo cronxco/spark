@@ -43,7 +43,7 @@
                     <div class="flex-shrink-0 self-center sm:self-start">
                         @php
                             $pluginClass = $this->getPluginClass();
-                            $icon = $pluginClass ? $pluginClass::getIcon() : 'fas-link';
+                            $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.link';
                         @endphp
                         <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
                             <x-icon name="{{ $icon }}" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />

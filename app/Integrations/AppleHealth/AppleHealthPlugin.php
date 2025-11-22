@@ -65,7 +65,7 @@ class AppleHealthPlugin extends WebhookPlugin
 
     public static function getIcon(): string
     {
-        return 'fab-apple';
+        return 'fab.apple';
     }
 
     public static function getAccentColor(): string
@@ -82,7 +82,7 @@ class AppleHealthPlugin extends WebhookPlugin
     {
         return [
             'did_workout' => [
-                'icon' => 'fas-fire',
+                'icon' => 'fas.fire',
                 'display_name' => 'Did Workout',
                 'description' => 'A workout session completed by the user',
                 'display_with_object' => false,
@@ -92,7 +92,7 @@ class AppleHealthPlugin extends WebhookPlugin
             ],
             // Health Metrics
             'had_environmental_audio_exposure' => [
-                'icon' => 'fas-volume-high',
+                'icon' => 'fas.volume-high',
                 'display_name' => 'Had Environmental Audio Exposure',
                 'description' => 'Environmental audio exposure measurement',
                 'display_with_object' => false,
@@ -101,7 +101,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_heart_rate' => [
-                'icon' => 'fas-heart-pulse',
+                'icon' => 'fas.heart-pulse',
                 'display_name' => 'Had Heart Rate',
                 'description' => 'Heart rate measurement',
                 'display_with_object' => false,
@@ -110,7 +110,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_walking_speed' => [
-                'icon' => 'fas-person-walking',
+                'icon' => 'fas.person-walking',
                 'display_name' => 'Had Walking Speed',
                 'description' => 'Walking speed measurement',
                 'display_with_object' => false,
@@ -119,7 +119,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_walking_heart_rate_average' => [
-                'icon' => 'fas-heart-pulse',
+                'icon' => 'fas.heart-pulse',
                 'display_name' => 'Had Walking Heart Rate Average',
                 'description' => 'Average heart rate while walking',
                 'display_with_object' => false,
@@ -128,7 +128,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_basal_energy_burned' => [
-                'icon' => 'fas-fire',
+                'icon' => 'fas.fire',
                 'display_name' => 'Had Basal Energy Burned',
                 'description' => 'Basal energy expenditure measurement',
                 'display_with_object' => false,
@@ -137,7 +137,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_resting_heart_rate' => [
-                'icon' => 'fas-heart-pulse',
+                'icon' => 'fas.heart-pulse',
                 'display_name' => 'Had Resting Heart Rate',
                 'description' => 'Resting heart rate measurement',
                 'display_with_object' => false,
@@ -146,7 +146,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_breathing_disturbances' => [
-                'icon' => 'fas-lungs',
+                'icon' => 'fas.lungs',
                 'display_name' => 'Had Breathing Disturbances',
                 'description' => 'Sleep breathing disturbances measurement',
                 'display_with_object' => false,
@@ -154,7 +154,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_stair_speed_down' => [
-                'icon' => 'fas-stairs',
+                'icon' => 'fas.stairs',
                 'display_name' => 'Had Stair Speed Down',
                 'description' => 'Speed going down stairs',
                 'display_with_object' => false,
@@ -163,7 +163,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_headphone_audio_exposure' => [
-                'icon' => 'fas-headphones',
+                'icon' => 'fas.headphones',
                 'display_name' => 'Had Headphone Audio Exposure',
                 'description' => 'Audio exposure through headphones',
                 'display_with_object' => false,
@@ -172,7 +172,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_active_energy' => [
-                'icon' => 'fas-bolt',
+                'icon' => 'fas.bolt',
                 'display_name' => 'Had Active Energy',
                 'description' => 'Active energy burned measurement',
                 'display_with_object' => false,
@@ -181,7 +181,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_flights_climbed' => [
-                'icon' => 'fas-stairs',
+                'icon' => 'fas.stairs',
                 'display_name' => 'Had Flights Climbed',
                 'description' => 'Number of flights of stairs climbed',
                 'display_with_object' => false,
@@ -190,7 +190,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_walking_step_length' => [
-                'icon' => 'fas-person-walking',
+                'icon' => 'fas.person-walking',
                 'display_name' => 'Had Walking Step Length',
                 'description' => 'Average length of walking steps',
                 'display_with_object' => false,
@@ -199,7 +199,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_stair_speed_up' => [
-                'icon' => 'fas-stairs',
+                'icon' => 'fas.stairs',
                 'display_name' => 'Had Stair Speed Up',
                 'description' => 'Speed going up stairs',
                 'display_with_object' => false,
@@ -208,7 +208,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_walking_asymmetry_percentage' => [
-                'icon' => 'fas-weight-scale',
+                'icon' => 'fas.weight-scale',
                 'display_name' => 'Had Walking Asymmetry Percentage',
                 'description' => 'Walking gait asymmetry measurement',
                 'display_with_object' => false,
@@ -217,7 +217,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_apple_sleeping_wrist_temperature' => [
-                'icon' => 'fas-sun',
+                'icon' => 'fas.sun',
                 'display_name' => 'Had Apple Sleeping Wrist Temperature',
                 'description' => 'Wrist temperature during sleep',
                 'display_with_object' => false,
@@ -226,7 +226,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_walking_double_support_percentage' => [
-                'icon' => 'fas-weight-scale',
+                'icon' => 'fas.weight-scale',
                 'display_name' => 'Had Walking Double Support Percentage',
                 'description' => 'Percentage of walking cycle with both feet on ground',
                 'display_with_object' => false,
@@ -235,7 +235,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_vo2_max' => [
-                'icon' => 'fas-heart-pulse',
+                'icon' => 'fas.heart-pulse',
                 'display_name' => 'Had VO2 Max',
                 'description' => 'Maximum oxygen consumption measurement',
                 'display_with_object' => false,
@@ -244,7 +244,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_respiratory_rate' => [
-                'icon' => 'fas-lungs',
+                'icon' => 'fas.lungs',
                 'display_name' => 'Had Respiratory Rate',
                 'description' => 'Breathing rate measurement',
                 'display_with_object' => false,
@@ -253,7 +253,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_apple_exercise_time' => [
-                'icon' => 'fas-clock',
+                'icon' => 'fas.clock',
                 'display_name' => 'Had Apple Exercise Time',
                 'description' => 'Exercise time tracked by Apple Watch',
                 'display_with_object' => false,
@@ -262,7 +262,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_time_in_daylight' => [
-                'icon' => 'fas-sun',
+                'icon' => 'fas.sun',
                 'display_name' => 'Had Time in Daylight',
                 'description' => 'Time spent in daylight',
                 'display_with_object' => false,
@@ -271,7 +271,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_walking_running_distance' => [
-                'icon' => 'fas-route',
+                'icon' => 'fas.route',
                 'display_name' => 'Had Walking + Running Distance',
                 'description' => 'Distance covered walking and running',
                 'display_with_object' => false,
@@ -280,7 +280,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_physical_effort' => [
-                'icon' => 'fas-bolt',
+                'icon' => 'fas.bolt',
                 'display_name' => 'Had Physical Effort',
                 'description' => 'Physical effort measurement',
                 'display_with_object' => false,
@@ -288,7 +288,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_step_count' => [
-                'icon' => 'fas-shoe-prints',
+                'icon' => 'fas.shoe-prints',
                 'display_name' => 'Had Step Count',
                 'description' => 'Number of steps taken',
                 'display_with_object' => false,
@@ -297,7 +297,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_blood_oxygen_saturation' => [
-                'icon' => 'fas-droplet',
+                'icon' => 'fas.droplet',
                 'display_name' => 'Had Blood Oxygen Saturation',
                 'description' => 'Blood oxygen saturation level',
                 'display_with_object' => false,
@@ -306,7 +306,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_heart_rate_variability' => [
-                'icon' => 'fas-chart-simple',
+                'icon' => 'fas.chart-simple',
                 'display_name' => 'Had Heart Rate Variability',
                 'description' => 'Heart rate variability measurement',
                 'display_with_object' => false,
@@ -315,7 +315,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_apple_stand_hour' => [
-                'icon' => 'fas-circle-up',
+                'icon' => 'fas.circle-up',
                 'display_name' => 'Had Apple Stand Hour',
                 'description' => 'Stand hours tracked by Apple Watch',
                 'display_with_object' => false,
@@ -324,7 +324,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_six_minute_walking_test_distance' => [
-                'icon' => 'fas-route',
+                'icon' => 'fas.route',
                 'display_name' => 'Had Six Minute Walking Test Distance',
                 'description' => 'Distance covered in 6-minute walking test',
                 'display_with_object' => false,
@@ -333,7 +333,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'hidden' => false,
             ],
             'had_apple_stand_time' => [
-                'icon' => 'fas-clock',
+                'icon' => 'fas.clock',
                 'display_name' => 'Had Apple Stand Time',
                 'description' => 'Stand time tracked by Apple Watch',
                 'display_with_object' => false,
@@ -353,31 +353,31 @@ class AppleHealthPlugin extends WebhookPlugin
     {
         return [
             'apple_health_user' => [
-                'icon' => 'fas-heart-pulse',
+                'icon' => 'fas.heart-pulse',
                 'display_name' => 'Apple Health User',
                 'description' => 'User profile in Apple Health',
                 'hidden' => true,
             ],
             'apple_metric' => [
-                'icon' => 'fas-chart-simple',
+                'icon' => 'fas.chart-simple',
                 'display_name' => 'Apple Metric',
                 'description' => 'Health metric from Apple Health',
                 'hidden' => true,
             ],
             'apple_workout' => [
-                'icon' => 'fas-fire',
+                'icon' => 'fas.fire',
                 'display_name' => 'Apple Workout',
                 'description' => 'Workout from Apple Health',
                 'hidden' => true,
             ],
             'workout' => [
-                'icon' => 'fas-fire',
+                'icon' => 'fas.fire',
                 'display_name' => 'Workout',
                 'description' => 'Workout data type',
                 'hidden' => true,
             ],
             'metric' => [
-                'icon' => 'fas-chart-simple',
+                'icon' => 'fas.chart-simple',
                 'display_name' => 'Metric',
                 'description' => 'Metric data type',
                 'hidden' => true,

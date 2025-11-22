@@ -122,16 +122,16 @@ new class extends Component {
     public function getActionIcon(string $actionType): string
     {
         return match ($actionType) {
-            'migration' => 'fas-rotate',
-            'deletion' => 'fas-trash',
-            'sync' => 'fas-repeat',
-            'backup' => 'fas-box-archive',
-            'export' => 'fas-download',
-            'import' => 'fas-upload',
+            'migration' => 'fas.rotate',
+            'deletion' => 'fas.trash',
+            'sync' => 'fas.repeat',
+            'backup' => 'fas.box-archive',
+            'export' => 'fas.download',
+            'import' => 'fas.upload',
             'bulk_operation' => 'o-queue-list',
             'report' => 'o-document-chart-bar',
             'maintenance' => 'o-wrench-screwdriver',
-            default => 'fas-gear',
+            default => 'fas.gear',
         };
     }
 
@@ -373,7 +373,7 @@ new class extends Component {
                     @foreach ($unreadNotifications as $notification)
                     @php
                     $data = $notification->data;
-                    $iconName = $data['icon'] ?? 'fas-bell';
+                    $iconName = $data['icon'] ?? 'fas.bell';
                     $color = $data['color'] ?? 'primary';
                     $title = $data['title'] ?? 'Notification';
                     $message = $data['message'] ?? '';
@@ -648,7 +648,7 @@ new class extends Component {
                 @foreach ($unreadNotifications as $notification)
                 @php
                 $data = $notification->data;
-                $iconName = $data['icon'] ?? 'fas-bell';
+                $iconName = $data['icon'] ?? 'fas.bell';
                 $color = $data['color'] ?? 'primary';
                 $title = $data['title'] ?? 'Notification';
                 $message = $data['message'] ?? '';
