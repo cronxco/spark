@@ -147,20 +147,34 @@ class ReceiptTransactionMatcherTest extends TestCase
     /** @test */
     public function it_handles_receipt_without_target_when_flagging()
     {
+        // Create a receipt with a target
+        $merchant = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'merchant',
+            'type' => 'receipt_merchant',
+            'title' => 'Test Merchant',
+        ]);
+
         $receipt = Event::factory()->create([
             'integration_id' => $this->integration->id,
             'service' => 'receipt',
             'domain' => 'money',
             'action' => 'receipt_received_from',
-            'target_id' => null,
+            'target_id' => $merchant->id,
             'value' => 1500,
             'value_unit' => 'GBP',
         ]);
 
-        // Should not throw an exception
+        // Manually set target relation to null to simulate edge case
+        // (the database has NOT NULL constraint, but we test the method's null handling)
+        $receipt->setRelation('target', null);
+
+        // Should not throw an exception when target relation returns null
         $this->matcher->flagForReview($receipt, collect());
 
-        $this->assertTrue(true); // If we get here, the method handled null target gracefully
+        // Since target was null in the relation, no metadata update should occur
+        $merchant->refresh();
+        $this->assertArrayNotHasKey('needs_review', $merchant->metadata ?? []);
     }
 
     /** @test */
@@ -372,5 +386,67 @@ class ReceiptTransactionMatcherTest extends TestCase
         $receiptMerchant->refresh();
         $this->assertTrue($receiptMerchant->metadata['is_matched']);
         $this->assertEquals($transaction->id, $receiptMerchant->metadata['matched_transaction_id']);
+    }
+
+    /** @test */
+    public function it_creates_receipt_relationship_with_correct_value_fields()
+    {
+        $receiptMerchant = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'merchant',
+            'type' => 'receipt_merchant',
+            'title' => 'Test Merchant',
+            'metadata' => [],
+        ]);
+
+        $receipt = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'receipt',
+            'domain' => 'money',
+            'action' => 'receipt_received_from',
+            'target_id' => $receiptMerchant->id,
+            'value' => 2500,
+            'value_unit' => 'USD',
+        ]);
+
+        $monzoGroup = IntegrationGroup::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'monzo',
+        ]);
+        $monzoIntegration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $monzoGroup->id,
+            'service' => 'monzo',
+        ]);
+
+        $txnMerchant = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'merchant',
+            'type' => 'monzo_merchant',
+            'title' => 'Test Merchant',
+        ]);
+
+        $transaction = Event::factory()->create([
+            'integration_id' => $monzoIntegration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'target_id' => $txnMerchant->id,
+            'value' => 2500,
+            'value_unit' => 'USD',
+        ]);
+
+        $relationship = $this->matcher->createReceiptRelationship(
+            $receipt,
+            $transaction,
+            0.95,
+            'manual'
+        );
+
+        // Verify value fields are set correctly
+        $this->assertEquals(2500, $relationship->value);
+        $this->assertEquals(100, $relationship->value_multiplier);
+        $this->assertEquals('USD', $relationship->value_unit);
+        $this->assertEquals('manual', $relationship->metadata['match_method']);
     }
 }
