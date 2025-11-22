@@ -194,7 +194,7 @@ new class extends Component {
         <button class="btn btn-ghost btn-sm gap-2 sm:hidden" wire:click="openMobileModal">
             <div class="indicator">
                 @if ($activeProgresses->isNotEmpty())
-                <span class="indicator-item badge badge-primary badge-xs">
+                <span class="indicator-item badge badge-info badge-xs">
                     {{ $activeProgresses->count() }}
                 </span>
                 <span class="loading loading-spinner loading-xs"></span>
@@ -230,7 +230,7 @@ new class extends Component {
         <button @click="open = !open" class="btn btn-ghost btn-sm gap-2 hidden sm:flex">
             <div class="indicator">
                 @if ($activeProgresses->isNotEmpty())
-                <span class="indicator-item badge badge-primary badge-xs">
+                <span class="indicator-item badge badge-info badge-xs">
                     {{ $activeProgresses->count() }}
                 </span>
                 <span class="loading loading-spinner loading-xs"></span>

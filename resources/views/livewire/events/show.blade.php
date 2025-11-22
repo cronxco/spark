@@ -660,7 +660,7 @@ new class extends Component {
                             @if ($this->event->domain)
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="fas.lines-leaning" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.layer-group" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->event->domain) }}
                                 </x-slot:value>
                             </x-badge>
@@ -676,7 +676,7 @@ new class extends Component {
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="fas.font-awesome" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.cube" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->event->integration->instance_type) }}
                                 </x-slot:value>
                             </x-badge>
@@ -985,21 +985,21 @@ new class extends Component {
                     $subtitle = $relatedModel->time?->format('M j, Y g:i A');
                     $route = route('events.show', $relatedModel);
                     $badgeText = 'Event';
-                    $badgeClass = 'badge-primary';
+                    $badgeClass = 'badge-outline';
                     } elseif ($relatedModel instanceof \App\Models\EventObject) {
                     $icon = 'o-cube';
                     $title = $relatedModel->title;
                     $subtitle = $relatedModel->concept;
                     $route = route('objects.show', $relatedModel);
                     $badgeText = 'Object';
-                    $badgeClass = 'badge-secondary';
+                    $badgeClass = 'badge-outline';
                     } elseif ($relatedModel instanceof \App\Models\Block) {
                     $icon = 'fas.grip';
                     $title = $relatedModel->type;
                     $subtitle = $relatedModel->time?->format('M j, Y');
                     $route = route('blocks.show', $relatedModel);
                     $badgeText = 'Block';
-                    $badgeClass = 'badge-accent';
+                    $badgeClass = 'badge-outline';
                     }
                     @endphp
 

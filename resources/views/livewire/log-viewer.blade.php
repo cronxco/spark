@@ -61,7 +61,7 @@
                     <x-icon name="fas.filter" class="w-5 h-5" />
                     Filters & Actions
                     @if ($levelFilter !== 'all' || $search)
-                    <x-badge value="Active" class="badge-primary badge-xs" />
+                    <x-badge value="Active" class="badge-success badge-xs" />
                     @endif
                 </div>
             </x-slot:heading>

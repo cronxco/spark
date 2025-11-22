@@ -496,11 +496,11 @@ Cards should have clear visual hierarchy. There are several card types based on 
 
 #### Hero/Primary Card (Top of Page)
 
-The first card on a detail page - features large icon, prominent title, and main value.
+The first card on a detail page - features large icon, prominent title, and main value. Uses `bg-base-200 shadow` to stand out from the page background.
 
 ```blade
-<!-- Hero card with no background styling - clean and prominent -->
-<x-card>
+<!-- Hero card with background styling for visual separation -->
+<x-card class="bg-base-200 shadow">
     <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
         <!-- Large icon with circular background -->
         <div class="flex-shrink-0 self-center sm:self-start">
@@ -637,7 +637,7 @@ The first card on a detail page - features large icon, prominent title, and main
 
 **Guidelines:**
 
-- **Hero card**: No background class (clean white), large responsive icon, prominent title+value
+- **Hero card**: `bg-base-200 shadow` for clear separation from page, large responsive icon, prominent title+value
 - **Featured cards**: `bg-base-200/50 border-2 border-{color}/10` (semi-transparent with colored border)
 - **Standard cards**: `bg-base-200 shadow` (darker than page, clear separation)
 - **Nested items in featured cards**: `border-2 border-{color}/30 bg-base-100/80` (lighter with border)
@@ -838,6 +838,15 @@ Use badges sparingly for:
 <x-badge value="Needs Update" class="badge-warning" />
 <x-badge value="Failed" class="badge-error" />
 
+<!-- Entity type badges (outline, neutral) -->
+<x-badge value="Event" class="badge-outline badge-xs" />
+<x-badge value="Object" class="badge-outline badge-xs" />
+<x-badge value="Block" class="badge-outline badge-xs" />
+
+<!-- Count/indicator badges (info, for numbers) -->
+<x-badge value="5" class="badge-info badge-sm" />
+<span class="indicator-item badge badge-info badge-xs">{{ $count }}</span>
+
 <!-- Category badges (outline, neutral) -->
 <x-badge value="Current Account" class="badge-outline" />
 <x-badge value="OAuth" class="badge-outline" />
@@ -859,7 +868,9 @@ Use badges sparingly for:
 
 - Most badges should be outline style
 - Filled badges only for important status (success/warning/error)
-- Use `badge-xs` for metadata
+- Entity type badges (Event/Object/Block) use `badge-outline` for neutral identification
+- Count badges use `badge-info` for informational numbers
+- Use `badge-xs` for metadata and entity types
 - Use `badge-sm` for categories (default)
 - Avoid stacking too many badges (causes visual noise)
 
@@ -1078,6 +1089,91 @@ This pattern works well for:
 - Use ghost buttons for inline actions
 - Keep badges minimal
 
+### Tabs (View Mode Switching)
+
+Use tabs for switching between different view modes of the same data (e.g., cards vs table view).
+
+```blade
+<!-- View mode tabs -->
+<x-tabs wire:model="viewMode" selected="cards">
+    <x-tab name="cards" label="Cards" icon="o-squares-2x2">
+        <!-- Cards View Content -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach ($items as $item)
+                <x-card class="bg-base-200 shadow">
+                    <!-- Card content -->
+                </x-card>
+            @endforeach
+        </div>
+    </x-tab>
+
+    <x-tab name="table" label="Table" icon="o-table-cells">
+        <!-- Table View Content -->
+        <div class="overflow-x-auto">
+            <x-table :headers="$headers" :rows="$rows">
+                <!-- Table columns -->
+            </x-table>
+        </div>
+    </x-tab>
+</x-tabs>
+```
+
+**Guidelines:**
+
+- Use tabs for view mode switching (cards/table/list)
+- Each tab should have a clear label and icon
+- Keep the same data, different presentation
+- Use `wire:model` to persist selection across page refreshes
+- Tabs are NOT for navigation between different pages/sections
+
+### Left Border Status Indicators
+
+Use left border colors to provide at-a-glance status indication on cards.
+
+```blade
+@php
+    // Determine border color based on status
+    $borderClass = 'border-l-4 ';
+    if ($item->is_processing) {
+        $borderClass .= 'border-info';
+    } elseif ($item->is_paused) {
+        $borderClass .= 'border-neutral';
+    } elseif ($item->status === 'error') {
+        $borderClass .= 'border-error';
+    } elseif ($item->status === 'warning') {
+        $borderClass .= 'border-warning';
+    } elseif ($item->status === 'success') {
+        $borderClass .= 'border-success';
+    } else {
+        $borderClass .= 'border-base-300';
+    }
+@endphp
+
+<div class="card bg-base-200 shadow-sm {{ $borderClass }}">
+    <div class="card-body">
+        <!-- Card content -->
+    </div>
+</div>
+```
+
+**Status Color Mapping:**
+
+| Status | Border Class | Usage |
+| ------ | ------------ | ----- |
+| Processing | `border-info` | Active operations, loading |
+| Paused | `border-neutral` | Intentionally disabled |
+| Error | `border-error` | Failed, needs attention |
+| Warning | `border-warning` | Pending, may need action |
+| Success | `border-success` | Healthy, up to date |
+| Default | `border-base-300` | No specific status |
+
+**Guidelines:**
+
+- Use `border-l-4` for visible but not overwhelming indicator
+- Always provide a default/fallback border color
+- Combine with semantic badges for more detail in card content
+- Status borders work well in lists and grids of cards
+
 ## Anti-Patterns (What NOT to Do)
 
 ### ❌ Too Many Badges
@@ -1288,7 +1384,7 @@ When creating a new page, ensure:
 
 ### Visual Hierarchy
 
-- [ ] Hero card has no background (clean prominent display)
+- [ ] Hero card uses `bg-base-200 shadow` (clear separation from page)
 - [ ] Large responsive hero icon: `w-12 h-12 sm:w-16 sm:h-16`
 - [ ] Hero title: `text-xl sm:text-2xl lg:text-3xl font-bold`
 - [ ] Hero value: `text-2xl sm:text-3xl lg:text-4xl font-bold text-primary`

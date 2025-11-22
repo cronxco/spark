@@ -514,7 +514,7 @@ new class extends Component {
                                                             $cardBorderClass .= 'border-base-300';
                                                         }
                                                     @endphp
-                                                    <div class="card bg-base-200 shadow-sm {{ $cardBorderClass }}">
+                                                    <div class="card bg-base-100 border border-base-200 {{ $cardBorderClass }}">
                                 <div class="card-body p-3 sm:p-4">
                                     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 space-y-3 sm:space-y-0">
                                         <div class="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
@@ -793,7 +793,7 @@ new class extends Component {
                                     @if ($integration['last_triggered_at'] && $integration['last_triggered_at'] !== $integration['last_successful_update_at'])
                                         <div class="mt-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                                             <div class="flex items-center space-x-2">
-                                                <x-icon name="fas.exclamation-triangle" class="w-4 h-4 text-warning" />
+                                                <x-icon name="fas.triangle-exclamation" class="w-4 h-4 text-warning" />
                                                 <span class="text-sm text-warning">
                                                     {{ __('Last triggered') }}: {{ \Carbon\Carbon::parse($integration['last_triggered_at'])->diffForHumans() }}
                                                     @if (!$integration['last_successful_update_at'] || $integration['last_triggered_at'] > $integration['last_successful_update_at'])
@@ -817,7 +817,7 @@ new class extends Component {
 
                     <div class="mt-6 p-4 bg-base-300 rounded-lg">
                         <div class="flex items-center space-x-2 mb-2">
-                            <x-icon name="fas.info-circle" class="w-4 h-4 text-info" />
+                            <x-icon name="fas.circle-info" class="w-4 h-4 text-info" />
                             <span class="font-medium">{{ __('About Updates') }}</span>
                         </div>
                         <p class="text-sm text-base-content/70">
