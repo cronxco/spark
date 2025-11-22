@@ -268,6 +268,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Volt::route('objects', 'admin.objects')->name('objects.index');
     Volt::route('blocks', 'admin.blocks')->name('blocks.index');
     Volt::route('relationships', 'admin.relationships')->name('relationships.index');
+    Volt::route('pending-links', 'admin.pending-links')->name('pending-links.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
     Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
     Volt::route('search', 'admin.search')->name('search.index');
