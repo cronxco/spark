@@ -1,15 +1,15 @@
 name: Dust and Test
 
 on:
+  pull_request:
   issue_comment:
     types: [created]
 
 jobs:
   duster:
-    if: github.event.issue.pull_request && (
-          startsWith(github.event.comment.body, '/test') ||
-          startsWith(github.event.comment.body, '/run-tests')
-        )
+    if: |
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && (contains(github.event.comment.body, '/test') || contains(github.event.comment.body, '/run-tests')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -17,33 +17,33 @@ jobs:
       commit_sha: ${{ steps.get_sha.outputs.sha }}
     steps:
       - name: Add reaction to comment
-        uses: peter-evans/create-or-update-comment@v4
         if: github.event_name == 'issue_comment'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           comment-id: ${{ github.event.comment.id }}
           reactions: eyes
 
       - name: Get PR branch
-        id: comment-branch
         if: github.event_name == 'issue_comment'
-        uses: xt0rted/pull-request-comment-branch@v3
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
+        id: comment-branch
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ github.event_name == 'issue_comment' && steps.comment-branch.outputs.head_ref || github.event.pull_request.head.ref }}
           repository: ${{ github.event_name == 'issue_comment' && steps.comment-branch.outputs.head_repo || github.event.pull_request.head.repo.full_name }}
 
       - name: "Duster Fix"
-        uses: tighten/duster-action@v3
+        uses: tighten/duster-action@557d11cf6d55a7f7cf6324806c633af0062759eb # v3
         with:
           args: fix
 
-      - uses: stefanzweifel/git-auto-commit-action@v6
+      - uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6
         id: auto_commit_action
         with:
-          commit_message: "🚨 Fix code style"
-          commit_user_name: "GitHub Action"
-          commit_user_email: "actions@github.com"
+          commit_message: 🚨 Fix code style
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
 
       - name: Get current commit SHA
         id: get_sha
@@ -67,19 +67,26 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-      - uses: actions/checkout@v5
+      - name: Get PR branch
+        if: github.event_name == 'issue_comment'
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
+        id: comment-branch
+
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          # Use the commit SHA from duster to ensure we test the code after any duster fixes
           ref: ${{ needs.duster.outputs.commit_sha }}
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # v2
         with:
           php-version: 8.2
           tools: composer:v2
           coverage: xdebug
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: "npm"
@@ -111,21 +118,37 @@ jobs:
       - name: Run Tests
         id: tests
         run: |
+          # Run PHPUnit with output capturing all test results
+          # Use tee so we still see output in Actions logs
           ./vendor/bin/phpunit --teamcity | tee test_output.txt || true
+
+          # Extract finished and failed test names
           grep "##teamcity\[testFinished" test_output.txt \
             | sed "s/.*name='\([^']*\)'.*/\1/" > all_finished.txt
           grep "##teamcity\[testFailed" test_output.txt \
             | sed "s/.*name='\([^']*\)'.*/\1/" | sort -u > failed_tests.txt
+
+          # Compute passed = finished − failed
           sort -u all_finished.txt > all_finished_sorted.txt
           comm -23 all_finished_sorted.txt failed_tests.txt > passed_tests.txt
+
+          # Derive counts from lists
           TOTAL=$(wc -l < all_finished_sorted.txt)
           FAILED=$(wc -l < failed_tests.txt)
           PASSED=$(wc -l < passed_tests.txt)
+
+          # Clean up intermediate lists
           rm -f all_finished.txt all_finished_sorted.txt
+
+          # Store test results for summary step
           echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
           echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
           echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
-          if [ "${FAILED:-0}" -gt 0 ]; then exit 1; fi
+
+          # Exit with error if any tests failed
+          if [ "${FAILED:-0}" -gt 0 ]; then
+            exit 1
+          fi
 
       - name: Add Test Results to Summary
         if: always()
@@ -133,55 +156,66 @@ jobs:
           echo "# Deployment Summary :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Build & Test Results" >> $GITHUB_STEP_SUMMARY
+
           if [ "${{ steps.tests.outputs.failed }}" = "0" ]; then
             echo "- ✅ CI Tests Passed" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ❌ CI Tests Failed" >> $GITHUB_STEP_SUMMARY
           fi
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Test Statistics" >> $GITHUB_STEP_SUMMARY
           echo "- Total Tests: \`${{ steps.tests.outputs.total }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Passed: \`${{ steps.tests.outputs.passed }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- ❌ Failed: \`${{ steps.tests.outputs.failed }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add passed tests in expandable section
           echo "<details><summary>✅ Passed Tests (${{ steps.tests.outputs.passed }})</summary>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           cat passed_tests.txt >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add failed tests in expandable section if any
           if [ "${{ steps.tests.outputs.failed }}" != "0" ]; then
             echo "<details><summary>❌ Failed Tests (${{ steps.tests.outputs.failed }})</summary>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "```" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             cat failed_tests.txt >> $GITHUB_STEP_SUMMARY
-            echo "```" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Comment success
-        if: success()
-        uses: peter-evans/create-or-update-comment@v4
+        if: success() && github.event_name == 'issue_comment'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
             ✅ Dust and tests passed successfully!
+
             **Test Results:**
             - Total: `${{ steps.tests.outputs.total }}`
             - Passed: `${{ steps.tests.outputs.passed }}`
             - Failed: `${{ steps.tests.outputs.failed }}`
+
             Triggered by comment from @${{ github.event.comment.user.login }}
 
       - name: Comment failure
-        if: failure()
-        uses: peter-evans/create-or-update-comment@v4
+        if: failure() && github.event_name == 'issue_comment'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
             ❌ Dust and/or tests failed!
+
             **Test Results:**
             - Total: `${{ steps.tests.outputs.total }}`
             - Passed: `${{ steps.tests.outputs.passed }}`
             - Failed: `${{ steps.tests.outputs.failed }}`
+
             Triggered by comment from @${{ github.event.comment.user.login }}
             Please check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
