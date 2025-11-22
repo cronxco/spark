@@ -16,7 +16,7 @@
                             <x-button
                                 icon="o-arrow-down-tray"
                                 class="btn-ghost btn-sm"
-                                link="{{ $this->media->getUrl() }}"
+                                link="{{ $mediaUrl }}"
                                 external
                                 title="Download"
                             />
@@ -102,7 +102,7 @@
                         @if (str_starts_with($this->media->mime_type, 'video/'))
                             {{-- Video Player --}}
                             <video
-                                src="{{ $this->media->getUrl() }}"
+                                src="{{ $mediaUrl }}"
                                 class="max-w-full max-h-[600px] rounded-lg"
                                 controls
                             ></video>
@@ -110,7 +110,7 @@
                             {{-- Image Preview --}}
                             <div class="relative">
                                 <img
-                                    src="{{ $this->media->getUrl() }}"
+                                    src="{{ $mediaUrl }}"
                                     alt="{{ $this->media->name }}"
                                     class="max-w-full max-h-[600px] rounded-lg"
                                 />
@@ -124,7 +124,7 @@
                             {{-- PDF Preview --}}
                             <div class="w-full">
                                 <iframe
-                                    src="{{ $this->media->getUrl() }}"
+                                    src="{{ $mediaUrl }}"
                                     class="w-full h-[600px] rounded-lg border border-base-300"
                                 ></iframe>
                             </div>
@@ -133,7 +133,7 @@
                             <div class="flex flex-col items-center justify-center py-12">
                                 <x-icon name="o-document" class="w-16 h-16 text-base-content/30 mb-4" />
                                 <p class="text-base-content/70 mb-4">Preview not available for this file type</p>
-                                <a href="{{ $this->media->getUrl() }}" target="_blank" class="btn btn-primary btn-sm">
+                                <a href="{{ $mediaUrl }}" target="_blank" class="btn btn-primary btn-sm">
                                     <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
                                     Open in New Tab
                                 </a>
@@ -309,8 +309,12 @@
                                 <div>
                                     <span class="text-base-content/60">URL:</span>
                                     <div class="font-mono text-xs break-all mt-1">
-                                        <a href="{{ $this->media->getUrl() }}" target="_blank" class="link">
-                                            {{ $this->media->getUrl() }}
+                                        <a href="{{ $mediaUrl }}" target="_blank" class="link">
+                                            @if ($isS3)
+                                                <span class="text-warning">[Signed URL - expires in 60 min]</span>
+                                            @else
+                                                {{ $this->media->getUrl() }}
+                                            @endif
                                         </a>
                                     </div>
                                 </div>
