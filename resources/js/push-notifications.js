@@ -112,7 +112,7 @@ class SparkPushNotifications {
      */
     async getVapidPublicKey() {
         try {
-            const response = await fetch('/api/push/vapid-public-key');
+            const response = await fetch('/push/vapid-public-key');
             const data = await response.json();
             return data.publicKey;
         } catch (error) {
@@ -226,7 +226,7 @@ class SparkPushNotifications {
      * Send subscription to server
      */
     async sendSubscriptionToServer(subscription) {
-        const response = await fetch('/api/push/subscribe', {
+        const response = await fetch('/push/subscribe', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -238,7 +238,7 @@ class SparkPushNotifications {
         });
 
         if (!response.ok) {
-            const error = await response.json();
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || 'Failed to save subscription');
         }
 
@@ -249,7 +249,7 @@ class SparkPushNotifications {
      * Remove subscription from server
      */
     async removeSubscriptionFromServer(subscription) {
-        const response = await fetch('/api/push/unsubscribe', {
+        const response = await fetch('/push/unsubscribe', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -261,7 +261,7 @@ class SparkPushNotifications {
         });
 
         if (!response.ok) {
-            const error = await response.json();
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || 'Failed to remove subscription');
         }
 

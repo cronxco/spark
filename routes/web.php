@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
@@ -22,6 +23,20 @@ Route::get('/', function () {
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+// Push notification routes (public)
+Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])
+    ->name('push.vapid-public-key');
+
+// Push notification routes (authenticated)
+Route::middleware(['auth'])->prefix('push')->group(function () {
+    Route::post('subscribe', [PushSubscriptionController::class, 'subscribe'])->name('push.subscribe');
+    Route::post('unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('push.unsubscribe');
+    Route::get('status', [PushSubscriptionController::class, 'status'])->name('push.status');
+    Route::get('subscriptions', [PushSubscriptionController::class, 'list'])->name('push.subscriptions');
+    Route::delete('subscriptions/{id}', [PushSubscriptionController::class, 'destroy'])->name('push.subscriptions.destroy');
+    Route::post('test', [PushSubscriptionController::class, 'test'])->name('push.test');
+});
 
 Route::middleware(['auth'])->group(function () {
     // Day-based timeline routes
