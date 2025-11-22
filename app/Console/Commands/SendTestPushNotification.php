@@ -39,15 +39,13 @@ class SendTestPushNotification extends Command
 
     protected function findUser(string $identifier): ?User
     {
-        // Try to find by ID first
-        $user = User::find($identifier);
-
-        if ($user) {
-            return $user;
+        // If it looks like an email, search by email first
+        if (filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+            return User::where('email', $identifier)->first();
         }
 
-        // Try to find by email
-        return User::where('email', $identifier)->first();
+        // Otherwise try to find by ID (UUID)
+        return User::find($identifier);
     }
 
     protected function sendToUser(User $user): int
