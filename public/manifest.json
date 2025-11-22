@@ -2,10 +2,12 @@
     "$schema": "https://json.schemastore.org/web-manifest-combined.json",
     "name": "Spark",
     "short_name": "Spark",
-    "start_url": "https://spark.cronx.co/today",
+    "start_url": "/dashboard",
     "display": "standalone",
     "background_color": "#010E19",
+    "theme_color": "#010E19",
     "description": "Synaptic aggregation, analysis and action.",
+    "orientation": "portrait-primary",
     "icons": [
         {
             "src": "/favicon-32.png",
@@ -35,8 +37,16 @@
         {
             "src": "/favicon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "any maskable"
         }
     ],
-    "scope": "https://spark.cronx.co/"
+    "categories": ["productivity", "lifestyle"],
+    "prefer_related_applications": false
 }
