@@ -321,5 +321,102 @@ document.addEventListener('DOMContentLoaded', () => {
     window.SparkPush.init();
 });
 
+// Register Alpine.js component for push notifications UI
+document.addEventListener('alpine:init', () => {
+    Alpine.data('pushNotifications', () => ({
+        supported: false,
+        subscribed: false,
+        permission: 'default',
+        isiOSSafari: false,
+        loading: false,
+
+        async init() {
+            // Check support
+            this.supported = 'serviceWorker' in navigator &&
+                             'PushManager' in window &&
+                             'Notification' in window;
+
+            if (!this.supported) return;
+
+            // Check if iOS Safari (not standalone)
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                                window.navigator.standalone === true;
+            this.isiOSSafari = isIOS && !isStandalone;
+
+            // Get permission status
+            this.permission = Notification.permission;
+
+            // Check subscription status
+            if (navigator.serviceWorker.controller) {
+                await this.checkSubscription();
+            } else {
+                navigator.serviceWorker.ready.then(() => this.checkSubscription());
+            }
+
+            // Listen for push events
+            window.addEventListener('push-subscribed', () => {
+                this.subscribed = true;
+                if (this.$wire) this.$wire.$refresh();
+            });
+
+            window.addEventListener('push-unsubscribed', () => {
+                this.subscribed = false;
+                if (this.$wire) this.$wire.$refresh();
+            });
+        },
+
+        async checkSubscription() {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+                this.subscribed = subscription !== null;
+            } catch (e) {
+                console.error('Error checking subscription:', e);
+            }
+        },
+
+        async subscribe() {
+            if (!window.SparkPush) {
+                console.error('SparkPush not initialized');
+                return;
+            }
+
+            this.loading = true;
+            try {
+                await window.SparkPush.subscribe();
+                this.subscribed = true;
+                this.permission = Notification.permission;
+                if (this.$wire) this.$wire.$refresh();
+            } catch (e) {
+                console.error('Subscribe error:', e);
+                if (e.message.includes('permission')) {
+                    this.permission = 'denied';
+                }
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async unsubscribe() {
+            if (!window.SparkPush) {
+                console.error('SparkPush not initialized');
+                return;
+            }
+
+            this.loading = true;
+            try {
+                await window.SparkPush.unsubscribe();
+                this.subscribed = false;
+                if (this.$wire) this.$wire.$refresh();
+            } catch (e) {
+                console.error('Unsubscribe error:', e);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }));
+});
+
 // Export for module usage
 export default SparkPushNotifications;
