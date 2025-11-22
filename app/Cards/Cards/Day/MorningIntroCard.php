@@ -34,7 +34,7 @@ class MorningIntroCard extends BaseCard
 
     public function getIcon(): string
     {
-        return 'fas-sun';
+        return 'fas.sun';
     }
 
     public function getViewPath(): string

@@ -13,7 +13,7 @@ if ($customLayoutPath && view()->exists($customLayoutPath)) {
 
 // Get plugin info for styling
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
-$icon = $pluginClass ? $pluginClass::getIcon() : 'fas-grip';
+$icon = $pluginClass ? $pluginClass::getIcon() : 'fas.grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 $accentColor = $pluginClass ? $pluginClass::getAccentColor() : 'primary';
 $domain = $pluginClass ? $pluginClass::getDomain() : 'knowledge';

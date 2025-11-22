@@ -425,7 +425,7 @@ new class extends Component {
                     @else
                         <x-button
                             label="{{ $isDeleting ? 'Deleting...' : 'Delete Group' }}"
-                            icon="{{ $isDeleting ? 'fas-gear' : 'fas-trash' }}"
+                            icon="{{ $isDeleting ? 'fas.gear' : 'fas.trash' }}"
                             class="btn-error"
                             wire:click="deleteGroup"
                             :disabled="!$finalConfirmation || $isDeleting"

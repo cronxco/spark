@@ -1,4 +1,4 @@
-@props(['icon' => 'fas-inbox', 'message' => 'No items yet', 'action' => null, 'actionLabel' => 'Add', 'actionEvent' => null])
+@props(['icon' => 'fas.inbox', 'message' => 'No items yet', 'action' => null, 'actionLabel' => 'Add', 'actionEvent' => null])
 
 <div class="text-center py-4">
     <x-icon :name="$icon" class="w-8 h-8 mx-auto mb-2 text-base-content/30" />

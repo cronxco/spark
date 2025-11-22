@@ -29,7 +29,7 @@ class CookieExpiryWarning extends SparkNotification
 
     public function getIcon(): string
     {
-        return 'fas-triangle-exclamation';
+        return 'fas.triangle-exclamation';
     }
 
     public function getColor(): string

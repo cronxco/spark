@@ -135,7 +135,7 @@ class FinancialPlugin extends ManualPlugin
 
     public static function getIcon(): string
     {
-        return 'fas-sterling-sign';
+        return 'fas.sterling-sign';
     }
 
     public static function getAccentColor(): string
@@ -152,7 +152,7 @@ class FinancialPlugin extends ManualPlugin
     {
         return [
             'had_balance' => [
-                'icon' => 'fas-sterling-sign',
+                'icon' => 'fas.sterling-sign',
                 'display_name' => 'Balance Update',
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
@@ -171,13 +171,13 @@ class FinancialPlugin extends ManualPlugin
     {
         return [
             'manual_account' => [
-                'icon' => 'fas-wallet',
+                'icon' => 'fas.wallet',
                 'display_name' => 'Manual Account',
                 'description' => 'A manually entered financial account',
                 'hidden' => false,
             ],
             'day' => [
-                'icon' => 'fas-calendar-day',
+                'icon' => 'fas.calendar-day',
                 'display_name' => 'Day',
                 'description' => 'A calendar day',
                 'hidden' => false,

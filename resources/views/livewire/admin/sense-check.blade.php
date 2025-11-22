@@ -400,7 +400,7 @@ new class extends Component
                 'key' => 'undefined_actions',
                 'title' => 'Actions present in database but not defined in plugin files',
                 'description' => 'Distinct `events.action` that have no corresponding entry in plugin `getActionTypes()`.',
-                'icon' => 'fas-triangle-exclamation',
+                'icon' => 'fas.triangle-exclamation',
                 'issue_count' => count($this->undefinedActions),
             ],
             [
@@ -421,42 +421,42 @@ new class extends Component
                 'key' => 'undefined_object_types',
                 'title' => 'Object types present in events but not defined in plugin files',
                 'description' => 'Distinct `objects.type` used as actor/target per service with no corresponding entry in plugin `getObjectTypes()`.',
-                'icon' => 'fas-tag',
+                'icon' => 'fas.tag',
                 'issue_count' => count($this->undefinedObjectTypes),
             ],
             [
                 'key' => 'orphaned_events',
                 'title' => 'Orphaned database records',
                 'description' => 'Events without integrations, blocks without events, and objects without references.',
-                'icon' => 'fas-trash',
+                'icon' => 'fas.trash',
                 'issue_count' => $this->orphanedEvents['count'] + $this->orphanedBlocks['count'] + $this->orphanedObjects['count'],
             ],
             [
                 'key' => 'invalid_integrations',
                 'title' => 'Invalid integration records',
                 'description' => 'Integrations with missing groups or unknown services.',
-                'icon' => 'fas-circle-xmark',
+                'icon' => 'fas.circle-xmark',
                 'issue_count' => count($this->invalidIntegrations),
             ],
             [
                 'key' => 'plugin_config_issues',
                 'title' => 'Plugin configuration issues',
                 'description' => 'Missing required methods, invalid domains, or configuration errors in plugins.',
-                'icon' => 'fas-gear',
+                'icon' => 'fas.gear',
                 'issue_count' => count($this->pluginConfigIssues),
             ],
             [
                 'key' => 'embedding_health',
                 'title' => 'Embedding Health Dashboard',
                 'description' => 'Monitor semantic search embedding coverage across events, blocks, and objects.',
-                'icon' => 'fas-wand-magic-sparkles',
+                'icon' => 'fas.wand-magic-sparkles',
                 'issue_count' => 0, // Informational only
             ],
             [
                 'key' => 'block_types_custom_layouts',
                 'title' => 'Block Types with Custom Layouts',
                 'description' => 'Coverage of custom card layouts for block types across all plugins. Shows which block types have custom layouts and highlights high-volume types (>100 blocks) that could benefit from custom layouts.',
-                'icon' => 'fas-layer-group',
+                'icon' => 'fas.layer-group',
                 'issue_count' => 0, // Informational only
             ],
         ];

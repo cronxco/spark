@@ -95,7 +95,7 @@ class KarakeepPlugin extends ManualPlugin
 
     public static function getIcon(): string
     {
-        return 'fas-bookmark';
+        return 'fas.bookmark';
     }
 
     public static function getAccentColor(): string
@@ -117,7 +117,7 @@ class KarakeepPlugin extends ManualPlugin
     {
         return [
             'bookmarked' => [
-                'icon' => 'fas-bookmark',
+                'icon' => 'fas.bookmark',
                 'display_name' => 'Saved Bookmark',
                 'description' => 'A bookmark was saved',
                 'display_with_object' => true,
@@ -125,7 +125,7 @@ class KarakeepPlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'added_to_list' => [
-                'icon' => 'fas-circle-plus',
+                'icon' => 'fas.circle-plus',
                 'display_name' => 'Added to List',
                 'description' => 'A bookmark was added to a list',
                 'display_with_object' => true,
@@ -139,7 +139,7 @@ class KarakeepPlugin extends ManualPlugin
     {
         return [
             'bookmark_summary' => [
-                'icon' => 'fas-wand-magic-sparkles',
+                'icon' => 'fas.wand-magic-sparkles',
                 'display_name' => 'AI Summary',
                 'description' => 'AI-generated summary of the bookmark',
                 'display_with_object' => true,
@@ -147,7 +147,7 @@ class KarakeepPlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'bookmark_metadata' => [
-                'icon' => 'fas-image',
+                'icon' => 'fas.image',
                 'display_name' => 'Preview Card',
                 'description' => 'Rich preview metadata from the bookmark',
                 'display_with_object' => true,
@@ -155,7 +155,7 @@ class KarakeepPlugin extends ManualPlugin
                 'hidden' => false,
             ],
             'bookmark_highlight' => [
-                'icon' => 'fas-highlighter',
+                'icon' => 'fas.highlighter',
                 'display_name' => 'Highlight',
                 'description' => 'Text highlight from the bookmark',
                 'display_with_object' => true,
@@ -169,19 +169,19 @@ class KarakeepPlugin extends ManualPlugin
     {
         return [
             'karakeep_bookmark' => [
-                'icon' => 'fas-bookmark',
+                'icon' => 'fas.bookmark',
                 'display_name' => 'Karakeep Bookmark',
                 'description' => 'A bookmark from Karakeep',
                 'hidden' => false,
             ],
             'karakeep_list' => [
-                'icon' => 'fas-layer-group',
+                'icon' => 'fas.layer-group',
                 'display_name' => 'Karakeep List',
                 'description' => 'A list/collection in Karakeep',
                 'hidden' => false,
             ],
             'karakeep_user' => [
-                'icon' => 'fas-user-circle',
+                'icon' => 'fas.user-circle',
                 'display_name' => 'Karakeep User',
                 'description' => 'A Karakeep user',
                 'hidden' => true,

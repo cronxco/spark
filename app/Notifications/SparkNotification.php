@@ -58,7 +58,7 @@ abstract class SparkNotification extends Notification implements ShouldQueue
      */
     public function getIcon(): string
     {
-        return 'fas-bell';
+        return 'fas.bell';
     }
 
     /**

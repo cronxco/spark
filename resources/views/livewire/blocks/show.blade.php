@@ -182,7 +182,7 @@ new class extends Component {
         }
 
         // Fallback to default icon if plugin doesn't have this block type
-        return 'fas-grip';
+        return 'fas.grip';
     }
 
     public function notifyCopied(string $what): void
@@ -485,7 +485,7 @@ new class extends Component {
                         $route = '#';
 
                         if ($relatedModel instanceof \App\Models\Event) {
-                        $icon = 'fas-calendar';
+                        $icon = 'fas.calendar';
                         $title = $relatedModel->action;
                         $route = route('events.show', $relatedModel);
                         } elseif ($relatedModel instanceof \App\Models\EventObject) {
@@ -493,7 +493,7 @@ new class extends Component {
                         $title = $relatedModel->title;
                         $route = route('objects.show', $relatedModel);
                         } elseif ($relatedModel instanceof \App\Models\Block) {
-                        $icon = 'fas-grip';
+                        $icon = 'fas.grip';
                         $title = $relatedModel->type;
                         $route = route('blocks.show', $relatedModel);
                         }
@@ -678,7 +678,7 @@ new class extends Component {
                 $badgeClass = 'badge-ghost';
 
                 if ($relatedModel instanceof \App\Models\Event) {
-                $icon = 'fas-calendar';
+                $icon = 'fas.calendar';
                 $title = $relatedModel->action;
                 $subtitle = $relatedModel->time?->format('M j, Y g:i A');
                 $route = route('events.show', $relatedModel);
@@ -692,7 +692,7 @@ new class extends Component {
                 $badgeText = 'Object';
                 $badgeClass = 'badge-secondary';
                 } elseif ($relatedModel instanceof \App\Models\Block) {
-                $icon = 'fas-grip';
+                $icon = 'fas.grip';
                 $title = $relatedModel->type;
                 $subtitle = $relatedModel->time?->format('M j, Y');
                 $route = route('blocks.show', $relatedModel);

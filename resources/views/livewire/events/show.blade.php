@@ -191,41 +191,41 @@ new class extends Component {
 
         // Fallback to hardcoded icons if plugin doesn't have this action type
         $icons = [
-            'create' => 'fas-circle-plus',
-            'update' => 'fas-rotate',
-            'delete' => 'fas-trash',
-            'move' => 'fas-arrow-right',
-            'copy' => 'fas-copy',
-            'share' => 'fas-share',
-            'like' => 'fas-heart',
-            'comment' => 'fas-comment',
-            'follow' => 'fas-user-plus',
-            'unfollow' => 'fas-user-minus',
-            'join' => 'fas-users',
-            'leave' => 'fas-users',
-            'start' => 'fas-play',
-            'stop' => 'fas-stop',
-            'pause' => 'fas-pause',
-            'resume' => 'fas-play',
-            'complete' => 'fas-circle-check',
-            'fail' => 'fas-circle-xmark',
-            'cancel' => 'fas-xmark',
-            'approve' => 'fas-check',
-            'reject' => 'fas-xmark',
-            'publish' => 'fas-globe',
-            'unpublish' => 'fas-eye-slash',
-            'archive' => 'fas-box-archive',
-            'restore' => 'fas-rotate',
-            'login' => 'fas-right-from-bracket',
-            'logout' => 'fas-right-to-bracket',
+            'create' => 'fas.circle-plus',
+            'update' => 'fas.rotate',
+            'delete' => 'fas.trash',
+            'move' => 'fas.arrow-right',
+            'copy' => 'fas.copy',
+            'share' => 'fas.share',
+            'like' => 'fas.heart',
+            'comment' => 'fas.comment',
+            'follow' => 'fas.user-plus',
+            'unfollow' => 'fas.user-minus',
+            'join' => 'fas.users',
+            'leave' => 'fas.users',
+            'start' => 'fas.play',
+            'stop' => 'fas.stop',
+            'pause' => 'fas.pause',
+            'resume' => 'fas.play',
+            'complete' => 'fas.circle-check',
+            'fail' => 'fas.circle-xmark',
+            'cancel' => 'fas.xmark',
+            'approve' => 'fas.check',
+            'reject' => 'fas.xmark',
+            'publish' => 'fas.globe',
+            'unpublish' => 'fas.eye-slash',
+            'archive' => 'fas.box-archive',
+            'restore' => 'fas.rotate',
+            'login' => 'fas.right-from-bracket',
+            'logout' => 'fas.right-to-bracket',
             'purchase' => 'o-shopping-cart',
-            'refund' => 'fas-rotate',
-            'transfer' => 'fas-arrow-right',
-            'withdraw' => 'fas-arrow-down',
-            'deposit' => 'fas-arrow-up',
+            'refund' => 'fas.rotate',
+            'transfer' => 'fas.arrow-right',
+            'withdraw' => 'fas.arrow-down',
+            'deposit' => 'fas.arrow-up',
         ];
 
-        return $icons[strtolower($action)] ?? 'fas-bolt';
+        return $icons[strtolower($action)] ?? 'fas.bolt';
     }
 
     public function getEventColor($action)
@@ -978,7 +978,7 @@ new class extends Component {
                     $badgeClass = 'badge-ghost';
 
                     if ($relatedModel instanceof \App\Models\Event) {
-                    $icon = 'fas-calendar';
+                    $icon = 'fas.calendar';
                     $title = $relatedModel->action;
                     $subtitle = $relatedModel->time?->format('M j, Y g:i A');
                     $route = route('events.show', $relatedModel);
@@ -992,7 +992,7 @@ new class extends Component {
                     $badgeText = 'Object';
                     $badgeClass = 'badge-secondary';
                     } elseif ($relatedModel instanceof \App\Models\Block) {
-                    $icon = 'fas-grip';
+                    $icon = 'fas.grip';
                     $title = $relatedModel->type;
                     $subtitle = $relatedModel->time?->format('M j, Y');
                     $route = route('blocks.show', $relatedModel);
@@ -1160,7 +1160,7 @@ new class extends Component {
                             $route = '#';
 
                             if ($relatedModel instanceof \App\Models\Event) {
-                                $icon = 'fas-calendar';
+                                $icon = 'fas.calendar';
                                 $title = $relatedModel->action;
                                 $route = route('events.show', $relatedModel);
                             } elseif ($relatedModel instanceof \App\Models\EventObject) {
@@ -1168,7 +1168,7 @@ new class extends Component {
                                 $title = $relatedModel->title;
                                 $route = route('objects.show', $relatedModel);
                             } elseif ($relatedModel instanceof \App\Models\Block) {
-                                $icon = 'fas-grip';
+                                $icon = 'fas.grip';
                                 $title = $relatedModel->type;
                                 $route = route('blocks.show', $relatedModel);
                             }

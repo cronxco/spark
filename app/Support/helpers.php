@@ -851,10 +851,10 @@ if (! function_exists('heroicon_to_fontawesome')) {
             return $mappings[$heroiconName];
         }
 
-        // Auto-convert: o-icon-name -> fas-icon-name
+        // Auto-convert: o-icon-name -> fas.icon-name
         $baseName = preg_replace('/^[os]-/', '', $heroiconName);
 
-        return 'fas-' . $baseName;
+        return 'fas.' . $baseName;
     }
 }
 
@@ -870,8 +870,8 @@ if (! function_exists('icon_name')) {
     {
         $library = config('icons.default_library', 'fontawesome');
 
-        // Already in correct format
-        if ($library === 'fontawesome' && preg_match('/^fa[srb]-/', $name)) {
+        // Already in correct format (dot notation for FontAwesome: fas.icon-name)
+        if ($library === 'fontawesome' && preg_match('/^fa[srb]\./', $name)) {
             return $name;
         }
         if ($library === 'heroicons' && preg_match('/^[os]-/', $name)) {

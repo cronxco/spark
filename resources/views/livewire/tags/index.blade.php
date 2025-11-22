@@ -146,17 +146,17 @@ new class extends Component {
     {
         return match ($type) {
             'transaction_category', 'transaction_type', 'transaction_status',
-            'transaction_scheme', 'transaction_currency' => 'fas-sterling-sign',
-            'balance_type' => 'fas-scale-balanced',
-            'merchant_emoji', 'merchant_country', 'merchant_category' => 'fas-store',
-            'person' => 'fas-user',
-            'card_pan' => 'fas-credit-card',
-            'decline_reason' => 'fas-circle-xmark',
-            'music_artist', 'music_album', 'spotify_context' => 'fas-music',
-            'emoji' => 'fas-face-smile',
-            'spark' => 'fas-wand-magic-sparkles',
-            'untyped' => 'fas-tag',
-            default => 'fas-tag',
+            'transaction_scheme', 'transaction_currency' => 'fas.sterling-sign',
+            'balance_type' => 'fas.scale-balanced',
+            'merchant_emoji', 'merchant_country', 'merchant_category' => 'fas.store',
+            'person' => 'fas.user',
+            'card_pan' => 'fas.credit-card',
+            'decline_reason' => 'fas.circle-xmark',
+            'music_artist', 'music_album', 'spotify_context' => 'fas.music',
+            'emoji' => 'fas.face-smile',
+            'spark' => 'fas.wand-magic-sparkles',
+            'untyped' => 'fas.tag',
+            default => 'fas.tag',
         };
     }
 

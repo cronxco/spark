@@ -27,7 +27,7 @@ class CheckinHistoryCard extends BaseCard
 
     public function getIcon(): string
     {
-        return 'fas-chart-simple';
+        return 'fas.chart-simple';
     }
 
     public function getViewPath(): string
