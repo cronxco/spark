@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\FetchApiController;
 use App\Http\Controllers\Api\IntegrationApiController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\SearchApiController;
 use App\Http\Controllers\Api\SemanticSearchController;
 use App\Http\Controllers\EventApiController;
@@ -109,3 +110,16 @@ Route::middleware('sentry.api.logging')->group(function () {
 Route::get('user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum')->name('api.user');
+
+// Push notification routes
+Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])
+    ->name('api.push.vapid-public-key');
+
+Route::middleware('auth:sanctum')->prefix('push')->group(function () {
+    Route::post('subscribe', [PushSubscriptionController::class, 'subscribe'])->name('api.push.subscribe');
+    Route::post('unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('api.push.unsubscribe');
+    Route::get('status', [PushSubscriptionController::class, 'status'])->name('api.push.status');
+    Route::get('subscriptions', [PushSubscriptionController::class, 'list'])->name('api.push.subscriptions');
+    Route::delete('subscriptions/{id}', [PushSubscriptionController::class, 'destroy'])->name('api.push.subscriptions.destroy');
+    Route::post('test', [PushSubscriptionController::class, 'test'])->name('api.push.test');
+});

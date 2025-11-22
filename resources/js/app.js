@@ -9,6 +9,9 @@ import "../../vendor/wire-elements/pro/resources/js/spotlight-component.js";
 // Chart.js utilities and configuration
 import "./charts.js";
 
+// Push notifications
+import "./push-notifications.js";
+
 Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN || window.SENTRY_DSN || undefined,
     integrations: [
