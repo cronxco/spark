@@ -494,6 +494,76 @@ new class extends Component {
         ");
     }
 
+    /**
+     * Remove embeddings field from an array recursively.
+     */
+    private function stripEmbeddings(array $data): array
+    {
+        unset($data['embeddings']);
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = $this->stripEmbeddings($value);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get complete event data without embeddings fields.
+     */
+    public function getCompleteEventDataWithoutEmbeddings(): array
+    {
+        $data = $this->getCompleteEventData();
+
+        // Strip embeddings from event
+        if (isset($data['event'])) {
+            $data['event'] = $this->stripEmbeddings($data['event']);
+        }
+
+        // Strip embeddings from actor
+        if (isset($data['actor']) && is_array($data['actor'])) {
+            $data['actor'] = $this->stripEmbeddings($data['actor']);
+        }
+
+        // Strip embeddings from target
+        if (isset($data['target']) && is_array($data['target'])) {
+            $data['target'] = $this->stripEmbeddings($data['target']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Copy event data to clipboard (without embeddings).
+     */
+    public function copyEventWithoutEmbeddings(): void
+    {
+        $data = $this->getCompleteEventDataWithoutEmbeddings();
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $this->js("
+            navigator.clipboard.writeText(" . json_encode($json) . ").then(function() {
+                const toast = document.createElement('div');
+                toast.className = 'toast toast-top toast-center z-50';
+                toast.innerHTML = `
+                    <div class='alert alert-success shadow-lg'>
+                        <svg xmlns='http://www.w3.org/2000/svg' class='stroke-current shrink-0 h-5 w-5' fill='none' viewBox='0 0 24 24'>
+                            <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />
+                        </svg>
+                        <span>Event copied to clipboard!</span>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.classList.add('opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, 2000);
+            });
+        ");
+    }
+
     public function handleOpenManageRelationshipsModal(): void
     {
         $this->showManageRelationshipsModal = true;
@@ -989,13 +1059,22 @@ new class extends Component {
                 <div class="pb-4 border-b border-base-200">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
-                        <button
-                            wire:click="exportAsJson"
-                            class="btn btn-ghost btn-xs gap-1"
-                            title="Export complete event with all related data">
-                            <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
-                            <span class="hidden sm:inline">Export</span>
-                        </button>
+                        <div class="flex gap-1">
+                            <button
+                                wire:click="copyEventWithoutEmbeddings"
+                                class="btn btn-ghost btn-xs gap-1"
+                                title="Copy event data to clipboard (without embeddings)">
+                                <x-icon name="o-clipboard-document" class="w-3 h-3" />
+                                <span class="hidden sm:inline">Copy</span>
+                            </button>
+                            <button
+                                wire:click="exportAsJson"
+                                class="btn btn-ghost btn-xs gap-1"
+                                title="Export complete event with all related data">
+                                <x-icon name="o-arrow-down-tray" class="w-3 h-3" />
+                                <span class="hidden sm:inline">Export</span>
+                            </button>
+                        </div>
                     </div>
                     <dl>
                         <x-metadata-row label="Event ID" :value="$this->event->id" copyable />
