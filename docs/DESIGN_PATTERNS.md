@@ -681,6 +681,18 @@ Empty states should be clear and helpful.
 
 ## Icon Standards
 
+Spark supports both **FontAwesome Free** (preferred) and **Heroicons**. FontAwesome is preferred for new development due to its larger icon set (2,000+ icons), brand icons, and domain-specific financial icons.
+
+### Icon Libraries
+
+| Library | Prefix | Example | Use Case |
+| ------- | ------ | ------- | -------- |
+| FontAwesome Solid | `fas-` | `fas-heart` | Default, filled icons |
+| FontAwesome Regular | `far-` | `far-heart` | Outline icons |
+| FontAwesome Brands | `fab-` | `fab-github` | Brand/logo icons |
+| Heroicons Outline | `o-` | `o-heart` | Legacy support |
+| Heroicons Solid | `s-` | `s-heart` | Legacy support |
+
 ### Size Guidelines
 
 | Context      | Size Class                 | Usage                        |
@@ -697,64 +709,89 @@ Use these icons consistently across the entire app:
 
 #### Actions
 
-- **Add/Create**: `o-plus` or `o-plus-circle`
-- **Edit**: `o-pencil` or `o-pencil-square`
-- **Delete**: `o-trash`
-- **View**: `o-eye`
-- **Search**: `o-magnifying-glass`
-- **Filter**: `o-funnel`
-- **Settings**: `o-cog-6-tooth`
-- **More/Menu**: `o-ellipsis-vertical` (vertical) or `o-ellipsis-horizontal`
+- **Add/Create**: `fas-plus` or `fas-circle-plus`
+- **Edit**: `fas-pen` or `fas-pen-to-square`
+- **Delete**: `fas-trash`
+- **View**: `fas-eye`
+- **Search**: `fas-magnifying-glass`
+- **Filter**: `fas-filter`
+- **Settings**: `fas-gear`
+- **More/Menu**: `fas-ellipsis-vertical` or `fas-ellipsis`
 
 #### Navigation
 
-- **Back**: `o-arrow-left`
-- **Next**: `o-arrow-right` or `o-chevron-right`
-- **Previous**: `o-chevron-left`
-- **Up**: `o-chevron-up`
-- **Down**: `o-chevron-down`
-- **External**: `o-arrow-top-right-on-square`
+- **Back**: `fas-arrow-left`
+- **Next**: `fas-arrow-right` or `fas-chevron-right`
+- **Previous**: `fas-chevron-left`
+- **Up**: `fas-chevron-up`
+- **Down**: `fas-chevron-down`
+- **External**: `fas-arrow-up-right-from-square`
 
 #### Status
 
-- **Success/Complete**: `o-check-circle`
-- **Error/Failed**: `o-x-circle`
-- **Warning/Attention**: `o-exclamation-triangle`
-- **Info**: `o-information-circle`
-- **Pending**: `o-clock`
+- **Success/Complete**: `fas-circle-check`
+- **Error/Failed**: `fas-circle-xmark`
+- **Warning/Attention**: `fas-triangle-exclamation`
+- **Info**: `fas-circle-info`
+- **Pending**: `fas-clock`
+
+#### Financial (FontAwesome Exclusive)
+
+- **Balance**: `fas-sterling-sign`
+- **Transaction**: `fas-money-bills`
+- **Savings/Pot**: `fas-piggy-bank`
+- **Budget**: `fas-wallet`
+- **Transfer**: `fas-money-bill-transfer`
+- **Income**: `fas-hand-holding-dollar`
+- **Receipt**: `fas-receipt`
+- **Invoice**: `fas-file-invoice-dollar`
+
+#### Payment Cards (Brand Icons)
+
+- **Mastercard**: `fab-cc-mastercard`
+- **Visa**: `fab-cc-visa`
+- **Amex**: `fab-cc-amex`
+- **Apple Pay**: `fab-cc-apple-pay`
+- **PayPal**: `fab-cc-paypal`
+- **Generic Card**: `fas-credit-card`
 
 #### Content Types
 
-- **Calendar/Date**: `o-calendar`
-- **Time**: `o-clock`
-- **Money**: `o-currency-pound` (accounts), `o-banknotes` (transactions)
-- **Document**: `o-document-text`
-- **User/Person**: `o-user`
-- **Tag**: `o-tag`
-- **Integration/Link**: `o-link`
+- **Calendar/Date**: `fas-calendar`
+- **Time**: `fas-clock`
+- **Document**: `fas-file-lines`
+- **User/Person**: `fas-user`
+- **Tag**: `fas-tag`
+- **Link**: `fas-link`
 
 #### Data
 
-- **Chart/Analytics**: `o-chart-bar`
-- **List**: `o-list-bullet`
-- **Grid**: `o-squares-2x2`
-- **Table**: `o-table-cells`
+- **Chart/Analytics**: `fas-chart-simple`
+- **List**: `fas-list`
+- **Grid**: `fas-grip`
+- **Pie Chart**: `fas-chart-pie`
 
 ### Icon Color Usage
 
 ```blade
 <!-- ✅ CORRECT: Default color (neutral) -->
-<x-icon name="o-cog-6-tooth" class="w-5 h-5" />
+<x-icon name="fas-gear" class="w-5 h-5" />
 
 <!-- ✅ CORRECT: Muted for secondary icons -->
-<x-icon name="o-clock" class="w-4 h-4 text-base-content/70" />
+<x-icon name="fas-clock" class="w-4 h-4 text-base-content/70" />
 
 <!-- ✅ CORRECT: Semantic color for status -->
-<x-icon name="o-check-circle" class="w-5 h-5 text-success" />
-<x-icon name="o-exclamation-triangle" class="w-5 h-5 text-warning" />
+<x-icon name="fas-circle-check" class="w-5 h-5 text-success" />
+<x-icon name="fas-triangle-exclamation" class="w-5 h-5 text-warning" />
+
+<!-- ✅ CORRECT: Brand icon for payment card -->
+<x-icon name="fab-cc-mastercard" class="w-8 h-6" />
+
+<!-- ✅ CORRECT: Financial icon -->
+<x-icon name="fas-piggy-bank" class="w-5 h-5 text-success" />
 
 <!-- ❌ INCORRECT: Arbitrary color -->
-<x-icon name="o-user" class="w-5 h-5 text-blue-500" />
+<x-icon name="fas-user" class="w-5 h-5 text-blue-500" />
 ```
 
 **Guidelines:**
@@ -763,6 +800,24 @@ Use these icons consistently across the entire app:
 - Muted: `text-base-content/70` or `/50` for less important icons
 - Semantic only: `text-success`, `text-error`, `text-warning` for status
 - Never use arbitrary colors like `text-blue-500`
+- Use brand icons (`fab-`) for payment methods and integrations
+
+### Migration from Heroicons
+
+To migrate existing code from Heroicons to FontAwesome:
+
+```bash
+# Preview changes (dry run)
+sail artisan icons:migrate-to-fontawesome --dry-run
+
+# Apply changes
+sail artisan icons:migrate-to-fontawesome
+
+# Migrate specific directory
+sail artisan icons:migrate-to-fontawesome --path=app/Integrations
+```
+
+See `config/icons.php` for the complete mapping between Heroicons and FontAwesome equivalents.
 
 ## Badge Standards
 
