@@ -237,7 +237,7 @@ new class extends Component {
         foreach ($integrationsData as $integration) {
             $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration['service']);
             $pluginName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($integration['service']);
-            $pluginIcon = $pluginClass ? $pluginClass::getIcon() : 'o-puzzle-piece';
+            $pluginIcon = $pluginClass ? $pluginClass::getIcon() : 'fas.puzzle-piece';
 
             // Get integration group info
             $integrationModel = $userIntegrations->firstWhere('id', $integration['id']);
@@ -437,12 +437,12 @@ new class extends Component {
             <div class="card-body">
                 @if (count($integrations) === 0)
                     <div class="text-center py-12">
-                        <x-icon name="o-inbox" class="w-16 h-16 text-base-content/30 mx-auto mb-4" />
+                        <x-icon name="fas.inbox" class="w-16 h-16 text-base-content/30 mx-auto mb-4" />
                         <h3 class="text-lg font-semibold mb-2">{{ __('No Integrations Found') }}</h3>
                         <p class="text-base-content/70 mb-4">{{ __('You haven\'t set up any integrations yet.') }}</p>
                         <x-button
                             label="{{ __('Go to Integrations') }}"
-                            icon="o-puzzle-piece"
+                            icon="fas.puzzle-piece"
                             link="{{ route('integrations.index') }}"
                             class="btn-primary"
                         />
@@ -521,7 +521,7 @@ new class extends Component {
                                             <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-base-300 flex items-center justify-center flex-shrink-0">
                                                 @php
                                                     $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration['service']);
-                                                    $icon = $pluginClass ? $pluginClass::getIcon() : 'o-puzzle-piece';
+                                                    $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.puzzle-piece';
                                                 @endphp
                                                 <x-icon :name="$icon" class="w-4 h-4 sm:w-5 sm:h-5 text-base-content" />
                                             </div>
@@ -793,7 +793,7 @@ new class extends Component {
                                     @if ($integration['last_triggered_at'] && $integration['last_triggered_at'] !== $integration['last_successful_update_at'])
                                         <div class="mt-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                                             <div class="flex items-center space-x-2">
-                                                <x-icon name="o-exclamation-triangle" class="w-4 h-4 text-warning" />
+                                                <x-icon name="fas.triangle-exclamation" class="w-4 h-4 text-warning" />
                                                 <span class="text-sm text-warning">
                                                     {{ __('Last triggered') }}: {{ \Carbon\Carbon::parse($integration['last_triggered_at'])->diffForHumans() }}
                                                     @if (!$integration['last_successful_update_at'] || $integration['last_triggered_at'] > $integration['last_successful_update_at'])
@@ -817,7 +817,7 @@ new class extends Component {
 
                     <div class="mt-6 p-4 bg-base-300 rounded-lg">
                         <div class="flex items-center space-x-2 mb-2">
-                            <x-icon name="o-information-circle" class="w-4 h-4 text-info" />
+                            <x-icon name="fas.circle-info" class="w-4 h-4 text-info" />
                             <span class="font-medium">{{ __('About Updates') }}</span>
                         </div>
                         <p class="text-sm text-base-content/70">

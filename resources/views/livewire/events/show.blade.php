@@ -658,7 +658,7 @@ new class extends Component {
                             @if ($this->event->domain)
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="o-building-office" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.layer-group" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->event->domain) }}
                                 </x-slot:value>
                             </x-badge>
@@ -666,7 +666,7 @@ new class extends Component {
                             @endif
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="o-server" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.bell-concierge" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->event->service) }}
                                 </x-slot:value>
                             </x-badge>
@@ -674,7 +674,7 @@ new class extends Component {
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="o-cube" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.cube" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->event->integration->instance_type) }}
                                 </x-slot:value>
                             </x-badge>
@@ -683,7 +683,7 @@ new class extends Component {
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge-xs badge-outline">
                                 <x-slot:value>
-                                    <x-icon name="o-link" class="w-3 h-3 text-base-content/40" />
+                                    <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
                                     {{ str::Headline($this->event->integration->name) }}
                                 </x-slot:value>
                             </x-badge>
