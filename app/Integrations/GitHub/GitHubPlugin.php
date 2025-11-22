@@ -105,7 +105,7 @@ class GitHubPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'o-code-bracket';
+        return 'fab-github';
     }
 
     public static function getAccentColor(): string
@@ -127,7 +127,7 @@ class GitHubPlugin extends OAuthPlugin
     {
         return [
             'push' => [
-                'icon' => 'o-arrow-up',
+                'icon' => 'fas-code-commit',
                 'display_name' => 'Push',
                 'description' => 'Code was pushed to a repository',
                 'display_with_object' => true,
@@ -146,25 +146,25 @@ class GitHubPlugin extends OAuthPlugin
     {
         return [
             'github_user' => [
-                'icon' => 'o-user',
+                'icon' => 'fas-user',
                 'display_name' => 'GitHub User',
                 'description' => 'A GitHub user account',
                 'hidden' => false,
             ],
             'github_repo' => [
-                'icon' => 'o-code-bracket',
+                'icon' => 'fas-code-branch',
                 'display_name' => 'GitHub Repository',
                 'description' => 'A GitHub repository',
                 'hidden' => false,
             ],
             'github_pr' => [
-                'icon' => 'o-arrow-path',
+                'icon' => 'fas-code-pull-request',
                 'display_name' => 'GitHub Pull Request',
                 'description' => 'A GitHub pull request',
                 'hidden' => false,
             ],
             'github_issue' => [
-                'icon' => 'o-exclamation-triangle',
+                'icon' => 'fas-circle-dot',
                 'display_name' => 'GitHub Issue',
                 'description' => 'A GitHub issue',
                 'hidden' => false,

@@ -53,7 +53,7 @@ class BlockTypeRegistry
     {
         $config = self::getBlockTypeConfig($blockType);
 
-        return $config['icon'] ?? 'o-square-3-stack-3d';
+        return $config['icon'] ?? 'fas-layer-group';
     }
 
     /**

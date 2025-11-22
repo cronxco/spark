@@ -103,7 +103,7 @@ class BlueSkyPlugin extends OAuthPlugin
 
     public static function getIcon(): string
     {
-        return 'o-chat-bubble-left-right';
+        return 'fab-bluesky';
     }
 
     public static function getAccentColor(): string
@@ -125,7 +125,7 @@ class BlueSkyPlugin extends OAuthPlugin
     {
         return [
             'bookmarked_post' => [
-                'icon' => 'o-bookmark',
+                'icon' => 'fas-bookmark',
                 'display_name' => 'Bookmarked Post',
                 'description' => 'A post bookmarked on BlueSky',
                 'display_with_object' => true,
@@ -133,7 +133,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'liked_post' => [
-                'icon' => 'o-heart',
+                'icon' => 'fas-heart',
                 'display_name' => 'Liked Post',
                 'description' => 'A post liked on BlueSky',
                 'display_with_object' => true,
@@ -141,7 +141,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'reposted' => [
-                'icon' => 'o-arrow-path-rounded-square',
+                'icon' => 'fas-retweet',
                 'display_name' => 'Reposted',
                 'description' => 'A post reposted on BlueSky',
                 'display_with_object' => true,
@@ -155,7 +155,7 @@ class BlueSkyPlugin extends OAuthPlugin
     {
         return [
             'post_content' => [
-                'icon' => 'o-document-text',
+                'icon' => 'fas-file-lines',
                 'display_name' => 'Post Content',
                 'description' => 'Text content of the post',
                 'display_with_object' => true,
@@ -163,7 +163,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'post_media' => [
-                'icon' => 'o-photo',
+                'icon' => 'fas-image',
                 'display_name' => 'Post Media',
                 'description' => 'Images or videos embedded in the post',
                 'display_with_object' => true,
@@ -171,7 +171,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'quoted_post_content' => [
-                'icon' => 'o-chat-bubble-left-ellipsis',
+                'icon' => 'fas-quote-left',
                 'display_name' => 'Quoted Post',
                 'description' => 'Content of a quoted post',
                 'display_with_object' => true,
@@ -179,7 +179,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'thread_parent' => [
-                'icon' => 'o-arrow-up-circle',
+                'icon' => 'fas-circle-up',
                 'display_name' => 'Thread Parent',
                 'description' => 'Parent post in thread',
                 'display_with_object' => true,
@@ -187,7 +187,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'post_metrics' => [
-                'icon' => 'o-chart-bar',
+                'icon' => 'fas-chart-simple',
                 'display_name' => 'Post Metrics',
                 'description' => 'Engagement metrics (likes, reposts, replies)',
                 'display_with_object' => false,
@@ -195,7 +195,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'hidden' => false,
             ],
             'link_preview' => [
-                'icon' => 'o-link',
+                'icon' => 'fas-link',
                 'display_name' => 'Link Preview',
                 'description' => 'URLs extracted from the post',
                 'display_with_object' => false,
@@ -209,13 +209,13 @@ class BlueSkyPlugin extends OAuthPlugin
     {
         return [
             'bluesky_user' => [
-                'icon' => 'o-user',
+                'icon' => 'fas-user',
                 'display_name' => 'BlueSky User',
                 'description' => 'A BlueSky user account',
                 'hidden' => false,
             ],
             'bluesky_post' => [
-                'icon' => 'o-document',
+                'icon' => 'fas-file',
                 'display_name' => 'BlueSky Post',
                 'description' => 'A post on BlueSky',
                 'hidden' => false,

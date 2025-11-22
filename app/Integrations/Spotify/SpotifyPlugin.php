@@ -123,7 +123,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
 
     public static function getIcon(): string
     {
-        return 'o-musical-note';
+        return 'fab-spotify';
     }
 
     public static function getAccentColor(): string
@@ -176,7 +176,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
     {
         return [
             'listened_to' => [
-                'icon' => 'o-play',
+                'icon' => 'fas-play',
                 'display_name' => 'Listened to Track',
                 'description' => 'A track that was listened to on Spotify',
                 'display_with_object' => true,
@@ -190,7 +190,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
     {
         return [
             'album_art' => [
-                'icon' => 'o-photo',
+                'icon' => 'fas-image',
                 'display_name' => 'Album Artwork',
                 'description' => 'Album cover artwork for the track',
                 'display_with_object' => true,
@@ -198,7 +198,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'track_details' => [
-                'icon' => 'o-information-circle',
+                'icon' => 'fas-circle-info',
                 'display_name' => 'Track Details',
                 'description' => 'Detailed information about the track',
                 'display_with_object' => true,
@@ -206,7 +206,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'artist' => [
-                'icon' => 'o-user',
+                'icon' => 'fas-user',
                 'display_name' => 'Artist',
                 'description' => 'Musical artist who created the track',
                 'display_with_object' => true,
@@ -214,7 +214,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'track_info' => [
-                'icon' => 'o-information-circle',
+                'icon' => 'fas-circle-info',
                 'display_name' => 'Track Information',
                 'description' => 'Detailed track metadata and information',
                 'display_with_object' => true,
@@ -222,7 +222,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'episode_art' => [
-                'icon' => 'o-photo',
+                'icon' => 'fas-image',
                 'display_name' => 'Episode Artwork',
                 'description' => 'Cover art for the podcast episode',
                 'display_with_object' => true,
@@ -230,7 +230,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'episode_details' => [
-                'icon' => 'o-information-circle',
+                'icon' => 'fas-circle-info',
                 'display_name' => 'Episode Details',
                 'description' => 'Detailed information about the podcast episode',
                 'display_with_object' => true,
@@ -244,19 +244,19 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
     {
         return [
             'spotify_user' => [
-                'icon' => 'o-user',
+                'icon' => 'fas-user',
                 'display_name' => 'Spotify User',
                 'description' => 'A Spotify user account',
                 'hidden' => false,
             ],
             'spotify_track' => [
-                'icon' => 'o-musical-note',
+                'icon' => 'fas-music',
                 'display_name' => 'Spotify Track',
                 'description' => 'A Spotify track',
                 'hidden' => false,
             ],
             'spotify_podcast_episode' => [
-                'icon' => 'o-microphone',
+                'icon' => 'fas-microphone',
                 'display_name' => 'Podcast Episode',
                 'description' => 'A podcast episode on Spotify',
                 'hidden' => false,
