@@ -302,4 +302,5 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         ]);
     })->name('bin.delete');
     Volt::route('activity', 'admin.activity')->name('activity.index');
+    Volt::route('push-notifications', 'admin.push-notifications')->name('push-notifications.index');
 });
