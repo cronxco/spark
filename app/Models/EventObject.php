@@ -135,6 +135,11 @@ class EventObject extends Model implements HasMedia
 
         $this->addMediaCollection('downloaded_documents')
             ->useDisk(config('media-library.disk_name'));
+
+        // Primary article image extracted from the webpage (og:image, twitter:image, etc.)
+        $this->addMediaCollection('article_images')
+            ->useDisk(config('media-library.disk_name'))
+            ->singleFile(); // Only one primary article image per bookmark
     }
 
     /**
@@ -147,17 +152,17 @@ class EventObject extends Model implements HasMedia
             ->height(300)
             ->sharpen(10)
             ->nonQueued()
-            ->performOnCollections('screenshots', 'downloaded_images');
+            ->performOnCollections('screenshots', 'downloaded_images', 'article_images');
 
         $this->addMediaConversion('medium')
             ->width(800)
             ->keepOriginalImageFormat()
-            ->performOnCollections('screenshots', 'downloaded_images');
+            ->performOnCollections('screenshots', 'downloaded_images', 'article_images');
 
         $this->addMediaConversion('webp')
             ->width(800)
             ->format('webp')
-            ->performOnCollections('screenshots', 'downloaded_images');
+            ->performOnCollections('screenshots', 'downloaded_images', 'article_images');
     }
 
     public function user()
