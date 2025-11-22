@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Models\PendingTransactionLink;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\TransactionLinking\Strategies\BacsRecordStrategy;
@@ -391,15 +390,17 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals(1, $result['created']);
         $this->assertEquals(0, $result['pending']);
 
-        // Check relationship was created
-        $this->assertDatabaseHas('relationships', [
-            'user_id' => $this->user->id,
-            'from_type' => Event::class,
-            'from_id' => $sourceEvent->id,
-            'to_type' => Event::class,
-            'to_id' => $targetEvent->id,
-            'type' => 'triggered_by',
-        ]);
+        // Check relationship was created and is NOT pending
+        $relationship = Relationship::where('user_id', $this->user->id)
+            ->where('from_type', Event::class)
+            ->where('from_id', $sourceEvent->id)
+            ->where('to_type', Event::class)
+            ->where('to_id', $targetEvent->id)
+            ->where('type', 'triggered_by')
+            ->first();
+
+        $this->assertNotNull($relationship);
+        $this->assertFalse($relationship->isPending());
     }
 
     /** @test */
@@ -424,7 +425,7 @@ class TransactionLinkingTest extends TestCase
             ],
         ]);
 
-        // Create relationship in reverse direction (B -> A)
+        // Create relationship in reverse direction (A -> B)
         Relationship::createRelationship([
             'user_id' => $this->user->id,
             'from_type' => Event::class,
@@ -464,16 +465,19 @@ class TransactionLinkingTest extends TestCase
             ],
         ]);
 
-        // Create pending link in reverse direction (A -> B)
-        PendingTransactionLink::create([
+        // Create pending relationship in reverse direction (A -> B)
+        Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $eventA->id,
-            'target_event_id' => $eventB->id,
-            'relationship_type' => 'triggered_by',
-            'confidence' => 75,
-            'detection_strategy' => 'test',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
+            'from_type' => Event::class,
+            'from_id' => $eventA->id,
+            'to_type' => Event::class,
+            'to_id' => $eventB->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 75,
+                'detection_strategy' => 'test',
+            ],
         ]);
 
         // Try to process eventB which would create B -> A link
@@ -489,38 +493,47 @@ class TransactionLinkingTest extends TestCase
     {
         $service = app(TransactionLinkingService::class);
 
-        // Create some pending links
-        PendingTransactionLink::create([
+        // Create some pending relationships
+        Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $this->createMonzoEvent()->id,
-            'target_event_id' => $this->createMonzoEvent()->id,
-            'relationship_type' => 'triggered_by',
-            'confidence' => 90,
-            'detection_strategy' => 'test',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 90,
+                'detection_strategy' => 'test',
+            ],
         ]);
 
-        PendingTransactionLink::create([
+        Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $this->createMonzoEvent()->id,
-            'target_event_id' => $this->createMonzoEvent()->id,
-            'relationship_type' => 'funded_by',
-            'confidence' => 60,
-            'detection_strategy' => 'test',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'funded_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 60,
+                'detection_strategy' => 'test',
+            ],
         ]);
 
-        PendingTransactionLink::create([
+        Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $this->createMonzoEvent()->id,
-            'target_event_id' => $this->createMonzoEvent()->id,
-            'relationship_type' => 'payment_for',
-            'confidence' => 40,
-            'detection_strategy' => 'test',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'payment_for',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 40,
+                'detection_strategy' => 'test',
+            ],
         ]);
 
         $stats = $service->getPendingStats($this->user->id);
@@ -532,130 +545,106 @@ class TransactionLinkingTest extends TestCase
     }
 
     // ==========================================
-    // PendingTransactionLink Model Tests
+    // Pending Relationship Tests
     // ==========================================
 
     /** @test */
-    public function pending_link_can_be_approved(): void
+    public function pending_relationship_can_be_approved(): void
     {
         $sourceEvent = $this->createMonzoEvent();
         $targetEvent = $this->createMonzoEvent();
 
-        $pendingLink = PendingTransactionLink::create([
-            'user_id' => $this->user->id,
-            'source_event_id' => $sourceEvent->id,
-            'target_event_id' => $targetEvent->id,
-            'relationship_type' => 'triggered_by',
-            'confidence' => 75,
-            'detection_strategy' => 'test',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
-        ]);
-
-        $this->assertTrue($pendingLink->isPending());
-
-        $pendingLink->approve();
-
-        $this->assertEquals('approved', $pendingLink->fresh()->status);
-        $this->assertNotNull($pendingLink->fresh()->reviewed_at);
-
-        // Check relationship was created
-        $this->assertDatabaseHas('relationships', [
+        $relationship = Relationship::createRelationship([
             'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $sourceEvent->id,
             'to_type' => Event::class,
             'to_id' => $targetEvent->id,
             'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 75,
+                'detection_strategy' => 'test',
+            ],
         ]);
+
+        $this->assertTrue($relationship->isPending());
+
+        $relationship->approve();
+
+        $this->assertFalse($relationship->fresh()->isPending());
+        $this->assertNotNull($relationship->fresh()->metadata['approved_at']);
     }
 
     /** @test */
-    public function pending_link_can_be_rejected(): void
+    public function pending_relationship_can_be_rejected(): void
     {
         $sourceEvent = $this->createMonzoEvent();
         $targetEvent = $this->createMonzoEvent();
 
-        $pendingLink = PendingTransactionLink::create([
+        $relationship = Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $sourceEvent->id,
-            'target_event_id' => $targetEvent->id,
-            'relationship_type' => 'triggered_by',
-            'confidence' => 75,
-            'detection_strategy' => 'test',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
-        ]);
-
-        $pendingLink->reject();
-
-        $this->assertEquals('rejected', $pendingLink->fresh()->status);
-        $this->assertNotNull($pendingLink->fresh()->reviewed_at);
-
-        // Verify no relationship was created
-        $this->assertDatabaseMissing('relationships', [
+            'from_type' => Event::class,
             'from_id' => $sourceEvent->id,
+            'to_type' => Event::class,
             'to_id' => $targetEvent->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 75,
+                'detection_strategy' => 'test',
+            ],
         ]);
+
+        $relationship->reject();
+
+        // Should be soft deleted
+        $this->assertSoftDeleted('relationships', ['id' => $relationship->id]);
+
+        // Metadata should have rejected_at
+        $deletedRelationship = Relationship::withTrashed()->find($relationship->id);
+        $this->assertNotNull($deletedRelationship->metadata['rejected_at']);
     }
 
     /** @test */
-    public function pending_link_scopes_work_correctly(): void
+    public function pending_relationship_scopes_work_correctly(): void
     {
         $sourceEvent = $this->createMonzoEvent();
         $targetEvent = $this->createMonzoEvent();
 
-        PendingTransactionLink::create([
+        // Create a pending relationship
+        Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $sourceEvent->id,
-            'target_event_id' => $targetEvent->id,
-            'relationship_type' => 'triggered_by',
-            'confidence' => 90,
-            'detection_strategy' => 'explicit_reference',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'pending',
+            'from_type' => Event::class,
+            'from_id' => $sourceEvent->id,
+            'to_type' => Event::class,
+            'to_id' => $targetEvent->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 90,
+                'detection_strategy' => 'explicit_reference',
+            ],
         ]);
 
-        PendingTransactionLink::create([
+        // Create a confirmed relationship
+        Relationship::createRelationship([
             'user_id' => $this->user->id,
-            'source_event_id' => $this->createMonzoEvent()->id,
-            'target_event_id' => $this->createMonzoEvent()->id,
-            'relationship_type' => 'funded_by',
-            'confidence' => 50,
-            'detection_strategy' => 'bacs_record',
-            'matching_criteria' => ['type' => 'test'],
-            'status' => 'approved',
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'funded_by',
+            'metadata' => [
+                'confidence' => 50,
+                'detection_strategy' => 'bacs_record',
+            ],
         ]);
 
-        $this->assertEquals(1, PendingTransactionLink::pending()->count());
-        $this->assertEquals(1, PendingTransactionLink::aboveConfidence(80)->count());
-        $this->assertEquals(1, PendingTransactionLink::forStrategy('explicit_reference')->count());
-    }
-
-    /** @test */
-    public function pending_link_stores_matching_criteria(): void
-    {
-        $sourceEvent = $this->createMonzoEvent();
-        $targetEvent = $this->createMonzoEvent();
-
-        $criteria = [
-            'type' => 'transaction_id',
-            'path' => 'raw.metadata.transaction_id',
-            'referenced_id' => 'tx_12345',
-        ];
-
-        $pendingLink = PendingTransactionLink::create([
-            'user_id' => $this->user->id,
-            'source_event_id' => $sourceEvent->id,
-            'target_event_id' => $targetEvent->id,
-            'relationship_type' => 'triggered_by',
-            'confidence' => 100,
-            'detection_strategy' => 'explicit_reference',
-            'matching_criteria' => $criteria,
-            'status' => 'pending',
-        ]);
-
-        $this->assertEquals($criteria, $pendingLink->matching_criteria);
+        $this->assertEquals(1, Relationship::pending()->count());
+        $this->assertEquals(1, Relationship::confirmed()->count());
+        $this->assertEquals(1, Relationship::aboveConfidence(80)->count());
+        $this->assertEquals(1, Relationship::forStrategy('explicit_reference')->count());
     }
 
     // ==========================================

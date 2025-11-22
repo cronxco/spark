@@ -1,6 +1,7 @@
 <?php
 
-use App\Models\PendingTransactionLink;
+use App\Models\Event;
+use App\Models\Relationship;
 use App\Services\RelationshipTypeRegistry;
 use App\Services\TransactionLinking\TransactionLinkingService;
 use Illuminate\Support\Facades\Auth;
@@ -23,14 +24,14 @@ new class extends Component
     public string $confidenceFilter = '';
     public array $selectedLinks = [];
     public int $perPage = 25;
-    public array $sortBy = ['column' => 'confidence', 'direction' => 'desc'];
+    public array $sortBy = ['column' => 'created_at', 'direction' => 'desc'];
 
     protected $queryString = [
         'search' => ['except' => ''],
         'statusFilter' => ['except' => 'pending'],
         'strategyFilter' => ['except' => ''],
         'confidenceFilter' => ['except' => ''],
-        'sortBy' => ['except' => ['column' => 'confidence', 'direction' => 'desc']],
+        'sortBy' => ['except' => ['column' => 'created_at', 'direction' => 'desc']],
         'perPage' => ['except' => 25],
         'page' => ['except' => 1],
     ];
@@ -70,11 +71,11 @@ new class extends Component
     public function headers(): array
     {
         return [
-            ['key' => 'confidence', 'label' => 'Confidence', 'sortable' => true, 'class' => 'w-24'],
+            ['key' => 'confidence', 'label' => 'Confidence', 'sortable' => false, 'class' => 'w-24'],
             ['key' => 'source', 'label' => 'Source Transaction', 'sortable' => false],
             ['key' => 'type', 'label' => 'Link Type', 'sortable' => false, 'class' => 'w-32'],
             ['key' => 'target', 'label' => 'Target Transaction', 'sortable' => false],
-            ['key' => 'strategy', 'label' => 'Strategy', 'sortable' => true, 'class' => 'hidden lg:table-cell'],
+            ['key' => 'strategy', 'label' => 'Strategy', 'sortable' => false, 'class' => 'hidden lg:table-cell'],
             ['key' => 'actions', 'label' => 'Actions', 'sortable' => false, 'class' => 'w-32'],
         ];
     }
@@ -82,15 +83,15 @@ new class extends Component
     public function approveLink(string $linkId): void
     {
         try {
-            $link = PendingTransactionLink::findOrFail($linkId);
+            $relationship = Relationship::findOrFail($linkId);
 
-            if (!$link->isPending()) {
+            if (!$relationship->isPending()) {
                 $this->warning('This link has already been processed.');
                 return;
             }
 
-            $link->approve();
-            $this->success('Link approved and relationship created!');
+            $relationship->approve();
+            $this->success('Link approved!');
         } catch (\Exception $e) {
             $this->error('Failed to approve link: ' . $e->getMessage());
         }
@@ -99,14 +100,14 @@ new class extends Component
     public function rejectLink(string $linkId): void
     {
         try {
-            $link = PendingTransactionLink::findOrFail($linkId);
+            $relationship = Relationship::findOrFail($linkId);
 
-            if (!$link->isPending()) {
+            if (!$relationship->isPending()) {
                 $this->warning('This link has already been processed.');
                 return;
             }
 
-            $link->reject();
+            $relationship->reject();
             $this->success('Link rejected.');
         } catch (\Exception $e) {
             $this->error('Failed to reject link: ' . $e->getMessage());
@@ -123,9 +124,9 @@ new class extends Component
         $approved = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $link = PendingTransactionLink::find($linkId);
-                if ($link && $link->isPending()) {
-                    $link->approve();
+                $relationship = Relationship::find($linkId);
+                if ($relationship && $relationship->isPending()) {
+                    $relationship->approve();
                     $approved++;
                 }
             } catch (\Exception $e) {
@@ -147,9 +148,9 @@ new class extends Component
         $rejected = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $link = PendingTransactionLink::find($linkId);
-                if ($link && $link->isPending()) {
-                    $link->reject();
+                $relationship = Relationship::find($linkId);
+                if ($relationship && $relationship->isPending()) {
+                    $relationship->reject();
                     $rejected++;
                 }
             } catch (\Exception $e) {
@@ -163,25 +164,31 @@ new class extends Component
 
     public function getPendingLinks()
     {
-        $query = PendingTransactionLink::with(['sourceEvent.actor', 'sourceEvent.target', 'targetEvent.actor', 'targetEvent.target'])
-            ->where('user_id', Auth::id());
+        $query = Relationship::with(['from', 'to'])
+            ->where('user_id', Auth::id())
+            ->where('from_type', Event::class)
+            ->where('to_type', Event::class);
 
         // Apply status filter
-        if ($this->statusFilter) {
-            $query->where('status', $this->statusFilter);
+        if ($this->statusFilter === 'pending') {
+            $query->pending();
+        } elseif ($this->statusFilter === 'confirmed') {
+            $query->confirmed();
         }
+        // For 'all', don't filter by status
 
         // Apply strategy filter
         if ($this->strategyFilter) {
-            $query->where('detection_strategy', $this->strategyFilter);
+            $query->forStrategy($this->strategyFilter);
         }
 
         // Apply confidence filter
         if ($this->confidenceFilter) {
             match ($this->confidenceFilter) {
-                'high' => $query->where('confidence', '>=', 80),
-                'medium' => $query->whereBetween('confidence', [50, 80]),
-                'low' => $query->where('confidence', '<', 50),
+                'high' => $query->aboveConfidence(80),
+                'medium' => $query->whereRaw("(metadata->>'confidence')::numeric >= 50")
+                                  ->whereRaw("(metadata->>'confidence')::numeric < 80"),
+                'low' => $query->whereRaw("(metadata->>'confidence')::numeric < 50"),
                 default => null,
             };
         }
@@ -189,11 +196,11 @@ new class extends Component
         // Apply search
         if ($this->search) {
             $query->where(function ($q) {
-                $q->whereHas('sourceEvent', function ($eq) {
+                $q->whereHas('from', function ($eq) {
                     $eq->where('action', 'ilike', '%' . $this->search . '%')
                         ->orWhereRaw("event_metadata::text ilike ?", ['%' . $this->search . '%']);
                 })
-                ->orWhereHas('targetEvent', function ($eq) {
+                ->orWhereHas('to', function ($eq) {
                     $eq->where('action', 'ilike', '%' . $this->search . '%')
                         ->orWhereRaw("event_metadata::text ilike ?", ['%' . $this->search . '%']);
                 });
@@ -201,7 +208,7 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'confidence';
+        $sortColumn = $this->sortBy['column'] ?? 'created_at';
         $sortDirection = $this->sortBy['direction'] ?? 'desc';
         $query->orderBy($sortColumn, $sortDirection);
 
@@ -216,9 +223,12 @@ new class extends Component
 
     public function getUniqueStrategies()
     {
-        return PendingTransactionLink::where('user_id', Auth::id())
-            ->distinct()
-            ->pluck('detection_strategy')
+        return Relationship::where('user_id', Auth::id())
+            ->where('from_type', Event::class)
+            ->where('to_type', Event::class)
+            ->whereNotNull('metadata')
+            ->selectRaw("DISTINCT metadata->>'detection_strategy' as strategy")
+            ->pluck('strategy')
             ->filter()
             ->sort()
             ->values();
@@ -241,8 +251,11 @@ new class extends Component
         return $action . ($value ? " ({$value})" : '');
     }
 
-    public function formatStrategy(string $strategy): string
+    public function formatStrategy(?string $strategy): string
     {
+        if (!$strategy) {
+            return '-';
+        }
         return Str::title(str_replace('_', ' ', $strategy));
     }
 
@@ -251,8 +264,11 @@ new class extends Component
         return RelationshipTypeRegistry::getDisplayName($type) ?? Str::title(str_replace('_', ' ', $type));
     }
 
-    public function getConfidenceBadgeClass(float $confidence): string
+    public function getConfidenceBadgeClass(?float $confidence): string
     {
+        if ($confidence === null) {
+            return 'badge-ghost';
+        }
         if ($confidence >= 80) {
             return 'badge-success';
         }
@@ -333,9 +349,7 @@ new class extends Component
                         <select class="select select-bordered" wire:model.live="statusFilter">
                             <option value="">All</option>
                             <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="auto_approved">Auto-Approved</option>
+                            <option value="confirmed">Confirmed</option>
                         </select>
                     </div>
                     <div class="form-control">
@@ -398,45 +412,46 @@ new class extends Component
                     </x-slot:empty>
 
                     @scope('cell_confidence', $link)
-                    <div class="badge {{ $this->getConfidenceBadgeClass($link->confidence) }}">
-                        {{ number_format($link->confidence, 1) }}%
+                    @php $confidence = $link->getConfidence(); @endphp
+                    <div class="badge {{ $this->getConfidenceBadgeClass($confidence) }}">
+                        {{ $confidence !== null ? number_format($confidence, 1) . '%' : '-' }}
                     </div>
                     @endscope
 
                     @scope('cell_source', $link)
                     <div class="flex flex-col gap-1">
-                        <a href="{{ route('events.show', $link->sourceEvent) }}" class="link link-hover text-sm font-medium">
-                            {{ $this->formatTransactionTitle($link->sourceEvent) }}
+                        <a href="{{ route('events.show', $link->from) }}" class="link link-hover text-sm font-medium">
+                            {{ $this->formatTransactionTitle($link->from) }}
                         </a>
                         <div class="flex gap-2 text-xs text-base-content/70">
-                            <span>{{ $link->sourceEvent?->actor?->title ?? 'Unknown' }}</span>
+                            <span>{{ $link->from?->actor?->title ?? 'Unknown' }}</span>
                             <span>•</span>
-                            <span>{{ $link->sourceEvent?->time?->format('M j, Y H:i') }}</span>
+                            <span>{{ $link->from?->time?->format('M j, Y H:i') }}</span>
                         </div>
                     </div>
                     @endscope
 
                     @scope('cell_type', $link)
                     <div class="badge badge-outline">
-                        {{ $this->getTypeDisplayName($link->relationship_type) }}
+                        {{ $this->getTypeDisplayName($link->type) }}
                     </div>
                     @endscope
 
                     @scope('cell_target', $link)
                     <div class="flex flex-col gap-1">
-                        <a href="{{ route('events.show', $link->targetEvent) }}" class="link link-hover text-sm font-medium">
-                            {{ $this->formatTransactionTitle($link->targetEvent) }}
+                        <a href="{{ route('events.show', $link->to) }}" class="link link-hover text-sm font-medium">
+                            {{ $this->formatTransactionTitle($link->to) }}
                         </a>
                         <div class="flex gap-2 text-xs text-base-content/70">
-                            <span>{{ $link->targetEvent?->actor?->title ?? 'Unknown' }}</span>
+                            <span>{{ $link->to?->actor?->title ?? 'Unknown' }}</span>
                             <span>•</span>
-                            <span>{{ $link->targetEvent?->time?->format('M j, Y H:i') }}</span>
+                            <span>{{ $link->to?->time?->format('M j, Y H:i') }}</span>
                         </div>
                     </div>
                     @endscope
 
                     @scope('cell_strategy', $link)
-                    <span class="text-sm">{{ $this->formatStrategy($link->detection_strategy) }}</span>
+                    <span class="text-sm">{{ $this->formatStrategy($link->getDetectionStrategy()) }}</span>
                     @endscope
 
                     @scope('cell_actions', $link)
@@ -450,9 +465,7 @@ new class extends Component
                         </button>
                     </div>
                     @else
-                    <span class="badge badge-ghost badge-sm">
-                        {{ ucfirst(str_replace('_', ' ', $link->status)) }}
-                    </span>
+                    <span class="badge badge-ghost badge-sm">Confirmed</span>
                     @endif
                     @endscope
                 </x-table>
