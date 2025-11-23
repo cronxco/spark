@@ -213,9 +213,11 @@ class FinancialAccountsTest extends TestCase
         ]);
 
         $component = Livewire::test(FinancialAccounts::class);
+        $component->call('deleteAccount', $account)
+            ->assertForbidden();
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
-        $component->call('deleteAccount', $account);
+        // Account should still exist
+        $this->assertDatabaseHas('event_objects', ['id' => $account->id]);
     }
 
     #[Test]

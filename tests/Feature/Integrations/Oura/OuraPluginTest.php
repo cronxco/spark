@@ -73,7 +73,7 @@ class OuraPluginTest extends TestCase
 
         $this->assertIsArray($objectTypes);
         $this->assertArrayHasKey('oura_user', $objectTypes);
-        $this->assertArrayHasKey('oura_workout', $objectTypes);
+        $this->assertArrayHasKey('oura_sleep_record', $objectTypes);
         $this->assertArrayHasKey('oura_tag', $objectTypes);
     }
 

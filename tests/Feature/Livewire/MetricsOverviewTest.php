@@ -174,7 +174,7 @@ class MetricsOverviewTest extends TestCase
 
         MetricTrend::factory()->create([
             'metric_statistic_id' => $metric->id,
-            'trend_type' => 'increasing',
+            'type' => 'trend_up_weekly',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -215,7 +215,7 @@ class MetricsOverviewTest extends TestCase
         // Add more trends to metric2
         MetricTrend::factory()->count(3)->create([
             'metric_statistic_id' => $metric2->id,
-            'trend_type' => 'increasing',
+            'type' => 'trend_up_weekly',
             'acknowledged_at' => null,
         ]);
 
