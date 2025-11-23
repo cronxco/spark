@@ -53,7 +53,7 @@ return [
         'spotlight' => [
             'view' => 'wire-elements-pro::spotlight.component',
             'default-behavior' => [
-                'debounce_milliseconds' => 200,
+                'debounce_milliseconds' => 350,
                 'shortcuts' => [
                     'k',
                     'slash',

@@ -1,18 +1,20 @@
 <?php
 
-use App\Models\EventObject;
-use App\Models\Event;
-use App\Models\Block;
-use Illuminate\Support\Str;
-use Livewire\Volt\Component;
-use function Livewire\Volt\layout;
 use App\Integrations\PluginRegistry;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use Livewire\Attributes\Computed;
+use Livewire\Volt\Component;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Tags\Tag;
 
+use function Livewire\Volt\layout;
+
 layout('components.layouts.app');
 
-new class extends Component {
+new class extends Component
+{
     public EventObject $object;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -68,15 +70,17 @@ new class extends Component {
         $this->showSidebar = ! $this->showSidebar;
     }
 
-    public function getRelationships()
+    #[Computed]
+    public function relationships()
     {
         return $this->object->allRelationships()->get();
     }
 
-    public function getRelatedEvents()
+    #[Computed]
+    public function relatedEvents()
     {
         // Use semantic search if embeddings exist
-        if (!empty($this->object->embeddings)) {
+        if (! empty($this->object->embeddings)) {
             try {
                 $embedding = $this->object->embeddings;
 
@@ -117,10 +121,11 @@ new class extends Component {
             ->get();
     }
 
-    public function getRelatedBlocks()
+    #[Computed]
+    public function relatedBlocks()
     {
         // Use semantic search if embeddings exist
-        if (!empty($this->object->embeddings)) {
+        if (! empty($this->object->embeddings)) {
             try {
                 $embedding = $this->object->embeddings;
 
@@ -152,7 +157,8 @@ new class extends Component {
             ->get();
     }
 
-    public function getActivities()
+    #[Computed]
+    public function activities()
     {
         return Activity::forSubject($this->object)
             ->latest()
@@ -197,6 +203,7 @@ new class extends Component {
         if (is_array($data) || is_object($data)) {
             return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }
+
         return $data;
     }
 
@@ -215,8 +222,8 @@ new class extends Component {
                     'metadata' => $rel->metadata,
                 ];
             })->toArray(),
-            'related_events' => $this->getRelatedEvents()->toArray(),
-            'related_blocks' => $this->getRelatedBlocks()->toArray(),
+            'related_events' => $this->relatedEvents->toArray(),
+            'related_blocks' => $this->relatedBlocks->toArray(),
         ];
     }
 
@@ -225,8 +232,8 @@ new class extends Component {
         $data = $this->getCompleteObjectData();
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $this->js("
-            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+        $this->js('
+            const blob = new Blob([' . json_encode($json) . "], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1024,7 +1031,7 @@ new class extends Component {
     {
         $this->object->refresh()->load([
             'relationshipsFrom',
-            'relationshipsTo'
+            'relationshipsTo',
         ]);
     }
 
@@ -1161,15 +1168,15 @@ new class extends Component {
             @endif
 
             <!-- Related Blocks -->
-            @if ($this->getRelatedBlocks()->isNotEmpty())
+            @if ($this->relatedBlocks->isNotEmpty())
             <div class="relative">
                 <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
                         <x-icon name="fas.grip" class="w-5 h-5 text-warning" />
-                        Related Blocks ({{ $this->getRelatedBlocks()->count() }})
+                        Related Blocks ({{ $this->relatedBlocks->count() }})
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        @foreach ($this->getRelatedBlocks() as $block)
+                        @foreach ($this->relatedBlocks as $block)
                             <x-block-card :block="$block" />
                         @endforeach
                     </div>
@@ -1182,15 +1189,15 @@ new class extends Component {
             @endif
 
             <!-- Related Events -->
-            @if ($this->getRelatedEvents()->isNotEmpty())
+            @if ($this->relatedEvents->isNotEmpty())
             <div class="relative">
                 <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
                         <x-icon name="fas.bolt" class="w-5 h-5 text-warning" />
-                        Related Events ({{ $this->getRelatedEvents()->count() }})
+                        Related Events ({{ $this->relatedEvents->count() }})
                     </h3>
                     <div class="space-y-3">
-                        @foreach ($this->getRelatedEvents() as $event)
+                        @foreach ($this->relatedEvents as $event)
                         <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors bg-base-100">
                             <a href="{{ route('events.show', $event->id) }}"
                                 class="block hover:text-primary transition-colors">
@@ -1269,7 +1276,7 @@ new class extends Component {
             @endif
 
             <!-- Relationships -->
-            @php $relationships = $this->getRelationships(); @endphp
+            @php $relationships = $this->relationships; @endphp
             @if ($relationships->isNotEmpty())
             <x-card class="bg-base-200/50 border-2 border-accent/10">
                 <div class="flex items-center justify-between mb-4">
@@ -1468,7 +1475,7 @@ new class extends Component {
                                 <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
-                        @php $sidebarRelationships = $this->getRelationships(); @endphp
+                        @php $sidebarRelationships = $this->relationships; @endphp
                         @if ($sidebarRelationships->isEmpty())
                             <x-empty-state
                                 icon="fas.right-left"
@@ -1526,7 +1533,7 @@ new class extends Component {
                             </div>
                         </x-slot:heading>
                         <x-slot:content>
-                            @php $activities = $this->getActivities(); @endphp
+                            @php $activities = $this->activities; @endphp
                             @if ($activities->isEmpty())
                             <x-empty-state
                                 icon="fas.clock"
@@ -1535,7 +1542,7 @@ new class extends Component {
                                 actionLabel="Add Comment" />
                             @else
                             @php
-                            $activities = $this->getActivities();
+                            $activities = $this->activities;
                             $timeline = collect();
                             if ($this->object?->created_at) {
                             $timeline->push((object) [

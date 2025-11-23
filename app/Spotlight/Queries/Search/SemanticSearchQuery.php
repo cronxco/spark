@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\EmbeddingService;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -16,14 +17,13 @@ class SemanticSearchQuery
 {
     /**
      * Create Spotlight query for semantic search across events and blocks.
+     * Uses dedicated mode (~) to avoid running expensive AI queries on every keystroke.
      */
     public static function make(): SpotlightQuery
     {
-        return SpotlightQuery::asDefault(function (string $query) {
-            // Only trigger semantic search for queries of 3+ words or 15+ characters
-            // This avoids expensive API calls for short queries
-            $wordCount = str_word_count($query);
-            if (blank($query) || (strlen($query) < 15 && $wordCount < 3)) {
+        return SpotlightQuery::forMode('semantic', function (string $query) {
+            // Require at least 3 characters for semantic search
+            if (blank($query) || strlen($query) < 3) {
                 return collect();
             }
 

@@ -5,6 +5,7 @@ namespace App\Spotlight\Queries\Scoped;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -44,7 +45,23 @@ class IntegrationObjectsQuery
                 return collect();
             }
 
-            return $objects->map(function ($object) use ($integration) {
+            // Batch fetch latest events for all objects in a single query
+            $objectIdsList = $objects->pluck('id');
+            $latestEvents = Event::query()
+                ->whereIn('actor_id', $objectIdsList)
+                ->where('integration_id', $integrationId)
+                ->whereIn('id', function ($subquery) use ($objectIdsList, $integrationId) {
+                    $subquery->select(DB::raw('DISTINCT ON (actor_id) id'))
+                        ->from('events')
+                        ->whereIn('actor_id', $objectIdsList)
+                        ->where('integration_id', $integrationId)
+                        ->orderBy('actor_id')
+                        ->orderByDesc('time');
+                })
+                ->get()
+                ->keyBy('actor_id');
+
+            return $objects->map(function ($object) use ($latestEvents) {
                 // Build subtitle
                 $subtitleParts = [];
 
@@ -56,11 +73,8 @@ class IntegrationObjectsQuery
                     $subtitleParts[] = Str::headline($object->type);
                 }
 
-                // Try to get latest event for this object
-                $latestEvent = Event::where('actor_id', $object->id)
-                    ->where('integration_id', $integration->id)
-                    ->latest('time')
-                    ->first();
+                // Get pre-fetched latest event for this object
+                $latestEvent = $latestEvents->get($object->id);
 
                 if ($latestEvent) {
                     $subtitleParts[] = 'Updated ' . $latestEvent->time->diffForHumans();

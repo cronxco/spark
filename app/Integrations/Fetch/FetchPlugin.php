@@ -181,7 +181,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'hidden' => false,
             ],
             'fetch_key_takeaways' => [
-                'icon' => 'fas.list',
+                'icon' => 'fas.list-ul',
                 'display_name' => 'Key Takeaways',
                 'description' => '3-5 actionable bullet points',
                 'display_with_object' => true,
@@ -226,7 +226,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
             'fetch-add-url' => [
                 'title' => 'Add URL to Fetch',
                 'subtitle' => 'Subscribe to a new URL to monitor and archive',
-                'icon' => 'plus-circle',
+                'icon' => 'fas.circle-plus',
                 'action' => 'jump_to',
                 'actionParams' => [
                     'path' => '/bookmarks/fetch?tab=urls',
@@ -236,7 +236,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
             'fetch-manage-cookies' => [
                 'title' => 'Manage Fetch Cookies',
                 'subtitle' => 'Add or update authentication cookies for paywalled sites',
-                'icon' => 'key',
+                'icon' => 'fas.key',
                 'action' => 'jump_to',
                 'actionParams' => [
                     'path' => '/bookmarks/fetch?tab=cookies',
@@ -246,7 +246,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
             'fetch-discovery-settings' => [
                 'title' => 'Configure URL Discovery',
                 'subtitle' => 'Set up automatic URL discovery from other integrations',
-                'icon' => 'magnifying-glass',
+                'icon' => 'fas.magnifying-glass',
                 'action' => 'jump_to',
                 'actionParams' => [
                     'path' => '/bookmarks/fetch?tab=discovery',
@@ -256,7 +256,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
             'fetch-view-stats' => [
                 'title' => 'View Fetch Statistics',
                 'subtitle' => 'See your archived content and fetch history',
-                'icon' => 'chart-bar',
+                'icon' => 'fas.chart-simple',
                 'action' => 'jump_to',
                 'actionParams' => [
                     'path' => '/bookmarks/fetch?tab=stats',
@@ -266,7 +266,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
             'fetch-view-bookmarks' => [
                 'title' => 'View All Bookmarks',
                 'subtitle' => 'Browse your fetched content and summaries',
-                'icon' => 'bookmark',
+                'icon' => 'fas.bookmark',
                 'action' => 'jump_to',
                 'actionParams' => [
                     'path' => '/bookmarks',
