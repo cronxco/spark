@@ -50,6 +50,9 @@ new class extends Component {
         try {
             $this->object = $object->load(['tags', 'relationshipsFrom', 'relationshipsTo']);
             Log::info('EventObject mount complete');
+
+            // Track this view in the activity log (debounced to prevent duplicate views)
+            $this->object->logViewIfNotRecent(5);
         } catch (\Exception $e) {
             Log::error('EventObject mount failed', [
                 'exception' => get_class($e),

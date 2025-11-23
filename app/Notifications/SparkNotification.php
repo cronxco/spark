@@ -6,6 +6,8 @@ use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
 abstract class SparkNotification extends Notification implements ShouldQueue
 {
@@ -32,9 +34,14 @@ abstract class SparkNotification extends Notification implements ShouldQueue
     {
         $channels = ['database'];
 
-        // Priority notifications always send via email
+        // Priority notifications always send via all channels
         if ($this->isPriority()) {
             $channels[] = 'mail';
+
+            // Add push if user has any subscriptions
+            if ($notifiable->pushSubscriptions()->exists()) {
+                $channels[] = WebPushChannel::class;
+            }
 
             return $channels;
         }
@@ -42,15 +49,41 @@ abstract class SparkNotification extends Notification implements ShouldQueue
         // Check user preferences for email
         if ($notifiable->hasEmailNotificationsEnabled($this->getNotificationType())) {
             // Handle delayed sending based on work hours
-            if ($this->shouldDelayEmail($notifiable)) {
-                // Don't send email now - it will be queued for later
-                return $channels;
+            if (! $this->shouldDelayEmail($notifiable)) {
+                $channels[] = 'mail';
             }
+        }
 
-            $channels[] = 'mail';
+        // Check user preferences for push notifications
+        if ($notifiable->hasPushNotificationsEnabledForType($this->getNotificationType())) {
+            if ($notifiable->pushSubscriptions()->exists()) {
+                $channels[] = WebPushChannel::class;
+            }
         }
 
         return $channels;
+    }
+
+    /**
+     * Get the web push representation of the notification
+     */
+    public function toWebPush(User $notifiable, $notification): WebPushMessage
+    {
+        return (new WebPushMessage)
+            ->title($this->getTitle())
+            ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
+            ->body($this->getMessage())
+            ->badge('/favicon.ico')
+            ->tag($this->getNotificationType())
+            ->data([
+                'url' => $this->getActionUrl() ?? url('/'),
+                'type' => $this->getNotificationType(),
+                'notification_id' => $notification->id ?? null,
+            ])
+            ->options([
+                'TTL' => 86400, // 24 hours
+                'urgency' => $this->isPriority() ? 'high' : 'normal',
+            ]);
     }
 
     /**
