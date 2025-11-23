@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Relationship;
+use App\Services\RecentlyViewedService;
 use App\Services\RelationshipTypeRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +46,33 @@ class AddRelationship extends Component
     public function getRelationshipTypesProperty(): array
     {
         return RelationshipTypeRegistry::getTypes();
+    }
+
+    /**
+     * Get recently viewed items for quick selection.
+     * Excludes the current "from" item to avoid self-relationships.
+     */
+    public function getRecentlyViewedProperty()
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return collect();
+        }
+
+        $service = new RecentlyViewedService();
+
+        // Filter by selected type if one is chosen, otherwise show all types
+        $types = null;
+        if (filled($this->toType)) {
+            $types = [$this->toType];
+        }
+
+        return $service->getRecentlyViewed($user, 10, $types)
+            ->filter(function ($item) {
+                // Exclude the current "from" item to prevent self-relationships
+                return ! ($item->type === $this->fromType && $item->id === $this->fromId);
+            })
+            ->values();
     }
 
     public function getSearchResultsProperty()
@@ -100,6 +128,17 @@ class AddRelationship extends Component
     {
         $this->selectedToId = $id;
         $this->searchQuery = ''; // Clear search after selection
+    }
+
+    /**
+     * Select a target from recently viewed items.
+     * Also sets the toType based on the item type.
+     */
+    public function selectFromRecentlyViewed(string $type, string $id): void
+    {
+        $this->toType = $type;
+        $this->selectedToId = $id;
+        $this->searchQuery = '';
     }
 
     public function clearSelection(): void
@@ -198,6 +237,7 @@ class AddRelationship extends Component
             'relationshipTypes' => $this->relationshipTypes,
             'searchResults' => $this->searchResults,
             'selectedTarget' => $this->selectedTarget,
+            'recentlyViewed' => $this->recentlyViewed,
         ]);
     }
 
