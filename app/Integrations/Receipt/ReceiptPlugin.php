@@ -232,6 +232,14 @@ class ReceiptPlugin extends WebhookPlugin
      */
     private function extractS3ObjectKey(array $snsMessage): ?string
     {
+        // Log the message structure for debugging
+        Log::debug('Receipt: Extracting S3 object key from message', [
+            'message_keys' => array_keys($snsMessage),
+            'has_receipt' => isset($snsMessage['receipt']),
+            'has_mail' => isset($snsMessage['mail']),
+            'has_content' => isset($snsMessage['content']),
+        ]);
+
         // SES notification structure:
         // {
         //   "receipt": {
@@ -243,16 +251,29 @@ class ReceiptPlugin extends WebhookPlugin
         //   }
         // }
 
-        if (! isset($snsMessage['receipt']['action'])) {
-            return null;
+        if (isset($snsMessage['receipt']['action'])) {
+            $action = $snsMessage['receipt']['action'];
+
+            Log::debug('Receipt: Found receipt.action', [
+                'action_type' => $action['type'] ?? null,
+                'has_objectKey' => isset($action['objectKey']),
+                'action_keys' => array_keys($action),
+            ]);
+
+            if (($action['type'] ?? null) === 'S3' && isset($action['objectKey'])) {
+                return $action['objectKey'];
+            }
         }
 
-        $action = $snsMessage['receipt']['action'];
-
-        if ($action['type'] !== 'S3' || ! isset($action['objectKey'])) {
-            return null;
+        // Alternative: Check if objectKey is at a different path
+        // Some SES configurations put it differently
+        if (isset($snsMessage['mail']['messageId'])) {
+            // The messageId might be the S3 key in some configurations
+            Log::debug('Receipt: Checking mail.messageId as potential S3 key', [
+                'messageId' => $snsMessage['mail']['messageId'],
+            ]);
         }
 
-        return $action['objectKey'];
+        return null;
     }
 }
