@@ -385,8 +385,10 @@ class FinancialPlugin extends ManualPlugin
             return collect();
         }
 
-        // Get the actual table name (respects test prefixes)
-        $table = (new Event)->getTable();
+        // Get the actual table name with prefix (respects test prefixes)
+        $model = new Event;
+        $prefix = $model->getConnection()->getTablePrefix();
+        $table = $prefix . $model->getTable();
 
         // Use PostgreSQL DISTINCT ON for efficient "latest per group" query
         $placeholders = implode(',', array_fill(0, count($accountIds), '?'));
