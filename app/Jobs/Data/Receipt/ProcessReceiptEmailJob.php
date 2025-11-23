@@ -33,19 +33,27 @@ class ProcessReceiptEmailJob implements ShouldQueue
 
     public function __construct(
         public Integration $integration,
-        public string $s3ObjectKey
+        public ?string $s3ObjectKey = null,
+        public ?string $rawEmailContent = null
     ) {}
 
     public function handle(): void
     {
-        Log::info('Receipt: Processing receipt email from S3', [
+        Log::info('Receipt: Processing receipt email', [
             'integration_id' => $this->integration->id,
             's3_object_key' => $this->s3ObjectKey,
+            'has_raw_content' => ! empty($this->rawEmailContent),
         ]);
 
         try {
-            // Download email from S3
-            $emailContent = $this->downloadEmailFromS3($this->s3ObjectKey);
+            // Get email content - either from raw content or S3
+            if (! empty($this->rawEmailContent)) {
+                $emailContent = $this->rawEmailContent;
+            } elseif (! empty($this->s3ObjectKey)) {
+                $emailContent = $this->downloadEmailFromS3($this->s3ObjectKey);
+            } else {
+                throw new Exception('No email content or S3 key provided');
+            }
 
             // Parse email to extract text
             $parsedEmail = $this->parseEmail($emailContent);
@@ -82,7 +90,11 @@ class ProcessReceiptEmailJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'process_receipt_email_' . $this->integration->id . '_' . md5($this->s3ObjectKey);
+        $contentHash = $this->s3ObjectKey
+            ? md5($this->s3ObjectKey)
+            : md5($this->rawEmailContent ?? '');
+
+        return 'process_receipt_email_' . $this->integration->id . '_' . $contentHash;
     }
 
     /**

@@ -131,17 +131,39 @@ class ReceiptPlugin extends WebhookPlugin
             abort(400, 'Invalid SNS notification');
         }
 
-        // Extract S3 object key from SES notification
+        // Check if email content is included directly (SNS action type)
+        if (isset($snsMessage['content'])) {
+            $emailContent = $snsMessage['content'];
+
+            // Check encoding - SES can send base64 encoded content
+            $encoding = $snsMessage['receipt']['action']['encoding'] ?? null;
+            if ($encoding === 'BASE64') {
+                $emailContent = base64_decode($emailContent);
+            }
+
+            Log::info('Receipt: Processing email from SNS content', [
+                'integration_id' => $integration->id,
+                'content_length' => strlen($emailContent),
+                'encoding' => $encoding,
+            ]);
+
+            // Dispatch job with the raw email content
+            ProcessReceiptEmailJob::dispatch($integration, null, $emailContent);
+
+            return;
+        }
+
+        // Fall back to S3 object key extraction
         $s3ObjectKey = $this->extractS3ObjectKey($snsMessage);
 
         if (! $s3ObjectKey) {
-            Log::warning('Receipt: No S3 object key found in SNS notification', [
+            Log::warning('Receipt: No S3 object key or content found in SNS notification', [
                 'integration_id' => $integration->id,
             ]);
-            abort(400, 'No S3 object key in notification');
+            abort(400, 'No S3 object key or content in notification');
         }
 
-        // Dispatch job to process receipt email
+        // Dispatch job to process receipt email from S3
         ProcessReceiptEmailJob::dispatch($integration, $s3ObjectKey);
 
         Log::info('Receipt: Email processing job dispatched', [
