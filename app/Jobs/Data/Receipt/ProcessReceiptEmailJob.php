@@ -66,6 +66,19 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 $parsedEmail['from']
             );
 
+            // Check if this was identified as not a valid receipt
+            if (isset($receiptData['is_valid_receipt']) && $receiptData['is_valid_receipt'] === false) {
+                Log::info('Receipt: Skipping non-receipt email', [
+                    'integration_id' => $this->integration->id,
+                    'subject' => $parsedEmail['subject'],
+                    'from' => $parsedEmail['from'],
+                    'rejection_reason' => $receiptData['rejection_reason'] ?? 'unknown',
+                ]);
+
+                // Don't create any events for non-receipts
+                return;
+            }
+
             // Create receipt event and related data
             $receiptEvent = $this->createReceiptEvent($receiptData, $parsedEmail);
 
@@ -299,8 +312,14 @@ class ProcessReceiptEmailJob implements ShouldQueue
             'target_metadata' => [],
         ]);
 
-        // Create line item blocks
-        foreach ($receiptData['line_items'] ?? [] as $item) {
+        // Create line item blocks (only if there are line items with descriptions)
+        $lineItems = $receiptData['line_items'] ?? [];
+        foreach ($lineItems as $item) {
+            // Skip line items without descriptions or prices
+            if (empty($item['description']) || ! isset($item['total_price'])) {
+                continue;
+            }
+
             $event->createBlock([
                 'time' => $transactionTime,
                 'block_type' => 'receipt_line_item',
@@ -309,45 +328,62 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 'value_multiplier' => 100,
                 'value_unit' => $receiptData['transaction_summary']['currency'],
                 'metadata' => [
-                    'sequence' => $item['sequence'],
-                    'quantity' => $item['quantity'],
-                    'unit' => $item['unit'],
-                    'unit_price' => $item['unit_price'],
+                    'sequence' => $item['sequence'] ?? null,
+                    'quantity' => $item['quantity'] ?? null,
+                    'unit' => $item['unit'] ?? null,
+                    'unit_price' => $item['unit_price'] ?? null,
                     'category' => $item['category'] ?? null,
                     'sku' => $item['sku'] ?? null,
-                    'tax_rate' => $item['tax_rate'],
+                    'tax_rate' => $item['tax_rate'] ?? null,
                 ],
             ]);
         }
 
-        // Create tax summary block
-        $event->createBlock([
-            'time' => $transactionTime,
-            'block_type' => 'receipt_tax_summary',
-            'title' => 'Tax Summary',
-            'value' => $receiptData['transaction_summary']['tax_total'],
-            'value_multiplier' => 100,
-            'value_unit' => $receiptData['transaction_summary']['currency'],
-            'metadata' => [
-                'tax_rate' => $receiptData['transaction_summary']['tax_rate'],
-                'subtotal' => $receiptData['transaction_summary']['subtotal'],
-                'discount_total' => $receiptData['transaction_summary']['discount_total'] ?? 0,
-                'tip_amount' => $receiptData['transaction_summary']['tip_amount'] ?? 0,
-            ],
-        ]);
+        // Create tax summary block (only if there's tax data)
+        $taxTotal = $receiptData['transaction_summary']['tax_total'] ?? null;
+        $taxRate = $receiptData['transaction_summary']['tax_rate'] ?? null;
+        if ($taxTotal !== null && $taxTotal > 0) {
+            $event->createBlock([
+                'time' => $transactionTime,
+                'block_type' => 'receipt_tax_summary',
+                'title' => 'Tax Summary',
+                'value' => $taxTotal,
+                'value_multiplier' => 100,
+                'value_unit' => $receiptData['transaction_summary']['currency'],
+                'metadata' => [
+                    'tax_rate' => $taxRate,
+                    'subtotal' => $receiptData['transaction_summary']['subtotal'] ?? null,
+                    'discount_total' => $receiptData['transaction_summary']['discount_total'] ?? 0,
+                    'tip_amount' => $receiptData['transaction_summary']['tip_amount'] ?? 0,
+                ],
+            ]);
+        }
 
-        // Create payment method block
-        $event->createBlock([
-            'time' => $transactionTime,
-            'block_type' => 'receipt_payment_method',
-            'title' => 'Payment Method',
-            'metadata' => [
-                'payment_method' => $receiptData['transaction_metadata']['payment_method'] ?? 'unknown',
-                'card_last_4' => $receiptData['transaction_metadata']['card_last_4'] ?? null,
-                'receipt_number' => $receiptData['transaction_metadata']['receipt_number'] ?? null,
-                'terminal_id' => $receiptData['transaction_metadata']['terminal_id'] ?? null,
-            ],
-        ]);
+        // Create payment method block (only if there's meaningful payment data)
+        $paymentMethod = $receiptData['transaction_metadata']['payment_method'] ?? null;
+        $cardLast4 = $receiptData['transaction_metadata']['card_last_4'] ?? null;
+        $receiptNumber = $receiptData['transaction_metadata']['receipt_number'] ?? null;
+        $terminalId = $receiptData['transaction_metadata']['terminal_id'] ?? null;
+
+        // Only create if we have at least one meaningful field (not just 'unknown')
+        $hasPaymentData = ($paymentMethod && $paymentMethod !== 'unknown')
+            || $cardLast4
+            || $receiptNumber
+            || $terminalId;
+
+        if ($hasPaymentData) {
+            $event->createBlock([
+                'time' => $transactionTime,
+                'block_type' => 'receipt_payment_method',
+                'title' => 'Payment Method',
+                'metadata' => [
+                    'payment_method' => $paymentMethod,
+                    'card_last_4' => $cardLast4,
+                    'receipt_number' => $receiptNumber,
+                    'terminal_id' => $terminalId,
+                ],
+            ]);
+        }
 
         Log::info('Receipt: Created receipt event and blocks', [
             'event_id' => $event->id,

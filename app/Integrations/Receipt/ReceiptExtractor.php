@@ -18,6 +18,15 @@ class ReceiptExtractor
         $systemPrompt = <<<'PROMPT'
 You are an expert receipt data extractor. Extract structured information from receipt text.
 
+FIRST: Determine if this is actually a receipt/invoice/order confirmation.
+If NOT a receipt (e.g., newsletter, marketing email, general correspondence, account statement), return:
+{
+  "is_valid_receipt": false,
+  "rejection_reason": "Brief explanation of why this is not a receipt"
+}
+
+If it IS a valid receipt, extract the data with is_valid_receipt: true.
+
 CRITICAL REQUIREMENTS:
 1. ALL monetary amounts must be in smallest currency unit (pence for GBP, cents for USD, etc.)
 2. Parse dates as ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)
@@ -27,6 +36,20 @@ CRITICAL REQUIREMENTS:
 6. Extract line items with exact descriptions as shown
 7. For refunds, use negative amounts
 8. Guess currency from context (£/GBP, €/EUR, $/USD, etc.)
+
+Valid receipts include:
+- Purchase receipts (retail, restaurant, etc.)
+- Invoices
+- Order confirmations with amounts
+- Payment confirmations
+- Refund confirmations
+
+NOT valid receipts:
+- Marketing emails
+- Newsletters
+- Account statements without specific transactions
+- Shipping notifications without payment details
+- Password resets, account alerts, etc.
 
 The receipt may come from various sources:
 - Email body (HTML or plain text)
@@ -62,9 +85,28 @@ PROMPT;
 
             $extracted = json_decode($response->choices[0]->message->content, true);
 
-            if (! $extracted || ! isset($extracted['transaction_summary'])) {
+            if (! $extracted) {
+                throw new Exception('Invalid response from GPT-5: could not parse JSON');
+            }
+
+            // Check if this was identified as not a valid receipt
+            if (isset($extracted['is_valid_receipt']) && $extracted['is_valid_receipt'] === false) {
+                Log::info('Receipt: Email identified as not a valid receipt', [
+                    'subject' => $emailSubject,
+                    'from' => $emailFrom,
+                    'rejection_reason' => $extracted['rejection_reason'] ?? 'unknown',
+                ]);
+
+                return $extracted;
+            }
+
+            // Validate required fields for valid receipts
+            if (! isset($extracted['transaction_summary'])) {
                 throw new Exception('Invalid response from GPT-5: missing required fields');
             }
+
+            // Ensure is_valid_receipt is set
+            $extracted['is_valid_receipt'] = true;
 
             Log::info('Receipt: Successfully extracted receipt data', [
                 'merchant' => $extracted['merchant']['name'] ?? 'unknown',
@@ -91,6 +133,7 @@ PROMPT;
     private function getSchemaExample(): string
     {
         return json_encode([
+            'is_valid_receipt' => true,
             'receipt_metadata' => [
                 'email_subject' => 'string',
                 'email_from' => 'string',
