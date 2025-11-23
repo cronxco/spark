@@ -19,7 +19,9 @@ class EventApiController extends Controller
     {
         $user = Auth::user();
 
-        $query = Event::with(['actor', 'target', 'blocks', 'integration', 'tags'])
+        // Use withCount for blocks instead of eager loading (better for list views)
+        $query = Event::with(['actor', 'target', 'integration', 'tags'])
+            ->withCount('blocks')
             ->whereHas('integration', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             });

@@ -563,6 +563,40 @@ class Event extends Model
     }
 
     /**
+     * Scope for loading standard relations (for list views)
+     */
+    public function scopeWithStandardRelations($query)
+    {
+        return $query->with(['actor', 'target', 'integration', 'tags']);
+    }
+
+    /**
+     * Scope for listing events with count instead of full blocks
+     */
+    public function scopeForListing($query)
+    {
+        return $query->withStandardRelations()->withCount('blocks');
+    }
+
+    /**
+     * Scope for detailed event view (includes full blocks)
+     */
+    public function scopeForDetail($query)
+    {
+        return $query->with(['actor', 'target', 'blocks', 'integration', 'tags']);
+    }
+
+    /**
+     * Scope for filtering events by user through integration
+     */
+    public function scopeForUser($query, $userId)
+    {
+        return $query->whereHas('integration', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        });
+    }
+
+    /**
      * Log tag activity to the activity log
      */
     private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
