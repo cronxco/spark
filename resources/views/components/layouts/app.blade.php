@@ -9,6 +9,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#F5F5F5" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#010E19" media="(prefers-color-scheme: dark)">
+    <!-- Desktop favicons -->
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="icon" sizes="16x16 32x32 64x64" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="196x196" href="/favicon-192.png">
@@ -17,15 +18,17 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
-    <link rel="apple-touch-icon" href="/favicon-57.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="/favicon-114.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="/favicon-72.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="/favicon-144.png">
-    <link rel="apple-touch-icon" sizes="60x60" href="/favicon-60.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="/favicon-120.png">
-    <link rel="apple-touch-icon" sizes="76x76" href="/favicon-76.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/favicon-152.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
+    <!-- iOS/PWA icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/Spark-iOS-Default-60x60@3x.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/Spark-iOS-Default-83.5x83.5@2x.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/Spark-iOS-Default-76x76@2x.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/icons/Spark-iOS-Default-60x60@2x.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/icons/Spark-iOS-Default-38x38@3x.png">
+    <link rel="apple-touch-icon" sizes="80x80" href="/icons/Spark-iOS-Default-40x40@2x.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/icons/Spark-iOS-Default-38x38@2x.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/icons/Spark-iOS-Default-20x20@3x.png">
+    <link rel="apple-touch-icon" sizes="58x58" href="/icons/Spark-iOS-Default-29x29@2x.png">
+    <link rel="apple-touch-icon" sizes="40x40" href="/icons/Spark-iOS-Default-20x20@2x.png">
     <title>{{ isset($title) ? $title.' - '.config('app.name') : config('app.name') }}</title>
 
     <!-- Fonts -->
