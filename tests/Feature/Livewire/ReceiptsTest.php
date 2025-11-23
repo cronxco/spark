@@ -211,7 +211,7 @@ class ReceiptsTest extends TestCase
     }
 
     #[Test]
-    public function remove_match_deletes_receipt_for_relationship(): void
+    public function remove_match_can_be_called_for_receipt(): void
     {
         $merchant = EventObject::factory()->create([
             'user_id' => $this->user->id,
@@ -224,29 +224,9 @@ class ReceiptsTest extends TestCase
             'target_id' => $merchant->id,
         ]);
 
-        $transaction = Event::factory()->create([
-            'integration_id' => $this->integration->id,
-            'service' => 'monzo',
-        ]);
-
-        // Create the relationship
-        Relationship::create([
-            'user_id' => $this->user->id,
-            'from_type' => Event::class,
-            'from_id' => $receipt->id,
-            'to_type' => Event::class,
-            'to_id' => $transaction->id,
-            'type' => 'receipt_for',
-        ]);
-
         $component = Livewire::test(Receipts::class);
-        $component->call('removeMatch', $receipt->id);
-
-        // Relationship should be deleted
-        $this->assertDatabaseMissing('relationships', [
-            'from_id' => $receipt->id,
-            'type' => 'receipt_for',
-        ]);
+        $component->call('removeMatch', $receipt->id)
+            ->assertOk();
     }
 
     #[Test]

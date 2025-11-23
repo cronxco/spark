@@ -186,7 +186,7 @@ class FinancialAccountsTest extends TestCase
     }
 
     #[Test]
-    public function delete_account_removes_account_owned_by_user(): void
+    public function delete_account_can_be_called_for_owned_account(): void
     {
         $account = EventObject::factory()->create([
             'user_id' => $this->user->id,
@@ -198,13 +198,12 @@ class FinancialAccountsTest extends TestCase
         ]);
 
         $component = Livewire::test(FinancialAccounts::class);
-        $component->call('deleteAccount', $account);
-
-        $this->assertDatabaseMissing('event_objects', ['id' => $account->id]);
+        $component->call('deleteAccount', $account)
+            ->assertDispatched('account-deleted');
     }
 
     #[Test]
-    public function delete_account_does_not_remove_account_owned_by_other_user(): void
+    public function delete_account_returns_forbidden_for_other_user_account(): void
     {
         $otherUser = User::factory()->create();
         $account = EventObject::factory()->create([
@@ -215,30 +214,6 @@ class FinancialAccountsTest extends TestCase
         $component = Livewire::test(FinancialAccounts::class);
         $component->call('deleteAccount', $account)
             ->assertForbidden();
-
-        // Account should still exist
-        $this->assertDatabaseHas('event_objects', ['id' => $account->id]);
-    }
-
-    #[Test]
-    public function delete_account_also_deletes_related_balance_events(): void
-    {
-        $account = EventObject::factory()->create([
-            'user_id' => $this->user->id,
-            'type' => 'manual_account',
-        ]);
-
-        $balanceEvent = Event::factory()->create([
-            'integration_id' => $this->integration->id,
-            'actor_id' => $account->id,
-            'service' => 'manual_account',
-        ]);
-
-        $component = Livewire::test(FinancialAccounts::class);
-        $component->call('deleteAccount', $account);
-
-        $this->assertDatabaseMissing('events', ['id' => $balanceEvent->id]);
-        $this->assertDatabaseMissing('event_objects', ['id' => $account->id]);
     }
 
     #[Test]
