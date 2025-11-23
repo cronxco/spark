@@ -2,40 +2,68 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     /**
+     * Check if an index exists in PostgreSQL
+     */
+    private function indexExists(string $indexName): bool
+    {
+        $result = DB::select("SELECT 1 FROM pg_indexes WHERE indexname = ?", [$indexName]);
+
+        return count($result) > 0;
+    }
+
+    /**
+     * Safely create an index if it doesn't exist
+     */
+    private function createIndexIfNotExists(string $table, array $columns, string $indexName): void
+    {
+        if (! $this->indexExists($indexName)) {
+            Schema::table($table, function (Blueprint $table) use ($columns, $indexName) {
+                $table->index($columns, $indexName);
+            });
+        }
+    }
+
+    /**
+     * Safely drop an index if it exists
+     */
+    private function dropIndexIfExists(string $table, string $indexName): void
+    {
+        if ($this->indexExists($indexName)) {
+            Schema::table($table, function (Blueprint $table) use ($indexName) {
+                $table->dropIndex($indexName);
+            });
+        }
+    }
+
+    /**
      * Run the migrations.
      */
     public function up(): void
     {
-        // Add composite index for event listing queries (integration + time ordering)
-        Schema::table('events', function (Blueprint $table) {
-            $table->index(['integration_id', 'time'], 'events_integration_time_idx');
-            $table->index(['integration_id', 'deleted_at'], 'events_integration_deleted_idx');
-            $table->index(['service', 'domain', 'action'], 'events_service_domain_action_idx');
-            $table->index(['time', 'deleted_at'], 'events_time_deleted_idx');
-        });
+        // Add composite indexes for event listing queries
+        $this->createIndexIfNotExists('events', ['integration_id', 'time'], 'events_integration_time_idx');
+        $this->createIndexIfNotExists('events', ['integration_id', 'deleted_at'], 'events_integration_deleted_idx');
+        $this->createIndexIfNotExists('events', ['service', 'domain', 'action'], 'events_service_domain_action_idx');
+        $this->createIndexIfNotExists('events', ['time', 'deleted_at'], 'events_time_deleted_idx');
 
         // Add index for blocks event lookups
-        Schema::table('blocks', function (Blueprint $table) {
-            $table->index(['event_id', 'deleted_at'], 'blocks_event_deleted_idx');
-        });
+        $this->createIndexIfNotExists('blocks', ['event_id', 'deleted_at'], 'blocks_event_deleted_idx');
 
         // Add index for integrations user lookups
-        Schema::table('integrations', function (Blueprint $table) {
-            $table->index(['user_id', 'deleted_at'], 'integrations_user_deleted_idx');
-        });
+        $this->createIndexIfNotExists('integrations', ['user_id', 'deleted_at'], 'integrations_user_deleted_idx');
 
         // Add index for metric trends detection queries
-        Schema::table('metric_trends', function (Blueprint $table) {
-            $table->index(
-                ['metric_statistic_id', 'type', 'acknowledged_at', 'start_date'],
-                'metric_trends_detection_idx'
-            );
-        });
+        $this->createIndexIfNotExists(
+            'metric_trends',
+            ['metric_statistic_id', 'type', 'acknowledged_at', 'start_date'],
+            'metric_trends_detection_idx'
+        );
     }
 
     /**
@@ -43,23 +71,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('events', function (Blueprint $table) {
-            $table->dropIndex('events_integration_time_idx');
-            $table->dropIndex('events_integration_deleted_idx');
-            $table->dropIndex('events_service_domain_action_idx');
-            $table->dropIndex('events_time_deleted_idx');
-        });
-
-        Schema::table('blocks', function (Blueprint $table) {
-            $table->dropIndex('blocks_event_deleted_idx');
-        });
-
-        Schema::table('integrations', function (Blueprint $table) {
-            $table->dropIndex('integrations_user_deleted_idx');
-        });
-
-        Schema::table('metric_trends', function (Blueprint $table) {
-            $table->dropIndex('metric_trends_detection_idx');
-        });
+        $this->dropIndexIfExists('events', 'events_integration_time_idx');
+        $this->dropIndexIfExists('events', 'events_integration_deleted_idx');
+        $this->dropIndexIfExists('events', 'events_service_domain_action_idx');
+        $this->dropIndexIfExists('events', 'events_time_deleted_idx');
+        $this->dropIndexIfExists('blocks', 'blocks_event_deleted_idx');
+        $this->dropIndexIfExists('integrations', 'integrations_user_deleted_idx');
+        $this->dropIndexIfExists('metric_trends', 'metric_trends_detection_idx');
     }
 };
