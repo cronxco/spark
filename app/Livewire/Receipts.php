@@ -156,7 +156,7 @@ class Receipts extends Component
     {
         $query = Event::where('service', 'receipt')
             ->where('domain', 'money')
-            ->where('action', 'receipt_received_from')
+            ->where('action', 'had_receipt_from')
             ->with(['target', 'blocks', 'integration']);
 
         // Apply status filter
