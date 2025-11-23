@@ -23,6 +23,13 @@ class MetricDetail extends Component
 
     public bool $showMovingAverage = false;
 
+    // Progressive loading state
+    public bool $trendsLoaded = false;
+
+    public $cachedAnomalies = null;
+
+    public $cachedTrends = null;
+
     public function mount(MetricStatistic $metric): void
     {
         // Ensure user owns this metric
@@ -31,6 +38,22 @@ class MetricDetail extends Component
         }
 
         $this->metric = $metric;
+    }
+
+    public function loadTrends(): void
+    {
+        if ($this->trendsLoaded) {
+            return;
+        }
+
+        $trends = $this->metric->trends()
+            ->orderByDesc('detected_at')
+            ->get()
+            ->groupBy(fn ($trend) => $trend->isAnomaly() ? 'anomalies' : 'trends');
+
+        $this->cachedAnomalies = $trends['anomalies'] ?? collect();
+        $this->cachedTrends = $trends['trends'] ?? collect();
+        $this->trendsLoaded = true;
     }
 
     public function acknowledgeTrend(string $trendId): void
@@ -82,12 +105,6 @@ class MetricDetail extends Component
     {
         $user = Auth::user();
 
-        // Get trends for this metric
-        $trends = $this->metric->trends()
-            ->orderByDesc('detected_at')
-            ->get()
-            ->groupBy(fn ($trend) => $trend->isAnomaly() ? 'anomalies' : 'trends');
-
         // Check if tracking is disabled
         $isTrackingDisabled = $user->isMetricTrackingDisabled(
             $this->metric->service,
@@ -114,12 +131,13 @@ class MetricDetail extends Component
         }
 
         return view('livewire.metric-detail', [
-            'anomalies' => $trends['anomalies'] ?? collect(),
-            'detectedTrends' => $trends['trends'] ?? collect(),
+            'anomalies' => $this->cachedAnomalies ?? collect(),
+            'detectedTrends' => $this->cachedTrends ?? collect(),
             'isTrackingDisabled' => $isTrackingDisabled,
             'chartLabels' => $chartLabels,
             'chartData' => $chartData,
             'showNormalRange' => $this->showNormalRange,
+            'trendsLoaded' => $this->trendsLoaded,
         ]);
     }
 
