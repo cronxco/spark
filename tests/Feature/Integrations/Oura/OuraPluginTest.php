@@ -142,8 +142,8 @@ class OuraPluginTest extends TestCase
         $actionTypes = OuraPlugin::getActionTypes();
 
         foreach ($actionTypes as $action => $config) {
-            $this->assertArrayHasKey('icon', $config, "Action '$action' should have an icon");
-            $this->assertNotEmpty($config['icon'], "Action '$action' icon should not be empty");
+            $this->assertArrayHasKey('icon', $config, "Action '{$action}' should have an icon");
+            $this->assertNotEmpty($config['icon'], "Action '{$action}' icon should not be empty");
         }
     }
 
@@ -153,8 +153,8 @@ class OuraPluginTest extends TestCase
         $actionTypes = OuraPlugin::getActionTypes();
 
         foreach ($actionTypes as $action => $config) {
-            $this->assertArrayHasKey('display_name', $config, "Action '$action' should have a display_name");
-            $this->assertNotEmpty($config['display_name'], "Action '$action' display_name should not be empty");
+            $this->assertArrayHasKey('display_name', $config, "Action '{$action}' should have a display_name");
+            $this->assertNotEmpty($config['display_name'], "Action '{$action}' display_name should not be empty");
         }
     }
 
@@ -164,8 +164,8 @@ class OuraPluginTest extends TestCase
         $actionTypes = OuraPlugin::getActionTypes();
 
         foreach ($actionTypes as $action => $config) {
-            $this->assertArrayHasKey('description', $config, "Action '$action' should have a description");
-            $this->assertNotEmpty($config['description'], "Action '$action' description should not be empty");
+            $this->assertArrayHasKey('description', $config, "Action '{$action}' should have a description");
+            $this->assertNotEmpty($config['description'], "Action '{$action}' description should not be empty");
         }
     }
 }

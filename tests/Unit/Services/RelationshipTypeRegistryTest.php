@@ -217,17 +217,17 @@ class RelationshipTypeRegistryTest extends TestCase
         $types = RelationshipTypeRegistry::getTypes();
 
         foreach ($types as $key => $config) {
-            $this->assertArrayHasKey('display_name', $config, "Type '$key' missing display_name");
-            $this->assertArrayHasKey('icon', $config, "Type '$key' missing icon");
-            $this->assertArrayHasKey('is_directional', $config, "Type '$key' missing is_directional");
-            $this->assertArrayHasKey('description', $config, "Type '$key' missing description");
-            $this->assertArrayHasKey('supports_value', $config, "Type '$key' missing supports_value");
+            $this->assertArrayHasKey('display_name', $config, "Type '{$key}' missing display_name");
+            $this->assertArrayHasKey('icon', $config, "Type '{$key}' missing icon");
+            $this->assertArrayHasKey('is_directional', $config, "Type '{$key}' missing is_directional");
+            $this->assertArrayHasKey('description', $config, "Type '{$key}' missing description");
+            $this->assertArrayHasKey('supports_value', $config, "Type '{$key}' missing supports_value");
 
-            $this->assertIsString($config['display_name'], "Type '$key' display_name should be string");
-            $this->assertIsString($config['icon'], "Type '$key' icon should be string");
-            $this->assertIsBool($config['is_directional'], "Type '$key' is_directional should be bool");
-            $this->assertIsString($config['description'], "Type '$key' description should be string");
-            $this->assertIsBool($config['supports_value'], "Type '$key' supports_value should be bool");
+            $this->assertIsString($config['display_name'], "Type '{$key}' display_name should be string");
+            $this->assertIsString($config['icon'], "Type '{$key}' icon should be string");
+            $this->assertIsBool($config['is_directional'], "Type '{$key}' is_directional should be bool");
+            $this->assertIsString($config['description'], "Type '{$key}' description should be string");
+            $this->assertIsBool($config['supports_value'], "Type '{$key}' supports_value should be bool");
         }
     }
 
@@ -238,8 +238,8 @@ class RelationshipTypeRegistryTest extends TestCase
 
         foreach ($types as $key => $config) {
             if ($config['supports_value']) {
-                $this->assertArrayHasKey('default_value_unit', $config, "Value-supporting type '$key' should have default_value_unit");
-                $this->assertIsString($config['default_value_unit'], "Type '$key' default_value_unit should be string");
+                $this->assertArrayHasKey('default_value_unit', $config, "Value-supporting type '{$key}' should have default_value_unit");
+                $this->assertIsString($config['default_value_unit'], "Type '{$key}' default_value_unit should be string");
             }
         }
     }
