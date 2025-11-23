@@ -375,7 +375,7 @@ class FinancialPlugin extends ManualPlugin
      * Batch load latest balances for multiple accounts (N+1 optimization)
      *
      * @param  \Illuminate\Support\Collection  $accounts  Collection of EventObject accounts
-     * @return \Illuminate\Support\Collection  Keyed by actor_id
+     * @return \Illuminate\Support\Collection Keyed by actor_id
      */
     public function getLatestBalancesForAccounts($accounts): \Illuminate\Support\Collection
     {

@@ -186,16 +186,6 @@ class Index extends Component
         }
     }
 
-    /**
-     * Clear cached media filter values when media changes
-     */
-    private function clearMediaFilterCaches(): void
-    {
-        Cache::forget('media:model_types');
-        Cache::forget('media:collection_names');
-        Cache::forget('media:mime_types');
-    }
-
     public function render()
     {
         return view('livewire.media.index', [
@@ -205,5 +195,15 @@ class Index extends Component
             'mimeTypes' => $this->mimeTypes(),
             'headers' => $this->headers(),
         ]);
+    }
+
+    /**
+     * Clear cached media filter values when media changes
+     */
+    private function clearMediaFilterCaches(): void
+    {
+        Cache::forget('media:model_types');
+        Cache::forget('media:collection_names');
+        Cache::forget('media:mime_types');
     }
 }

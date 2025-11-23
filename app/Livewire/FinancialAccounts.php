@@ -48,11 +48,6 @@ class FinancialAccounts extends Component
         'other' => false, // 'other' accounts collapsed by default
     ];
 
-    /**
-     * Cache for batch-loaded balances (N+1 optimization)
-     */
-    private ?\Illuminate\Support\Collection $balanceCache = null;
-
     protected $queryString = [
         'search' => ['except' => ''],
         'accountTypeFilter' => ['except' => ''],
@@ -63,6 +58,11 @@ class FinancialAccounts extends Component
         'perPage' => ['except' => 25],
         'viewMode' => ['except' => 'cards'],
     ];
+
+    /**
+     * Cache for batch-loaded balances (N+1 optimization)
+     */
+    private ?\Illuminate\Support\Collection $balanceCache = null;
 
     public function updatedSearch(): void
     {
