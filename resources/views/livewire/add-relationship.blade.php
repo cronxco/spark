@@ -95,9 +95,10 @@
             </div>
         @endif
 
-        <!-- Search Results (fixed height container) -->
+        <!-- Search Results / Recently Viewed (fixed height container) -->
         <div class="form-control">
             @if ($toType && !$selectedTarget && $searchResults->isNotEmpty())
+                {{-- Search Results --}}
                 <label class="label">
                     <span class="label-text">Results ({{ $searchResults->count() }})</span>
                 </label>
@@ -139,11 +140,62 @@
                     @endforeach
                 </div>
             @elseif ($toType && !$selectedTarget && filled($searchQuery))
+                {{-- No Search Results --}}
                 <div class="h-64 flex items-center justify-center text-base-content/60 rounded-lg border border-base-300">
                     <div class="text-center">
                         <x-icon name="fas.magnifying-glass" class="w-8 h-8 mx-auto mb-2 text-base-content/30" />
                         <p class="text-sm">No results found</p>
                     </div>
+                </div>
+            @elseif (!$selectedTarget && $recentlyViewed->isNotEmpty() && blank($searchQuery))
+                {{-- Recently Viewed Items --}}
+                <label class="label">
+                    <span class="label-text flex items-center gap-2">
+                        <x-icon name="fas.clock-rotate-left" class="w-4 h-4 text-info" />
+                        Recently Viewed
+                    </span>
+                    @if (blank($toType))
+                        <span class="label-text-alt text-base-content/50">Select a type to filter</span>
+                    @endif
+                </label>
+                <div class="h-64 overflow-y-auto space-y-1 rounded-lg border border-base-300 p-2 bg-base-100/50">
+                    @foreach ($recentlyViewed as $item)
+                        @php
+                            $model = $item->model;
+                            if ($item->type === \App\Models\Event::class) {
+                                $icon = 'fas.calendar';
+                                $title = $model->action;
+                                $subtitle = $model->time?->format('M j, Y g:i A');
+                                $badge = 'Event';
+                                $badgeClass = 'badge-primary badge-outline';
+                            } elseif ($item->type === \App\Models\EventObject::class) {
+                                $icon = 'o-cube';
+                                $title = $model->title;
+                                $subtitle = $model->concept . ' / ' . $model->type;
+                                $badge = 'Object';
+                                $badgeClass = 'badge-secondary badge-outline';
+                            } elseif ($item->type === \App\Models\Block::class) {
+                                $icon = 'fas.grip';
+                                $title = $model->block_type ?? $model->title;
+                                $subtitle = $model->time?->format('M j, Y');
+                                $badge = 'Block';
+                                $badgeClass = 'badge-accent badge-outline';
+                            }
+                        @endphp
+                        <button
+                            type="button"
+                            wire:click="selectFromRecentlyViewed('{{ $item->type }}', '{{ $item->id }}')"
+                            class="w-full flex items-center gap-2 p-2 rounded hover:bg-info/10 transition-colors text-left group"
+                        >
+                            <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0 text-base-content/60 group-hover:text-info" />
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium truncate text-sm group-hover:text-info">{{ $title }}</div>
+                                <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
+                            </div>
+                            <span class="badge {{ $badgeClass }} badge-xs">{{ $badge }}</span>
+                            <span class="text-xs text-base-content/40">{{ $item->viewed_at->diffForHumans(short: true) }}</span>
+                        </button>
+                    @endforeach
                 </div>
             @endif
         </div>

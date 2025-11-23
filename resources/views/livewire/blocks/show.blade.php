@@ -35,6 +35,9 @@ new class extends Component {
     public function mount(Block $block): void
     {
         $this->block = $block->load(['event', 'relationshipsFrom', 'relationshipsTo']);
+
+        // Track this view in the activity log (debounced to prevent duplicate views)
+        $this->block->logViewIfNotRecent(5);
     }
 
     public function toggleSidebar(): void
