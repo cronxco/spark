@@ -297,7 +297,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
             'actor_metadata' => [],
             'service' => 'receipt',
             'domain' => 'money',
-            'action' => 'receipt_received_from',
+            'action' => 'had_receipt_from',
             'value' => $receiptData['transaction_summary']['total_amount'],
             'value_multiplier' => 100,
             'value_unit' => $receiptData['transaction_summary']['currency'],

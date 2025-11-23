@@ -44,9 +44,9 @@ class ReceiptPluginTest extends TestCase
     {
         $actionTypes = $this->plugin->getActionTypes();
 
-        $this->assertArrayHasKey('receipt_received_from', $actionTypes);
+        $this->assertArrayHasKey('had_receipt_from', $actionTypes);
 
-        $receiptAction = $actionTypes['receipt_received_from'];
+        $receiptAction = $actionTypes['had_receipt_from'];
         $this->assertEquals('Receipt', $receiptAction['display_name']);
         $this->assertEquals('fas.receipt', $receiptAction['icon']);
         $this->assertTrue($receiptAction['display_with_object']);

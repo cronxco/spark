@@ -60,7 +60,7 @@ class ReceiptPlugin extends WebhookPlugin
     public static function getActionTypes(): array
     {
         return [
-            'receipt_received_from' => [
+            'had_receipt_from' => [
                 'icon' => 'fas.receipt',
                 'display_name' => 'Receipt',
                 'description' => 'Receipt received from merchant',
