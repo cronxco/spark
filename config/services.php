@@ -152,6 +152,16 @@ return [
         'cookie_refresh_threshold_days' => env('PLAYWRIGHT_COOKIE_REFRESH_THRESHOLD', 7),
     ],
 
+    'fetch' => [
+        // Archive.is bypass for paywalled content
+        'archive_bypass_enabled' => env('FETCH_ARCHIVE_BYPASS_ENABLED', true),
+        'archive_bypass_timeout' => env('FETCH_ARCHIVE_BYPASS_TIMEOUT', 30), // seconds
+
+        // Domains to exclude from archive bypass (comma-separated)
+        // Some sites may not work well with archive.is or have their own bypass mechanisms
+        'archive_bypass_excluded_domains' => env('FETCH_ARCHIVE_BYPASS_EXCLUDED_DOMAINS', ''),
+    ],
+
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),
