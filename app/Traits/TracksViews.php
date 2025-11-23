@@ -23,78 +23,13 @@ trait TracksViews
     public const MAX_RECENT_VIEWS = 20;
 
     /**
-     * Log a view activity for this model.
-     *
-     * @return void
-     */
-    public function logView(): void
-    {
-        $user = Auth::guard('web')->user();
-
-        if (!$user) {
-            return;
-        }
-
-        activity('changelog')
-            ->performedOn($this)
-            ->causedBy($user)
-            ->event('viewed')
-            ->log('viewed');
-
-        // Purge old views to maintain the retention window
-        static::purgeOldViews($user);
-    }
-
-    /**
-     * Check if this model was recently viewed by the current user.
-     * This can be used to prevent logging duplicate views in quick succession.
-     *
-     * @param int $withinMinutes Only check for views within this many minutes
-     * @return bool
-     */
-    public function wasRecentlyViewed(int $withinMinutes = 5): bool
-    {
-        $user = Auth::guard('web')->user();
-
-        if (!$user) {
-            return false;
-        }
-
-        return Activity::query()
-            ->where('subject_type', get_class($this))
-            ->where('subject_id', $this->id)
-            ->where('causer_type', get_class($user))
-            ->where('causer_id', $user->id)
-            ->where('event', 'viewed')
-            ->where('created_at', '>=', now()->subMinutes($withinMinutes))
-            ->exists();
-    }
-
-    /**
-     * Log a view if not recently viewed.
-     * This prevents flooding the activity log with duplicate views.
-     *
-     * @param int $withinMinutes Only log if not viewed within this many minutes
-     * @return bool Whether a new view was logged
-     */
-    public function logViewIfNotRecent(int $withinMinutes = 5): bool
-    {
-        if ($this->wasRecentlyViewed($withinMinutes)) {
-            return false;
-        }
-
-        $this->logView();
-        return true;
-    }
-
-    /**
      * Purge old view records for a user beyond the retention window.
      *
      * This keeps only the MAX_RECENT_VIEWS most recent unique views per user,
      * deleting older view records to prevent the activity log from growing indefinitely.
      *
-     * @param User $user The user to purge old views for
-     * @param int|null $retentionLimit Maximum views to retain (defaults to MAX_RECENT_VIEWS)
+     * @param  User  $user  The user to purge old views for
+     * @param  int|null  $retentionLimit  Maximum views to retain (defaults to MAX_RECENT_VIEWS)
      * @return int Number of records deleted
      */
     public static function purgeOldViews(User $user, ?int $retentionLimit = null): int
@@ -138,5 +73,68 @@ trait TracksViews
             ->delete();
 
         return $deleted;
+    }
+
+    /**
+     * Log a view activity for this model.
+     */
+    public function logView(): void
+    {
+        $user = Auth::guard('web')->user();
+
+        if (! $user) {
+            return;
+        }
+
+        activity('changelog')
+            ->performedOn($this)
+            ->causedBy($user)
+            ->event('viewed')
+            ->log('viewed');
+
+        // Purge old views to maintain the retention window
+        static::purgeOldViews($user);
+    }
+
+    /**
+     * Check if this model was recently viewed by the current user.
+     * This can be used to prevent logging duplicate views in quick succession.
+     *
+     * @param  int  $withinMinutes  Only check for views within this many minutes
+     */
+    public function wasRecentlyViewed(int $withinMinutes = 5): bool
+    {
+        $user = Auth::guard('web')->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return Activity::query()
+            ->where('subject_type', get_class($this))
+            ->where('subject_id', $this->id)
+            ->where('causer_type', get_class($user))
+            ->where('causer_id', $user->id)
+            ->where('event', 'viewed')
+            ->where('created_at', '>=', now()->subMinutes($withinMinutes))
+            ->exists();
+    }
+
+    /**
+     * Log a view if not recently viewed.
+     * This prevents flooding the activity log with duplicate views.
+     *
+     * @param  int  $withinMinutes  Only log if not viewed within this many minutes
+     * @return bool Whether a new view was logged
+     */
+    public function logViewIfNotRecent(int $withinMinutes = 5): bool
+    {
+        if ($this->wasRecentlyViewed($withinMinutes)) {
+            return false;
+        }
+
+        $this->logView();
+
+        return true;
     }
 }
