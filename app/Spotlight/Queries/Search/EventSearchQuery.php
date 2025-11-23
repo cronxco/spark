@@ -16,7 +16,7 @@ class EventSearchQuery
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::asDefault(function (string $query) {
-            if (blank($query) || strlen($query) < 2) {
+            if (blank($query) || strlen($query) < 3) {
                 return collect();
             }
 

@@ -27,11 +27,11 @@ class BookmarkUrl extends Component
     ];
 
     #[On('bookmark-url')]
-    public function handleBookmarkUrl(string $url): void
+    public function handleBookmarkUrl(string $url = '', string $mode = 'recurring'): void
     {
         // Pre-fill URL and show modal
         $this->url = $url;
-        $this->fetchMode = 'recurring';
+        $this->fetchMode = $mode;
         $this->enabled = true;
         $this->showModal = true;
     }

@@ -1,16 +1,15 @@
 <?php
 
-use App\Models\Event;
-use App\Models\EventObject;
-use App\Models\Block;
-use Illuminate\Support\Str;
-use Livewire\Volt\Component;
 use App\Integrations\PluginRegistry;
+use App\Models\Event;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Computed;
+use Livewire\Volt\Component;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Tags\Tag;
-use Illuminate\Support\Facades\Log;
 
-new class extends Component {
+new class extends Component
+{
     public Event $event;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -53,22 +52,24 @@ new class extends Component {
             'actor.tags',
             'target.tags',
             'relationshipsFrom',
-            'relationshipsTo'
+            'relationshipsTo',
         ]);
 
         // Track this view in the activity log (debounced to prevent duplicate views)
         $this->event->logViewIfNotRecent(5);
     }
 
-    public function getRelationships()
+    #[Computed]
+    public function relationships()
     {
         return $this->event->allRelationships()->get();
     }
 
-    public function getRelatedEvents()
+    #[Computed]
+    public function relatedEvents()
     {
         // Use semantic search if embeddings exist
-        if (!empty($this->event->embeddings)) {
+        if (! empty($this->event->embeddings)) {
             try {
                 $embedding = json_decode($this->event->embeddings, true);
 
@@ -115,15 +116,16 @@ new class extends Component {
             ->get();
     }
 
-    public function getEventAnomalies()
+    #[Computed]
+    public function eventAnomalies()
     {
         // Check if this event has any associated anomalies
-        if (!$this->event->value || !$this->event->value_unit) {
+        if (! $this->event->value || ! $this->event->value_unit) {
             return collect();
         }
 
         $userId = optional(auth()->guard('web')->user())->id;
-        if (!$userId) {
+        if (! $userId) {
             return collect();
         }
 
@@ -134,7 +136,7 @@ new class extends Component {
             ->where('value_unit', $this->event->value_unit)
             ->first();
 
-        if (!$metricStatistic) {
+        if (! $metricStatistic) {
             return collect();
         }
 
@@ -146,7 +148,8 @@ new class extends Component {
             ->get();
     }
 
-    public function getActivities()
+    #[Computed]
+    public function activities()
     {
         return Activity::forSubject($this->event)
             ->latest()
@@ -180,6 +183,7 @@ new class extends Component {
         if (is_array($data) || is_object($data)) {
             return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }
+
         return $data;
     }
 
@@ -275,7 +279,7 @@ new class extends Component {
 
     public function toggleSidebar()
     {
-        $this->showSidebar = !$this->showSidebar;
+        $this->showSidebar = ! $this->showSidebar;
     }
 
     public function addTag(string $value, ?string $type = null): void
@@ -421,7 +425,7 @@ new class extends Component {
             'blocks',
             'tags',
             'actor.tags',
-            'target.tags'
+            'target.tags',
         ]);
         $this->showEditEventModal = false;
     }
@@ -435,7 +439,7 @@ new class extends Component {
             'blocks',
             'tags',
             'actor.tags',
-            'target.tags'
+            'target.tags',
         ]);
     }
 
@@ -470,8 +474,8 @@ new class extends Component {
         $data = $this->getCompleteEventData();
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $this->js("
-            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+        $this->js('
+            const blob = new Blob([' . json_encode($json) . "], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -497,22 +501,6 @@ new class extends Component {
                 setTimeout(() => toast.remove(), 300);
             }, 2000);
         ");
-    }
-
-    /**
-     * Remove embeddings field from an array recursively.
-     */
-    private function stripEmbeddings(array $data): array
-    {
-        unset($data['embeddings']);
-
-        foreach ($data as $key => $value) {
-            if (is_array($value)) {
-                $data[$key] = $this->stripEmbeddings($value);
-            }
-        }
-
-        return $data;
     }
 
     /**
@@ -548,8 +536,8 @@ new class extends Component {
         $data = $this->getCompleteEventDataWithoutEmbeddings();
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $this->js("
-            navigator.clipboard.writeText(" . json_encode($json) . ").then(function() {
+        $this->js('
+            navigator.clipboard.writeText(' . json_encode($json) . ").then(function() {
                 const toast = document.createElement('div');
                 toast.className = 'toast toast-top toast-center z-50';
                 toast.innerHTML = `
@@ -585,7 +573,7 @@ new class extends Component {
     {
         $this->event->refresh()->load([
             'relationshipsFrom',
-            'relationshipsTo'
+            'relationshipsTo',
         ]);
     }
 
@@ -595,6 +583,22 @@ new class extends Component {
         $this->showTagModal = false;
         $this->showManageRelationshipsModal = false;
         $this->showAddRelationshipModal = false;
+    }
+
+    /**
+     * Remove embeddings field from an array recursively.
+     */
+    private function stripEmbeddings(array $data): array
+    {
+        unset($data['embeddings']);
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = $this->stripEmbeddings($value);
+            }
+        }
+
+        return $data;
     }
 };
 ?>
@@ -751,7 +755,7 @@ new class extends Component {
             </x-card>
 
             <!-- Anomaly Information -->
-            @php $anomalies = $this->getEventAnomalies(); @endphp
+            @php $anomalies = $this->eventAnomalies; @endphp
             @if ($anomalies->isNotEmpty())
             <x-card class="bg-warning/5 border-2 border-warning/30">
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
@@ -852,7 +856,7 @@ new class extends Component {
             @endif
 
             <!-- Related Events -->
-            @if ($this->getRelatedEvents()->isNotEmpty())
+            @if ($this->relatedEvents->isNotEmpty())
             <div class="relative">
                 <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
@@ -860,7 +864,7 @@ new class extends Component {
                         Related Events
                     </h3>
                     <div class="space-y-3">
-                        @foreach ($this->getRelatedEvents() as $relatedEvent)
+                        @foreach ($this->relatedEvents as $relatedEvent)
                         <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
                             <a href="{{ route('events.show', $relatedEvent->id) }}"
                                 class="block hover:text-primary transition-colors">
@@ -950,7 +954,7 @@ new class extends Component {
             @endif
 
             <!-- Relationships -->
-            @php $relationships = $this->getRelationships(); @endphp
+            @php $relationships = $this->relationships; @endphp
             @if ($relationships->isNotEmpty())
             <x-card class="bg-base-200/50 border-2 border-accent/10">
                 <div class="flex items-center justify-between mb-4">
@@ -1147,7 +1151,7 @@ new class extends Component {
                                 <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
-                        @php $sidebarRelationships = $this->getRelationships(); @endphp
+                        @php $sidebarRelationships = $this->relationships; @endphp
                         @if ($sidebarRelationships->isEmpty())
                         <x-empty-state
                             icon="fas.right-left"
@@ -1216,9 +1220,9 @@ new class extends Component {
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        @php $activities = $this->getActivities(); @endphp
+                        @php $activities = $this->activities; @endphp
                         @php
-                        $activities = $this->getActivities();
+                        $activities = $this->activities;
                         // newest first, synth created first as well
                         $timeline = collect();
                         if ($this->event?->created_at) {

@@ -143,7 +143,16 @@ new class extends \Livewire\Volt\Component
 }; ?>
 
 <div>
-    <x-header title="Bookmarks" subtitle="All your saved content from across your integrations" separator />
+    <x-header title="Bookmarks" subtitle="All your saved content from across your integrations" separator>
+        <x-slot:actions>
+            <x-button
+                label="Add"
+                icon="fas.plus"
+                class="btn-primary btn-sm"
+                @click="$dispatch('bookmark-url', { url: '', mode: 'once' })"
+            />
+        </x-slot:actions>
+    </x-header>
 
     <!-- Bookmarks Grid -->
     @if ($this->bookmarks->count() > 0)
