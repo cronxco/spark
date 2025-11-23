@@ -2,7 +2,12 @@
 
 namespace App\Traits;
 
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Activitylog\Models\Activity;
 
 /**
  * Trait for tracking views of models in the activity log.
@@ -12,6 +17,11 @@ use Illuminate\Support\Facades\Auth;
  */
 trait TracksViews
 {
+    /**
+     * Maximum number of recently viewed items to retain per user.
+     */
+    public const MAX_RECENT_VIEWS = 20;
+
     /**
      * Log a view activity for this model.
      *
@@ -30,6 +40,9 @@ trait TracksViews
             ->causedBy($user)
             ->event('viewed')
             ->log('viewed');
+
+        // Purge old views to maintain the retention window
+        static::purgeOldViews($user);
     }
 
     /**
@@ -47,7 +60,7 @@ trait TracksViews
             return false;
         }
 
-        return \Spatie\Activitylog\Models\Activity::query()
+        return Activity::query()
             ->where('subject_type', get_class($this))
             ->where('subject_id', $this->id)
             ->where('causer_type', get_class($user))
@@ -72,5 +85,58 @@ trait TracksViews
 
         $this->logView();
         return true;
+    }
+
+    /**
+     * Purge old view records for a user beyond the retention window.
+     *
+     * This keeps only the MAX_RECENT_VIEWS most recent unique views per user,
+     * deleting older view records to prevent the activity log from growing indefinitely.
+     *
+     * @param User $user The user to purge old views for
+     * @param int|null $retentionLimit Maximum views to retain (defaults to MAX_RECENT_VIEWS)
+     * @return int Number of records deleted
+     */
+    public static function purgeOldViews(User $user, ?int $retentionLimit = null): int
+    {
+        $limit = $retentionLimit ?? self::MAX_RECENT_VIEWS;
+
+        // Get the IDs of the most recent view for each unique subject
+        // We want to keep only the latest view per subject, up to the limit
+        $subjectTypes = [
+            Event::class,
+            EventObject::class,
+            Block::class,
+        ];
+
+        // Get the most recent activity ID for each unique subject
+        $latestViewIds = Activity::query()
+            ->selectRaw('MAX(id) as id')
+            ->where('causer_type', User::class)
+            ->where('causer_id', $user->id)
+            ->where('event', 'viewed')
+            ->whereIn('subject_type', $subjectTypes)
+            ->whereNotNull('subject_type')
+            ->whereNotNull('subject_id')
+            ->groupBy('subject_type', 'subject_id')
+            ->pluck('id');
+
+        // Get the top N most recent unique views to keep
+        $idsToKeep = Activity::query()
+            ->whereIn('id', $latestViewIds)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->pluck('id');
+
+        // Delete all view records for this user that are not in the keep list
+        $deleted = Activity::query()
+            ->where('causer_type', User::class)
+            ->where('causer_id', $user->id)
+            ->where('event', 'viewed')
+            ->whereIn('subject_type', $subjectTypes)
+            ->whereNotIn('id', $idsToKeep)
+            ->delete();
+
+        return $deleted;
     }
 }
