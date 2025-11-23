@@ -380,14 +380,20 @@ class EventObjectTest extends TestCase
             'user_id' => $this->user->id,
         ]);
 
-        // Set embeddings as array
-        $object->embeddings = [0.1, 0.2, 0.3];
+        // Set embeddings as array (1536 dimensions required by database)
+        $testEmbeddings = array_fill(0, 1536, 0.0);
+        $testEmbeddings[0] = 0.1;
+        $testEmbeddings[1] = 0.2;
+        $testEmbeddings[2] = 0.3;
+
+        $object->embeddings = $testEmbeddings;
         $object->save();
         $object->refresh();
 
         $embeddings = $object->embeddings;
 
         $this->assertIsArray($embeddings);
+        $this->assertCount(1536, $embeddings);
         $this->assertEquals(0.1, $embeddings[0]);
         $this->assertEquals(0.2, $embeddings[1]);
         $this->assertEquals(0.3, $embeddings[2]);

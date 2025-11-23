@@ -246,9 +246,11 @@ class IntegrationGroupTest extends TestCase
         ]);
 
         $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create(['user_id' => $this->user->id]);
         $event = Event::factory()->create([
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
+            'target_id' => $target->id,
         ]);
 
         Block::factory()->count(2)->create(['event_id' => $event->id]);
@@ -258,7 +260,7 @@ class IntegrationGroupTest extends TestCase
         $this->assertEquals(1, $summary['integrations']);
         $this->assertEquals(1, $summary['events']);
         $this->assertEquals(2, $summary['blocks']);
-        $this->assertEquals(1, $summary['objects']);
+        $this->assertEquals(2, $summary['objects']);
         $this->assertEquals('test_service', $summary['service_name']);
         $this->assertEquals('test_account_123', $summary['account_id']);
     }
