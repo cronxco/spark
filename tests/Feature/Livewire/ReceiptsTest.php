@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -165,7 +166,7 @@ class ReceiptsTest extends TestCase
         $component = Livewire::test(Receipts::class);
 
         // Use a valid UUID format for testing
-        $testId = (string) \Illuminate\Support\Str::uuid();
+        $testId = (string) Str::uuid();
         $component->set('selectedReceiptId', $testId)
             ->set('showMatchModal', true)
             ->call('closeMatchModal')
