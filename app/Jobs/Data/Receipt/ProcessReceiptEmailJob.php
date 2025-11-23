@@ -66,6 +66,19 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 $parsedEmail['from']
             );
 
+            // Check if this was identified as not a valid receipt
+            if (isset($receiptData['is_valid_receipt']) && $receiptData['is_valid_receipt'] === false) {
+                Log::info('Receipt: Skipping non-receipt email', [
+                    'integration_id' => $this->integration->id,
+                    'subject' => $parsedEmail['subject'],
+                    'from' => $parsedEmail['from'],
+                    'rejection_reason' => $receiptData['rejection_reason'] ?? 'unknown',
+                ]);
+
+                // Don't create any events for non-receipts
+                return;
+            }
+
             // Create receipt event and related data
             $receiptEvent = $this->createReceiptEvent($receiptData, $parsedEmail);
 
