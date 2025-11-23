@@ -227,4 +227,96 @@ class RecentlyViewedService
             default => class_basename($subjectType),
         };
     }
+
+    /**
+     * Purge old view records for a user beyond the retention window.
+     *
+     * This keeps only the DEFAULT_LIMIT most recent unique views per user,
+     * deleting older view records to prevent the activity log from growing indefinitely.
+     *
+     * @param User $user The user to purge old views for
+     * @param int|null $retentionLimit Maximum views to retain (defaults to DEFAULT_LIMIT)
+     * @return int Number of records deleted
+     */
+    public function purgeOldViewsForUser(User $user, ?int $retentionLimit = null): int
+    {
+        $limit = $retentionLimit ?? self::DEFAULT_LIMIT;
+
+        $subjectTypes = [
+            Event::class,
+            EventObject::class,
+            Block::class,
+        ];
+
+        // Get the most recent activity ID for each unique subject
+        $latestViewIds = Activity::query()
+            ->selectRaw('MAX(id) as id')
+            ->where('causer_type', User::class)
+            ->where('causer_id', $user->id)
+            ->where('event', 'viewed')
+            ->whereIn('subject_type', $subjectTypes)
+            ->whereNotNull('subject_type')
+            ->whereNotNull('subject_id')
+            ->groupBy('subject_type', 'subject_id')
+            ->pluck('id');
+
+        // Get the top N most recent unique views to keep
+        $idsToKeep = Activity::query()
+            ->whereIn('id', $latestViewIds)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->pluck('id');
+
+        // Delete all view records for this user that are not in the keep list
+        $deleted = Activity::query()
+            ->where('causer_type', User::class)
+            ->where('causer_id', $user->id)
+            ->where('event', 'viewed')
+            ->whereIn('subject_type', $subjectTypes)
+            ->whereNotIn('id', $idsToKeep)
+            ->delete();
+
+        return $deleted;
+    }
+
+    /**
+     * Purge old view records for all users.
+     *
+     * This is useful for scheduled cleanup tasks.
+     *
+     * @param int|null $retentionLimit Maximum views to retain per user
+     * @return array Array with 'users_processed' and 'total_deleted' counts
+     */
+    public function purgeOldViewsForAllUsers(?int $retentionLimit = null): array
+    {
+        $subjectTypes = [
+            Event::class,
+            EventObject::class,
+            Block::class,
+        ];
+
+        // Get all users who have view records
+        $userIds = Activity::query()
+            ->where('event', 'viewed')
+            ->whereIn('subject_type', $subjectTypes)
+            ->distinct()
+            ->pluck('causer_id');
+
+        $totalDeleted = 0;
+        $usersProcessed = 0;
+
+        foreach ($userIds as $userId) {
+            $user = User::find($userId);
+            if ($user) {
+                $deleted = $this->purgeOldViewsForUser($user, $retentionLimit);
+                $totalDeleted += $deleted;
+                $usersProcessed++;
+            }
+        }
+
+        return [
+            'users_processed' => $usersProcessed,
+            'total_deleted' => $totalDeleted,
+        ];
+    }
 }
