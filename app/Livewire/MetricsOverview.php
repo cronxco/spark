@@ -20,6 +20,32 @@ class MetricsOverview extends Component
 
     public string $sortBy = 'interesting'; // interesting, service, recent
 
+    // Progressive loading state
+    public bool $recentTrendsLoaded = false;
+
+    public $cachedRecentTrends = null;
+
+    public function loadRecentTrends(): void
+    {
+        if ($this->recentTrendsLoaded) {
+            return;
+        }
+
+        $user = Auth::user();
+
+        $this->cachedRecentTrends = MetricTrend::whereHas('metricStatistic', function ($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+            ->trends()
+            ->unacknowledged()
+            ->with('metricStatistic')
+            ->orderByDesc('detected_at')
+            ->limit(10)
+            ->get();
+
+        $this->recentTrendsLoaded = true;
+    }
+
     public function calculateStatistics(): void
     {
         CalculateMetricStatisticsJob::dispatch();
@@ -68,21 +94,11 @@ class MetricsOverview extends Component
             ->pluck('service')
             ->sort();
 
-        // Get recent unacknowledged trends (excluding anomalies)
-        $recentTrends = MetricTrend::whereHas('metricStatistic', function ($query) use ($user) {
-            $query->where('user_id', $user->id);
-        })
-            ->trends() // Only get actual trends, not anomalies
-            ->unacknowledged()
-            ->with('metricStatistic')
-            ->orderByDesc('detected_at')
-            ->limit(10)
-            ->get();
-
         return view('livewire.metrics-overview', [
             'metrics' => $metrics,
             'services' => $services,
-            'recentTrends' => $recentTrends,
+            'recentTrends' => $this->cachedRecentTrends ?? collect(),
+            'recentTrendsLoaded' => $this->recentTrendsLoaded,
         ]);
     }
 

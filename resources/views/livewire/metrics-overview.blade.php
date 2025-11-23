@@ -33,17 +33,19 @@
     </x-header>
 
     {{-- Recent Trends Summary --}}
-    @if ($recentTrends->count() > 0)
-        <div class="alert alert-info">
-            <x-icon name="fas.circle-info" class="h-5 w-5" />
-            <div>
-                <h3 class="font-bold">{{ $recentTrends->count() }} Unacknowledged {{ Str::plural('Trend', $recentTrends->count()) }}</h3>
-                <div class="text-sm">
-                    You have {{ $recentTrends->count() }} {{ Str::plural('trend', $recentTrends->count()) }} awaiting review.
+    <div wire:init="loadRecentTrends">
+        @if ($recentTrendsLoaded && $recentTrends->count() > 0)
+            <div class="alert alert-info">
+                <x-icon name="fas.circle-info" class="h-5 w-5" />
+                <div>
+                    <h3 class="font-bold">{{ $recentTrends->count() }} Unacknowledged {{ Str::plural('Trend', $recentTrends->count()) }}</h3>
+                    <div class="text-sm">
+                        You have {{ $recentTrends->count() }} {{ Str::plural('trend', $recentTrends->count()) }} awaiting review.
+                    </div>
                 </div>
             </div>
-        </div>
-    @endif
+        @endif
+    </div>
 
     {{-- Metrics Grid --}}
     @if ($metrics->isEmpty())
@@ -108,7 +110,14 @@
     @endif
 
     {{-- Recent Trends List --}}
-    @if ($recentTrends->count() > 0)
+    @if (! $recentTrendsLoaded)
+        <div class="card bg-base-200 shadow">
+            <div class="card-body">
+                <h3 class="card-title">Recent Trends</h3>
+                <x-skeleton-loader type="list-item" :count="3" />
+            </div>
+        </div>
+    @elseif ($recentTrends->count() > 0)
         <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <h3 class="card-title">Recent Trends</h3>
