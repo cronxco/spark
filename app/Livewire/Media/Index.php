@@ -3,6 +3,7 @@
 namespace App\Livewire\Media;
 
 use Exception;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -114,41 +115,50 @@ class Index extends Component
 
     public function modelTypes()
     {
-        return Media::select('model_type')
-            ->distinct()
-            ->whereNotNull('model_type')
-            ->pluck('model_type')
-            ->map(fn ($type) => [
-                'id' => $type,
-                'name' => class_basename($type),
-            ])
-            ->toArray();
+        // Cache for 5 minutes to avoid repeated full table scans
+        return Cache::remember('media:model_types', 300, function () {
+            return Media::select('model_type')
+                ->distinct()
+                ->whereNotNull('model_type')
+                ->pluck('model_type')
+                ->map(fn ($type) => [
+                    'id' => $type,
+                    'name' => class_basename($type),
+                ])
+                ->toArray();
+        });
     }
 
     public function collections()
     {
-        return Media::select('collection_name')
-            ->distinct()
-            ->whereNotNull('collection_name')
-            ->pluck('collection_name')
-            ->map(fn ($name) => [
-                'id' => $name,
-                'name' => ucfirst(str_replace('_', ' ', $name)),
-            ])
-            ->toArray();
+        // Cache for 5 minutes to avoid repeated full table scans
+        return Cache::remember('media:collection_names', 300, function () {
+            return Media::select('collection_name')
+                ->distinct()
+                ->whereNotNull('collection_name')
+                ->pluck('collection_name')
+                ->map(fn ($name) => [
+                    'id' => $name,
+                    'name' => ucfirst(str_replace('_', ' ', $name)),
+                ])
+                ->toArray();
+        });
     }
 
     public function mimeTypes()
     {
-        return Media::select('mime_type')
-            ->distinct()
-            ->whereNotNull('mime_type')
-            ->pluck('mime_type')
-            ->map(fn ($type) => [
-                'id' => $type,
-                'name' => $type,
-            ])
-            ->toArray();
+        // Cache for 5 minutes to avoid repeated full table scans
+        return Cache::remember('media:mime_types', 300, function () {
+            return Media::select('mime_type')
+                ->distinct()
+                ->whereNotNull('mime_type')
+                ->pluck('mime_type')
+                ->map(fn ($type) => [
+                    'id' => $type,
+                    'name' => $type,
+                ])
+                ->toArray();
+        });
     }
 
     public function bulkDelete(): void
@@ -164,6 +174,9 @@ class Index extends Component
                 Media::whereIn('id', $this->selectedItems)->delete();
             });
 
+            // Clear media filter caches after deletion
+            $this->clearMediaFilterCaches();
+
             $count = count($this->selectedItems);
             $this->success("Successfully deleted {$count} media item(s).");
             $this->selectedItems = [];
@@ -171,6 +184,16 @@ class Index extends Component
         } catch (Exception $e) {
             $this->error('Failed to delete: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Clear cached media filter values when media changes
+     */
+    private function clearMediaFilterCaches(): void
+    {
+        Cache::forget('media:model_types');
+        Cache::forget('media:collection_names');
+        Cache::forget('media:mime_types');
     }
 
     public function render()

@@ -48,6 +48,11 @@ class FinancialAccounts extends Component
         'other' => false, // 'other' accounts collapsed by default
     ];
 
+    /**
+     * Cache for batch-loaded balances (N+1 optimization)
+     */
+    private ?\Illuminate\Support\Collection $balanceCache = null;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'accountTypeFilter' => ['except' => ''],
@@ -159,6 +164,9 @@ class FinancialAccounts extends Component
         // Eager load tags for all accounts
         $accounts->load('tags');
 
+        // Batch load all balances in a single query (N+1 optimization)
+        $this->balanceCache = $plugin->getLatestBalancesForAccounts($accounts);
+
         // Apply filters
         if ($this->search) {
             $accounts = $accounts->filter(function ($account) {
@@ -195,12 +203,8 @@ class FinancialAccounts extends Component
         $accounts = $this->applySorting($accounts);
 
         // Get unique account types and providers for filters
-        // Use the same account set that's being displayed for consistent filtering
-        $allAccounts = $this->showArchived
-            ? $plugin->getAllFinancialAccounts(Auth::user())
-            : $plugin->getFinancialAccounts(Auth::user());
-
-        $accountTypes = $allAccounts->pluck('metadata.account_type')
+        // Reuse the already loaded accounts (avoids duplicate query)
+        $accountTypes = $accounts->pluck('metadata.account_type')
             ->filter()
             ->unique()
             ->mapWithKeys(function ($type) {
@@ -208,7 +212,7 @@ class FinancialAccounts extends Component
             })
             ->sort();
 
-        $providers = $allAccounts->pluck('metadata.provider')
+        $providers = $accounts->pluck('metadata.provider')
             ->filter()
             ->unique()
             ->sort();
@@ -295,11 +299,12 @@ class FinancialAccounts extends Component
 
     /**
      * Get the properly formatted balance for an account, handling value_multiplier correctly
+     * Uses batch-loaded cache to avoid N+1 queries
      */
     private function getFormattedBalance(EventObject $account): ?float
     {
-        $plugin = new FinancialPlugin;
-        $latestBalance = $plugin->getLatestBalance($account);
+        // Use cached balance if available (batch loaded in render())
+        $latestBalance = $this->balanceCache?->get($account->id);
 
         if ($latestBalance) {
             if (isset($latestBalance->event_metadata['balance'])) {

@@ -28,6 +28,14 @@ return new class extends Migration
         Schema::table('integrations', function (Blueprint $table) {
             $table->index(['user_id', 'deleted_at'], 'integrations_user_deleted_idx');
         });
+
+        // Add index for metric trends detection queries
+        Schema::table('metric_trends', function (Blueprint $table) {
+            $table->index(
+                ['metric_statistic_id', 'type', 'acknowledged_at', 'start_date'],
+                'metric_trends_detection_idx'
+            );
+        });
     }
 
     /**
@@ -48,6 +56,10 @@ return new class extends Migration
 
         Schema::table('integrations', function (Blueprint $table) {
             $table->dropIndex('integrations_user_deleted_idx');
+        });
+
+        Schema::table('metric_trends', function (Blueprint $table) {
+            $table->dropIndex('metric_trends_detection_idx');
         });
     }
 };

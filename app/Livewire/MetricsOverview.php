@@ -47,15 +47,12 @@ class MetricsOverview extends Component
             $metricsQuery->where('service', $this->filterService);
         }
 
-        // Get metrics with their trend counts (excluding anomalies)
-        $metrics = $metricsQuery->get()->map(function ($metric) {
-            $metric->unacknowledged_trends_count = $metric->trends()
-                ->trends() // Only count actual trends, not anomalies
-                ->unacknowledged()
-                ->count();
-
-            return $metric;
-        });
+        // Get metrics with their trend counts using withCount (N+1 optimization)
+        // Count only actual trends (not anomalies) that are unacknowledged
+        $metrics = $metricsQuery->withCount(['trends as unacknowledged_trends_count' => function ($query) {
+            $query->where('type', 'like', 'trend_%')
+                ->whereNull('acknowledged_at');
+        }])->get();
 
         // Sort metrics
         $metrics = match ($this->sortBy) {
