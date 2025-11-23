@@ -27,7 +27,7 @@ class AdminPushNotification extends Notification
     {
         return (new WebPushMessage)
             ->title($this->title)
-            ->icon('/apple-touch-icon.png')
+            ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
             ->body($this->message)
             ->badge('/favicon.ico')
             ->tag('admin-notification-' . time())

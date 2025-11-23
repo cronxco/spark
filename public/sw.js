@@ -8,7 +8,7 @@ const CACHE_NAME = `spark-cache-${CACHE_VERSION}`;
 
 // Assets to cache for offline use
 const PRECACHE_ASSETS = [
-    '/apple-touch-icon.png',
+    '/icons/Spark-iOS-Default-60x60@3x.png',
     '/favicon.ico',
     '/favicon.svg',
 ];
@@ -57,7 +57,7 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body || data.message || '',
-        icon: data.icon || '/apple-touch-icon.png',
+        icon: data.icon || '/icons/Spark-iOS-Default-60x60@3x.png',
         badge: data.badge || '/favicon.ico',
         tag: data.tag || 'spark-notification',
         data: data.data || {},
