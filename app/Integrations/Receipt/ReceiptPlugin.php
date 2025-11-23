@@ -6,7 +6,9 @@ use App\Integrations\Base\WebhookPlugin;
 use App\Jobs\Data\Receipt\ProcessReceiptEmailJob;
 use App\Models\Integration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ReceiptPlugin extends WebhookPlugin
 {
@@ -160,7 +162,21 @@ class ReceiptPlugin extends WebhookPlugin
      */
     private function parseSnsNotification(Request $request): ?array
     {
-        $payload = $request->all();
+        // AWS SNS sends content as text/plain, so we need to parse the raw body
+        $rawBody = $request->getContent();
+        $payload = json_decode($rawBody, true);
+
+        // Fall back to request->all() if raw body isn't valid JSON
+        if (! $payload) {
+            $payload = $request->all();
+        }
+
+        Log::debug('Receipt: Parsing SNS notification', [
+            'content_type' => $request->header('Content-Type'),
+            'has_type' => isset($payload['Type']),
+            'type' => $payload['Type'] ?? null,
+            'has_message' => isset($payload['Message']),
+        ]);
 
         // Check if this is an SNS subscription confirmation
         if (isset($payload['Type']) && $payload['Type'] === 'SubscriptionConfirmation') {
@@ -168,18 +184,47 @@ class ReceiptPlugin extends WebhookPlugin
                 'subscribe_url' => $payload['SubscribeURL'] ?? null,
             ]);
 
-            // This should be handled by the route, not here
+            // Auto-confirm the subscription by hitting the SubscribeURL
+            if (isset($payload['SubscribeURL'])) {
+                try {
+                    Http::get($payload['SubscribeURL']);
+                    Log::info('Receipt: SNS subscription confirmed');
+                } catch (Throwable $e) {
+                    Log::error('Receipt: Failed to confirm SNS subscription', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return null;
         }
 
-        // Extract the Message field (SES notification is JSON inside this)
-        if (! isset($payload['Message'])) {
-            return null;
+        // Handle SNS Notification type
+        if (isset($payload['Type']) && $payload['Type'] === 'Notification') {
+            // Extract the Message field (SES notification is JSON inside this)
+            if (! isset($payload['Message'])) {
+                Log::warning('Receipt: SNS Notification missing Message field', [
+                    'payload_keys' => array_keys($payload),
+                ]);
+
+                return null;
+            }
+
+            $message = json_decode($payload['Message'], true);
+
+            return $message ?: null;
         }
 
-        $message = json_decode($payload['Message'], true);
+        // If no Type field, maybe the payload IS the message (direct SES notification)
+        if (isset($payload['receipt']) || isset($payload['mail'])) {
+            return $payload;
+        }
 
-        return $message ?: null;
+        Log::warning('Receipt: Unrecognized SNS payload format', [
+            'payload_keys' => array_keys($payload),
+        ]);
+
+        return null;
     }
 
     /**
