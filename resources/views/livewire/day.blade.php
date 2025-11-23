@@ -1037,7 +1037,7 @@ $availableStreams = computed(function () {
                             @else
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
                             <div class="py-2 px-2">
-                                <a href="{{ route('events.show', $firstEvent->id) }}" class="block hover:text-primary transition-colors min-w-0 text-xl">
+                                <a href="{{ route('events.show', $firstEvent->id) }}" wire:navigate class="block hover:text-primary transition-colors min-w-0 text-xl">
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                     @if ($firstEvent->target)
@@ -1087,7 +1087,7 @@ $availableStreams = computed(function () {
                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                     </div>
                     <div class="py-2 px-2">
-                        <a href="{{ route('events.show', $event->id) }}" class="text-base-content block hover:text-primary transition-colors min-w-0 text-lg">
+                        <a href="{{ route('events.show', $event->id) }}" wire:navigate class="text-base-content block hover:text-primary transition-colors min-w-0 text-lg">
                             <span class="font-medium">{{ $this->formatAction($event->action) }}</span>
                             @if (should_display_action_with_object($event->action, $event->service))
                             @if ($event->target)
