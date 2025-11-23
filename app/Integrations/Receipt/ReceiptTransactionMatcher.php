@@ -56,10 +56,12 @@ class ReceiptTransactionMatcher
             ->whereBetween('time', [$startTime, $endTime])
             ->where(function ($q) use ($hints) {
                 // Match exact amount OR within 5% variance
-                $tolerance = $hints['suggested_amount'] * 0.05;
+                // Cast to int because the value column is bigint in PostgreSQL
+                $amount = (int) $hints['suggested_amount'];
+                $tolerance = (int) ($amount * 0.05);
                 $q->whereBetween('value', [
-                    max(0, $hints['suggested_amount'] - $tolerance),
-                    $hints['suggested_amount'] + $tolerance,
+                    max(0, $amount - $tolerance),
+                    $amount + $tolerance,
                 ]);
             })
             ->with(['target', 'integration'])
