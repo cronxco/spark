@@ -71,34 +71,39 @@ class TransactionLinkingTest extends TestCase
     }
 
     /** @test */
-    public function explicit_strategy_finds_coin_jar_reference(): void
+    public function explicit_strategy_ignores_coin_jar_transaction_to_prevent_wrong_direction(): void
     {
         $strategy = new ExplicitReferenceStrategy;
 
-        // Create the original card payment
+        // Create the original card payment with coin_jar_transaction reference
+        // This should NOT create a link because coin_jar_transaction points TO the
+        // triggered transaction, which would create a relationship in the wrong direction.
+        // Instead, the triggered transaction has triggered_by pointing back, which
+        // gives the correct direction.
         $cardPayment = $this->createMonzoEvent([
             'source_id' => 'tx_original_payment',
             'action' => 'card_payment_to',
             'value' => -1299,
-        ]);
-
-        // Create the coin jar transaction referencing it
-        $coinJar = $this->createMonzoEvent([
-            'action' => 'pot_deposit_from',
-            'value' => -1,
             'event_metadata' => [
                 'raw' => [
                     'metadata' => [
-                        'coin_jar_transaction' => 'tx_original_payment',
+                        'coin_jar_transaction' => 'tx_coin_jar_deposit',
                     ],
                 ],
             ],
         ]);
 
-        $links = $strategy->findLinks($coinJar);
+        // Create the coin jar transaction (the one referenced)
+        $coinJar = $this->createMonzoEvent([
+            'source_id' => 'tx_coin_jar_deposit',
+            'action' => 'pot_deposit_from',
+            'value' => -1,
+        ]);
 
-        $this->assertCount(1, $links);
-        $this->assertEquals($cardPayment->id, $links->first()['target_event']->id);
+        // The card payment should NOT find links via coin_jar_transaction
+        $links = $strategy->findLinks($cardPayment);
+
+        $this->assertCount(0, $links, 'coin_jar_transaction should not create links (wrong direction)');
     }
 
     /** @test */
