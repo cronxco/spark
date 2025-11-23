@@ -27,6 +27,13 @@ new class extends Component
     public bool $showManageRelationshipsModal = false;
     public bool $showAddRelationshipModal = false;
 
+    // Progressive loading state flags
+    public bool $tagsLoaded = false;
+    public bool $relationshipsLoaded = false;
+    public bool $relatedEventsLoaded = false;
+    public bool $relatedBlocksLoaded = false;
+    public bool $activitiesLoaded = false;
+
     protected $listeners = [
         'open-tag-modal' => 'handleOpenTagModal',
         'show-timeline' => 'handleShowTimeline',
@@ -50,7 +57,8 @@ new class extends Component
         ]);
 
         try {
-            $this->object = $object->load(['tags', 'relationshipsFrom', 'relationshipsTo']);
+            // Load only the bare minimum - just the object itself
+            $this->object = $object;
             Log::info('EventObject mount complete');
 
             // Track this view in the activity log (debounced to prevent duplicate views)
@@ -65,6 +73,63 @@ new class extends Component
         }
     }
 
+    /**
+     * Load tags for the object
+     */
+    public function loadTags(): void
+    {
+        if ($this->tagsLoaded) {
+            return;
+        }
+        $this->object->load(['tags']);
+        $this->tagsLoaded = true;
+    }
+
+    /**
+     * Load relationships with their related models
+     */
+    public function loadRelationships(): void
+    {
+        if ($this->relationshipsLoaded) {
+            return;
+        }
+        $this->object->load(['relationshipsFrom', 'relationshipsTo']);
+        $this->relationshipsLoaded = true;
+    }
+
+    /**
+     * Load related events via semantic search (expensive operation)
+     */
+    public function loadRelatedEvents(): void
+    {
+        if ($this->relatedEventsLoaded) {
+            return;
+        }
+        $this->relatedEventsLoaded = true;
+    }
+
+    /**
+     * Load related blocks via semantic search (expensive operation)
+     */
+    public function loadRelatedBlocks(): void
+    {
+        if ($this->relatedBlocksLoaded) {
+            return;
+        }
+        $this->relatedBlocksLoaded = true;
+    }
+
+    /**
+     * Load activity log entries
+     */
+    public function loadActivities(): void
+    {
+        if ($this->activitiesLoaded) {
+            return;
+        }
+        $this->activitiesLoaded = true;
+    }
+
     public function toggleSidebar(): void
     {
         $this->showSidebar = ! $this->showSidebar;
@@ -73,12 +138,20 @@ new class extends Component
     #[Computed]
     public function relationships()
     {
+        if (! $this->relationshipsLoaded) {
+            return collect();
+        }
+
         return $this->object->allRelationships()->get();
     }
 
     #[Computed]
     public function relatedEvents()
     {
+        if (! $this->relatedEventsLoaded) {
+            return collect();
+        }
+
         // Use semantic search if embeddings exist
         if (! empty($this->object->embeddings)) {
             try {
@@ -124,6 +197,10 @@ new class extends Component
     #[Computed]
     public function relatedBlocks()
     {
+        if (! $this->relatedBlocksLoaded) {
+            return collect();
+        }
+
         // Use semantic search if embeddings exist
         if (! empty($this->object->embeddings)) {
             try {
@@ -160,6 +237,10 @@ new class extends Component
     #[Computed]
     public function activities()
     {
+        if (! $this->activitiesLoaded) {
+            return collect();
+        }
+
         return Activity::forSubject($this->object)
             ->latest()
             ->get();
@@ -1006,13 +1087,18 @@ new class extends Component
 
     public function handleObjectUpdated(): void
     {
-        $this->object->refresh()->load(['tags']);
+        $this->object->refresh();
+        // Reload any sections that were already loaded
+        if ($this->tagsLoaded) {
+            $this->object->load(['tags']);
+        }
         $this->showEditObjectModal = false;
     }
 
     public function handleTagsUpdated(): void
     {
-        $this->object->refresh()->load(['tags']);
+        $this->object->refresh()->loadMissing(['tags']);
+        $this->tagsLoaded = true;
     }
 
     public function handleOpenManageRelationshipsModal(): void
@@ -1138,16 +1224,18 @@ new class extends Component
                         </div>
                         @endif
 
-                        <!-- Tags -->
-                        @if ($this->object->tags->isNotEmpty())
-                        <div class="mt-4">
+                        <!-- Tags (Progressive) -->
+                        <div class="mt-4" wire:init="loadTags">
+                            @if ($tagsLoaded && $this->object->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center gap-2">
                                 @foreach ($this->object->tags as $tag)
                                 <x-spark-tag :tag="$tag" />
                                 @endforeach
                             </div>
+                            @elseif (! $tagsLoaded)
+                            <x-skeleton-loader type="tags" class="justify-center" />
+                            @endif
                         </div>
-                        @endif
                     </div>
                 </div>
             </x-card>
@@ -1167,37 +1255,54 @@ new class extends Component
             </x-card>
             @endif
 
-            <!-- Related Blocks -->
-            @if ($this->relatedBlocks->isNotEmpty())
-            <div class="relative">
-                <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas.grip" class="w-5 h-5 text-warning" />
-                        Related Blocks ({{ $this->relatedBlocks->count() }})
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        @foreach ($this->relatedBlocks as $block)
-                            <x-block-card :block="$block" />
-                        @endforeach
+            <!-- Related Blocks (Progressive) -->
+            <div wire:init="loadRelatedBlocks">
+                @if ($relatedBlocksLoaded && $this->relatedBlocks->isNotEmpty())
+                <div class="relative">
+                    <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.grip" class="w-5 h-5 text-warning" />
+                            Related Blocks ({{ $this->relatedBlocks->count() }})
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            @foreach ($this->relatedBlocks as $block)
+                                <x-block-card :block="$block" />
+                            @endforeach
+                        </div>
+                    </div>
+                    <!-- AI Badge -->
+                    <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                        <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
                     </div>
                 </div>
-                <!-- AI Badge -->
-                <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                    <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                @elseif (! $relatedBlocksLoaded)
+                <div class="relative">
+                    <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.grip" class="w-5 h-5 text-warning" />
+                            Related Blocks
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </div>
+                    <!-- AI Badge -->
+                    <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                        <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                    </div>
                 </div>
+                @endif
             </div>
-            @endif
 
-            <!-- Related Events -->
-            @if ($this->relatedEvents->isNotEmpty())
-            <div class="relative">
-                <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas.bolt" class="w-5 h-5 text-warning" />
-                        Related Events ({{ $this->relatedEvents->count() }})
-                    </h3>
-                    <div class="space-y-3">
-                        @foreach ($this->relatedEvents as $event)
+            <!-- Related Events (Progressive) -->
+            <div wire:init="loadRelatedEvents">
+                @if ($relatedEventsLoaded && $this->relatedEvents->isNotEmpty())
+                <div class="relative">
+                    <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-warning" />
+                            Related Events ({{ $this->relatedEvents->count() }})
+                        </h3>
+                        <div class="space-y-3">
+                            @foreach ($this->relatedEvents as $event)
                         <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors bg-base-100">
                             <a href="{{ route('events.show', $event->id) }}"
                                 class="block hover:text-primary transition-colors">
@@ -1266,18 +1371,34 @@ new class extends Component
                             </a>
                         </div>
                         @endforeach
+                        </div>
+                    </div>
+                    <!-- AI Badge -->
+                    <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                        <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
                     </div>
                 </div>
-                <!-- AI Badge -->
-                <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                    <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                @elseif (! $relatedEventsLoaded)
+                <div class="relative">
+                    <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-warning" />
+                            Related Events
+                        </h3>
+                        <x-skeleton-loader type="event-list" />
+                    </div>
+                    <!-- AI Badge -->
+                    <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                        <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                    </div>
                 </div>
+                @endif
             </div>
-            @endif
 
-            <!-- Relationships -->
+            <!-- Relationships (Progressive) -->
+            <div wire:init="loadRelationships">
             @php $relationships = $this->relationships; @endphp
-            @if ($relationships->isNotEmpty())
+            @if ($relationshipsLoaded && $relationships->isNotEmpty())
             <x-card class="bg-base-200/50 border-2 border-accent/10">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold flex items-center gap-2">
@@ -1381,7 +1502,18 @@ new class extends Component
                     @endif
                 </div>
             </x-card>
+            @elseif (! $relationshipsLoaded)
+            <x-card class="bg-base-200/50 border-2 border-accent/10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <x-icon name="fas.right-left" class="w-5 h-5 text-accent" />
+                        Relationships
+                    </h3>
+                </div>
+                <x-skeleton-loader type="relationship-list" />
+            </x-card>
             @endif
+            </div>
 
             <!-- Drawer for Technical Details -->
             <x-drawer wire:model="showSidebar" right title="Object Details" with-close-button separator class="w-11/12 lg:w-1/3">
@@ -1466,7 +1598,7 @@ new class extends Component
                     </div>
 
                     <!-- Relationships -->
-                    <div class="pb-4 border-b border-base-200">
+                    <div class="pb-4 border-b border-base-200" wire:init="loadRelationships">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Relationships
@@ -1475,6 +1607,9 @@ new class extends Component
                                 <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
+                        @if (! $relationshipsLoaded)
+                            <x-skeleton-loader type="relationship-list" />
+                        @else
                         @php $sidebarRelationships = $this->relationships; @endphp
                         @if ($sidebarRelationships->isEmpty())
                             <x-empty-state
@@ -1523,16 +1658,20 @@ new class extends Component
                                 </div>
                             @endif
                         @endif
+                        @endif
                     </div>
 
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
-                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
+                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80" wire:init="loadActivities">
                                 Activity
                             </div>
                         </x-slot:heading>
                         <x-slot:content>
+                            @if (! $activitiesLoaded)
+                            <x-skeleton-loader type="list-item" count="3" />
+                            @else
                             @php $activities = $this->activities; @endphp
                             @if ($activities->isEmpty())
                             <x-empty-state
@@ -1587,6 +1726,7 @@ new class extends Component
                             </div>
                             @endif
                             @endforeach
+                            @endif
                             @endif
                         </x-slot:content>
                     </x-collapse>
