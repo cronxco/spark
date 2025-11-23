@@ -385,18 +385,21 @@ class FinancialPlugin extends ManualPlugin
             return collect();
         }
 
+        // Get the actual table name (respects test prefixes)
+        $table = (new Event)->getTable();
+
         // Use PostgreSQL DISTINCT ON for efficient "latest per group" query
         $placeholders = implode(',', array_fill(0, count($accountIds), '?'));
 
         $results = Event::fromRaw("(
             SELECT DISTINCT ON (actor_id) *
-            FROM events
+            FROM {$table}
             WHERE actor_id IN ({$placeholders})
             AND service IN ('manual_account', 'monzo', 'gocardless')
             AND action = 'had_balance'
             AND deleted_at IS NULL
             ORDER BY actor_id, time DESC
-        ) as events", $accountIds)->get();
+        ) as {$table}", $accountIds)->get();
 
         return $results->keyBy('actor_id');
     }
