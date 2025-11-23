@@ -149,24 +149,23 @@ class RecentlyViewedService
      */
     public function getRecentlyViewedCount(User $user, ?array $types = null): int
     {
-        $query = Activity::query()
+        $subjectTypes = $types !== null && count($types) > 0
+            ? $types
+            : [Event::class, EventObject::class, Block::class];
+
+        // Use a subquery to count unique subject_type/subject_id combinations
+        // PostgreSQL doesn't support COUNT(DISTINCT col1, col2)
+        $uniqueSubjects = Activity::query()
+            ->selectRaw('1')
             ->where('causer_type', User::class)
             ->where('causer_id', $user->id)
             ->where('event', 'viewed')
             ->whereNotNull('subject_type')
-            ->whereNotNull('subject_id');
+            ->whereNotNull('subject_id')
+            ->whereIn('subject_type', $subjectTypes)
+            ->groupBy('subject_type', 'subject_id');
 
-        if ($types !== null && count($types) > 0) {
-            $query->whereIn('subject_type', $types);
-        } else {
-            $query->whereIn('subject_type', [
-                Event::class,
-                EventObject::class,
-                Block::class,
-            ]);
-        }
-
-        return $query->distinct('subject_type', 'subject_id')->count();
+        return $uniqueSubjects->get()->count();
     }
 
     /**
