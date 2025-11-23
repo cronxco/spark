@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Integrations\PluginRegistry;
 use App\Jobs\Metrics\DetectMetricAnomaliesJob;
+use App\Traits\TracksViews;
 use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,7 @@ use Spatie\Tags\HasTags;
 
 class Event extends Model
 {
-    use HasFactory, HasTags, LogsActivity, SoftDeletes;
+    use HasFactory, HasTags, LogsActivity, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait

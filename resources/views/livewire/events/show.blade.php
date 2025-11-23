@@ -53,6 +53,9 @@ new class extends Component {
             'relationshipsFrom',
             'relationshipsTo'
         ]);
+
+        // Track this view in the activity log (debounced to prevent duplicate views)
+        $this->event->logViewIfNotRecent(5);
     }
 
     public function getRelationships()
