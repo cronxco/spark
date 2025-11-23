@@ -8,6 +8,7 @@ use App\Models\Integration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ReceiptPlugin extends WebhookPlugin
 {
@@ -188,7 +189,7 @@ class ReceiptPlugin extends WebhookPlugin
                 try {
                     Http::get($payload['SubscribeURL']);
                     Log::info('Receipt: SNS subscription confirmed');
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::error('Receipt: Failed to confirm SNS subscription', [
                         'error' => $e->getMessage(),
                     ]);
