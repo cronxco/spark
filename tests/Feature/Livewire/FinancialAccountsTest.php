@@ -3,7 +3,6 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\FinancialAccounts;
-use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
