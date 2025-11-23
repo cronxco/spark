@@ -2,7 +2,6 @@
 
 namespace App\Spotlight\Queries\Search;
 
-use Illuminate\Support\Facades\DB;
 use Spatie\Tags\Tag;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -15,7 +14,9 @@ class TagSearchQuery
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::forMode('tags', function (string $query) {
-            $tagsQuery = Tag::query();
+            // Use a subquery to count taggables in a single query (avoid N+1)
+            $tagsQuery = Tag::query()
+                ->selectRaw('tags.*, (SELECT COUNT(*) FROM taggables WHERE taggables.tag_id = tags.id) as taggables_count');
 
             if (! blank($query)) {
                 $tagsQuery->where(function ($q) use ($query) {
@@ -29,10 +30,7 @@ class TagSearchQuery
                 ->limit(5)
                 ->get()
                 ->map(function (Tag $tag) {
-                    // Get count of tagged items using the taggables table
-                    $taggablesCount = DB::table('taggables')
-                        ->where('tag_id', $tag->id)
-                        ->count();
+                    $taggablesCount = $tag->taggables_count ?? 0;
 
                     $subtitle = ucfirst($tag->type ?? 'general');
                     if ($taggablesCount > 0) {

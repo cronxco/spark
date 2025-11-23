@@ -11,6 +11,8 @@ class PluginRegistry
 {
     private static array $plugins = [];
 
+    private static ?Collection $cachedSpotlightCommands = null;
+
     /**
      * Get the list of valid domains that plugins can use
      */
@@ -126,12 +128,17 @@ class PluginRegistry
 
     /**
      * Get Spotlight commands from all plugins that support them.
+     * Results are cached per-request to avoid recalculating on every keystroke.
      *
      * @return Collection<array{plugin: string, key: string, command: array}>
      */
     public static function getSpotlightCommands(): Collection
     {
-        return self::getAllPlugins()
+        if (self::$cachedSpotlightCommands !== null) {
+            return self::$cachedSpotlightCommands;
+        }
+
+        self::$cachedSpotlightCommands = self::getAllPlugins()
             ->filter(fn ($pluginClass) => is_subclass_of($pluginClass, SupportsSpotlightCommands::class))
             ->flatMap(function ($pluginClass) {
                 $identifier = $pluginClass::getIdentifier();
@@ -145,5 +152,15 @@ class PluginRegistry
                     ];
                 });
             });
+
+        return self::$cachedSpotlightCommands;
+    }
+
+    /**
+     * Clear the cached spotlight commands (useful for testing).
+     */
+    public static function clearSpotlightCommandsCache(): void
+    {
+        self::$cachedSpotlightCommands = null;
     }
 }

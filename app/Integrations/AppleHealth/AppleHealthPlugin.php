@@ -92,7 +92,7 @@ class AppleHealthPlugin extends WebhookPlugin
             ],
             // Health Metrics
             'had_environmental_audio_exposure' => [
-                'icon' => 'fas.volume-high',
+                'icon' => 'fas.ear-listen',
                 'display_name' => 'Had Environmental Audio Exposure',
                 'description' => 'Environmental audio exposure measurement',
                 'display_with_object' => false,
