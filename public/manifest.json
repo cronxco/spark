@@ -2,8 +2,10 @@
     "$schema": "https://json.schemastore.org/web-manifest-combined.json",
     "name": "Spark",
     "short_name": "Spark",
-    "start_url": "/dashboard",
+    "id": "/?source=pwa",
+    "start_url": "/today",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "background_color": "#010E19",
     "theme_color": "#010E19",
     "description": "Synaptic aggregation, analysis and action.",
@@ -43,6 +45,12 @@
         {
             "src": "/apple-touch-icon.png",
             "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/favicon-512.png",
+            "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
         }
