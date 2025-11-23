@@ -120,6 +120,9 @@ class ExtractArticleImageJob implements ShouldQueue
             );
 
             if ($media) {
+                // Also update media_url field on the bookmark for backward compatibility
+                $webpage->update(['media_url' => $articleImageUrl]);
+
                 Log::info('ExtractArticleImage: Article image saved', [
                     'webpage_id' => $this->webpageId,
                     'url' => $webpage->url,

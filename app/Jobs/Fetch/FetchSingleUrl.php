@@ -341,6 +341,9 @@ class FetchSingleUrl implements ShouldQueue
                         'image_url' => $articleImageUrl,
                         'media_uuid' => $media->uuid,
                     ]);
+
+                    // Also update media_url field on the bookmark for backward compatibility
+                    $webpage->update(['media_url' => $articleImageUrl]);
                 }
             } catch (Exception $e) {
                 Log::warning('Fetch: Failed to save article image', [
