@@ -188,7 +188,7 @@ new class extends Component
                             <div class="divider">Preview</div>
                             <div class="bg-base-300 rounded-lg p-4">
                                 <div class="flex items-start gap-3">
-                                    <img src="/apple-touch-icon.png" alt="Icon" class="w-10 h-10 rounded" />
+                                    <img src="/icons/Spark-iOS-Default-60x60@3x.png" alt="Icon" class="w-10 h-10 rounded" />
                                     <div class="flex-1 min-w-0">
                                         <div class="font-semibold text-sm">{{ $title ?: 'Notification Title' }}</div>
                                         <div class="text-sm text-base-content/70 line-clamp-2">{{ $message ?: 'Notification message will appear here...' }}</div>

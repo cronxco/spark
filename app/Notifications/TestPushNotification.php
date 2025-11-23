@@ -50,7 +50,7 @@ class TestPushNotification extends SparkNotification
     {
         return (new WebPushMessage)
             ->title($this->getTitle())
-            ->icon('/apple-touch-icon.png')
+            ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
             ->body($this->getMessage())
             ->badge('/favicon.ico')
             ->tag('test-notification')

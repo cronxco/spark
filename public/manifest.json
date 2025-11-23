@@ -2,47 +2,86 @@
     "$schema": "https://json.schemastore.org/web-manifest-combined.json",
     "name": "Spark",
     "short_name": "Spark",
-    "start_url": "/dashboard",
+    "id": "/?source=pwa",
+    "start_url": "/today",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "background_color": "#010E19",
     "theme_color": "#010E19",
     "description": "Synaptic aggregation, analysis and action.",
     "orientation": "portrait-primary",
     "icons": [
         {
-            "src": "/favicon-32.png",
+            "src": "/icons/Spark-iOS-Default-16x16@1x.png",
+            "sizes": "16x16",
+            "type": "image/png"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-32x32@1x.png",
             "sizes": "32x32",
             "type": "image/png"
         },
         {
-            "src": "/favicon-72.png",
-            "sizes": "72x72",
+            "src": "/icons/Spark-iOS-Default-20x20@2x.png",
+            "sizes": "40x40",
             "type": "image/png"
         },
         {
-            "src": "/favicon-96.png",
-            "sizes": "96x96",
+            "src": "/icons/Spark-iOS-Default-32x32@2x.png",
+            "sizes": "64x64",
             "type": "image/png"
         },
         {
-            "src": "/favicon-144.png",
-            "sizes": "144x144",
+            "src": "/icons/Spark-iOS-Default-38x38@2x.png",
+            "sizes": "76x76",
             "type": "image/png"
         },
         {
-            "src": "/favicon-160.png",
-            "sizes": "160x160",
+            "src": "/icons/Spark-iOS-Default-40x40@2x.png",
+            "sizes": "80x80",
             "type": "image/png"
         },
         {
-            "src": "/favicon-192.png",
+            "src": "/icons/Spark-iOS-Default-60x60@2x.png",
+            "sizes": "120x120",
+            "type": "image/png"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-128x128@1x.png",
+            "sizes": "128x128",
+            "type": "image/png"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-76x76@2x.png",
+            "sizes": "152x152",
+            "type": "image/png"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-83.5x83.5@2x.png",
+            "sizes": "167x167",
+            "type": "image/png"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-60x60@3x.png",
+            "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-64x64@3x.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "/apple-touch-icon.png",
-            "sizes": "180x180",
+            "src": "/icons/Spark-iOS-Default-512x512@1x.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/Spark-iOS-Default-1024x1024@1x.png",
+            "sizes": "1024x1024",
             "type": "image/png",
             "purpose": "any maskable"
         }
