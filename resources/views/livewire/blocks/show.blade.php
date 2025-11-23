@@ -1,16 +1,18 @@
 <?php
 
+use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
-use Livewire\Volt\Component;
-use function Livewire\Volt\layout;
-use App\Integrations\PluginRegistry;
-use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Facades\Log;
+use Livewire\Volt\Component;
+use Spatie\Activitylog\Models\Activity;
+
+use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
+new class extends Component
+{
     public Block $block;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -19,6 +21,16 @@ new class extends Component {
     public bool $showEditBlockModal = false;
     public bool $showManageRelationshipsModal = false;
     public bool $showAddRelationshipModal = false;
+
+    // Progressive loading state flags
+    public bool $relationshipsLoaded = false;
+    public bool $relatedBlocksLoaded = false;
+    public bool $activitiesLoaded = false;
+
+    // Cached data
+    public $cachedRelationships = null;
+    public $cachedRelatedBlocks = null;
+    public $cachedActivities = null;
 
     protected $listeners = [
         'jump-to-parent-event' => 'handleJumpToParentEvent',
@@ -34,10 +46,42 @@ new class extends Component {
 
     public function mount(Block $block): void
     {
-        $this->block = $block->load(['event', 'relationshipsFrom', 'relationshipsTo']);
+        // Load only the event relationship initially
+        $this->block = $block->load(['event']);
 
         // Track this view in the activity log (debounced to prevent duplicate views)
         $this->block->logViewIfNotRecent(5);
+    }
+
+    public function loadRelationships(): void
+    {
+        if ($this->relationshipsLoaded) {
+            return;
+        }
+
+        $this->block->load(['relationshipsFrom', 'relationshipsTo']);
+        $this->cachedRelationships = $this->block->allRelationships()->get();
+        $this->relationshipsLoaded = true;
+    }
+
+    public function loadRelatedBlocks(): void
+    {
+        if ($this->relatedBlocksLoaded) {
+            return;
+        }
+
+        $this->cachedRelatedBlocks = $this->fetchRelatedBlocks();
+        $this->relatedBlocksLoaded = true;
+    }
+
+    public function loadActivities(): void
+    {
+        if ($this->activitiesLoaded) {
+            return;
+        }
+
+        $this->cachedActivities = Activity::forSubject($this->block)->latest()->get();
+        $this->activitiesLoaded = true;
     }
 
     public function toggleSidebar(): void
@@ -47,50 +91,29 @@ new class extends Component {
 
     public function getRelationships()
     {
-        return $this->block->allRelationships()->get();
+        if (! $this->relationshipsLoaded) {
+            return collect();
+        }
+
+        return $this->cachedRelationships ?? collect();
     }
 
     public function getRelatedBlocks()
     {
-        // Use semantic search if embeddings exist
-        if (!empty($this->block->embeddings)) {
-            try {
-                $embedding = json_decode($this->block->embeddings, true);
-
-                if (is_array($embedding) && count($embedding) > 0) {
-                    // Get user's integration IDs for security
-                    $userIntegrationIds = auth()->user()->integrations()->pluck('id')->toArray();
-
-                    // Perform semantic search with temporal weighting
-                    return Block::semanticSearch($embedding, threshold: 1.2, limit: 5, temporalWeight: 0.015)
-                        ->whereHas('event', function ($q) use ($userIntegrationIds) {
-                            $q->whereIn('integration_id', $userIntegrationIds);
-                        })
-                        ->where('id', '!=', $this->block->id) // Exclude current block
-                        ->with(['event.integration'])
-                        ->get();
-                }
-            } catch (\Exception $e) {
-                Log::warning('Semantic search failed for related blocks on block', [
-                    'block_id' => $this->block->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        if (! $this->relatedBlocksLoaded) {
+            return collect();
         }
 
-        // Fallback to original logic if embeddings don't exist or semantic search fails
-        return Block::where('event_id', $this->block->event_id)
-            ->where('id', '!=', $this->block->id)
-            ->orderBy('time', 'desc')
-            ->limit(5)
-            ->get();
+        return $this->cachedRelatedBlocks ?? collect();
     }
 
     public function getActivities()
     {
-        return Activity::forSubject($this->block)
-            ->latest()
-            ->get();
+        if (! $this->activitiesLoaded) {
+            return collect();
+        }
+
+        return $this->cachedActivities ?? collect();
     }
 
     public function addComment(): void
@@ -115,6 +138,7 @@ new class extends Component {
         if (is_array($data) || is_object($data)) {
             return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }
+
         return $data;
     }
 
@@ -142,8 +166,8 @@ new class extends Component {
         $data = $this->getCompleteBlockData();
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $this->js("
-            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+        $this->js('
+            const blob = new Blob([' . json_encode($json) . "], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -249,8 +273,13 @@ new class extends Component {
     {
         $this->block->refresh()->load([
             'relationshipsFrom',
-            'relationshipsTo'
+            'relationshipsTo',
         ]);
+
+        // Refresh cached relationships if already loaded
+        if ($this->relationshipsLoaded) {
+            $this->cachedRelationships = $this->block->allRelationships()->get();
+        }
     }
 
     public function closeEditModal(): void
@@ -258,6 +287,42 @@ new class extends Component {
         $this->showEditBlockModal = false;
         $this->showManageRelationshipsModal = false;
         $this->showAddRelationshipModal = false;
+    }
+
+    protected function fetchRelatedBlocks()
+    {
+        // Use semantic search if embeddings exist
+        if (! empty($this->block->embeddings)) {
+            try {
+                $embedding = json_decode($this->block->embeddings, true);
+
+                if (is_array($embedding) && count($embedding) > 0) {
+                    // Get user's integration IDs for security
+                    $userIntegrationIds = auth()->user()->integrations()->pluck('id')->toArray();
+
+                    // Perform semantic search with temporal weighting
+                    return Block::semanticSearch($embedding, threshold: 1.2, limit: 5, temporalWeight: 0.015)
+                        ->whereHas('event', function ($q) use ($userIntegrationIds) {
+                            $q->whereIn('integration_id', $userIntegrationIds);
+                        })
+                        ->where('id', '!=', $this->block->id) // Exclude current block
+                        ->with(['event.integration'])
+                        ->get();
+                }
+            } catch (\Exception $e) {
+                Log::warning('Semantic search failed for related blocks on block', [
+                    'block_id' => $this->block->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Fallback to original logic if embeddings don't exist or semantic search fails
+        return Block::where('event_id', $this->block->event_id)
+            ->where('id', '!=', $this->block->id)
+            ->orderBy('time', 'desc')
+            ->limit(5)
+            ->get();
     }
 };
 
@@ -405,45 +470,56 @@ new class extends Component {
         @endif
 
         <!-- Linked Blocks -->
-        @if ($this->getRelatedBlocks()->isNotEmpty())
-        <x-card class="bg-base-200 shadow">
-            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
-                Related Blocks
-            </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                @foreach ($this->getRelatedBlocks() as $relatedBlock)
-                <a href="{{ route('blocks.show', $relatedBlock) }}"
-                    class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                    <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
-                            <x-icon name="{{ $this->getBlockIcon($relatedBlock->block_type, $relatedBlock->event?->service) }}"
-                                class="w-4 h-4 text-info" />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="font-medium text-sm line-clamp-1">{{ $relatedBlock->title }}</div>
-                            <div class="text-xs text-base-content/70">
-                                {{ $relatedBlock->block_type }}
-                                @if ($relatedBlock->time)
-                                · {{ $relatedBlock->time->diffForHumans() }}
+        <div wire:init="loadRelatedBlocks">
+            @if ($relatedBlocksLoaded && $this->getRelatedBlocks()->isNotEmpty())
+            <x-card class="bg-base-200 shadow">
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                    Related Blocks
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    @foreach ($this->getRelatedBlocks() as $relatedBlock)
+                    <a href="{{ route('blocks.show', $relatedBlock) }}"
+                        class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
+                                <x-icon name="{{ $this->getBlockIcon($relatedBlock->block_type, $relatedBlock->event?->service) }}"
+                                    class="w-4 h-4 text-info" />
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-sm line-clamp-1">{{ $relatedBlock->title }}</div>
+                                <div class="text-xs text-base-content/70">
+                                    {{ $relatedBlock->block_type }}
+                                    @if ($relatedBlock->time)
+                                    · {{ $relatedBlock->time->diffForHumans() }}
+                                    @endif
+                                </div>
+                                @if ($relatedBlock->value)
+                                <div class="text-sm font-semibold text-info mt-1">
+                                    {!! format_event_value_display($relatedBlock->formatted_value, $relatedBlock->value_unit, $relatedBlock->event?->service, $relatedBlock->block_type, 'block') !!}
+                                </div>
                                 @endif
                             </div>
-                            @if ($relatedBlock->value)
-                            <div class="text-sm font-semibold text-info mt-1">
-                                {!! format_event_value_display($relatedBlock->formatted_value, $relatedBlock->value_unit, $relatedBlock->event?->service, $relatedBlock->block_type, 'block') !!}
-                            </div>
-                            @endif
                         </div>
-                    </div>
-                </a>
-                @endforeach
-            </div>
-        </x-card>
-        @endif
+                    </a>
+                    @endforeach
+                </div>
+            </x-card>
+            @elseif (! $relatedBlocksLoaded)
+            <x-card class="bg-base-200 shadow">
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="o-squares-2x2" class="w-5 h-5 text-info" />
+                    Related Blocks
+                </h3>
+                <x-skeleton-loader type="block-grid" />
+            </x-card>
+            @endif
+        </div>
 
         <!-- Relationships Section -->
+        <div wire:init="loadRelationships">
         @php $relationships = $this->getRelationships(); @endphp
-        @if ($relationships->isNotEmpty())
+        @if ($relationshipsLoaded && $relationships->isNotEmpty())
         <x-card class="bg-base-200 shadow">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
@@ -538,6 +614,14 @@ new class extends Component {
                 @endif
             </div>
         </x-card>
+        @elseif (! $relationshipsLoaded)
+        <x-card class="bg-base-200 shadow">
+            <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                <x-icon name="o-link" class="w-5 h-5 text-accent" />
+                Relationships
+            </h3>
+            <x-skeleton-loader type="relationship-list" />
+        </x-card>
         @endif
         </div>
 
@@ -599,7 +683,7 @@ new class extends Component {
                 </div>
 
                 <!-- Relationships -->
-                <div class="pb-4 border-b border-base-200">
+                <div class="pb-4 border-b border-base-200" wire:init="loadRelationships">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Relationships
@@ -608,6 +692,9 @@ new class extends Component {
                             <x-icon name="o-plus" class="w-3 h-3" />
                         </button>
                     </div>
+                    @if (! $relationshipsLoaded)
+                    <x-skeleton-loader type="relationship-list" />
+                    @else
                     @php $sidebarRelationships = $this->getRelationships(); @endphp
                     @if ($sidebarRelationships->isEmpty())
                     <x-empty-state
@@ -656,6 +743,7 @@ new class extends Component {
                     </div>
                     @endif
                     @endif
+                    @endif
                 </div>
 
                 <!-- Comment -->
@@ -679,6 +767,10 @@ new class extends Component {
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
+                        <div wire:init="loadActivities">
+                        @if (! $activitiesLoaded)
+                        <x-skeleton-loader type="list-item" :count="3" />
+                        @else
                         @php $activities = $this->getActivities(); @endphp
                         @if ($activities->isEmpty())
                         <x-empty-state
@@ -734,6 +826,8 @@ new class extends Component {
                         @endif
                         @endforeach
                         @endif
+                        @endif
+                        </div>
                     </x-slot:content>
                 </x-collapse>
 

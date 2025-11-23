@@ -99,94 +99,124 @@
 
             @if ($this->getPluginClass())
                 <!-- Action Types Overview -->
-                @if ($this->getActionTypes()->count() > 0)
-                <x-card class="bg-base-200 shadow">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
-                        Action Types
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        @foreach ($this->getActionTypes() as $actionType)
-                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                            <div class="flex items-start gap-3 mb-2">
-                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                    <x-icon name="{{ $actionType['action']['icon'] }}" class="w-4 h-4 text-primary" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-base truncate">{{ $actionType['action']['display_name'] }}</div>
-                                    <div class="text-sm text-base-content/70 flex items-center gap-2">
-                                        <span class="text-lg font-bold text-primary">{{ $actionType['count'] }}</span>
-                                        @if ($actionType['newest'])
-                                        <span class="text-xs">{{ $actionType['newest']->created_at->diffForHumans() }}</span>
-                                        @endif
+                <div wire:init="loadActionTypes">
+                    @if ($actionTypesLoaded && $this->getActionTypes()->isNotEmpty())
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
+                            Action Types
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->getActionTypes() as $actionType)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <div class="flex items-start gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                        <x-icon name="{{ $actionType['action']['icon'] }}" class="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-base truncate">{{ $actionType['action']['display_name'] }}</div>
+                                        <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                            <span class="text-lg font-bold text-primary">{{ $actionType['count'] }}</span>
+                                            @if ($actionType['newest'])
+                                            <span class="text-xs">{{ $actionType['newest']->created_at->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                            @endforeach
                         </div>
-                        @endforeach
-                    </div>
-                </x-card>
-                @endif
+                    </x-card>
+                    @elseif (! $actionTypesLoaded)
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
+                            Action Types
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </x-card>
+                    @endif
+                </div>
 
                 <!-- Object Types Overview -->
-                @if ($this->getObjectTypes()->count() > 0)
-                <x-card class="bg-base-200 shadow">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas.grip" class="w-5 h-5 text-info" />
-                        Object Types
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        @foreach ($this->getObjectTypes() as $objectType)
-                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                            <div class="flex items-start gap-3 mb-2">
-                                <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
-                                    <x-icon name="{{ $objectType['object']['icon'] }}" class="w-4 h-4 text-info" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-base truncate">{{ $objectType['object']['display_name'] }}</div>
-                                    <div class="text-sm text-base-content/70 flex items-center gap-2">
-                                        <span class="text-lg font-bold text-info">{{ $objectType['count'] }}</span>
-                                        @if ($objectType['newest'])
-                                        <span class="text-xs">{{ $objectType['newest']->created_at->diffForHumans() }}</span>
-                                        @endif
+                <div wire:init="loadObjectTypes">
+                    @if ($objectTypesLoaded && $this->getObjectTypes()->isNotEmpty())
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.grip" class="w-5 h-5 text-info" />
+                            Object Types
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->getObjectTypes() as $objectType)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <div class="flex items-start gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
+                                        <x-icon name="{{ $objectType['object']['icon'] }}" class="w-4 h-4 text-info" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-base truncate">{{ $objectType['object']['display_name'] }}</div>
+                                        <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                            <span class="text-lg font-bold text-info">{{ $objectType['count'] }}</span>
+                                            @if ($objectType['newest'])
+                                            <span class="text-xs">{{ $objectType['newest']->created_at->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                            @endforeach
                         </div>
-                        @endforeach
-                    </div>
-                </x-card>
-                @endif
+                    </x-card>
+                    @elseif (! $objectTypesLoaded)
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.grip" class="w-5 h-5 text-info" />
+                            Object Types
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </x-card>
+                    @endif
+                </div>
 
                 <!-- Block Types Overview -->
-                @if ($this->getBlockTypes()->count() > 0)
-                <x-card class="bg-base-200 shadow">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="o-cube" class="w-5 h-5 text-success" />
-                        Block Types
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        @foreach ($this->getBlockTypes() as $blockType)
-                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                            <div class="flex items-start gap-3 mb-2">
-                                <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
-                                    <x-icon name="{{ $blockType['block']['icon'] }}" class="w-4 h-4 text-success" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-base truncate">{{ $blockType['block']['display_name'] }}</div>
-                                    <div class="text-sm text-base-content/70 flex items-center gap-2">
-                                        <span class="text-lg font-bold text-success">{{ $blockType['count'] }}</span>
-                                        @if ($blockType['newest'])
-                                        <span class="text-xs">{{ $blockType['newest']->created_at->diffForHumans() }}</span>
-                                        @endif
+                <div wire:init="loadBlockTypes">
+                    @if ($blockTypesLoaded && $this->getBlockTypes()->isNotEmpty())
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-cube" class="w-5 h-5 text-success" />
+                            Block Types
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->getBlockTypes() as $blockType)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <div class="flex items-start gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                                        <x-icon name="{{ $blockType['block']['icon'] }}" class="w-4 h-4 text-success" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-base truncate">{{ $blockType['block']['display_name'] }}</div>
+                                        <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                            <span class="text-lg font-bold text-success">{{ $blockType['count'] }}</span>
+                                            @if ($blockType['newest'])
+                                            <span class="text-xs">{{ $blockType['newest']->created_at->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                            @endforeach
                         </div>
-                        @endforeach
-                    </div>
-                </x-card>
-                @endif
+                    </x-card>
+                    @elseif (! $blockTypesLoaded)
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-cube" class="w-5 h-5 text-success" />
+                            Block Types
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </x-card>
+                    @endif
+                </div>
             @else
                 <!-- No plugin configuration -->
                 <x-card class="bg-base-200 shadow">

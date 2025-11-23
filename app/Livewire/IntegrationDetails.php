@@ -12,8 +12,24 @@ use Livewire\Component;
 class IntegrationDetails extends Component
 {
     public Integration $integration;
+
     public bool $showSidebar = false;
+
     public bool $configOpen = true;
+
+    // Progressive loading state flags
+    public bool $actionTypesLoaded = false;
+
+    public bool $objectTypesLoaded = false;
+
+    public bool $blockTypesLoaded = false;
+
+    // Cached data for loaded types
+    public array $cachedActionTypes = [];
+
+    public array $cachedObjectTypes = [];
+
+    public array $cachedBlockTypes = [];
 
     public function mount(Integration $integration)
     {
@@ -22,6 +38,45 @@ class IntegrationDetails extends Component
         }
 
         $this->integration = $integration->load('group');
+    }
+
+    /**
+     * Load action types with their statistics (expensive)
+     */
+    public function loadActionTypes(): void
+    {
+        if ($this->actionTypesLoaded) {
+            return;
+        }
+
+        $this->cachedActionTypes = $this->fetchActionTypes();
+        $this->actionTypesLoaded = true;
+    }
+
+    /**
+     * Load object types with their statistics (expensive)
+     */
+    public function loadObjectTypes(): void
+    {
+        if ($this->objectTypesLoaded) {
+            return;
+        }
+
+        $this->cachedObjectTypes = $this->fetchObjectTypes();
+        $this->objectTypesLoaded = true;
+    }
+
+    /**
+     * Load block types with their statistics (expensive)
+     */
+    public function loadBlockTypes(): void
+    {
+        if ($this->blockTypesLoaded) {
+            return;
+        }
+
+        $this->cachedBlockTypes = $this->fetchBlockTypes();
+        $this->blockTypesLoaded = true;
     }
 
     public function toggleSidebar(): void
@@ -111,6 +166,39 @@ class IntegrationDetails extends Component
 
     public function getActionTypes()
     {
+        if (! $this->actionTypesLoaded) {
+            return collect();
+        }
+
+        return collect($this->cachedActionTypes);
+    }
+
+    public function getObjectTypes()
+    {
+        if (! $this->objectTypesLoaded) {
+            return collect();
+        }
+
+        return collect($this->cachedObjectTypes);
+    }
+
+    public function getBlockTypes()
+    {
+        if (! $this->blockTypesLoaded) {
+            return collect();
+        }
+
+        return collect($this->cachedBlockTypes);
+    }
+
+    public function render()
+    {
+        return view('livewire.integration-details')
+            ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+    }
+
+    protected function fetchActionTypes(): array
+    {
         $pluginClass = $this->getPluginClass();
         if (! $pluginClass) {
             return [];
@@ -134,10 +222,10 @@ class IntegrationDetails extends Component
                     ->orderBy('created_at', 'desc')
                     ->first(),
             ];
-        });
+        })->toArray();
     }
 
-    public function getObjectTypes()
+    protected function fetchObjectTypes(): array
     {
         $pluginClass = $this->getPluginClass();
         if (! $pluginClass) {
@@ -180,10 +268,10 @@ class IntegrationDetails extends Component
                     ->orderBy('created_at', 'desc')
                     ->first(),
             ];
-        });
+        })->toArray();
     }
 
-    public function getBlockTypes()
+    protected function fetchBlockTypes(): array
     {
         $pluginClass = $this->getPluginClass();
         if (! $pluginClass) {
@@ -214,13 +302,7 @@ class IntegrationDetails extends Component
                     ->orderBy('created_at', 'desc')
                     ->first(),
             ];
-        });
-    }
-
-    public function render()
-    {
-        return view('livewire.integration-details')
-            ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+        })->toArray();
     }
 
     protected function getListeners(): array
