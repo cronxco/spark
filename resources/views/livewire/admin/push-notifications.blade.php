@@ -135,7 +135,7 @@ new class extends Component
                             </label>
                             <input
                                 type="text"
-                                wire:model="title"
+                                wire:model.live="title"
                                 class="input input-bordered w-full"
                                 placeholder="Notification title"
                                 maxlength="100"
@@ -153,7 +153,7 @@ new class extends Component
                                 <span class="label-text-alt text-base-content/50">{{ strlen($message) }}/500</span>
                             </label>
                             <textarea
-                                wire:model="message"
+                                wire:model.live="message"
                                 class="textarea textarea-bordered w-full"
                                 placeholder="Notification message"
                                 rows="3"
@@ -172,7 +172,7 @@ new class extends Component
                             </label>
                             <input
                                 type="url"
-                                wire:model="url"
+                                wire:model.live="url"
                                 class="input input-bordered w-full"
                                 placeholder="https://example.com/page"
                             />
