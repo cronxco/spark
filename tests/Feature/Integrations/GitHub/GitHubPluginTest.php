@@ -178,13 +178,25 @@ class GitHubPluginTest extends TestCase
     }
 
     #[Test]
-    public function plugin_returns_default_events_when_empty(): void
+    public function plugin_returns_default_events_when_null(): void
     {
         $plugin = new GitHubPlugin;
 
-        $events = $plugin->normalizeEvents([]);
+        // Default events are returned when input is not string or array
+        $events = $plugin->normalizeEvents(null);
 
         $this->assertContains('push', $events);
         $this->assertContains('pull_request', $events);
+    }
+
+    #[Test]
+    public function plugin_returns_empty_array_when_events_empty(): void
+    {
+        $plugin = new GitHubPlugin;
+
+        // Empty array returns empty after filtering
+        $events = $plugin->normalizeEvents([]);
+
+        $this->assertEmpty($events);
     }
 }

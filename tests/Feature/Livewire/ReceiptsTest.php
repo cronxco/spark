@@ -164,7 +164,9 @@ class ReceiptsTest extends TestCase
     {
         $component = Livewire::test(Receipts::class);
 
-        $component->set('selectedReceiptId', 'test-id')
+        // Use a valid UUID format for testing
+        $testId = (string) \Illuminate\Support\Str::uuid();
+        $component->set('selectedReceiptId', $testId)
             ->set('showMatchModal', true)
             ->call('closeMatchModal')
             ->assertSet('selectedReceiptId', null)
@@ -229,6 +231,7 @@ class ReceiptsTest extends TestCase
 
         // Create the relationship
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $receipt->id,
             'to_type' => Event::class,

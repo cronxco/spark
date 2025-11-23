@@ -52,8 +52,8 @@ class EditEventTest extends TestCase
             'actor_id' => $actor->id,
             'target_id' => $target->id,
             'action' => 'test_action',
-            'value' => 100.00,
-            'value_multiplier' => 1,
+            'value' => 10000,
+            'value_multiplier' => 100,
             'value_unit' => 'GBP',
             'time' => now(),
         ]);
@@ -72,8 +72,8 @@ class EditEventTest extends TestCase
         $component = Livewire::test(EditEvent::class, ['event' => $this->event]);
 
         $component->assertSet('action', 'test_action')
-            ->assertSet('value', 100.00)
-            ->assertSet('value_multiplier', 1)
+            ->assertSet('value', 10000)
+            ->assertSet('value_multiplier', 100)
             ->assertSet('value_unit', 'GBP');
     }
 
@@ -96,8 +96,9 @@ class EditEventTest extends TestCase
             'action' => 'other_action',
         ]);
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
-        Livewire::test(EditEvent::class, ['event' => $otherEvent]);
+        // The component aborts with 403 for unauthorized access
+        Livewire::test(EditEvent::class, ['event' => $otherEvent])
+            ->assertForbidden();
     }
 
     #[Test]
@@ -117,11 +118,11 @@ class EditEventTest extends TestCase
     {
         $component = Livewire::test(EditEvent::class, ['event' => $this->event]);
 
-        $component->set('value', 250.50)
+        $component->set('value', 25050)
             ->call('save');
 
         $this->event->refresh();
-        $this->assertEquals(250.50, $this->event->value);
+        $this->assertEquals(25050, $this->event->value);
     }
 
     #[Test]

@@ -192,6 +192,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => Event::class,
@@ -214,6 +215,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $otherEvent->id,
             'to_type' => Event::class,
@@ -240,6 +242,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => Event::class,
@@ -248,6 +251,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event3->id,
             'to_type' => Event::class,
@@ -271,6 +275,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => Event::class,
@@ -299,6 +304,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => Event::class,
@@ -307,6 +313,7 @@ class EventTest extends TestCase
         ]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => Event::class,
@@ -329,6 +336,7 @@ class EventTest extends TestCase
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => EventObject::class,
@@ -351,6 +359,7 @@ class EventTest extends TestCase
         $block = Block::factory()->create(['event_id' => $event->id]);
 
         Relationship::create([
+            'user_id' => $this->user->id,
             'from_type' => Event::class,
             'from_id' => $event->id,
             'to_type' => Block::class,
