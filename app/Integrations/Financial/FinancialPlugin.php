@@ -370,4 +370,34 @@ class FinancialPlugin extends ManualPlugin
             ->latest('time')
             ->first();
     }
+
+    /**
+     * Batch load latest balances for multiple accounts (N+1 optimization)
+     *
+     * @param  \Illuminate\Support\Collection  $accounts  Collection of EventObject accounts
+     * @return \Illuminate\Support\Collection  Keyed by actor_id
+     */
+    public function getLatestBalancesForAccounts($accounts): \Illuminate\Support\Collection
+    {
+        $accountIds = $accounts->pluck('id')->toArray();
+
+        if (empty($accountIds)) {
+            return collect();
+        }
+
+        // Use PostgreSQL DISTINCT ON for efficient "latest per group" query
+        $placeholders = implode(',', array_fill(0, count($accountIds), '?'));
+
+        $results = Event::fromRaw("(
+            SELECT DISTINCT ON (actor_id) *
+            FROM events
+            WHERE actor_id IN ({$placeholders})
+            AND service IN ('manual_account', 'monzo', 'gocardless')
+            AND action = 'had_balance'
+            AND deleted_at IS NULL
+            ORDER BY actor_id, time DESC
+        ) as events", $accountIds)->get();
+
+        return $results->keyBy('actor_id');
+    }
 }
