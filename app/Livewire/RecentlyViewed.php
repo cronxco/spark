@@ -41,11 +41,11 @@ class RecentlyViewed extends Component
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return collect();
         }
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         $types = null;
 

@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 
@@ -28,9 +29,9 @@ class RecentlyViewedService
      * Returns a collection of items (Events, EventObjects, Blocks) that the user
      * has recently viewed, ordered by most recent first.
      *
-     * @param User $user The user to get recently viewed items for
-     * @param int $limit Maximum number of items to return
-     * @param array|null $types Filter by subject types (Event::class, EventObject::class, Block::class)
+     * @param  User  $user  The user to get recently viewed items for
+     * @param  int  $limit  Maximum number of items to return
+     * @param  array|null  $types  Filter by subject types (Event::class, EventObject::class, Block::class)
      * @return Collection Collection of recently viewed models with their view timestamps
      */
     public function getRecentlyViewed(User $user, int $limit = self::DEFAULT_LIMIT, ?array $types = null): Collection
@@ -87,7 +88,7 @@ class RecentlyViewedService
         return $activities->map(function (Activity $activity) {
             $model = $this->loadSubject($activity);
 
-            if (!$model) {
+            if (! $model) {
                 return null;
             }
 
@@ -104,8 +105,8 @@ class RecentlyViewedService
     /**
      * Get recently viewed events for a user.
      *
-     * @param User $user The user to get recently viewed events for
-     * @param int $limit Maximum number of items to return
+     * @param  User  $user  The user to get recently viewed events for
+     * @param  int  $limit  Maximum number of items to return
      * @return Collection Collection of recently viewed Event models
      */
     public function getRecentlyViewedEvents(User $user, int $limit = self::DEFAULT_LIMIT): Collection
@@ -117,8 +118,8 @@ class RecentlyViewedService
     /**
      * Get recently viewed objects for a user.
      *
-     * @param User $user The user to get recently viewed objects for
-     * @param int $limit Maximum number of items to return
+     * @param  User  $user  The user to get recently viewed objects for
+     * @param  int  $limit  Maximum number of items to return
      * @return Collection Collection of recently viewed EventObject models
      */
     public function getRecentlyViewedObjects(User $user, int $limit = self::DEFAULT_LIMIT): Collection
@@ -130,8 +131,8 @@ class RecentlyViewedService
     /**
      * Get recently viewed blocks for a user.
      *
-     * @param User $user The user to get recently viewed blocks for
-     * @param int $limit Maximum number of items to return
+     * @param  User  $user  The user to get recently viewed blocks for
+     * @param  int  $limit  Maximum number of items to return
      * @return Collection Collection of recently viewed Block models
      */
     public function getRecentlyViewedBlocks(User $user, int $limit = self::DEFAULT_LIMIT): Collection
@@ -143,8 +144,8 @@ class RecentlyViewedService
     /**
      * Get the count of recently viewed items for a user.
      *
-     * @param User $user The user to count recently viewed items for
-     * @param array|null $types Filter by subject types
+     * @param  User  $user  The user to count recently viewed items for
+     * @param  array|null  $types  Filter by subject types
      * @return int The count of unique recently viewed items
      */
     public function getRecentlyViewedCount(User $user, ?array $types = null): int
@@ -169,72 +170,13 @@ class RecentlyViewedService
     }
 
     /**
-     * Load the subject model from an activity record.
-     *
-     * @param Activity $activity The activity record
-     * @return \Illuminate\Database\Eloquent\Model|null The loaded model or null
-     */
-    protected function loadSubject(Activity $activity): ?\Illuminate\Database\Eloquent\Model
-    {
-        $subjectType = $activity->subject_type;
-        $subjectId = $activity->subject_id;
-
-        if (!$subjectType || !$subjectId) {
-            return null;
-        }
-
-        // Check if the model class exists
-        if (!class_exists($subjectType)) {
-            return null;
-        }
-
-        // Load the model with appropriate relationships based on type
-        try {
-            switch ($subjectType) {
-                case Event::class:
-                    return Event::with(['actor', 'target', 'integration', 'tags'])
-                        ->find($subjectId);
-
-                case EventObject::class:
-                    return EventObject::with(['tags'])
-                        ->find($subjectId);
-
-                case Block::class:
-                    return Block::with(['event', 'event.integration'])
-                        ->find($subjectId);
-
-                default:
-                    return $subjectType::find($subjectId);
-            }
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Get a human-readable label for a subject type.
-     *
-     * @param string $subjectType The fully qualified class name
-     * @return string The human-readable label
-     */
-    protected function getTypeLabel(string $subjectType): string
-    {
-        return match ($subjectType) {
-            Event::class => 'Event',
-            EventObject::class => 'Object',
-            Block::class => 'Block',
-            default => class_basename($subjectType),
-        };
-    }
-
-    /**
      * Purge old view records for a user beyond the retention window.
      *
      * This keeps only the DEFAULT_LIMIT most recent unique views per user,
      * deleting older view records to prevent the activity log from growing indefinitely.
      *
-     * @param User $user The user to purge old views for
-     * @param int|null $retentionLimit Maximum views to retain (defaults to DEFAULT_LIMIT)
+     * @param  User  $user  The user to purge old views for
+     * @param  int|null  $retentionLimit  Maximum views to retain (defaults to DEFAULT_LIMIT)
      * @return int Number of records deleted
      */
     public function purgeOldViewsForUser(User $user, ?int $retentionLimit = null): int
@@ -283,7 +225,7 @@ class RecentlyViewedService
      *
      * This is useful for scheduled cleanup tasks.
      *
-     * @param int|null $retentionLimit Maximum views to retain per user
+     * @param  int|null  $retentionLimit  Maximum views to retain per user
      * @return array Array with 'users_processed' and 'total_deleted' counts
      */
     public function purgeOldViewsForAllUsers(?int $retentionLimit = null): array
@@ -317,5 +259,64 @@ class RecentlyViewedService
             'users_processed' => $usersProcessed,
             'total_deleted' => $totalDeleted,
         ];
+    }
+
+    /**
+     * Load the subject model from an activity record.
+     *
+     * @param  Activity  $activity  The activity record
+     * @return \Illuminate\Database\Eloquent\Model|null The loaded model or null
+     */
+    protected function loadSubject(Activity $activity): ?\Illuminate\Database\Eloquent\Model
+    {
+        $subjectType = $activity->subject_type;
+        $subjectId = $activity->subject_id;
+
+        if (! $subjectType || ! $subjectId) {
+            return null;
+        }
+
+        // Check if the model class exists
+        if (! class_exists($subjectType)) {
+            return null;
+        }
+
+        // Load the model with appropriate relationships based on type
+        try {
+            switch ($subjectType) {
+                case Event::class:
+                    return Event::with(['actor', 'target', 'integration', 'tags'])
+                        ->find($subjectId);
+
+                case EventObject::class:
+                    return EventObject::with(['tags'])
+                        ->find($subjectId);
+
+                case Block::class:
+                    return Block::with(['event', 'event.integration'])
+                        ->find($subjectId);
+
+                default:
+                    return $subjectType::find($subjectId);
+            }
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get a human-readable label for a subject type.
+     *
+     * @param  string  $subjectType  The fully qualified class name
+     * @return string The human-readable label
+     */
+    protected function getTypeLabel(string $subjectType): string
+    {
+        return match ($subjectType) {
+            Event::class => 'Event',
+            EventObject::class => 'Object',
+            Block::class => 'Block',
+            default => class_basename($subjectType),
+        };
     }
 }

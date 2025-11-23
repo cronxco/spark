@@ -169,7 +169,7 @@ class RecentlyViewedTest extends TestCase
         $event->logView();
         $object->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $recentlyViewed = $service->getRecentlyViewed($this->user);
 
         $this->assertEquals(2, $recentlyViewed->count());
@@ -191,7 +191,7 @@ class RecentlyViewedTest extends TestCase
         $this->travel(1)->seconds();
         $event3->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $recentlyViewed = $service->getRecentlyViewed($this->user);
 
         $this->assertEquals($event3->id, $recentlyViewed->first()->model->id);
@@ -209,7 +209,7 @@ class RecentlyViewedTest extends TestCase
         $event->logView();
         $object->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         // Get only events
         $events = $service->getRecentlyViewed($this->user, 10, [Event::class]);
@@ -252,7 +252,7 @@ class RecentlyViewedTest extends TestCase
             'created_at' => now(),
         ]);
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $recentlyViewed = $service->getRecentlyViewed($this->user);
 
         // Should only return one item despite two activity records
@@ -271,7 +271,7 @@ class RecentlyViewedTest extends TestCase
             $this->travel(1)->seconds();
         }
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         $limited = $service->getRecentlyViewed($this->user, 3);
         $this->assertEquals(3, $limited->count());
@@ -291,7 +291,7 @@ class RecentlyViewedTest extends TestCase
         $object->logView();
         $block->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         $events = $service->getRecentlyViewedEvents($this->user);
         $this->assertEquals(1, $events->count());
@@ -317,7 +317,7 @@ class RecentlyViewedTest extends TestCase
         $event->logView();
         $object->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         $this->assertEquals(2, $service->getRecentlyViewedCount($this->user));
         $this->assertEquals(1, $service->getRecentlyViewedCount($this->user, [Event::class]));
@@ -354,7 +354,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(25, Activity::where('event', 'viewed')->count());
 
         // Purge with limit of 20
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $deleted = $service->purgeOldViewsForUser($this->user, 20);
 
         // Should delete 5 records
@@ -394,7 +394,7 @@ class RecentlyViewedTest extends TestCase
         ]);
 
         // Purge with limit of 1
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $deleted = $service->purgeOldViewsForUser($this->user, 1);
 
         $this->assertEquals(1, $deleted);
@@ -483,7 +483,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(10, Activity::where('event', 'viewed')->count());
 
         // Purge with limit of 3 per user
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $result = $service->purgeOldViewsForAllUsers(3);
 
         $this->assertEquals(2, $result['users_processed']);
@@ -503,7 +503,7 @@ class RecentlyViewedTest extends TestCase
         $event = Event::factory()->create(['integration_id' => $this->integration->id]);
         $event->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $recentlyViewed = $service->getRecentlyViewed($this->user);
 
         $item = $recentlyViewed->first();
@@ -530,7 +530,7 @@ class RecentlyViewedTest extends TestCase
         $event->logView();
 
         // Verify we have a view
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
         $this->assertEquals(1, $service->getRecentlyViewed($this->user)->count());
 
         // Delete the event
@@ -561,7 +561,7 @@ class RecentlyViewedTest extends TestCase
         $event2 = Event::factory()->create(['integration_id' => $integration2->id]);
         $event2->logView();
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         // User 1 should only see their view
         $user1Views = $service->getRecentlyViewed($this->user);

@@ -59,7 +59,7 @@ class AddRelationship extends Component
             return collect();
         }
 
-        $service = new RecentlyViewedService();
+        $service = new RecentlyViewedService;
 
         // Filter by selected type if one is chosen, otherwise show all types
         $types = null;
