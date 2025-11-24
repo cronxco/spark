@@ -195,7 +195,8 @@ new class extends Component
             return collect();
         }
 
-        return $this->event->actor->getMedia(['screenshots', 'downloaded_images']);
+        return $this->event->actor->getMedia('screenshots')
+            ->merge($this->event->actor->getMedia('downloaded_images'));
     }
 
     #[Computed]
@@ -205,7 +206,8 @@ new class extends Component
             return collect();
         }
 
-        return $this->event->target->getMedia(['screenshots', 'downloaded_images']);
+        return $this->event->target->getMedia('screenshots')
+            ->merge($this->event->target->getMedia('downloaded_images'));
     }
 
     #[Computed]
