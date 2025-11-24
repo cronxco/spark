@@ -13,6 +13,7 @@ use Spatie\Tags\Tag;
 new class extends Component
 {
     use HasProgressiveLoading;
+
     public Event $event;
     public bool $showSidebar = false;
     public string $comment = '';

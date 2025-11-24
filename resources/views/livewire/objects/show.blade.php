@@ -18,6 +18,7 @@ layout('components.layouts.app');
 new class extends Component
 {
     use HasProgressiveLoading;
+
     public EventObject $object;
     public bool $showSidebar = false;
     public string $comment = '';
