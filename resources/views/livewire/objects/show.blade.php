@@ -235,7 +235,11 @@ new class extends Component
             return collect();
         }
 
-        return $this->object->getMedia(['screenshots', 'downloaded_images', 'pdfs', 'downloaded_videos', 'downloaded_documents']);
+        return $this->object->getMedia('screenshots')
+            ->merge($this->object->getMedia('downloaded_images'))
+            ->merge($this->object->getMedia('pdfs'))
+            ->merge($this->object->getMedia('downloaded_videos'))
+            ->merge($this->object->getMedia('downloaded_documents'));
     }
 
     #[Computed]
