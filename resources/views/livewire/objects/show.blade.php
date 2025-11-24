@@ -39,6 +39,10 @@ new class extends Component
     public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
 
+    // -------------------------------------------------------------------------
+    // Protected Methods & Properties
+    // -------------------------------------------------------------------------
+
     /**
      * Define the loading tiers for progressive loading.
      * Priority order: Tags -> Direct Events -> Media -> Relationships -> Semantic Blocks -> Semantic Events -> Activities
