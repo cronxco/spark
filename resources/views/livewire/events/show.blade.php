@@ -38,8 +38,21 @@ new class extends Component
     public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
 
+    protected $listeners = [
+        'open-tag-modal' => 'handleOpenTagModal',
+        'open-edit-event-modal' => 'handleOpenEditModal',
+        'open-manage-relationships-modal' => 'handleOpenManageRelationshipsModal',
+        'open-add-relationship-modal' => 'handleOpenAddRelationshipModal',
+        'delete-event' => 'handleDeleteEvent',
+        'event-updated' => 'handleEventUpdated',
+        'tags-updated' => 'handleTagsUpdated',
+        'relationship-created' => 'handleRelationshipUpdated',
+        'relationship-deleted' => 'handleRelationshipUpdated',
+        'close-modal' => 'closeModals',
+    ];
+
     // -------------------------------------------------------------------------
-    // Protected Methods & Properties
+    // Protected Methods
     // -------------------------------------------------------------------------
 
     /**
@@ -58,19 +71,6 @@ new class extends Component
             7 => ['loadActivities'],
         ];
     }
-
-    protected $listeners = [
-        'open-tag-modal' => 'handleOpenTagModal',
-        'open-edit-event-modal' => 'handleOpenEditModal',
-        'open-manage-relationships-modal' => 'handleOpenManageRelationshipsModal',
-        'open-add-relationship-modal' => 'handleOpenAddRelationshipModal',
-        'delete-event' => 'handleDeleteEvent',
-        'event-updated' => 'handleEventUpdated',
-        'tags-updated' => 'handleTagsUpdated',
-        'relationship-created' => 'handleRelationshipUpdated',
-        'relationship-deleted' => 'handleRelationshipUpdated',
-        'close-modal' => 'closeModals',
-    ];
 
     // -------------------------------------------------------------------------
     // Public Methods

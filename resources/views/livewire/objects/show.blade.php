@@ -39,8 +39,22 @@ new class extends Component
     public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
 
+    protected $listeners = [
+        'open-tag-modal' => 'handleOpenTagModal',
+        'show-timeline' => 'handleShowTimeline',
+        'open-edit-object-modal' => 'handleOpenEditModal',
+        'open-manage-relationships-modal' => 'handleOpenManageRelationshipsModal',
+        'open-add-relationship-modal' => 'handleOpenAddRelationshipModal',
+        'delete-object' => 'handleDeleteObject',
+        'object-updated' => 'handleObjectUpdated',
+        'tags-updated' => 'handleTagsUpdated',
+        'relationship-created' => 'handleRelationshipUpdated',
+        'relationship-deleted' => 'handleRelationshipUpdated',
+        'close-modal' => 'closeModals',
+    ];
+
     // -------------------------------------------------------------------------
-    // Protected Methods & Properties
+    // Protected Methods
     // -------------------------------------------------------------------------
 
     /**
@@ -59,20 +73,6 @@ new class extends Component
             7 => ['loadActivities'],
         ];
     }
-
-    protected $listeners = [
-        'open-tag-modal' => 'handleOpenTagModal',
-        'show-timeline' => 'handleShowTimeline',
-        'open-edit-object-modal' => 'handleOpenEditModal',
-        'open-manage-relationships-modal' => 'handleOpenManageRelationshipsModal',
-        'open-add-relationship-modal' => 'handleOpenAddRelationshipModal',
-        'delete-object' => 'handleDeleteObject',
-        'object-updated' => 'handleObjectUpdated',
-        'tags-updated' => 'handleTagsUpdated',
-        'relationship-created' => 'handleRelationshipUpdated',
-        'relationship-deleted' => 'handleRelationshipUpdated',
-        'close-modal' => 'closeModals',
-    ];
 
     // -------------------------------------------------------------------------
     // Public Methods
