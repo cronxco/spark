@@ -4,7 +4,9 @@ use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Traits\HasProgressiveLoading;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Tags\Tag;
@@ -15,6 +17,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
+    use HasProgressiveLoading;
     public EventObject $object;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -29,10 +32,29 @@ new class extends Component
 
     // Progressive loading state flags
     public bool $tagsLoaded = false;
+    public bool $directEventsLoaded = false;
+    public bool $mediaLoaded = false;
     public bool $relationshipsLoaded = false;
-    public bool $relatedEventsLoaded = false;
     public bool $relatedBlocksLoaded = false;
+    public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
+
+    /**
+     * Define the loading tiers for progressive loading.
+     * Priority order: Tags -> Direct Events -> Media -> Relationships -> Semantic Blocks -> Semantic Events -> Activities
+     */
+    protected function getLoadingTiers(): array
+    {
+        return [
+            1 => ['loadTags'],
+            2 => ['loadDirectEvents'],
+            3 => ['loadMedia'],
+            4 => ['loadRelationships'],
+            5 => ['loadRelatedBlocks'],
+            6 => ['loadRelatedEvents'],
+            7 => ['loadActivities'],
+        ];
+    }
 
     protected $listeners = [
         'open-tag-modal' => 'handleOpenTagModal',
@@ -63,6 +85,9 @@ new class extends Component
 
             // Track this view in the activity log (debounced to prevent duplicate views)
             $this->object->logViewIfNotRecent(5);
+
+            // Start progressive loading chain
+            $this->startProgressiveLoading();
         } catch (\Exception $e) {
             Log::error('EventObject mount failed', [
                 'exception' => get_class($e),
@@ -83,6 +108,29 @@ new class extends Component
         }
         $this->object->load(['tags']);
         $this->tagsLoaded = true;
+    }
+
+    /**
+     * Load direct events where this object is actor or target (not semantic search)
+     */
+    public function loadDirectEvents(): void
+    {
+        if ($this->directEventsLoaded) {
+            return;
+        }
+        $this->directEventsLoaded = true;
+    }
+
+    /**
+     * Load media collections for this object
+     */
+    public function loadMedia(): void
+    {
+        if ($this->mediaLoaded) {
+            return;
+        }
+        $this->object->load(['media']);
+        $this->mediaLoaded = true;
     }
 
     /**
@@ -143,6 +191,42 @@ new class extends Component
         }
 
         return $this->object->allRelationships()->get();
+    }
+
+    #[Computed]
+    public function directEvents()
+    {
+        if (! $this->directEventsLoaded) {
+            return collect();
+        }
+
+        // Get events where this object is actor OR target (direct relationship, not semantic)
+        $userId = auth()->id();
+        if (! $userId) {
+            return collect();
+        }
+
+        return Event::with(['actor', 'target', 'integration', 'tags'])
+            ->whereHas('integration', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->where(function ($q) {
+                $q->where('actor_id', $this->object->id)
+                    ->orWhere('target_id', $this->object->id);
+            })
+            ->orderBy('time', 'desc')
+            ->limit(10)
+            ->get();
+    }
+
+    #[Computed]
+    public function objectMedia()
+    {
+        if (! $this->mediaLoaded) {
+            return collect();
+        }
+
+        return $this->object->getMedia(['screenshots', 'downloaded_images', 'pdfs', 'downloaded_videos', 'downloaded_documents']);
     }
 
     #[Computed]
@@ -1225,7 +1309,7 @@ new class extends Component
                         @endif
 
                         <!-- Tags (Progressive) -->
-                        <div class="mt-4" wire:init="loadTags">
+                        <div class="mt-4">
                             @if ($tagsLoaded && $this->object->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center gap-2">
                                 @foreach ($this->object->tags as $tag)
@@ -1255,8 +1339,124 @@ new class extends Component
             </x-card>
             @endif
 
-            <!-- Related Blocks (Progressive) -->
-            <div wire:init="loadRelatedBlocks">
+            <!-- Direct Events (Progressive - events where this object is actor/target) -->
+            @php $directEvents = $this->directEvents; @endphp
+            @if ($directEventsLoaded && $directEvents->isNotEmpty())
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
+                    Events ({{ $directEvents->count() }})
+                </h3>
+                <div class="space-y-3">
+                    @foreach ($directEvents as $event)
+                    <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors bg-base-100">
+                        <a href="{{ route('events.show', $event->id) }}"
+                            class="block hover:text-primary transition-colors">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                    <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-start justify-between gap-2 mb-1">
+                                        <span class="font-medium">
+                                            {{ $this->formatAction($event->action) }}
+                                            @if (should_display_action_with_object($event->action, $event->service))
+                                                @if ($event->target && $event->target_id !== $this->object->id)
+                                                    <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
+                                                @elseif ($event->actor && $event->actor_id !== $this->object->id)
+                                                    <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
+                                                @endif
+                                            @endif
+                                        </span>
+                                        @if ($event->value)
+                                        <span class="text-sm font-semibold text-primary">
+                                            {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                        </span>
+                                        @endif
+                                    </div>
+                                    <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                        <span>{{ $event->time->format('d/m/Y H:i') }}</span>
+                                        <span>·</span>
+                                        <x-badge :value="$event->service" class="badge-xs badge-outline" />
+                                        @if ($event->integration)
+                                        <span>·</span>
+                                        <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
+                                        @endif
+                                        @if ($event->tags && count($event->tags) > 0)
+                                        <span>·</span>
+                                        @foreach ($event->tags->take(3) as $tag)
+                                        <x-spark-tag :tag="$tag" size="xs" />
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                                <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                            </div>
+                        </a>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @elseif (! $directEventsLoaded)
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
+                    Events
+                </h3>
+                <x-skeleton-loader type="event-list" />
+            </div>
+            @endif
+
+            <!-- Media Gallery (Progressive) -->
+            @php $objectMedia = $this->objectMedia; @endphp
+            @if ($mediaLoaded && $objectMedia->isNotEmpty())
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.images" class="w-5 h-5 text-secondary" />
+                    Media ({{ $objectMedia->count() }})
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    @foreach ($objectMedia->take(8) as $media)
+                    <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
+                        @if (Str::startsWith($media->mime_type, 'image/'))
+                        <img
+                            src="{{ $media->getUrl('thumbnail') ?: $media->getUrl() }}"
+                            alt="{{ $media->name }}"
+                            class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                            loading="lazy"
+                            onclick="window.open('{{ $media->getUrl() }}', '_blank')"
+                        />
+                        @elseif (Str::startsWith($media->mime_type, 'video/'))
+                        <div class="w-full h-full flex items-center justify-center bg-base-300 cursor-pointer" onclick="window.open('{{ $media->getUrl() }}', '_blank')">
+                            <x-icon name="fas.play-circle" class="w-12 h-12 text-base-content/40" />
+                        </div>
+                        @else
+                        <div class="w-full h-full flex flex-col items-center justify-center bg-base-300 cursor-pointer p-2" onclick="window.open('{{ $media->getUrl() }}', '_blank')">
+                            <x-icon name="fas.file" class="w-8 h-8 text-base-content/40" />
+                            <span class="text-xs text-base-content/60 mt-1 truncate max-w-full">{{ $media->file_name }}</span>
+                        </div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @if ($objectMedia->count() > 8)
+                <p class="text-sm text-base-content/60 mt-2 text-center">
+                    +{{ $objectMedia->count() - 8 }} more items
+                </p>
+                @endif
+            </div>
+            @elseif (! $mediaLoaded)
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.images" class="w-5 h-5 text-secondary" />
+                    Media
+                </h3>
+                <x-skeleton-loader type="block-grid" />
+            </div>
+            @endif
+
+            <!-- Related Blocks (Progressive - Semantic Search) -->
+            <div>
                 @if ($relatedBlocksLoaded && $this->relatedBlocks->isNotEmpty())
                 <div class="relative">
                     <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
@@ -1292,8 +1492,8 @@ new class extends Component
                 @endif
             </div>
 
-            <!-- Related Events (Progressive) -->
-            <div wire:init="loadRelatedEvents">
+            <!-- Related Events (Progressive - Semantic Search) -->
+            <div>
                 @if ($relatedEventsLoaded && $this->relatedEvents->isNotEmpty())
                 <div class="relative">
                     <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
@@ -1396,7 +1596,7 @@ new class extends Component
             </div>
 
             <!-- Relationships (Progressive) -->
-            <div wire:init="loadRelationships">
+            <div>
             @php $relationships = $this->relationships; @endphp
             @if ($relationshipsLoaded && $relationships->isNotEmpty())
             <x-card class="bg-base-200/50 border-2 border-accent/10">
@@ -1598,7 +1798,7 @@ new class extends Component
                     </div>
 
                     <!-- Relationships -->
-                    <div class="pb-4 border-b border-base-200" wire:init="loadRelationships">
+                    <div class="pb-4 border-b border-base-200">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Relationships
@@ -1664,7 +1864,7 @@ new class extends Component
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
                         <x-slot:heading>
-                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80" wire:init="loadActivities">
+                            <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Activity
                             </div>
                         </x-slot:heading>
