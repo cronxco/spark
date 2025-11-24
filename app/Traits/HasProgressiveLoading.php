@@ -29,22 +29,6 @@ trait HasProgressiveLoading
     public bool $progressiveLoadingStarted = false;
 
     /**
-     * Define the loading tiers for this component.
-     * Each tier is an array of method names to call.
-     * Methods within a tier are called in parallel (same request).
-     *
-     * Example:
-     * return [
-     *     1 => ['loadTags'],
-     *     2 => ['loadCore'],
-     *     3 => ['loadBlocks', 'loadMedia'],
-     *     4 => ['loadRelationships'],
-     *     5 => ['loadRelatedEvents'],
-     * ];
-     */
-    abstract protected function getLoadingTiers(): array;
-
-    /**
      * Start the progressive loading chain.
      * Call this at the end of mount() or via wire:init on a wrapper element.
      */
@@ -112,4 +96,20 @@ trait HasProgressiveLoading
         $this->currentLoadingTier = 0;
         $this->progressiveLoadingStarted = false;
     }
+
+    /**
+     * Define the loading tiers for this component.
+     * Each tier is an array of method names to call.
+     * Methods within a tier are called in parallel (same request).
+     *
+     * Example:
+     * return [
+     *     1 => ['loadTags'],
+     *     2 => ['loadCore'],
+     *     3 => ['loadBlocks', 'loadMedia'],
+     *     4 => ['loadRelationships'],
+     *     5 => ['loadRelatedEvents'],
+     * ];
+     */
+    abstract protected function getLoadingTiers(): array;
 }
