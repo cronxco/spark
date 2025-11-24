@@ -72,6 +72,10 @@ new class extends Component
         'close-modal' => 'closeModals',
     ];
 
+    // -------------------------------------------------------------------------
+    // Public Methods
+    // -------------------------------------------------------------------------
+
     public function mount(Event $event): void
     {
         // Load only the bare minimum - just the event with integration for display

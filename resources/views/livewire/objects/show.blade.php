@@ -74,6 +74,10 @@ new class extends Component
         'close-modal' => 'closeModals',
     ];
 
+    // -------------------------------------------------------------------------
+    // Public Methods
+    // -------------------------------------------------------------------------
+
     public function mount(EventObject $object): void
     {
         Log::info('EventObject mount called', [
