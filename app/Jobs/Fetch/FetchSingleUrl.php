@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Fetch;
 
+use App\Integrations\Fetch\ArchiveBypassHandler;
 use App\Integrations\Fetch\ArticleImageExtractor;
 use App\Integrations\Fetch\ContentExtractor;
 use App\Integrations\Fetch\FetchEngineManager;
@@ -108,6 +109,57 @@ class FetchSingleUrl implements ShouldQueue
                     'url' => $this->url,
                     'reason' => $reason,
                 ]);
+
+                // Check if this is a paywall failure and attempt archive.is bypass
+                if (str_contains(strtolower($reason), 'paywall') &&
+                    ArchiveBypassHandler::shouldAttemptBypass($this->url)) {
+
+                    Log::info('Fetch: Attempting archive.is bypass for paywalled content', [
+                        'url' => $this->url,
+                    ]);
+
+                    $archiveResult = $this->attemptArchiveBypass($this->url);
+
+                    if ($archiveResult['success']) {
+                        // Re-extract content from archive
+                        $archiveExtraction = ContentExtractor::extract($archiveResult['html'], $this->url);
+
+                        if ($archiveExtraction['success']) {
+                            Log::info('Fetch: Archive bypass successful', [
+                                'url' => $this->url,
+                                'archive_url' => $archiveResult['archive_url'],
+                            ]);
+
+                            // Use the archived content
+                            $extraction = $archiveExtraction;
+                            $html = $archiveResult['html'];
+
+                            // Update metadata to track archive usage
+                            $metadata = $webpage->metadata ?? [];
+                            $metadata['last_archive_bypass'] = [
+                                'timestamp' => now()->toIso8601String(),
+                                'archive_url' => $archiveResult['archive_url'],
+                            ];
+                            $webpage->update(['metadata' => $metadata]);
+
+                            // Update history with archive success
+                            $engine->updateLastHistoryEntry($webpage, [
+                                'outcome' => 'success_via_archive',
+                                'duration_ms' => $durationMs,
+                                'status_code' => $statusCode,
+                                'archive_url' => $archiveResult['archive_url'],
+                            ]);
+
+                            // Continue with the successful extraction below
+                            goto extraction_success;
+                        }
+                    }
+
+                    Log::debug('Fetch: Archive bypass did not yield usable content', [
+                        'url' => $this->url,
+                    ]);
+                }
+
                 $this->updateWebpageError($webpage, $reason);
 
                 // Update history with failure
@@ -119,6 +171,8 @@ class FetchSingleUrl implements ShouldQueue
 
                 return;
             }
+
+            extraction_success:
 
             $extracted = $extraction['data'];
 
@@ -232,6 +286,32 @@ class FetchSingleUrl implements ShouldQueue
         $webpage = EventObject::find($this->webpageObjectId);
         if ($webpage) {
             $this->updateWebpageError($webpage, 'Failed after 3 attempts: ' . $exception->getMessage());
+        }
+    }
+
+    /**
+     * Attempt to fetch content via archive.is bypass
+     *
+     * @return array ['success' => bool, 'html' => ?string, 'archive_url' => ?string, 'error' => ?string]
+     */
+    private function attemptArchiveBypass(string $url): array
+    {
+        try {
+            $handler = new ArchiveBypassHandler;
+
+            return $handler->fetchFromArchive($url);
+        } catch (Exception $e) {
+            Log::warning('Fetch: Archive bypass exception', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'html' => null,
+                'archive_url' => null,
+                'error' => $e->getMessage(),
+            ];
         }
     }
 
