@@ -190,8 +190,10 @@ class ContentExtractor
 
         // Content truncation detection - if extracted text is suspiciously short
         // compared to what we'd expect from a full article
+        // Only flag if content is VERY short (< 150 chars) and has article structure
+        // This helps catch paywalls that show only a brief teaser
         $contentTruncated = false;
-        if ($textContent !== null && strlen($textContent) < 500) {
+        if ($textContent !== null && strlen($textContent) < 150) {
             // Check if HTML has more content indicators that suggest a full article
             // but the extracted content is very short (likely truncated by paywall)
             $hasArticleStructure = preg_match('/<article|<main|class="article|class="post|class="entry/i', $html);
