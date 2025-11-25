@@ -16,6 +16,16 @@ use Carbon\Carbon;
                     </div>
                 </div>
 
+                <!-- Show info when adding additional instances to existing group -->
+                @if ($group->integrations->count() > 0 && $group->service === 'google-calendar')
+                <div class="alert alert-info mb-6">
+                    <x-icon name="fas.info-circle" class="w-5 h-5" />
+                    <span>
+                        {{ __('You already have :count calendar(s) connected. Select another calendar below to add to your account.', ['count' => $group->integrations->count()]) }}
+                    </span>
+                </div>
+                @endif
+
                 <form method="POST" action="{{ route('integrations.storeInstances', ['group' => $group->id]) }}" class="space-y-6">
                     @csrf
 
