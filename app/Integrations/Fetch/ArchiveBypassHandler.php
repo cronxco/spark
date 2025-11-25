@@ -38,13 +38,45 @@ class ArchiveBypassHandler
     }
 
     /**
+     * Check if a URL should be considered for archive bypass
+     * Some domains don't work well with archive.is
+     */
+    public static function shouldAttemptBypass(string $url): bool
+    {
+        if (! self::isEnabled()) {
+            return false;
+        }
+
+        $excludedDomains = config('services.fetch.archive_bypass_excluded_domains', []);
+
+        if (is_string($excludedDomains)) {
+            $excludedDomains = array_filter(array_map('trim', explode(',', $excludedDomains)));
+        }
+
+        $domain = FetchHttpClient::getDomainFromUrl($url);
+
+        foreach ($excludedDomains as $excluded) {
+            if ($domain === $excluded || str_ends_with($domain, '.' . $excluded)) {
+                Log::debug('Fetch: Domain excluded from archive bypass', [
+                    'url' => $url,
+                    'domain' => $domain,
+                ]);
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Attempt to fetch content from archive.is for a paywalled URL
      *
      * @return array ['success' => bool, 'html' => ?string, 'archive_url' => ?string, 'error' => ?string]
      */
     public function fetchFromArchive(string $originalUrl): array
     {
-        if (!self::isEnabled()) {
+        if (! self::isEnabled()) {
             return [
                 'success' => false,
                 'html' => null,
@@ -135,6 +167,7 @@ class ArchiveBypassHandler
             $finalUrl = $this->getFinalUrl($response);
             if ($this->isArchivedPageUrl($finalUrl)) {
                 Log::debug('Fetch: Redirected directly to archived page', ['archive_url' => $finalUrl]);
+
                 return $finalUrl;
             }
 
@@ -155,6 +188,7 @@ class ArchiveBypassHandler
                 'url' => $searchUrl,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -239,6 +273,7 @@ class ArchiveBypassHandler
                     'archive_url' => $archiveUrl,
                     'length' => strlen($html),
                 ]);
+
                 return null;
             }
 
@@ -252,6 +287,7 @@ class ArchiveBypassHandler
                 'archive_url' => $archiveUrl,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -292,41 +328,10 @@ class ArchiveBypassHandler
     {
         $redirects = $response->getHeader('X-Guzzle-Redirect-History');
 
-        if (!empty($redirects)) {
+        if (! empty($redirects)) {
             return end($redirects);
         }
 
         return '';
-    }
-
-    /**
-     * Check if a URL should be considered for archive bypass
-     * Some domains don't work well with archive.is
-     */
-    public static function shouldAttemptBypass(string $url): bool
-    {
-        if (!self::isEnabled()) {
-            return false;
-        }
-
-        $excludedDomains = config('services.fetch.archive_bypass_excluded_domains', []);
-
-        if (is_string($excludedDomains)) {
-            $excludedDomains = array_filter(array_map('trim', explode(',', $excludedDomains)));
-        }
-
-        $domain = FetchHttpClient::getDomainFromUrl($url);
-
-        foreach ($excludedDomains as $excluded) {
-            if ($domain === $excluded || str_ends_with($domain, '.' . $excluded)) {
-                Log::debug('Fetch: Domain excluded from archive bypass', [
-                    'url' => $url,
-                    'domain' => $domain,
-                ]);
-                return false;
-            }
-        }
-
-        return true;
     }
 }
