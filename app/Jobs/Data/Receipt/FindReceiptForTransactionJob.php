@@ -42,7 +42,7 @@ class FindReceiptForTransactionJob implements ShouldQueue
 
             $unmatchedReceipts = Event::where('service', 'receipt')
                 ->where('domain', 'money')
-                ->where('action', 'receipt_received_from')
+                ->where('action', 'had_receipt_from')
                 ->whereBetween('time', [$startTime, $endTime])
                 ->where(function ($query) {
                     // Amount within ±10% of transaction

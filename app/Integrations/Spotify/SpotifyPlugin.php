@@ -150,7 +150,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             'spotify-sync-recent' => [
                 'title' => 'Sync Recent Spotify Plays',
                 'subtitle' => 'Fetch your latest listening history from Spotify',
-                'icon' => 'musical-note',
+                'icon' => 'fas.music',
                 'action' => 'dispatch_event',
                 'actionParams' => [
                     'name' => 'trigger-spotify-sync',
@@ -162,7 +162,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             'spotify-view-stats' => [
                 'title' => 'View Spotify Listening Stats',
                 'subtitle' => 'See your music trends and top artists',
-                'icon' => 'chart-bar',
+                'icon' => 'fas.chart-simple',
                 'action' => 'jump_to',
                 'actionParams' => [
                     'path' => '/integrations?filter=spotify',

@@ -125,108 +125,121 @@
         </div>
     </div>
 
-    {{-- Anomalies --}}
-    @if ($anomalies->count() > 0)
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="card-title">Detected Anomalies</h3>
+    {{-- Anomalies & Trends Section --}}
+    <div wire:init="loadTrends">
+        @if (! $trendsLoaded)
+            {{-- Skeleton while loading --}}
+            <div class="card bg-base-200 shadow">
+                <div class="card-body">
+                    <h3 class="card-title">Loading Trends & Anomalies...</h3>
+                    <x-skeleton-loader type="list-item" :count="3" />
+                </div>
+            </div>
+        @else
+            {{-- Anomalies --}}
+            @if ($anomalies->count() > 0)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title">Detected Anomalies</h3>
 
-                <div class="divide-y">
-                    @foreach ($anomalies as $anomaly)
-                        <div class="flex items-center justify-between py-3">
-                            <div class="flex items-center gap-3">
-                                @if ($anomaly->type === 'anomaly_high')
-                                    <div class="badge badge-error">High</div>
-                                @else
-                                    <div class="badge badge-info">Low</div>
-                                @endif
+                        <div class="divide-y">
+                            @foreach ($anomalies as $anomaly)
+                                <div class="flex items-center justify-between py-3">
+                                    <div class="flex items-center gap-3">
+                                        @if ($anomaly->type === 'anomaly_high')
+                                            <div class="badge badge-error">High</div>
+                                        @else
+                                            <div class="badge badge-info">Low</div>
+                                        @endif
 
-                                <div>
-                                    <div class="font-semibold">
-                                        {{ number_format($anomaly->current_value, 2) }} {{ $metric->value_unit }}
+                                        <div>
+                                            <div class="font-semibold">
+                                                {{ number_format($anomaly->current_value, 2) }} {{ $metric->value_unit }}
+                                            </div>
+                                            <div class="text-sm text-gray-500">
+                                                {{ $anomaly->detected_at->format('M j, Y') }} •
+                                                {{ number_format($anomaly->deviation, 1) }}σ from mean
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="text-sm text-gray-500">
-                                        {{ $anomaly->detected_at->format('M j, Y') }} •
-                                        {{ number_format($anomaly->deviation, 1) }}σ from mean
-                                    </div>
+
+                                    @if (!$anomaly->acknowledged_at)
+                                        <button wire:click="acknowledgeTrend('{{ $anomaly->id }}')" class="btn btn-ghost btn-sm">
+                                            Acknowledge
+                                        </button>
+                                    @else
+                                        <span class="text-xs text-gray-500">
+                                            Acknowledged {{ $anomaly->acknowledged_at->diffForHumans() }}
+                                        </span>
+                                    @endif
                                 </div>
-                            </div>
-
-                            @if (!$anomaly->acknowledged_at)
-                                <button wire:click="acknowledgeTrend('{{ $anomaly->id }}')" class="btn btn-ghost btn-sm">
-                                    Acknowledge
-                                </button>
-                            @else
-                                <span class="text-xs text-gray-500">
-                                    Acknowledged {{ $anomaly->acknowledged_at->diffForHumans() }}
-                                </span>
-                            @endif
+                            @endforeach
                         </div>
-                    @endforeach
+                    </div>
                 </div>
-            </div>
-        </div>
-    @endif
+            @endif
 
-    {{-- Trends --}}
-    @if ($detectedTrends->count() > 0)
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="card-title">Detected Trends</h3>
+            {{-- Trends --}}
+            @if ($detectedTrends->count() > 0)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title">Detected Trends</h3>
 
-                <div class="divide-y">
-                    @foreach ($detectedTrends as $trend)
-                        <div class="flex items-center justify-between py-3">
-                            <div class="flex items-center gap-3">
-                                @if ($trend->getDirection() === 'up')
-                                    <x-icon name="fas.arrow-trend-up" class="h-6 w-6 text-success" />
-                                @else
-                                    <x-icon name="fas.arrow-trend-down" class="h-6 w-6 text-error" />
-                                @endif
+                        <div class="divide-y">
+                            @foreach ($detectedTrends as $trend)
+                                <div class="flex items-center justify-between py-3">
+                                    <div class="flex items-center gap-3">
+                                        @if ($trend->getDirection() === 'up')
+                                            <x-icon name="fas.arrow-trend-up" class="h-6 w-6 text-success" />
+                                        @else
+                                            <x-icon name="fas.arrow-trend-down" class="h-6 w-6 text-error" />
+                                        @endif
 
-                                <div>
-                                    <div class="font-semibold">{{ $trend->getTypeLabel() }}</div>
-                                    <div class="text-sm text-gray-500">
-                                        {{ $trend->detected_at->format('M j, Y') }} •
-                                        {{ number_format(abs(($trend->current_value - $trend->baseline_value) / $trend->baseline_value) * 100, 1) }}%
-                                        change
+                                        <div>
+                                            <div class="font-semibold">{{ $trend->getTypeLabel() }}</div>
+                                            <div class="text-sm text-gray-500">
+                                                {{ $trend->detected_at->format('M j, Y') }} •
+                                                {{ number_format(abs(($trend->current_value - $trend->baseline_value) / $trend->baseline_value) * 100, 1) }}%
+                                                change
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                {{ number_format($trend->baseline_value, 1) }} →
+                                                {{ number_format($trend->current_value, 1) }} {{ $metric->value_unit }}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="text-xs text-gray-500">
-                                        {{ number_format($trend->baseline_value, 1) }} →
-                                        {{ number_format($trend->current_value, 1) }} {{ $metric->value_unit }}
-                                    </div>
+
+                                    @if (!$trend->acknowledged_at)
+                                        <button wire:click="acknowledgeTrend('{{ $trend->id }}')" class="btn btn-ghost btn-sm">
+                                            Acknowledge
+                                        </button>
+                                    @else
+                                        <span class="text-xs text-gray-500">
+                                            Acknowledged {{ $trend->acknowledged_at->diffForHumans() }}
+                                        </span>
+                                    @endif
                                 </div>
-                            </div>
-
-                            @if (!$trend->acknowledged_at)
-                                <button wire:click="acknowledgeTrend('{{ $trend->id }}')" class="btn btn-ghost btn-sm">
-                                    Acknowledge
-                                </button>
-                            @else
-                                <span class="text-xs text-gray-500">
-                                    Acknowledged {{ $trend->acknowledged_at->diffForHumans() }}
-                                </span>
-                            @endif
+                            @endforeach
                         </div>
-                    @endforeach
+                    </div>
                 </div>
-            </div>
-        </div>
-    @endif
+            @endif
 
-    @if ($anomalies->isEmpty() && $detectedTrends->isEmpty())
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="text-center py-12">
-                    <x-icon name="fas.circle-check" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
-                    <h3 class="text-lg font-medium text-base-content mb-2">No Trends or Anomalies Detected</h3>
-                    <p class="text-base-content/70">
-                        Your {{ strtolower($metric->getDisplayName()) }} is stable with no significant deviations.
-                    </p>
+            @if ($anomalies->isEmpty() && $detectedTrends->isEmpty())
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <div class="text-center py-12">
+                            <x-icon name="fas.circle-check" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                            <h3 class="text-lg font-medium text-base-content mb-2">No Trends or Anomalies Detected</h3>
+                            <p class="text-base-content/70">
+                                Your {{ strtolower($metric->getDisplayName()) }} is stable with no significant deviations.
+                            </p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    @endif
+            @endif
+        @endif
+    </div>
 
     @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

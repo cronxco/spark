@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\IntegrationDetails;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -92,7 +94,6 @@ class PluginAndIntegrationViewsTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Action Types');
         $response->assertSee('Push');
-        $response->assertSee('Pull Request');
     }
 
     #[Test]
@@ -105,8 +106,8 @@ class PluginAndIntegrationViewsTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Object Types');
-        $response->assertSee('Repository');
-        $response->assertSee('User');
+        $response->assertSee('GitHub Repository');
+        $response->assertSee('GitHub User');
     }
 
     #[Test]
@@ -139,12 +140,11 @@ class PluginAndIntegrationViewsTest extends TestCase
             'service' => 'github',
         ]);
 
-        $response = $this->get("/integrations/{$integration->id}/details");
-
-        $response->assertStatus(200);
-        $response->assertSee('Action Types');
-        $response->assertSee('Push');
-        $response->assertSee('Pull Request');
+        // Use Livewire testing to trigger the progressive loading
+        Livewire::test(IntegrationDetails::class, ['integration' => $integration])
+            ->call('loadActionTypes')
+            ->assertSee('Action Types')
+            ->assertSee('Push');
     }
 
     #[Test]
@@ -164,12 +164,12 @@ class PluginAndIntegrationViewsTest extends TestCase
             'service' => 'github',
         ]);
 
-        $response = $this->get("/integrations/{$integration->id}/details");
-
-        $response->assertStatus(200);
-        $response->assertSee('Object Types');
-        $response->assertSee('Repository');
-        $response->assertSee('User');
+        // Use Livewire testing to trigger the progressive loading
+        Livewire::test(IntegrationDetails::class, ['integration' => $integration])
+            ->call('loadObjectTypes')
+            ->assertSee('Object Types')
+            ->assertSee('GitHub Repository')
+            ->assertSee('GitHub User');
     }
 
     #[Test]

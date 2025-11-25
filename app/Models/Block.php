@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Media\MediaDeduplicationService;
+use App\Traits\TracksViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -17,7 +18,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Block extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, LogsActivity, SoftDeletes;
+    use HasFactory, InteractsWithMedia, LogsActivity, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait.

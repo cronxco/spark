@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CacheApiResponse;
 use App\Http\Middleware\SentryApiLogging;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register Sentry API logging middleware
         $middleware->alias([
             'sentry.api.logging' => SentryApiLogging::class,
+            'cache.api' => CacheApiResponse::class,
         ]);
 
         // Exclude webhook routes from CSRF protection

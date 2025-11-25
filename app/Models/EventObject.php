@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Media\MediaDeduplicationService;
+use App\Traits\TracksViews;
 use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +19,7 @@ use Spatie\Tags\HasTags;
 
 class EventObject extends Model implements HasMedia
 {
-    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, SoftDeletes;
+    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait.
@@ -167,7 +168,7 @@ class EventObject extends Model implements HasMedia
 
     public function user()
     {
-        return $this->belongsTo(User::class)->withTrashed();
+        return $this->belongsTo(User::class);
     }
 
     public function integration()

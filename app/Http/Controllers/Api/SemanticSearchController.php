@@ -12,6 +12,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class SemanticSearchController extends Controller
@@ -57,6 +58,30 @@ class SemanticSearchController extends Controller
         }
 
         try {
+            // Generate cache key based on user and search parameters
+            $cacheKey = sprintf(
+                'search:%s:%s:%s:%.2f:%d:%.3f',
+                $user->id,
+                md5($query),
+                implode(',', $models),
+                $threshold,
+                $limit,
+                $temporalWeight
+            );
+
+            // Try to get cached results (cache for 5 minutes)
+            $cachedResults = Cache::get($cacheKey);
+            if ($cachedResults !== null) {
+                return response()->json([
+                    'success' => true,
+                    'query' => $query,
+                    'threshold' => $threshold,
+                    'limit' => $limit,
+                    'results' => $cachedResults,
+                    'cached' => true,
+                ]);
+            }
+
             // Generate embedding for query
             $embedding = $this->embeddingService->embed($query);
 
@@ -74,6 +99,9 @@ class SemanticSearchController extends Controller
             if (in_array('objects', $models)) {
                 $results['objects'] = $this->searchObjects($embedding, $user->id, $threshold, $limit, $temporalWeight);
             }
+
+            // Cache results for 5 minutes
+            Cache::put($cacheKey, $results, now()->addMinutes(5));
 
             return response()->json([
                 'success' => true,

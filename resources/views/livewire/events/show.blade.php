@@ -1,16 +1,19 @@
 <?php
 
-use App\Models\Event;
-use App\Models\EventObject;
-use App\Models\Block;
-use Illuminate\Support\Str;
-use Livewire\Volt\Component;
 use App\Integrations\PluginRegistry;
+use App\Models\Event;
+use App\Traits\HasProgressiveLoading;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Tags\Tag;
-use Illuminate\Support\Facades\Log;
 
-new class extends Component {
+new class extends Component
+{
+    use HasProgressiveLoading;
+
     public Event $event;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -29,6 +32,15 @@ new class extends Component {
     public bool $showManageRelationshipsModal = false;
     public bool $showAddRelationshipModal = false;
 
+    // Progressive loading state flags
+    public bool $coreLoaded = false;
+    public bool $tagsLoaded = false;
+    public bool $blocksLoaded = false;
+    public bool $mediaLoaded = false;
+    public bool $relationshipsLoaded = false;
+    public bool $relatedEventsLoaded = false;
+    public bool $activitiesLoaded = false;
+
     protected $listeners = [
         'open-tag-modal' => 'handleOpenTagModal',
         'open-edit-event-modal' => 'handleOpenEditModal',
@@ -42,30 +54,173 @@ new class extends Component {
         'close-modal' => 'closeModals',
     ];
 
-    public function mount(Event $event): void
+    // -------------------------------------------------------------------------
+    // Protected Methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Define the loading tiers for progressive loading.
+     * Priority order: Tags -> Core (Actor/Target) -> Blocks -> Media -> Relationships -> Related Events -> Activities
+     */
+    protected function getLoadingTiers(): array
     {
-        $this->event = $event->load([
-            'actor',
-            'target',
-            'integration',
-            'blocks',
-            'tags',
-            'actor.tags',
-            'target.tags',
-            'relationshipsFrom',
-            'relationshipsTo'
-        ]);
+        return [
+            1 => ['loadTags'],
+            2 => ['loadCore'],
+            3 => ['loadBlocks'],
+            4 => ['loadMedia'],
+            5 => ['loadRelationships'],
+            6 => ['loadRelatedEvents'],
+            7 => ['loadActivities'],
+        ];
     }
 
-    public function getRelationships()
+    // -------------------------------------------------------------------------
+    // Public Methods
+    // -------------------------------------------------------------------------
+
+    public function mount(Event $event): void
     {
+        // Load only the bare minimum - just the event with integration for display
+        $this->event = $event->load(['integration']);
+
+        // Track this view in the activity log (debounced to prevent duplicate views)
+        $this->event->logViewIfNotRecent(5);
+
+        // Start progressive loading chain
+        $this->startProgressiveLoading();
+    }
+
+    /**
+     * Load actor, target, and their tags (core relationships for main display)
+     */
+    public function loadCore(): void
+    {
+        if ($this->coreLoaded) {
+            return;
+        }
+        $this->event->load(['actor.tags', 'target.tags']);
+        $this->coreLoaded = true;
+    }
+
+    /**
+     * Load tags for the event
+     */
+    public function loadTags(): void
+    {
+        if ($this->tagsLoaded) {
+            return;
+        }
+        $this->event->load(['tags']);
+        $this->tagsLoaded = true;
+    }
+
+    /**
+     * Load blocks linked to the event
+     */
+    public function loadBlocks(): void
+    {
+        if ($this->blocksLoaded) {
+            return;
+        }
+        $this->event->load(['blocks.media']);
+        $this->blocksLoaded = true;
+    }
+
+    /**
+     * Load media for actor and target objects
+     */
+    public function loadMedia(): void
+    {
+        if ($this->mediaLoaded) {
+            return;
+        }
+        // Load media collections for actor and target if they exist
+        if ($this->event->actor) {
+            $this->event->actor->load(['media']);
+        }
+        if ($this->event->target) {
+            $this->event->target->load(['media']);
+        }
+        $this->mediaLoaded = true;
+    }
+
+    /**
+     * Load relationships with their related models
+     */
+    public function loadRelationships(): void
+    {
+        if ($this->relationshipsLoaded) {
+            return;
+        }
+        $this->event->load(['relationshipsFrom', 'relationshipsTo']);
+        $this->relationshipsLoaded = true;
+    }
+
+    /**
+     * Load related events via semantic search (expensive operation)
+     */
+    public function loadRelatedEvents(): void
+    {
+        if ($this->relatedEventsLoaded) {
+            return;
+        }
+        // Simply mark as loaded - the computed property will do the work
+        $this->relatedEventsLoaded = true;
+    }
+
+    /**
+     * Load activity log entries
+     */
+    public function loadActivities(): void
+    {
+        if ($this->activitiesLoaded) {
+            return;
+        }
+        $this->activitiesLoaded = true;
+    }
+
+    #[Computed]
+    public function relationships()
+    {
+        if (! $this->relationshipsLoaded) {
+            return collect();
+        }
+
         return $this->event->allRelationships()->get();
     }
 
-    public function getRelatedEvents()
+    #[Computed]
+    public function actorMedia()
     {
+        if (! $this->mediaLoaded || ! $this->event->actor) {
+            return collect();
+        }
+
+        return $this->event->actor->getMedia('screenshots')
+            ->merge($this->event->actor->getMedia('downloaded_images'));
+    }
+
+    #[Computed]
+    public function targetMedia()
+    {
+        if (! $this->mediaLoaded || ! $this->event->target) {
+            return collect();
+        }
+
+        return $this->event->target->getMedia('screenshots')
+            ->merge($this->event->target->getMedia('downloaded_images'));
+    }
+
+    #[Computed]
+    public function relatedEvents()
+    {
+        if (! $this->relatedEventsLoaded) {
+            return collect();
+        }
+
         // Use semantic search if embeddings exist
-        if (!empty($this->event->embeddings)) {
+        if (! empty($this->event->embeddings)) {
             try {
                 $embedding = json_decode($this->event->embeddings, true);
 
@@ -112,15 +267,16 @@ new class extends Component {
             ->get();
     }
 
-    public function getEventAnomalies()
+    #[Computed]
+    public function eventAnomalies()
     {
         // Check if this event has any associated anomalies
-        if (!$this->event->value || !$this->event->value_unit) {
+        if (! $this->event->value || ! $this->event->value_unit) {
             return collect();
         }
 
         $userId = optional(auth()->guard('web')->user())->id;
-        if (!$userId) {
+        if (! $userId) {
             return collect();
         }
 
@@ -131,7 +287,7 @@ new class extends Component {
             ->where('value_unit', $this->event->value_unit)
             ->first();
 
-        if (!$metricStatistic) {
+        if (! $metricStatistic) {
             return collect();
         }
 
@@ -143,8 +299,13 @@ new class extends Component {
             ->get();
     }
 
-    public function getActivities()
+    #[Computed]
+    public function activities()
     {
+        if (! $this->activitiesLoaded) {
+            return collect();
+        }
+
         return Activity::forSubject($this->event)
             ->latest()
             ->get();
@@ -177,6 +338,7 @@ new class extends Component {
         if (is_array($data) || is_object($data)) {
             return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }
+
         return $data;
     }
 
@@ -272,7 +434,7 @@ new class extends Component {
 
     public function toggleSidebar()
     {
-        $this->showSidebar = !$this->showSidebar;
+        $this->showSidebar = ! $this->showSidebar;
     }
 
     public function addTag(string $value, ?string $type = null): void
@@ -411,29 +573,24 @@ new class extends Component {
 
     public function handleEventUpdated(): void
     {
-        $this->event->refresh()->load([
-            'actor',
-            'target',
-            'integration',
-            'blocks',
-            'tags',
-            'actor.tags',
-            'target.tags'
-        ]);
+        $this->event->refresh()->load(['integration']);
+        // Reload any sections that were already loaded
+        if ($this->coreLoaded) {
+            $this->event->load(['actor.tags', 'target.tags']);
+        }
+        if ($this->tagsLoaded) {
+            $this->event->load(['tags']);
+        }
+        if ($this->blocksLoaded) {
+            $this->event->load(['blocks']);
+        }
         $this->showEditEventModal = false;
     }
 
     public function handleTagsUpdated(): void
     {
-        $this->event->refresh()->load([
-            'actor',
-            'target',
-            'integration',
-            'blocks',
-            'tags',
-            'actor.tags',
-            'target.tags'
-        ]);
+        $this->event->refresh()->loadMissing(['tags']);
+        $this->tagsLoaded = true;
     }
 
     public function getCompleteEventData(): array
@@ -467,8 +624,8 @@ new class extends Component {
         $data = $this->getCompleteEventData();
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $this->js("
-            const blob = new Blob([" . json_encode($json) . "], { type: 'application/json' });
+        $this->js('
+            const blob = new Blob([' . json_encode($json) . "], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -494,22 +651,6 @@ new class extends Component {
                 setTimeout(() => toast.remove(), 300);
             }, 2000);
         ");
-    }
-
-    /**
-     * Remove embeddings field from an array recursively.
-     */
-    private function stripEmbeddings(array $data): array
-    {
-        unset($data['embeddings']);
-
-        foreach ($data as $key => $value) {
-            if (is_array($value)) {
-                $data[$key] = $this->stripEmbeddings($value);
-            }
-        }
-
-        return $data;
     }
 
     /**
@@ -545,8 +686,8 @@ new class extends Component {
         $data = $this->getCompleteEventDataWithoutEmbeddings();
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $this->js("
-            navigator.clipboard.writeText(" . json_encode($json) . ").then(function() {
+        $this->js('
+            navigator.clipboard.writeText(' . json_encode($json) . ").then(function() {
                 const toast = document.createElement('div');
                 toast.className = 'toast toast-top toast-center z-50';
                 toast.innerHTML = `
@@ -582,7 +723,7 @@ new class extends Component {
     {
         $this->event->refresh()->load([
             'relationshipsFrom',
-            'relationshipsTo'
+            'relationshipsTo',
         ]);
     }
 
@@ -592,6 +733,22 @@ new class extends Component {
         $this->showTagModal = false;
         $this->showManageRelationshipsModal = false;
         $this->showAddRelationshipModal = false;
+    }
+
+    /**
+     * Remove embeddings field from an array recursively.
+     */
+    private function stripEmbeddings(array $data): array
+    {
+        unset($data['embeddings']);
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = $this->stripEmbeddings($value);
+            }
+        }
+
+        return $data;
     }
 };
 ?>
@@ -692,9 +849,10 @@ new class extends Component {
                             @endif
                         </div>
 
-                        <!-- Actor & Target Flow -->
-                        @if ($this->event->actor || $this->event->target)
+                        <!-- Actor & Target Flow (Progressive) -->
+                        @if ($this->event->actor_id || $this->event->target_id)
                         <div class="mt-4 lg:mt-6 p-3 lg:p-4 rounded-lg bg-base-300/50 border-2 border-info/20">
+                            @if ($coreLoaded)
                             <div class="flex flex-col sm:flex-row items-center justify-center gap-3 lg:gap-4">
                                 @if ($this->event->actor)
                                 <div class="flex items-center gap-2">
@@ -730,25 +888,30 @@ new class extends Component {
                                 </div>
                                 @endif
                             </div>
+                            @else
+                            <x-skeleton-loader type="avatar-row" />
+                            @endif
                         </div>
                         @endif
 
-                        <!-- Tags -->
-                        @if ($this->event->tags->isNotEmpty())
+                        <!-- Tags (Progressive) -->
                         <div class="mt-4">
+                            @if ($tagsLoaded && $this->event->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center gap-2">
                                 @foreach ($this->event->tags as $tag)
                                 <x-spark-tag :tag="$tag" />
                                 @endforeach
                             </div>
+                            @elseif (! $tagsLoaded)
+                            <x-skeleton-loader type="tags" class="justify-center" />
+                            @endif
                         </div>
-                        @endif
                     </div>
                 </div>
             </x-card>
 
             <!-- Anomaly Information -->
-            @php $anomalies = $this->getEventAnomalies(); @endphp
+            @php $anomalies = $this->eventAnomalies; @endphp
             @if ($anomalies->isNotEmpty())
             <x-card class="bg-warning/5 border-2 border-warning/30">
                 <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
@@ -833,122 +996,190 @@ new class extends Component {
             </div>
             @endif
 
-            <!-- Linked Blocks -->
-            @if ($this->event->blocks->isNotEmpty())
+            <!-- Linked Blocks (Progressive) -->
             <div>
-                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                    <x-icon name="fas.grip" class="w-5 h-5 text-info" />
-                    Linked Blocks ({{ $this->event->blocks->count() }})
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @foreach ($this->event->blocks as $block)
-                        <x-block-card :block="$block" />
-                    @endforeach
-                </div>
-            </div>
-            @endif
-
-            <!-- Related Events -->
-            @if ($this->getRelatedEvents()->isNotEmpty())
-            <div class="relative">
-                <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                @if ($blocksLoaded && $this->event->blocks->isNotEmpty())
+                <div>
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas.rotate" class="w-5 h-5 text-warning" />
-                        Related Events
+                        <x-icon name="fas.grip" class="w-5 h-5 text-info" />
+                        Linked Blocks ({{ $this->event->blocks->count() }})
                     </h3>
-                    <div class="space-y-3">
-                        @foreach ($this->getRelatedEvents() as $relatedEvent)
-                        <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                            <a href="{{ route('events.show', $relatedEvent->id) }}"
-                                class="block hover:text-primary transition-colors">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                        <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}"
-                                            class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-start justify-between gap-2 mb-1">
-                                            <span class="font-medium">
-                                                {{ $this->formatAction($relatedEvent->action) }}
-                                                @if (should_display_action_with_object($relatedEvent->action, $relatedEvent->service))
-                                                @if ($relatedEvent->target)
-                                                <span class="text-base-content/80">{{ ' ' . $relatedEvent->target->title }}</span>
-                                                @elseif ($relatedEvent->actor)
-                                                <span class="text-base-content/80">{{ ' ' . $relatedEvent->actor->title }}</span>
-                                                @endif
-                                                @endif
-                                            </span>
-                                            <div class="flex items-center gap-2 flex-shrink-0">
-                                                @if (isset($relatedEvent->similarity))
-                                                @php
-                                                    $similarity = round((1 - $relatedEvent->similarity) * 100);
-                                                    $daysAgo = isset($relatedEvent->days_ago) ? round($relatedEvent->days_ago) : null;
-                                                @endphp
-                                                <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
-                                                @if ($daysAgo !== null)
-                                                    @if ($daysAgo === 0)
-                                                        <span class="text-xs">🔥</span>
-                                                    @elseif ($daysAgo === 1)
-                                                        <span class="text-xs">⏰</span>
-                                                    @elseif ($daysAgo < 7)
-                                                        <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
-                                                    @endif
-                                                @endif
-                                                @endif
-                                                @if ($relatedEvent->value)
-                                                <span class="text-sm text-primary font-semibold">
-                                                    {!! format_event_value_display($relatedEvent->formatted_value, $relatedEvent->value_unit, $relatedEvent->service, $relatedEvent->action, 'action') !!}
-                                                </span>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                            <span>{{ to_user_timezone($relatedEvent->time, auth()->user())->format('d/m/Y H:i') }}</span>
-                                            @if ($relatedEvent->domain)
-                                            <span>·</span>
-                                            <x-badge class="badge-xs badge-outline">
-                                                <x-slot:value>
-                                                    {{ Str::lower($relatedEvent->domain) }}
-                                                </x-slot:value>
-                                            </x-badge>
-                                            @endif
-                                            <x-badge class="badge-xs badge-outline">
-                                                <x-slot:value>
-                                                    {{ Str::lower($relatedEvent->service) }}
-                                                </x-slot:value>
-                                            </x-badge>
-                                            @if ($relatedEvent->integration)
-                                            <x-badge class="badge-xs badge-outline">
-                                                <x-slot:value>
-                                                    {{ Str::lower($relatedEvent->integration->name) }}
-                                                </x-slot:value>
-                                            </x-badge>
-                                            @endif
-                                            @if ($relatedEvent->tags && count($relatedEvent->tags) > 0)
-                                            <span>·</span>
-                                            @foreach ($relatedEvent->tags as $tag)
-                                            <x-spark-tag :tag="$tag" size="xs" />
-                                            @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
-                                </div>
-                            </a>
-                        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach ($this->event->blocks as $block)
+                            <x-block-card :block="$block" />
                         @endforeach
                     </div>
                 </div>
-                <!-- AI Badge -->
-                <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
-                    <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                @elseif (! $blocksLoaded)
+                <div>
+                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <x-icon name="fas.grip" class="w-5 h-5 text-info" />
+                        Linked Blocks
+                    </h3>
+                    <x-skeleton-loader type="block-grid" />
                 </div>
+                @endif
+            </div>
+
+            <!-- Media Gallery (Progressive) -->
+            @php
+                $actorMedia = $this->actorMedia;
+                $targetMedia = $this->targetMedia;
+                $allMedia = $actorMedia->merge($targetMedia);
+            @endphp
+            @if ($mediaLoaded && $allMedia->isNotEmpty())
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.images" class="w-5 h-5 text-secondary" />
+                    Media ({{ $allMedia->count() }})
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    @foreach ($allMedia->take(8) as $media)
+                    <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
+                        <img
+                            src="{{ $media->getUrl('thumbnail') ?: $media->getUrl() }}"
+                            alt="{{ $media->name }}"
+                            class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                            loading="lazy"
+                            onclick="window.open('{{ $media->getUrl() }}', '_blank')"
+                        />
+                    </div>
+                    @endforeach
+                </div>
+                @if ($allMedia->count() > 8)
+                <p class="text-sm text-base-content/60 mt-2 text-center">
+                    +{{ $allMedia->count() - 8 }} more items
+                </p>
+                @endif
+            </div>
+            @elseif (! $mediaLoaded)
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.images" class="w-5 h-5 text-secondary" />
+                    Media
+                </h3>
+                <x-skeleton-loader type="block-grid" />
             </div>
             @endif
 
-            <!-- Relationships -->
-            @php $relationships = $this->getRelationships(); @endphp
-            @if ($relationships->isNotEmpty())
+            <!-- Related Events (Progressive) -->
+            <div>
+                @if ($relatedEventsLoaded && $this->relatedEvents->isNotEmpty())
+                <div class="relative">
+                    <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.rotate" class="w-5 h-5 text-warning" />
+                            Related Events
+                        </h3>
+                        <div class="space-y-3">
+                            @foreach ($this->relatedEvents as $relatedEvent)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <a href="{{ route('events.show', $relatedEvent->id) }}"
+                                    class="block hover:text-primary transition-colors">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                            <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}"
+                                                class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-2 mb-1">
+                                                <span class="font-medium">
+                                                    {{ $this->formatAction($relatedEvent->action) }}
+                                                    @if (should_display_action_with_object($relatedEvent->action, $relatedEvent->service))
+                                                    @if ($relatedEvent->target)
+                                                    <span class="text-base-content/80">{{ ' ' . $relatedEvent->target->title }}</span>
+                                                    @elseif ($relatedEvent->actor)
+                                                    <span class="text-base-content/80">{{ ' ' . $relatedEvent->actor->title }}</span>
+                                                    @endif
+                                                    @endif
+                                                </span>
+                                                <div class="flex items-center gap-2 flex-shrink-0">
+                                                    @if (isset($relatedEvent->similarity))
+                                                    @php
+                                                        $similarity = round((1 - $relatedEvent->similarity) * 100);
+                                                        $daysAgo = isset($relatedEvent->days_ago) ? round($relatedEvent->days_ago) : null;
+                                                    @endphp
+                                                    <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
+                                                    @if ($daysAgo !== null)
+                                                        @if ($daysAgo === 0)
+                                                            <span class="text-xs">🔥</span>
+                                                        @elseif ($daysAgo === 1)
+                                                            <span class="text-xs">⏰</span>
+                                                        @elseif ($daysAgo < 7)
+                                                            <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
+                                                        @endif
+                                                    @endif
+                                                    @endif
+                                                    @if ($relatedEvent->value)
+                                                    <span class="text-sm text-primary font-semibold">
+                                                        {!! format_event_value_display($relatedEvent->formatted_value, $relatedEvent->value_unit, $relatedEvent->service, $relatedEvent->action, 'action') !!}
+                                                    </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                                <span>{{ to_user_timezone($relatedEvent->time, auth()->user())->format('d/m/Y H:i') }}</span>
+                                                @if ($relatedEvent->domain)
+                                                <span>·</span>
+                                                <x-badge class="badge-xs badge-outline">
+                                                    <x-slot:value>
+                                                        {{ Str::lower($relatedEvent->domain) }}
+                                                    </x-slot:value>
+                                                </x-badge>
+                                                @endif
+                                                <x-badge class="badge-xs badge-outline">
+                                                    <x-slot:value>
+                                                        {{ Str::lower($relatedEvent->service) }}
+                                                    </x-slot:value>
+                                                </x-badge>
+                                                @if ($relatedEvent->integration)
+                                                <x-badge class="badge-xs badge-outline">
+                                                    <x-slot:value>
+                                                        {{ Str::lower($relatedEvent->integration->name) }}
+                                                    </x-slot:value>
+                                                </x-badge>
+                                                @endif
+                                                @if ($relatedEvent->tags && count($relatedEvent->tags) > 0)
+                                                <span>·</span>
+                                                @foreach ($relatedEvent->tags as $tag)
+                                                <x-spark-tag :tag="$tag" size="xs" />
+                                                @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                                    </div>
+                                </a>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    <!-- AI Badge -->
+                    <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                        <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                    </div>
+                </div>
+                @elseif (! $relatedEventsLoaded)
+                <div class="relative">
+                    <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.rotate" class="w-5 h-5 text-warning" />
+                            Related Events
+                        </h3>
+                        <x-skeleton-loader type="event-list" />
+                    </div>
+                    <!-- AI Badge -->
+                    <div class="absolute -top-2 -right-2 bg-warning rounded-full p-1.5 shadow">
+                        <x-icon name="fas.wand-magic-sparkles" class="w-3 h-3 text-warning-content" />
+                    </div>
+                </div>
+                @endif
+            </div>
+
+            <!-- Relationships (Progressive) -->
+            <div>
+            @php $relationships = $this->relationships; @endphp
+            @if ($relationshipsLoaded && $relationships->isNotEmpty())
             <x-card class="bg-base-200/50 border-2 border-accent/10">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold flex items-center gap-2">
@@ -1051,7 +1282,18 @@ new class extends Component {
                     @endif
                 </div>
             </x-card>
+            @elseif (! $relationshipsLoaded)
+            <x-card class="bg-base-200/50 border-2 border-accent/10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <x-icon name="fas.right-left" class="w-5 h-5 text-accent" />
+                        Relationships
+                    </h3>
+                </div>
+                <x-skeleton-loader type="relationship-list" />
+            </x-card>
             @endif
+            </div>
         </div>
 
         <!-- Drawer for Event Details -->
@@ -1144,7 +1386,10 @@ new class extends Component {
                                 <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
-                        @php $sidebarRelationships = $this->getRelationships(); @endphp
+                        @if (! $relationshipsLoaded)
+                        <x-skeleton-loader type="relationship-list" />
+                        @else
+                        @php $sidebarRelationships = $this->relationships; @endphp
                         @if ($sidebarRelationships->isEmpty())
                         <x-empty-state
                             icon="fas.right-left"
@@ -1190,6 +1435,7 @@ new class extends Component {
                         </div>
                         @endif
                         @endif
+                        @endif
                     </div>
 
                     <!-- Comment -->
@@ -1213,9 +1459,12 @@ new class extends Component {
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        @php $activities = $this->getActivities(); @endphp
+                        @if (! $activitiesLoaded)
+                        <x-skeleton-loader type="list-item" count="3" />
+                        @else
+                        @php $activities = $this->activities; @endphp
                         @php
-                        $activities = $this->getActivities();
+                        $activities = $this->activities;
                         // newest first, synth created first as well
                         $timeline = collect();
                         if ($this->event?->created_at) {
@@ -1268,12 +1517,13 @@ new class extends Component {
                         </x-timeline-item>
 
                         @endforeach
+                        @endif
 
                     </x-slot:content>
                 </x-collapse>
 
                 <!-- Details (Collapsible, Default: Open) -->
-                @if ($this->event->actor || $this->event->target)
+                @if ($coreLoaded && ($this->event->actor || $this->event->target))
                 <x-collapse wire:model="detailsOpen">
                     <x-slot:heading>
                         <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
