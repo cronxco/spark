@@ -298,6 +298,7 @@ class FetchSingleUrl implements ShouldQueue
     {
         try {
             $handler = new ArchiveBypassHandler;
+
             return $handler->fetchFromArchive($url);
         } catch (Exception $e) {
             Log::warning('Fetch: Archive bypass exception', [

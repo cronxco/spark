@@ -164,7 +164,7 @@ class ContentExtractor
         }
 
         // Determine paywall type if indicators found
-        if (!empty($detectedIndicators)) {
+        if (! empty($detectedIndicators)) {
             $indicatorStr = implode(' ', array_map('strtolower', $detectedIndicators));
 
             if (str_contains($indicatorStr, 'metered') ||
@@ -201,7 +201,7 @@ class ContentExtractor
             }
         }
 
-        $isPaywall = !empty($detectedIndicators) || $contentTruncated;
+        $isPaywall = ! empty($detectedIndicators) || $contentTruncated;
 
         if ($returnDetails) {
             return [
@@ -359,6 +359,7 @@ class ContentExtractor
         $paywallCheck = self::detectPaywall($html, $textContent, true);
         if ($paywallCheck['detected']) {
             $paywallType = $paywallCheck['type'] ?? 'unknown';
+
             return [
                 'success' => false,
                 'reason' => "Paywall detected ({$paywallType})",
