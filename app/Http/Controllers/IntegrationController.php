@@ -409,7 +409,7 @@ class IntegrationController extends Controller
             if (method_exists($plugin, 'fetchAvailableCalendars')) {
                 try {
                     $availableCalendars = $plugin->fetchAvailableCalendars($group);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     // Token refresh failed - user needs to re-authenticate
                     Log::warning('Failed to fetch calendars, redirecting to OAuth', [
                         'group_id' => $group->id,
