@@ -306,8 +306,9 @@ use Carbon\Carbon;
                                               @error('config.'.$typeKey.'.'.$field)
                                                   <div class="text-xs text-error mt-1">{{ $message }}</div>
                                               @enderror
-                                        @elseif ($group->service === 'google-calendar' && $field === 'calendar_id' && !empty($availableCalendars))
+                                        @elseif ($group->service === 'google-calendar' && $field === 'calendar_id')
                                               <!-- Special handling for Google Calendar dropdown -->
+                                              @if (!empty($availableCalendars))
                                               <select name="config[{{ $typeKey }}][{{ $field }}]" class="select select-bordered w-full" id="calendar-id-select" data-type-key="{{ $typeKey }}">
                                                   <option value="">{{ __('Select a calendar...') }}</option>
                                                   @foreach ($availableCalendars as $calendar)
@@ -316,6 +317,20 @@ use Carbon\Carbon;
                                                       </option>
                                                   @endforeach
                                               </select>
+                                              @else
+                                              <!-- No calendars available - show message and re-auth option -->
+                                              <div class="alert alert-warning">
+                                                  <x-icon name="fas.exclamation-triangle" class="w-5 h-5" />
+                                                  <div class="flex-1">
+                                                      <p class="font-medium">{{ __('Unable to load your calendars') }}</p>
+                                                      <p class="text-sm">{{ __('Your Google Calendar connection may have expired or there was an issue fetching your calendars.') }}</p>
+                                                  </div>
+                                              </div>
+                                              <a href="{{ route('integrations.oauth', ['service' => 'google-calendar']) }}" class="btn btn-primary btn-sm mt-2">
+                                                  <x-icon name="fas.rotate" class="w-4 h-4" />
+                                                  {{ __('Re-authenticate with Google') }}
+                                              </a>
+                                              @endif
                                               @error('config.'.$typeKey.'.'.$field)
                                                   <div class="text-xs text-error mt-1">{{ $message }}</div>
                                               @enderror

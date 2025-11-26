@@ -407,17 +407,11 @@ class IntegrationController extends Controller
         if ($group->service === 'google-calendar' && $pluginClass) {
             $plugin = new $pluginClass;
             if (method_exists($plugin, 'fetchAvailableCalendars')) {
-                try {
-                    $availableCalendars = $plugin->fetchAvailableCalendars($group);
-                } catch (Exception $e) {
-                    // Token refresh failed - user needs to re-authenticate
-                    Log::warning('Failed to fetch calendars, redirecting to OAuth', [
-                        'group_id' => $group->id,
-                        'error' => $e->getMessage(),
-                    ]);
+                $availableCalendars = $plugin->fetchAvailableCalendars($group);
 
-                    return redirect()->route('integrations.oauth', ['service' => 'google-calendar'])
-                        ->with('error', 'Your Google Calendar connection has expired. Please reconnect to add more calendars.');
+                // If we got no calendars and the token seems invalid, show a warning
+                if (empty($availableCalendars) && (! $group->access_token || ($group->expiry && $group->expiry->isPast() && ! $group->refresh_token))) {
+                    session()->flash('warning', 'Unable to fetch your calendars. Your connection may have expired. Try re-authenticating if the problem persists.');
                 }
             }
         }
