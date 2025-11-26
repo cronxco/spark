@@ -797,10 +797,10 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 Log::error('Google Calendar refresh token is invalid - user needs to re-authorize', [
                     'group_id' => $group->id,
                 ]);
-                // TODO: Notify user to re-authorize
             }
 
-            throw new Exception('Failed to refresh access token');
+            // Don't throw exception - let caller handle the failure gracefully
+            return;
         }
 
         $tokenData = $response->json();
