@@ -378,39 +378,49 @@ class GoogleCalendarPlugin extends OAuthPlugin
      */
     public function fetchAvailableCalendars(IntegrationGroup $group): array
     {
-        // Ensure token is fresh
-        if ($group->expiry && $group->expiry->isPast()) {
-            $this->refreshToken($group);
-        }
+        try {
+            // Ensure token is fresh
+            if ($group->expiry && $group->expiry->isPast()) {
+                $this->refreshToken($group);
+            }
 
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/users/me/calendarList'));
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/users/me/calendarList'));
 
-        $response = Http::withToken($group->access_token)
-            ->get($this->baseUrl . '/users/me/calendarList');
-        $span?->finish();
+            $response = Http::withToken($group->access_token)
+                ->get($this->baseUrl . '/users/me/calendarList');
+            $span?->finish();
 
-        if (! $response->successful()) {
-            Log::warning('Failed to fetch calendar list', [
+            if (! $response->successful()) {
+                Log::warning('Failed to fetch calendar list', [
+                    'group_id' => $group->id,
+                    'status' => $response->status(),
+                ]);
+
+                return [];
+            }
+
+            $calendars = [];
+            foreach ($response->json()['items'] ?? [] as $calendar) {
+                $calendars[] = [
+                    'id' => $calendar['id'],
+                    'name' => $calendar['summary'] ?? 'Unnamed Calendar',
+                    'primary' => $calendar['primary'] ?? false,
+                    'access_role' => $calendar['accessRole'] ?? null,
+                ];
+            }
+
+            return $calendars;
+        } catch (Exception $e) {
+            // Token refresh or API call failed - log and return empty array
+            Log::warning('Failed to fetch available calendars', [
                 'group_id' => $group->id,
-                'status' => $response->status(),
+                'error' => $e->getMessage(),
             ]);
 
             return [];
         }
-
-        $calendars = [];
-        foreach ($response->json()['items'] ?? [] as $calendar) {
-            $calendars[] = [
-                'id' => $calendar['id'],
-                'name' => $calendar['summary'] ?? 'Unnamed Calendar',
-                'primary' => $calendar['primary'] ?? false,
-                'access_role' => $calendar['accessRole'] ?? null,
-            ];
-        }
-
-        return $calendars;
     }
 
     /**
