@@ -405,12 +405,15 @@ class IntegrationController extends Controller
         // Get available calendars for Google Calendar onboarding
         $availableCalendars = [];
         if ($group->service === 'google-calendar' && $pluginClass) {
+            // Refresh group from database to ensure we have latest tokens
+            $group->refresh();
+
             $plugin = new $pluginClass;
             if (method_exists($plugin, 'fetchAvailableCalendars')) {
                 $availableCalendars = $plugin->fetchAvailableCalendars($group);
 
-                // If we got no calendars and the token seems invalid, show a warning
-                if (empty($availableCalendars) && (! $group->access_token || ($group->expiry && $group->expiry->isPast() && ! $group->refresh_token))) {
+                // If we got no calendars, show a warning
+                if (empty($availableCalendars)) {
                     session()->flash('warning', 'Unable to fetch your calendars. Your connection may have expired. Try re-authenticating if the problem persists.');
                 }
             }
