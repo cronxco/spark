@@ -381,8 +381,20 @@ class GoogleCalendarPlugin extends OAuthPlugin
         try {
             // Ensure token is fresh
             if ($group->expiry && $group->expiry->isPast()) {
+                Log::info('Google Calendar token expired, refreshing', [
+                    'group_id' => $group->id,
+                    'expiry' => $group->expiry,
+                ]);
                 $this->refreshToken($group);
+                // Refresh the group model to get updated tokens
+                $group->refresh();
             }
+
+            Log::info('Fetching available calendars', [
+                'group_id' => $group->id,
+                'has_access_token' => ! empty($group->access_token),
+                'expiry' => $group->expiry,
+            ]);
 
             $hub = SentrySdk::getCurrentHub();
             $parentSpan = $hub->getSpan();
@@ -393,9 +405,10 @@ class GoogleCalendarPlugin extends OAuthPlugin
             $span?->finish();
 
             if (! $response->successful()) {
-                Log::warning('Failed to fetch calendar list', [
+                Log::warning('Failed to fetch calendar list from Google API', [
                     'group_id' => $group->id,
                     'status' => $response->status(),
+                    'response' => $response->body(),
                 ]);
 
                 return [];
@@ -411,12 +424,18 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 ];
             }
 
+            Log::info('Successfully fetched calendars', [
+                'group_id' => $group->id,
+                'calendar_count' => count($calendars),
+            ]);
+
             return $calendars;
         } catch (Exception $e) {
             // Token refresh or API call failed - log and return empty array
-            Log::warning('Failed to fetch available calendars', [
+            Log::error('Exception while fetching available calendars', [
                 'group_id' => $group->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [];
