@@ -91,7 +91,7 @@ new class extends Component {
 
         $event = Event::find($modelId);
         if ($event) {
-            \App\Jobs\TaskPipeline\ProcessTaskPipelineJob::dispatch(
+            App\Jobs\TaskPipeline\ProcessTaskPipelineJob::dispatch(
                 model: $event,
                 trigger: 'manual',
                 taskFilter: [$taskKey],
