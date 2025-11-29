@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
+use App\Integrations\SupportsTaskPipeline;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Support\ServiceProvider;
-use App\Integrations\SupportsTaskPipeline;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use ReflectionClass;
