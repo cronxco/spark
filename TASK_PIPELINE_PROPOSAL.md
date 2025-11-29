@@ -22,7 +22,7 @@ This proposal outlines a comprehensive redesign of how automated tasks are trigg
 
 | Task Type | Trigger Method | Queue | Issues |
 |-----------|---------------|-------|--------|
-| Embedding Generation | Observer (create/update) | `embeddings` | No tracking, can't retry |
+| Embedding Generation | Observer (create/update) | `embeddings` → `tasks` | No tracking, can't retry |
 | Receipt Matching (Forward) | Webhook handler | `default` | Scattered logic |
 | Receipt Matching (Reverse) | AppServiceProvider boot listener | `default` | Hard to discover |
 | Anomaly Detection (RT) | Event model boot method | `default` | Hidden in model |
@@ -418,9 +418,28 @@ abstract class BaseTaskJob implements ShouldQueue
             $this->updateStatus('success', ['completed_at' => now()]);
 
         } catch (Exception $e) {
-            // Report to Sentry
+            // Report to Sentry with comprehensive context
             if (app()->bound('sentry')) {
-                app('sentry')->captureException($e);
+                app('sentry')->captureException($e, [
+                    'extra' => [
+                        'task_key' => $this->task->key,
+                        'task_name' => $this->task->name,
+                        'model_type' => get_class($this->model),
+                        'model_id' => $this->model->id,
+                        'user_id' => $this->model->user_id ?? null,
+                        'attempt' => $this->attempts(),
+                        'max_tries' => $this->tries,
+                        'task_conditions' => $this->task->conditions,
+                        'model_attributes' => $this->model->only([
+                            'service', 'domain', 'action', 'value', 'value_unit'
+                        ]),
+                    ],
+                    'tags' => [
+                        'task' => $this->task->key,
+                        'model' => class_basename($this->model),
+                        'queue' => $this->task->queue,
+                    ],
+                ]);
             }
 
             $this->updateStatus('failed', [
@@ -471,8 +490,6 @@ abstract class BaseTaskJob implements ShouldQueue
 // app/Jobs/TaskPipeline/Tasks/GenerateEmbeddingTask.php
 class GenerateEmbeddingTask extends BaseTaskJob
 {
-    public $queue = 'embeddings'; // Can override base queue
-
     protected function execute(): void
     {
         // Existing embedding generation logic
@@ -514,7 +531,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             appliesTo: ['event', 'block', 'object'],
             conditions: [],
             dependencies: [],
-            queue: 'embeddings',
+            queue: 'tasks',
             priority: 100,
             runOnCreate: true,
             runOnUpdate: true,
@@ -1466,10 +1483,10 @@ class ListTasksCommand extends Command
 **Concern:** Single-process queue could become bottleneck
 
 **Mitigation:**
-- Keep `embeddings` queue separate (already high volume)
 - Monitor queue depth in Horizon
 - Add more single-process workers if needed (still prevents race on same item)
 - Use job priorities for critical tasks
+- Consider splitting high-volume tasks to dedicated queue if needed
 
 ### Risk 2: Metadata Size
 **Concern:** Task execution history could bloat metadata field
@@ -1567,40 +1584,46 @@ class ListTasksCommand extends Command
 
 ---
 
-## Open Questions for Feedback
+## Design Decisions
 
-1. **Metadata vs Dedicated Table:**
-   - Are you comfortable with task executions in metadata?
-   - Should we plan for a dedicated table if metadata grows?
+✅ **Metadata Storage:**
+   - Task executions stored in `metadata['task_executions']` field
+   - Only last attempt + last success retained per task
+   - No dedicated table needed at this time
 
-2. **Queue Separation:**
-   - Keep embeddings separate or move to `tasks` queue?
-   - Any other tasks that should have dedicated queues?
+✅ **Queue Consolidation:**
+   - All tasks use single `tasks` queue (including embeddings)
+   - Single worker process prevents race conditions
+   - Consistent processing across all task types
 
-3. **Notification System:**
-   - Should users be notified of task failures?
-   - Integration health dashboard for task status?
+✅ **Error Tracking:**
+   - All failures logged to Sentry with comprehensive context
+   - Include model type, ID, task key, error details
+   - User notifications to be considered in future iteration
 
-4. **Audit Trail:**
-   - Beyond metadata, should we log task executions to activity log?
-   - Keep long-term analytics on task success/failure rates?
+✅ **No Activity Log:**
+   - Task executions not duplicated to activity log
+   - Metadata provides sufficient tracking
+   - Reduces storage overhead
 
-5. **Priority System:**
-   - Is the proposed priority system (100 = highest) sufficient?
-   - Should we support dynamic priorities based on conditions?
+✅ **Priority System:**
+   - Simple numeric priority (higher = runs first)
+   - Range: 0-100 recommended
+   - Sufficient for current needs
 
-6. **Plugin Developer Experience:**
-   - What documentation/examples do plugin developers need?
-   - Should we provide helper methods or traits?
+**Future Considerations:**
+- User notification system for task failures
+- Plugin developer documentation and helper traits
+- Integration health dashboard for task status overview
 
 ---
 
 ## Next Steps
 
-1. **Review this proposal** and provide feedback
-2. **Answer open questions** above
-3. **Approve implementation plan** or suggest changes
-4. **Begin Phase 1** development
+1. ✅ **Review proposal** - Complete
+2. ✅ **Answer design questions** - Complete (see Design Decisions section)
+3. **Begin implementation** - Ready to start Phase 1
+4. **Monitor and iterate** - Adjust based on production feedback
 
 ---
 
