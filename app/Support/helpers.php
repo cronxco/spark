@@ -816,14 +816,14 @@ if (! function_exists('normalize_icon_for_spotlight')) {
             return null;
         }
 
-        // FontAwesome: fas-icon-name, far-icon-name, fab-icon-name -> icon-name
-        if (preg_match('/^fa[srb]-(.+)$/', $icon, $matches)) {
-            return $matches[1];
+        // Keep Font Awesome icons as-is (fas.icon-name or far.icon-name or fab.icon-name)
+        if (str_starts_with($icon, 'fas.') || str_starts_with($icon, 'far.') || str_starts_with($icon, 'fab.')) {
+            return $icon; // Return as-is, will be handled by FA icon classes
         }
 
-        // Legacy FontAwesome: fas.icon-name -> icon-name
-        if (str_contains($icon, '.')) {
-            return explode('.', $icon, 2)[1];
+        if (preg_match('/^fa[srb]-/', $icon)) {
+            // Convert fas-icon-name to fas.icon-name format
+            return str_replace(['fas-', 'far-', 'fab-'], ['fas.', 'far.', 'fab.'], $icon);
         }
 
         // Heroicons: o-icon-name or s-icon-name -> icon-name
