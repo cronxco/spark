@@ -2,14 +2,18 @@
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Traits\HasProgressiveLoading;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Tags\Tag;
 
 new class extends Component
 {
+    use HasProgressiveLoading;
+
     public Event $event;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -32,6 +36,7 @@ new class extends Component
     public bool $coreLoaded = false;
     public bool $tagsLoaded = false;
     public bool $blocksLoaded = false;
+    public bool $mediaLoaded = false;
     public bool $relationshipsLoaded = false;
     public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
@@ -49,6 +54,31 @@ new class extends Component
         'close-modal' => 'closeModals',
     ];
 
+    // -------------------------------------------------------------------------
+    // Protected Methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Define the loading tiers for progressive loading.
+     * Priority order: Tags -> Core (Actor/Target) -> Blocks -> Media -> Relationships -> Related Events -> Activities
+     */
+    protected function getLoadingTiers(): array
+    {
+        return [
+            1 => ['loadTags'],
+            2 => ['loadCore'],
+            3 => ['loadBlocks'],
+            4 => ['loadMedia'],
+            5 => ['loadRelationships'],
+            6 => ['loadRelatedEvents'],
+            7 => ['loadActivities'],
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Public Methods
+    // -------------------------------------------------------------------------
+
     public function mount(Event $event): void
     {
         // Load only the bare minimum - just the event with integration for display
@@ -56,6 +86,9 @@ new class extends Component
 
         // Track this view in the activity log (debounced to prevent duplicate views)
         $this->event->logViewIfNotRecent(5);
+
+        // Start progressive loading chain
+        $this->startProgressiveLoading();
     }
 
     /**
@@ -90,8 +123,26 @@ new class extends Component
         if ($this->blocksLoaded) {
             return;
         }
-        $this->event->load(['blocks']);
+        $this->event->load(['blocks.media']);
         $this->blocksLoaded = true;
+    }
+
+    /**
+     * Load media for actor and target objects
+     */
+    public function loadMedia(): void
+    {
+        if ($this->mediaLoaded) {
+            return;
+        }
+        // Load media collections for actor and target if they exist
+        if ($this->event->actor) {
+            $this->event->actor->load(['media']);
+        }
+        if ($this->event->target) {
+            $this->event->target->load(['media']);
+        }
+        $this->mediaLoaded = true;
     }
 
     /**
@@ -137,6 +188,28 @@ new class extends Component
         }
 
         return $this->event->allRelationships()->get();
+    }
+
+    #[Computed]
+    public function actorMedia()
+    {
+        if (! $this->mediaLoaded || ! $this->event->actor) {
+            return collect();
+        }
+
+        return $this->event->actor->getMedia('screenshots')
+            ->merge($this->event->actor->getMedia('downloaded_images'));
+    }
+
+    #[Computed]
+    public function targetMedia()
+    {
+        if (! $this->mediaLoaded || ! $this->event->target) {
+            return collect();
+        }
+
+        return $this->event->target->getMedia('screenshots')
+            ->merge($this->event->target->getMedia('downloaded_images'));
     }
 
     #[Computed]
@@ -778,7 +851,7 @@ new class extends Component
 
                         <!-- Actor & Target Flow (Progressive) -->
                         @if ($this->event->actor_id || $this->event->target_id)
-                        <div class="mt-4 lg:mt-6 p-3 lg:p-4 rounded-lg bg-base-300/50 border-2 border-info/20" wire:init="loadCore">
+                        <div class="mt-4 lg:mt-6 p-3 lg:p-4 rounded-lg bg-base-300/50 border-2 border-info/20">
                             @if ($coreLoaded)
                             <div class="flex flex-col sm:flex-row items-center justify-center gap-3 lg:gap-4">
                                 @if ($this->event->actor)
@@ -822,7 +895,7 @@ new class extends Component
                         @endif
 
                         <!-- Tags (Progressive) -->
-                        <div class="mt-4" wire:init="loadTags">
+                        <div class="mt-4">
                             @if ($tagsLoaded && $this->event->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center gap-2">
                                 @foreach ($this->event->tags as $tag)
@@ -924,7 +997,7 @@ new class extends Component
             @endif
 
             <!-- Linked Blocks (Progressive) -->
-            <div wire:init="loadBlocks">
+            <div>
                 @if ($blocksLoaded && $this->event->blocks->isNotEmpty())
                 <div>
                     <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
@@ -948,8 +1021,49 @@ new class extends Component
                 @endif
             </div>
 
+            <!-- Media Gallery (Progressive) -->
+            @php
+                $actorMedia = $this->actorMedia;
+                $targetMedia = $this->targetMedia;
+                $allMedia = $actorMedia->merge($targetMedia);
+            @endphp
+            @if ($mediaLoaded && $allMedia->isNotEmpty())
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.images" class="w-5 h-5 text-secondary" />
+                    Media ({{ $allMedia->count() }})
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    @foreach ($allMedia->take(8) as $media)
+                    <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
+                        <img
+                            src="{{ $media->getUrl('thumbnail') ?: $media->getUrl() }}"
+                            alt="{{ $media->name }}"
+                            class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                            loading="lazy"
+                            onclick="window.open('{{ $media->getUrl() }}', '_blank')"
+                        />
+                    </div>
+                    @endforeach
+                </div>
+                @if ($allMedia->count() > 8)
+                <p class="text-sm text-base-content/60 mt-2 text-center">
+                    +{{ $allMedia->count() - 8 }} more items
+                </p>
+                @endif
+            </div>
+            @elseif (! $mediaLoaded)
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.images" class="w-5 h-5 text-secondary" />
+                    Media
+                </h3>
+                <x-skeleton-loader type="block-grid" />
+            </div>
+            @endif
+
             <!-- Related Events (Progressive) -->
-            <div wire:init="loadRelatedEvents">
+            <div>
                 @if ($relatedEventsLoaded && $this->relatedEvents->isNotEmpty())
                 <div class="relative">
                     <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-4 border border-warning/50">
@@ -1063,7 +1177,7 @@ new class extends Component
             </div>
 
             <!-- Relationships (Progressive) -->
-            <div wire:init="loadRelationships">
+            <div>
             @php $relationships = $this->relationships; @endphp
             @if ($relationshipsLoaded && $relationships->isNotEmpty())
             <x-card class="bg-base-200/50 border-2 border-accent/10">
@@ -1263,7 +1377,7 @@ new class extends Component
                     </div>
 
                     <!-- Relationships -->
-                    <div class="pb-4 border-b border-base-200" wire:init="loadRelationships">
+                    <div class="pb-4 border-b border-base-200">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                                 Relationships
@@ -1340,7 +1454,7 @@ new class extends Component
                 <!-- Activity Timeline (Collapsible, Default: Open) -->
                 <x-collapse wire:model="activityOpen">
                     <x-slot:heading>
-                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80" wire:init="loadActivities">
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Activity
                         </div>
                     </x-slot:heading>

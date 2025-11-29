@@ -378,39 +378,68 @@ class GoogleCalendarPlugin extends OAuthPlugin
      */
     public function fetchAvailableCalendars(IntegrationGroup $group): array
     {
-        // Ensure token is fresh
-        if ($group->expiry && $group->expiry->isPast()) {
-            $this->refreshToken($group);
-        }
+        try {
+            // Ensure token is fresh
+            if ($group->expiry && $group->expiry->isPast()) {
+                Log::info('Google Calendar token expired, refreshing', [
+                    'group_id' => $group->id,
+                    'expiry' => $group->expiry,
+                ]);
+                $this->refreshToken($group);
+                // Refresh the group model to get updated tokens
+                $group->refresh();
+            }
 
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/users/me/calendarList'));
-
-        $response = Http::withToken($group->access_token)
-            ->get($this->baseUrl . '/users/me/calendarList');
-        $span?->finish();
-
-        if (! $response->successful()) {
-            Log::warning('Failed to fetch calendar list', [
+            Log::info('Fetching available calendars', [
                 'group_id' => $group->id,
-                'status' => $response->status(),
+                'has_access_token' => ! empty($group->access_token),
+                'expiry' => $group->expiry,
+            ]);
+
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/users/me/calendarList'));
+
+            $response = Http::withToken($group->access_token)
+                ->get($this->baseUrl . '/users/me/calendarList');
+            $span?->finish();
+
+            if (! $response->successful()) {
+                Log::warning('Failed to fetch calendar list from Google API', [
+                    'group_id' => $group->id,
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+
+                return [];
+            }
+
+            $calendars = [];
+            foreach ($response->json()['items'] ?? [] as $calendar) {
+                $calendars[] = [
+                    'id' => $calendar['id'],
+                    'name' => $calendar['summary'] ?? 'Unnamed Calendar',
+                    'primary' => $calendar['primary'] ?? false,
+                    'access_role' => $calendar['accessRole'] ?? null,
+                ];
+            }
+
+            Log::info('Successfully fetched calendars', [
+                'group_id' => $group->id,
+                'calendar_count' => count($calendars),
+            ]);
+
+            return $calendars;
+        } catch (Exception $e) {
+            // Token refresh or API call failed - log and return empty array
+            Log::error('Exception while fetching available calendars', [
+                'group_id' => $group->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [];
         }
-
-        $calendars = [];
-        foreach ($response->json()['items'] ?? [] as $calendar) {
-            $calendars[] = [
-                'id' => $calendar['id'],
-                'name' => $calendar['summary'] ?? 'Unnamed Calendar',
-                'primary' => $calendar['primary'] ?? false,
-                'access_role' => $calendar['accessRole'] ?? null,
-            ];
-        }
-
-        return $calendars;
     }
 
     /**
@@ -787,10 +816,10 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 Log::error('Google Calendar refresh token is invalid - user needs to re-authorize', [
                     'group_id' => $group->id,
                 ]);
-                // TODO: Notify user to re-authorize
             }
 
-            throw new Exception('Failed to refresh access token');
+            // Don't throw exception - let caller handle the failure gracefully
+            return;
         }
 
         $tokenData = $response->json();

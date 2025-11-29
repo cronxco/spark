@@ -95,30 +95,149 @@ class ContentExtractor
 
     /**
      * Detect if content is behind a paywall
+     *
+     * @param  string|null  $textContent  Optional extracted text content for length-based detection
+     * @return bool|array Returns true/false for simple detection, or array with details if $returnDetails is true
      */
-    public static function detectPaywall(string $html): bool
+    public static function detectPaywall(string $html, ?string $textContent = null, bool $returnDetails = false): bool|array
     {
-        $paywallIndicators = [
+        // HTML class/id/data attribute indicators
+        $htmlIndicators = [
             'class="paywall"',
             'id="paywall"',
             'data-paywall',
+            'class="subscriber-only"',
+            'class="premium-content"',
+            'class="locked-content"',
+            'class="metered-content"',
+            'data-paywall-type',
+            'data-subscription',
+            'class="registration-wall"',
+            'id="regwall"',
+        ];
+
+        // Text content indicators
+        $textIndicators = [
             'subscribe to continue reading',
+            'subscribe to read',
             'sign up to read',
+            'sign in to read',
             'create a free account',
             'subscription required',
             'subscribers only',
             'become a member',
             'this article is exclusive',
+            'premium article',
+            'premium content',
+            'members-only',
+            'member exclusive',
+            'already a subscriber',
+            'for subscribers',
+            'to continue reading',
+            'register to continue',
+            'free trial',
+            'start your subscription',
+            'unlock this article',
+            'get unlimited access',
+            'you\'ve reached your limit',
+            'article limit reached',
+            'free articles remaining',
+            'articles this month',
         ];
 
         $lowerHtml = strtolower($html);
-        foreach ($paywallIndicators as $indicator) {
+        $detectedIndicators = [];
+        $paywallType = null;
+
+        // Check HTML indicators
+        foreach ($htmlIndicators as $indicator) {
             if (str_contains($lowerHtml, strtolower($indicator))) {
-                return true;
+                $detectedIndicators[] = $indicator;
             }
         }
 
-        return false;
+        // Check text indicators
+        foreach ($textIndicators as $indicator) {
+            if (str_contains($lowerHtml, strtolower($indicator))) {
+                $detectedIndicators[] = $indicator;
+            }
+        }
+
+        // Determine paywall type if indicators found
+        if (! empty($detectedIndicators)) {
+            $indicatorStr = implode(' ', array_map('strtolower', $detectedIndicators));
+
+            if (str_contains($indicatorStr, 'metered') ||
+                str_contains($indicatorStr, 'limit') ||
+                str_contains($indicatorStr, 'remaining') ||
+                str_contains($indicatorStr, 'this month')) {
+                $paywallType = 'metered';
+            } elseif (str_contains($indicatorStr, 'registration') ||
+                      str_contains($indicatorStr, 'register') ||
+                      str_contains($indicatorStr, 'regwall') ||
+                      str_contains($indicatorStr, 'sign up') ||
+                      str_contains($indicatorStr, 'free account')) {
+                $paywallType = 'registration';
+            } elseif (str_contains($indicatorStr, 'subscriber') ||
+                      str_contains($indicatorStr, 'subscription') ||
+                      str_contains($indicatorStr, 'premium') ||
+                      str_contains($indicatorStr, 'member')) {
+                $paywallType = 'hard';
+            } else {
+                $paywallType = 'soft';
+            }
+        }
+
+        // Content truncation detection - if extracted text is suspiciously short
+        // compared to what we'd expect from a full article
+        // Only flag if:
+        // 1. Content is relatively short (< 300 chars)
+        // 2. AND we detect soft paywall language (but not explicit paywall classes)
+        // 3. AND page has article structure
+        // This catches paywalls that show teasers without explicit paywall divs
+        $contentTruncated = false;
+        if ($textContent !== null && strlen($textContent) < 300 && empty($detectedIndicators)) {
+            // Check for article structure
+            $hasArticleStructure = preg_match('/<article|<main|class="article|class="post|class="entry/i', $html);
+
+            // Check for soft paywall language that suggests truncation
+            $softPaywallPhrases = [
+                'to continue reading',
+                'continue reading this',
+                'read the full',
+                'sign in to read',
+                'register to continue',
+                'log in to read',
+                'this story continues',
+            ];
+
+            $hasSoftPaywallLanguage = false;
+            foreach ($softPaywallPhrases as $phrase) {
+                if (str_contains($lowerHtml, $phrase)) {
+                    $hasSoftPaywallLanguage = true;
+                    break;
+                }
+            }
+
+            // Only flag as truncated if we have both signals
+            if ($hasArticleStructure && $hasSoftPaywallLanguage) {
+                $contentTruncated = true;
+                $paywallType = $paywallType ?? 'truncated';
+            }
+        }
+
+        $isPaywall = ! empty($detectedIndicators) || $contentTruncated;
+
+        if ($returnDetails) {
+            return [
+                'detected' => $isPaywall,
+                'type' => $paywallType,
+                'indicators' => $detectedIndicators,
+                'truncated' => $contentTruncated,
+            ];
+        }
+
+        return $isPaywall;
     }
 
     /**
@@ -262,11 +381,15 @@ class ContentExtractor
 
         // Check for paywall BEFORE checking content length
         // This ensures paywall indicators are detected even with short content
-        if (self::detectPaywall($html)) {
+        $paywallCheck = self::detectPaywall($html, $textContent, true);
+        if ($paywallCheck['detected']) {
+            $paywallType = $paywallCheck['type'] ?? 'unknown';
+
             return [
                 'success' => false,
-                'reason' => 'Paywall detected',
+                'reason' => "Paywall detected ({$paywallType})",
                 'data' => null,
+                'paywall_details' => $paywallCheck,
             ];
         }
 
