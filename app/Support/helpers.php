@@ -1023,3 +1023,85 @@ if (! function_exists('get_media_temporary_url')) {
         );
     }
 }
+
+if (! function_exists('render_media_responsive')) {
+    /**
+     * Render a media object as responsive HTML using Spatie's responsive images.
+     * Falls back to regular img tag if no media found.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\Spatie\MediaLibrary\HasMedia  $model
+     * @param  string  $collection  The media collection to check
+     * @param  array  $attributes  Additional HTML attributes (class, alt, etc.)
+     * @param  bool  $useSignedUrls  Whether to use signed URLs for S3 (default: true)
+     * @return string|null The HTML output or null if no media found
+     */
+    function render_media_responsive(
+        $model,
+        string $collection = 'downloaded_images',
+        array $attributes = [],
+        bool $useSignedUrls = true
+    ): ?string {
+        if (! method_exists($model, 'getFirstMedia')) {
+            return null;
+        }
+
+        $media = $model->getFirstMedia($collection);
+
+        if (! $media) {
+            // Fallback to media_url if no Media Library attachment
+            if (isset($model->media_url) && ! empty($model->media_url)) {
+                $attrs = collect($attributes)
+                    ->map(fn ($value, $key) => sprintf('%s="%s"', $key, e($value)))
+                    ->implode(' ');
+
+                return sprintf('<img src="%s" %s />', e($model->media_url), $attrs);
+            }
+
+            return null;
+        }
+
+        // For S3 with signed URLs enabled
+        if ($useSignedUrls && config('media-library.disk_name') === 's3') {
+            // Spatie's responsive images work with signed URLs automatically
+            // We just need to render the media object
+            $html = (string) $media;
+
+            // Add custom attributes if provided
+            if (! empty($attributes)) {
+                // Parse the HTML and add attributes
+                $doc = new DOMDocument;
+                @$doc->loadHTML($html, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                $img = $doc->getElementsByTagName('img')->item(0);
+
+                if ($img) {
+                    foreach ($attributes as $key => $value) {
+                        $img->setAttribute($key, $value);
+                    }
+
+                    return $doc->saveHTML($img);
+                }
+            }
+
+            return $html;
+        }
+
+        // For local/public disks or when signed URLs disabled, use regular rendering
+        $html = (string) $media;
+
+        if (! empty($attributes)) {
+            $doc = new DOMDocument;
+            @$doc->loadHTML($html, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+            $img = $doc->getElementsByTagName('img')->item(0);
+
+            if ($img) {
+                foreach ($attributes as $key => $value) {
+                    $img->setAttribute($key, $value);
+                }
+
+                return $doc->saveHTML($img);
+            }
+        }
+
+        return $html;
+    }
+}

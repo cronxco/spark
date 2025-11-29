@@ -161,6 +161,8 @@ class RedditSavedData extends BaseProcessingJob
                 $event->attachTag($tag, 'reddit_subreddit');
             }
         }
+
+        // Note: Image downloading now handled by DownloadImagesToMediaLibraryTask in task pipeline
     }
 
     /**

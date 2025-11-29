@@ -56,15 +56,23 @@ if (!$isValueBlock) {
         $contentPreview = $metadata['text'];
     }
 
-    // Check for images - use Media Library first, then fallback to metadata or media_url
-    $imageUrl = get_media_url($block, 'downloaded_images', 'thumbnail');
+    // Check for images - use Media Library for responsive images with signed URLs
+    $media = $block->getFirstMedia('downloaded_images');
+    $responsiveImageHtml = null;
 
-    if (!$imageUrl && $block->media_url) {
-        $imageUrl = $block->media_url;
-    } elseif (!$imageUrl && isset($metadata['image'])) {
-        $imageUrl = $metadata['image'];
-    } elseif (!$imageUrl && isset($metadata['image_url'])) {
-        $imageUrl = $metadata['image_url'];
+    if ($media) {
+        // Generate responsive image HTML from Media Library
+        $responsiveImageHtml = (string) $media;
+        // Parse and add custom classes
+        $doc = new DOMDocument;
+        @$doc->loadHTML($responsiveImageHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+        $img = $doc->getElementsByTagName('img')->item(0);
+        if ($img) {
+            $img->setAttribute('class', 'w-full h-full object-cover');
+            $img->setAttribute('loading', 'lazy');
+            $img->setAttribute('alt', $block->title);
+            $responsiveImageHtml = $doc->saveHTML($img);
+        }
     }
 }
 @endphp
@@ -175,12 +183,9 @@ if (!$isValueBlock) {
             </div>
 
             {{-- Image (if available) --}}
-            @if ($imageUrl)
+            @if ($responsiveImageHtml)
                 <div class="w-full h-48 rounded-lg overflow-hidden bg-base-300">
-                    <img src="{{ $imageUrl }}"
-                         alt="{{ $block->title }}"
-                         class="w-full h-full object-cover"
-                         loading="lazy">
+                    {!! $responsiveImageHtml !!}
                 </div>
             @endif
 

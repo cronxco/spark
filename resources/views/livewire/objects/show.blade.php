@@ -1432,19 +1432,28 @@ new class extends Component
                     @foreach ($objectMedia->take(8) as $media)
                     <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
                         @if (Str::startsWith($media->mime_type, 'image/'))
-                        <img
-                            src="{{ $media->getUrl('thumbnail') ?: $media->getUrl() }}"
-                            alt="{{ $media->name }}"
-                            class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
-                            loading="lazy"
-                            onclick="window.open('{{ $media->getUrl() }}', '_blank')"
-                        />
+                        @php
+                            // Use Spatie's responsive images with signed URLs
+                            $responsiveHtml = (string) $media;
+                            // Parse and add custom classes
+                            $doc = new DOMDocument;
+                            @$doc->loadHTML($responsiveHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                            $img = $doc->getElementsByTagName('img')->item(0);
+                            if ($img) {
+                                $img->setAttribute('class', 'w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer');
+                                $img->setAttribute('loading', 'lazy');
+                                $img->setAttribute('alt', $media->name);
+                                $img->setAttribute('onclick', "window.open('" . addslashes($media->getTemporaryUrl(now()->addHour())) . "', '_blank')");
+                                $responsiveHtml = $doc->saveHTML($img);
+                            }
+                        @endphp
+                        {!! $responsiveHtml !!}
                         @elseif (Str::startsWith($media->mime_type, 'video/'))
-                        <div class="w-full h-full flex items-center justify-center bg-base-300 cursor-pointer" onclick="window.open('{{ $media->getUrl() }}', '_blank')">
+                        <div class="w-full h-full flex items-center justify-center bg-base-300 cursor-pointer" onclick="window.open('{{ $media->getTemporaryUrl(now()->addHour()) }}', '_blank')">
                             <x-icon name="fas.play-circle" class="w-12 h-12 text-base-content/40" />
                         </div>
                         @else
-                        <div class="w-full h-full flex flex-col items-center justify-center bg-base-300 cursor-pointer p-2" onclick="window.open('{{ $media->getUrl() }}', '_blank')">
+                        <div class="w-full h-full flex flex-col items-center justify-center bg-base-300 cursor-pointer p-2" onclick="window.open('{{ $media->getTemporaryUrl(now()->addHour()) }}', '_blank')">
                             <x-icon name="fas.file" class="w-8 h-8 text-base-content/40" />
                             <span class="text-xs text-base-content/60 mt-1 truncate max-w-full">{{ $media->file_name }}</span>
                         </div>
