@@ -183,7 +183,48 @@ class TaskPipelineServiceProvider extends ServiceProvider
      */
     protected function registerPluginTasks(): void
     {
-        // Plugin task registration will be implemented when we have a plugin registry
-        // Plugins implementing SupportsTaskPipeline will be auto-discovered
+        // Scan app/Integrations directory for plugin classes
+        $integrationPath = app_path('Integrations');
+
+        if (!is_dir($integrationPath)) {
+            return;
+        }
+
+        // Get all PHP files in Integrations directory (recursively)
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($integrationPath)
+        );
+
+        foreach ($files as $file) {
+            if ($file->isDir() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            // Convert file path to class name
+            $relativePath = str_replace($integrationPath . '/', '', $file->getPathname());
+            $className = 'App\\Integrations\\' . str_replace(
+                ['/', '.php'],
+                ['\\', ''],
+                $relativePath
+            );
+
+            // Check if class exists and implements SupportsTaskPipeline
+            if (!class_exists($className)) {
+                continue;
+            }
+
+            $reflection = new \ReflectionClass($className);
+
+            if ($reflection->implementsInterface(\App\Integrations\Contracts\SupportsTaskPipeline::class)) {
+                // Get task definitions from the plugin
+                $tasks = $className::getTaskDefinitions();
+
+                foreach ($tasks as $task) {
+                    // Mark as registered by this plugin
+                    $task->registeredBy = $className;
+                    TaskRegistry::register($task);
+                }
+            }
+        }
     }
 }
