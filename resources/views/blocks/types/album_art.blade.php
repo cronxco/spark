@@ -7,10 +7,23 @@ $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
-$imageUrl = get_media_url($block, 'downloaded_images', 'thumbnail')
-    ?? $block->media_url
-    ?? $block->metadata['url']
-    ?? null;
+// Use Media Library for responsive images with signed URLs
+$media = $block->getFirstMedia('downloaded_images');
+$responsiveImageHtml = null;
+
+if ($media) {
+    $responsiveImageHtml = (string) $media;
+    $doc = new DOMDocument;
+    @$doc->loadHTML($responsiveImageHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+    $img = $doc->getElementsByTagName('img')->item(0);
+    if ($img) {
+        $img->setAttribute('class', 'w-full h-full object-cover');
+        $img->setAttribute('loading', 'lazy');
+        $img->setAttribute('alt', $block->title);
+        $responsiveImageHtml = $doc->saveHTML($img);
+    }
+}
+
 $trackName = $block->metadata['track'] ?? null;
 $artist = $block->metadata['artist'] ?? null;
 @endphp
@@ -28,12 +41,9 @@ $artist = $block->metadata['artist'] ?? null;
         </div>
 
         {{-- Album Art Display --}}
-        @if ($imageUrl)
+        @if ($responsiveImageHtml)
         <div class="w-full aspect-square rounded-lg overflow-hidden bg-base-300 shadow-md">
-            <img src="{{ $imageUrl }}"
-                 alt="{{ $block->title }}"
-                 class="w-full h-full object-cover"
-                 loading="lazy">
+            {!! $responsiveImageHtml !!}
         </div>
         @else
         <div class="w-full aspect-square rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">

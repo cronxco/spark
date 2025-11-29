@@ -67,13 +67,21 @@
                         </div>
                     </div>
                 @elseif (str_starts_with($media->mime_type, 'image/'))
-                    {{-- Image Preview --}}
-                    <img
-                        src="{{ $thumbnailUrl }}"
-                        alt="{{ $media->name }}"
-                        class="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        loading="lazy"
-                    />
+                    {{-- Image Preview with Responsive Images --}}
+                    @php
+                        // Use Spatie's responsive images with signed URLs
+                        $responsiveHtml = (string) $media;
+                        $doc = new DOMDocument;
+                        @$doc->loadHTML($responsiveHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                        $img = $doc->getElementsByTagName('img')->item(0);
+                        if ($img) {
+                            $img->setAttribute('class', 'w-full h-full object-cover group-hover:scale-105 transition-transform');
+                            $img->setAttribute('loading', 'lazy');
+                            $img->setAttribute('alt', $media->name);
+                            $responsiveHtml = $doc->saveHTML($img);
+                        }
+                    @endphp
+                    {!! $responsiveHtml !!}
                 @elseif (str_starts_with($media->mime_type, 'application/pdf'))
                     {{-- PDF Preview --}}
                     <div class="flex flex-col items-center justify-center w-full h-full">
