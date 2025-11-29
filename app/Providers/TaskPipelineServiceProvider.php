@@ -191,8 +191,8 @@ class TaskPipelineServiceProvider extends ServiceProvider
         }
 
         // Get all PHP files in Integrations directory (recursively)
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($integrationPath)
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($integrationPath)
         );
 
         foreach ($files as $file) {
@@ -213,9 +213,9 @@ class TaskPipelineServiceProvider extends ServiceProvider
                 continue;
             }
 
-            $reflection = new \ReflectionClass($className);
+            $reflection = new ReflectionClass($className);
 
-            if ($reflection->implementsInterface(\App\Integrations\Contracts\SupportsTaskPipeline::class)) {
+            if ($reflection->implementsInterface(App\Integrations\Contracts\SupportsTaskPipeline::class)) {
                 // Get task definitions from the plugin
                 $tasks = $className::getTaskDefinitions();
 
