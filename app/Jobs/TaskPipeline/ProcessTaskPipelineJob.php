@@ -18,7 +18,6 @@ class ProcessTaskPipelineJob implements ShouldQueue
 
     public $timeout = 300;
     public $tries = 1; // Don't retry the dispatcher itself
-    public $queue = 'tasks';
 
     public function __construct(
         public Model $model,
