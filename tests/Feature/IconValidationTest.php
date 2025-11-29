@@ -235,6 +235,11 @@ class IconValidationTest extends TestCase
         foreach ($files as $file) {
             $extension = $file->getExtension();
 
+            // Skip Font Awesome icon class definitions to avoid false positives
+            if (str_contains($file->getPathname(), 'app/Icons/FontAwesome')) {
+                continue;
+            }
+
             // Only scan relevant file types
             if (in_array($extension, ['php', 'blade.php', 'js', 'vue', 'tsx', 'jsx'])) {
                 $this->scanFileForIcons($file->getPathname());
