@@ -35,7 +35,7 @@ class DispatchTrendDetectionTasksJob implements ShouldQueue
             ->whereNotNull('value_unit')
             ->where('time', '>=', now()->subWeek())
             ->groupBy('service', 'action', 'value_unit')
-            ->chunk(100, function($metricGroups) use (&$count) {
+            ->chunk(100, function ($metricGroups) use (&$count) {
                 foreach ($metricGroups as $group) {
                     // Get the most recent event for this metric to trigger trend detection
                     $event = Event::query()

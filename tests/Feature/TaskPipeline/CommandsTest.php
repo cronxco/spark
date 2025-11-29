@@ -18,7 +18,10 @@ class CommandsTest extends TestCase
         TaskRegistry::clear();
     }
 
-    public function test_list_tasks_command_displays_registered_tasks(): void
+    /**
+     * @test
+     */
+    public function list_tasks_command_displays_registered_tasks(): void
     {
         TaskRegistry::register(new TaskDefinition(
             key: 'test_task',
@@ -34,7 +37,10 @@ class CommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
-    public function test_list_tasks_command_with_json_output(): void
+    /**
+     * @test
+     */
+    public function list_tasks_command_with_json_output(): void
     {
         TaskRegistry::register(new TaskDefinition(
             key: 'test_task',
@@ -49,7 +55,10 @@ class CommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
-    public function test_list_tasks_command_filters_by_model_type(): void
+    /**
+     * @test
+     */
+    public function list_tasks_command_filters_by_model_type(): void
     {
         TaskRegistry::register(new TaskDefinition(
             key: 'event_task',
@@ -73,21 +82,30 @@ class CommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
-    public function test_rerun_command_validates_model_type(): void
+    /**
+     * @test
+     */
+    public function rerun_command_validates_model_type(): void
     {
         $this->artisan('task-pipeline:rerun test_task invalid_model abc-123')
             ->expectsOutputToContain('Invalid model type')
             ->assertExitCode(1);
     }
 
-    public function test_bulk_rerun_command_validates_model_type(): void
+    /**
+     * @test
+     */
+    public function bulk_rerun_command_validates_model_type(): void
     {
         $this->artisan('task-pipeline:bulk-rerun test_task invalid_model')
             ->expectsOutputToContain('Invalid model type')
             ->assertExitCode(1);
     }
 
-    public function test_bulk_rerun_command_dry_run_mode(): void
+    /**
+     * @test
+     */
+    public function bulk_rerun_command_dry_run_mode(): void
     {
         $this->artisan('task-pipeline:bulk-rerun test_task event --dry-run')
             ->expectsOutputToContain('DRY RUN')

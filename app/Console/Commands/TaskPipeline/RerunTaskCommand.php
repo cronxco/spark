@@ -38,15 +38,17 @@ class RerunTaskCommand extends Command
         $taskKey = $this->argument('task');
         $id = $this->argument('id');
 
-        if (!$modelClass) {
+        if (! $modelClass) {
             $this->error('Invalid model type. Must be one of: event, block, object, integration');
+
             return Command::FAILURE;
         }
 
         $model = $modelClass::find($id);
 
-        if (!$model) {
+        if (! $model) {
             $this->error("{$this->argument('model')} with ID {$id} not found");
+
             return Command::FAILURE;
         }
 
@@ -67,7 +69,7 @@ class RerunTaskCommand extends Command
      */
     protected function getModelClass(string $type): ?string
     {
-        return match($type) {
+        return match ($type) {
             'event' => Event::class,
             'block' => Block::class,
             'object' => EventObject::class,

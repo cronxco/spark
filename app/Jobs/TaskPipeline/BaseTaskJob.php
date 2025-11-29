@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 abstract class BaseTaskJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, InteractsWithTaskMetadata;
+    use Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
 
     public $timeout = 120;
     public $tries = 3;

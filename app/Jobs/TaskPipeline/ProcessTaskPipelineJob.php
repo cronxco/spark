@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class ProcessTaskPipelineJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, InteractsWithTaskMetadata;
+    use Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
 
     public $timeout = 300;
     public $tries = 1; // Don't retry the dispatcher itself
@@ -37,8 +37,8 @@ class ProcessTaskPipelineJob implements ShouldQueue
         }
 
         // Filter out already-executed tasks (unless force)
-        if (!$this->force) {
-            $tasks = $tasks->reject(function($task) {
+        if (! $this->force) {
+            $tasks = $tasks->reject(function ($task) {
                 return $this->wasSuccessfullyExecuted($task);
             });
         }
@@ -69,8 +69,9 @@ class ProcessTaskPipelineJob implements ShouldQueue
     protected function dispatchTask(TaskDefinition $task): void
     {
         // Check if applicable
-        if (!$task->isApplicableTo($this->model)) {
+        if (! $task->isApplicableTo($this->model)) {
             $this->markNotApplicable($task);
+
             return;
         }
 

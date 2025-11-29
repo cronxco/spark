@@ -22,6 +22,7 @@ trait InteractsWithTaskMetadata
     {
         $field = $this->getMetadataField($model);
         $metadata = $model->$field ?? [];
+
         return $metadata['task_executions'] ?? [];
     }
 
@@ -34,7 +35,7 @@ trait InteractsWithTaskMetadata
         $metadata = $model->$field ?? [];
         $metadata['task_executions'] = $executions;
 
-        $model->withoutEvents(function() use ($model, $field, $metadata) {
+        $model->withoutEvents(function () use ($model, $field, $metadata) {
             $model->update([$field => $metadata]);
         });
     }

@@ -54,7 +54,7 @@ class CalculateMetricStatsTask extends BaseTaskJob
      */
     protected function calculateStdDev($values, $mean): float
     {
-        $variance = $values->map(function($value) use ($mean) {
+        $variance = $values->map(function ($value) use ($mean) {
             return pow($value - $mean, 2);
         })->avg();
 

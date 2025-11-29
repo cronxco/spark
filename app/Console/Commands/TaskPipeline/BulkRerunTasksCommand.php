@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Console\Command;
 
 class BulkRerunTasksCommand extends Command
@@ -43,8 +44,9 @@ class BulkRerunTasksCommand extends Command
         $modelClass = $this->getModelClass($this->argument('model'));
         $taskKey = $this->argument('task');
 
-        if (!$modelClass) {
+        if (! $modelClass) {
             $this->error('Invalid model type. Must be one of: event, block, object, integration');
+
             return Command::FAILURE;
         }
 
@@ -66,8 +68,9 @@ class BulkRerunTasksCommand extends Command
         if ($since = $this->option('since')) {
             try {
                 $query->where('created_at', '>=', Carbon::parse($since));
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->error('Invalid date format for --since option');
+
                 return Command::FAILURE;
             }
         }
@@ -80,6 +83,7 @@ class BulkRerunTasksCommand extends Command
 
         if ($count === 0) {
             $this->warn('No items match the specified filters');
+
             return Command::SUCCESS;
         }
 
@@ -87,11 +91,13 @@ class BulkRerunTasksCommand extends Command
 
         if ($this->option('dry-run')) {
             $this->comment("DRY RUN: Would re-run task '{$taskKey}' for {$count} items");
+
             return Command::SUCCESS;
         }
 
-        if (!$this->confirm("Re-run task '{$taskKey}' for {$count} items?", true)) {
+        if (! $this->confirm("Re-run task '{$taskKey}' for {$count} items?", true)) {
             $this->comment('Operation cancelled');
+
             return Command::SUCCESS;
         }
 
@@ -100,7 +106,7 @@ class BulkRerunTasksCommand extends Command
 
         $dispatched = 0;
 
-        $query->chunk(100, function($items) use ($bar, $taskKey, &$dispatched) {
+        $query->chunk(100, function ($items) use ($bar, $taskKey, &$dispatched) {
             foreach ($items as $item) {
                 ProcessTaskPipelineJob::dispatch(
                     model: $item,
@@ -126,7 +132,7 @@ class BulkRerunTasksCommand extends Command
      */
     protected function getModelClass(string $type): ?string
     {
-        return match($type) {
+        return match ($type) {
             'event' => Event::class,
             'block' => Block::class,
             'object' => EventObject::class,

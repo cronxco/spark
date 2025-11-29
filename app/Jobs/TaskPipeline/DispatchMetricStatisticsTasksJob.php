@@ -33,7 +33,7 @@ class DispatchMetricStatisticsTasksJob implements ShouldQueue
             ->whereNotNull('value')
             ->whereNotNull('value_unit')
             ->where('time', '>=', now()->subDay())
-            ->chunk(100, function($events) use (&$count) {
+            ->chunk(100, function ($events) use (&$count) {
                 foreach ($events as $event) {
                     // Dispatch task pipeline with just the stats calculation task
                     ProcessTaskPipelineJob::dispatch(

@@ -2,9 +2,9 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use App\Services\TaskPipeline\TaskRegistry;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskRegistry;
+use Illuminate\Support\ServiceProvider;
 
 class TaskPipelineServiceProvider extends ServiceProvider
 {
@@ -43,7 +43,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             priority: 100,
             runOnCreate: true,
             runOnUpdate: true,
-            shouldRun: fn() => config('services.openai.api_key') !== null,
+            shouldRun: fn () => config('services.openai.api_key') !== null,
         ));
 
         // Metric Statistics - calculates baseline stats for metrics
@@ -59,7 +59,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             priority: 90,
             runOnCreate: false, // Only scheduled
             runOnUpdate: false,
-            shouldRun: function($model) {
+            shouldRun: function ($model) {
                 return $model->value !== null && $model->value_unit !== null;
             },
         ));
@@ -77,14 +77,14 @@ class TaskPipelineServiceProvider extends ServiceProvider
             priority: 80,
             runOnCreate: true,
             runOnUpdate: false,
-            shouldRun: function($model) {
-                if (!$model->value || !$model->value_unit) {
+            shouldRun: function ($model) {
+                if (! $model->value || ! $model->value_unit) {
                     return false;
                 }
 
                 // Only run if integration has real-time anomaly detection enabled
                 $integration = $model->integration;
-                if (!$integration) {
+                if (! $integration) {
                     return false;
                 }
 
@@ -107,7 +107,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             priority: 70,
             runOnCreate: false, // Only scheduled
             runOnUpdate: false,
-            shouldRun: function($model) {
+            shouldRun: function ($model) {
                 return $model->value !== null && $model->value_unit !== null;
             },
         ));
@@ -146,7 +146,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             priority: 60,
             runOnCreate: true,
             runOnUpdate: false,
-            shouldRun: function($model) {
+            shouldRun: function ($model) {
                 // Only run for payment-related actions
                 $paymentActions = [
                     'had_card_payment',
@@ -186,7 +186,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
         // Scan app/Integrations directory for plugin classes
         $integrationPath = app_path('Integrations');
 
-        if (!is_dir($integrationPath)) {
+        if (! is_dir($integrationPath)) {
             return;
         }
 
@@ -209,7 +209,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             );
 
             // Check if class exists and implements SupportsTaskPipeline
-            if (!class_exists($className)) {
+            if (! class_exists($className)) {
                 continue;
             }
 
