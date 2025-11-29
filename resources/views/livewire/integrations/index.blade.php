@@ -464,6 +464,19 @@ new class extends Component {
                                 {{ __('Add Another') }}
                             </button>
                         </form>
+                        @elseif ($plugin['identifier'] === 'google-calendar')
+                        <!-- Google Calendar: Direct to onboarding to add another calendar -->
+                        <a href="{{ route('integrations.onboarding', ['group' => $group['id']]) }}"
+                            class="btn btn-outline btn-sm w-full">
+                            <x-icon name="fas.plus" class="w-4 h-4" />
+                            {{ __('Add Another Calendar') }}
+                        </a>
+                        <!-- Re-authenticate option for Google Calendar -->
+                        <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
+                            class="btn btn-ghost btn-sm w-full text-xs">
+                            <x-icon name="fas.rotate" class="w-3 h-3" />
+                            {{ __('Re-authenticate') }}
+                        </a>
                         @else
                         <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
                             class="btn btn-outline btn-sm w-full">
