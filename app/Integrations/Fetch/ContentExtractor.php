@@ -190,14 +190,37 @@ class ContentExtractor
 
         // Content truncation detection - if extracted text is suspiciously short
         // compared to what we'd expect from a full article
-        // Only flag if content is VERY short (< 150 chars) and has article structure
-        // This helps catch paywalls that show only a brief teaser
+        // Only flag if:
+        // 1. Content is relatively short (< 300 chars)
+        // 2. AND we detect soft paywall language (but not explicit paywall classes)
+        // 3. AND page has article structure
+        // This catches paywalls that show teasers without explicit paywall divs
         $contentTruncated = false;
-        if ($textContent !== null && strlen($textContent) < 150) {
-            // Check if HTML has more content indicators that suggest a full article
-            // but the extracted content is very short (likely truncated by paywall)
+        if ($textContent !== null && strlen($textContent) < 300 && empty($detectedIndicators)) {
+            // Check for article structure
             $hasArticleStructure = preg_match('/<article|<main|class="article|class="post|class="entry/i', $html);
-            if ($hasArticleStructure) {
+
+            // Check for soft paywall language that suggests truncation
+            $softPaywallPhrases = [
+                'to continue reading',
+                'continue reading this',
+                'read the full',
+                'sign in to read',
+                'register to continue',
+                'log in to read',
+                'this story continues',
+            ];
+
+            $hasSoftPaywallLanguage = false;
+            foreach ($softPaywallPhrases as $phrase) {
+                if (str_contains($lowerHtml, $phrase)) {
+                    $hasSoftPaywallLanguage = true;
+                    break;
+                }
+            }
+
+            // Only flag as truncated if we have both signals
+            if ($hasArticleStructure && $hasSoftPaywallLanguage) {
                 $contentTruncated = true;
                 $paywallType = $paywallType ?? 'truncated';
             }
