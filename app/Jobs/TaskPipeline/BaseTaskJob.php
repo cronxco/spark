@@ -2,6 +2,7 @@
 
 namespace App\Jobs\TaskPipeline;
 
+use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 abstract class BaseTaskJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, InteractsWithTaskMetadata;
 
     public $timeout = 120;
     public $tries = 3;
@@ -78,8 +79,7 @@ abstract class BaseTaskJob implements ShouldQueue
      */
     protected function updateStatus(string $status, array $additionalData = []): void
     {
-        $metadata = $this->model->metadata ?? [];
-        $executions = $metadata['task_executions'] ?? [];
+        $executions = $this->getTaskExecutions($this->model);
 
         $executionData = array_merge([
             'status' => $status,
@@ -96,12 +96,7 @@ abstract class BaseTaskJob implements ShouldQueue
             $executions[$this->task->key]['last_success'] = $executionData;
         }
 
-        $metadata['task_executions'] = $executions;
-
-        // Update without triggering observers
-        $this->model->withoutEvents(function() use ($metadata) {
-            $this->model->update(['metadata' => $metadata]);
-        });
+        $this->setTaskExecutions($this->model, $executions);
     }
 
     /**

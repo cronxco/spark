@@ -44,6 +44,7 @@ class Block extends Model implements HasMedia
         'value',
         'value_multiplier',
         'value_unit',
+        'metadata',
         'embeddings',
     ];
 
