@@ -2,6 +2,7 @@
 
 namespace App\Jobs\TaskPipeline;
 
+use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Queueable;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class ProcessTaskPipelineJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, InteractsWithTaskMetadata;
 
     public $timeout = 300;
     public $tries = 1; // Don't retry the dispatcher itself
@@ -56,7 +57,7 @@ class ProcessTaskPipelineJob implements ShouldQueue
      */
     protected function wasSuccessfullyExecuted(TaskDefinition $task): bool
     {
-        $executions = $this->model->metadata['task_executions'] ?? [];
+        $executions = $this->getTaskExecutions($this->model);
         $lastAttempt = $executions[$task->key]['last_attempt'] ?? null;
 
         return $lastAttempt && $lastAttempt['status'] === 'success';
@@ -89,19 +90,13 @@ class ProcessTaskPipelineJob implements ShouldQueue
      */
     protected function updateTaskStatus(TaskDefinition $task, string $status, array $data): void
     {
-        $metadata = $this->model->metadata ?? [];
-        $executions = $metadata['task_executions'] ?? [];
+        $executions = $this->getTaskExecutions($this->model);
 
         $executions[$task->key]['last_attempt'] = array_merge($data, [
             'status' => $status,
         ]);
 
-        $metadata['task_executions'] = $executions;
-
-        // Update without triggering observers
-        $this->model->withoutEvents(function() use ($metadata) {
-            $this->model->update(['metadata' => $metadata]);
-        });
+        $this->setTaskExecutions($this->model, $executions);
     }
 
     /**
