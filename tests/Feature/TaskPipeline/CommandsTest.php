@@ -107,6 +107,9 @@ class CommandsTest extends TestCase
      */
     public function bulk_rerun_command_dry_run_mode(): void
     {
+        // Create a test event so the command has something to find
+        \App\Models\Event::factory()->create();
+
         $this->artisan('task-pipeline:bulk-rerun test_task event --dry-run')
             ->expectsOutputToContain('DRY RUN')
             ->assertExitCode(0);
