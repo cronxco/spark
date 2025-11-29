@@ -17,7 +17,10 @@ class TaskRegistryTest extends TestCase
         TaskRegistry::clear();
     }
 
-    public function test_can_register_task(): void
+    /**
+     * @test
+     */
+    public function can_register_task(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -33,7 +36,10 @@ class TaskRegistryTest extends TestCase
         $this->assertEquals('test_task', TaskRegistry::getTask('test_task')->key);
     }
 
-    public function test_can_get_all_tasks(): void
+    /**
+     * @test
+     */
+    public function can_get_all_tasks(): void
     {
         $task1 = new TaskDefinition(
             key: 'task1',
@@ -61,7 +67,10 @@ class TaskRegistryTest extends TestCase
         $this->assertArrayHasKey('task2', $all);
     }
 
-    public function test_can_get_tasks_for_model(): void
+    /**
+     * @test
+     */
+    public function can_get_tasks_for_model(): void
     {
         $task1 = new TaskDefinition(
             key: 'event_task',
@@ -84,14 +93,17 @@ class TaskRegistryTest extends TestCase
         TaskRegistry::register($task1);
         TaskRegistry::register($task2);
 
-        $event = new Event();
+        $event = new Event;
         $tasks = TaskRegistry::getTasksForModel($event, 'created');
 
         $this->assertCount(1, $tasks);
         $this->assertEquals('event_task', $tasks->first()->key);
     }
 
-    public function test_filters_tasks_by_trigger(): void
+    /**
+     * @test
+     */
+    public function filters_tasks_by_trigger(): void
     {
         $task = new TaskDefinition(
             key: 'update_only',
@@ -105,7 +117,7 @@ class TaskRegistryTest extends TestCase
 
         TaskRegistry::register($task);
 
-        $event = new Event();
+        $event = new Event;
 
         $createTasks = TaskRegistry::getTasksForModel($event, 'created');
         $this->assertCount(0, $createTasks);
@@ -114,7 +126,10 @@ class TaskRegistryTest extends TestCase
         $this->assertCount(1, $updateTasks);
     }
 
-    public function test_resolves_execution_order_with_dependencies(): void
+    /**
+     * @test
+     */
+    public function resolves_execution_order_with_dependencies(): void
     {
         $task1 = new TaskDefinition(
             key: 'task1',
@@ -154,7 +169,10 @@ class TaskRegistryTest extends TestCase
         $this->assertEquals(['task1', 'task2', 'task3'], $keys);
     }
 
-    public function test_detects_circular_dependencies(): void
+    /**
+     * @test
+     */
+    public function detects_circular_dependencies(): void
     {
         $task1 = new TaskDefinition(
             key: 'task1',
@@ -180,7 +198,10 @@ class TaskRegistryTest extends TestCase
         TaskRegistry::resolveExecutionOrder($tasks);
     }
 
-    public function test_clears_registry(): void
+    /**
+     * @test
+     */
+    public function clears_registry(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',

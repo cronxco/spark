@@ -77,7 +77,7 @@ new class extends Component {
         <flux:heading size="lg">Task Executions</flux:heading>
 
         <div class="flex gap-2 items-center">
-            @if($hiddenCount > 0)
+            @if ($hiddenCount > 0)
                 <flux:badge color="zinc" size="sm">
                     {{ $hiddenCount }} hidden
                 </flux:badge>
@@ -91,14 +91,14 @@ new class extends Component {
         </div>
     </div>
 
-    @if(session('message'))
+    @if (session('message'))
         <flux:banner variant="success">
             {{ session('message') }}
         </flux:banner>
     @endif
 
     <div class="space-y-3">
-        @forelse($allTasks as $task)
+        @forelse ($allTasks as $task)
             @php
             $execution = $executions[$task->key] ?? null;
             $lastAttempt = $execution['last_attempt'] ?? null;
@@ -112,23 +112,23 @@ new class extends Component {
                         <div class="flex items-center gap-2">
                             <flux:heading size="sm">{{ $task->name }}</flux:heading>
 
-                            @if($status === 'success')
+                            @if ($status === 'success')
                                 <flux:badge color="green" size="sm" icon="check-circle">
                                     Success
                                 </flux:badge>
-                            @elseif($status === 'failed')
+                            @elseif ($status === 'failed')
                                 <flux:badge color="red" size="sm" icon="x-circle">
                                     Failed
                                 </flux:badge>
-                            @elseif($status === 'running')
+                            @elseif ($status === 'running')
                                 <flux:badge color="amber" size="sm" icon="arrow-path">
                                     Running
                                 </flux:badge>
-                            @elseif($status === 'pending')
+                            @elseif ($status === 'pending')
                                 <flux:badge color="blue" size="sm" icon="clock">
                                     Pending
                                 </flux:badge>
-                            @elseif($status === 'not_applicable')
+                            @elseif ($status === 'not_applicable')
                                 <flux:badge color="zinc" size="sm" icon="minus-circle">
                                     Not Applicable
                                 </flux:badge>
@@ -141,17 +141,17 @@ new class extends Component {
 
                         <flux:subheading>{{ $task->description }}</flux:subheading>
 
-                        @if($lastAttempt)
+                        @if ($lastAttempt)
                             <div class="text-xs text-zinc-500 dark:text-zinc-400 space-y-1">
                                 <div class="flex items-center gap-4">
                                     <span>Last run: {{ \Carbon\Carbon::parse($lastAttempt['started_at'])->diffForHumans() }}</span>
-                                    @if(isset($lastAttempt['attempts']) && $lastAttempt['attempts'] > 1)
+                                    @if (isset($lastAttempt['attempts']) && $lastAttempt['attempts'] > 1)
                                         <span>Attempts: {{ $lastAttempt['attempts'] }}</span>
                                     @endif
                                     <span>Trigger: {{ $lastAttempt['triggered_by'] ?? 'unknown' }}</span>
                                 </div>
 
-                                @if($status === 'failed' && isset($lastAttempt['error']))
+                                @if ($status === 'failed' && isset($lastAttempt['error']))
                                     <flux:banner variant="danger" size="sm">
                                         {{ $lastAttempt['error'] }}
                                     </flux:banner>
@@ -159,7 +159,7 @@ new class extends Component {
                             </div>
                         @endif
 
-                        @if(!empty($task->dependencies))
+                        @if (!empty($task->dependencies))
                             <div class="text-xs text-zinc-400">
                                 Depends on: {{ collect($task->dependencies)->map(fn($key) => TaskRegistry::getTask($key)?->name ?? $key)->join(', ') }}
                             </div>

@@ -112,7 +112,7 @@ new class extends Component {
         </flux:button>
     </div>
 
-    @if(session('message'))
+    @if (session('message'))
         <flux:banner variant="success">
             {{ session('message') }}
         </flux:banner>
@@ -166,7 +166,7 @@ new class extends Component {
             </flux:columns>
 
             <flux:rows>
-                @foreach($tasks as $task)
+                @foreach ($tasks as $task)
                     <flux:row>
                         <flux:cell>
                             <div>
@@ -177,14 +177,14 @@ new class extends Component {
 
                         <flux:cell>
                             <div class="flex flex-wrap gap-1">
-                                @foreach($task->appliesTo as $type)
+                                @foreach ($task->appliesTo as $type)
                                     <flux:badge size="sm">{{ $type }}</flux:badge>
                                 @endforeach
                             </div>
                         </flux:cell>
 
                         <flux:cell>
-                            @if(!empty($task->dependencies))
+                            @if (!empty($task->dependencies))
                                 <div class="text-xs">{{ count($task->dependencies) }} dependencies</div>
                             @else
                                 <span class="text-zinc-400">None</span>
@@ -192,7 +192,7 @@ new class extends Component {
                         </flux:cell>
 
                         <flux:cell>
-                            @if($task->registeredBy)
+                            @if ($task->registeredBy)
                                 <flux:badge variant="outline" size="sm">Plugin</flux:badge>
                             @else
                                 <span class="text-zinc-500">Core</span>
@@ -205,7 +205,7 @@ new class extends Component {
     </flux:card>
 
     {{-- Recent Failures --}}
-    @if(!empty($recentFailures))
+    @if (!empty($recentFailures))
         <flux:card>
             <flux:heading size="lg">Recent Failures</flux:heading>
 
@@ -219,7 +219,7 @@ new class extends Component {
                 </flux:columns>
 
                 <flux:rows>
-                    @foreach($recentFailures as $failure)
+                    @foreach ($recentFailures as $failure)
                         <flux:row>
                             <flux:cell>{{ $failure['task_name'] }}</flux:cell>
 

@@ -47,8 +47,8 @@ class TaskRegistry
     public static function getTasksForModel(Model $model, string $trigger = 'created'): Collection
     {
         return collect(static::$tasks)
-            ->filter(fn(TaskDefinition $task) => $task->isApplicableTo($model))
-            ->filter(function(TaskDefinition $task) use ($trigger) {
+            ->filter(fn (TaskDefinition $task) => $task->isApplicableTo($model))
+            ->filter(function (TaskDefinition $task) use ($trigger) {
                 return ($trigger === 'created' && $task->runOnCreate)
                     || ($trigger === 'updated' && $task->runOnUpdate)
                     || $trigger === 'manual'
@@ -70,10 +70,10 @@ class TaskRegistry
 
         while ($remaining->isNotEmpty()) {
             // Find tasks whose dependencies are all satisfied
-            $resolved = $remaining->filter(function($task) use ($ordered) {
+            $resolved = $remaining->filter(function ($task) use ($ordered) {
                 // All dependencies already in ordered list?
                 return collect($task->dependencies)
-                    ->every(fn($dep) => $ordered->has($dep));
+                    ->every(fn ($dep) => $ordered->has($dep));
             });
 
             if ($resolved->isEmpty() && $remaining->isNotEmpty()) {

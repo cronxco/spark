@@ -2,12 +2,12 @@
 
 namespace App\Services\TaskPipeline;
 
-use Closure;
-use Illuminate\Database\Eloquent\Model;
-use App\Models\Event;
 use App\Models\Block;
+use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use Closure;
+use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
 class TaskDefinition
@@ -34,7 +34,7 @@ class TaskDefinition
     public function isApplicableTo(Model $model): bool
     {
         // Check model type
-        if (!in_array($this->getModelType($model), $this->appliesTo)) {
+        if (! in_array($this->getModelType($model), $this->appliesTo)) {
             return false;
         }
 
@@ -42,19 +42,19 @@ class TaskDefinition
         foreach ($this->conditions as $field => $value) {
             // Handle array of allowed values
             if (is_array($value)) {
-                if (!in_array($model->$field, $value)) {
+                if (! in_array($model->$field, $value)) {
                     return false;
                 }
             } else {
                 // Single value match
-                if ($model->$field !== $value) {
+                if ($value !== $model->$field) {
                     return false;
                 }
             }
         }
 
         // Check custom condition callback
-        if ($this->shouldRun && !($this->shouldRun)($model)) {
+        if ($this->shouldRun && ! ($this->shouldRun)($model)) {
             return false;
         }
 

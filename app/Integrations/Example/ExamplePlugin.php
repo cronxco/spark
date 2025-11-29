@@ -54,9 +54,9 @@ class ExamplePlugin implements SupportsTaskPipeline
                 priority: 40,
                 runOnCreate: false,
                 runOnUpdate: true,
-                shouldRun: function($model) {
+                shouldRun: function ($model) {
                     // Only run if model has sufficient data
-                    return !empty($model->content) && strlen($model->content) > 100;
+                    return ! empty($model->content) && strlen($model->content) > 100;
                 },
             ),
         ];

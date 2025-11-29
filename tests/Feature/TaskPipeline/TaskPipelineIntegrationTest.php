@@ -22,7 +22,10 @@ class TaskPipelineIntegrationTest extends TestCase
         TaskRegistry::clear();
     }
 
-    public function test_dispatches_applicable_tasks_on_event_creation(): void
+    /**
+     * @test
+     */
+    public function dispatches_applicable_tasks_on_event_creation(): void
     {
         Queue::fake();
 
@@ -51,13 +54,19 @@ class TaskPipelineIntegrationTest extends TestCase
         Queue::assertPushed(ProcessTaskPipelineJob::class);
     }
 
-    public function test_marks_task_as_not_applicable_when_conditions_not_met(): void
+    /**
+     * @test
+     */
+    public function marks_task_as_not_applicable_when_conditions_not_met(): void
     {
         // This would need database setup, so marking as example
         $this->markTestSkipped('Requires database setup with migrations');
     }
 
-    public function test_respects_task_dependencies(): void
+    /**
+     * @test
+     */
+    public function respects_task_dependencies(): void
     {
         TaskRegistry::clear();
 
@@ -82,7 +91,7 @@ class TaskPipelineIntegrationTest extends TestCase
         TaskRegistry::register($task1);
         TaskRegistry::register($task2);
 
-        $event = new Event();
+        $event = new Event;
         $tasks = TaskRegistry::getTasksForModel($event, 'created');
 
         $ordered = TaskRegistry::resolveExecutionOrder($tasks);
@@ -91,7 +100,10 @@ class TaskPipelineIntegrationTest extends TestCase
         $this->assertEquals('task2', $ordered->last()->key);
     }
 
-    public function test_filters_tasks_by_service_condition(): void
+    /**
+     * @test
+     */
+    public function filters_tasks_by_service_condition(): void
     {
         TaskRegistry::clear();
 

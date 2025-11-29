@@ -33,15 +33,16 @@ class ListTasksCommand extends Command
 
         // Apply filters
         if ($plugin = $this->option('plugin')) {
-            $tasks = $tasks->filter(fn($task) => $task->registeredBy === $plugin);
+            $tasks = $tasks->filter(fn ($task) => $task->registeredBy === $plugin);
         }
 
         if ($appliesTo = $this->option('applies-to')) {
-            $tasks = $tasks->filter(fn($task) => in_array($appliesTo, $task->appliesTo));
+            $tasks = $tasks->filter(fn ($task) => in_array($appliesTo, $task->appliesTo));
         }
 
         if ($tasks->isEmpty()) {
             $this->warn('No tasks found matching the specified filters');
+
             return Command::SUCCESS;
         }
 
@@ -64,7 +65,7 @@ class ListTasksCommand extends Command
 
         $this->table(
             ['Key', 'Name', 'Applies To', 'Dependencies', 'Priority', 'Queue', 'Source'],
-            $tasks->sortByDesc('priority')->map(fn($task) => [
+            $tasks->sortByDesc('priority')->map(fn ($task) => [
                 $task->key,
                 $task->name,
                 implode(', ', $task->appliesTo),
@@ -77,8 +78,8 @@ class ListTasksCommand extends Command
 
         $this->newLine();
         $this->info('Total: ' . $tasks->count() . ' tasks');
-        $this->comment('Core: ' . $tasks->filter(fn($t) => !$t->registeredBy)->count());
-        $this->comment('Plugin: ' . $tasks->filter(fn($t) => $t->registeredBy)->count());
+        $this->comment('Core: ' . $tasks->filter(fn ($t) => ! $t->registeredBy)->count());
+        $this->comment('Plugin: ' . $tasks->filter(fn ($t) => $t->registeredBy)->count());
     }
 
     /**
@@ -86,7 +87,7 @@ class ListTasksCommand extends Command
      */
     protected function outputJson($tasks): void
     {
-        $output = $tasks->map(fn($task) => [
+        $output = $tasks->map(fn ($task) => [
             'key' => $task->key,
             'name' => $task->name,
             'description' => $task->description,

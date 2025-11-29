@@ -3,8 +3,8 @@
 namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
-use App\Models\Event;
 use App\Models\Block;
+use App\Models\Event;
 use App\Models\EventObject;
 
 class GenerateEmbeddingTask extends BaseTaskJob

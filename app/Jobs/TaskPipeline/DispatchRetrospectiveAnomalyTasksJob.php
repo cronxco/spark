@@ -38,7 +38,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                 now()->subDay()->startOfDay(),
                 now()->subDay()->endOfDay(),
             ])
-            ->chunk(100, function($events) use (&$count) {
+            ->chunk(100, function ($events) use (&$count) {
                 foreach ($events as $event) {
                     // Check if anomaly detection has already been run successfully
                     $executions = $event->metadata['task_executions'] ?? [];

@@ -68,6 +68,7 @@ class PopulateInitialTaskExecutionState extends Command
         if ($total === 0) {
             $this->comment("No {$modelName} records found.");
             $this->newLine();
+
             return;
         }
 
@@ -77,7 +78,7 @@ class PopulateInitialTaskExecutionState extends Command
         $processed = 0;
         $skipped = 0;
 
-        $query->chunk(100, function($items) use ($bar, $modelName, &$processed, &$skipped) {
+        $query->chunk(100, function ($items) use ($bar, $modelName, &$processed, &$skipped) {
             foreach ($items as $item) {
                 $result = $this->populateTaskExecutions($item, $modelName);
 
@@ -106,7 +107,7 @@ class PopulateInitialTaskExecutionState extends Command
         // Check if already has task executions
         $existingExecutions = $this->getTaskExecutions($model);
 
-        if (!empty($existingExecutions)) {
+        if (! empty($existingExecutions)) {
             return false; // Skip - already populated
         }
 
@@ -133,7 +134,8 @@ class PopulateInitialTaskExecutionState extends Command
         }
 
         if ($this->option('dry-run')) {
-            $this->line("  Would update {$modelType} #{$model->id} with " . count($executions) . " task executions");
+            $this->line("  Would update {$modelType} #{$model->id} with " . count($executions) . ' task executions');
+
             return true;
         }
 
@@ -191,7 +193,7 @@ class PopulateInitialTaskExecutionState extends Command
         ];
 
         if ($modelOption) {
-            return array_filter($all, fn($name) => $name === $modelOption);
+            return array_filter($all, fn ($name) => $name === $modelOption);
         }
 
         return $all;

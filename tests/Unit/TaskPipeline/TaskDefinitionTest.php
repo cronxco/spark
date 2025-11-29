@@ -11,7 +11,10 @@ use Tests\TestCase;
 
 class TaskDefinitionTest extends TestCase
 {
-    public function test_is_applicable_to_correct_model_type(): void
+    /**
+     * @test
+     */
+    public function is_applicable_to_correct_model_type(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -21,16 +24,19 @@ class TaskDefinitionTest extends TestCase
             appliesTo: ['event', 'block'],
         );
 
-        $event = new Event();
-        $block = new Block();
-        $object = new EventObject();
+        $event = new Event;
+        $block = new Block;
+        $object = new EventObject;
 
         $this->assertTrue($task->isApplicableTo($event));
         $this->assertTrue($task->isApplicableTo($block));
         $this->assertFalse($task->isApplicableTo($object));
     }
 
-    public function test_checks_single_condition(): void
+    /**
+     * @test
+     */
+    public function checks_single_condition(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -50,7 +56,10 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event2));
     }
 
-    public function test_checks_array_condition(): void
+    /**
+     * @test
+     */
+    public function checks_array_condition(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -72,7 +81,10 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event3));
     }
 
-    public function test_checks_multiple_conditions(): void
+    /**
+     * @test
+     */
+    public function checks_multiple_conditions(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -95,7 +107,10 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event3));
     }
 
-    public function test_checks_custom_should_run_callback(): void
+    /**
+     * @test
+     */
+    public function checks_custom_should_run_callback(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -103,7 +118,7 @@ class TaskDefinitionTest extends TestCase
             description: 'A test task',
             jobClass: GenerateEmbeddingTask::class,
             appliesTo: ['event'],
-            shouldRun: fn($model) => $model->value > 100,
+            shouldRun: fn ($model) => $model->value > 100,
         );
 
         $event1 = new Event(['value' => 150]);
@@ -113,7 +128,10 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event2));
     }
 
-    public function test_combines_conditions_and_callback(): void
+    /**
+     * @test
+     */
+    public function combines_conditions_and_callback(): void
     {
         $task = new TaskDefinition(
             key: 'test_task',
@@ -124,7 +142,7 @@ class TaskDefinitionTest extends TestCase
             conditions: [
                 'service' => 'monzo',
             ],
-            shouldRun: fn($model) => $model->value > 100,
+            shouldRun: fn ($model) => $model->value > 100,
         );
 
         $event1 = new Event(['service' => 'monzo', 'value' => 150]);
