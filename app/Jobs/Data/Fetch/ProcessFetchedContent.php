@@ -78,6 +78,9 @@ class ProcessFetchedContent implements ShouldQueue
             $sourceEventId = $isLinkable ? ($metadata['discovered_from_event_id'] ?? null) : null;
             $sourceIsObject = $metadata['source_is_object'] ?? false;
 
+            // Get fetch mode (used for determining one-time vs recurring behavior)
+            $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
+
             // Only create daily fetch event for non-linkable URLs (manual subscriptions)
             $event = null;
             if (! $isLinkable) {
@@ -96,7 +99,6 @@ class ProcessFetchedContent implements ShouldQueue
                 );
 
                 // Create or update today's Event
-                $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
                 $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
                 if ($fetchMode === 'once') {
                     $action = 'bookmarked';
