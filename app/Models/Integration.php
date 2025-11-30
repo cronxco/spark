@@ -467,6 +467,25 @@ class Integration extends Model
         return $triggerIsRecent && $triggerAfterLastSuccess;
     }
 
+    /**
+     * Get the anomaly detection mode for this integration
+     * Returns one of: 'realtime', 'retrospective', 'disabled', or null if not configured
+     */
+    public function getAnomalyDetectionMode(): ?string
+    {
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        if (! $pluginClass) {
+            return null;
+        }
+
+        $instanceTypes = $pluginClass::getInstanceTypes();
+        if (! isset($instanceTypes[$this->instance_type]['anomaly_detection_mode'])) {
+            return null;
+        }
+
+        return $instanceTypes[$this->instance_type]['anomaly_detection_mode'];
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

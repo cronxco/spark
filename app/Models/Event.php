@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Integrations\PluginRegistry;
 use App\Jobs\Metrics\DetectMetricAnomaliesJob;
 use App\Traits\TracksViews;
 use ArrayAccess;
@@ -74,20 +73,12 @@ class Event extends Model
             $shouldRunRealtime = true;
 
             if ($model->integration) {
-                $plugin = PluginRegistry::getPlugin($model->service);
-                if ($plugin) {
-                    $instanceTypes = $plugin::getInstanceTypes();
-                    $instanceType = $model->integration->instance_type;
-
-                    if (isset($instanceTypes[$instanceType]['anomaly_detection_mode'])) {
-                        $mode = $instanceTypes[$instanceType]['anomaly_detection_mode'];
-                        // Only dispatch for realtime mode, skip for retrospective and disabled
-                        $shouldRunRealtime = $mode === 'realtime';
-                    }
-                }
+                $mode = $model->integration->getAnomalyDetectionMode();
+                // Only dispatch for realtime mode (default if not configured), skip for retrospective and disabled
+                $shouldRunRealtime = $mode === 'realtime' || $mode === null;
             }
 
-            // Dispatch anomaly detection job only if mode is realtime
+            // Dispatch anomaly detection job only if mode is realtime (or not configured)
             if ($shouldRunRealtime) {
                 DetectMetricAnomaliesJob::dispatch($model);
             }
