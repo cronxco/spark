@@ -19,6 +19,8 @@ class Show extends Component
 
     public bool $showDeleteConfirm = false;
 
+    public bool $showInstancesModal = false;
+
     // Sidebar collapse states
     public bool $detailsOpen = true;
 
@@ -128,6 +130,41 @@ class Show extends Component
         }
     }
 
+    public function openInstancesModal(): void
+    {
+        $this->showInstancesModal = true;
+    }
+
+    public function closeInstancesModal(): void
+    {
+        $this->showInstancesModal = false;
+    }
+
+    /**
+     * Get all instances of this media (same MD5 hash)
+     */
+    public function getAllInstances()
+    {
+        $md5Hash = $this->media->getCustomProperty('md5_hash');
+
+        if (! $md5Hash) {
+            return collect();
+        }
+
+        return Media::where('custom_properties->md5_hash', $md5Hash)
+            ->with(['model'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get count of all instances
+     */
+    public function getInstancesCount(): int
+    {
+        return $this->getAllInstances()->count();
+    }
+
     /**
      * Check if we're using S3 storage
      */
@@ -181,6 +218,8 @@ class Show extends Component
             'conversions' => $this->getConversions(),
             'mediaUrl' => $this->getMediaUrl(),
             'isS3' => $this->isS3(),
+            'allInstances' => $this->getAllInstances(),
+            'instancesCount' => $this->getInstancesCount(),
         ]);
     }
 }

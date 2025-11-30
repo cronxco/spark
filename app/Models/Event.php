@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Jobs\Metrics\DetectMetricAnomaliesJob;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Traits\TracksViews;
 use ArrayAccess;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -69,19 +69,9 @@ class Event extends Model
         });
 
         static::created(function ($model): void {
-            // Check if anomaly detection should run in realtime for this integration
-            $shouldRunRealtime = true;
-
-            if ($model->integration) {
-                $mode = $model->integration->getAnomalyDetectionMode();
-                // Only dispatch for realtime mode (default if not configured), skip for retrospective and disabled
-                $shouldRunRealtime = $mode === 'realtime' || $mode === null;
-            }
-
-            // Dispatch anomaly detection job only if mode is realtime (or not configured)
-            if ($shouldRunRealtime) {
-                DetectMetricAnomaliesJob::dispatch($model);
-            }
+            // Dispatch Task Pipeline to run applicable tasks
+            // This includes: embedding generation, anomaly detection, receipt matching, etc.
+            ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
         });
 
         static::deleted(function ($model): void {

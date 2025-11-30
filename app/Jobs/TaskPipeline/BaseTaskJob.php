@@ -39,8 +39,8 @@ abstract class BaseTaskJob implements ShouldQueue
         } catch (Exception $e) {
             // Report to Sentry with comprehensive context
             if (app()->bound('sentry')) {
-                app('sentry')->captureException($e, [
-                    'extra' => [
+                \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($e) {
+                    $scope->setContext('task', [
                         'task_key' => $this->task->key,
                         'task_name' => $this->task->name,
                         'model_type' => get_class($this->model),
@@ -50,13 +50,14 @@ abstract class BaseTaskJob implements ShouldQueue
                         'max_tries' => $this->tries,
                         'task_conditions' => $this->task->conditions,
                         'model_attributes' => $this->getModelAttributes(),
-                    ],
-                    'tags' => [
-                        'task' => $this->task->key,
-                        'model' => class_basename($this->model),
-                        'queue' => $this->task->queue,
-                    ],
-                ]);
+                    ]);
+
+                    $scope->setTag('task', $this->task->key);
+                    $scope->setTag('model', class_basename($this->model));
+                    $scope->setTag('queue', $this->task->queue);
+
+                    \Sentry\captureException($e);
+                });
             }
 
             $this->updateStatus('failed', [
