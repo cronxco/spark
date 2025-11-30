@@ -5,6 +5,8 @@ namespace Tests\Feature\TaskPipeline;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Jobs\TaskPipeline\Tasks\GenerateEmbeddingTask;
 use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
@@ -57,10 +59,68 @@ class TaskPipelineIntegrationTest extends TestCase
     /**
      * @test
      */
-    public function marks_task_as_not_applicable_when_conditions_not_met(): void
+    public function does_not_dispatch_tasks_when_conditions_not_met(): void
     {
-        // This would need database setup, so marking as example
-        $this->markTestSkipped('Requires database setup with migrations');
+        Queue::fake();
+
+        // Register two tasks: one for Monzo only, one for all events
+        TaskRegistry::register(new TaskDefinition(
+            key: 'monzo_only_task',
+            name: 'Monzo Only Task',
+            description: 'Task that only runs for Monzo',
+            jobClass: GenerateEmbeddingTask::class,
+            appliesTo: ['event'],
+            conditions: ['service' => 'monzo'],
+            runOnCreate: true,
+        ));
+
+        TaskRegistry::register(new TaskDefinition(
+            key: 'all_events_task',
+            name: 'All Events Task',
+            description: 'Task that runs for all events',
+            jobClass: GenerateEmbeddingTask::class,
+            appliesTo: ['event'],
+            runOnCreate: true,
+        ));
+
+        $user = User::factory()->create();
+
+        // Create required EventObjects for actor and target
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
+
+        // Create an Integration
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+
+        // Create a Spotify event (doesn't match Monzo condition)
+        $spotifyEvent = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
+            'service' => 'spotify',
+            'domain' => 'media',
+            'action' => 'listened_to',
+        ]);
+
+        // Get tasks that would be dispatched
+        $applicableTasks = TaskRegistry::getTasksForModel($spotifyEvent, 'created');
+
+        // Verify only the all_events_task is applicable
+        $this->assertCount(1, $applicableTasks);
+        $this->assertEquals('all_events_task', $applicableTasks->first()->key);
+
+        // Process the task pipeline
+        $job = new ProcessTaskPipelineJob($spotifyEvent, 'created');
+        $job->handle();
+
+        // Verify only one job was dispatched (the applicable one)
+        Queue::assertPushed(GenerateEmbeddingTask::class, 1);
+
+        // Verify the event metadata only tracks the executed task
+        $metadata = $spotifyEvent->refresh()->event_metadata ?? [];
+        $executions = $metadata['task_executions'] ?? [];
+        $this->assertArrayHasKey('all_events_task', $executions);
+        $this->assertArrayNotHasKey('monzo_only_task', $executions);
     }
 
     /**
