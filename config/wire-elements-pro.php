@@ -1,7 +1,50 @@
 <?php
 
-use WireElements\Pro\Components\Modal\Resolvers\EnumPropertyResolver;
 use WireElements\Pro\Components\Spotlight\Enums\OnCloseStateBehavior;
+
+// Build Font Awesome icon registry dynamically
+// Create anonymous classes for each Font Awesome icon to match Wire Elements' expected format
+$fontAwesomeIcons = [];
+$faIconNames = [
+    'route', 'circle-plus', 'key', 'magnifying-glass', 'chart-simple',
+    'bolt', 'shoe-prints', 'droplet', 'circle-up', 'arrow-right-from-bracket',
+    'arrow-right-to-bracket', 'baseball', 'basketball', 'battery-full',
+    'bicycle', 'bookmark', 'box-archive', 'building-columns', 'calculator',
+    'calendar', 'calendar-check', 'calendar-day', 'calendar-week', 'chart-line',
+    'circle', 'circle-check', 'circle-dot', 'circle-info', 'circle-minus',
+    'circle-xmark', 'clipboard-check', 'clock', 'code', 'code-branch',
+    'code-commit', 'code-pull-request', 'comment', 'comments', 'credit-card',
+    'download', 'dumbbell', 'ear-listen', 'ellipsis', 'face-smile',
+    'file', 'file-lines', 'fire', 'football', 'futbol', 'gear',
+    'globe', 'golf-ball-tee', 'hand-holding-dollar', 'hashtag', 'headphones',
+    'heart', 'heart-pulse', 'highlighter', 'image', 'layer-group',
+    'lightbulb', 'link', 'list', 'list-ul', 'location-dot',
+    'lungs', 'microphone', 'minus', 'money-bill-transfer', 'money-bills',
+    'moon', 'mountain', 'music', 'pause', 'percent',
+    'person-hiking', 'person-running', 'person-skating', 'person-skiing',
+    'person-snowboarding', 'person-swimming', 'person-walking', 'piggy-bank',
+    'play', 'plus', 'puzzle-piece', 'quote-left', 'receipt',
+    'repeat', 'retweet', 'right-left', 'ring', 'rotate',
+    'rotate-left', 'shield-heart', 'spa', 'stairs', 'sterling-sign',
+    'store', 'sun', 'table-tennis-paddle-ball', 'tag', 'triangle-exclamation',
+    'user', 'user-circle', 'user-group', 'user-minus', 'user-plus',
+    'volleyball', 'wallet', 'wand-magic-sparkles', 'water', 'weight-scale',
+];
+
+// Map Font Awesome icon names to generated class names
+// Reserved PHP keywords that cannot be used as class names
+$reservedKeywords = ['list', 'echo', 'print', 'continue', 'break', 'default'];
+
+foreach ($faIconNames as $iconName) {
+    $className = str_replace(' ', '', ucwords(str_replace('-', ' ', $iconName)));
+
+    // If class name is a reserved keyword, append 'Icon' suffix
+    if (in_array(strtolower($className), $reservedKeywords)) {
+        $className .= 'Icon';
+    }
+
+    $fontAwesomeIcons["fas.{$iconName}"] = 'App\\Icons\\FontAwesome\\' . $className;
+}
 
 return [
     'default' => 'tailwind',
@@ -11,7 +54,7 @@ return [
             'view' => 'wire-elements-pro::modal.component',
             'placeholder' => 'wire-elements-pro::modal.placeholder',
             'property-resolvers' => [
-                EnumPropertyResolver::class,
+                \WireElements\Pro\Components\Modal\Resolvers\EnumPropertyResolver::class,
             ],
             'default-behavior' => [
                 'close-on-escape' => true,
@@ -27,7 +70,7 @@ return [
             'view' => 'wire-elements-pro::slide-over.component',
             'placeholder' => 'wire-elements-pro::slide-over.placeholder',
             'property-resolvers' => [
-                EnumPropertyResolver::class,
+                \WireElements\Pro\Components\Modal\Resolvers\EnumPropertyResolver::class,
             ],
             'default-behavior' => [
                 'close-on-escape' => true,
@@ -53,7 +96,7 @@ return [
         'spotlight' => [
             'view' => 'wire-elements-pro::spotlight.component',
             'default-behavior' => [
-                'debounce_milliseconds' => 350,
+                'debounce_milliseconds' => 200,
                 'shortcuts' => [
                     'k',
                     'slash',
@@ -427,5 +470,5 @@ return [
         'wrench' => WireElements\Pro\Icons\Wrench::class,
         'x-circle' => WireElements\Pro\Icons\XCircle::class,
         'x-mark' => WireElements\Pro\Icons\XMark::class,
-    ],
+    ] + $fontAwesomeIcons,
 ];
