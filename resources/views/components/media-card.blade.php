@@ -72,7 +72,8 @@
                         // Use Spatie's responsive images with signed URLs
                         $responsiveHtml = (string) $media;
                         $doc = new DOMDocument;
-                        @$doc->loadHTML($responsiveHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                        $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+                        @$doc->loadHTML($responsiveHtml, $libxmlFlags);
                         $img = $doc->getElementsByTagName('img')->item(0);
                         if ($img) {
                             $img->setAttribute('class', 'w-full h-full object-cover group-hover:scale-105 transition-transform');

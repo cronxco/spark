@@ -1070,7 +1070,8 @@ if (! function_exists('render_media_responsive')) {
             if (! empty($attributes)) {
                 // Parse the HTML and add attributes
                 $doc = new DOMDocument;
-                @$doc->loadHTML($html, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+                @$doc->loadHTML($html, $libxmlFlags);
                 $img = $doc->getElementsByTagName('img')->item(0);
 
                 if ($img) {
@@ -1090,7 +1091,8 @@ if (! function_exists('render_media_responsive')) {
 
         if (! empty($attributes)) {
             $doc = new DOMDocument;
-            @$doc->loadHTML($html, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+            $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+            @$doc->loadHTML($html, $libxmlFlags);
             $img = $doc->getElementsByTagName('img')->item(0);
 
             if ($img) {
