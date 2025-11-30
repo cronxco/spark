@@ -200,7 +200,7 @@ new class extends Component {
                             wire:click="rerunTask('{{ $task->key }}')"
                             class="btn btn-ghost btn-xs flex-shrink-0"
                             title="Re-run this task"
-                            @if(in_array($status, ['running', 'pending'])) disabled @endif>
+                            @if (in_array($status, ['running', 'pending'])) disabled @endif>
                             <x-icon name="fas.rotate" class="w-3 h-3" />
                         </button>
                     </div>
