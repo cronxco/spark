@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Integrations\SupportsTaskPipeline;
+use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Support\ServiceProvider;
