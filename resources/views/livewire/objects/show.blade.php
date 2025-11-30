@@ -36,9 +36,13 @@ new class extends Component
     public bool $directEventsLoaded = false;
     public bool $mediaLoaded = false;
     public bool $relationshipsLoaded = false;
+    public bool $tasksLoaded = false;
     public bool $relatedBlocksLoaded = false;
     public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
+
+    // Collapse states
+    public bool $tasksOpen = false;
 
     protected $listeners = [
         'open-tag-modal' => 'handleOpenTagModal',
@@ -68,7 +72,7 @@ new class extends Component
             1 => ['loadTags'],
             2 => ['loadDirectEvents'],
             3 => ['loadMedia'],
-            4 => ['loadRelationships'],
+            4 => ['loadRelationships', 'loadTasks'],
             5 => ['loadRelatedBlocks'],
             6 => ['loadRelatedEvents'],
             7 => ['loadActivities'],
@@ -152,6 +156,39 @@ new class extends Component
         }
         $this->object->load(['relationshipsFrom', 'relationshipsTo']);
         $this->relationshipsLoaded = true;
+    }
+
+    /**
+     * Load task execution information
+     */
+    public function loadTasks(): void
+    {
+        if ($this->tasksLoaded) {
+            return;
+        }
+
+        // Calculate smart default for collapse state
+        $this->tasksOpen = $this->shouldExpandTasksSection();
+        $this->tasksLoaded = true;
+    }
+
+    /**
+     * Determine if tasks section should be expanded by default
+     */
+    protected function shouldExpandTasksSection(): bool
+    {
+        // Expand if there are failed or pending tasks
+        $metadata = $this->object->metadata ?? [];
+        $executions = $metadata['task_executions'] ?? [];
+
+        foreach ($executions as $execution) {
+            $status = $execution['last_attempt']['status'] ?? null;
+            if (in_array($status, ['failed', 'pending'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1882,6 +1919,50 @@ new class extends Component
                         @endif
                         @endif
                     </div>
+
+                    <!-- Tasks -->
+                    @if ($tasksLoaded)
+                        @php
+                            $metadata = $object->metadata ?? [];
+                            $executions = $metadata['task_executions'] ?? [];
+                            $failedCount = collect($executions)->filter(fn($e) => ($e['last_attempt']['status'] ?? null) === 'failed')->count();
+                            $pendingCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['pending', 'running']))->count();
+                            $executedCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['success', 'failed', 'running', 'pending']))->count();
+                        @endphp
+                        <x-collapse wire:model="tasksOpen">
+                            <x-slot:heading>
+                                <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between w-full">
+                                    <div class="flex items-center gap-2">
+                                        <span>Tasks</span>
+                                        @if ($failedCount > 0)
+                                            <x-badge class="badge-xs badge-error">{{ $failedCount }} failed</x-badge>
+                                        @endif
+                                        @if ($pendingCount > 0)
+                                            <x-badge class="badge-xs badge-warning">{{ $pendingCount }} pending</x-badge>
+                                        @endif
+                                        @if ($executedCount > 0 && $failedCount === 0 && $pendingCount === 0)
+                                            <x-badge class="badge-xs badge-ghost">{{ $executedCount }} executed</x-badge>
+                                        @endif
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click.stop="$dispatch('tasks-rerun-initiated')"
+                                        class="btn btn-xs btn-ghost"
+                                        title="Re-run all tasks">
+                                        <x-icon name="fas.rotate" class="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </x-slot:heading>
+                            <x-slot:content>
+                                <livewire:task-execution-section :model="$object" :key="'tasks-object-' . $object->id" />
+                            </x-slot:content>
+                        </x-collapse>
+                    @elseif ($this->tierLoaded(3))
+                        <div class="pb-4 border-b border-base-200">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Tasks</h3>
+                            <x-skeleton-loader type="list-item" :count="2" />
+                        </div>
+                    @endif
 
                     <!-- Activity Timeline -->
                     <x-collapse wire:model="activityOpen">
