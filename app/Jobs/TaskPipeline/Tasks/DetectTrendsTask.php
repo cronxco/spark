@@ -8,42 +8,20 @@ class DetectTrendsTask extends BaseTaskJob
 {
     /**
      * Execute the trend detection task
+     *
+     * Note: This task is scheduled-only and runs via DispatchTrendDetectionTasksJob
+     * It is not triggered on event creation
      */
     protected function execute(): void
     {
-        // TODO: Implement trend detection
-        // This task detects weekly, monthly, and quarterly trends
+        // Trend detection is a scheduled batch job that analyzes all metrics
+        // The actual implementation is in DetectMetricTrendsJob which processes
+        // all metric statistics globally.
+        //
+        // This task skeleton exists for consistency but the work is done
+        // by the scheduled job, not per-event.
 
-        // Example implementation:
-        // $this->detectWeeklyTrends();
-        // $this->detectMonthlyTrends();
-        // $this->detectQuarterlyTrends();
-    }
-
-    /**
-     * Detect weekly trends
-     */
-    protected function detectWeeklyTrends(): void
-    {
-        // Compare current week vs previous 4, 8, and 12 weeks
-        // If change > 15%, create trend record
-    }
-
-    /**
-     * Detect monthly trends
-     */
-    protected function detectMonthlyTrends(): void
-    {
-        // Compare current month vs previous 3, 6, and 12 months
-        // If change > 15%, create trend record
-    }
-
-    /**
-     * Detect quarterly trends
-     */
-    protected function detectQuarterlyTrends(): void
-    {
-        // Compare current quarter vs previous 2 and 4 quarters
-        // If change > 15%, create trend record
+        // If we wanted per-event trend detection, we could implement it here,
+        // but for now the scheduled batch approach is more efficient.
     }
 }

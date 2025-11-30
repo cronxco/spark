@@ -65,27 +65,28 @@ Task executions are tracked in model metadata fields:
 - **Integration**: Uses `metadata['task_executions']`
 
 Structure:
+
 ```json
 {
-  "task_executions": {
-    "task_key": {
-      "last_attempt": {
-        "started_at": "2025-11-29T10:00:00Z",
-        "completed_at": "2025-11-29T10:00:05Z",
-        "status": "success|failed|running|pending|not_applicable",
-        "attempts": 1,
-        "error": null,
-        "triggered_by": "created|manual|scheduled|migration"
-      },
-      "last_success": {
-        "started_at": "2025-11-29T10:00:00Z",
-        "completed_at": "2025-11-29T10:00:05Z",
-        "status": "success",
-        "attempts": 1,
-        "triggered_by": "created"
-      }
+    "task_executions": {
+        "task_key": {
+            "last_attempt": {
+                "started_at": "2025-11-29T10:00:00Z",
+                "completed_at": "2025-11-29T10:00:05Z",
+                "status": "success|failed|running|pending|not_applicable",
+                "attempts": 1,
+                "error": null,
+                "triggered_by": "created|manual|scheduled|migration"
+            },
+            "last_success": {
+                "started_at": "2025-11-29T10:00:00Z",
+                "completed_at": "2025-11-29T10:00:05Z",
+                "status": "success",
+                "attempts": 1,
+                "triggered_by": "created"
+            }
+        }
     }
-  }
 }
 ```
 
@@ -126,6 +127,7 @@ dependencies: ['calculate_metric_stats', 'generate_embedding']
 ```
 
 The system ensures:
+
 - Dependencies run first
 - Circular dependencies are detected
 - Order is deterministic
@@ -246,6 +248,7 @@ TaskRegistry::register(new TaskDefinition(
 ### Task Configuration Options
 
 **Basic:**
+
 ```php
 key: 'unique_key',              // Required: unique identifier
 name: 'Display Name',           // Required: human-readable name
@@ -255,6 +258,7 @@ appliesTo: ['event'],           // Required: model types
 ```
 
 **Filtering:**
+
 ```php
 conditions: [
     'service' => 'monzo',                    // Single value
@@ -264,6 +268,7 @@ shouldRun: fn($model) => $model->value > 100,  // Custom callback
 ```
 
 **Execution:**
+
 ```php
 dependencies: ['task1', 'task2'],  // Run after these tasks
 queue: 'tasks',                    // Queue name
@@ -382,11 +387,13 @@ php artisan task-pipeline:rerun detect_anomalies event abc-123 --force
 ```
 
 **Arguments:**
+
 - `task_key`: Task to run (from task-pipeline:list)
 - `model_type`: event | block | object | integration
 - `model_id`: Model's UUID
 
 **Options:**
+
 - `--force`: Re-run even if already successful
 
 ### task-pipeline:bulk-rerun
@@ -402,6 +409,7 @@ php artisan task-pipeline:bulk-rerun generate_embedding block --limit=100 --dry-
 ```
 
 **Options:**
+
 - `--service={service}`: Filter by service
 - `--domain={domain}`: Filter by domain
 - `--action={action}`: Filter by action
@@ -424,6 +432,7 @@ php artisan task-pipeline:populate-initial-state --limit=100
 ```
 
 **Options:**
+
 - `--model={type}`: Process specific model type only
 - `--limit={number}`: Limit number of records
 - `--dry-run`: Preview without making changes
@@ -439,6 +448,7 @@ Display task status for individual items (events, blocks, objects):
 ```
 
 Features:
+
 - Shows all applicable tasks
 - Color-coded status badges
 - Execution history (last attempt + last success)
@@ -456,6 +466,7 @@ Monitor task pipeline health:
 ```
 
 Features:
+
 - Statistics dashboard (total, pending, failed, success)
 - Complete task registry table
 - Recent failures with retry buttons
@@ -487,15 +498,14 @@ Horizon configuration (already set up):
 Configured in `routes/console.php`:
 
 ```php
-// Hourly: Metric statistics
-Schedule::job(new DispatchMetricStatisticsTasksJob)->hourly();
-
 // Daily: Trend detection
 Schedule::job(new DispatchTrendDetectionTasksJob)->daily();
 
 // Daily: Retrospective anomaly detection
 Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)->daily();
 ```
+
+**Note:** Metric statistics calculation now runs automatically in the task pipeline on event creation and update, so no scheduled job is needed.
 
 ### Task Retry Configuration
 
@@ -536,16 +546,19 @@ php artisan test tests/Unit/TaskPipeline/TaskRegistryTest.php
 ### Task Not Running
 
 **Check if task is registered:**
+
 ```bash
 php artisan task-pipeline:list
 ```
 
 **Check if task is applicable:**
+
 - Verify model type in `appliesTo`
 - Check `conditions` match model attributes
 - Test `shouldRun` callback logic
 
 **Check execution history:**
+
 ```bash
 # View in UI or check model metadata
 $event->event_metadata['task_executions']['task_key']
@@ -554,17 +567,20 @@ $event->event_metadata['task_executions']['task_key']
 ### Task Failing
 
 **View error in metadata:**
+
 ```php
 $execution = $event->event_metadata['task_executions']['task_key'];
 $error = $execution['last_attempt']['error'];
 ```
 
 **Check Sentry:**
+
 - Errors are automatically logged with context
 - Tags: task, model, queue
 - Extra: task_key, model_id, attempt
 
 **Re-run with force:**
+
 ```bash
 php artisan task-pipeline:rerun task_key event model-id --force
 ```
@@ -574,6 +590,7 @@ php artisan task-pipeline:rerun task_key event model-id --force
 Error: "Circular dependency detected in tasks: task1, task2"
 
 **Solution:**
+
 - Review task dependencies
 - Remove or reorder circular references
 - Use `task-pipeline:list` to see dependencies
@@ -593,6 +610,7 @@ php artisan horizon:terminate
 ### Performance Issues
 
 **Queue backed up:**
+
 ```bash
 # Check queue depth
 php artisan queue:monitor tasks
@@ -602,6 +620,7 @@ php artisan queue:monitor tasks
 ```
 
 **Slow tasks:**
+
 - Check task timeouts
 - Optimize task logic
 - Consider splitting into smaller tasks
@@ -668,34 +687,35 @@ $this->model->withoutEvents(function() use ($data) {
 If migrating from scattered observers/listeners:
 
 1. **Identify existing tasks:**
-   - Search for Observer files
-   - Check AppServiceProvider boot listeners
-   - Review scheduled jobs
+    - Search for Observer files
+    - Check AppServiceProvider boot listeners
+    - Review scheduled jobs
 
 2. **Create task jobs:**
-   - Move logic to task job classes
-   - Extend BaseTaskJob
-   - Keep existing functionality intact
+    - Move logic to task job classes
+    - Extend BaseTaskJob
+    - Keep existing functionality intact
 
 3. **Register tasks:**
-   - Add to TaskPipelineServiceProvider
-   - Define conditions and dependencies
+    - Add to TaskPipelineServiceProvider
+    - Define conditions and dependencies
 
 4. **Populate initial state:**
-   ```bash
-   php artisan task-pipeline:populate-initial-state --dry-run
-   php artisan task-pipeline:populate-initial-state
-   ```
+
+    ```bash
+    php artisan task-pipeline:populate-initial-state --dry-run
+    php artisan task-pipeline:populate-initial-state
+    ```
 
 5. **Test in parallel:**
-   - Run both systems temporarily
-   - Compare results
-   - Verify execution tracking
+    - Run both systems temporarily
+    - Compare results
+    - Verify execution tracking
 
 6. **Cutover:**
-   - Remove old observers
-   - Clean up listeners
-   - Monitor for issues
+    - Remove old observers
+    - Clean up listeners
+    - Monitor for issues
 
 ## Support
 

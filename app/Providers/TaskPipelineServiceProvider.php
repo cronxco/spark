@@ -44,7 +44,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             conditions: [],
             dependencies: [],
             queue: 'tasks',
-            priority: 110, // Run before embedding generation
+            priority: 100, // Run before embedding generation
             runOnCreate: true,
             runOnUpdate: false,
             shouldRun: function ($model) {
@@ -103,7 +103,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             conditions: [],
             dependencies: [],
             queue: 'tasks',
-            priority: 100,
+            priority: 95,
             runOnCreate: true,
             runOnUpdate: true,
             shouldRun: fn () => config('services.openai.api_key') !== null,
@@ -120,8 +120,8 @@ class TaskPipelineServiceProvider extends ServiceProvider
             dependencies: [],
             queue: 'tasks',
             priority: 90,
-            runOnCreate: false, // Only scheduled
-            runOnUpdate: false,
+            runOnCreate: true,
+            runOnUpdate: true,
             shouldRun: function ($model) {
                 return $model->value !== null && $model->value_unit !== null;
             },
@@ -188,7 +188,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
                 'service' => 'receipt',
                 'action' => 'had_receipt_from',
             ],
-            dependencies: ['generate_embedding'],
+            dependencies: config('services.openai.api_key') ? ['generate_embedding'] : [],
             queue: 'tasks',
             priority: 60,
             runOnCreate: true,
@@ -206,7 +206,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
                 'service' => ['monzo', 'gocardless'],
                 'domain' => 'money',
             ],
-            dependencies: ['generate_embedding'],
+            dependencies: config('services.openai.api_key') ? ['generate_embedding'] : [],
             queue: 'tasks',
             priority: 60,
             runOnCreate: true,
@@ -235,7 +235,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
                 'service' => ['monzo', 'gocardless'],
                 'domain' => 'money',
             ],
-            dependencies: ['generate_embedding'],
+            dependencies: config('services.openai.api_key') ? ['generate_embedding'] : [],
             queue: 'tasks',
             priority: 50,
             runOnCreate: true,

@@ -2,7 +2,6 @@
 
 namespace App\Observers;
 
-use App\Jobs\GenerateObjectEmbeddingJob;
 use App\Models\EventObject;
 
 class EventObjectObserver
@@ -12,10 +11,8 @@ class EventObjectObserver
      */
     public function created(EventObject $object): void
     {
-        // Only dispatch if embeddings are enabled (API key is configured)
-        if (config('services.openai.api_key')) {
-            GenerateObjectEmbeddingJob::dispatch($object)->onQueue('embeddings');
-        }
+        // Embedding generation is now handled by TaskPipeline
+        // See GenerateEmbeddingTask in app/Jobs/TaskPipeline/Tasks/
     }
 
     /**
@@ -23,13 +20,7 @@ class EventObjectObserver
      */
     public function updated(EventObject $object): void
     {
-        // Only dispatch if embeddings are enabled (API key is configured)
-        if (config('services.openai.api_key')) {
-            // Check if relevant fields changed that would affect the embedding
-            if ($object->wasChanged(['concept', 'type', 'title', 'content', 'url'])) {
-                // Dispatch job to regenerate embedding
-                GenerateObjectEmbeddingJob::dispatch($object)->onQueue('embeddings');
-            }
-        }
+        // Embedding regeneration on updates is now handled by TaskPipeline
+        // See GenerateEmbeddingTask in app/Jobs/TaskPipeline/Tasks/
     }
 }

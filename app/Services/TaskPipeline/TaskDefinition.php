@@ -12,6 +12,8 @@ use InvalidArgumentException;
 
 class TaskDefinition
 {
+    private ?Closure $shouldRunCallback = null;
+
     public function __construct(
         public string $key,                          // Unique identifier (e.g., 'generate_embedding')
         public string $name,                         // Display name
@@ -24,9 +26,11 @@ class TaskDefinition
         public int $priority = 50,                   // Execution priority (higher = first)
         public bool $runOnCreate = true,             // Run when item created
         public bool $runOnUpdate = false,            // Run when item updated
-        public ?Closure $shouldRun = null,           // Custom condition callback
+        ?Closure $shouldRun = null,                  // Custom condition callback
         public ?string $registeredBy = null,         // Plugin class that registered it
-    ) {}
+    ) {
+        $this->shouldRunCallback = $shouldRun;
+    }
 
     /**
      * Check if this task is applicable to the given model
@@ -54,7 +58,7 @@ class TaskDefinition
         }
 
         // Check custom condition callback
-        if ($this->shouldRun && ! ($this->shouldRun)($model)) {
+        if ($this->shouldRunCallback && ! ($this->shouldRunCallback)($model)) {
             return false;
         }
 
@@ -73,5 +77,26 @@ class TaskDefinition
             Integration::class => 'integration',
             default => throw new InvalidArgumentException('Unsupported model type: ' . get_class($model)),
         };
+    }
+
+    /**
+     * Prevent serialization of Closures
+     */
+    public function __sleep(): array
+    {
+        return [
+            'key',
+            'name',
+            'description',
+            'jobClass',
+            'appliesTo',
+            'conditions',
+            'dependencies',
+            'queue',
+            'priority',
+            'runOnCreate',
+            'runOnUpdate',
+            'registeredBy',
+        ];
     }
 }

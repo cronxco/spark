@@ -39,6 +39,7 @@ new class extends Component
     public bool $tasksLoaded = false;
     public bool $relatedEventsLoaded = false;
     public bool $activitiesLoaded = false;
+    public bool $drawerContentLoaded = false;
 
     // Collapse states
     public bool $tasksOpen = false;
@@ -54,28 +55,8 @@ new class extends Component
         'relationship-created' => 'handleRelationshipUpdated',
         'relationship-deleted' => 'handleRelationshipUpdated',
         'close-modal' => 'closeModals',
+        'drawer-opened' => 'loadDrawerContent',
     ];
-
-    // -------------------------------------------------------------------------
-    // Protected Methods
-    // -------------------------------------------------------------------------
-
-    /**
-     * Define the loading tiers for progressive loading.
-     * Priority order: Tags -> Core (Actor/Target) -> Blocks -> Media -> Relationships -> Related Events -> Activities
-     */
-    protected function getLoadingTiers(): array
-    {
-        return [
-            1 => ['loadTags'],
-            2 => ['loadCore'],
-            3 => ['loadBlocks'],
-            4 => ['loadMedia'],
-            5 => ['loadRelationships', 'loadTasks'],
-            6 => ['loadRelatedEvents'],
-            7 => ['loadActivities'],
-        ];
-    }
 
     // -------------------------------------------------------------------------
     // Public Methods
@@ -174,25 +155,6 @@ new class extends Component
     }
 
     /**
-     * Determine if tasks section should be expanded by default
-     */
-    protected function shouldExpandTasksSection(): bool
-    {
-        // Expand if there are failed or pending tasks
-        $metadata = $this->event->event_metadata ?? [];
-        $executions = $metadata['task_executions'] ?? [];
-
-        foreach ($executions as $execution) {
-            $status = $execution['last_attempt']['status'] ?? null;
-            if (in_array($status, ['failed', 'pending'])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Load related events via semantic search (expensive operation)
      */
     public function loadRelatedEvents(): void
@@ -213,6 +175,31 @@ new class extends Component
             return;
         }
         $this->activitiesLoaded = true;
+    }
+
+    /**
+     * Load drawer-specific content when drawer is opened.
+     * This is called only when the drawer is opened to avoid loading
+     * unnecessary data if the user never opens the drawer.
+     */
+    public function loadDrawerContent(): void
+    {
+        if ($this->drawerContentLoaded) {
+            return;
+        }
+
+        // Load only the data needed for drawer that isn't already loaded
+        if (! $this->relationshipsLoaded) {
+            $this->loadRelationships();
+        }
+        if (! $this->tasksLoaded) {
+            $this->loadTasks();
+        }
+        if (! $this->activitiesLoaded) {
+            $this->loadActivities();
+        }
+
+        $this->drawerContentLoaded = true;
     }
 
     #[Computed]
@@ -770,6 +757,49 @@ new class extends Component
         $this->showAddRelationshipModal = false;
     }
 
+    // -------------------------------------------------------------------------
+    // Protected Methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Define the loading tiers for progressive loading.
+     * Priority order optimized for main view content first, drawer content later.
+     * Tier 1-3: Main page visible content (core data, tags, blocks)
+     * Tier 4-5: Supporting content (media, related events)
+     * Tier 6-7: Drawer-only content (loaded on-demand when drawer opens)
+     */
+    protected function getLoadingTiers(): array
+    {
+        return [
+            1 => ['loadCore'],               // Actor/target (shown in main view) - highest priority
+            2 => ['loadTags', 'loadBlocks'], // Visible in main view
+            3 => ['loadMedia'],              // Media for actor/target objects
+            4 => ['loadRelatedEvents'],      // Shown in main view, but lower priority
+            5 => ['loadRelationships'],      // Drawer-only (loaded on-demand)
+            6 => ['loadTasks'],              // Drawer-only (loaded on-demand)
+            7 => ['loadActivities'],         // Drawer-only (loaded on-demand)
+        ];
+    }
+
+    /**
+     * Determine if tasks section should be expanded by default
+     */
+    protected function shouldExpandTasksSection(): bool
+    {
+        // Expand if there are failed or pending tasks
+        $metadata = $this->event->event_metadata ?? [];
+        $executions = $metadata['task_executions'] ?? [];
+
+        foreach ($executions as $execution) {
+            $status = $execution['last_attempt']['status'] ?? null;
+            if (in_array($status, ['failed', 'pending'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Remove embeddings field from an array recursively.
      */
@@ -788,7 +818,12 @@ new class extends Component
 };
 ?>
 
-<div>
+<div x-data="{ drawerOpen: @entangle('showSidebar').live }"
+     x-init="$watch('drawerOpen', value => {
+         if (value) {
+             setTimeout(() => $wire.dispatch('drawer-opened'), 50);
+         }
+     })">
     @if ($this->event)
     <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
         <!-- Main Content Area -->
@@ -797,10 +832,10 @@ new class extends Component
             <x-header title="Event Details" separator>
                 <x-slot:actions>
                     <x-button
-                        wire:click="toggleSidebar"
+                        @click="drawerOpen = !drawerOpen"
                         class="btn-ghost btn-sm"
-                        title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
-                        aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                        ::title="drawerOpen ? 'Hide details' : 'Show details'"
+                        ::aria-label="drawerOpen ? 'Hide details' : 'Show details'"
                         data-hotkey="d">
                         <x-icon name="fas.sliders" class="w-4 h-4" />
                     </x-button>
@@ -1421,7 +1456,7 @@ new class extends Component
                                 <x-icon name="fas.plus" class="w-3 h-3" />
                             </button>
                         </div>
-                        @if (! $relationshipsLoaded)
+                        @if (!$drawerContentLoaded || !$relationshipsLoaded)
                         <x-skeleton-loader type="relationship-list" />
                         @else
                         @php $sidebarRelationships = $this->relationships; @endphp
@@ -1474,7 +1509,7 @@ new class extends Component
                     </div>
 
                     <!-- Tasks -->
-                    @if ($tasksLoaded)
+                    @if ($drawerContentLoaded && $tasksLoaded)
                         @php
                             $metadata = $event->event_metadata ?? [];
                             $executions = $metadata['task_executions'] ?? [];
@@ -1510,7 +1545,7 @@ new class extends Component
                                 <livewire:task-execution-section :model="$event" :key="'tasks-event-' . $event->id" />
                             </x-slot:content>
                         </x-collapse>
-                    @elseif ($this->tierLoaded(4))
+                    @else
                         <div class="pb-4 border-b border-base-200">
                             <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Tasks</h3>
                             <x-skeleton-loader type="list-item" :count="2" />
@@ -1538,7 +1573,7 @@ new class extends Component
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        @if (! $activitiesLoaded)
+                        @if (!$drawerContentLoaded || !$activitiesLoaded)
                         <x-skeleton-loader type="list-item" count="3" />
                         @else
                         @php $activities = $this->activities; @endphp

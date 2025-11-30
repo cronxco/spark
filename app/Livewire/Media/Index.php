@@ -3,6 +3,7 @@
 namespace App\Livewire\Media;
 
 use Exception;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -79,12 +80,35 @@ class Index extends Component
 
     public function media()
     {
-        $query = Media::query()
+        // First, get deduplicated media (one per MD5 hash)
+        $deduplicatedQuery = Media::query()
+            ->select([
+                'id',
+                'model_type',
+                'model_id',
+                'uuid',
+                'collection_name',
+                'name',
+                'file_name',
+                'mime_type',
+                'disk',
+                'conversions_disk',
+                'size',
+                'manipulations',
+                'custom_properties',
+                'generated_conversions',
+                'responsive_images',
+                'order_column',
+                'created_at',
+                'updated_at',
+                DB::raw("custom_properties->>'md5_hash' as md5_hash"),
+                DB::raw('COUNT(*) OVER (PARTITION BY custom_properties->>\'md5_hash\') as instances_count'),
+            ])
             ->with(['model']);
 
         // Search filter
         if ($this->search) {
-            $query->where(function ($q) {
+            $deduplicatedQuery->where(function ($q) {
                 $q->where('name', 'ilike', '%' . $this->search . '%')
                     ->orWhere('file_name', 'ilike', '%' . $this->search . '%');
             });
@@ -92,25 +116,51 @@ class Index extends Component
 
         // Model type filter
         if (! empty($this->modelFilter)) {
-            $query->whereIn('model_type', $this->modelFilter);
+            $deduplicatedQuery->whereIn('model_type', $this->modelFilter);
         }
 
         // Collection filter
         if (! empty($this->collectionFilter)) {
-            $query->whereIn('collection_name', $this->collectionFilter);
+            $deduplicatedQuery->whereIn('collection_name', $this->collectionFilter);
         }
 
         // MIME type filter
         if (! empty($this->mimeFilter)) {
-            $query->whereIn('mime_type', $this->mimeFilter);
+            $deduplicatedQuery->whereIn('mime_type', $this->mimeFilter);
         }
 
-        // Sorting
+        // Get all media with counts, then deduplicate by keeping only one per hash
+        $allMedia = $deduplicatedQuery->get();
+
+        // Group by MD5 hash and keep only the most recent one from each group
+        $deduplicatedMedia = $allMedia->groupBy('md5_hash')->map(function ($group) {
+            // Sort by created_at desc and take the first (most recent)
+            return $group->sortByDesc('created_at')->first();
+        })->values();
+
+        // Apply sorting
         $sortColumn = $this->sortBy['column'] ?? 'created_at';
         $sortDirection = $this->sortBy['direction'] ?? 'desc';
-        $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        if ($sortDirection === 'desc') {
+            $deduplicatedMedia = $deduplicatedMedia->sortByDesc($sortColumn)->values();
+        } else {
+            $deduplicatedMedia = $deduplicatedMedia->sortBy($sortColumn)->values();
+        }
+
+        // Manual pagination
+        $currentPage = $this->getPage();
+        $perPage = $this->perPage;
+        $total = $deduplicatedMedia->count();
+        $items = $deduplicatedMedia->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $currentPage,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
     }
 
     public function modelTypes()

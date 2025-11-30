@@ -2,8 +2,7 @@
 
 namespace App\Observers;
 
-use App\Jobs\GenerateBlockEmbeddingJob;
-use App\Jobs\GenerateEventEmbeddingJob;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Block;
 
 class BlockObserver
@@ -13,16 +12,14 @@ class BlockObserver
      */
     public function created(Block $block): void
     {
-        // Only dispatch if embeddings are enabled (API key is configured)
-        if (config('services.openai.api_key')) {
-            // Dispatch job to generate embedding asynchronously
-            GenerateBlockEmbeddingJob::dispatch($block)->onQueue('embeddings');
+        // Embedding generation is now handled by TaskPipeline
+        // See GenerateEmbeddingTask in app/Jobs/TaskPipeline/Tasks/
 
-            // If this is a summary/details block, regenerate parent event's embedding
-            // This ensures events include AI-generated summaries in their embeddings
-            if ($this->isSummaryOrDetailsBlock($block)) {
-                GenerateEventEmbeddingJob::dispatch($block->event)->onQueue('embeddings');
-            }
+        // If this is a summary/details block, trigger parent event's task pipeline
+        // This ensures events get re-embedded when AI summaries are added
+        if ($this->isSummaryOrDetailsBlock($block) && $block->event) {
+            ProcessTaskPipelineJob::dispatch($block->event, 'updated', ['generate_embedding'], force: true)
+                ->onQueue('tasks');
         }
     }
 
@@ -31,17 +28,14 @@ class BlockObserver
      */
     public function updated(Block $block): void
     {
-        // Only dispatch if embeddings are enabled (API key is configured)
-        if (config('services.openai.api_key')) {
-            // Check if relevant fields changed that would affect the embedding
-            if ($block->wasChanged(['title', 'metadata', 'url', 'value', 'value_unit'])) {
-                // Dispatch job to regenerate embedding
-                GenerateBlockEmbeddingJob::dispatch($block)->onQueue('embeddings');
+        // Embedding regeneration is now handled by TaskPipeline
+        // See GenerateEmbeddingTask in app/Jobs/TaskPipeline/Tasks/
 
-                // If this is a summary/details block, also regenerate parent event's embedding
-                if ($this->isSummaryOrDetailsBlock($block)) {
-                    GenerateEventEmbeddingJob::dispatch($block->event)->onQueue('embeddings');
-                }
+        // If this is a summary/details block and relevant fields changed, trigger parent event's task pipeline
+        if ($block->wasChanged(['title', 'metadata', 'url', 'value', 'value_unit'])) {
+            if ($this->isSummaryOrDetailsBlock($block) && $block->event) {
+                ProcessTaskPipelineJob::dispatch($block->event, 'updated', ['generate_embedding'], force: true)
+                    ->onQueue('tasks');
             }
         }
     }
