@@ -24,6 +24,11 @@ class IntegrationDetails extends Component
 
     public bool $blockTypesLoaded = false;
 
+    public bool $tasksLoaded = false;
+
+    // Collapse states
+    public bool $tasksOpen = false;
+
     // Cached data for loaded types
     public array $cachedActionTypes = [];
 
@@ -77,6 +82,20 @@ class IntegrationDetails extends Component
 
         $this->cachedBlockTypes = $this->fetchBlockTypes();
         $this->blockTypesLoaded = true;
+    }
+
+    /**
+     * Load task execution information
+     */
+    public function loadTasks(): void
+    {
+        if ($this->tasksLoaded) {
+            return;
+        }
+
+        // Calculate smart default for collapse state
+        $this->tasksOpen = $this->shouldExpandTasksSection();
+        $this->tasksLoaded = true;
     }
 
     public function toggleSidebar(): void
@@ -195,6 +214,26 @@ class IntegrationDetails extends Component
     {
         return view('livewire.integration-details')
             ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+    }
+
+    /**
+     * Determine if tasks section should be expanded by default
+     */
+    protected function shouldExpandTasksSection(): bool
+    {
+        // Expand if there are failed or pending tasks
+        // For Integration, task_executions are stored in configuration column
+        $configuration = $this->integration->configuration ?? [];
+        $executions = $configuration['task_executions'] ?? [];
+
+        foreach ($executions as $execution) {
+            $status = $execution['last_attempt']['status'] ?? null;
+            if (in_array($status, ['failed', 'pending'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function fetchActionTypes(): array

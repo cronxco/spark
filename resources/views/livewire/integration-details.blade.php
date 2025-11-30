@@ -330,6 +330,50 @@
                         </div>
                     </x-slot:content>
                 </x-collapse>
+
+                <!-- Tasks -->
+                <div class="pb-4 border-b border-base-200" wire:init="loadTasks">
+                    @if ($tasksLoaded)
+                        @php
+                            $configuration = $integration->configuration ?? [];
+                            $executions = $configuration['task_executions'] ?? [];
+                            $failedCount = collect($executions)->filter(fn($e) => ($e['last_attempt']['status'] ?? null) === 'failed')->count();
+                            $pendingCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['pending', 'running']))->count();
+                            $executedCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['success', 'failed', 'running', 'pending']))->count();
+                        @endphp
+                        <x-collapse wire:model="tasksOpen">
+                            <x-slot:heading>
+                                <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between w-full">
+                                    <div class="flex items-center gap-2">
+                                        <span>Tasks</span>
+                                        @if ($failedCount > 0)
+                                            <x-badge class="badge-xs badge-error">{{ $failedCount }} failed</x-badge>
+                                        @endif
+                                        @if ($pendingCount > 0)
+                                            <x-badge class="badge-xs badge-warning">{{ $pendingCount }} pending</x-badge>
+                                        @endif
+                                        @if ($executedCount > 0 && $failedCount === 0 && $pendingCount === 0)
+                                            <x-badge class="badge-xs badge-ghost">{{ $executedCount }} executed</x-badge>
+                                        @endif
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click.stop="$dispatch('tasks-rerun-initiated')"
+                                        class="btn btn-xs btn-ghost"
+                                        title="Re-run all tasks">
+                                        <x-icon name="fas.rotate" class="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </x-slot:heading>
+                            <x-slot:content>
+                                <livewire:task-execution-section :model="$integration" :key="'tasks-integration-' . $integration->id" />
+                            </x-slot:content>
+                        </x-collapse>
+                    @else
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Tasks</h3>
+                        <x-skeleton-loader type="list-item" :count="2" />
+                    @endif
+                </div>
             </div>
         </x-drawer>
     </div>

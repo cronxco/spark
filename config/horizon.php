@@ -67,6 +67,14 @@ return [
                 'memory' => 256,
                 'tries' => 1,
             ],
+            'supervisor-4' => [
+                'connection' => 'redis',
+                'queue' => ['tasks'],
+                'balance' => 'auto',
+                'maxProcesses' => 1,
+                'memory' => 256,
+                'tries' => 1,
+            ],
         ],
 
         'staging' => [
@@ -94,6 +102,14 @@ return [
                 'memory' => 256,
                 'tries' => 1,
             ],
+            'supervisor-4' => [
+                'connection' => 'redis',
+                'queue' => ['tasks'],
+                'balance' => 'auto',
+                'maxProcesses' => 1,
+                'memory' => 256,
+                'tries' => 1,
+            ],
         ],
 
         'local' => [
@@ -118,6 +134,14 @@ return [
                 'queue' => ['embeddings'],
                 'balance' => 'auto',
                 'maxProcesses' => 5,
+                'memory' => 256,
+                'tries' => 1,
+            ],
+            'supervisor-4' => [
+                'connection' => 'redis',
+                'queue' => ['tasks'],
+                'balance' => 'auto',
+                'maxProcesses' => 1,
                 'memory' => 256,
                 'tries' => 1,
             ],
