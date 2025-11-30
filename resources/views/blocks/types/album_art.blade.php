@@ -10,11 +10,13 @@ $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->e
 // Use Media Library for responsive images with signed URLs
 $media = $block->getFirstMedia('downloaded_images');
 $responsiveImageHtml = null;
+$imageUrl = null;
 
 if ($media) {
     $responsiveImageHtml = (string) $media;
     $doc = new DOMDocument;
-    @$doc->loadHTML($responsiveImageHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+    $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+    @$doc->loadHTML($responsiveImageHtml, $libxmlFlags);
     $img = $doc->getElementsByTagName('img')->item(0);
     if ($img) {
         $img->setAttribute('class', 'w-full h-full object-cover');
@@ -22,6 +24,10 @@ if ($media) {
         $img->setAttribute('alt', $block->title);
         $responsiveImageHtml = $doc->saveHTML($img);
     }
+
+    // Get image URL for "View Full Image" link
+    $isS3 = config('media-library.disk_name') === 's3';
+    $imageUrl = $isS3 ? $media->getTemporaryUrl(now()->addMinutes(60)) : $media->getUrl();
 }
 
 $trackName = $block->metadata['track'] ?? null;

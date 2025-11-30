@@ -1474,7 +1474,8 @@ new class extends Component
                             $responsiveHtml = (string) $media;
                             // Parse and add custom classes
                             $doc = new DOMDocument;
-                            @$doc->loadHTML($responsiveHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                            $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+                            @$doc->loadHTML($responsiveHtml, $libxmlFlags);
                             $img = $doc->getElementsByTagName('img')->item(0);
                             if ($img) {
                                 $img->setAttribute('class', 'w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer');
