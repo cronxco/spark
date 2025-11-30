@@ -151,9 +151,11 @@ class TaskPipelineServiceProvider extends ServiceProvider
                     return false;
                 }
 
-                // TODO: Check integration's anomaly_detection_mode when that field exists
-                // For now, assume it's enabled
-                return true;
+                // Check integration's anomaly_detection_mode
+                $mode = $integration->getAnomalyDetectionMode();
+
+                // Only run for realtime mode (default if not configured), skip for retrospective and disabled
+                return $mode === 'realtime' || $mode === null;
             },
         ));
 
