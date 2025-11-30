@@ -140,6 +140,8 @@ class KarakeepBookmarkData extends BaseProcessingJob
             'event_id' => $event->id,
             'bookmark_id' => $bookmarkId,
         ]);
+
+        // Note: Image downloading now handled by DownloadImagesToMediaLibraryTask in task pipeline
     }
 
     protected function processAddedToList(array $bookmark, array $listsMap): void

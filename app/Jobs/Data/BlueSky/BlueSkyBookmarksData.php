@@ -46,6 +46,8 @@ class BlueSkyBookmarksData extends BaseProcessingJob
                 $event->attachTag($tagData['name'], $tagData['type']);
             }
         }
+
+        // Note: Image downloading now handled by DownloadImagesToMediaLibraryTask in task pipeline
     }
 
     protected function processPost(array $post, string $action): ?array

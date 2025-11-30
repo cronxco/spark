@@ -98,6 +98,7 @@ class MediaDownloadHelper
                     ['md5_hash' => $md5Hash, 'source_url' => $url],
                     $customProperties
                 ))
+                ->withResponsiveImages()
                 ->toMediaCollection($collection);
 
             // Clean up temp file
@@ -205,6 +206,7 @@ class MediaDownloadHelper
                     ['md5_hash' => $md5Hash],
                     $customProperties
                 ))
+                ->withResponsiveImages()
                 ->toMediaCollection($collection);
 
             // Clean up temp file

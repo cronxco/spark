@@ -287,4 +287,124 @@ abstract class BaseProcessingJob implements ShouldQueue
             ->whereNull('deleted_at')
             ->exists();
     }
+
+    /**
+     * Download images from media_url and metadata fields to Media Library.
+     * Call this after creating events to convert external image URLs to Media Library attachments.
+     */
+    protected function downloadImagesToMediaLibrary(Collection $events): void
+    {
+        $mediaHelper = app(\App\Services\Media\MediaDownloadHelper::class);
+
+        foreach ($events as $event) {
+            // Download images from blocks with media_url
+            foreach ($event->blocks as $block) {
+                if ($block->media_url && ! $block->hasMedia('downloaded_images')) {
+                    try {
+                        $media = $mediaHelper->downloadAndAttachMedia(
+                            $block->media_url,
+                            $block,
+                            'downloaded_images'
+                        );
+
+                        if ($media) {
+                            Log::debug('Downloaded image to Media Library for block', [
+                                'block_id' => $block->id,
+                                'block_type' => $block->block_type,
+                                'media_url' => $block->media_url,
+                                'media_id' => $media->id,
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        Log::warning('Failed to download image for block', [
+                            'block_id' => $block->id,
+                            'media_url' => $block->media_url,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Download images from metadata['image'] or metadata['image_url']
+                $metadata = $block->metadata ?? [];
+                $imageUrl = $metadata['image'] ?? $metadata['image_url'] ?? null;
+
+                if ($imageUrl && ! $block->hasMedia('downloaded_images')) {
+                    try {
+                        $media = $mediaHelper->downloadAndAttachMedia(
+                            $imageUrl,
+                            $block,
+                            'downloaded_images'
+                        );
+
+                        if ($media) {
+                            Log::debug('Downloaded image from metadata to Media Library for block', [
+                                'block_id' => $block->id,
+                                'block_type' => $block->block_type,
+                                'image_url' => $imageUrl,
+                                'media_id' => $media->id,
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        Log::warning('Failed to download image from metadata for block', [
+                            'block_id' => $block->id,
+                            'image_url' => $imageUrl,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            // Download target object images (e.g., Reddit post image)
+            if ($event->target && $event->target->media_url && ! $event->target->hasMedia('downloaded_images')) {
+                try {
+                    $media = $mediaHelper->downloadAndAttachMedia(
+                        $event->target->media_url,
+                        $event->target,
+                        'downloaded_images'
+                    );
+
+                    if ($media) {
+                        Log::debug('Downloaded image to Media Library for target object', [
+                            'object_id' => $event->target->id,
+                            'object_type' => $event->target->type,
+                            'media_url' => $event->target->media_url,
+                            'media_id' => $media->id,
+                        ]);
+                    }
+                } catch (Exception $e) {
+                    Log::warning('Failed to download image for target object', [
+                        'object_id' => $event->target->id,
+                        'media_url' => $event->target->media_url,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Download actor object images (e.g., avatar)
+            if ($event->actor && $event->actor->media_url && ! $event->actor->hasMedia('downloaded_images')) {
+                try {
+                    $media = $mediaHelper->downloadAndAttachMedia(
+                        $event->actor->media_url,
+                        $event->actor,
+                        'downloaded_images'
+                    );
+
+                    if ($media) {
+                        Log::debug('Downloaded image to Media Library for actor object', [
+                            'object_id' => $event->actor->id,
+                            'object_type' => $event->actor->type,
+                            'media_url' => $event->actor->media_url,
+                            'media_id' => $media->id,
+                        ]);
+                    }
+                } catch (Exception $e) {
+                    Log::warning('Failed to download image for actor object', [
+                        'object_id' => $event->actor->id,
+                        'media_url' => $event->actor->media_url,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+    }
 }

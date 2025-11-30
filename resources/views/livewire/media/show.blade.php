@@ -107,13 +107,22 @@
                                 controls
                             ></video>
                         @elseif (str_starts_with($this->media->mime_type, 'image/'))
-                            {{-- Image Preview --}}
+                            {{-- Image Preview with Responsive Images --}}
                             <div class="relative">
-                                <img
-                                    src="{{ $mediaUrl }}"
-                                    alt="{{ $this->media->name }}"
-                                    class="max-w-full max-h-[600px] rounded-lg"
-                                />
+                                @php
+                                    // Use Spatie's responsive images
+                                    $responsiveHtml = (string) $this->media;
+                                    // Parse and add custom classes
+                                    $doc = new DOMDocument;
+                                    @$doc->loadHTML($responsiveHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+                                    $img = $doc->getElementsByTagName('img')->item(0);
+                                    if ($img) {
+                                        $img->setAttribute('class', 'max-w-full max-h-[600px] rounded-lg');
+                                        $img->setAttribute('alt', $this->media->name);
+                                        $responsiveHtml = $doc->saveHTML($img);
+                                    }
+                                @endphp
+                                {!! $responsiveHtml !!}
                                 @if ($this->media->getCustomProperty('width') && $this->media->getCustomProperty('height'))
                                     <div class="absolute bottom-2 right-2 badge badge-sm bg-black/70 text-white">
                                         {{ $this->media->getCustomProperty('width') }} × {{ $this->media->getCustomProperty('height') }}

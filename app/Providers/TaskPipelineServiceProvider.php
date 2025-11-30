@@ -2,9 +2,13 @@
 
 namespace App\Providers;
 
+use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Support\ServiceProvider;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use ReflectionClass;
 
 class TaskPipelineServiceProvider extends ServiceProvider
 {
@@ -30,6 +34,65 @@ class TaskPipelineServiceProvider extends ServiceProvider
      */
     protected function registerCoreTasks(): void
     {
+        // Download Images to Media Library - downloads external images and stores them with deduplication
+        TaskRegistry::register(new TaskDefinition(
+            key: 'download_images_to_media_library',
+            name: 'Download Images to Media Library',
+            description: 'Download external images and store in Media Library with responsive variants',
+            jobClass: \App\Jobs\TaskPipeline\Tasks\DownloadImagesToMediaLibraryTask::class,
+            appliesTo: ['event', 'block', 'object'],
+            conditions: [],
+            dependencies: [],
+            queue: 'tasks',
+            priority: 110, // Run before embedding generation
+            runOnCreate: true,
+            runOnUpdate: false,
+            shouldRun: function ($model) {
+                // For Blocks: check for media_url or image in metadata
+                if ($model instanceof \App\Models\Block) {
+                    if ($model->media_url && ! $model->hasMedia('downloaded_images')) {
+                        return true;
+                    }
+                    $metadata = $model->metadata ?? [];
+                    $imageUrl = $metadata['image'] ?? $metadata['image_url'] ?? null;
+
+                    return $imageUrl && ! $model->hasMedia('downloaded_images');
+                }
+
+                // For EventObjects: check for media_url
+                if ($model instanceof \App\Models\EventObject) {
+                    return $model->media_url && ! $model->hasMedia('downloaded_images');
+                }
+
+                // For Events: check if any blocks or objects have images to download
+                if ($model instanceof \App\Models\Event) {
+                    // Check blocks
+                    foreach ($model->blocks as $block) {
+                        if ($block->media_url && ! $block->hasMedia('downloaded_images')) {
+                            return true;
+                        }
+                        $metadata = $block->metadata ?? [];
+                        $imageUrl = $metadata['image'] ?? $metadata['image_url'] ?? null;
+                        if ($imageUrl && ! $block->hasMedia('downloaded_images')) {
+                            return true;
+                        }
+                    }
+
+                    // Check target object
+                    if ($model->target && $model->target->media_url && ! $model->target->hasMedia('downloaded_images')) {
+                        return true;
+                    }
+
+                    // Check actor object
+                    if ($model->actor && $model->actor->media_url && ! $model->actor->hasMedia('downloaded_images')) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+        ));
+
         // Embedding Generation - runs on all model types when OpenAI is configured
         TaskRegistry::register(new TaskDefinition(
             key: 'generate_embedding',
@@ -88,9 +151,11 @@ class TaskPipelineServiceProvider extends ServiceProvider
                     return false;
                 }
 
-                // TODO: Check integration's anomaly_detection_mode when that field exists
-                // For now, assume it's enabled
-                return true;
+                // Check integration's anomaly_detection_mode
+                $mode = $integration->getAnomalyDetectionMode();
+
+                // Only run for realtime mode (default if not configured), skip for retrospective and disabled
+                return $mode === 'realtime' || $mode === null;
             },
         ));
 
@@ -215,7 +280,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
 
             $reflection = new ReflectionClass($className);
 
-            if ($reflection->implementsInterface(App\Integrations\Contracts\SupportsTaskPipeline::class)) {
+            if ($reflection->implementsInterface(SupportsTaskPipeline::class)) {
                 // Get task definitions from the plugin
                 $tasks = $className::getTaskDefinitions();
 

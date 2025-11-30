@@ -9,7 +9,23 @@ $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->e
 
 $title = $block->metadata['title'] ?? $block->title;
 $description = $block->metadata['description'] ?? '';
-$imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['image_url'] ?? null;
+
+// Use Media Library for responsive images with signed URLs
+$media = $block->getFirstMedia('downloaded_images');
+$responsiveImageHtml = null;
+
+if ($media) {
+    $responsiveImageHtml = (string) $media;
+    $doc = new DOMDocument;
+    @$doc->loadHTML($responsiveImageHtml, LIBXML_HTML_NOIMPLIES | LIBXML_HTML_NODEFDTD);
+    $img = $doc->getElementsByTagName('img')->item(0);
+    if ($img) {
+        $img->setAttribute('class', 'w-full h-full object-cover');
+        $img->setAttribute('loading', 'lazy');
+        $img->setAttribute('alt', $title);
+        $responsiveImageHtml = $doc->saveHTML($img);
+    }
+}
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -31,12 +47,9 @@ $imageUrl = $block->media_url ?? $block->metadata['image'] ?? $block->metadata['
         </div>
 
         {{-- Large image preview (taller than default) --}}
-        @if ($imageUrl)
+        @if ($responsiveImageHtml)
             <div class="w-full h-56 rounded-lg overflow-hidden bg-base-300">
-                <img src="{{ $imageUrl }}"
-                     alt="{{ $title }}"
-                     class="w-full h-full object-cover"
-                     loading="lazy">
+                {!! $responsiveImageHtml !!}
             </div>
         @endif
 
