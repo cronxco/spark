@@ -60,26 +60,29 @@ class KarakeepPlugin extends ManualPlugin
 
     public static function getConfigurationSchema($instanceType = null): array
     {
-        return [
-            'update_frequency_minutes' => [
-                'type' => 'integer',
-                'label' => 'Update Frequency (minutes)',
-                'required' => true,
-                'min' => 15,
-                'max' => 1440,
-                'default' => 30,
-                'description' => 'How often to sync bookmarks (15-1440 minutes)',
-            ],
-            'fetch_limit' => [
-                'type' => 'integer',
-                'label' => 'Fetch Limit',
-                'required' => false,
-                'min' => 10,
-                'max' => 100,
-                'default' => 50,
-                'description' => 'Number of bookmarks to fetch per sync (10-100)',
-            ],
-        ];
+        return array_merge(
+            static::getGroupConfigurationSchema(),
+            [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 15,
+                    'max' => 1440,
+                    'default' => 30,
+                    'description' => 'How often to sync bookmarks (15-1440 minutes)',
+                ],
+                'fetch_limit' => [
+                    'type' => 'integer',
+                    'label' => 'Fetch Limit',
+                    'required' => false,
+                    'min' => 10,
+                    'max' => 100,
+                    'default' => 50,
+                    'description' => 'Number of bookmarks to fetch per sync (10-100)',
+                ],
+            ]
+        );
     }
 
     public static function getInstanceTypes(): array

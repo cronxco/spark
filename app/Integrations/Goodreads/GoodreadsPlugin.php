@@ -51,17 +51,20 @@ class GoodreadsPlugin extends ManualPlugin
 
     public static function getConfigurationSchema($instanceType = null): array
     {
-        return [
-            'update_frequency_minutes' => [
-                'type' => 'integer',
-                'label' => 'Update Frequency (minutes)',
-                'required' => true,
-                'min' => 15,
-                'max' => 1440,
-                'default' => 60,
-                'description' => 'How often to check for new reading activity (15-1440 minutes)',
-            ],
-        ];
+        return array_merge(
+            static::getGroupConfigurationSchema(),
+            [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 15,
+                    'max' => 1440,
+                    'default' => 60,
+                    'description' => 'How often to check for new reading activity (15-1440 minutes)',
+                ],
+            ]
+        );
     }
 
     public static function getInstanceTypes(): array
