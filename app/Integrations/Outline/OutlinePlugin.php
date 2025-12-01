@@ -93,72 +93,83 @@ class OutlinePlugin extends ManualPlugin
         ];
 
         if ($instanceType === 'recent_daynotes') {
-            return array_merge($baseSchema, [
-                'update_frequency_minutes' => [
-                    'type' => 'integer',
-                    'label' => 'Update Frequency (minutes)',
-                    'required' => true,
-                    'min' => 5,
-                    'max' => 60,
-                    'default' => 15,
-                    'description' => 'How often to sync recent day notes (5-60 minutes)',
-                ],
-                'document_limit' => [
-                    'type' => 'integer',
-                    'label' => 'Document Limit',
-                    'required' => false,
-                    'min' => 1,
-                    'max' => 20,
-                    'default' => 5,
-                    'description' => 'Number of most recent day notes to sync',
-                ],
-            ]);
+            return array_merge(
+                static::getGroupConfigurationSchema(),
+                $baseSchema,
+                [
+                    'update_frequency_minutes' => [
+                        'type' => 'integer',
+                        'label' => 'Update Frequency (minutes)',
+                        'required' => true,
+                        'min' => 5,
+                        'max' => 60,
+                        'default' => 15,
+                        'description' => 'How often to sync recent day notes (5-60 minutes)',
+                    ],
+                    'document_limit' => [
+                        'type' => 'integer',
+                        'label' => 'Document Limit',
+                        'required' => false,
+                        'min' => 1,
+                        'max' => 20,
+                        'default' => 5,
+                        'description' => 'Number of most recent day notes to sync',
+                    ],
+                ]
+            );
         }
 
         if ($instanceType === 'recent_documents') {
-            return array_merge($baseSchema, [
-                'update_frequency_minutes' => [
-                    'type' => 'integer',
-                    'label' => 'Update Frequency (minutes)',
-                    'required' => true,
-                    'min' => 60,
-                    'max' => 1440,
-                    'default' => 120,
-                    'description' => 'How often to sync recent documents (1-24 hours)',
-                ],
-                'document_limit' => [
-                    'type' => 'integer',
-                    'label' => 'Document Limit',
-                    'required' => false,
-                    'min' => 1,
-                    'max' => 50,
-                    'default' => 10,
-                    'description' => 'Number of most recent documents to sync',
-                ],
-            ]);
+            return array_merge(
+                static::getGroupConfigurationSchema(),
+                $baseSchema,
+                [
+                    'update_frequency_minutes' => [
+                        'type' => 'integer',
+                        'label' => 'Update Frequency (minutes)',
+                        'required' => true,
+                        'min' => 60,
+                        'max' => 1440,
+                        'default' => 120,
+                        'description' => 'How often to sync recent documents (1-24 hours)',
+                    ],
+                    'document_limit' => [
+                        'type' => 'integer',
+                        'label' => 'Document Limit',
+                        'required' => false,
+                        'min' => 1,
+                        'max' => 50,
+                        'default' => 10,
+                        'description' => 'Number of most recent documents to sync',
+                    ],
+                ]
+            );
         }
 
         // Legacy schema for backward compatibility
-        return array_merge($baseSchema, [
-            'poll_interval_minutes' => [
-                'type' => 'integer',
-                'label' => 'Polling Interval (minutes)',
-                'required' => true,
-                'min' => 1,
-                'default' => (int) (config('services.outline.poll_interval_minutes') ?? 15),
-            ],
-            'since_cursor' => [
-                'type' => 'string',
-                'label' => 'Since Cursor (updatedAt ISO8601)',
-                'required' => false,
-            ],
-            'backfill_years' => [
-                'type' => 'integer',
-                'label' => 'Backfill Years',
-                'required' => false,
-                'default' => 3,
-            ],
-        ]);
+        return array_merge(
+            static::getGroupConfigurationSchema(),
+            $baseSchema,
+            [
+                'poll_interval_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Polling Interval (minutes)',
+                    'required' => true,
+                    'min' => 1,
+                    'default' => (int) (config('services.outline.poll_interval_minutes') ?? 15),
+                ],
+                'since_cursor' => [
+                    'type' => 'string',
+                    'label' => 'Since Cursor (updatedAt ISO8601)',
+                    'required' => false,
+                ],
+                'backfill_years' => [
+                    'type' => 'integer',
+                    'label' => 'Backfill Years',
+                    'required' => false,
+                    'default' => 3,
+                ],
+            ]);
     }
 
     public static function getInstanceTypes(): array
