@@ -3,6 +3,8 @@
 namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
+use App\Services\TransactionLinking\TransactionLinkingService;
+use Illuminate\Support\Facades\Log;
 
 class LinkTransactionsTask extends BaseTaskJob
 {
@@ -11,33 +13,24 @@ class LinkTransactionsTask extends BaseTaskJob
      */
     protected function execute(): void
     {
-        // TODO: Implement transaction linking
-        // This task finds and links related transactions (e.g., same transaction across providers)
+        // Only process money domain events
+        if ($this->model->domain !== 'money') {
+            return;
+        }
 
-        // Example implementation:
-        // $linkingService = app(TransactionLinkingService::class);
-        //
-        // // Try different linking strategies
-        // $strategies = [
-        //     new ExplicitReferenceStrategy(),
-        //     new BacsRecordStrategy(),
-        //     new CrossProviderStrategy(),
-        // ];
-        //
-        // foreach ($strategies as $strategy) {
-        //     $links = $strategy->findLinks($this->model);
-        //
-        //     foreach ($links as $link) {
-        //         if ($link['confidence'] >= 85) {
-        //             // Create link between transactions
-        //             TransactionLink::create([
-        //                 'transaction_a_id' => $this->model->id,
-        //                 'transaction_b_id' => $link['transaction']->id,
-        //                 'strategy' => $link['strategy'],
-        //                 'confidence' => $link['confidence'],
-        //             ]);
-        //         }
-        //     }
-        // }
+        $linkingService = app(TransactionLinkingService::class);
+        $autoApproveThreshold = TransactionLinkingService::DEFAULT_AUTO_APPROVE_THRESHOLD;
+
+        $stats = $linkingService->processEvent($this->model, $autoApproveThreshold);
+
+        if ($stats['created'] > 0 || $stats['pending'] > 0) {
+            Log::info('Transaction linking completed via TaskPipeline', [
+                'event_id' => $this->model->id,
+                'source_id' => $this->model->source_id,
+                'created' => $stats['created'],
+                'pending' => $stats['pending'],
+                'skipped' => $stats['skipped'],
+            ]);
+        }
     }
 }

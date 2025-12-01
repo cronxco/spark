@@ -3,9 +3,9 @@
 namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
-use App\Models\Block;
 use App\Models\Event;
-use App\Models\EventObject;
+use App\Services\EmbeddingService;
+use Illuminate\Support\Facades\Log;
 
 class GenerateEmbeddingTask extends BaseTaskJob
 {
@@ -14,114 +14,47 @@ class GenerateEmbeddingTask extends BaseTaskJob
      */
     protected function execute(): void
     {
-        // TODO: Implement embedding generation when OpenAI service is available
-        // This is a placeholder implementation
+        $embeddingService = app(EmbeddingService::class);
 
-        $text = $this->getEmbeddingText();
+        // Get searchable text from the model using its getSearchableText() method
+        $searchableText = $this->model->getSearchableText();
 
-        // For now, just log that we would generate an embedding
-        // In production, this would call OpenAI API to generate embeddings
+        if (empty(trim($searchableText))) {
+            Log::warning('Model has no searchable text, skipping embedding generation', [
+                'model_type' => get_class($this->model),
+                'model_id' => $this->model->id,
+            ]);
 
-        // Example implementation:
-        // $service = app(OpenAIService::class);
-        // $embedding = $service->generateEmbedding($text);
-        //
-        // $this->model->withoutEvents(function() use ($embedding) {
-        //     $this->model->update(['embeddings' => $embedding]);
-        // });
-    }
-
-    /**
-     * Get the text to generate embedding from
-     */
-    protected function getEmbeddingText(): string
-    {
-        if ($this->model instanceof Event) {
-            return $this->getEventEmbeddingText();
-        } elseif ($this->model instanceof Block) {
-            return $this->getBlockEmbeddingText();
-        } elseif ($this->model instanceof EventObject) {
-            return $this->getObjectEmbeddingText();
+            return;
         }
 
-        return '';
-    }
+        // Generate embedding
+        $embedding = $embeddingService->embed($searchableText);
 
-    /**
-     * Get embedding text for Event
-     */
-    protected function getEventEmbeddingText(): string
-    {
-        $parts = [];
+        // Get embedding metadata
+        $embeddingMetadata = $embeddingService->getEmbeddingMetadata();
 
-        if ($this->model->service) {
-            $parts[] = $this->model->service;
-        }
+        // Determine metadata field name (Events use 'event_metadata', others use 'metadata')
+        $metadataField = $this->model instanceof Event ? 'event_metadata' : 'metadata';
 
-        if ($this->model->domain) {
-            $parts[] = $this->model->domain;
-        }
+        // Merge embedding metadata into model metadata
+        $metadata = $this->model->$metadataField ?? [];
+        $metadata = array_merge($metadata, $embeddingMetadata);
 
-        if ($this->model->action) {
-            $parts[] = $this->model->action;
-        }
+        // Store embedding and metadata in database
+        // Use withoutEvents() to prevent observers from triggering on this internal update
+        $this->model->withoutEvents(function () use ($embedding, $metadata, $metadataField) {
+            $this->model->update([
+                'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                $metadataField => $metadata,
+            ]);
+        });
 
-        if ($this->model->value && $this->model->value_unit) {
-            $parts[] = $this->model->value . ' ' . $this->model->value_unit;
-        }
-
-        return implode(' ', $parts);
-    }
-
-    /**
-     * Get embedding text for Block
-     */
-    protected function getBlockEmbeddingText(): string
-    {
-        $parts = [];
-
-        if ($this->model->title) {
-            $parts[] = $this->model->title;
-        }
-
-        if ($this->model->url) {
-            $parts[] = $this->model->url;
-        }
-
-        if ($this->model->value && $this->model->value_unit) {
-            $parts[] = $this->model->value . ' ' . $this->model->value_unit;
-        }
-
-        return implode(' ', $parts);
-    }
-
-    /**
-     * Get embedding text for EventObject
-     */
-    protected function getObjectEmbeddingText(): string
-    {
-        $parts = [];
-
-        if ($this->model->concept) {
-            $parts[] = $this->model->concept;
-        }
-
-        if ($this->model->type) {
-            $parts[] = $this->model->type;
-        }
-
-        if ($this->model->title) {
-            $parts[] = $this->model->title;
-        }
-
-        if ($this->model->content) {
-            $parts[] = $this->model->content;
-        }
-
-        if ($this->model->url) {
-            $parts[] = $this->model->url;
-        }
-
-        return implode(' ', $parts);
+        Log::info('Generated embedding via TaskPipeline', [
+            'model_type' => get_class($this->model),
+            'model_id' => $this->model->id,
+            'text_length' => strlen($searchableText),
+            'embedding_model' => $embeddingMetadata['embedding_model'],
+        ]);
     }
 }

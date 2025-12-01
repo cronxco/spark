@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
 use App\Traits\TracksViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -136,6 +137,13 @@ class Block extends Model implements HasMedia
         static::creating(function ($model) {
             if (empty($model->id)) {
                 $model->id = Str::uuid();
+            }
+        });
+
+        static::created(function ($model): void {
+            // Dispatch Task Pipeline to run applicable tasks
+            if (config('app.enable_task_pipeline', true)) {
+                ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });
 

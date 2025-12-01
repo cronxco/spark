@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
 use App\Traits\TracksViews;
 use ArrayAccess;
@@ -63,6 +64,13 @@ class EventObject extends Model implements HasMedia
             }
 
             // no-op: user_id must be provided by callers now
+        });
+
+        static::created(function ($model): void {
+            // Dispatch Task Pipeline to run applicable tasks
+            if (config('app.enable_task_pipeline', true)) {
+                ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
+            }
         });
 
         static::updating(function ($model) {

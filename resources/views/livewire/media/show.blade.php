@@ -39,7 +39,7 @@
                 </x-header>
 
                 {{-- Overview Card --}}
-                <x-card class="bg-base-200 shadow">
+                <x-card class="bg-base-200 shadow max-w-full">
                     <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
                         <div class="flex-shrink-0">
                             <div class="w-16 h-16 rounded-full bg-base-300 flex items-center justify-center">
@@ -57,7 +57,9 @@
 
                         <div class="flex-1">
                             <h2 class="text-2xl lg:text-3xl font-bold text-base-content mb-2">
-                                {{ $this->media->name ?: $this->media->file_name }}
+                                <span class="block" title="{{ $media->name ?: $media->file_name }}">
+                                    {{ Str::Headline($media->name ?: $media->file_name) }}
+                                </span>
                             </h2>
 
                             <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -86,6 +88,16 @@
                                         {{ class_basename($this->media->model_type) }}
                                     </div>
                                 @endif
+                                @if ($instancesCount > 1)
+                                    <button
+                                        wire:click="openInstancesModal"
+                                        class="badge badge-info gap-1 cursor-pointer hover:badge-info/80 transition-colors"
+                                        title="This file is referenced by {{ $instancesCount }} models"
+                                    >
+                                        <x-icon name="fas.layer-group" class="w-3 h-3" />
+                                        {{ $instancesCount }} instances
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -107,23 +119,14 @@
                                 controls
                             ></video>
                         @elseif (str_starts_with($this->media->mime_type, 'image/'))
-                            {{-- Image Preview with Responsive Images --}}
+                            {{-- Image Preview --}}
                             <div class="relative">
-                                @php
-                                    // Use Spatie's responsive images
-                                    $responsiveHtml = (string) $this->media;
-                                    // Parse and add custom classes
-                                    $doc = new DOMDocument;
-                                    $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
-                                    @$doc->loadHTML($responsiveHtml, $libxmlFlags);
-                                    $img = $doc->getElementsByTagName('img')->item(0);
-                                    if ($img) {
-                                        $img->setAttribute('class', 'max-w-full max-h-[600px] rounded-lg');
-                                        $img->setAttribute('alt', $this->media->name);
-                                        $responsiveHtml = $doc->saveHTML($img);
-                                    }
-                                @endphp
-                                {!! $responsiveHtml !!}
+                                <img
+                                    src="{{ $mediaUrl }}"
+                                    alt="{{ $this->media->name }}"
+                                    class="max-w-full max-h-[600px] rounded-lg object-contain"
+                                    loading="lazy"
+                                />
                                 @if ($this->media->getCustomProperty('width') && $this->media->getCustomProperty('height'))
                                     <div class="absolute bottom-2 right-2 badge badge-sm bg-black/70 text-white">
                                         {{ $this->media->getCustomProperty('width') }} × {{ $this->media->getCustomProperty('height') }}
@@ -217,11 +220,12 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             @foreach ($conversions as $conversion)
                                 <div class="p-3 bg-base-200 rounded-lg">
-                                    <div class="aspect-video bg-base-300 rounded mb-2 overflow-hidden">
+                                    <div class="aspect-video bg-base-300 rounded mb-2 overflow-hidden flex items-center justify-center">
                                         <img
                                             src="{{ $conversion['url'] }}"
                                             alt="{{ $conversion['name'] }}"
-                                            class="w-full h-full object-cover"
+                                            class="max-w-full max-h-full object-contain"
+                                            loading="lazy"
                                         />
                                     </div>
                                     <div class="flex items-center justify-between">
@@ -415,6 +419,96 @@
         <x-slot:actions>
             <x-button label="Cancel" @click="$wire.closeDeleteConfirm()" />
             <x-button label="Delete Permanently" class="btn-error" wire:click="deleteMedia" />
+        </x-slot:actions>
+    </x-modal>
+
+    {{-- All Instances Modal --}}
+    <x-modal wire:model="showInstancesModal" title="All Media Instances" subtitle="This file is referenced by {{ $instancesCount }} model(s)" class="w-full" separator>
+        <div class="space-y-4">
+            @if ($instancesCount > 1)
+                <div class="alert alert-info">
+                    <x-icon name="fas.info-circle" class="w-5 h-5" />
+                    <div>
+                        <p class="font-semibold">Deduplicated Storage</p>
+                        <p class="text-sm">This file is stored once but referenced by {{ $instancesCount }} different models. Deleting any instance will only remove the reference, not the file itself, unless it's the last reference.</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Collection</th>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($allInstances as $instance)
+                                <tr class="{{ $instance->id === $this->media->id ? 'bg-info/10' : '' }}">
+                                    <td>
+                                        <div class="flex items-center gap-2">
+                                            @if ($instance->model)
+                                                <div class="badge badge-sm badge-secondary">
+                                                    {{ class_basename($instance->model_type) }}
+                                                </div>
+                                            @else
+                                                <div class="badge badge-sm badge-ghost">No Model</div>
+                                            @endif
+                                            @if ($instance->id === $this->media->id)
+                                                <div class="badge badge-xs badge-info">Current</div>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-sm">{{ ucfirst(str_replace('_', ' ', $instance->collection_name ?? 'media')) }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-sm font-medium line-clamp-1">{{ $instance->name ?: $instance->file_name }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-sm text-base-content/70">
+                                            <x-uk-date :date="$instance->created_at" :show-time="false" class="text-sm" />
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-1">
+                                            @if ($instance->model)
+                                                @if ($instance->model instanceof \App\Models\EventObject)
+                                                    <a href="{{ route('objects.show', $instance->model->id) }}" wire:navigate class="btn btn-ghost btn-xs" title="View EventObject">
+                                                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                                    </a>
+                                                @elseif ($instance->model instanceof \App\Models\Block)
+                                                    <a href="{{ route('blocks.show', $instance->model->id) }}" wire:navigate class="btn btn-ghost btn-xs" title="View Block">
+                                                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                                    </a>
+                                                @elseif ($instance->model instanceof \App\Models\Event)
+                                                    <a href="{{ route('events.show', $instance->model->id) }}" wire:navigate class="btn btn-ghost btn-xs" title="View Event">
+                                                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                                    </a>
+                                                @endif
+                                            @endif
+                                            @if ($instance->id !== $this->media->id)
+                                                <a href="{{ route('media.show', $instance->uuid) }}" wire:navigate class="btn btn-ghost btn-xs" title="View this instance">
+                                                    <x-icon name="fas.eye" class="w-3 h-3" />
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="text-base-content/70">This file has only one instance.</p>
+            @endif
+        </div>
+
+        <x-slot:actions>
+            <x-button label="Close" @click="$wire.closeInstancesModal()" />
         </x-slot:actions>
     </x-modal>
 </div>
