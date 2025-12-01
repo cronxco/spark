@@ -5,6 +5,7 @@ namespace App\Jobs\TaskPipeline;
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 class ProcessTaskPipelineJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
 
     public $timeout = 300;
     public $tries = 1; // Don't retry the dispatcher itself

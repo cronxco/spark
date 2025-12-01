@@ -8,19 +8,20 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\TaskPipeline\TaskRegistry;
-use Exception;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ProcessIncompleteBatchJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
@@ -78,6 +79,45 @@ class ProcessIncompleteBatchJob implements ShouldQueue
             'next_offset' => $nextOffset,
         ]);
 
+        // If no incomplete models found, move to next model type or finalize
+        if ($incompleteModels->isEmpty()) {
+            $this->stats['examined'] += $examined;
+            $this->updateProgress();
+
+            // Determine next action
+            $modelTypes = [
+                Event::class,
+                Block::class,
+                EventObject::class,
+            ];
+
+            $currentIndex = array_search($this->modelType, $modelTypes);
+
+            if ($currentIndex === false || $currentIndex >= count($modelTypes) - 1) {
+                // Done with all model types
+                $this->finalizeProcessing();
+            } else {
+                // Move to next model type
+                $nextModelType = $modelTypes[$currentIndex + 1];
+
+                Log::info('No incomplete models found, moving to next model type', [
+                    'from' => $this->modelType,
+                    'to' => $nextModelType,
+                ]);
+
+                static::dispatch(
+                    $nextModelType,
+                    0, // Reset offset
+                    $this->batchSize,
+                    $this->filters,
+                    $this->progressId,
+                    $this->stats
+                )->onQueue('tasks');
+            }
+
+            return;
+        }
+
         // Pre-fill embedding tasks where applicable
         $prefilled = 0;
         foreach ($incompleteModels as $model) {
@@ -86,56 +126,113 @@ class ProcessIncompleteBatchJob implements ShouldQueue
             }
         }
 
-        // Dispatch ProcessTaskPipelineJob for each model
-        $dispatched = 0;
+        // Create batch of ProcessTaskPipelineJob for each model
+        $jobs = [];
         foreach ($incompleteModels as $model) {
-            try {
-                ProcessTaskPipelineJob::dispatch(
-                    model: $model,
-                    trigger: 'scheduled',
-                    taskFilter: null,
-                    force: false
-                )->onQueue('tasks');
-
-                $dispatched++;
-            } catch (Exception $e) {
-                Log::error('Failed to dispatch ProcessTaskPipelineJob', [
-                    'model_type' => $this->modelType,
-                    'model_id' => $model->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $this->stats['failed']++;
-            }
+            $jobs[] = new ProcessTaskPipelineJob(
+                model: $model,
+                trigger: 'scheduled',
+                taskFilter: null,
+                force: false
+            );
         }
 
         // Update stats
-        $this->stats['processed'] += $dispatched;
+        $this->stats['processed'] += $incompleteModels->count();
         $this->stats['examined'] += $examined;
         $this->stats['prefilled'] += $prefilled;
 
         // Update progress
         $this->updateProgress();
 
-        // Determine next action
-        if ($incompleteModels->count() >= $this->batchSize) {
-            // More models to process in this model type - chain to next batch
-            Log::info('Chaining to next batch', [
-                'model_type' => $this->modelType,
-                'next_offset' => $nextOffset,
-            ]);
+        // Determine what happens after this batch completes
+        $hasMoreInThisType = $incompleteModels->count() >= $this->batchSize;
 
-            static::dispatch(
-                $this->modelType,
-                $nextOffset,
-                $this->batchSize,
-                $this->filters,
-                $this->progressId,
-                $this->stats
-            )->onQueue('tasks');
-        } else {
-            // Done with this model type - move to next or finalize
-            $this->processNextModelType();
-        }
+        // Capture instance properties for the closure (can't use $this in finally callback)
+        $modelType = $this->modelType;
+        $batchSize = $this->batchSize;
+        $filters = $this->filters;
+        $progressId = $this->progressId;
+        $stats = $this->stats;
+
+        // Dispatch batch with continuation job
+        $batch = Bus::batch($jobs)
+            ->name("task_pipeline_batch_{$this->modelType}_{$this->offset}")
+            ->onQueue('tasks')
+            ->finally(function () use ($hasMoreInThisType, $nextOffset, $modelType, $batchSize, $filters, $progressId, $stats) {
+                if ($hasMoreInThisType) {
+                    // More models to process in this model type - chain to next batch
+                    Log::info('Batch complete, chaining to next batch', [
+                        'model_type' => $modelType,
+                        'next_offset' => $nextOffset,
+                    ]);
+
+                    ProcessIncompleteBatchJob::dispatch(
+                        $modelType,
+                        $nextOffset,
+                        $batchSize,
+                        $filters,
+                        $progressId,
+                        $stats
+                    )->onQueue('tasks');
+                } else {
+                    // Done with this model type - dispatch next model type or finalize
+                    Log::info('Batch complete, determining next model type', [
+                        'model_type' => $modelType,
+                    ]);
+
+                    $modelTypes = [
+                        Event::class,
+                        Block::class,
+                        EventObject::class,
+                    ];
+
+                    $currentIndex = array_search($modelType, $modelTypes);
+
+                    if ($currentIndex === false || $currentIndex >= count($modelTypes) - 1) {
+                        // Done with all model types - finalize
+                        Log::info('Batch processing complete', [
+                            'stats' => $stats,
+                        ]);
+
+                        if ($progressId) {
+                            $progress = ActionProgress::find($progressId);
+                            if ($progress) {
+                                $progress->markCompleted([
+                                    'total_processed' => $stats['processed'],
+                                    'total_examined' => $stats['examined'],
+                                    'total_prefilled' => $stats['prefilled'],
+                                    'total_failed' => $stats['failed'],
+                                ]);
+                            }
+                        }
+                    } else {
+                        // Move to next model type
+                        $nextModelType = $modelTypes[$currentIndex + 1];
+
+                        Log::info('Moving to next model type', [
+                            'from' => $modelType,
+                            'to' => $nextModelType,
+                        ]);
+
+                        ProcessIncompleteBatchJob::dispatch(
+                            $nextModelType,
+                            0, // Reset offset
+                            $batchSize,
+                            $filters,
+                            $progressId,
+                            $stats
+                        )->onQueue('tasks');
+                    }
+                }
+            })
+            ->dispatch();
+
+        Log::info('Dispatched batch', [
+            'batch_id' => $batch->id,
+            'job_count' => count($jobs),
+            'model_type' => $this->modelType,
+        ]);
     }
 
     /**
@@ -302,44 +399,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
         ]);
 
         return true; // Pre-filled
-    }
-
-    /**
-     * Process next model type or finalize
-     */
-    protected function processNextModelType(): void
-    {
-        $modelTypes = [
-            Event::class,
-            Block::class,
-            EventObject::class,
-        ];
-
-        $currentIndex = array_search($this->modelType, $modelTypes);
-
-        if ($currentIndex === false || $currentIndex >= count($modelTypes) - 1) {
-            // Done with all model types
-            $this->finalizeProcessing();
-
-            return;
-        }
-
-        // Move to next model type
-        $nextModelType = $modelTypes[$currentIndex + 1];
-
-        Log::info('Moving to next model type', [
-            'from' => $this->modelType,
-            'to' => $nextModelType,
-        ]);
-
-        static::dispatch(
-            $nextModelType,
-            0, // Reset offset
-            $this->batchSize,
-            $this->filters,
-            $this->progressId,
-            $this->stats
-        )->onQueue('tasks');
     }
 
     /**
