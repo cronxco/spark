@@ -8,6 +8,7 @@ use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
 use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
+use App\Jobs\OAuth\Goodreads\GoodreadsRssPull;
 use App\Jobs\OAuth\GoogleCalendar\GoogleCalendarEventsPull;
 use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
 use App\Jobs\OAuth\Karakeep\KarakeepBookmarksPull;
@@ -33,6 +34,7 @@ use App\Jobs\OAuth\Oura\OuraVO2MaxPull;
 use App\Jobs\OAuth\Oura\OuraWorkoutsPull;
 use App\Jobs\OAuth\Reddit\RedditSavedPull;
 use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
+use App\Jobs\OAuth\Untappd\UntappdRssPull;
 use App\Models\Integration;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -224,6 +226,8 @@ class CheckIntegrationUpdates implements ShouldQueue
             'karakeep' => $this->getKarakeepFetchJobs($integration),
             'google-calendar' => $this->getGoogleCalendarFetchJobs($integration),
             'fetch' => $this->getFetchFetchJobs($integration),
+            'goodreads' => $this->getGoodreadsFetchJobs($integration),
+            'untappd' => $this->getUntappdFetchJobs($integration),
             // Add other services here as they are implemented
             default => [],
         };
@@ -363,6 +367,26 @@ class CheckIntegrationUpdates implements ShouldQueue
 
         return match ($instanceType) {
             'fetcher' => [FetchScheduledUrls::class],
+            default => [],
+        };
+    }
+
+    private function getGoodreadsFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'rss_feed';
+
+        return match ($instanceType) {
+            'rss_feed' => [GoodreadsRssPull::class],
+            default => [],
+        };
+    }
+
+    private function getUntappdFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'rss_feed';
+
+        return match ($instanceType) {
+            'rss_feed' => [UntappdRssPull::class],
             default => [],
         };
     }
