@@ -217,7 +217,9 @@ class GoodreadsRssData extends BaseProcessingJob
         // Extract cover image
         $images = $xpath->query('//img');
         if ($images->length > 0) {
-            $data['coverUrl'] = $images->item(0)->getAttribute('src');
+            $coverUrl = $images->item(0)->getAttribute('src');
+            // Strip size suffix to get full-sized image (e.g., _SX98_, _SY475_)
+            $data['coverUrl'] = $this->getFullSizeCoverUrl($coverUrl);
         }
 
         // Extract book link and title
@@ -299,5 +301,19 @@ class GoodreadsRssData extends BaseProcessingJob
         }
 
         return $this->createEvents($payloads);
+    }
+
+    /**
+     * Strip size suffix from Goodreads cover URL to get full-sized image
+     * Example: https://i.gr-assets.com/.../55928896._SX98_.jpg -> https://i.gr-assets.com/.../55928896.jpg
+     */
+    private function getFullSizeCoverUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        // Remove size suffixes like _SX98_, _SY475_, etc.
+        return preg_replace('/\._[A-Z]{2}\d+_\./', '.', $url);
     }
 }

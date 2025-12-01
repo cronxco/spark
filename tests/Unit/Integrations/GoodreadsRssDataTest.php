@@ -255,6 +255,41 @@ class GoodreadsRssDataTest extends TestCase
         $this->assertEquals('goodreads_' . md5('UniqueGuid123'), $event->source_id);
     }
 
+    /** @test */
+    public function it_strips_size_suffix_from_cover_urls()
+    {
+        $items = [
+            [
+                'guid' => 'CoverTest123',
+                'pubDate' => 'Sat, 29 Nov 2025 14:03:15 -0800',
+                'title' => "George is currently reading 'Book With Cover'",
+                'link' => 'https://www.goodreads.com/review/show/999',
+                'description' => $this->buildGoodreadsDescription(
+                    'Book With Cover',
+                    'Cover Author',
+                    'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1605735671l/55928896._SX98_.jpg',
+                    '/book/show/999',
+                    '/author/show/999'
+                ),
+            ],
+        ];
+
+        $job = new GoodreadsRssData($this->integration, ['items' => $items]);
+        $job->handle();
+
+        $event = Event::where('service', 'goodreads')->first();
+        $coverBlock = $event->blocks->where('block_type', 'book_cover')->first();
+
+        $this->assertNotNull($coverBlock);
+        // Should have stripped _SX98_ suffix
+        $this->assertEquals(
+            'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1605735671l/55928896.jpg',
+            $coverBlock->media_url
+        );
+        // Ensure it doesn't contain the size suffix
+        $this->assertStringNotContainsString('_SX98_', $coverBlock->media_url);
+    }
+
     /**
      * Build a mock Goodreads RSS description HTML
      */
