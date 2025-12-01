@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
 use App\Jobs\Metrics\DetectMetricAnomaliesJob;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
+use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -22,8 +24,11 @@ class MetricTrackingTest extends TestCase
     /**
      * @test
      */
-    public function event_creation_dispatches_anomaly_detection_job(): void
+    public function event_creation_dispatches_task_pipeline_and_anomaly_detection(): void
     {
+        // Enable task pipeline for this test
+        config(['app.enable_task_pipeline' => true]);
+
         Queue::fake();
 
         $user = User::factory()->create();
@@ -36,7 +41,7 @@ class MetricTrackingTest extends TestCase
         $actor = EventObject::factory()->create(['user_id' => $user->id]);
         $target = EventObject::factory()->create(['user_id' => $user->id]);
 
-        Event::create([
+        $event = Event::create([
             'source_id' => 'test-123',
             'time' => now(),
             'integration_id' => $integration->id,
@@ -50,7 +55,19 @@ class MetricTrackingTest extends TestCase
             'target_id' => $target->id,
         ]);
 
-        Queue::assertPushed(DetectMetricAnomaliesJob::class);
+        // Verify ProcessTaskPipelineJob was dispatched
+        Queue::assertPushed(ProcessTaskPipelineJob::class, function ($job) use ($event) {
+            return $job->model->id === $event->id && $job->trigger === 'created';
+        });
+
+        // Process the pipeline manually to verify it dispatches the anomaly detection task
+        $pipelineJob = new ProcessTaskPipelineJob($event, 'created');
+        $pipelineJob->handle();
+
+        // Verify DetectAnomaliesTask was dispatched by the pipeline
+        Queue::assertPushed(DetectAnomaliesTask::class, function ($job) use ($event) {
+            return $job->model->id === $event->id;
+        });
     }
 
     /**
