@@ -137,6 +137,7 @@ class GoodreadsPlugin extends ManualPlugin
                 'display_name' => 'Book Cover',
                 'description' => 'Book cover image',
                 'display_with_object' => false,
+                'value_unit' => null,
                 'hidden' => false,
             ],
             'book_author' => [
@@ -144,6 +145,7 @@ class GoodreadsPlugin extends ManualPlugin
                 'display_name' => 'Author',
                 'description' => 'Book author information',
                 'display_with_object' => false,
+                'value_unit' => null,
                 'hidden' => false,
             ],
         ];

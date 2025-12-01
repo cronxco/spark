@@ -83,7 +83,7 @@ class UntappdRssDataTest extends TestCase
         $tags = $event->tags;
         $this->assertTrue($tags->contains('name', 'Great Brewery'));
         $breweryTag = $tags->where('name', 'Great Brewery')->first();
-        $this->assertEquals('untappd_brewery', $breweryTag->tag_type);
+        $this->assertEquals('untappd_brewery', $breweryTag->type);
     }
 
     /** @test */
@@ -114,7 +114,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertTrue($tags->contains('name', 'Cool Bar'));
 
         $venueTag = $tags->where('name', 'Cool Bar')->first();
-        $this->assertEquals('untappd_venue', $venueTag->tag_type);
+        $this->assertEquals('untappd_venue', $venueTag->type);
     }
 
     /** @test */
@@ -282,7 +282,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('Sample Brewery', $breweryBlocks->first()->title);
 
         // Check brewery tag exists
-        $breweryTags = $event->tags->where('tag_type', 'untappd_brewery');
+        $breweryTags = $event->tags->where('type', 'untappd_brewery');
         $this->assertCount(1, $breweryTags);
         $this->assertEquals('Sample Brewery', $breweryTags->first()->name);
     }
