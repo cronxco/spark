@@ -128,4 +128,7 @@ return [
     // Whitelist of allowed job classes for Task plugin execution (comma-separated FQCNs)
     'allowed_task_jobs' => env('ALLOWED_TASK_JOBS') ? explode(',', env('ALLOWED_TASK_JOBS')) : null,
 
+    // Enable/disable TaskPipeline job dispatch (disabled in testing by default to improve performance)
+    'enable_task_pipeline' => env('ENABLE_TASK_PIPELINE', true),
+
 ];
