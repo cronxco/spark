@@ -21,7 +21,7 @@ class UntappdRssPull extends BaseFetchJob
 
     protected function fetchData(): array
     {
-        $group = $this->integration->integrationGroup;
+        $group = $this->integration->group;
         $rssUrl = $group->auth_metadata['rss_url'] ?? null;
 
         if (! $rssUrl) {
