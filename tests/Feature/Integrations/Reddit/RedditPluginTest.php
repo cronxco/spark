@@ -8,15 +8,12 @@ use App\Jobs\OAuth\Reddit\RedditSavedPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class RedditPluginTest extends TestCase
 {
-    use RefreshDatabase;
-
     /**
      * @test
      */

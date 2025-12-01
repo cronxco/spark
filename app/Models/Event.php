@@ -71,7 +71,9 @@ class Event extends Model
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
             // This includes: embedding generation, anomaly detection, receipt matching, etc.
-            ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
+            if (config('app.enable_task_pipeline', true)) {
+                ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
+            }
         });
 
         static::deleted(function ($model): void {
