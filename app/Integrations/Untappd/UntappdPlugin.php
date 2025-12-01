@@ -112,6 +112,7 @@ class UntappdPlugin extends ManualPlugin
                 'display_name' => 'Beer Comment',
                 'description' => 'User comment about the beer',
                 'display_with_object' => false,
+                'value_unit' => null,
                 'hidden' => false,
             ],
             'beer_brewery' => [
@@ -119,6 +120,7 @@ class UntappdPlugin extends ManualPlugin
                 'display_name' => 'Brewery',
                 'description' => 'Brewery information',
                 'display_with_object' => false,
+                'value_unit' => null,
                 'hidden' => false,
             ],
         ];

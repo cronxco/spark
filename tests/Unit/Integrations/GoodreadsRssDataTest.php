@@ -95,7 +95,10 @@ class GoodreadsRssDataTest extends TestCase
         // Check tags
         $tags = $event->tags;
         $this->assertTrue($tags->contains('name', 'John Smith'));
-        $this->assertEquals('goodreads_author', $tags->first()->tag_type);
+
+        $authorTag = $tags->where('name', 'John Smith')->first();
+        $this->assertNotNull($authorTag);
+        $this->assertEquals('goodreads_author', $authorTag->type);
     }
 
     /** @test */
