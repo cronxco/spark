@@ -3,6 +3,7 @@
 namespace App\Jobs\Data\Goodreads;
 
 use App\Jobs\Base\BaseProcessingJob;
+use App\Models\EventObject;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMXPath;
@@ -62,16 +63,20 @@ class GoodreadsRssData extends BaseProcessingJob
 
             // Build target (book)
             $bookTitle = $descriptionData['bookTitle'] ?? $parsedData['bookTitle'] ?? 'Unknown Book';
+            $bookUrl = $descriptionData['bookUrl'] ?? $link;
+            $bookId = $this->extractBookId($bookUrl);
+
             $target = [
                 'concept' => 'document',
                 'type' => 'goodreads_book',
                 'title' => $bookTitle,
                 'content' => null,
                 'metadata' => [
+                    'book_id' => $bookId,
                     'author' => $descriptionData['authorName'] ?? null,
                     'author_url' => $descriptionData['authorUrl'] ?? null,
                 ],
-                'url' => $descriptionData['bookUrl'] ?? $link,
+                'url' => $bookUrl,
                 'image_url' => $descriptionData['coverUrl'] ?? null,
                 'time' => $pubDate ? Carbon::parse($pubDate) : now(),
             ];
@@ -144,6 +149,47 @@ class GoodreadsRssData extends BaseProcessingJob
                 $event->attachTag($tag, 'goodreads_author');
             }
         }
+    }
+
+    /**
+     * Override createOrUpdateObject to handle book deduplication by book_id
+     */
+    protected function createOrUpdateObject(array $objectData): EventObject
+    {
+        // For Goodreads books, check if object with same book_id already exists
+        if ($objectData['type'] === 'goodreads_book' && isset($objectData['metadata']['book_id'])) {
+            $bookId = $objectData['metadata']['book_id'];
+
+            // Find existing book by book_id in metadata
+            $existingBook = EventObject::where('user_id', $this->integration->user_id)
+                ->where('concept', $objectData['concept'])
+                ->where('type', $objectData['type'])
+                ->whereJsonContains('metadata->book_id', $bookId)
+                ->first();
+
+            if ($existingBook) {
+                // Keep the longer title (handles truncated titles from RSS feed)
+                $newTitle = $objectData['title'];
+                $existingTitle = $existingBook->title;
+                $titleToKeep = mb_strlen($newTitle) > mb_strlen($existingTitle) ? $newTitle : $existingTitle;
+
+                // Update the existing book with new data
+                $existingBook->update([
+                    'time' => $objectData['time'] ?? now(),
+                    'title' => $titleToKeep,
+                    'content' => $objectData['content'] ?? null,
+                    'metadata' => array_merge($existingBook->metadata ?? [], $objectData['metadata'] ?? []),
+                    'url' => $objectData['url'] ?? $existingBook->url,
+                    'media_url' => $objectData['image_url'] ?? $existingBook->media_url,
+                    'embeddings' => $objectData['embeddings'] ?? $existingBook->embeddings,
+                ]);
+
+                return $existingBook;
+            }
+        }
+
+        // Fall back to parent method for other object types
+        return parent::createOrUpdateObject($objectData);
     }
 
     /**
@@ -315,5 +361,23 @@ class GoodreadsRssData extends BaseProcessingJob
 
         // Remove size suffixes like _SX98_, _SY475_, etc.
         return preg_replace('/\._[A-Z]{2}\d+_\./', '.', $url);
+    }
+
+    /**
+     * Extract book ID from Goodreads book URL
+     * Example: https://www.goodreads.com/book/show/25792894-kings-rising -> 25792894
+     */
+    private function extractBookId(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        // Match pattern: /book/show/{book_id}-{slug} or /book/show/{book_id}
+        if (preg_match('/\/book\/show\/(\d+)(?:-|$)/', $url, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
     }
 }

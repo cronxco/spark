@@ -96,9 +96,9 @@ class UntappdPlugin extends ManualPlugin
     public static function getActionTypes(): array
     {
         return [
-            'drank_beer' => [
+            'drank' => [
                 'icon' => 'fas.beer-mug-empty',
-                'display_name' => 'Drank Beer',
+                'display_name' => 'Drank',
                 'description' => 'Drank a beer',
                 'display_with_object' => true,
                 'value_unit' => null,
