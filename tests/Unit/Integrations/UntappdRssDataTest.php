@@ -57,12 +57,12 @@ class UntappdRssDataTest extends TestCase
 
         $this->assertDatabaseHas('events', [
             'service' => 'untappd',
-            'action' => 'drank_beer',
+            'action' => 'drank',
             'domain' => 'health',
         ]);
 
         $event = Event::where('service', 'untappd')->first();
-        $this->assertEquals('drank_beer', $event->action);
+        $this->assertEquals('drank', $event->action);
         $this->assertNull($event->value);
 
         // Check actor
@@ -217,8 +217,8 @@ class UntappdRssDataTest extends TestCase
         $events = Event::where('service', 'untappd')->get();
         $this->assertCount(3, $events);
 
-        // All should be drank_beer actions
-        $this->assertTrue($events->every(fn ($e) => $e->action === 'drank_beer'));
+        // All should be drank actions
+        $this->assertTrue($events->every(fn ($e) => $e->action === 'drank'));
 
         // Check that one has a venue
         $eventWithVenue = $events->first(fn ($e) => ! empty($e->target->metadata['venue']));

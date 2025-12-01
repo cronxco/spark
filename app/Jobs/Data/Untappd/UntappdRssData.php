@@ -126,7 +126,7 @@ class UntappdRssData extends BaseProcessingJob
                 'source_id' => $sourceId,
                 'time' => $pubDate ? Carbon::parse($pubDate) : now(),
                 'domain' => 'health',
-                'action' => 'drank_beer',
+                'action' => 'drank',
                 'value' => null,
                 'value_multiplier' => 1,
                 'value_unit' => null,
