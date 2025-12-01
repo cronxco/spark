@@ -9,6 +9,7 @@ use App\Integrations\Fetch\FetchPlugin;
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
+use App\Integrations\Goodreads\GoodreadsPlugin;
 use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Integrations\Hevy\HevyPlugin;
 use App\Integrations\Karakeep\KarakeepPlugin;
@@ -21,6 +22,7 @@ use App\Integrations\Reddit\RedditPlugin;
 use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
 use App\Integrations\Task\TaskPlugin;
+use App\Integrations\Untappd\UntappdPlugin;
 use Illuminate\Support\ServiceProvider;
 
 class IntegrationServiceProvider extends ServiceProvider
@@ -49,6 +51,8 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(GoogleCalendarPlugin::class);
         PluginRegistry::register(BlueSkyPlugin::class);
         PluginRegistry::register(ReceiptPlugin::class);
+        PluginRegistry::register(GoodreadsPlugin::class);
+        PluginRegistry::register(UntappdPlugin::class);
     }
 
     /**
