@@ -8,7 +8,8 @@ use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
 use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
-use App\Jobs\OAuth\Goodreads\GoodreadsRssPull;
+use App\Jobs\OAuth\Goodreads\GoodreadsProgressPull;
+use App\Jobs\OAuth\Goodreads\GoodreadsShelfPull;
 use App\Jobs\OAuth\GoogleCalendar\GoogleCalendarEventsPull;
 use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
 use App\Jobs\OAuth\Karakeep\KarakeepBookmarksPull;
@@ -373,10 +374,13 @@ class CheckIntegrationUpdates implements ShouldQueue
 
     private function getGoodreadsFetchJobs(Integration $integration): array
     {
-        $instanceType = $integration->instance_type ?: 'rss_feed';
+        $instanceType = $integration->instance_type ?: 'shelf_currently_reading';
 
         return match ($instanceType) {
-            'rss_feed' => [GoodreadsRssPull::class],
+            'shelf_currently_reading' => [GoodreadsShelfPull::class],
+            'shelf_read' => [GoodreadsShelfPull::class],
+            'shelf_to_read' => [GoodreadsShelfPull::class],
+            'updates_progress' => [GoodreadsProgressPull::class],
             default => [],
         };
     }
