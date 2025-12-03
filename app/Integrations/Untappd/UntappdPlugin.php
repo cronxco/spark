@@ -101,7 +101,7 @@ class UntappdPlugin extends ManualPlugin
                 'display_name' => 'Drank',
                 'description' => 'Drank a beer',
                 'display_with_object' => true,
-                'value_unit' => null,
+                'value_unit' => '/5',
                 'hidden' => false,
             ],
         ];
@@ -122,6 +122,14 @@ class UntappdPlugin extends ManualPlugin
                 'icon' => 'fas.industry',
                 'display_name' => 'Brewery',
                 'description' => 'Brewery information',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'badge_earned' => [
+                'icon' => 'fas.award',
+                'display_name' => 'Badge Earned',
+                'description' => 'Badge earned from this check-in',
                 'display_with_object' => false,
                 'value_unit' => null,
                 'hidden' => false,
