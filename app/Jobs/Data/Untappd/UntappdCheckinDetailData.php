@@ -121,7 +121,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
                     $this->integration,
                     (string) $event->target->id,
                     $fullBeerUrl
-                )->onQueue('pull')->delay(now()->addMinutes(5));
+                )->onQueue('pull')->delay(now()->addMinutes(2));
             } else {
                 // Beer details are already complete, create block immediately
                 logger()->info('Creating beer info block immediately', [
@@ -157,7 +157,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
                     $this->integration,
                     (string) $breweryId,
                     $fullBreweryUrl
-                )->onQueue('pull')->delay(now()->addMinutes(5));
+                )->onQueue('pull')->delay(now()->addMinutes(3));
             } elseif ($breweryId) {
                 // Brewery details are already complete, create block immediately
                 logger()->info('Creating brewery info block immediately', [
@@ -385,7 +385,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
     /**
      * Get or create brewery EventObject
      */
-    private function getOrCreateBreweryObject(string $breweryName, string $breweryUrl): ?int
+    private function getOrCreateBreweryObject(string $breweryName, string $breweryUrl): ?string
     {
         if (empty($breweryName) || empty($breweryUrl)) {
             return null;
@@ -413,7 +413,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
     /**
      * Determine if brewery details should be fetched
      */
-    private function shouldFetchBreweryDetails(int $breweryId): bool
+    private function shouldFetchBreweryDetails(string $breweryId): bool
     {
         $brewery = EventObject::find($breweryId);
 

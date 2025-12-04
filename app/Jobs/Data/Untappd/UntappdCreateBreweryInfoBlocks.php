@@ -51,9 +51,11 @@ class UntappdCreateBreweryInfoBlocks extends BaseProcessingJob
 
         // Find all events for beers from this brewery that don't already have a brewery_details block
         // We need to find events where the beer's brewery matches this brewery
-        $events = Event::where('user_id', $this->integration->user_id)
-            ->where('service', 'untappd')
+        $events = Event::where('service', 'untappd')
             ->where('action', 'drank')
+            ->whereHas('integration', function ($query) {
+                $query->where('user_id', $this->integration->user_id);
+            })
             ->whereHas('target', function ($query) use ($brewery) {
                 // Filter to beers that have this brewery name in their metadata
                 $query->where('type', 'untappd_beer')
@@ -90,6 +92,12 @@ class UntappdCreateBreweryInfoBlocks extends BaseProcessingJob
             'brewery_url' => $metadata['brewery_url'] ?? $brewery->url,
         ];
 
+        // Convert aggregate rating to integer (multiply by 1000 to preserve 3 decimal places)
+        $ratingValue = null;
+        if (isset($metadata['aggregate_rating']) && is_numeric($metadata['aggregate_rating'])) {
+            $ratingValue = (int) round($metadata['aggregate_rating'] * 1000);
+        }
+
         // Create the block
         $block = $event->createBlock([
             'block_type' => 'brewery_details',
@@ -98,8 +106,8 @@ class UntappdCreateBreweryInfoBlocks extends BaseProcessingJob
             'metadata' => $blockMetadata,
             'url' => $metadata['brewery_url'] ?? $brewery->url,
             'media_url' => null,
-            'value' => $metadata['aggregate_rating'] ?? null,
-            'value_multiplier' => 1,
+            'value' => $ratingValue,
+            'value_multiplier' => 1000,
             'value_unit' => '/5',
             'time' => $event->time,
         ]);

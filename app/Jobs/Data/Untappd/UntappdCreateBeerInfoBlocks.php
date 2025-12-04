@@ -49,7 +49,7 @@ class UntappdCreateBeerInfoBlocks extends BaseProcessingJob
         ]);
 
         // Find all events where this beer is the target and don't already have a beer_details block
-        $events = $beer->eventsAsTarget()
+        $events = $beer->targetEvents()
             ->whereDoesntHave('blocks', function ($query) {
                 $query->where('block_type', 'beer_details');
             })
@@ -80,6 +80,12 @@ class UntappdCreateBeerInfoBlocks extends BaseProcessingJob
             'beer_url' => $metadata['beer_url'] ?? $beer->url,
         ];
 
+        // Convert aggregate rating to integer (multiply by 1000 to preserve 3 decimal places)
+        $ratingValue = null;
+        if (isset($metadata['aggregate_rating']) && is_numeric($metadata['aggregate_rating'])) {
+            $ratingValue = (int) round($metadata['aggregate_rating'] * 1000);
+        }
+
         // Create the block
         $block = $event->createBlock([
             'block_type' => 'beer_details',
@@ -88,8 +94,8 @@ class UntappdCreateBeerInfoBlocks extends BaseProcessingJob
             'metadata' => $blockMetadata,
             'url' => $metadata['beer_url'] ?? $beer->url,
             'media_url' => null,
-            'value' => $metadata['aggregate_rating'] ?? null,
-            'value_multiplier' => 1,
+            'value' => $ratingValue,
+            'value_multiplier' => 1000,
             'value_unit' => '/5',
             'time' => $event->time,
         ]);
