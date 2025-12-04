@@ -3,11 +3,14 @@
 namespace Tests\Unit\Integrations;
 
 use App\Jobs\Data\Untappd\UntappdRssData;
+use App\Jobs\OAuth\Untappd\UntappdCheckinDetailPull;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class UntappdRssDataTest extends TestCase
@@ -19,6 +22,17 @@ class UntappdRssDataTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Mock HTTP responses for Playwright health checks
+        // This prevents Playwright worker availability checks from failing in CI
+        Http::fake([
+            '*/health' => Http::response(['status' => 'error'], 500),
+            '*' => Http::response('', 404),
+        ]);
+
+        // Fake the queue to prevent UntappdCheckinDetailPull jobs from running
+        // since they require Playwright which isn't available in CI
+        Queue::fake([UntappdCheckinDetailPull::class]);
 
         $user = User::factory()->create();
         $group = IntegrationGroup::create([
@@ -72,7 +86,7 @@ class UntappdRssDataTest extends TestCase
         // Check target (beer)
         $this->assertEquals('untappd_beer', $event->target->type);
         $this->assertEquals('Test IPA', $event->target->title);
-        $this->assertEquals('Great Brewery', $event->target->metadata['brewery']);
+        $this->assertEquals('Great Brewery', $event->target->metadata['brewery_name']);
 
         // Check brewery block
         $breweryBlock = $event->blocks->where('block_type', 'beer_brewery')->first();
@@ -105,7 +119,7 @@ class UntappdRssDataTest extends TestCase
         $event = Event::where('service', 'untappd')->first();
         $this->assertEquals('Bob D.', $event->actor->title);
         $this->assertEquals('Craft Lager', $event->target->title);
-        $this->assertEquals('Amazing Brewing', $event->target->metadata['brewery']);
+        $this->assertEquals('Amazing Brewing', $event->target->metadata['brewery_name']);
         $this->assertEquals('Cool Bar', $event->target->metadata['venue']);
 
         // Check tags
@@ -181,7 +195,7 @@ class UntappdRssDataTest extends TestCase
         $event = Event::where('service', 'untappd')->first();
         // Should decode &apos; to '
         $this->assertEquals("Brewer's Choice [2025]", $event->target->title);
-        $this->assertEquals('Artisan Brewery', $event->target->metadata['brewery']);
+        $this->assertEquals('Artisan Brewery', $event->target->metadata['brewery_name']);
     }
 
     /** @test */
