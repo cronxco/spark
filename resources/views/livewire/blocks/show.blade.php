@@ -27,6 +27,7 @@ new class extends Component
     public bool $tasksLoaded = false;
     public bool $relatedBlocksLoaded = false;
     public bool $activitiesLoaded = false;
+    public bool $drawerContentLoaded = false;
 
     // Collapse states
     public bool $tasksOpen = false;
@@ -46,6 +47,7 @@ new class extends Component
         'relationship-created' => 'handleRelationshipUpdated',
         'relationship-deleted' => 'handleRelationshipUpdated',
         'close-modal' => 'closeEditModal',
+        'drawer-opened' => 'loadDrawerContent',
     ];
 
     public function mount(Block $block): void
@@ -79,22 +81,6 @@ new class extends Component
         $this->tasksLoaded = true;
     }
 
-    protected function shouldExpandTasksSection(): bool
-    {
-        // Expand if there are failed or pending tasks
-        $metadata = $this->block->metadata ?? [];
-        $executions = $metadata['task_executions'] ?? [];
-
-        foreach ($executions as $execution) {
-            $status = $execution['last_attempt']['status'] ?? null;
-            if (in_array($status, ['failed', 'pending'])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     public function loadRelatedBlocks(): void
     {
         if ($this->relatedBlocksLoaded) {
@@ -113,6 +99,31 @@ new class extends Component
 
         $this->cachedActivities = Activity::forSubject($this->block)->latest()->get();
         $this->activitiesLoaded = true;
+    }
+
+    /**
+     * Load drawer-specific content when drawer is opened.
+     * This is called only when the drawer is opened to avoid loading
+     * unnecessary data if the user never opens the drawer.
+     */
+    public function loadDrawerContent(): void
+    {
+        if ($this->drawerContentLoaded) {
+            return;
+        }
+
+        // Load only the data needed for drawer that isn't already loaded
+        if (! $this->relationshipsLoaded) {
+            $this->loadRelationships();
+        }
+        if (! $this->tasksLoaded) {
+            $this->loadTasks();
+        }
+        if (! $this->activitiesLoaded) {
+            $this->loadActivities();
+        }
+
+        $this->drawerContentLoaded = true;
     }
 
     public function toggleSidebar(): void
@@ -320,6 +331,22 @@ new class extends Component
         $this->showAddRelationshipModal = false;
     }
 
+    protected function shouldExpandTasksSection(): bool
+    {
+        // Expand if there are failed or pending tasks
+        $metadata = $this->block->metadata ?? [];
+        $executions = $metadata['task_executions'] ?? [];
+
+        foreach ($executions as $execution) {
+            $status = $execution['last_attempt']['status'] ?? null;
+            if (in_array($status, ['failed', 'pending'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function fetchRelatedBlocks()
     {
         // Use semantic search if embeddings exist
@@ -359,7 +386,12 @@ new class extends Component
 
 ?>
 
-<div>
+<div x-data="{ drawerOpen: @entangle('showSidebar').live }"
+     x-init="$watch('drawerOpen', value => {
+         if (value) {
+             setTimeout(() => $wire.dispatch('drawer-opened'), 50);
+         }
+     })">
     @if ($this->block)
     <!-- Two-column layout: main content + optional drawer -->
     <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
@@ -369,10 +401,10 @@ new class extends Component
         <x-header title="Block Details" separator>
             <x-slot:actions>
                 <x-button
-                    wire:click="toggleSidebar"
+                    @click="drawerOpen = !drawerOpen"
                     class="btn-ghost btn-sm"
-                    title="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
-                    aria-label="{{ $this->showSidebar ? 'Hide details' : 'Show details' }}"
+                    ::title="drawerOpen ? 'Hide details' : 'Show details'"
+                    ::aria-label="drawerOpen ? 'Hide details' : 'Show details'"
                     data-hotkey="d">
                     <x-icon name="o-adjustments-horizontal" class="w-4 h-4" />
                 </x-button>
@@ -714,7 +746,7 @@ new class extends Component
                 </div>
 
                 <!-- Relationships -->
-                <div class="pb-4 border-b border-base-200" wire:init="loadRelationships">
+                <div class="pb-4 border-b border-base-200">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
                             Relationships
@@ -723,7 +755,7 @@ new class extends Component
                             <x-icon name="o-plus" class="w-3 h-3" />
                         </button>
                     </div>
-                    @if (! $relationshipsLoaded)
+                    @if (!$drawerContentLoaded || !$relationshipsLoaded)
                     <x-skeleton-loader type="relationship-list" />
                     @else
                     @php $sidebarRelationships = $this->getRelationships(); @endphp
@@ -778,8 +810,8 @@ new class extends Component
                 </div>
 
                 <!-- Tasks -->
-                <div class="pb-4 border-b border-base-200" wire:init="loadTasks">
-                    @if ($tasksLoaded)
+                <div class="pb-4 border-b border-base-200">
+                    @if ($drawerContentLoaded && $tasksLoaded)
                         @php
                             $metadata = $block->metadata ?? [];
                             $executions = $metadata['task_executions'] ?? [];
@@ -842,8 +874,7 @@ new class extends Component
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
-                        <div wire:init="loadActivities">
-                        @if (! $activitiesLoaded)
+                        @if (!$drawerContentLoaded || !$activitiesLoaded)
                         <x-skeleton-loader type="list-item" :count="3" />
                         @else
                         @php $activities = $this->getActivities(); @endphp
@@ -902,7 +933,6 @@ new class extends Component
                         @endforeach
                         @endif
                         @endif
-                        </div>
                     </x-slot:content>
                 </x-collapse>
 
