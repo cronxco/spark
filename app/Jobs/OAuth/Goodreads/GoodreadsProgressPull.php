@@ -63,7 +63,7 @@ class GoodreadsProgressPull extends BaseFetchJob
                 Log::info('Item title', ['title' => $title]);
 
                 // Parse progress from title: "Will is 23% done with The Book"
-                if (preg_match('/^\s*is (\d+)% done with (.+)$/m', $title, $matches)) {
+                if (preg_match('/^\s*.+?\s+is (\d+)% done with (.+)$/m', $title, $matches)) {
                     $items[] = [
                         'guid' => $guid,
                         'pubDate' => $pubDate,
@@ -88,7 +88,7 @@ class GoodreadsProgressPull extends BaseFetchJob
 
                 // Parse "is currently reading" from title
                 // Match: "Will is currently reading 'How Spies Think: Ten Lessons in Intelligence'"
-                if (preg_match('/^\s*is currently reading [\'"](.+?)[\'"]$/m', $title, $matches)) {
+                if (preg_match('/^\s*.+?\s+is currently reading [\'"](.+?)[\'"]$/m', $title, $matches)) {
                     $items[] = [
                         'guid' => $guid,
                         'pubDate' => $pubDate,

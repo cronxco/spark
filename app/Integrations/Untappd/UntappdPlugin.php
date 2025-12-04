@@ -124,6 +124,22 @@ class UntappdPlugin extends ManualPlugin
                 'description' => 'Brewery information',
                 'display_with_object' => false,
                 'value_unit' => null,
+                'hidden' => true,
+            ],
+            'beer_details' => [
+                'icon' => 'fas.beer-mug-empty',
+                'display_name' => 'Beer Details',
+                'description' => 'Detailed beer information including style, ABV, IBU, and ratings',
+                'display_with_object' => false,
+                'value_unit' => '/5',
+                'hidden' => false,
+            ],
+            'brewery_details' => [
+                'icon' => 'fas.industry',
+                'display_name' => 'Brewery Details',
+                'description' => 'Detailed brewery information including location and ratings',
+                'display_with_object' => false,
+                'value_unit' => '/5',
                 'hidden' => false,
             ],
             'badge_earned' => [
@@ -144,6 +160,12 @@ class UntappdPlugin extends ManualPlugin
                 'icon' => 'fas.beer-mug-empty',
                 'display_name' => 'Beer',
                 'description' => 'A beer on Untappd',
+                'hidden' => false,
+            ],
+            'untappd_brewery' => [
+                'icon' => 'fas.industry',
+                'display_name' => 'Brewery',
+                'description' => 'A brewery on Untappd',
                 'hidden' => false,
             ],
             'untappd_user' => [
