@@ -12,7 +12,7 @@ class UntappdBeerDetailPull extends BaseFetchJob
 {
     public function __construct(
         public Integration $integration,
-        public int $beerId,
+        public string $beerId,
         public string $beerUrl
     ) {
         parent::__construct($integration);
@@ -58,8 +58,10 @@ class UntappdBeerDetailPull extends BaseFetchJob
     {
         UntappdBeerDetailData::dispatch(
             $this->integration,
-            $this->beerId,
-            $rawData['html']
+            [
+                'beer_id' => $this->beerId,
+                'html' => $rawData['html'],
+            ]
         );
     }
 }

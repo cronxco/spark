@@ -4,6 +4,7 @@ namespace App\Jobs\Data\Untappd;
 
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Services\Media\MediaDownloadHelper;
 use DOMDocument;
 use DOMXPath;
@@ -12,11 +13,10 @@ use Exception;
 class UntappdBeerDetailData extends BaseProcessingJob
 {
     public function __construct(
-        public $integration,
-        public int $beerId,
-        public string $html
+        Integration $integration,
+        array $rawData
     ) {
-        parent::__construct($integration, []);
+        parent::__construct($integration, $rawData);
     }
 
     protected function getServiceName(): string
@@ -31,20 +31,48 @@ class UntappdBeerDetailData extends BaseProcessingJob
 
     protected function process(): void
     {
+        $beerId = $this->rawData['beer_id'] ?? null;
+        $html = $this->rawData['html'] ?? null;
+
+        if (! $beerId || ! $html) {
+            logger()->warning('Missing required data for beer detail processing', [
+                'has_beer_id' => ! empty($beerId),
+                'has_html' => ! empty($html),
+            ]);
+
+            return;
+        }
+
+        logger()->info('Starting beer detail processing', [
+            'beer_id' => $beerId,
+            'html_length' => strlen($html),
+        ]);
+
         // Load the beer EventObject
-        $beer = EventObject::find($this->beerId);
+        $beer = EventObject::find($beerId);
 
         if (! $beer) {
             logger()->warning('Beer EventObject not found for detail processing', [
-                'beer_id' => $this->beerId,
+                'beer_id' => $beerId,
                 'integration_id' => $this->integration->id,
             ]);
 
             return;
         }
 
+        logger()->info('Beer loaded successfully', [
+            'beer_id' => $beer->id,
+            'beer_title' => $beer->title,
+            'current_metadata' => $beer->metadata,
+        ]);
+
         // Parse HTML
-        $details = $this->parseBeerDetails($this->html);
+        $details = $this->parseBeerDetails($html);
+
+        logger()->info('Beer details parsed', [
+            'beer_id' => $beer->id,
+            'details' => $details,
+        ]);
 
         // Merge metadata (don't overwrite existing fields)
         $metadata = $beer->metadata ?? [];
@@ -73,7 +101,16 @@ class UntappdBeerDetailData extends BaseProcessingJob
 
         $metadata['last_enriched_at'] = now()->toIso8601String();
 
+        logger()->info('Updating beer metadata', [
+            'beer_id' => $beer->id,
+            'metadata' => $metadata,
+        ]);
+
         $beer->update(['metadata' => $metadata]);
+
+        logger()->info('Beer metadata updated successfully', [
+            'beer_id' => $beer->id,
+        ]);
 
         // Download beer label image if available
         if (! empty($details['label_url'])) {
@@ -92,6 +129,12 @@ class UntappdBeerDetailData extends BaseProcessingJob
                 ]);
             }
         }
+
+        // Dispatch job to create beer info blocks on related checkin events
+        UntappdCreateBeerInfoBlocks::dispatch(
+            $this->integration,
+            ['beer_id' => $beer->id]
+        );
     }
 
     /**
@@ -103,16 +146,31 @@ class UntappdBeerDetailData extends BaseProcessingJob
         $jsonLdData = $this->extractJsonLd($html);
 
         if ($jsonLdData) {
+            // Extract image URL (could be string or array)
+            $imageUrl = null;
+            if (isset($jsonLdData['image'])) {
+                if (is_string($jsonLdData['image'])) {
+                    $imageUrl = $jsonLdData['image'];
+                } elseif (is_array($jsonLdData['image'])) {
+                    // If array, take first item or 'url' field
+                    $imageUrl = $jsonLdData['image'][0] ?? $jsonLdData['image']['url'] ?? null;
+                }
+            }
+
+            // Parse DOM for ABV, IBU, and Style (not in JSON-LD)
+            $dom = new DOMDocument;
+            @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+            $xpath = new DOMXPath($dom);
+
             return [
                 'description' => $jsonLdData['description'] ?? null,
-                'abv' => $this->extractABVFromJsonLd($jsonLdData),
-                'ibu' => $this->extractIBUFromJsonLd($jsonLdData),
+                'abv' => $this->extractABV($xpath),
+                'ibu' => $this->extractIBU($xpath),
                 'aggregate_rating' => $jsonLdData['aggregateRating']['ratingValue'] ?? null,
                 'review_count' => $jsonLdData['aggregateRating']['reviewCount'] ?? null,
-                'label_url' => $jsonLdData['image'] ?? null,
+                'label_url' => $imageUrl,
                 'beer_url' => $jsonLdData['url'] ?? null,
-                // Style not in JSON-LD, need HTML fallback
-                'style' => $this->extractStyleFromHtml($html),
+                'style' => $this->extractStyle($xpath),
             ];
         }
 

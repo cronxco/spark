@@ -63,7 +63,7 @@ class UntappdRssData extends BaseProcessingJob
                 'title' => $parsedData['beerName'],
                 'content' => null,
                 'metadata' => [
-                    'brewery' => $parsedData['breweryName'] ?? null,
+                    'brewery_name' => $parsedData['breweryName'] ?? null,
                     'venue' => $parsedData['venueName'] ?? null,
                 ],
                 'url' => $link,
@@ -158,7 +158,7 @@ class UntappdRssData extends BaseProcessingJob
         foreach ($created as $event) {
             $checkinUrl = $event->event_metadata['link'] ?? null;
             if ($checkinUrl && ($event->event_metadata['needs_enrichment'] ?? false)) {
-                UntappdCheckinDetailPull::dispatch($this->integration, $event->id, $checkinUrl)
+                UntappdCheckinDetailPull::dispatch($this->integration, (string) $event->id, $checkinUrl)
                     ->onQueue('pull');
             }
         }
