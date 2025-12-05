@@ -3,6 +3,7 @@
 namespace App\Jobs\Data\Untappd;
 
 use App\Jobs\Base\BaseProcessingJob;
+use App\Jobs\OAuth\Untappd\UntappdCheckinDetailPull;
 use Carbon\Carbon;
 
 class UntappdRssData extends BaseProcessingJob
@@ -62,7 +63,7 @@ class UntappdRssData extends BaseProcessingJob
                 'title' => $parsedData['beerName'],
                 'content' => null,
                 'metadata' => [
-                    'brewery' => $parsedData['breweryName'] ?? null,
+                    'brewery_name' => $parsedData['breweryName'] ?? null,
                     'venue' => $parsedData['venueName'] ?? null,
                 ],
                 'url' => $link,
@@ -133,6 +134,7 @@ class UntappdRssData extends BaseProcessingJob
                 'event_metadata' => [
                     'guid' => $guid,
                     'link' => $link,
+                    'needs_enrichment' => true,
                     '__tags' => $tags,
                 ],
                 'actor' => $actor,
@@ -149,6 +151,15 @@ class UntappdRssData extends BaseProcessingJob
             $tags = $event->event_metadata['__tags'] ?? [];
             foreach ($tags as $tagData) {
                 $event->attachTag($tagData['name'], $tagData['type']);
+            }
+        }
+
+        // Dispatch detail fetch jobs for newly created events
+        foreach ($created as $event) {
+            $checkinUrl = $event->event_metadata['link'] ?? null;
+            if ($checkinUrl && ($event->event_metadata['needs_enrichment'] ?? false)) {
+                UntappdCheckinDetailPull::dispatch($this->integration, (string) $event->id, $checkinUrl)
+                    ->onQueue('pull');
             }
         }
     }

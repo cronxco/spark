@@ -14,9 +14,6 @@ class GoodreadsPlugin extends ManualPlugin
         return 'apikey';
     }
 
-    /**
-     * API key integrations use polling, not staleness checking
-     */
     public static function getTimeUntilStaleMinutes(): ?int
     {
         return null;
@@ -34,17 +31,23 @@ class GoodreadsPlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Track your reading activity from Goodreads RSS feed.';
+        return 'Track your reading activity from Goodreads RSS feeds.';
     }
 
     public static function getGroupConfigurationSchema(): array
     {
         return [
-            'rss_url' => [
+            'user_id' => [
                 'type' => 'string',
-                'label' => 'RSS Feed URL',
+                'label' => 'Goodreads User ID',
                 'required' => true,
-                'description' => 'Your Goodreads RSS feed URL (found in Profile → Updates → RSS)',
+                'description' => 'Your Goodreads user ID (found in your profile URL)',
+            ],
+            'api_key' => [
+                'type' => 'string',
+                'label' => 'RSS API Key',
+                'required' => true,
+                'description' => 'Your Goodreads RSS feed API key',
             ],
         ];
     }
@@ -70,10 +73,25 @@ class GoodreadsPlugin extends ManualPlugin
     public static function getInstanceTypes(): array
     {
         return [
-            'rss_feed' => [
-                'label' => 'RSS Feed',
-                'schema' => self::getConfigurationSchema('rss_feed'),
-                'description' => 'Syncs reading activity from your Goodreads RSS feed',
+            'shelf_currently_reading' => [
+                'label' => 'Currently Reading Shelf',
+                'schema' => self::getConfigurationSchema('shelf_currently_reading'),
+                'description' => 'Track books you are currently reading',
+            ],
+            'shelf_read' => [
+                'label' => 'Read Shelf',
+                'schema' => self::getConfigurationSchema('shelf_read'),
+                'description' => 'Track books you have finished reading',
+            ],
+            'shelf_to_read' => [
+                'label' => 'To-Read Shelf',
+                'schema' => self::getConfigurationSchema('shelf_to_read'),
+                'description' => 'Track books you want to read',
+            ],
+            'updates_progress' => [
+                'label' => 'Reading Progress Updates',
+                'schema' => self::getConfigurationSchema('updates_progress'),
+                'description' => 'Track your reading progress percentage updates',
             ],
         ];
     }
@@ -99,9 +117,10 @@ class GoodreadsPlugin extends ManualPlugin
             'is_reading' => [
                 'icon' => 'fas.book-open',
                 'display_name' => 'Reading',
-                'description' => 'Reading a book',
+                'description' => 'Currently reading a book',
                 'display_with_object' => true,
-                'value_unit' => null,
+                'value_unit' => '%',
+                'value_formatter' => '{{ $value }}%',
                 'hidden' => false,
             ],
             'wants_to_read' => [
@@ -117,16 +136,8 @@ class GoodreadsPlugin extends ManualPlugin
                 'display_name' => 'Finished Reading',
                 'description' => 'Completed reading a book',
                 'display_with_object' => true,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'reviewed' => [
-                'icon' => 'fas.star',
-                'display_name' => 'Reviewed Book',
-                'description' => 'Reviewed and rated a book',
-                'display_with_object' => true,
-                'value_unit' => 'stars',
-                'value_formatter' => '{{ $value }}<span class="text-[0.875em]"> stars</span>',
+                'value_unit' => '/5',
+                'value_formatter' => '@if($value){{ $value }}<span class="text-[0.875em]">/5</span>@endif',
                 'hidden' => false,
             ],
         ];
@@ -135,18 +146,10 @@ class GoodreadsPlugin extends ManualPlugin
     public static function getBlockTypes(): array
     {
         return [
-            'book_cover' => [
-                'icon' => 'fas.image',
-                'display_name' => 'Book Cover',
-                'description' => 'Book cover image',
-                'display_with_object' => false,
-                'value_unit' => null,
-                'hidden' => false,
-            ],
-            'book_author' => [
-                'icon' => 'fas.pen-nib',
-                'display_name' => 'Author',
-                'description' => 'Book author information',
+            'book' => [
+                'icon' => 'fas.book',
+                'display_name' => 'Book',
+                'description' => 'Book information with cover, year, pages, and ISBN',
                 'display_with_object' => false,
                 'value_unit' => null,
                 'hidden' => false,
@@ -163,6 +166,12 @@ class GoodreadsPlugin extends ManualPlugin
                 'description' => 'A book on Goodreads',
                 'hidden' => false,
             ],
+            'goodreads_series' => [
+                'icon' => 'fas.layer-group',
+                'display_name' => 'Book Series',
+                'description' => 'A series of books',
+                'hidden' => false,
+            ],
             'goodreads_user' => [
                 'icon' => 'fas.user',
                 'display_name' => 'Goodreads User',
@@ -170,6 +179,35 @@ class GoodreadsPlugin extends ManualPlugin
                 'hidden' => true,
             ],
         ];
+    }
+
+    /**
+     * Build RSS URL for shelf feeds
+     */
+    public static function buildShelfUrl(string $userId, string $apiKey, string $shelf): string
+    {
+        return "https://www.goodreads.com/review/list_rss/{$userId}?key={$apiKey}&shelf={$shelf}";
+    }
+
+    /**
+     * Build RSS URL for user updates feed
+     */
+    public static function buildUpdatesUrl(string $userId, string $apiKey): string
+    {
+        return "https://www.goodreads.com/user/updates_rss/{$userId}?key={$apiKey}";
+    }
+
+    /**
+     * Get shelf name from instance type
+     */
+    public static function getShelfFromInstanceType(string $instanceType): ?string
+    {
+        return match ($instanceType) {
+            'shelf_currently_reading' => 'currently-reading',
+            'shelf_read' => 'read',
+            'shelf_to_read' => 'to-read',
+            default => null,
+        };
     }
 
     public function initializeGroup(User $user): IntegrationGroup
@@ -192,9 +230,14 @@ class GoodreadsPlugin extends ManualPlugin
         $groupConfig = [];
         $instanceConfig = $initialConfig;
 
-        if (isset($initialConfig['rss_url'])) {
-            $groupConfig['rss_url'] = $initialConfig['rss_url'];
-            unset($instanceConfig['rss_url']);
+        if (isset($initialConfig['user_id'])) {
+            $groupConfig['user_id'] = $initialConfig['user_id'];
+            unset($instanceConfig['user_id']);
+        }
+
+        if (isset($initialConfig['api_key'])) {
+            $groupConfig['api_key'] = $initialConfig['api_key'];
+            unset($instanceConfig['api_key']);
         }
 
         // Update group auth_metadata if we have group-level config
