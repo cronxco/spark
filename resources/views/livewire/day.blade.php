@@ -804,6 +804,21 @@ $groupedEvents = computed(function () {
     return $groups;
 });
 
+// Computed helper: initial collapsed state (auto-collapse groups with 4+ events)
+$initialCollapsedGroups = computed(function () {
+    $groups = $this->groupedEvents;
+    $collapsed = [];
+
+    foreach ($groups as $group) {
+        // Auto-collapse if 4 or more events in group
+        if (count($group['events']) >= 4) {
+            $collapsed[$group['key']] = true;
+        }
+    }
+
+    return $collapsed;
+});
+
 // Computed helper: are all groups currently expanded?
 $areAllGroupsExpanded = computed(function () {
     $groups = $this->groupedEvents;
@@ -1001,7 +1016,7 @@ $availableStreams = computed(function () {
                 $hour = $userTime->format('H');
                 $showHourMarker = $previousHour !== $hour;
                 $previousHour = $hour;
-                $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? false);
+                $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? $this->initialCollapsedGroups[$eventGroup['key']] ?? false);
                 @endphp
 
                 <!-- Hour marker inside spine -->
@@ -1030,9 +1045,22 @@ $availableStreams = computed(function () {
                     <div class="{{ $isCollapsed ? 'py-3' : '' }}">
                         <div class="min-w-0">
                             @if ($isCollapsed)
+                            @php $firstEvent = $eventGroup['events'][0]; @endphp
                             <div class="truncate">
-                                <span class="font-semibold">{{ $eventGroup['formatted_action'] }}</span>
-                                <span class="text-base-content/90">{{ ' ' . $eventGroup['count'] . ' ' . $eventGroup['object_type_plural'] }}</span>
+                                <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
+                                @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
+                                    @if ($firstEvent->target)
+                                        <span class="font-bold">{{ ' ' . $firstEvent->target->title }}</span>
+                                    @elseif ($firstEvent->actor)
+                                        <span class="font-bold">{{ ' ' . $firstEvent->actor->title }}</span>
+                                    @endif
+                                @endif
+                                @if ($eventGroup['count'] > 1)
+                                    <span class="text-base-content/70">{{ ' + ' . ($eventGroup['count'] - 1) . ' other' . ($eventGroup['count'] > 2 ? 's' : '') }}</span>
+                                @endif
+                            </div>
+                            <div class="mt-1 text-sm text-base-content/70">
+                                {{ to_user_timezone($firstEvent->time, auth()->user())->format('H:i') }}
                             </div>
                             @else
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
@@ -1070,11 +1098,9 @@ $availableStreams = computed(function () {
                         </div>
                     </div>
                     <div class="{{ $isCollapsed ? 'py-3' : 'py-2' }} text-right pr-2">
-                        @if (! $isCollapsed)
-                        @php $firstEvent = $eventGroup['events'][0]; @endphp
-                        @if (! is_null($firstEvent->value))
-                        <span class="text-lg font-bold {{ $this->valueColorClass($firstEvent) }}">{!! $this->formatValueDisplay($firstEvent) !!}</span>
-                        @endif
+                        @php $displayEvent = $eventGroup['events'][0]; @endphp
+                        @if (! is_null($displayEvent->value))
+                        <span class="text-lg font-bold {{ $this->valueColorClass($displayEvent) }}">{!! $this->formatValueDisplay($displayEvent) !!}</span>
                         @endif
                     </div>
                 </div>
