@@ -1042,25 +1042,42 @@ $availableStreams = computed(function () {
                             <x-icon name="{{ $this->getEventIcon($eventGroup['action'], $eventGroup['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($eventGroup['service']) }}" />
                         </button>
                     </div>
-                    <div class="{{ $isCollapsed ? 'py-3' : '' }}">
+                    <div>
                         <div class="min-w-0">
                             @if ($isCollapsed)
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
-                            <div class="truncate">
-                                <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
-                                @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
-                                    @if ($firstEvent->target)
-                                        <span class="font-bold">{{ ' ' . $firstEvent->target->title }}</span>
-                                    @elseif ($firstEvent->actor)
-                                        <span class="font-bold">{{ ' ' . $firstEvent->actor->title }}</span>
+                            <div class="py-2 px-2">
+                                <div class="text-xl">
+                                    <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
+                                    @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
+                                        @if ($firstEvent->target)
+                                            <span class="sm:inline block break-words font-bold min-w-0">{{ ' ' . $firstEvent->target->title }}</span>
+                                        @elseif ($firstEvent->actor)
+                                            <span class="sm:inline block break-words font-bold min-w-0">{{ ' ' . $firstEvent->actor->title }}</span>
+                                        @endif
                                     @endif
-                                @endif
-                                @if ($eventGroup['count'] > 1)
-                                    <span class="text-base-content/70">{{ ' + ' . ($eventGroup['count'] - 1) . ' other' . ($eventGroup['count'] > 2 ? 's' : '') }}</span>
-                                @endif
-                            </div>
-                            <div class="mt-1 text-sm text-base-content/70">
-                                {{ to_user_timezone($firstEvent->time, auth()->user())->format('H:i') }}
+                                    @if ($eventGroup['count'] > 1)
+                                        <span class="text-base-content/70">{{ ' + ' . ($eventGroup['count'] - 1) . ' other' . ($eventGroup['count'] > 2 ? 's' : '') }}</span>
+                                    @endif
+                                </div>
+                                <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
+                                    {{ to_user_timezone($firstEvent->time, auth()->user())->format(' H:i') }} ·
+                                    <span title="{{ to_user_timezone($firstEvent->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($firstEvent->time, auth()->user())->diffForHumans() }}</span>
+                                    <span class="hidden sm:inline">·</span>
+                                    <span class="sm:hidden w-full"></span>
+                                    @if ($firstEvent->integration)
+                                    <x-badge class="badge-sm sm:badge-md badge-base">
+                                        <x-slot:value>
+                                            {{ str::Lower($firstEvent->integration->name) }}
+                                        </x-slot:value>
+                                    </x-badge>
+                                    @endif
+                                    @if ($firstEvent->tags && count($firstEvent->tags) > 0)
+                                    <span class="hidden sm:inline">·</span>
+                                    <span class="sm:hidden w-full"></span>
+                                    @endif
+                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="md" fill />@endforeach
+                                </div>
                             </div>
                             @else
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
@@ -1097,7 +1114,7 @@ $availableStreams = computed(function () {
                             @endif
                         </div>
                     </div>
-                    <div class="{{ $isCollapsed ? 'py-3' : 'py-2' }} text-right pr-2">
+                    <div class="py-2 pr-2 text-right">
                         @php $displayEvent = $eventGroup['events'][0]; @endphp
                         @if (! is_null($displayEvent->value))
                         <span class="text-lg font-bold {{ $this->valueColorClass($displayEvent) }}">{!! $this->formatValueDisplay($displayEvent) !!}</span>
