@@ -953,6 +953,18 @@ if (! function_exists('get_media_url')) {
             $media = $model->getFirstMedia($collection);
 
             if ($media) {
+                // For S3, use temporary signed URLs
+                if (config('media-library.disk_name') === 's3') {
+                    $urlExpiry = now()->addMinutes(60);
+
+                    if ($conversion) {
+                        return $media->getTemporaryUrl($urlExpiry, $conversion);
+                    }
+
+                    return $media->getTemporaryUrl($urlExpiry);
+                }
+
+                // For local/public disks, use regular URLs
                 if ($conversion) {
                     return $media->getUrl($conversion);
                 }

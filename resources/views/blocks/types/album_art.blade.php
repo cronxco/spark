@@ -8,27 +8,18 @@ $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.grip';
 $displayName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
 
 // Use Media Library for responsive images with signed URLs
-$media = $block->getFirstMedia('downloaded_images');
-$responsiveImageHtml = null;
-$imageUrl = null;
+$responsiveImageHtml = render_media_responsive(
+    $block,
+    'downloaded_images',
+    [
+        'class' => 'w-full h-full object-cover',
+        'loading' => 'lazy',
+        'alt' => $block->title,
+    ]
+);
 
-if ($media) {
-    $responsiveImageHtml = (string) $media;
-    $doc = new DOMDocument;
-    $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
-    @$doc->loadHTML($responsiveImageHtml, $libxmlFlags);
-    $img = $doc->getElementsByTagName('img')->item(0);
-    if ($img) {
-        $img->setAttribute('class', 'w-full h-full object-cover');
-        $img->setAttribute('loading', 'lazy');
-        $img->setAttribute('alt', $block->title);
-        $responsiveImageHtml = $doc->saveHTML($img);
-    }
-
-    // Get image URL for "View Full Image" link
-    $isS3 = config('media-library.disk_name') === 's3';
-    $imageUrl = $isS3 ? $media->getTemporaryUrl(now()->addMinutes(60)) : $media->getUrl();
-}
+// Get image URL for "View Full Image" link
+$imageUrl = get_media_url($block, 'downloaded_images');
 
 $trackName = $block->metadata['track'] ?? null;
 $artist = $block->metadata['artist'] ?? null;
