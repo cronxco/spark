@@ -1,24 +1,8 @@
 @props(['media'])
 
 @php
-// Use temporary URLs for S3 (private bucket), regular URLs for local storage
-$isS3 = config('media-library.disk_name') === 's3';
-$urlExpiry = now()->addMinutes(60);
-
-$thumbnailUrl = null;
-$fullUrl = null;
-
-if ($isS3) {
-$thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
-? $media->getTemporaryUrl($urlExpiry, 'thumbnail')
-: $media->getTemporaryUrl($urlExpiry);
-$fullUrl = $media->getTemporaryUrl($urlExpiry);
-} else {
-$thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
-? $media->getUrl('thumbnail')
-: $media->getUrl();
-$fullUrl = $media->getUrl();
-}
+// Use helper function for S3 signed URLs
+$fullUrl = get_media_object_url($media);
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all group">
@@ -51,11 +35,11 @@ $fullUrl = $media->getUrl();
                 {{-- Video Preview --}}
                 <div class="relative w-full h-full">
                     @if ($media->hasGeneratedConversion('thumbnail'))
-                    <img
-                        src="{{ $thumbnailUrl }}"
-                        alt="{{ $media->name }}"
-                        class="w-full h-full object-cover"
-                        loading="lazy" />
+                    {!! render_media_object_responsive($media, [
+                        'alt' => $media->name,
+                        'class' => 'w-full h-full object-cover',
+                        'loading' => 'lazy',
+                    ]) !!}
                     @else
                     <div class="flex items-center justify-center w-full h-full">
                         <x-icon name="o-video-camera" class="w-12 h-12 text-base-content/30" />
@@ -69,11 +53,11 @@ $fullUrl = $media->getUrl();
                 </div>
                 @elseif (str_starts_with($media->mime_type, 'image/'))
                 {{-- Image Preview --}}
-                <img
-                    src="{{ $thumbnailUrl }}"
-                    alt="{{ $media->name ?: $media->file_name }}"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    loading="lazy" />
+                {!! render_media_object_responsive($media, [
+                    'alt' => $media->name ?: $media->file_name,
+                    'class' => 'w-full h-full object-cover group-hover:scale-105 transition-transform',
+                    'loading' => 'lazy',
+                ]) !!}
                 @elseif (str_starts_with($media->mime_type, 'application/pdf'))
                 {{-- PDF Preview --}}
                 <div class="flex flex-col items-center justify-center w-full h-full">

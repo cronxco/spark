@@ -20,33 +20,9 @@ if ($block->event->action === 'reviewed' && $block->event->value) {
     $rating = (int) $block->event->value;
 }
 
-// Use Media Library for responsive images with signed URLs, or fallback to media_url
-$media = $block->getFirstMedia('downloaded_images');
-$imageUrl = null;
-$mediumUrl = null;
-$thumbnailUrl = null;
-
-if ($media) {
-    // Get URLs for different conversions with S3 support
-    $isS3 = config('media-library.disk_name') === 's3';
-    $urlExpiry = now()->addMinutes(60);
-
-    // Get original image URL
-    $imageUrl = $isS3 ? $media->getTemporaryUrl($urlExpiry) : $media->getUrl();
-
-    // Get medium conversion URL (800px width)
-    if ($media->hasGeneratedConversion('medium')) {
-        $mediumUrl = $isS3 ? $media->getTemporaryUrl($urlExpiry, 'medium') : $media->getUrl('medium');
-    }
-
-    // Get thumbnail URL (300x300)
-    if ($media->hasGeneratedConversion('thumbnail')) {
-        $thumbnailUrl = $isS3 ? $media->getTemporaryUrl($urlExpiry, 'thumbnail') : $media->getUrl('thumbnail');
-    }
-} elseif ($block->media_url) {
-    // Fallback to media_url field (for integrations not yet using Media Library)
-    $imageUrl = $block->media_url;
-}
+// Use Media Library for responsive images with signed URLs
+$imageUrl = get_media_url($block, 'downloaded_images');
+$hasImage = $block->getFirstMedia('downloaded_images') !== null;
 
 // Get action display name
 $actionTypes = $pluginClass ? $pluginClass::getActionTypes() : [];
@@ -66,17 +42,13 @@ $actionDisplayName = $actionType['display_name'] ?? ucfirst(str_replace('_', ' '
         </div>
 
         {{-- Book Cover Display (portrait aspect ratio for books) --}}
-        @if ($mediumUrl || $imageUrl)
+        @if ($hasImage)
         <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-base-300 shadow-md">
-            <img
-                src="{{ $mediumUrl ?: $imageUrl }}"
-                alt="{{ $bookTitle }}"
-                class="w-full h-full object-cover"
-                loading="lazy"
-                @if ($thumbnailUrl)
-                style="background-image: url('{{ $thumbnailUrl }}'); background-size: cover;"
-                @endif
-            />
+            {!! render_media_responsive($block, 'downloaded_images', [
+                'alt' => $bookTitle,
+                'class' => 'w-full h-full object-cover',
+                'loading' => 'lazy',
+            ]) !!}
         </div>
         @else
         <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
