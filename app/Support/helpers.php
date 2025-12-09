@@ -1163,3 +1163,81 @@ if (! function_exists('get_media_object_url')) {
         return $media->getUrl();
     }
 }
+
+if (! function_exists('render_media_object_responsive')) {
+    /**
+     * Render a Media object as responsive HTML using Spatie's responsive images.
+     * Works directly with Media objects (not models).
+     *
+     * @param  \Spatie\MediaLibrary\MediaCollections\Models\Media  $media  The media object
+     * @param  array  $attributes  Additional HTML attributes (class, alt, etc.)
+     * @param  int  $expirationMinutes  URL expiration in minutes for S3 (default: 60)
+     * @return string The HTML output
+     */
+    function render_media_object_responsive(
+        $media,
+        array $attributes = [],
+        int $expirationMinutes = 60
+    ): string {
+        // For S3 with signed URLs
+        if (config('media-library.disk_name') === 's3') {
+            // Spatie's string cast generates responsive HTML but needs signed URLs
+            // We'll build the HTML manually with signed URLs for S3
+            $baseUrl = get_media_object_url($media, '', $expirationMinutes);
+            $thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
+                ? get_media_object_url($media, 'thumbnail', $expirationMinutes)
+                : $baseUrl;
+            $mediumUrl = $media->hasGeneratedConversion('medium')
+                ? get_media_object_url($media, 'medium', $expirationMinutes)
+                : $baseUrl;
+
+            // Build srcset if conversions exist
+            $srcset = [];
+            if ($media->hasGeneratedConversion('thumbnail')) {
+                $srcset[] = $thumbnailUrl . ' 300w';
+            }
+            if ($media->hasGeneratedConversion('medium')) {
+                $srcset[] = $mediumUrl . ' 800w';
+            }
+            $srcset[] = $baseUrl . ' ' . ($media->getCustomProperty('width') ?? '1200') . 'w';
+
+            $srcsetAttr = implode(', ', $srcset);
+
+            // Default sizes if not provided
+            if (! isset($attributes['sizes'])) {
+                $attributes['sizes'] = '(max-width: 300px) 300px, (max-width: 800px) 800px, 100vw';
+            }
+
+            $attrs = collect($attributes)
+                ->map(fn ($value, $key) => sprintf('%s="%s"', $key, e($value)))
+                ->implode(' ');
+
+            return sprintf(
+                '<img src="%s" srcset="%s" %s />',
+                e($baseUrl),
+                e($srcsetAttr),
+                $attrs
+            );
+        }
+
+        // For local/public disks, use Spatie's native responsive image generation
+        $html = (string) $media;
+
+        if (! empty($attributes)) {
+            $doc = new DOMDocument;
+            $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+            @$doc->loadHTML($html, $libxmlFlags);
+            $img = $doc->getElementsByTagName('img')->item(0);
+
+            if ($img) {
+                foreach ($attributes as $key => $value) {
+                    $img->setAttribute($key, $value);
+                }
+
+                return $doc->saveHTML($img);
+            }
+        }
+
+        return $html;
+    }
+}
