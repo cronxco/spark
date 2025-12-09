@@ -1503,31 +1503,26 @@ new class extends Component
                 </h3>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     @foreach ($objectMedia->take(8) as $media)
+                    @php
+                        // Use helper function for S3 signed URLs
+                        $thumbnailUrl = get_media_object_url($media, 'thumbnail');
+                        $fullUrl = get_media_object_url($media);
+                    @endphp
                     <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
                         @if (Str::startsWith($media->mime_type, 'image/'))
-                        @php
-                            // Use Spatie's responsive images with signed URLs
-                            $responsiveHtml = (string) $media;
-                            // Parse and add custom classes
-                            $doc = new DOMDocument;
-                            $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
-                            @$doc->loadHTML($responsiveHtml, $libxmlFlags);
-                            $img = $doc->getElementsByTagName('img')->item(0);
-                            if ($img) {
-                                $img->setAttribute('class', 'w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer');
-                                $img->setAttribute('loading', 'lazy');
-                                $img->setAttribute('alt', $media->name);
-                                $img->setAttribute('onclick', "window.open('" . addslashes($media->getTemporaryUrl(now()->addHour())) . "', '_blank')");
-                                $responsiveHtml = $doc->saveHTML($img);
-                            }
-                        @endphp
-                        {!! $responsiveHtml !!}
+                        <img
+                            src="{{ $thumbnailUrl }}"
+                            alt="{{ $media->name }}"
+                            class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                            loading="lazy"
+                            onclick="window.open('{{ $fullUrl }}', '_blank')"
+                        />
                         @elseif (Str::startsWith($media->mime_type, 'video/'))
-                        <div class="w-full h-full flex items-center justify-center bg-base-300 cursor-pointer" onclick="window.open('{{ $media->getTemporaryUrl(now()->addHour()) }}', '_blank')">
+                        <div class="w-full h-full flex items-center justify-center bg-base-300 cursor-pointer" onclick="window.open('{{ $fullUrl }}', '_blank')">
                             <x-icon name="fas.play-circle" class="w-12 h-12 text-base-content/40" />
                         </div>
                         @else
-                        <div class="w-full h-full flex flex-col items-center justify-center bg-base-300 cursor-pointer p-2" onclick="window.open('{{ $media->getTemporaryUrl(now()->addHour()) }}', '_blank')">
+                        <div class="w-full h-full flex flex-col items-center justify-center bg-base-300 cursor-pointer p-2" onclick="window.open('{{ $fullUrl }}', '_blank')">
                             <x-icon name="fas.file" class="w-8 h-8 text-base-content/40" />
                             <span class="text-xs text-base-content/60 mt-1 truncate max-w-full">{{ $media->file_name }}</span>
                         </div>

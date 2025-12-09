@@ -1106,16 +1106,9 @@ new class extends Component
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     @foreach ($allMedia->take(8) as $media)
                     @php
-                        // Use signed URLs for S3
-                        $isS3 = config('media-library.disk_name') === 's3';
-                        $thumbnailUrl = $isS3
-                            ? ($media->hasGeneratedConversion('thumbnail')
-                                ? $media->getTemporaryUrl(now()->addMinutes(60), 'thumbnail')
-                                : $media->getTemporaryUrl(now()->addMinutes(60)))
-                            : ($media->getUrl('thumbnail') ?: $media->getUrl());
-                        $fullUrl = $isS3
-                            ? $media->getTemporaryUrl(now()->addMinutes(60))
-                            : $media->getUrl();
+                        // Use helper function for S3 signed URLs
+                        $thumbnailUrl = get_media_object_url($media, 'thumbnail');
+                        $fullUrl = get_media_object_url($media);
                     @endphp
                     <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
                         <img
