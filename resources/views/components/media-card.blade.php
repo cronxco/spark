@@ -1,24 +1,9 @@
 @props(['media'])
 
 @php
-// Use temporary URLs for S3 (private bucket), regular URLs for local storage
-$isS3 = config('media-library.disk_name') === 's3';
-$urlExpiry = now()->addMinutes(60);
-
-$thumbnailUrl = null;
-$fullUrl = null;
-
-if ($isS3) {
-$thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
-? $media->getTemporaryUrl($urlExpiry, 'thumbnail')
-: $media->getTemporaryUrl($urlExpiry);
-$fullUrl = $media->getTemporaryUrl($urlExpiry);
-} else {
-$thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
-? $media->getUrl('thumbnail')
-: $media->getUrl();
-$fullUrl = $media->getUrl();
-}
+// Use helper function for S3 signed URLs
+$thumbnailUrl = get_media_object_url($media, 'thumbnail');
+$fullUrl = get_media_object_url($media);
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all group">
