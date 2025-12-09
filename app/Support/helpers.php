@@ -1119,3 +1119,47 @@ if (! function_exists('render_media_responsive')) {
         return $html;
     }
 }
+
+if (! function_exists('get_media_object_url')) {
+    /**
+     * Get URL from a Media object (signed for S3, direct for local)
+     *
+     * @param  \Spatie\MediaLibrary\MediaCollections\Models\Media  $media  The media object
+     * @param  string  $conversion  Optional conversion name (thumbnail, medium, webp, etc.)
+     * @param  int  $expirationMinutes  URL expiration in minutes for S3 (default: 60)
+     * @return string The media URL
+     */
+    function get_media_object_url(
+        $media,
+        string $conversion = '',
+        int $expirationMinutes = 60
+    ): string {
+        // For S3, use temporary signed URLs
+        if (config('media-library.disk_name') === 's3') {
+            $urlExpiry = now()->addMinutes($expirationMinutes);
+
+            if ($conversion && $media->hasGeneratedConversion($conversion)) {
+                return $media->getTemporaryUrl($urlExpiry, $conversion);
+            }
+
+            if ($conversion) {
+                // Conversion requested but not available, return original
+                return $media->getTemporaryUrl($urlExpiry);
+            }
+
+            return $media->getTemporaryUrl($urlExpiry);
+        }
+
+        // For local/public disks, use regular URLs
+        if ($conversion && $media->hasGeneratedConversion($conversion)) {
+            return $media->getUrl($conversion);
+        }
+
+        if ($conversion) {
+            // Conversion requested but not available, return original
+            return $media->getUrl();
+        }
+
+        return $media->getUrl();
+    }
+}
