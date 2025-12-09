@@ -20,33 +20,10 @@ if ($block->event->action === 'reviewed' && $block->event->value) {
     $rating = (int) $block->event->value;
 }
 
-// Use Media Library for responsive images with signed URLs, or fallback to media_url
-$media = $block->getFirstMedia('downloaded_images');
-$imageUrl = null;
-$mediumUrl = null;
-$thumbnailUrl = null;
-
-if ($media) {
-    // Get URLs for different conversions with S3 support
-    $isS3 = config('media-library.disk_name') === 's3';
-    $urlExpiry = now()->addMinutes(60);
-
-    // Get original image URL
-    $imageUrl = $isS3 ? $media->getTemporaryUrl($urlExpiry) : $media->getUrl();
-
-    // Get medium conversion URL (800px width)
-    if ($media->hasGeneratedConversion('medium')) {
-        $mediumUrl = $isS3 ? $media->getTemporaryUrl($urlExpiry, 'medium') : $media->getUrl('medium');
-    }
-
-    // Get thumbnail URL (300x300)
-    if ($media->hasGeneratedConversion('thumbnail')) {
-        $thumbnailUrl = $isS3 ? $media->getTemporaryUrl($urlExpiry, 'thumbnail') : $media->getUrl('thumbnail');
-    }
-} elseif ($block->media_url) {
-    // Fallback to media_url field (for integrations not yet using Media Library)
-    $imageUrl = $block->media_url;
-}
+// Use Media Library for responsive images with signed URLs
+$imageUrl = get_media_url($block, 'downloaded_images');
+$mediumUrl = get_media_url($block, 'downloaded_images', 'medium');
+$thumbnailUrl = get_media_url($block, 'downloaded_images', 'thumbnail');
 
 // Get action display name
 $actionTypes = $pluginClass ? $pluginClass::getActionTypes() : [];

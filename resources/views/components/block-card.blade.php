@@ -57,24 +57,15 @@ if (!$isValueBlock) {
     }
 
     // Check for images - use Media Library for responsive images with signed URLs
-    $media = $block->getFirstMedia('downloaded_images');
-    $responsiveImageHtml = null;
-
-    if ($media) {
-        // Generate responsive image HTML from Media Library
-        $responsiveImageHtml = (string) $media;
-        // Parse and add custom classes
-        $doc = new DOMDocument;
-        $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
-        @$doc->loadHTML($responsiveImageHtml, $libxmlFlags);
-        $img = $doc->getElementsByTagName('img')->item(0);
-        if ($img) {
-            $img->setAttribute('class', 'w-full h-full object-cover');
-            $img->setAttribute('loading', 'lazy');
-            $img->setAttribute('alt', $block->title);
-            $responsiveImageHtml = $doc->saveHTML($img);
-        }
-    }
+    $responsiveImageHtml = render_media_responsive(
+        $block,
+        'downloaded_images',
+        [
+            'class' => 'w-full h-full object-cover',
+            'loading' => 'lazy',
+            'alt' => $block->title,
+        ]
+    );
 }
 @endphp
 
