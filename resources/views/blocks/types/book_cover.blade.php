@@ -22,8 +22,7 @@ if ($block->event->action === 'reviewed' && $block->event->value) {
 
 // Use Media Library for responsive images with signed URLs
 $imageUrl = get_media_url($block, 'downloaded_images');
-$mediumUrl = get_media_url($block, 'downloaded_images', 'medium');
-$thumbnailUrl = get_media_url($block, 'downloaded_images', 'thumbnail');
+$hasImage = $block->getFirstMedia('downloaded_images') !== null;
 
 // Get action display name
 $actionTypes = $pluginClass ? $pluginClass::getActionTypes() : [];
@@ -43,17 +42,13 @@ $actionDisplayName = $actionType['display_name'] ?? ucfirst(str_replace('_', ' '
         </div>
 
         {{-- Book Cover Display (portrait aspect ratio for books) --}}
-        @if ($mediumUrl || $imageUrl)
+        @if ($hasImage)
         <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-base-300 shadow-md">
-            <img
-                src="{{ $mediumUrl ?: $imageUrl }}"
-                alt="{{ $bookTitle }}"
-                class="w-full h-full object-cover"
-                loading="lazy"
-                @if ($thumbnailUrl)
-                style="background-image: url('{{ $thumbnailUrl }}'); background-size: cover;"
-                @endif
-            />
+            {!! render_media_responsive($block, 'downloaded_images', [
+                'alt' => $bookTitle,
+                'class' => 'w-full h-full object-cover',
+                'loading' => 'lazy',
+            ]) !!}
         </div>
         @else
         <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">

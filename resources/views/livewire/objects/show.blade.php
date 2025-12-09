@@ -1505,18 +1505,16 @@ new class extends Component
                     @foreach ($objectMedia->take(8) as $media)
                     @php
                         // Use helper function for S3 signed URLs
-                        $thumbnailUrl = get_media_object_url($media, 'thumbnail');
                         $fullUrl = get_media_object_url($media);
                     @endphp
                     <div class="aspect-square rounded-lg overflow-hidden bg-base-200 border border-base-300">
                         @if (Str::startsWith($media->mime_type, 'image/'))
-                        <img
-                            src="{{ $thumbnailUrl }}"
-                            alt="{{ $media->name }}"
-                            class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
-                            loading="lazy"
-                            onclick="window.open('{{ $fullUrl }}', '_blank')"
-                        />
+                        {!! render_media_object_responsive($media, [
+                            'alt' => $media->name,
+                            'class' => 'w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer',
+                            'loading' => 'lazy',
+                            'onclick' => "window.open('" . addslashes($fullUrl) . "', '_blank')",
+                        ]) !!}
                         @elseif (Str::startsWith($media->mime_type, 'video/'))
                         <div class="w-full h-full flex items-center justify-center bg-base-300 cursor-pointer" onclick="window.open('{{ $fullUrl }}', '_blank')">
                             <x-icon name="fas.play-circle" class="w-12 h-12 text-base-content/40" />
