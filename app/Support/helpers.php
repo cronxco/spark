@@ -1072,30 +1072,10 @@ if (! function_exists('render_media_responsive')) {
             return null;
         }
 
-        // For S3 with signed URLs enabled
+        // For S3 with signed URLs enabled, build responsive HTML manually
         if ($useSignedUrls && config('media-library.disk_name') === 's3') {
-            // Spatie's responsive images work with signed URLs automatically
-            // We just need to render the media object
-            $html = (string) $media;
-
-            // Add custom attributes if provided
-            if (! empty($attributes)) {
-                // Parse the HTML and add attributes
-                $doc = new DOMDocument;
-                $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
-                @$doc->loadHTML($html, $libxmlFlags);
-                $img = $doc->getElementsByTagName('img')->item(0);
-
-                if ($img) {
-                    foreach ($attributes as $key => $value) {
-                        $img->setAttribute($key, $value);
-                    }
-
-                    return $doc->saveHTML($img);
-                }
-            }
-
-            return $html;
+            // Build responsive HTML with signed URLs (string cast doesn't work with S3)
+            return render_media_object_responsive($media, $attributes, 60);
         }
 
         // For local/public disks or when signed URLs disabled, use regular rendering
