@@ -1042,25 +1042,27 @@ $availableStreams = computed(function () {
                             <x-icon name="{{ $this->getEventIcon($eventGroup['action'], $eventGroup['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($eventGroup['service']) }}" />
                         </button>
                     </div>
-                    <div class="{{ $isCollapsed ? 'py-3' : '' }}">
+                    <div>
                         <div class="min-w-0">
                             @if ($isCollapsed)
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
-                            <div class="truncate">
-                                <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
-                                @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
-                                    @if ($firstEvent->target)
-                                        <span class="font-bold">{{ ' ' . $firstEvent->target->title }}</span>
-                                    @elseif ($firstEvent->actor)
-                                        <span class="font-bold">{{ ' ' . $firstEvent->actor->title }}</span>
+                            <div class="py-2 px-2">
+                                <div class="truncate text-xl">
+                                    <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
+                                    @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
+                                        @if ($firstEvent->target)
+                                            <span class="font-bold">{{ ' ' . $firstEvent->target->title }}</span>
+                                        @elseif ($firstEvent->actor)
+                                            <span class="font-bold">{{ ' ' . $firstEvent->actor->title }}</span>
+                                        @endif
                                     @endif
-                                @endif
-                                @if ($eventGroup['count'] > 1)
-                                    <span class="text-base-content/70">{{ ' + ' . ($eventGroup['count'] - 1) . ' other' . ($eventGroup['count'] > 2 ? 's' : '') }}</span>
-                                @endif
-                            </div>
-                            <div class="mt-1 text-sm text-base-content/70">
-                                {{ to_user_timezone($firstEvent->time, auth()->user())->format('H:i') }}
+                                    @if ($eventGroup['count'] > 1)
+                                        <span class="text-base-content/70">{{ ' + ' . ($eventGroup['count'] - 1) . ' other' . ($eventGroup['count'] > 2 ? 's' : '') }}</span>
+                                    @endif
+                                </div>
+                                <div class="mt-1 text-sm text-base-content/70">
+                                    {{ to_user_timezone($firstEvent->time, auth()->user())->format('H:i') }}
+                                </div>
                             </div>
                             @else
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
@@ -1097,7 +1099,7 @@ $availableStreams = computed(function () {
                             @endif
                         </div>
                     </div>
-                    <div class="{{ $isCollapsed ? 'py-3' : 'py-2' }} text-right pr-2">
+                    <div class="py-2 pr-2 text-right">
                         @php $displayEvent = $eventGroup['events'][0]; @endphp
                         @if (! is_null($displayEvent->value))
                         <span class="text-lg font-bold {{ $this->valueColorClass($displayEvent) }}">{!! $this->formatValueDisplay($displayEvent) !!}</span>
