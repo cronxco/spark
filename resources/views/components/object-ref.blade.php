@@ -51,15 +51,20 @@ $relationshipCount = $object->allRelationships()->count();
 <span
     x-data="{
         open: false,
-        timeout: null,
+        showTimeout: null,
+        hideTimeout: null,
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;
-            this.timeout = setTimeout(() => { this.open = true; }, 200);
+            clearTimeout(this.hideTimeout);
+            this.showTimeout = setTimeout(() => { this.open = true; }, 200);
         },
         hide() {
-            clearTimeout(this.timeout);
-            this.open = false;
+            clearTimeout(this.showTimeout);
+            this.hideTimeout = setTimeout(() => { this.open = false; }, 150);
+        },
+        keepOpen() {
+            clearTimeout(this.hideTimeout);
         },
         toggle() {
             if (this.isMobile) {
@@ -99,6 +104,7 @@ $relationshipCount = $object->allRelationships()->count();
         x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95"
         x-cloak
+        @mouseenter="keepOpen()"
         @click.outside="open = false"
         class="absolute z-50 mt-2 left-0"
         style="min-width: 320px; max-width: 380px;"
