@@ -1,4 +1,4 @@
-@props(['object', 'showType' => false])
+@props(['object', 'showType' => false, 'variant' => 'badge', 'href' => null])
 
 @php
 use App\Integrations\PluginRegistry;
@@ -24,6 +24,20 @@ $conceptDisplay = Str::headline($object->concept ?? '');
 // Generate unique ID for this popover
 $popoverId = 'object-ref-' . $object->id;
 
+// Try to get icon from plugin object types config
+$objectIcon = 'fas.cube'; // default
+$objectTypes = [];
+
+// Find the plugin that defines this object type
+foreach (PluginRegistry::all() as $pluginClass) {
+    $types = $pluginClass::getObjectTypes();
+    if (isset($types[$object->type])) {
+        $objectTypes = $types[$object->type];
+        $objectIcon = $objectTypes['icon'] ?? 'fas.cube';
+        break;
+    }
+}
+
 // Determine accent color based on concept
 $accentColors = [
     'user' => 'secondary',
@@ -46,6 +60,9 @@ foreach ($accentColors as $key => $color) {
 // Event counts
 $eventCount = $object->actorEvents()->count() + $object->targetEvents()->count();
 $relationshipCount = $object->allRelationships()->count();
+
+// Default href to object show page
+$linkHref = $href ?? route('objects.show', $object);
 @endphp
 
 <span
@@ -78,21 +95,31 @@ $relationshipCount = $object->allRelationships()->count();
     @keydown.escape="open = false"
     class="relative inline-block"
 >
-    {{-- Trigger: The reference link/badge --}}
+    {{-- Trigger: Badge variant (default) --}}
+    @if ($variant === 'badge')
     <a
-        href="{{ route('objects.show', $object) }}"
+        href="{{ $linkHref }}"
         wire:navigate
         @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
-        <x-icon name="fas.cube" class="w-3 h-3 opacity-70" />
+        <x-icon :name="$objectIcon" class="w-3 h-3 opacity-70" />
         <span class="max-w-[200px] truncate">{{ $object->title }}</span>
         @if ($showType && $object->type)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $typeDisplay }}</span>
         @endif
     </a>
+    @else
+    {{-- Trigger: Text variant (plain text with hover) --}}
+    <a
+        href="{{ $linkHref }}"
+        wire:navigate
+        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
+        class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer"
+    >{{ $object->title }}</a>
+    @endif
 
     {{-- Popover Card --}}
     <div
@@ -114,16 +141,16 @@ $relationshipCount = $object->allRelationships()->count();
             <div class="h-1 bg-gradient-to-r from-{{ $accentColor }} to-{{ $accentColor }}/50"></div>
 
             <div class="card-body p-4 gap-3">
-                {{-- Header with thumbnail and title --}}
+                {{-- Header with thumbnail/icon and title --}}
                 <div class="flex gap-3">
-                    {{-- Thumbnail --}}
+                    {{-- Thumbnail or Icon --}}
                     @if ($thumbnailUrl)
                         <div class="w-16 h-16 rounded-lg overflow-hidden bg-base-300 flex-shrink-0 ring-2 ring-{{ $accentColor }}/20">
                             <img src="{{ $thumbnailUrl }}" alt="{{ $object->title }}" class="w-full h-full object-cover">
                         </div>
                     @else
-                        <div class="w-16 h-16 rounded-lg bg-{{ $accentColor }}/10 flex items-center justify-center flex-shrink-0">
-                            <x-icon name="fas.cube" class="w-8 h-8 text-{{ $accentColor }}/50" />
+                        <div class="w-16 h-16 rounded-lg bg-{{ $accentColor }}/10 flex items-center justify-center flex-shrink-0 ring-2 ring-{{ $accentColor }}/20">
+                            <x-icon :name="$objectIcon" class="w-8 h-8 text-{{ $accentColor }}" />
                         </div>
                     @endif
 
@@ -134,7 +161,10 @@ $relationshipCount = $object->allRelationships()->count();
                         </h4>
                         <div class="flex flex-wrap gap-1">
                             @if ($object->type)
-                                <span class="badge badge-{{ $accentColor }} badge-outline badge-xs">{{ $typeDisplay }}</span>
+                                <span class="badge badge-{{ $accentColor }} badge-outline badge-xs gap-1">
+                                    <x-icon :name="$objectIcon" class="w-2.5 h-2.5" />
+                                    {{ $typeDisplay }}
+                                </span>
                             @endif
                             @if ($conceptDisplay)
                                 <span class="badge badge-ghost badge-xs">{{ $conceptDisplay }}</span>
