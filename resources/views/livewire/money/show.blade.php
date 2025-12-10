@@ -94,7 +94,7 @@
                             @if ($account->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
                                 @foreach ($account->tags as $tag)
-                                <x-spark-tag :tag="$tag" size="sm" />
+                                <x-tag-ref :tag="$tag" size="sm" />
                                 @endforeach
                             </div>
                             @endif

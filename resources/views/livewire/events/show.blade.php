@@ -860,12 +860,12 @@ new class extends Component
                         <div class="mb-4 text-center sm:text-left">
                             <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 mb-2">
                                 <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content leading-tight">
-                                    {{ $this->formatAction($this->event->action) }}
+                                    <x-action-ref :action="$this->event->action" :service="$this->event->service" variant="text" />
                                     @if (should_display_action_with_object($this->event->action, $this->event->service))
                                     @if ($this->event->target)
-                                    {{ $this->event->target->title }}
+                                    <x-object-ref :object="$this->event->target" variant="text" />
                                     @elseif ($this->event->actor)
-                                    {{ $this->event->actor->title }}
+                                    <x-object-ref :object="$this->event->actor" variant="text" />
                                     @endif
                                     @endif
                                 </h2>
@@ -912,12 +912,7 @@ new class extends Component
                             @endif
                             @if ($this->event->integration)
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
-                            <x-badge class="badge-xs badge-outline">
-                                <x-slot:value>
-                                    <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
-                                    {{ str::Headline($this->event->integration->name) }}
-                                </x-slot:value>
-                            </x-badge>
+                            <x-integration-ref :integration="$this->event->integration" :showStatus="false" />
                             @endif
                         </div>
 
@@ -931,10 +926,7 @@ new class extends Component
                                     <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary/10 flex items-center justify-center">
                                         <x-icon name="fas.user" class="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
                                     </div>
-                                    <a href="{{ route('objects.show', $this->event->actor->id) }}"
-                                        class="font-medium text-secondary hover:underline text-sm sm:text-base">
-                                        {{ $this->event->actor->title }}
-                                    </a>
+                                    <x-object-ref :object="$this->event->actor" />
                                 </div>
                                 @endif
 
@@ -942,7 +934,7 @@ new class extends Component
                                 <div class="flex items-center gap-2">
                                     <x-icon name="fas.arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
                                     <x-icon name="fas.arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
-                                    <span class="text-sm text-base-content/70 font-medium">{{ $this->formatAction($this->event->action) }}</span>
+                                    <x-action-ref :action="$this->event->action" :service="$this->event->service" />
                                     <x-icon name="fas.arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
                                     <x-icon name="fas.arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
                                 </div>
@@ -953,10 +945,7 @@ new class extends Component
                                     <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent/10 flex items-center justify-center">
                                         <x-icon name="fas.arrow-trend-up" class="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                     </div>
-                                    <a href="{{ route('objects.show', $this->event->target->id) }}"
-                                        class="font-medium text-accent hover:underline text-sm sm:text-base">
-                                        {{ $this->event->target->title }}
-                                    </a>
+                                    <x-object-ref :object="$this->event->target" />
                                 </div>
                                 @endif
                             </div>
@@ -971,7 +960,7 @@ new class extends Component
                             @if ($tagsLoaded && $this->event->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center gap-2">
                                 @foreach ($this->event->tags as $tag)
-                                <x-spark-tag :tag="$tag" />
+                                <x-tag-ref :tag="$tag" />
                                 @endforeach
                             </div>
                             @elseif (! $tagsLoaded)
@@ -1217,7 +1206,7 @@ new class extends Component
                                                 @if ($relatedEvent->tags && count($relatedEvent->tags) > 0)
                                                 <span>·</span>
                                                 @foreach ($relatedEvent->tags as $tag)
-                                                <x-spark-tag :tag="$tag" size="xs" />
+                                                <x-tag-ref :tag="$tag" size="xs" />
                                                 @endforeach
                                                 @endif
                                             </div>
@@ -1323,18 +1312,20 @@ new class extends Component
                         @endif
 
                         <!-- Related Entity -->
-                        <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
-                            <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
-                            <div class="min-w-0 flex-1">
-                                <div class="font-medium truncate text-sm">{{ $title }}</div>
-                                @if ($subtitle)
-                                <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
-                                @endif
-                            </div>
-                        </a>
-
-                        <!-- Badge -->
-                        <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
+                        <div class="flex-1 min-w-0">
+                            @if ($relatedModel instanceof \App\Models\Event)
+                                <x-event-ref :event="$relatedModel" :showService="true" />
+                            @elseif ($relatedModel instanceof \App\Models\EventObject)
+                                <x-object-ref :object="$relatedModel" :showType="true" />
+                            @elseif ($relatedModel instanceof \App\Models\Block)
+                                <x-block-ref :block="$relatedModel" :showType="true" />
+                            @else
+                                <a href="{{ $route }}" class="flex items-center gap-2 hover:text-accent transition-colors">
+                                    <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
+                                    <span class="font-medium truncate text-sm">{{ $title }}</span>
+                                </a>
+                            @endif
+                        </div>
 
                         <!-- Value (if present) -->
                         @if ($relationship->value !== null)
@@ -1672,7 +1663,7 @@ new class extends Component
                                     <x-metadata-row label="Tags" :copyable="false">
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($this->event->actor->tags as $tag)
-                                                <x-spark-tag :tag="$tag" size="xs" />
+                                                <x-tag-ref :tag="$tag" size="xs" />
                                             @endforeach
                                         </div>
                                     </x-metadata-row>
@@ -1703,7 +1694,7 @@ new class extends Component
                                     <x-metadata-row label="Tags" :copyable="false">
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($this->event->target->tags as $tag)
-                                                <x-spark-tag :tag="$tag" size="xs" />
+                                                <x-tag-ref :tag="$tag" size="xs" />
                                             @endforeach
                                         </div>
                                     </x-metadata-row>

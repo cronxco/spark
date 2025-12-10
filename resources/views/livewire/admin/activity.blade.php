@@ -486,14 +486,21 @@ new class extends Component
                     @endscope
 
                     @scope('cell_subject_type', $activity)
-                    @if ($this->getSubjectUrl($activity))
-                    <a href="{{ $this->getSubjectUrl($activity) }}" class="link font-medium">
-                        {{ Str::limit($this->getSubjectTitle($activity), 30) }}
-                    </a>
+                    @if ($activity->subject)
+                        @if ($activity->subject instanceof \App\Models\Event)
+                            <x-event-ref :event="$activity->subject" :showService="false" />
+                        @elseif ($activity->subject instanceof \App\Models\EventObject)
+                            <x-object-ref :object="$activity->subject" />
+                        @elseif ($activity->subject instanceof \App\Models\Block)
+                            <x-block-ref :block="$activity->subject" :showType="false" />
+                        @else
+                            <span class="text-base-content/70">{{ Str::limit($this->getSubjectTitle($activity), 30) }}</span>
+                            <div class="text-xs text-base-content/70">{{ $this->prettifySubjectType($activity->subject_type) }}</div>
+                        @endif
                     @else
-                    <span class="text-base-content/70">{{ Str::limit($this->getSubjectTitle($activity), 30) }}</span>
+                        <span class="text-base-content/70 italic">Deleted</span>
+                        <div class="text-xs text-base-content/70">{{ $this->prettifySubjectType($activity->subject_type) }}</div>
                     @endif
-                    <div class="text-xs text-base-content/70">{{ $this->prettifySubjectType($activity->subject_type) }}</div>
                     @endscope
 
                     @scope('cell_changes', $activity)
@@ -561,14 +568,20 @@ new class extends Component
                                 <div>
                                     <span class="text-sm font-medium">Subject:</span>
                                     <div class="mt-1">
-                                        @if ($this->getSubjectUrl($selectedActivity))
-                                        <a href="{{ $this->getSubjectUrl($selectedActivity) }}" class="link font-medium" target="_blank">
-                                            {{ $this->getSubjectTitle($selectedActivity) }}
-                                        </a>
+                                        @if ($selectedActivity->subject)
+                                            @if ($selectedActivity->subject instanceof \App\Models\Event)
+                                                <x-event-ref :event="$selectedActivity->subject" />
+                                            @elseif ($selectedActivity->subject instanceof \App\Models\EventObject)
+                                                <x-object-ref :object="$selectedActivity->subject" :showType="true" />
+                                            @elseif ($selectedActivity->subject instanceof \App\Models\Block)
+                                                <x-block-ref :block="$selectedActivity->subject" />
+                                            @else
+                                                <span class="text-base-content/70">{{ $this->getSubjectTitle($selectedActivity) }}</span>
+                                            @endif
                                         @else
-                                        <span class="text-base-content/70">{{ $this->getSubjectTitle($selectedActivity) }}</span>
+                                            <span class="text-base-content/70 italic">Deleted</span>
                                         @endif
-                                        <div class="text-xs text-base-content/70">{{ $this->prettifySubjectType($selectedActivity->subject_type) }}</div>
+                                        <div class="text-xs text-base-content/70 mt-1">{{ $this->prettifySubjectType($selectedActivity->subject_type) }}</div>
                                         @if ($selectedActivity->subject_id)
                                         <div class="text-xs text-base-content/70 font-mono">ID: {{ $selectedActivity->subject_id }}</div>
                                         @endif

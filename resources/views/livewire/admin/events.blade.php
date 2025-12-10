@@ -335,7 +335,6 @@ new class extends Component {
                     selectable
                     selectable-key="id"
                     wire:model.live="selectedEvents"
-                    link="/events/{id}"
                     striped
                     class="[&_table]:!static [&_td]:!static">
                     <x-slot:empty>
@@ -353,7 +352,7 @@ new class extends Component {
                     </x-slot:empty>
 
                     @scope('cell_id', $event)
-                    <span class="text-sm font-mono">{{ $this->truncateId($event->id) }}</span>
+                    <x-event-ref :event="$event" :showService="false" :text="'<span class=\'font-mono text-xs\'>' . $this->truncateId($event->id) . '</span>'" />
                     @endscope
 
                     @scope('cell_service', $event)
@@ -367,7 +366,7 @@ new class extends Component {
                     @scope('cell_action', $event)
                     <div class="flex flex-col gap-1">
                         <span class="sm:hidden text-xs">{{ $event->service }}</span>
-                        <span class="text-sm">{{ $this->prettifyAction($event->action) }}</span>
+                        <x-action-ref :action="$event->action" :service="$event->service" :href="route('events.show', $event)" />
                         @if (!empty($event->value))
                         <span class="sm:hidden text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
                         @endif
@@ -375,9 +374,11 @@ new class extends Component {
                     @endscope
 
                     @scope('cell_target', $event)
-                    <x-uk-date :date="$event->time" />
+                    <x-uk-date :date="$event->time" class="sm:hidden" />
                     @if ($event->target)
-                    {{ Str::limit($event->target->title, 30) }}
+                    <x-object-ref :object="$event->target" />
+                    @elseif ($event->actor)
+                    <x-object-ref :object="$event->actor" />
                     @endif
                     @endscope
 

@@ -72,19 +72,21 @@
                                     <div class="text-xl text-base-content/40 font-mono">↔</div>
                                 @endif
 
-                                <!-- Related Entity -->
-                                <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
-                                    <x-icon name="{{ $icon }}" class="w-5 h-5 flex-shrink-0" />
-                                    <div class="min-w-0 flex-1">
-                                        <div class="font-medium truncate">{{ $title }}</div>
-                                        @if ($subtitle)
-                                            <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
-                                        @endif
-                                    </div>
-                                </a>
-
-                                <!-- Badge -->
-                                <span class="badge {{ $badgeClass }} badge-sm">{{ $badgeText }}</span>
+                                <!-- Related Entity (using ref components with hover cards) -->
+                                <div class="flex-1 min-w-0">
+                                    @if ($relatedModel instanceof \App\Models\Event)
+                                        <x-event-ref :event="$relatedModel" :showService="true" />
+                                    @elseif ($relatedModel instanceof \App\Models\EventObject)
+                                        <x-object-ref :object="$relatedModel" :showType="true" />
+                                    @elseif ($relatedModel instanceof \App\Models\Block)
+                                        <x-block-ref :block="$relatedModel" :showType="true" />
+                                    @else
+                                        <a href="{{ $route }}" class="flex items-center gap-2 hover:text-accent transition-colors">
+                                            <x-icon name="{{ $icon }}" class="w-5 h-5 flex-shrink-0" />
+                                            <span class="font-medium truncate">{{ $title }}</span>
+                                        </a>
+                                    @endif
+                                </div>
 
                                 <!-- Value (if present) -->
                                 @if ($relationship->value !== null)
