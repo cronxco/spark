@@ -487,47 +487,43 @@ new class extends Component
                 Related Event
             </h3>
             <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                <a href="{{ route('events.show', $this->block->event->id) }}"
-                    class="block hover:text-primary transition-colors">
-                    <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0 mt-1">
-                            <x-icon name="o-bolt" class="w-4 h-4" />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-start justify-between gap-2 mb-1">
-                                <span class="font-medium">
-                                    {{ format_action_title($this->block->event->action) }}
-                                    @if (should_display_action_with_object($this->block->event->action, $this->block->event->service))
-                                    @if ($this->block->event->target)
-                                    <span class="text-base-content/80">{{ ' ' . $this->block->event->target->title }}</span>
-                                    @elseif ($this->block->event->actor)
-                                    <span class="text-base-content/80">{{ ' ' . $this->block->event->actor->title }}</span>
-                                    @endif
-                                    @endif
-                                </span>
-                                @if ($this->block->event->value)
-                                <span class="text-sm font-semibold flex-shrink-0">
-                                    {!! format_event_value_display($this->block->event->formatted_value, $this->block->event->value_unit, $this->block->event->service, $this->block->event->action, 'action') !!}
-                                </span>
-                                @endif
-                            </div>
-                            <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                <span>{{ to_user_timezone($this->block->event->time, auth()->user())->format('d/m/Y H:i') }}</span>
-                                @if ($this->block->event->domain)
-                                <span>·</span>
-                                <x-badge :value="$this->block->event->domain" class="badge-xs badge-outline" />
-                                @endif
-                                <span>·</span>
-                                <x-badge :value="$this->block->event->service" class="badge-xs badge-outline" />
-                                @if ($this->block->event->integration)
-                                <span>·</span>
-                                <x-badge :value="$this->block->event->integration->name" class="badge-xs badge-outline" />
-                                @endif
-                            </div>
-                        </div>
-                        <x-icon name="o-chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0 mt-1">
+                        <x-icon name="o-bolt" class="w-4 h-4" />
                     </div>
-                </a>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <div class="flex items-center flex-wrap gap-1">
+                                <x-event-ref :event="$this->block->event" :showService="false" />
+                                @if (should_display_action_with_object($this->block->event->action, $this->block->event->service))
+                                @if ($this->block->event->target)
+                                <x-object-ref :object="$this->block->event->target" />
+                                @elseif ($this->block->event->actor)
+                                <x-object-ref :object="$this->block->event->actor" />
+                                @endif
+                                @endif
+                            </div>
+                            @if ($this->block->event->value)
+                            <span class="text-sm font-semibold flex-shrink-0">
+                                {!! format_event_value_display($this->block->event->formatted_value, $this->block->event->value_unit, $this->block->event->service, $this->block->event->action, 'action') !!}
+                            </span>
+                            @endif
+                        </div>
+                        <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                            <span>{{ to_user_timezone($this->block->event->time, auth()->user())->format('d/m/Y H:i') }}</span>
+                            @if ($this->block->event->domain)
+                            <span>·</span>
+                            <x-badge :value="$this->block->event->domain" class="badge-xs badge-outline" />
+                            @endif
+                            <span>·</span>
+                            @if ($this->block->event->integration)
+                            <x-integration-ref :integration="$this->block->event->integration" :showStatus="false" />
+                            @else
+                            <x-badge :value="$this->block->event->service" class="badge-xs badge-outline" />
+                            @endif
+                        </div>
+                    </div>
+                </div>
             </div>
         </x-card>
         @endif
@@ -647,16 +643,20 @@ new class extends Component
                     @else
                     <span class="text-base-content/40 text-sm">↔</span>
                     @endif
-                    <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
-                        <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
-                        <div class="min-w-0 flex-1">
-                            <div class="font-medium truncate text-sm">{{ $title }}</div>
-                            @if ($subtitle)
-                            <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
-                            @endif
-                        </div>
-                    </a>
-                    <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
+                    <div class="flex-1 min-w-0">
+                        @if ($relatedModel instanceof \App\Models\Event)
+                            <x-event-ref :event="$relatedModel" :showService="true" />
+                        @elseif ($relatedModel instanceof \App\Models\EventObject)
+                            <x-object-ref :object="$relatedModel" :showType="true" />
+                        @elseif ($relatedModel instanceof \App\Models\Block)
+                            <x-block-ref :block="$relatedModel" :showType="true" />
+                        @else
+                            <a href="{{ $route }}" class="flex items-center gap-2 hover:text-accent transition-colors">
+                                <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
+                                <span class="font-medium truncate text-sm">{{ $title }}</span>
+                            </a>
+                        @endif
+                    </div>
                     @if ($relationship->value !== null)
                     <div class="text-xs font-mono text-info">
                         @if ($relationship->value_unit)

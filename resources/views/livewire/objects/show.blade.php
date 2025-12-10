@@ -1436,49 +1436,45 @@ new class extends Component
                 <div class="space-y-3">
                     @foreach ($directEvents as $event)
                     <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors bg-base-100">
-                        <a href="{{ route('events.show', $event->id) }}"
-                            class="block hover:text-primary transition-colors">
-                            <div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                    <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-start justify-between gap-2 mb-1">
-                                        <span class="font-medium">
-                                            {{ $this->formatAction($event->action) }}
-                                            @if (should_display_action_with_object($event->action, $event->service))
-                                                @if ($event->target && $event->target_id !== $this->object->id)
-                                                    <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
-                                                @elseif ($event->actor && $event->actor_id !== $this->object->id)
-                                                    <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
-                                                @endif
-                                            @endif
-                                        </span>
-                                        @if ($event->value)
-                                        <span class="text-sm font-semibold text-primary">
-                                            {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
-                                        </span>
-                                        @endif
-                                    </div>
-                                    <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                        <span>{{ $event->time->format('d/m/Y H:i') }}</span>
-                                        <span>·</span>
-                                        <x-badge :value="$event->service" class="badge-xs badge-outline" />
-                                        @if ($event->integration)
-                                        <span>·</span>
-                                        <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
-                                        @endif
-                                        @if ($event->tags && count($event->tags) > 0)
-                                        <span>·</span>
-                                        @foreach ($event->tags->take(3) as $tag)
-                                        <x-spark-tag :tag="$tag" size="xs" />
-                                        @endforeach
-                                        @endif
-                                    </div>
-                                </div>
-                                <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
                             </div>
-                        </a>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between gap-2 mb-1">
+                                    <div class="flex items-center flex-wrap gap-1">
+                                        <x-event-ref :event="$event" :showService="false" />
+                                        @if (should_display_action_with_object($event->action, $event->service))
+                                            @if ($event->target && $event->target_id !== $this->object->id)
+                                                <x-object-ref :object="$event->target" />
+                                            @elseif ($event->actor && $event->actor_id !== $this->object->id)
+                                                <x-object-ref :object="$event->actor" />
+                                            @endif
+                                        @endif
+                                    </div>
+                                    @if ($event->value)
+                                    <span class="text-sm font-semibold text-primary">
+                                        {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                    </span>
+                                    @endif
+                                </div>
+                                <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                    <span>{{ $event->time->format('d/m/Y H:i') }}</span>
+                                    <span>·</span>
+                                    @if ($event->integration)
+                                    <x-integration-ref :integration="$event->integration" :showStatus="false" />
+                                    @else
+                                    <x-badge :value="$event->service" class="badge-xs badge-outline" />
+                                    @endif
+                                    @if ($event->tags && count($event->tags) > 0)
+                                    <span>·</span>
+                                    @foreach ($event->tags->take(3) as $tag)
+                                    <x-spark-tag :tag="$tag" size="xs" />
+                                    @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     @endforeach
                 </div>
@@ -1757,18 +1753,20 @@ new class extends Component
                             @endif
 
                             <!-- Related Entity -->
-                            <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
-                                <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
-                                <div class="min-w-0 flex-1">
-                                    <div class="font-medium truncate text-sm">{{ $title }}</div>
-                                    @if ($subtitle)
-                                        <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
-                                    @endif
-                                </div>
-                            </a>
-
-                            <!-- Badge -->
-                            <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
+                            <div class="flex-1 min-w-0">
+                                @if ($relatedModel instanceof \App\Models\Event)
+                                    <x-event-ref :event="$relatedModel" :showService="true" />
+                                @elseif ($relatedModel instanceof \App\Models\EventObject)
+                                    <x-object-ref :object="$relatedModel" :showType="true" />
+                                @elseif ($relatedModel instanceof \App\Models\Block)
+                                    <x-block-ref :block="$relatedModel" :showType="true" />
+                                @else
+                                    <a href="{{ $route }}" class="flex items-center gap-2 hover:text-accent transition-colors">
+                                        <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
+                                        <span class="font-medium truncate text-sm">{{ $title }}</span>
+                                    </a>
+                                @endif
+                            </div>
 
                             <!-- Value (if present) -->
                             @if ($relationship->value !== null)

@@ -375,9 +375,11 @@ new class extends Component {
                     @endscope
 
                     @scope('cell_target', $event)
-                    <x-uk-date :date="$event->time" />
+                    <x-uk-date :date="$event->time" class="sm:hidden" />
                     @if ($event->target)
-                    {{ Str::limit($event->target->title, 30) }}
+                    <x-object-ref :object="$event->target" />
+                    @elseif ($event->actor)
+                    <x-object-ref :object="$event->actor" />
                     @endif
                     @endscope
 
