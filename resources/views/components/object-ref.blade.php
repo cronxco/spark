@@ -29,7 +29,7 @@ $objectIcon = 'fas.cube'; // default
 $objectTypes = [];
 
 // Find the plugin that defines this object type
-foreach (PluginRegistry::all() as $pluginClass) {
+foreach (PluginRegistry::getAllPlugins() as $pluginClass) {
     $types = $pluginClass::getObjectTypes();
     if (isset($types[$object->type])) {
         $objectTypes = $types[$object->type];
