@@ -21,8 +21,8 @@ $contentPreview = $object->content ? Str::limit(strip_tags($object->content), 10
 $typeDisplay = Str::headline($object->type ?? 'Object');
 $conceptDisplay = Str::headline($object->concept ?? '');
 
-// Generate unique ID for this popover
-$popoverId = 'object-ref-' . $object->id;
+// Generate unique ID for this popover instance (not just per object, but per render)
+$popoverId = 'object-ref-' . $object->id . '-' . Str::random(8);
 
 // Try to get icon from plugin object types config
 $objectIcon = 'fas.cube'; // default

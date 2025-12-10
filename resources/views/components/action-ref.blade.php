@@ -35,8 +35,8 @@ $domainColors = [
 ];
 $domainColor = $domainColors[$domain] ?? 'primary';
 
-// Generate unique ID for this popover
-$popoverId = 'action-ref-' . md5($service . '-' . $action);
+// Generate unique ID for this popover instance (not just per action, but per render)
+$popoverId = 'action-ref-' . md5($service . '-' . $action) . '-' . Str::random(8);
 @endphp
 
 <span
