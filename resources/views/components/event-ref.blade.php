@@ -34,8 +34,8 @@ $domainColor = $domainColors[$domain] ?? 'primary';
 $event->loadMissing(['actor', 'target', 'integration']);
 $blocksCount = $event->blocks()->count();
 
-// Generate unique ID
-$popoverId = 'event-ref-' . $event->id;
+// Generate unique ID for this popover instance (not just per event, but per render)
+$popoverId = 'event-ref-' . $event->id . '-' . Str::random(8);
 @endphp
 
 <span

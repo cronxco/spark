@@ -48,8 +48,8 @@ if ($isPaused) {
 $lastUpdate = $integration->last_successful_update_at;
 $nextUpdate = $integration->getNextUpdateTime();
 
-// Generate unique ID
-$popoverId = 'integration-ref-' . $integration->id;
+// Generate unique ID for this popover instance (not just per integration, but per render)
+$popoverId = 'integration-ref-' . $integration->id . '-' . Str::random(8);
 @endphp
 
 <span

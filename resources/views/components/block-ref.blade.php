@@ -37,8 +37,8 @@ $accentColor = $domainColors[$domain] ?? 'accent';
 $hasCustomLayout = $block->hasCustomCardLayout();
 $customLayoutPath = $block->getCustomCardLayoutPath();
 
-// Generate unique ID
-$popoverId = 'block-ref-' . $block->id;
+// Generate unique ID for this popover instance (not just per block, but per render)
+$popoverId = 'block-ref-' . $block->id . '-' . Str::random(8);
 @endphp
 
 <span
