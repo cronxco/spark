@@ -860,12 +860,12 @@ new class extends Component
                         <div class="mb-4 text-center sm:text-left">
                             <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 mb-2">
                                 <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content leading-tight">
-                                    {{ $this->formatAction($this->event->action) }}
+                                    <x-action-ref :action="$this->event->action" :service="$this->event->service" variant="text" />
                                     @if (should_display_action_with_object($this->event->action, $this->event->service))
                                     @if ($this->event->target)
-                                    {{ $this->event->target->title }}
+                                    <x-object-ref :object="$this->event->target" variant="text" />
                                     @elseif ($this->event->actor)
-                                    {{ $this->event->actor->title }}
+                                    <x-object-ref :object="$this->event->actor" variant="text" />
                                     @endif
                                     @endif
                                 </h2>
@@ -912,12 +912,7 @@ new class extends Component
                             @endif
                             @if ($this->event->integration)
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
-                            <x-badge class="badge-xs badge-outline">
-                                <x-slot:value>
-                                    <x-icon name="fas.thumbtack" class="w-3 h-3 text-base-content/40" />
-                                    {{ str::Headline($this->event->integration->name) }}
-                                </x-slot:value>
-                            </x-badge>
+                            <x-integration-ref :integration="$this->event->integration" :showStatus="false" />
                             @endif
                         </div>
 
@@ -939,7 +934,7 @@ new class extends Component
                                 <div class="flex items-center gap-2">
                                     <x-icon name="fas.arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
                                     <x-icon name="fas.arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
-                                    <span class="text-sm text-base-content/70 font-medium">{{ $this->formatAction($this->event->action) }}</span>
+                                    <x-action-ref :action="$this->event->action" :service="$this->event->service" />
                                     <x-icon name="fas.arrow-down" class="w-4 h-4 text-base-content/40 sm:hidden" />
                                     <x-icon name="fas.arrow-right" class="w-4 h-4 text-base-content/40 hidden sm:block" />
                                 </div>
