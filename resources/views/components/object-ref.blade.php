@@ -1,4 +1,4 @@
-@props(['object', 'showType' => false, 'variant' => 'badge', 'href' => null])
+@props(['object', 'showType' => false, 'variant' => 'badge', 'href' => null, 'text' => null])
 
 @php
 use App\Integrations\PluginRegistry;
@@ -118,7 +118,7 @@ $linkHref = $href ?? route('objects.show', $object);
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$objectIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{{ $object->title }}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? $object->title !!}</span>
         @if ($showType && $object->type)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $typeDisplay }}</span>
         @endif
@@ -130,7 +130,7 @@ $linkHref = $href ?? route('objects.show', $object);
         wire:navigate
         @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
         class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer"
-    >{{ $object->title }}</a>
+    >{!! $text ?? $object->title !!}</a>
     @endif
 
     {{-- Popover Card --}}

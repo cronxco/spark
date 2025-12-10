@@ -1,4 +1,4 @@
-@props(['block', 'showType' => true])
+@props(['block', 'showType' => true, 'text' => null])
 
 @php
 use App\Integrations\PluginRegistry;
@@ -93,7 +93,7 @@ $popoverBaseId = 'block-ref-' . $block->id;
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[180px] truncate">{{ $block->title ?? $blockDisplayName }}</span>
+        <span class="max-w-[180px] truncate">{!! $text ?? ($block->title ?? $blockDisplayName) !!}</span>
         @if ($showType && $block->block_type)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
         @endif
@@ -192,14 +192,6 @@ $popoverBaseId = 'block-ref-' . $block->id;
                                     @endforeach
                                 </div>
                             @endif
-                        @endif
-
-                        {{-- Parent event info --}}
-                        @if ($block->event)
-                            <div class="flex items-center gap-2 text-xs text-base-content/50">
-                                <x-icon :name="$icon" class="w-3 h-3" />
-                                <span>From {{ $serviceName }} event</span>
-                            </div>
                         @endif
                     </div>
                 @endif

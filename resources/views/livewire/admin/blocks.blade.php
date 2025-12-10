@@ -341,7 +341,7 @@ new class extends Component
                 class="[&_table]:!static [&_td]:!static">
 
                 @scope('cell_id', $block)
-                <code class="text-xs hidden md:inline">{{ $this->truncateId($block->id) }}</code>
+                <x-block-ref :block="$block" :showType="false" :text="'<span class=\'font-mono text-xs\'>' . $this->truncateId($block->id) . '</span>'" />
                 @endscope
 
                 @scope('cell_title', $block)

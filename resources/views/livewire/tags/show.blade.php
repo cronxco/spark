@@ -141,7 +141,7 @@ new class extends Component {
                 <div class="flex-1 w-full">
                     <div class="mb-4 text-center sm:text-left">
                         <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2">
-                            <x-spark-tag :tag="$tag" />
+                            <x-tag-ref :tag="$tag" />
                         </h2>
                         <div class="text-sm text-base-content/70">
                             {{ $this->getTagTypeLabel($tag->type ?? 'untyped') }}
@@ -235,7 +235,7 @@ new class extends Component {
                                                 @if ($event->tags->isNotEmpty())
                                                     <div class="flex flex-wrap gap-1 mt-2">
                                                         @foreach ($event->tags as $eventTag)
-                                                            <x-spark-tag :tag="$eventTag" />
+                                                            <x-tag-ref :tag="$eventTag" />
                                                         @endforeach
                                                     </div>
                                                 @endif
@@ -298,7 +298,7 @@ new class extends Component {
                                                 @if ($object->tags->isNotEmpty())
                                                     <div class="flex flex-wrap gap-1 mt-2">
                                                         @foreach ($object->tags as $objectTag)
-                                                            <x-spark-tag :tag="$objectTag" />
+                                                            <x-tag-ref :tag="$objectTag" />
                                                         @endforeach
                                                     </div>
                                                 @endif

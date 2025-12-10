@@ -352,7 +352,7 @@ new class extends Component {
                     </x-slot:empty>
 
                     @scope('cell_id', $event)
-                    <span class="text-sm font-mono">{{ $this->truncateId($event->id) }}</span>
+                    <x-event-ref :event="$event" :showService="false" :text="'<span class=\'font-mono text-xs\'>' . $this->truncateId($event->id) . '</span>'" />
                     @endscope
 
                     @scope('cell_service', $event)

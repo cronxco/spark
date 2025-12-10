@@ -1,4 +1,4 @@
-@props(['action', 'service', 'variant' => 'badge', 'href' => null, 'showService' => false])
+@props(['action', 'service', 'variant' => 'badge', 'href' => null, 'showService' => false, 'text' => null])
 
 @php
 use App\Integrations\PluginRegistry;
@@ -93,7 +93,7 @@ $popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{{ $actionDisplay }}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
         @if ($showService)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
         @endif
@@ -106,7 +106,7 @@ $popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
                border border-{{ $domainColor }}/20 cursor-default"
     >
         <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{{ $actionDisplay }}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
         @if ($showService)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
         @endif
@@ -120,12 +120,12 @@ $popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
         wire:navigate
         @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
         class="font-medium hover:text-{{ $domainColor }} transition-colors cursor-pointer"
-    >{{ $actionDisplay }}</a>
+    >{!! $text ?? $actionDisplay !!}</a>
     @else
     <span
         @click.stop="toggle()"
         class="font-medium cursor-default"
-    >{{ $actionDisplay }}</span>
+    >{!! $text ?? $actionDisplay !!}</span>
     @endif
     @endif
 

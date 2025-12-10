@@ -318,9 +318,7 @@ new class extends Component
                 class="[&_table]:!static [&_td]:!static">
 
                 @scope('cell_id', $object)
-                <a href="{{ route('objects.show', $object->id) }}" class="link font-mono text-xs hidden md:inline" title="{{ $object->id }}">
-                    {{ $this->truncateId($object->id) }}
-                </a>
+                <x-object-ref :object="$object" :showType="false" :text="'<span class=\'font-mono text-xs\'>' . $this->truncateId($object->id) . '</span>'" />
                 @endscope
 
                 @scope('cell_title', $object)

@@ -38,7 +38,7 @@
             </label>
             <div class="flex flex-wrap gap-2">
                 @foreach ($event->tags as $tag)
-                <x-spark-tag :tag="$tag" />
+                <x-tag-ref :tag="$tag" />
                 @endforeach
             </div>
         </div>

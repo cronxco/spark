@@ -962,6 +962,8 @@ new class extends Component
                 @endif
             </div>
         </x-drawer>
+        </div>
+        <!-- End two-column layout -->
     </div>
     @else
     <div class="text-center py-12">

@@ -1072,7 +1072,7 @@ $availableStreams = computed(function () {
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @endif
-                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="md" fill />@endforeach
+                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="md" fill />@endforeach
                                 </div>
                             </div>
                             @else
@@ -1100,7 +1100,7 @@ $availableStreams = computed(function () {
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @endif
-                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="md" fill />@endforeach
+                                    @foreach ($firstEvent->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="md" fill />@endforeach
                                     @if ($firstEvent->blocks && count($firstEvent->blocks) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
@@ -1151,7 +1151,7 @@ $availableStreams = computed(function () {
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @endif
-                            @foreach ($event->tags ?? [] as $tag)<x-spark-tag :tag="$tag" size="sm" />@endforeach
+                            @foreach ($event->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="sm" />@endforeach
                             @if ($event->blocks && count($event->blocks) > 0)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
