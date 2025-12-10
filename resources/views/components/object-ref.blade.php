@@ -21,8 +21,8 @@ $contentPreview = $object->content ? Str::limit(strip_tags($object->content), 10
 $typeDisplay = Str::headline($object->type ?? 'Object');
 $conceptDisplay = Str::headline($object->concept ?? '');
 
-// Generate unique ID for this popover instance (not just per object, but per render)
-$popoverId = 'object-ref-' . $object->id . '-' . Str::random(8);
+// Base ID for this popover (unique suffix added via JavaScript)
+$popoverBaseId = 'object-ref-' . $object->id;
 
 // Try to get icon from plugin object types config
 $objectIcon = 'fas.cube'; // default
@@ -70,7 +70,7 @@ $linkHref = $href ?? route('objects.show', $object);
         open: false,
         showTimeout: null,
         hideTimeout: null,
-        popoverId: '{{ $popoverId }}',
+        popoverId: '{{ $popoverBaseId }}-' + Math.random().toString(36).substring(2, 10),
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;

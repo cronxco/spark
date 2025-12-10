@@ -35,8 +35,8 @@ $domainColors = [
 ];
 $domainColor = $domainColors[$domain] ?? 'primary';
 
-// Generate unique ID for this popover instance (not just per action, but per render)
-$popoverId = 'action-ref-' . md5($service . '-' . $action) . '-' . Str::random(8);
+// Base ID for this popover (unique suffix added via JavaScript)
+$popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
 @endphp
 
 <span
@@ -44,7 +44,7 @@ $popoverId = 'action-ref-' . md5($service . '-' . $action) . '-' . Str::random(8
         open: false,
         showTimeout: null,
         hideTimeout: null,
-        popoverId: '{{ $popoverId }}',
+        popoverId: '{{ $popoverBaseId }}-' + Math.random().toString(36).substring(2, 10),
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;

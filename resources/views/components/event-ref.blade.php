@@ -34,8 +34,8 @@ $domainColor = $domainColors[$domain] ?? 'primary';
 $event->loadMissing(['actor', 'target', 'integration']);
 $blocksCount = $event->blocks()->count();
 
-// Generate unique ID for this popover instance (not just per event, but per render)
-$popoverId = 'event-ref-' . $event->id . '-' . Str::random(8);
+// Base ID for this popover (unique suffix added via JavaScript)
+$popoverBaseId = 'event-ref-' . $event->id;
 @endphp
 
 <span
@@ -43,7 +43,7 @@ $popoverId = 'event-ref-' . $event->id . '-' . Str::random(8);
         open: false,
         showTimeout: null,
         hideTimeout: null,
-        popoverId: '{{ $popoverId }}',
+        popoverId: '{{ $popoverBaseId }}-' + Math.random().toString(36).substring(2, 10),
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;

@@ -48,8 +48,8 @@ if ($isPaused) {
 $lastUpdate = $integration->last_successful_update_at;
 $nextUpdate = $integration->getNextUpdateTime();
 
-// Generate unique ID for this popover instance (not just per integration, but per render)
-$popoverId = 'integration-ref-' . $integration->id . '-' . Str::random(8);
+// Base ID for this popover (unique suffix added via JavaScript)
+$popoverBaseId = 'integration-ref-' . $integration->id;
 @endphp
 
 <span
@@ -57,7 +57,7 @@ $popoverId = 'integration-ref-' . $integration->id . '-' . Str::random(8);
         open: false,
         showTimeout: null,
         hideTimeout: null,
-        popoverId: '{{ $popoverId }}',
+        popoverId: '{{ $popoverBaseId }}-' + Math.random().toString(36).substring(2, 10),
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;
