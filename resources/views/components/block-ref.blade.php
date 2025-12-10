@@ -37,8 +37,8 @@ $accentColor = $domainColors[$domain] ?? 'accent';
 $hasCustomLayout = $block->hasCustomCardLayout();
 $customLayoutPath = $block->getCustomCardLayoutPath();
 
-// Generate unique ID for this popover instance (not just per block, but per render)
-$popoverId = 'block-ref-' . $block->id . '-' . Str::random(8);
+// Base ID for this popover (unique suffix added via JavaScript)
+$popoverBaseId = 'block-ref-' . $block->id;
 @endphp
 
 <span
@@ -46,7 +46,7 @@ $popoverId = 'block-ref-' . $block->id . '-' . Str::random(8);
         open: false,
         showTimeout: null,
         hideTimeout: null,
-        popoverId: '{{ $popoverId }}',
+        popoverId: '{{ $popoverBaseId }}-' + Math.random().toString(36).substring(2, 10),
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;
