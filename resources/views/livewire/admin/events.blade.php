@@ -367,7 +367,7 @@ new class extends Component {
                     @scope('cell_action', $event)
                     <div class="flex flex-col gap-1">
                         <span class="sm:hidden text-xs">{{ $event->service }}</span>
-                        <span class="text-sm">{{ $this->prettifyAction($event->action) }}</span>
+                        <x-action-ref :action="$event->action" :service="$event->service" :href="route('events.show', $event)" />
                         @if (!empty($event->value))
                         <span class="sm:hidden text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
                         @endif

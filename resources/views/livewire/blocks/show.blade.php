@@ -737,9 +737,7 @@ new class extends Component
                         @endif
                         @if ($this->block->event)
                             <x-metadata-row label="Related Event" :copy-value="format_action_title($this->block->event->action)">
-                                <a href="{{ route('events.show', $this->block->event->id) }}" class="hover:underline">
-                                    {{ format_action_title($this->block->event->action) }}
-                                </a>
+                                <x-action-ref :action="$this->block->event->action" :service="$this->block->event->service" :href="route('events.show', $this->block->event)" />
                             </x-metadata-row>
                         @endif
                     </dl>
