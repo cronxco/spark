@@ -1051,9 +1051,9 @@ $availableStreams = computed(function () {
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                         @if ($firstEvent->target)
-                                            <x-object-ref :object="$firstEvent->target" />
+                                            <x-object-ref :object="$firstEvent->target" variant="text" :href="route('events.show', $firstEvent)" />
                                         @elseif ($firstEvent->actor)
-                                            <x-object-ref :object="$firstEvent->actor" />
+                                            <x-object-ref :object="$firstEvent->actor" variant="text" :href="route('events.show', $firstEvent)" />
                                         @endif
                                     @endif
                                     @if ($eventGroup['count'] > 1)
@@ -1082,9 +1082,9 @@ $availableStreams = computed(function () {
                                     <a href="{{ route('events.show', $firstEvent->id) }}" wire:navigate class="hover:text-primary transition-colors font-semibold">{{ $this->formatAction($firstEvent->action) }}</a>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                     @if ($firstEvent->target)
-                                    <x-object-ref :object="$firstEvent->target" />
+                                    <x-object-ref :object="$firstEvent->target" variant="text" :href="route('events.show', $firstEvent)" />
                                     @elseif ($firstEvent->actor)
-                                    <x-object-ref :object="$firstEvent->actor" />
+                                    <x-object-ref :object="$firstEvent->actor" variant="text" :href="route('events.show', $firstEvent)" />
                                     @endif
                                     @endif
                                 </div>
@@ -1134,9 +1134,9 @@ $availableStreams = computed(function () {
                             <a href="{{ route('events.show', $event->id) }}" wire:navigate class="text-base-content hover:text-primary transition-colors font-medium">{{ $this->formatAction($event->action) }}</a>
                             @if (should_display_action_with_object($event->action, $event->service))
                             @if ($event->target)
-                            <x-object-ref :object="$event->target" />
+                            <x-object-ref :object="$event->target" variant="text" :href="route('events.show', $event)" />
                             @elseif ($event->actor)
-                            <x-object-ref :object="$event->actor" />
+                            <x-object-ref :object="$event->actor" variant="text" :href="route('events.show', $event)" />
                             @endif
                             @endif
                         </div>
