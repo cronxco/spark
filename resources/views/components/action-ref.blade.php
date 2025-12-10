@@ -44,11 +44,15 @@ $popoverId = 'action-ref-' . md5($service . '-' . $action);
         open: false,
         showTimeout: null,
         hideTimeout: null,
+        popoverId: '{{ $popoverId }}',
         isMobile: window.innerWidth < 768,
         show() {
             if (this.isMobile) return;
             clearTimeout(this.hideTimeout);
-            this.showTimeout = setTimeout(() => { this.open = true; }, 200);
+            this.showTimeout = setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('popover-opening', { detail: this.popoverId }));
+                this.open = true;
+            }, 200);
         },
         hide() {
             clearTimeout(this.showTimeout);
@@ -59,7 +63,14 @@ $popoverId = 'action-ref-' . md5($service . '-' . $action);
         },
         toggle() {
             if (this.isMobile) {
+                window.dispatchEvent(new CustomEvent('popover-opening', { detail: this.popoverId }));
                 this.open = !this.open;
+            }
+        },
+        closeIfNotMe(event) {
+            if (event.detail !== this.popoverId) {
+                clearTimeout(this.showTimeout);
+                this.open = false;
             }
         }
     }"
@@ -67,6 +78,7 @@ $popoverId = 'action-ref-' . md5($service . '-' . $action);
     @mouseleave="hide()"
     @click="toggle()"
     @keydown.escape="open = false"
+    @popover-opening.window="closeIfNotMe($event)"
     class="relative inline-block"
 >
     {{-- Trigger: Badge variant (default) --}}
