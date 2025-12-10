@@ -1598,12 +1598,12 @@ new class extends Component
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-start justify-between gap-2 mb-1">
                                             <span class="font-medium">
-                                                {{ $this->formatAction($event->action) }}
+                                                <x-action-ref :action="$event->action" :service="$event->service" variant="text" />
                                                 @if (should_display_action_with_object($event->action, $event->service))
                                                 @if ($event->target)
-                                                <span class="text-base-content/80">{{ ' ' . $event->target->title }}</span>
+                                                <x-object-ref :object="$event->target" variant="text" />
                                                 @elseif ($event->actor)
-                                                <span class="text-base-content/80">{{ ' ' . $event->actor->title }}</span>
+                                                <x-object-ref :object="$event->actor" variant="text" />
                                                 @endif
                                                 @endif
                                             </span>
