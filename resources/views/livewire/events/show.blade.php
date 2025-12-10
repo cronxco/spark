@@ -931,10 +931,7 @@ new class extends Component
                                     <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary/10 flex items-center justify-center">
                                         <x-icon name="fas.user" class="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
                                     </div>
-                                    <a href="{{ route('objects.show', $this->event->actor->id) }}"
-                                        class="font-medium text-secondary hover:underline text-sm sm:text-base">
-                                        {{ $this->event->actor->title }}
-                                    </a>
+                                    <x-object-ref :object="$this->event->actor" />
                                 </div>
                                 @endif
 
@@ -953,10 +950,7 @@ new class extends Component
                                     <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent/10 flex items-center justify-center">
                                         <x-icon name="fas.arrow-trend-up" class="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                     </div>
-                                    <a href="{{ route('objects.show', $this->event->target->id) }}"
-                                        class="font-medium text-accent hover:underline text-sm sm:text-base">
-                                        {{ $this->event->target->title }}
-                                    </a>
+                                    <x-object-ref :object="$this->event->target" />
                                 </div>
                                 @endif
                             </div>
@@ -1323,18 +1317,20 @@ new class extends Component
                         @endif
 
                         <!-- Related Entity -->
-                        <a href="{{ $route }}" class="flex items-center gap-2 flex-1 min-w-0 hover:text-accent transition-colors">
-                            <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
-                            <div class="min-w-0 flex-1">
-                                <div class="font-medium truncate text-sm">{{ $title }}</div>
-                                @if ($subtitle)
-                                <div class="text-xs text-base-content/60 truncate">{{ $subtitle }}</div>
-                                @endif
-                            </div>
-                        </a>
-
-                        <!-- Badge -->
-                        <span class="badge {{ $badgeClass }} badge-xs">{{ $badgeText }}</span>
+                        <div class="flex-1 min-w-0">
+                            @if ($relatedModel instanceof \App\Models\Event)
+                                <x-event-ref :event="$relatedModel" :showService="true" />
+                            @elseif ($relatedModel instanceof \App\Models\EventObject)
+                                <x-object-ref :object="$relatedModel" :showType="true" />
+                            @elseif ($relatedModel instanceof \App\Models\Block)
+                                <x-block-ref :block="$relatedModel" :showType="true" />
+                            @else
+                                <a href="{{ $route }}" class="flex items-center gap-2 hover:text-accent transition-colors">
+                                    <x-icon name="{{ $icon }}" class="w-4 h-4 flex-shrink-0" />
+                                    <span class="font-medium truncate text-sm">{{ $title }}</span>
+                                </a>
+                            @endif
+                        </div>
 
                         <!-- Value (if present) -->
                         @if ($relationship->value !== null)

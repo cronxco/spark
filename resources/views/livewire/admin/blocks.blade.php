@@ -375,9 +375,7 @@ new class extends Component
 
                 @scope('cell_event_id', $block)
                 @if ($block->event)
-                <a href="{{ route('events.show', $block->event) }}" class="link">
-                    <code class="text-xs">{{ $this->truncateId($block->event->id) }}</code>
-                </a>
+                <x-event-ref :event="$block->event" :showService="false" />
                 @else
                 <span class="text-error">Missing Event</span>
                 @endif
