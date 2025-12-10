@@ -1,4 +1,4 @@
-@props(['event', 'showService' => true])
+@props(['event', 'showService' => true, 'text' => null])
 
 @php
 use App\Integrations\PluginRegistry;
@@ -90,7 +90,7 @@ $popoverBaseId = 'event-ref-' . $event->id;
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$icon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{{ $actionDisplay }}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
         @if ($showService)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
         @endif

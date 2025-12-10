@@ -1,4 +1,4 @@
-@props(['integration', 'showStatus' => true])
+@props(['integration', 'showStatus' => true, 'text' => null])
 
 @php
 use App\Integrations\PluginRegistry;
@@ -28,20 +28,16 @@ $isProcessing = $integration->isProcessing();
 
 $statusColor = 'success';
 $statusText = 'Active';
-$statusIcon = 'fas.check-circle';
 
 if ($isPaused) {
     $statusColor = 'warning';
     $statusText = 'Paused';
-    $statusIcon = 'fas.pause-circle';
 } elseif ($isStale) {
     $statusColor = 'error';
-    $statusText = 'Stale';
-    $statusIcon = 'fas.exclamation-circle';
+    $statusText = 'Overdue';
 } elseif ($isProcessing) {
     $statusColor = 'info';
     $statusText = 'Processing';
-    $statusIcon = 'fas.spinner';
 }
 
 // Get timing info
@@ -104,9 +100,9 @@ $popoverBaseId = 'integration-ref-' . $integration->id;
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$icon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[180px] truncate">{{ $integration->name ?? $serviceName }}</span>
+        <span class="max-w-[180px] truncate">{!! $text ?? ($integration->name ?? $serviceName) !!}</span>
         @if ($showStatus)
-            <span class="w-2 h-2 rounded-full bg-{{ $statusColor }} {{ $isProcessing ? 'animate-pulse' : '' }}"></span>
+            <span class="status status-{{ $statusColor }} status-xs {{ $isProcessing ? 'animate-pulse' : '' }}"></span>
         @endif
     </a>
 
@@ -146,61 +142,37 @@ $popoverBaseId = 'integration-ref-' . $integration->id;
                     </div>
                 </div>
 
-                {{-- Status indicator --}}
-                <div class="flex items-center gap-2 p-2 rounded-lg bg-{{ $statusColor }}/10 border border-{{ $statusColor }}/20">
-                    <x-icon :name="$statusIcon" class="w-4 h-4 text-{{ $statusColor }} {{ $isProcessing ? 'animate-spin' : '' }}" />
-                    <span class="text-sm font-medium text-{{ $statusColor }}">{{ $statusText }}</span>
-                    @if ($isPaused)
-                        <span class="text-xs text-base-content/50 ml-auto">Updates suspended</span>
-                    @elseif ($isStale)
-                        <span class="text-xs text-base-content/50 ml-auto">No recent data</span>
-                    @elseif ($isProcessing)
-                        <span class="text-xs text-base-content/50 ml-auto">Syncing...</span>
-                    @endif
-                </div>
-
                 {{-- Timing info --}}
-                <div class="space-y-2 text-sm">
+                <div class="text-xs space-y-1.5">
                     @if ($lastUpdate)
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-base-content/60 flex items-center gap-1">
-                                <x-icon name="fas.clock-rotate-left" class="w-3 h-3" />
-                                Last updated
-                            </span>
-                            <span class="font-medium">{{ $lastUpdate->diffForHumans() }}</span>
+                            <span class="text-base-content/50">Last updated</span>
+                            <x-uk-date :date="$lastUpdate" :show-time="true" class="font-medium" />
                         </div>
                     @endif
 
                     @if ($nextUpdate && !$isPaused)
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-base-content/60 flex items-center gap-1">
-                                <x-icon name="fas.clock" class="w-3 h-3" />
-                                Next update
-                            </span>
-                            <span class="font-medium">{{ $nextUpdate->diffForHumans() }}</span>
+                            <span class="text-base-content/50">Next update</span>
+                            <x-uk-date :date="$nextUpdate" :show-time="true" class="font-medium" />
                         </div>
                     @endif
 
-                    @if ($integration->useSchedule())
-                        @php $scheduleSummary = $integration->getScheduleSummary(); @endphp
-                        @if ($scheduleSummary)
-                            <div class="flex items-center gap-2 text-xs text-base-content/50">
-                                <x-icon name="fas.calendar-days" class="w-3 h-3" />
-                                <span>{{ $scheduleSummary }}</span>
-                            </div>
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-base-300">
+                        @if ($integration->useSchedule())
+                            @php $scheduleSummary = $integration->getScheduleSummary(); @endphp
+                            @if ($scheduleSummary)
+                                <span class="text-base-content/50">{{ $scheduleSummary }}</span>
+                            @endif
+                        @else
+                            <span class="text-base-content/50">Every {{ $integration->getUpdateFrequencyMinutes() }}min</span>
                         @endif
-                    @else
-                        <div class="flex items-center gap-2 text-xs text-base-content/50">
-                            <x-icon name="fas.repeat" class="w-3 h-3" />
-                            <span>Every {{ $integration->getUpdateFrequencyMinutes() }} minutes</span>
-                        </div>
-                    @endif
-                </div>
 
-                {{-- Service type badge --}}
-                <div class="flex items-center gap-2 text-xs text-base-content/50">
-                    <span class="badge badge-ghost badge-xs capitalize">{{ $serviceType }}</span>
-                    <span class="badge badge-ghost badge-xs capitalize">{{ $domain }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="status status-{{ $statusColor }} {{ $isProcessing ? 'animate-pulse' : '' }}"></span>
+                            <span class="font-medium">{{ $statusText }}</span>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Action footer --}}

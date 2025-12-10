@@ -1,4 +1,4 @@
-@props(['tag', 'full' => false, 'fill' => false, 'size' => 'sm', 'showCounts' => false])
+@props(['tag', 'full' => false, 'fill' => false, 'size' => 'sm', 'showCounts' => false, 'text' => null])
 
 @php
 // Handle both objects and arrays
@@ -165,7 +165,7 @@ $popoverId = 'spark-tag-' . ($tagId ?? md5($tagName . ($tagType ?? '')));
             class="badge {{ $badgeClass }} gap-1 cursor-pointer hover:brightness-110 transition-all"
         >
             <x-icon :name="$tagIcon" class="w-3 h-3 opacity-70" />
-            <span>{{ $displayName }}</span>
+            <span>{!! $text ?? $displayName !!}</span>
         </a>
     @else
         <span
@@ -173,7 +173,7 @@ $popoverId = 'spark-tag-' . ($tagId ?? md5($tagName . ($tagType ?? '')));
             class="badge {{ $badgeClass }} gap-1 cursor-default"
         >
             <x-icon :name="$tagIcon" class="w-3 h-3 opacity-70" />
-            <span>{{ $displayName }}</span>
+            <span>{!! $text ?? $displayName !!}</span>
         </span>
     @endif
 

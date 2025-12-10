@@ -206,7 +206,9 @@ class Integration extends Model
     }
 
     /**
-     * Check if this integration is stale (for webhook/manual integrations)
+     * Check if this integration is stale or overdue
+     * - For webhook/manual integrations: checks if no events received within configured time
+     * - For OAuth integrations: checks if overdue for scheduled update
      */
     public function isStale(): bool
     {
@@ -216,18 +218,26 @@ class Integration extends Model
         }
 
         $timeUntilStaleMinutes = $pluginClass::getTimeUntilStaleMinutes();
-        if ($timeUntilStaleMinutes === null) {
-            return false; // Staleness checking disabled for this plugin
+
+        // For webhook/manual integrations, check event staleness
+        if ($timeUntilStaleMinutes !== null) {
+            $lastEventTime = $this->getLastEventTime();
+            if (! $lastEventTime) {
+                return true; // No events yet, consider stale
+            }
+
+            $staleThreshold = Carbon::now()->subMinutes($timeUntilStaleMinutes);
+
+            return $lastEventTime->lessThan($staleThreshold);
         }
 
-        $lastEventTime = $this->getLastEventTime();
-        if (! $lastEventTime) {
-            return true; // No events yet, consider stale
+        // For OAuth integrations, check if overdue for update
+        // An integration is overdue if it's due for an update but not currently processing
+        if ($this->isPaused() || $this->isProcessing()) {
+            return false;
         }
 
-        $staleThreshold = Carbon::now()->subMinutes($timeUntilStaleMinutes);
-
-        return $lastEventTime->lessThan($staleThreshold);
+        return $this->isDue();
     }
 
     /**

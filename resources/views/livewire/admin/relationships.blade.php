@@ -428,10 +428,16 @@ new class extends Component
 
                     @scope('cell_from', $relationship)
                     <div class="flex items-center gap-2">
-                        <div class="flex flex-col">
+                        @if ($relationship->from instanceof App\Models\Event)
+                            <x-event-ref :event="$relationship->from" :showService="false" />
+                        @elseif ($relationship->from instanceof App\Models\EventObject)
+                            <x-object-ref :object="$relationship->from" :showType="false" />
+                        @elseif ($relationship->from instanceof App\Models\Block)
+                            <x-block-ref :block="$relationship->from" :showType="false" />
+                        @else
                             <span class="text-sm">{{ $this->formatEntityTitle($relationship, 'from') }}</span>
-                            <span class="text-xs text-base-content/70 sm:hidden">{{ $this->formatModelType($relationship->from_type) }}</span>
-                        </div>
+                        @endif
+                        <span class="text-xs text-base-content/70 sm:hidden">{{ $this->formatModelType($relationship->from_type) }}</span>
                     </div>
                     @endscope
 
@@ -451,10 +457,16 @@ new class extends Component
 
                     @scope('cell_to', $relationship)
                     <div class="flex items-center gap-2">
-                        <div class="flex flex-col">
+                        @if ($relationship->to instanceof App\Models\Event)
+                            <x-event-ref :event="$relationship->to" :showService="false" />
+                        @elseif ($relationship->to instanceof App\Models\EventObject)
+                            <x-object-ref :object="$relationship->to" :showType="false" />
+                        @elseif ($relationship->to instanceof App\Models\Block)
+                            <x-block-ref :block="$relationship->to" :showType="false" />
+                        @else
                             <span class="text-sm">{{ $this->formatEntityTitle($relationship, 'to') }}</span>
-                            <span class="text-xs text-base-content/70 sm:hidden">{{ $this->formatModelType($relationship->to_type) }}</span>
-                        </div>
+                        @endif
+                        <span class="text-xs text-base-content/70 sm:hidden">{{ $this->formatModelType($relationship->to_type) }}</span>
                     </div>
                     @endscope
 

@@ -1383,13 +1383,6 @@ new class extends Component
                                     <span>{{ $this->object->url }}</span>
                                 </a>
                                 @endif
-                                @if ($this->object->media_url)
-                                <a href="{{ $this->object->media_url }}" target="_blank"
-                                    class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors">
-                                    <x-icon name="fas.image" class="w-4 h-4" />
-                                    <span>{{ $this->object->media_url }}</span>
-                                </a>
-                                @endif
                             </div>
                         </div>
                         @endif
@@ -1399,7 +1392,7 @@ new class extends Component
                             @if ($tagsLoaded && $this->object->tags->isNotEmpty())
                             <div class="flex flex-wrap justify-center gap-2">
                                 @foreach ($this->object->tags as $tag)
-                                <x-spark-tag :tag="$tag" />
+                                <x-tag-ref :tag="$tag" />
                                 @endforeach
                             </div>
                             @elseif (! $tagsLoaded)
@@ -1469,7 +1462,7 @@ new class extends Component
                                     @if ($event->tags && count($event->tags) > 0)
                                     <span>·</span>
                                     @foreach ($event->tags->take(3) as $tag)
-                                    <x-spark-tag :tag="$tag" size="xs" />
+                                    <x-tag-ref :tag="$tag" size="xs" />
                                     @endforeach
                                     @endif
                                 </div>
@@ -1646,7 +1639,7 @@ new class extends Component
                                             @if ($event->tags && count($event->tags) > 0)
                                             <span>·</span>
                                             @foreach ($event->tags as $tag)
-                                            <x-spark-tag :tag="$tag" size="xs" />
+                                            <x-tag-ref :tag="$tag" size="xs" />
                                             @endforeach
                                             @endif
                                         </div>
