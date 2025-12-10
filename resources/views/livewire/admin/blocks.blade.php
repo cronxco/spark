@@ -332,7 +332,6 @@ new class extends Component
                 :headers="$this->headers()"
                 :rows="$this->getBlocks()"
                 :sort-by="$sortBy"
-                :link="route('blocks.show', ['block' => '[id]'])"
                 with-pagination
                 per-page=" perPage"
                 :per-page-values="[10, 25, 50, 100]"
@@ -346,8 +345,6 @@ new class extends Component
                 @endscope
 
                 @scope('cell_title', $block)
-                <x-uk-date :date="$block->time" class="sm:hidden" />
-                <br />
                 <div class="font-medium">{{ $block->title ?: 'N/A' }}</div>
                 @endscope
 

@@ -335,7 +335,6 @@ new class extends Component {
                     selectable
                     selectable-key="id"
                     wire:model.live="selectedEvents"
-                    link="/events/{id}"
                     striped
                     class="[&_table]:!static [&_td]:!static">
                     <x-slot:empty>
