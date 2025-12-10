@@ -107,7 +107,7 @@ $shelfDisplay = $currentShelf ? ucfirst(str_replace('-', ' ', $currentShelf)) : 
                 @if ($seriesName)
                 <div class="text-xs text-base-content/60 flex items-center gap-1">
                     <x-icon name="fas.layer-group" class="w-3 h-3" />
-                    {{ $seriesName }}@if($seriesNumber) #{{ $seriesNumber }}@endif
+                    {{ $seriesName }}@if ($seriesNumber) #{{ $seriesNumber }}@endif
                 </div>
                 @endif
 
@@ -153,7 +153,7 @@ $shelfDisplay = $currentShelf ? ucfirst(str_replace('-', ' ', $currentShelf)) : 
                         <progress class="progress progress-{{ $accentColor }} w-full h-2" value="{{ $currentProgress }}" max="100"></progress>
                     </div>
                 @elseif ($currentShelf === 'to-read')
-                    
+
                 @elseif ($currentShelf === 'read' && $dateRead)
                     {{-- Read Badge with Date --}}
                     <div class="badge badge-sm badge-outline badge-{{ $accentColor }} gap-1">
