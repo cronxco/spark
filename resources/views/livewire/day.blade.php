@@ -203,15 +203,21 @@
                                 <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
                                     {{ to_user_timezone($firstEvent->time, auth()->user())->format(' H:i') }} ·
                                     <span title="{{ to_user_timezone($firstEvent->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($firstEvent->time, auth()->user())->diffForHumans() }}</span>
-                                    @if ($integrationLoaded && $firstEvent->integration)
+                                    @if (!$additionalDataLoaded)
+                                    <span class="hidden sm:inline">·</span>
+                                    <span class="sm:hidden w-full"></span>
+                                    <div class="skeleton h-5 w-24"></div>
+                                    @else
+                                    @if ($firstEvent->integration)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     <x-integration-ref :integration="$firstEvent->integration" :showStatus="false" />
                                     @endif
-                                    @if ($tagsLoaded && $firstEvent->tags && count($firstEvent->tags) > 0)
+                                    @if ($firstEvent->tags && count($firstEvent->tags) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @foreach ($firstEvent->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="md" fill />@endforeach
+                                    @endif
                                     @endif
                                 </div>
                             </div>
@@ -231,22 +237,28 @@
                                 <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
                                     {{ to_user_timezone($firstEvent->time, auth()->user())->format(' H:i') }} ·
                                     <span title="{{ to_user_timezone($firstEvent->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($firstEvent->time, auth()->user())->diffForHumans() }}</span>
-                                    @if ($integrationLoaded && $firstEvent->integration)
+                                    @if (!$additionalDataLoaded)
+                                    <span class="hidden sm:inline">·</span>
+                                    <span class="sm:hidden w-full"></span>
+                                    <div class="skeleton h-5 w-32"></div>
+                                    @else
+                                    @if ($firstEvent->integration)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     <x-integration-ref :integration="$firstEvent->integration" :showStatus="false" />
                                     @endif
-                                    @if ($tagsLoaded && $firstEvent->tags && count($firstEvent->tags) > 0)
+                                    @if ($firstEvent->tags && count($firstEvent->tags) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @foreach ($firstEvent->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="md" fill />@endforeach
                                     @endif
-                                    @if ($blocksLoaded && $firstEvent->blocks && count($firstEvent->blocks) > 0)
+                                    @if ($firstEvent->blocks && count($firstEvent->blocks) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @foreach ($firstEvent->blocks->take(3) as $block)<x-block-ref :block="$block" :showType="false" />@endforeach
                                     @if (count($firstEvent->blocks) > 3)
                                     <span class="badge badge-ghost badge-sm">+{{ count($firstEvent->blocks) - 3 }}</span>
+                                    @endif
                                     @endif
                                     @endif
                                 </div>
@@ -282,22 +294,28 @@
                         </div>
                         <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
                             <span title="{{ to_user_timezone($event->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($event->time, auth()->user())->diffForHumans() }}</span>
-                            @if ($integrationLoaded && $event->integration)
+                            @if (!$additionalDataLoaded)
+                            <span class="hidden sm:inline">·</span>
+                            <span class="sm:hidden w-full"></span>
+                            <div class="skeleton h-4 w-20"></div>
+                            @else
+                            @if ($event->integration)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             <x-integration-ref :integration="$event->integration" :showStatus="false" />
                             @endif
-                            @if ($tagsLoaded && $event->tags && count($event->tags) > 0)
+                            @if ($event->tags && count($event->tags) > 0)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @foreach ($event->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="sm" />@endforeach
                             @endif
-                            @if ($blocksLoaded && $event->blocks && count($event->blocks) > 0)
+                            @if ($event->blocks && count($event->blocks) > 0)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @foreach ($event->blocks->take(2) as $block)<x-block-ref :block="$block" :showType="false" />@endforeach
                             @if (count($event->blocks) > 2)
                             <span class="badge badge-ghost badge-xs">+{{ count($event->blocks) - 2 }}</span>
+                            @endif
                             @endif
                             @endif
                         </div>

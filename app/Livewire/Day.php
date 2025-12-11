@@ -42,9 +42,7 @@ class Day extends Component
 
     // Progressive Loading State Flags
     public bool $coreEventsLoaded = false;
-    public bool $integrationLoaded = false;
-    public bool $tagsLoaded = false;
-    public bool $blocksLoaded = false;
+    public bool $additionalDataLoaded = false;
     public bool $dayNoteLoaded = false;
     public bool $checkinStatusLoaded = false;
     public bool $cardStreamsLoaded = false;
@@ -144,67 +142,27 @@ class Day extends Component
     }
 
     /**
-     * Tier 2: Load integration
-     * Integration provides important context about the data source
+     * Tier 2: Load additional data (integration, tags, blocks)
+     * These provide context and details for the events
      */
-    public function loadIntegration(): void
+    public function loadAdditionalData(): void
     {
-        if ($this->integrationLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
+        if ($this->additionalDataLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
             return;
         }
 
-        // Load integration relationship
-        $this->allEvents->load(['integration']);
+        // Load integration, tags, and blocks relationships together
+        $this->allEvents->load(['integration', 'tags', 'blocks']);
 
-        Log::info('Day: Loaded integration', [
+        Log::info('Day: Loaded additional data (integration, tags, blocks)', [
             'count' => $this->allEvents->count(),
         ]);
 
-        $this->integrationLoaded = true;
+        $this->additionalDataLoaded = true;
     }
 
     /**
-     * Tier 3: Load tags
-     * Tags provide categorization and filtering capabilities
-     */
-    public function loadTags(): void
-    {
-        if ($this->tagsLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
-            return;
-        }
-
-        // Load tags relationship
-        $this->allEvents->load(['tags']);
-
-        Log::info('Day: Loaded tags', [
-            'count' => $this->allEvents->count(),
-        ]);
-
-        $this->tagsLoaded = true;
-    }
-
-    /**
-     * Tier 4: Load blocks
-     * Blocks provide additional detail but are lower priority
-     */
-    public function loadBlocks(): void
-    {
-        if ($this->blocksLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
-            return;
-        }
-
-        // Load blocks relationship
-        $this->allEvents->load(['blocks']);
-
-        Log::info('Day: Loaded blocks', [
-            'count' => $this->allEvents->count(),
-        ]);
-
-        $this->blocksLoaded = true;
-    }
-
-    /**
-     * Tier 5: Load day note (eager, but lower priority)
+     * Tier 3: Load day note (eager, but lower priority)
      */
     public function loadDayNote(): void
     {
@@ -268,7 +226,7 @@ class Day extends Component
     }
 
     /**
-     * Tier 5: Load check-in status
+     * Tier 3: Load check-in status
      */
     public function loadCheckinStatus(): void
     {
@@ -282,7 +240,7 @@ class Day extends Component
     }
 
     /**
-     * Tier 6: Load card streams for FAB (background, lowest priority)
+     * Tier 4: Load card streams for FAB (background, lowest priority)
      */
     public function loadCardStreams(): void
     {
@@ -1014,11 +972,9 @@ class Day extends Component
     {
         return [
             1 => ['loadCoreEvents'],                        // Critical: Events with actor & target
-            2 => ['loadIntegration'],                       // Important: Integration context
-            3 => ['loadTags'],                              // Important: Tags for categorization
-            4 => ['loadBlocks'],                            // Additional: Block details
-            5 => ['loadDayNote', 'loadCheckinStatus'],      // Nice-to-have: Day note + checkin
-            6 => ['loadCardStreams'],                       // Background: FAB streams
+            2 => ['loadAdditionalData'],                    // Important: Integration, tags, blocks
+            3 => ['loadDayNote', 'loadCheckinStatus'],      // Nice-to-have: Day note + checkin
+            4 => ['loadCardStreams'],                       // Background: FAB streams
         ];
     }
 
