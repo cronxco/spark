@@ -151,7 +151,6 @@ $popoverId = 'spark-tag-' . ($tagId ?? md5($tagName . ($tagType ?? '')));
     }"
     @mouseenter="show()"
     @mouseleave="hide()"
-    @click="toggle()"
     @keydown.escape="open = false"
     @popover-opening.window="closeIfNotMe($event)"
     class="relative inline-block"
@@ -161,7 +160,7 @@ $popoverId = 'spark-tag-' . ($tagId ?? md5($tagName . ($tagType ?? '')));
         <a
             href="{{ route('tags.show', [$tagType, $tagSlug, $tagId]) }}"
             wire:navigate
-            @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
+            @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
             class="badge {{ $badgeClass }} gap-1 cursor-pointer hover:brightness-110 transition-all"
         >
             <x-icon :name="$tagIcon" class="w-3 h-3 opacity-70" />
