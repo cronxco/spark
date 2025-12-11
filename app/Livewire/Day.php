@@ -28,7 +28,6 @@ class Day extends Component
     public ?string $eventId = null;
     public string $search = '';
     public string $date;
-    public array $collapsedGroups = [];
     public string $pollMode = 'visible';
     public bool $dayNoteOpen = false;
 
@@ -428,19 +427,6 @@ class Day extends Component
     }
 
     #[Computed]
-    public function areAllGroupsExpanded(): bool
-    {
-        $groups = $this->groupedEvents;
-        foreach ($groups as $g) {
-            if (($this->collapsedGroups[$g['key']] ?? false) === true) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    #[Computed]
     public function availableStreams(): Collection
     {
         if (! $this->cardStreamsLoaded) {
@@ -566,51 +552,8 @@ class Day extends Component
     // -------------------------------------------------------------------------
     // Group Management
     // -------------------------------------------------------------------------
-
-    public function toggleGroup(string $groupKey): void
-    {
-        $current = $this->collapsedGroups[$groupKey] ?? false;
-        $this->collapsedGroups[$groupKey] = ! $current;
-    }
-
-    public function expandAllGroups(): void
-    {
-        $groups = $this->groupedEvents;
-        $new = [];
-        foreach ($groups as $g) {
-            $new[$g['key']] = false;
-        }
-        $this->collapsedGroups = $new;
-    }
-
-    public function collapseAllGroups(): void
-    {
-        $groups = $this->groupedEvents;
-        $new = [];
-        foreach ($groups as $g) {
-            $new[$g['key']] = true;
-        }
-        $this->collapsedGroups = $new;
-    }
-
-    public function toggleAllGroups(): void
-    {
-        $groups = $this->groupedEvents;
-        $anyCollapsed = false;
-
-        foreach ($groups as $g) {
-            if (($this->collapsedGroups[$g['key']] ?? false) === true) {
-                $anyCollapsed = true;
-                break;
-            }
-        }
-
-        if ($anyCollapsed) {
-            $this->expandAllGroups();
-        } else {
-            $this->collapseAllGroups();
-        }
-    }
+    // Note: Group collapse/expand is now handled client-side via Alpine.js
+    // for instant performance without server roundtrips
 
     public function togglePollMode(): void
     {
