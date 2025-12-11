@@ -83,7 +83,7 @@ $popoverBaseId = 'event-ref-' . $event->id;
     <a
         href="{{ route('events.show', $event) }}"
         wire:navigate
-        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
+        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
