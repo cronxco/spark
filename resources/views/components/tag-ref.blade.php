@@ -157,15 +157,27 @@ $popoverId = 'spark-tag-' . ($tagId ?? md5($tagName . ($tagType ?? '')));
 >
     {{-- Trigger: The tag badge --}}
     @if ($isLinkable)
+        {{-- Desktop: navigable link --}}
         <a
+            x-show="!isMobile"
             href="{{ route('tags.show', [$tagType, $tagSlug, $tagId]) }}"
             wire:navigate
-            @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
             class="badge {{ $badgeClass }} gap-1 cursor-pointer hover:brightness-110 transition-all"
         >
             <x-icon :name="$tagIcon" class="w-3 h-3 opacity-70" />
             <span>{!! $text ?? $displayName !!}</span>
         </a>
+
+        {{-- Mobile: popover trigger only --}}
+        <button
+            x-show="isMobile"
+            type="button"
+            @click="toggle()"
+            class="badge {{ $badgeClass }} gap-1 cursor-pointer hover:brightness-110 transition-all"
+        >
+            <x-icon :name="$tagIcon" class="w-3 h-3 opacity-70" />
+            <span>{!! $text ?? $displayName !!}</span>
+        </button>
     @else
         <span
             @click.stop="toggle()"

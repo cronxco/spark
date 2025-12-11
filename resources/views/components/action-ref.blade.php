@@ -82,50 +82,76 @@ $popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
 >
     {{-- Trigger: Badge variant (default) --}}
     @if ($variant === 'badge')
-    @if ($href)
-    <a
-        href="{{ $href }}"
-        wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
-        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
-               bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
-               border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
-    >
-        <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
-        @if ($showService)
-            <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
+        @if ($href)
+            {{-- Desktop: navigable link --}}
+            <a
+                x-show="!isMobile"
+                href="{{ $href }}"
+                wire:navigate
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+                       bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
+                       border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
+            >
+                <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
+                <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
+                @if ($showService)
+                    <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
+                @endif
+            </a>
+
+            {{-- Mobile: popover trigger only --}}
+            <button
+                x-show="isMobile"
+                type="button"
+                @click="toggle()"
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+                       bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
+                       border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
+            >
+                <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
+                <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
+                @if ($showService)
+                    <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
+                @endif
+            </button>
+        @else
+            <span
+                @click.stop="toggle()"
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+                       bg-{{ $domainColor }}/10 text-{{ $domainColor }}
+                       border border-{{ $domainColor }}/20 cursor-default"
+            >
+                <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
+                <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
+                @if ($showService)
+                    <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
+                @endif
+            </span>
         @endif
-    </a>
     @else
-    <span
-        @click.stop="toggle()"
-        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
-               bg-{{ $domainColor }}/10 text-{{ $domainColor }}
-               border border-{{ $domainColor }}/20 cursor-default"
-    >
-        <x-icon :name="$actionIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
-        @if ($showService)
-            <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
+        {{-- Trigger: Text variant (plain text with hover) --}}
+        @if ($href)
+            {{-- Desktop: navigable link --}}
+            <a
+                x-show="!isMobile"
+                href="{{ $href }}"
+                wire:navigate
+                class="font-medium hover:text-{{ $domainColor }} transition-colors cursor-pointer"
+            >{!! $text ?? $actionDisplay !!}</a>
+
+            {{-- Mobile: popover trigger only --}}
+            <button
+                x-show="isMobile"
+                type="button"
+                @click="toggle()"
+                class="font-medium hover:text-{{ $domainColor }} transition-colors cursor-pointer bg-transparent border-0 p-0"
+            >{!! $text ?? $actionDisplay !!}</button>
+        @else
+            <span
+                @click.stop="toggle()"
+                class="font-medium cursor-default"
+            >{!! $text ?? $actionDisplay !!}</span>
         @endif
-    </span>
-    @endif
-    @else
-    {{-- Trigger: Text variant (plain text with hover) --}}
-    @if ($href)
-    <a
-        href="{{ $href }}"
-        wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
-        class="font-medium hover:text-{{ $domainColor }} transition-colors cursor-pointer"
-    >{!! $text ?? $actionDisplay !!}</a>
-    @else
-    <span
-        @click.stop="toggle()"
-        class="font-medium cursor-default"
-    >{!! $text ?? $actionDisplay !!}</span>
-    @endif
     @endif
 
     {{-- Popover Card --}}
