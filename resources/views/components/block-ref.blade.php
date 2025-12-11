@@ -78,7 +78,6 @@ $popoverBaseId = 'block-ref-' . $block->id;
     }"
     @mouseenter="show()"
     @mouseleave="hide()"
-    @click="toggle()"
     @popover-opening.window="closeIfNotMe($event)"
     @keydown.escape="open = false"
     class="relative inline-block"
@@ -87,7 +86,7 @@ $popoverBaseId = 'block-ref-' . $block->id;
     <a
         href="{{ route('blocks.show', $block) }}"
         wire:navigate
-        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
+        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
