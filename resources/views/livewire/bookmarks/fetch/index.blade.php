@@ -1480,16 +1480,41 @@ new class extends Component
 
                         <!-- Error Message -->
                         @if ($url['last_error'])
-                        <div class="alert alert-error mt-4">
-                            <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
-                            <span class="text-sm">
-                                {{ $url['last_error']['message'] ?? 'Unknown error' }}
-                                @if (isset($url['last_error']['timestamp']))
-                                <span class="text-xs opacity-70">
-                                    ({{ \Carbon\Carbon::parse($url['last_error']['timestamp'])->diffForHumans() }})
+                        <div class="mt-4 space-y-3">
+                            <div class="alert alert-error">
+                                <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
+                                <span class="text-sm">
+                                    {{ $url['last_error']['message'] ?? 'Unknown error' }}
+                                    @if (isset($url['last_error']['timestamp']))
+                                    <span class="text-xs opacity-70">
+                                        ({{ \Carbon\Carbon::parse($url['last_error']['timestamp'])->diffForHumans() }})
+                                    </span>
+                                    @endif
                                 </span>
-                                @endif
-                            </span>
+                            </div>
+
+                            @php
+                                $eventObject = \App\Models\EventObject::find($url['id']);
+                                $errorScreenshot = $eventObject?->getFirstMediaUrl('error_screenshots');
+                            @endphp
+
+                            @if ($errorScreenshot)
+                            <div class="card bg-base-300">
+                                <div class="card-body p-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <x-icon name="fas.camera" class="w-4 h-4 text-warning" />
+                                        <span class="text-xs font-medium text-base-content/70">Screenshot of failed fetch</span>
+                                    </div>
+                                    <a href="{{ $errorScreenshot }}" target="_blank" class="block">
+                                        <img src="{{ $errorScreenshot }}" alt="Error screenshot" class="w-full rounded-lg border border-base-content/10 hover:border-warning transition-colors" />
+                                    </a>
+                                    <p class="text-xs text-base-content/60 mt-2">
+                                        This screenshot shows what Playwright saw when trying to fetch the page.
+                                        <a href="{{ $errorScreenshot }}" target="_blank" class="link link-warning">Click to view full size</a>
+                                    </p>
+                                </div>
+                            </div>
+                            @endif
                         </div>
                         @endif
 
