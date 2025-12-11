@@ -133,6 +133,9 @@ class EventObject extends Model implements HasMedia
         $this->addMediaCollection('screenshots')
             ->useDisk(config('media-library.disk_name'));
 
+        $this->addMediaCollection('error_screenshots')
+            ->useDisk(config('media-library.disk_name'));
+
         $this->addMediaCollection('pdfs')
             ->useDisk(config('media-library.disk_name'));
 
