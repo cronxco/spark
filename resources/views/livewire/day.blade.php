@@ -219,7 +219,7 @@
                         <div class="min-w-0">
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
                             <div class="py-2 px-2" x-show="isCollapsed(@js($groupKey))">
-                                <div class="text-xl">
+                                <div class="text-xl text-left">
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                         @if ($firstEvent->target)
@@ -254,7 +254,7 @@
                                 </div>
                             </div>
                             <div class="py-2 px-2" x-show="!isCollapsed(@js($groupKey))">
-                                <div class="text-xl">
+                                <div class="text-xl text-left">
                                     <a href="{{ route('events.show', $firstEvent->id) }}" wire:navigate class="hover:text-primary transition-colors font-semibold">{{ $this->formatAction($firstEvent->action) }}</a>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
                                     @if ($firstEvent->target)
@@ -311,7 +311,7 @@
                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                     </div>
                     <div class="py-2 px-2">
-                        <div class="text-lg">
+                        <div class="text-lg text-left">
                             <a href="{{ route('events.show', $event->id) }}" wire:navigate class="text-base-content hover:text-primary transition-colors font-medium">{{ $this->formatAction($event->action) }}</a>
                             @if (should_display_action_with_object($event->action, $event->service))
                             @if ($event->target)
