@@ -102,7 +102,6 @@ $linkHref = $href ?? route('objects.show', $object);
     }"
     @mouseenter="show()"
     @mouseleave="hide()"
-    @click="toggle()"
     @keydown.escape="open = false"
     @popover-opening.window="closeIfNotMe($event)"
     class="relative inline-block"
@@ -112,7 +111,7 @@ $linkHref = $href ?? route('objects.show', $object);
     <a
         href="{{ $linkHref }}"
         wire:navigate
-        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
+        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
@@ -128,7 +127,7 @@ $linkHref = $href ?? route('objects.show', $object);
     <a
         href="{{ $linkHref }}"
         wire:navigate
-        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); }"
+        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
         class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer"
     >{!! $text ?? $object->title !!}</a>
     @endif
