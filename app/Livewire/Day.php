@@ -42,7 +42,9 @@ class Day extends Component
 
     // Progressive Loading State Flags
     public bool $coreEventsLoaded = false;
-    public bool $eventRelationshipsLoaded = false;
+    public bool $integrationLoaded = false;
+    public bool $tagsLoaded = false;
+    public bool $blocksLoaded = false;
     public bool $dayNoteLoaded = false;
     public bool $checkinStatusLoaded = false;
     public bool $cardStreamsLoaded = false;
@@ -82,7 +84,8 @@ class Day extends Component
     // -------------------------------------------------------------------------
 
     /**
-     * Tier 1: Load core event data (minimal, no relationships)
+     * Tier 1: Load core event data with actor and target objects
+     * This is crucial for displaying events properly
      */
     public function loadCoreEvents(): void
     {
@@ -96,7 +99,8 @@ class Day extends Component
             $selectedDate = Carbon::today();
         }
 
-        // Load events with minimal data - just enough to show the timeline structure
+        // Load events with actor and target relationships
+        // These are essential for display and must load together
         $query = Event::select([
             'id',
             'integration_id',
@@ -110,6 +114,7 @@ class Day extends Component
             'actor_id',
             'target_id',
         ])
+            ->with(['actor', 'target']) // Load actor and target immediately
             ->whereHas('integration', function ($q) {
                 $userId = optional(auth()->guard('web')->user())->id;
                 if ($userId) {
@@ -123,7 +128,7 @@ class Day extends Component
 
         $this->allEvents = $query->get();
 
-        Log::info('Day: Loaded core events', [
+        Log::info('Day: Loaded core events with actor and target', [
             'count' => $this->allEvents->count(),
             'date' => $this->date,
         ]);
@@ -139,25 +144,67 @@ class Day extends Component
     }
 
     /**
-     * Tier 2: Load event relationships (actor, target, integration, tags, blocks)
+     * Tier 2: Load integration
+     * Integration provides important context about the data source
      */
-    public function loadEventRelationships(): void
+    public function loadIntegration(): void
     {
-        if ($this->eventRelationshipsLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
+        if ($this->integrationLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
             return;
         }
 
-        // Load relationships for all events at once
-        $this->allEvents->load(['actor', 'target', 'integration', 'tags', 'blocks']);
+        // Load integration relationship
+        $this->allEvents->load(['integration']);
 
-        // Don't re-apply filters - just mark as loaded
-        // The filters were already applied in tier 1, no need to redo them
+        Log::info('Day: Loaded integration', [
+            'count' => $this->allEvents->count(),
+        ]);
 
-        $this->eventRelationshipsLoaded = true;
+        $this->integrationLoaded = true;
     }
 
     /**
-     * Tier 3: Load day note (eager, but lower priority)
+     * Tier 3: Load tags
+     * Tags provide categorization and filtering capabilities
+     */
+    public function loadTags(): void
+    {
+        if ($this->tagsLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
+            return;
+        }
+
+        // Load tags relationship
+        $this->allEvents->load(['tags']);
+
+        Log::info('Day: Loaded tags', [
+            'count' => $this->allEvents->count(),
+        ]);
+
+        $this->tagsLoaded = true;
+    }
+
+    /**
+     * Tier 4: Load blocks
+     * Blocks provide additional detail but are lower priority
+     */
+    public function loadBlocks(): void
+    {
+        if ($this->blocksLoaded || ! $this->coreEventsLoaded || $this->allEvents === null || $this->allEvents->isEmpty()) {
+            return;
+        }
+
+        // Load blocks relationship
+        $this->allEvents->load(['blocks']);
+
+        Log::info('Day: Loaded blocks', [
+            'count' => $this->allEvents->count(),
+        ]);
+
+        $this->blocksLoaded = true;
+    }
+
+    /**
+     * Tier 5: Load day note (eager, but lower priority)
      */
     public function loadDayNote(): void
     {
@@ -221,7 +268,7 @@ class Day extends Component
     }
 
     /**
-     * Tier 4: Load check-in status
+     * Tier 5: Load check-in status
      */
     public function loadCheckinStatus(): void
     {
@@ -235,7 +282,7 @@ class Day extends Component
     }
 
     /**
-     * Tier 5: Load card streams for FAB (background, lowest priority)
+     * Tier 6: Load card streams for FAB (background, lowest priority)
      */
     public function loadCardStreams(): void
     {
@@ -966,10 +1013,12 @@ class Day extends Component
     protected function getLoadingTiers(): array
     {
         return [
-            1 => ['loadCoreEvents'],                        // Critical: Basic timeline structure
-            2 => ['loadEventRelationships'],                // Important: Full event details
-            3 => ['loadDayNote', 'loadCheckinStatus'],      // Nice-to-have: Day note + checkin
-            4 => ['loadCardStreams'],                       // Background: FAB streams
+            1 => ['loadCoreEvents'],                        // Critical: Events with actor & target
+            2 => ['loadIntegration'],                       // Important: Integration context
+            3 => ['loadTags'],                              // Important: Tags for categorization
+            4 => ['loadBlocks'],                            // Additional: Block details
+            5 => ['loadDayNote', 'loadCheckinStatus'],      // Nice-to-have: Day note + checkin
+            6 => ['loadCardStreams'],                       // Background: FAB streams
         ];
     }
 
