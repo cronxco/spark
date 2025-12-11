@@ -47,8 +47,8 @@
     </x-header>
 
     <!-- Day Note editor -->
-    <div class="mb-2" x-data="{ dayNoteOpenState: @entangle('dayNoteOpen').live }">
-        <x-collapse x-model="dayNoteOpenState" separator class="bg-base-200">
+    <div class="mb-2">
+        <x-collapse wire:model="dayNoteOpen" separator class="bg-base-200">
             <x-slot:heading>
                 <div class="flex items-center gap-2">
                     <x-icon name="fas.calendar" />
