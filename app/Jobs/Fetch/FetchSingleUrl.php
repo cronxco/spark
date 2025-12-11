@@ -110,12 +110,15 @@ class FetchSingleUrl implements ShouldQueue
                     'reason' => $reason,
                 ]);
 
-                // Check if this is a paywall failure and attempt archive.is bypass
-                if (str_contains(strtolower($reason), 'paywall') &&
-                    ArchiveBypassHandler::shouldAttemptBypass($this->url)) {
+                // Check if this is a failure that could benefit from archive.is bypass
+                // (paywall, robot check, etc.)
+                $shouldTryArchive = $this->shouldAttemptArchiveBypass($reason);
 
-                    Log::info('Fetch: Attempting archive.is bypass for paywalled content', [
+                if ($shouldTryArchive && ArchiveBypassHandler::shouldAttemptBypass($this->url)) {
+
+                    Log::info('Fetch: Attempting archive.is bypass', [
                         'url' => $this->url,
+                        'reason' => $reason,
                     ]);
 
                     $archiveResult = $this->attemptArchiveBypass($this->url);
@@ -139,6 +142,7 @@ class FetchSingleUrl implements ShouldQueue
                             $metadata['last_archive_bypass'] = [
                                 'timestamp' => now()->toIso8601String(),
                                 'archive_url' => $archiveResult['archive_url'],
+                                'original_error' => $reason,
                             ];
                             $webpage->update(['metadata' => $metadata]);
 
@@ -152,12 +156,25 @@ class FetchSingleUrl implements ShouldQueue
 
                             // Continue with the successful extraction below
                             goto extraction_success;
+                        } else {
+                            // Archive was found but extraction still failed
+                            $archiveError = $archiveExtraction['reason'] ?? 'extraction failed';
+                            Log::warning('Fetch: Archive found but extraction failed', [
+                                'url' => $this->url,
+                                'archive_url' => $archiveResult['archive_url'],
+                                'archive_error' => $archiveError,
+                            ]);
+                            $reason = "{$reason} (archive found but {$archiveError})";
                         }
+                    } else {
+                        // No archive found or fetch failed
+                        $archiveError = $archiveResult['error'] ?? 'no archive available';
+                        Log::info('Fetch: Archive bypass failed', [
+                            'url' => $this->url,
+                            'error' => $archiveError,
+                        ]);
+                        $reason = "{$reason} (archive: {$archiveError})";
                     }
-
-                    Log::debug('Fetch: Archive bypass did not yield usable content', [
-                        'url' => $this->url,
-                    ]);
                 }
 
                 $this->updateWebpageError($webpage, $reason);
@@ -287,6 +304,34 @@ class FetchSingleUrl implements ShouldQueue
         if ($webpage) {
             $this->updateWebpageError($webpage, 'Failed after 3 attempts: ' . $exception->getMessage());
         }
+    }
+
+    /**
+     * Check if archive bypass should be attempted for this error type
+     */
+    private function shouldAttemptArchiveBypass(string $reason): bool
+    {
+        $lowerReason = strtolower($reason);
+
+        // List of error types that could benefit from archive.is bypass
+        $archiveBypassIndicators = [
+            'paywall',
+            'robot check',
+            'captcha',
+            'access denied',
+            'forbidden',
+            '403',
+            'cloudflare',
+            'subscription required',
+        ];
+
+        foreach ($archiveBypassIndicators as $indicator) {
+            if (str_contains($lowerReason, $indicator)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
