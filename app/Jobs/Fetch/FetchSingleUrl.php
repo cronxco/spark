@@ -177,6 +177,31 @@ class FetchSingleUrl implements ShouldQueue
                     }
                 }
 
+                // Save screenshot on failure if we have one (for debugging paywall/robot checks)
+                if ($screenshot && $shouldTryArchive) {
+                    try {
+                        $mediaHelper = app(MediaDownloadHelper::class);
+                        $fileName = 'error-screenshot-' . now()->format('Y-m-d-His') . '.png';
+
+                        $mediaHelper->attachMediaFromBase64(
+                            $screenshot,
+                            $webpage,
+                            $fileName,
+                            'error_screenshots'
+                        );
+
+                        Log::info('Fetch: Saved screenshot of failed fetch', [
+                            'url' => $this->url,
+                            'reason' => $reason,
+                        ]);
+                    } catch (Exception $e) {
+                        Log::warning('Fetch: Failed to save error screenshot', [
+                            'url' => $this->url,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 $this->updateWebpageError($webpage, $reason);
 
                 // Update history with failure
