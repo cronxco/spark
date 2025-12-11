@@ -25,14 +25,22 @@
                         class="w-full" />
                 </div>
 
-                <div class="hidden sm:flex items-center gap-2">
+                <div class="hidden sm:flex items-center gap-2" x-data="{ allExpanded: false }">
                     <!-- Expand/Collapse all (icon-only) -->
-                    <x-button
-                        class="btn-ghost btn-sm"
-                        wire:click="toggleAllGroups"
-                        aria-label="{{ $this->areAllGroupsExpanded ? 'Collapse all' : 'Expand all' }}">
-                        <x-icon name="{{ $this->areAllGroupsExpanded ? 'o-arrows-pointing-in' : 'o-arrows-pointing-out' }}" class="w-4 h-4" />
-                    </x-button>
+                    <button
+                        class="btn btn-ghost btn-sm"
+                        @click="
+                            allExpanded = !allExpanded;
+                            $dispatch('toggle-all-groups', { expand: allExpanded });
+                        "
+                        x-bind:aria-label="allExpanded ? 'Collapse all' : 'Expand all'">
+                        <div x-show="!allExpanded">
+                            <x-icon name="o-arrows-pointing-out" class="w-4 h-4" />
+                        </div>
+                        <div x-show="allExpanded">
+                            <x-icon name="o-arrows-pointing-in" class="w-4 h-4" />
+                        </div>
+                    </button>
                     <!-- Polling mode toggle: keep-alive vs visible -->
                     <x-button
                         class="btn-ghost btn-sm"
@@ -142,12 +150,37 @@
         </x-card>
         @else
         <!-- Custom Vertical Timeline View -->
-        @if ($this->pollMode === 'keep')
-        <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.keep-alive>
-            @else
-            <div class="bg-base-100 rounded-lg p-2 sm:p-4" wire:poll.90s.visible>
-                @endif
-                @php $previousHour = null; @endphp
+        <div
+            x-data="{
+                collapsedGroups: @js($this->initialCollapsedGroups),
+                init() {
+                    // Load from localStorage if available
+                    const saved = localStorage.getItem('day-collapsed-groups-{{ $date }}');
+                    if (saved) {
+                        this.collapsedGroups = JSON.parse(saved);
+                    }
+                },
+                toggleGroup(key) {
+                    this.collapsedGroups[key] = !this.collapsedGroups[key];
+                    // Persist to localStorage
+                    localStorage.setItem('day-collapsed-groups-{{ $date }}', JSON.stringify(this.collapsedGroups));
+                },
+                toggleAll(expand) {
+                    const allKeys = Object.keys(this.collapsedGroups);
+                    allKeys.forEach(key => {
+                        this.collapsedGroups[key] = !expand;
+                    });
+                    // Persist to localStorage
+                    localStorage.setItem('day-collapsed-groups-{{ $date }}', JSON.stringify(this.collapsedGroups));
+                },
+                isCollapsed(key) {
+                    return this.collapsedGroups[key] ?? false;
+                }
+            }"
+            @toggle-all-groups.window="toggleAll($event.detail.expand)"
+            class="bg-base-100 rounded-lg p-2 sm:p-4"
+            wire:poll.90s.{{ $this->pollMode === 'keep' ? 'keep-alive' : 'visible' }}>
+            @php $previousHour = null; @endphp
 
                 @foreach (($this->groupedEvents ?? []) as $eventGroup)
                 @php
@@ -156,7 +189,7 @@
                 $hour = $userTime->format('H');
                 $showHourMarker = $previousHour !== $hour;
                 $previousHour = $hour;
-                $isCollapsed = ($this->collapsedGroups[$eventGroup['key']] ?? $this->initialCollapsedGroups[$eventGroup['key']] ?? false);
+                $groupKey = $eventGroup['key'];
                 @endphp
 
                 <!-- Hour marker inside spine -->
@@ -172,21 +205,20 @@
                 @endif
 
                 <!-- Group header -->
-                <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3 {{ $isCollapsed ? 'py-1' : '' }}">
+                <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3" :class="isCollapsed(@js($groupKey)) ? 'py-1' : ''">
                     <div class="relative">
                         <div class="absolute left-2 top-0 bottom-0 w-px bg-base-300"></div>
                         <button class="absolute left-2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-base-100 ring-2 ring-base-300 flex items-center justify-center hover:bg-base-200"
-                            wire:click="toggleGroup(@js($eventGroup['key']))"
-                            aria-expanded="{{ $isCollapsed ? 'false' : 'true' }}"
+                            @click="toggleGroup(@js($groupKey))"
+                            :aria-expanded="!isCollapsed(@js($groupKey))"
                             aria-label="Toggle group">
                             <x-icon name="{{ $this->getEventIcon($eventGroup['action'], $eventGroup['service']) }}" class="w-4 h-4 {{ $this->getAccentColorForService($eventGroup['service']) }}" />
                         </button>
                     </div>
                     <div>
                         <div class="min-w-0">
-                            @if ($isCollapsed)
                             @php $firstEvent = $eventGroup['events'][0]; @endphp
-                            <div class="py-2 px-2">
+                            <div class="py-2 px-2" x-show="isCollapsed(@js($groupKey))">
                                 <div class="text-xl">
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
@@ -221,9 +253,7 @@
                                     @endif
                                 </div>
                             </div>
-                            @else
-                            @php $firstEvent = $eventGroup['events'][0]; @endphp
-                            <div class="py-2 px-2">
+                            <div class="py-2 px-2" x-show="!isCollapsed(@js($groupKey))">
                                 <div class="text-xl">
                                     <a href="{{ route('events.show', $firstEvent->id) }}" wire:navigate class="hover:text-primary transition-colors font-semibold">{{ $this->formatAction($firstEvent->action) }}</a>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
@@ -263,7 +293,6 @@
                                     @endif
                                 </div>
                             </div>
-                            @endif
                         </div>
                     </div>
                     <div class="py-2 pr-2 text-right">
@@ -274,7 +303,7 @@
                     </div>
                 </div>
 
-                @if (! $isCollapsed)
+                <div x-show="!isCollapsed(@js($groupKey))" x-collapse>
                 @php $eventsToShow = array_slice($eventGroup['events'], 1); @endphp
                 @foreach ($eventsToShow as $event)
                 <div class="grid grid-cols-[1.25rem_1fr_auto] gap-3">
@@ -327,7 +356,7 @@
                     </div>
                 </div>
                 @endforeach
-                @endif
+                </div>
 
                 @endforeach
             </div>
