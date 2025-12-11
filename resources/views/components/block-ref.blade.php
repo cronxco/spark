@@ -39,6 +39,16 @@ $customLayoutPath = $block->getCustomCardLayoutPath();
 
 // Base ID for this popover (unique suffix added via JavaScript)
 $popoverBaseId = 'block-ref-' . $block->id;
+
+// Format value display for pill
+$valueDisplay = null;
+if ($block->value !== null) {
+    $formattedValue = number_format($block->formatted_value, ($block->value_multiplier && $block->value_multiplier > 1) ? 2 : 0);
+    $valueDisplay = $formattedValue;
+    if ($block->value_unit) {
+        $valueDisplay .= $block->value_unit;
+    }
+}
 @endphp
 
 <span
@@ -83,20 +93,47 @@ $popoverBaseId = 'block-ref-' . $block->id;
     class="relative inline-block"
 >
     {{-- Trigger: The reference link/badge --}}
+    {{-- Desktop: navigable link --}}
     <a
+        x-show="!isMobile"
         href="{{ route('blocks.show', $block) }}"
         wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[180px] truncate">{!! $text ?? ($block->title ?? $blockDisplayName) !!}</span>
+        <span class="max-w-[180px] truncate">
+            {!! $text ?? ($block->title ?? $blockDisplayName) !!}
+            @if ($valueDisplay)
+                <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
+            @endif
+        </span>
         @if ($showType && $block->block_type)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
         @endif
     </a>
+
+    {{-- Mobile: popover trigger only --}}
+    <button
+        x-show="isMobile"
+        type="button"
+        @click="toggle()"
+        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+               bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
+               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
+    >
+        <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
+        <span class="max-w-[180px] truncate">
+            {!! $text ?? ($block->title ?? $blockDisplayName) !!}
+            @if ($valueDisplay)
+                <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
+            @endif
+        </span>
+        @if ($showType && $block->block_type)
+            <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
+        @endif
+    </button>
 
     {{-- Popover Card --}}
     <div

@@ -108,10 +108,11 @@ $linkHref = $href ?? route('objects.show', $object);
 >
     {{-- Trigger: Badge variant (default) --}}
     @if ($variant === 'badge')
+    {{-- Desktop: navigable link --}}
     <a
+        x-show="!isMobile"
         href="{{ $linkHref }}"
         wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
@@ -122,14 +123,39 @@ $linkHref = $href ?? route('objects.show', $object);
             <span class="badge badge-xs badge-ghost opacity-70">{{ $typeDisplay }}</span>
         @endif
     </a>
+
+    {{-- Mobile: popover trigger only --}}
+    <button
+        x-show="isMobile"
+        type="button"
+        @click="toggle()"
+        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+               bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
+               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
+    >
+        <x-icon :name="$objectIcon" class="w-3 h-3 opacity-70" />
+        <span class="max-w-[200px] truncate">{!! $text ?? $object->title !!}</span>
+        @if ($showType && $object->type)
+            <span class="badge badge-xs badge-ghost opacity-70">{{ $typeDisplay }}</span>
+        @endif
+    </button>
     @else
     {{-- Trigger: Text variant (plain text with hover) --}}
+    {{-- Desktop: navigable link --}}
     <a
+        x-show="!isMobile"
         href="{{ $linkHref }}"
         wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer"
     >{!! $text ?? $object->title !!}</a>
+
+    {{-- Mobile: popover trigger only --}}
+    <button
+        x-show="isMobile"
+        type="button"
+        @click="toggle()"
+        class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer bg-transparent border-0 p-0"
+    >{!! $text ?? $object->title !!}</button>
     @endif
 
     {{-- Popover Card --}}

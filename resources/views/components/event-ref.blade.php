@@ -80,10 +80,11 @@ $popoverBaseId = 'event-ref-' . $event->id;
     class="relative inline-block"
 >
     {{-- Trigger: The reference link/badge --}}
+    {{-- Desktop: navigable link --}}
     <a
+        x-show="!isMobile"
         href="{{ route('events.show', $event) }}"
         wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
@@ -94,6 +95,22 @@ $popoverBaseId = 'event-ref-' . $event->id;
             <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
         @endif
     </a>
+
+    {{-- Mobile: popover trigger only --}}
+    <button
+        x-show="isMobile"
+        type="button"
+        @click="toggle()"
+        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+               bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
+               border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
+    >
+        <x-icon :name="$icon" class="w-3 h-3 opacity-70" />
+        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
+        @if ($showService)
+            <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
+        @endif
+    </button>
 
     {{-- Popover Card --}}
     <div
