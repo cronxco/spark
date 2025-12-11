@@ -40,11 +40,11 @@ Route::middleware(['auth'])->prefix('push')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     // Day-based timeline routes
-    Volt::route('day/today', 'day')->name('today.day');
-    Volt::route('today', 'day')->name('today.main');
-    Volt::route('day/tomorrow', 'day')->name('tomorrow');
-    Volt::route('day/yesterday', 'day')->name('day.yesterday');
-    Volt::route('day/{date}', 'day')->name('day.show');
+    Route::get('day/today', \App\Livewire\Day::class)->name('today.day');
+    Route::get('today', \App\Livewire\Day::class)->name('today.main');
+    Route::get('day/tomorrow', \App\Livewire\Day::class)->name('tomorrow');
+    Route::get('day/yesterday', \App\Livewire\Day::class)->name('day.yesterday');
+    Route::get('day/{date}', \App\Livewire\Day::class)->name('day.show');
     Route::redirect('settings', 'settings/profile');
 
     Volt::route('settings/profile', 'settings.profile')->name('settings.profile');

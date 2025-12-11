@@ -86,7 +86,7 @@ $popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
     <a
         href="{{ $href }}"
         wire:navigate
-        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
+        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $domainColor }}/10 text-{{ $domainColor }} hover:bg-{{ $domainColor }}/20
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
@@ -117,7 +117,7 @@ $popoverBaseId = 'action-ref-' . md5($service . '-' . $action);
     <a
         href="{{ $href }}"
         wire:navigate
-        @click.stop="if (isMobile) { $event.preventDefault(); toggle(); } else if (!isMobile) { return; }"
+        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="font-medium hover:text-{{ $domainColor }} transition-colors cursor-pointer"
     >{!! $text ?? $actionDisplay !!}</a>
     @else
