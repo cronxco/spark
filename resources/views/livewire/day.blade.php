@@ -190,9 +190,9 @@
                                 <div class="text-xl">
                                     <span class="font-semibold">{{ $this->formatAction($firstEvent->action) }}</span>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
-                                        @if ($eventRelationshipsLoaded && $firstEvent->target)
+                                        @if ($firstEvent->target)
                                             <x-object-ref :object="$firstEvent->target" variant="text" :href="route('events.show', $firstEvent)" />
-                                        @elseif ($eventRelationshipsLoaded && $firstEvent->actor)
+                                        @elseif ($firstEvent->actor)
                                             <x-object-ref :object="$firstEvent->actor" variant="text" :href="route('events.show', $firstEvent)" />
                                         @endif
                                     @endif
@@ -203,16 +203,14 @@
                                 <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
                                     {{ to_user_timezone($firstEvent->time, auth()->user())->format(' H:i') }} ·
                                     <span title="{{ to_user_timezone($firstEvent->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($firstEvent->time, auth()->user())->diffForHumans() }}</span>
-                                    @if ($eventRelationshipsLoaded)
+                                    @if ($integrationLoaded && $firstEvent->integration)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    @if ($firstEvent->integration)
                                     <x-integration-ref :integration="$firstEvent->integration" :showStatus="false" />
                                     @endif
-                                    @if ($firstEvent->tags && count($firstEvent->tags) > 0)
+                                    @if ($tagsLoaded && $firstEvent->tags && count($firstEvent->tags) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    @endif
                                     @foreach ($firstEvent->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="md" fill />@endforeach
                                     @endif
                                 </div>
@@ -223,9 +221,9 @@
                                 <div class="text-xl">
                                     <a href="{{ route('events.show', $firstEvent->id) }}" wire:navigate class="hover:text-primary transition-colors font-semibold">{{ $this->formatAction($firstEvent->action) }}</a>
                                     @if (should_display_action_with_object($firstEvent->action, $firstEvent->service))
-                                    @if ($eventRelationshipsLoaded && $firstEvent->target)
+                                    @if ($firstEvent->target)
                                     <x-object-ref :object="$firstEvent->target" variant="text" :href="route('events.show', $firstEvent)" />
-                                    @elseif ($eventRelationshipsLoaded && $firstEvent->actor)
+                                    @elseif ($firstEvent->actor)
                                     <x-object-ref :object="$firstEvent->actor" variant="text" :href="route('events.show', $firstEvent)" />
                                     @endif
                                     @endif
@@ -233,24 +231,22 @@
                                 <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
                                     {{ to_user_timezone($firstEvent->time, auth()->user())->format(' H:i') }} ·
                                     <span title="{{ to_user_timezone($firstEvent->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($firstEvent->time, auth()->user())->diffForHumans() }}</span>
-                                    @if ($eventRelationshipsLoaded)
+                                    @if ($integrationLoaded && $firstEvent->integration)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    @if ($firstEvent->integration)
                                     <x-integration-ref :integration="$firstEvent->integration" :showStatus="false" />
                                     @endif
-                                    @if ($firstEvent->tags && count($firstEvent->tags) > 0)
+                                    @if ($tagsLoaded && $firstEvent->tags && count($firstEvent->tags) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    @endif
                                     @foreach ($firstEvent->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="md" fill />@endforeach
-                                    @if ($firstEvent->blocks && count($firstEvent->blocks) > 0)
+                                    @endif
+                                    @if ($blocksLoaded && $firstEvent->blocks && count($firstEvent->blocks) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
                                     @foreach ($firstEvent->blocks->take(3) as $block)<x-block-ref :block="$block" :showType="false" />@endforeach
                                     @if (count($firstEvent->blocks) > 3)
                                     <span class="badge badge-ghost badge-sm">+{{ count($firstEvent->blocks) - 3 }}</span>
-                                    @endif
                                     @endif
                                     @endif
                                 </div>
@@ -277,33 +273,31 @@
                         <div class="text-lg">
                             <a href="{{ route('events.show', $event->id) }}" wire:navigate class="text-base-content hover:text-primary transition-colors font-medium">{{ $this->formatAction($event->action) }}</a>
                             @if (should_display_action_with_object($event->action, $event->service))
-                            @if ($eventRelationshipsLoaded && $event->target)
+                            @if ($event->target)
                             <x-object-ref :object="$event->target" variant="text" :href="route('events.show', $event)" />
-                            @elseif ($eventRelationshipsLoaded && $event->actor)
+                            @elseif ($event->actor)
                             <x-object-ref :object="$event->actor" variant="text" :href="route('events.show', $event)" />
                             @endif
                             @endif
                         </div>
                         <div class="mt-1 text-sm text-base-content/70 flex items-center flex-wrap gap-1">
                             <span title="{{ to_user_timezone($event->time, auth()->user())->toDayDateTimeString() }}">{{ to_user_timezone($event->time, auth()->user())->diffForHumans() }}</span>
-                            @if ($eventRelationshipsLoaded)
+                            @if ($integrationLoaded && $event->integration)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
-                            @if ($event->integration)
                             <x-integration-ref :integration="$event->integration" :showStatus="false" />
                             @endif
-                            @if ($event->tags && count($event->tags) > 0)
+                            @if ($tagsLoaded && $event->tags && count($event->tags) > 0)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
-                            @endif
                             @foreach ($event->tags ?? [] as $tag)<x-tag-ref :tag="$tag" size="sm" />@endforeach
-                            @if ($event->blocks && count($event->blocks) > 0)
+                            @endif
+                            @if ($blocksLoaded && $event->blocks && count($event->blocks) > 0)
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @foreach ($event->blocks->take(2) as $block)<x-block-ref :block="$block" :showType="false" />@endforeach
                             @if (count($event->blocks) > 2)
                             <span class="badge badge-ghost badge-xs">+{{ count($event->blocks) - 2 }}</span>
-                            @endif
                             @endif
                             @endif
                         </div>
