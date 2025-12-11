@@ -90,10 +90,11 @@ $popoverBaseId = 'integration-ref-' . $integration->id;
     class="relative inline-block"
 >
     {{-- Trigger: The reference link/badge --}}
+    {{-- Desktop: navigable link --}}
     <a
+        x-show="!isMobile"
         href="{{ route('integrations.configure', $integration) }}"
         wire:navigate
-        @click="if (isMobile) { $event.preventDefault(); $event.stopPropagation(); toggle(); }"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
@@ -104,6 +105,22 @@ $popoverBaseId = 'integration-ref-' . $integration->id;
             <span class="status status-{{ $statusColor }} status-xs {{ $isProcessing ? 'animate-pulse' : '' }}"></span>
         @endif
     </a>
+
+    {{-- Mobile: popover trigger only --}}
+    <button
+        x-show="isMobile"
+        type="button"
+        @click="toggle()"
+        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
+               bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
+               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
+    >
+        <x-icon :name="$icon" class="w-3 h-3 opacity-70" />
+        <span class="max-w-[180px] truncate">{!! $text ?? ($integration->name ?? $serviceName) !!}</span>
+        @if ($showStatus)
+            <span class="status status-{{ $statusColor }} status-xs {{ $isProcessing ? 'animate-pulse' : '' }}"></span>
+        @endif
+    </button>
 
     {{-- Popover Card --}}
     <div
