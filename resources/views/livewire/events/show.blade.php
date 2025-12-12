@@ -887,20 +887,10 @@ new class extends Component
                             <span class="hidden sm:inline">·</span>
                             <span class="sm:hidden w-full"></span>
                             @if ($this->event->domain)
-                            <x-badge class="badge-xs badge-outline">
-                                <x-slot:value>
-                                    <x-icon name="fas.layer-group" class="w-3 h-3 text-base-content/40" />
-                                    {{ str::Headline($this->event->domain) }}
-                                </x-slot:value>
-                            </x-badge>
+                            <x-domain-ref :domain="$this->event->domain" />
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             @endif
-                            <x-badge class="badge-xs badge-outline">
-                                <x-slot:value>
-                                    <x-icon name="fas.bell-concierge" class="w-3 h-3 text-base-content/40" />
-                                    {{ str::Headline($this->event->service) }}
-                                </x-slot:value>
-                            </x-badge>
+                            <x-service-ref :service="$this->event->service" />
                             @if ($this->event->integration && (str::Headline($this->event->integration->instance_type) !== str::Headline($this->event->integration->name)))
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-badge class="badge-xs badge-outline">
@@ -1398,9 +1388,13 @@ new class extends Component
                                 {!! format_event_value_display($this->event->formatted_value, $this->event->value_unit, $this->event->service, $this->event->action, 'action') !!}
                             </x-metadata-row>
                         @endif
-                        <x-metadata-row label="Service" :value="str::headline($this->event->service)" />
+                        <x-metadata-row label="Service" :copyable="false">
+                            <x-service-ref :service="$this->event->service" />
+                        </x-metadata-row>
                         @if ($this->event->domain)
-                            <x-metadata-row label="Domain" :value="str::headline($this->event->domain)" />
+                            <x-metadata-row label="Domain" :copyable="false">
+                                <x-domain-ref :domain="$this->event->domain" />
+                            </x-metadata-row>
                         @endif
                         @if ($this->event->integration)
                             <x-metadata-row label="Integration" :value="$this->event->integration->name" />

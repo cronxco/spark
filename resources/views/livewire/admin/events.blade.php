@@ -25,9 +25,9 @@ new class extends Component {
 
     protected $queryString = [
         'search' => ['except' => ''],
-        'serviceFilter' => ['except' => ''],
-        'domainFilter' => ['except' => ''],
-        'actionFilter' => ['except' => ''],
+        'serviceFilter' => ['except' => '', 'as' => 'service'],
+        'domainFilter' => ['except' => '', 'as' => 'domain'],
+        'actionFilter' => ['except' => '', 'as' => 'action'],
         'sortBy' => ['except' => ['column' => 'time', 'direction' => 'desc']],
         'perPage' => ['except' => 25],
         'page' => ['except' => 1],
