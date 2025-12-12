@@ -195,15 +195,14 @@ $popoverBaseId = 'domain-ref-' . md5($domain);
 
                 {{-- Domain stats --}}
                 @php
+                    // Get services in this domain
+                    $servicesInDomain = \App\Integrations\PluginRegistry::getAllPlugins()
+                        ->filter(fn($plugin) => $plugin::getDomain() === $domain)
+                        ->map(fn($plugin) => $plugin::getIdentifier())
+                        ->toArray();
+
                     // Get counts for this domain
-                    $eventsCount = \App\Models\Event::whereHas('integration.integrationGroup', function($q) use ($domain) {
-                        $q->whereIn('service', array_keys(
-                            array_filter(
-                                \App\Integrations\PluginRegistry::getPlugins(),
-                                fn($plugin) => $plugin::getDomain() === $domain
-                            )
-                        ));
-                    })->count();
+                    $eventsCount = \App\Models\Event::whereIn('service', $servicesInDomain)->count();
                 @endphp
 
                 <div class="space-y-2 text-sm">

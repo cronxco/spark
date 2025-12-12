@@ -889,15 +889,6 @@ new class extends Component
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             @endif
                             <x-service-ref :service="$this->event->service" />
-                            @if ($this->event->integration && (str::Headline($this->event->integration->instance_type) !== str::Headline($this->event->integration->name)))
-                            <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
-                            <x-badge class="badge-xs badge-outline">
-                                <x-slot:value>
-                                    <x-icon name="fas.cube" class="w-3 h-3 text-base-content/40" />
-                                    {{ str::Headline($this->event->integration->instance_type) }}
-                                </x-slot:value>
-                            </x-badge>
-                            @endif
                             @if ($this->event->integration)
                             <x-icon name="fas.arrow-right" class="w-3 h-3 text-base-content/40" />
                             <x-integration-ref :integration="$this->event->integration" :showStatus="false" />
