@@ -25,8 +25,8 @@ new class extends Component
 
     protected $queryString = [
         'search' => ['except' => ''],
-        'blockTypeFilter' => ['except' => ''],
-        'serviceFilter' => ['except' => ''],
+        'blockTypeFilter' => ['except' => '', 'as' => 'blockType'],
+        'serviceFilter' => ['except' => '', 'as' => 'service'],
         'sortBy' => ['except' => ['column' => 'time', 'direction' => 'desc']],
         'perPage' => ['except' => 25],
         'page' => ['except' => 1],
