@@ -154,7 +154,7 @@ $linkHref = $href ?? route('objects.show', $object);
         x-show="isMobile"
         type="button"
         @click="toggle()"
-        class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer bg-transparent border-0 p-0"
+        class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer bg-transparent border-0 p-0 text-left"
     >{!! $text ?? $object->title !!}</button>
     @endif
 

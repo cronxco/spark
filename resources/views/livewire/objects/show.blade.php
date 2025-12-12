@@ -44,6 +44,7 @@ new class extends Component
 
     // Collapse states
     public bool $tasksOpen = false;
+    public bool $contentOpen = true;
 
     protected $listeners = [
         'open-tag-modal' => 'handleOpenTagModal',
@@ -470,8 +471,18 @@ new class extends Component
             $pluginClass = PluginRegistry::getPlugin($service);
             if ($pluginClass) {
                 $objectTypes = $pluginClass::getObjectTypes();
-                if (isset($objectTypes[$concept]) && isset($objectTypes[$concept]['icon'])) {
-                    return $objectTypes[$concept]['icon'];
+                if (isset($objectTypes[$type]) && isset($objectTypes[$type]['icon'])) {
+                    return $objectTypes[$type]['icon'];
+                }
+            }
+        }
+
+        // If no service provided or not found, search through all plugins
+        if (!$service || !isset($objectTypes[$type])) {
+            foreach (PluginRegistry::getAllPlugins() as $pluginClass) {
+                $objectTypes = $pluginClass::getObjectTypes();
+                if (isset($objectTypes[$type]) && isset($objectTypes[$type]['icon'])) {
+                    return $objectTypes[$type]['icon'];
                 }
             }
         }
@@ -1326,9 +1337,9 @@ new class extends Component
                 <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
                     <!-- Object Icon -->
                     <div class="flex-shrink-0 self-center sm:self-start">
-                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-base-200 flex items-center justify-center">
-                            <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept) }}"
-                                class="w-6 h-6 sm:w-8 sm:h-8" />
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                            <x-icon name="{{ $this->getObjectIcon($this->object->type, $this->object->concept, $this->object->metadata['service'] ?? null) }}"
+                                class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                         </div>
                     </div>
 
@@ -1378,9 +1389,10 @@ new class extends Component
                             <div class="flex flex-col sm:flex-row items-center justify-center gap-3 lg:gap-4">
                                 @if ($this->object->url)
                                 <a href="{{ $this->object->url }}" target="_blank"
-                                    class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors">
+                                    class="flex items-center gap-2 px-4 py-2 bg-info/10 hover:bg-info/20 text-info font-medium rounded-lg transition-colors"
+                                    title="{{ $this->object->url }}">
                                     <x-icon name="fas.link" class="w-4 h-4" />
-                                    <span>{{ $this->object->url }}</span>
+                                    <span class="truncate">{{ parse_url($this->object->url, PHP_URL_HOST) }}</span>
                                 </a>
                                 @endif
                             </div>
@@ -1405,17 +1417,23 @@ new class extends Component
 
             <!-- Content Section -->
             @if ($this->object->content)
-            <x-card class="bg-base-100 shadow">
-                <div class="max-w-prose mx-auto">
-                    <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
-                        <x-icon name="fas.file-lines" class="w-5 h-5 text-info" />
-                        Content
-                    </h3>
-                    <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                        {!! Str::markdown($this->object->content) !!}
-                    </div>
-                </div>
-            </x-card>
+            <div class="mb-6">
+                <x-collapse wire:model="contentOpen">
+                    <x-slot:heading>
+                        <div class="text-lg font-semibold text-base-content flex items-center gap-2">
+                            <x-icon name="fas.file-lines" class="w-5 h-5 text-info" />
+                            Content
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        <div class="max-w-prose mx-auto pt-4">
+                            <div class="prose dark:prose-invert prose-base lg:prose-lg">
+                                {!! Str::markdown($this->object->content) !!}
+                            </div>
+                        </div>
+                    </x-slot:content>
+                </x-collapse>
+            </div>
             @endif
 
             <!-- Direct Events (Progressive - events where this object is actor/target) -->
@@ -1436,20 +1454,27 @@ new class extends Component
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-start justify-between gap-2 mb-1">
                                     <div class="flex items-center flex-wrap gap-1">
+                                        @if ($event->actor)
+                                            <x-object-ref :object="$event->actor" />
+                                        @endif
                                         <x-event-ref :event="$event" :showService="false" />
-                                        @if (should_display_action_with_object($event->action, $event->service))
-                                            @if ($event->target && $event->target_id !== $this->object->id)
-                                                <x-object-ref :object="$event->target" />
-                                            @elseif ($event->actor && $event->actor_id !== $this->object->id)
-                                                <x-object-ref :object="$event->actor" />
-                                            @endif
+                                        @if ($event->target)
+                                            <x-object-ref :object="$event->target" />
                                         @endif
                                     </div>
-                                    @if ($event->value)
-                                    <span class="text-sm font-semibold text-primary">
-                                        {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
-                                    </span>
-                                    @endif
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        @if ($event->value)
+                                        <span class="text-sm font-semibold text-primary">
+                                            {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                        </span>
+                                        @endif
+                                        <a href="{{ route('events.show', $event->id) }}"
+                                           wire:navigate
+                                           class="btn btn-ghost btn-xs btn-square"
+                                           title="View event details">
+                                            <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                        </a>
+                                    </div>
                                 </div>
                                 <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
                                     <span>{{ $event->time->format('d/m/Y H:i') }}</span>
@@ -1582,71 +1607,72 @@ new class extends Component
                         <div class="space-y-3">
                             @foreach ($this->relatedEvents as $event)
                         <div class="border border-base-300 rounded-lg p-3 hover:bg-base-50 transition-colors bg-base-100">
-                            <a href="{{ route('events.show', $event->id) }}"
-                                class="block hover:text-primary transition-colors">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                        <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-start justify-between gap-2 mb-1">
-                                            <span class="font-medium">
-                                                <x-action-ref :action="$event->action" :service="$event->service" variant="text" />
-                                                @if (should_display_action_with_object($event->action, $event->service))
-                                                @if ($event->target)
-                                                <x-object-ref :object="$event->target" variant="text" />
-                                                @elseif ($event->actor)
-                                                <x-object-ref :object="$event->actor" variant="text" />
-                                                @endif
-                                                @endif
-                                            </span>
-                                            <div class="flex items-center gap-2 flex-shrink-0">
-                                                @if (isset($event->similarity))
-                                                @php
-                                                    $similarity = round((1 - $event->similarity) * 100);
-                                                    $daysAgo = isset($event->days_ago) ? round($event->days_ago) : null;
-                                                @endphp
-                                                <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
-                                                @if ($daysAgo !== null)
-                                                    @if ($daysAgo === 0)
-                                                        <span class="text-xs">🔥</span>
-                                                    @elseif ($daysAgo === 1)
-                                                        <span class="text-xs">⏰</span>
-                                                    @elseif ($daysAgo < 7)
-                                                        <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
-                                                    @endif
-                                                @endif
-                                                @endif
-                                                @if ($event->value)
-                                                <span class="text-sm font-semibold">
-                                                    {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
-                                                </span>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                            <span>{{ $event->time->format('d/m/Y H:i') }}</span>
-                                            @if ($event->domain)
-                                            <span>·</span>
-                                            <x-badge :value="$event->domain" class="badge-xs badge-outline" />
-                                            @endif
-                                            <span>·</span>
-                                            <x-badge :value="$event->service" class="badge-xs badge-outline" />
-                                            @if ($event->integration)
-                                            <span>·</span>
-                                            <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
-                                            @endif
-                                            @if ($event->tags && count($event->tags) > 0)
-                                            <span>·</span>
-                                            @foreach ($event->tags as $tag)
-                                            <x-tag-ref :tag="$tag" size="xs" />
-                                            @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                    <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
                                 </div>
-                            </a>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-start justify-between gap-2 mb-1">
+                                        <div class="flex items-center flex-wrap gap-1">
+                                            @if ($event->actor)
+                                                <x-object-ref :object="$event->actor" />
+                                            @endif
+                                            <x-event-ref :event="$event" :showService="false" />
+                                            @if ($event->target)
+                                                <x-object-ref :object="$event->target" />
+                                            @endif
+                                        </div>
+                                        <div class="flex items-center gap-2 flex-shrink-0">
+                                            @if (isset($event->similarity))
+                                            @php
+                                                $similarity = round((1 - $event->similarity) * 100);
+                                                $daysAgo = isset($event->days_ago) ? round($event->days_ago) : null;
+                                            @endphp
+                                            <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
+                                            @if ($daysAgo !== null)
+                                                @if ($daysAgo === 0)
+                                                    <span class="text-xs">🔥</span>
+                                                @elseif ($daysAgo === 1)
+                                                    <span class="text-xs">⏰</span>
+                                                @elseif ($daysAgo < 7)
+                                                    <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
+                                                @endif
+                                            @endif
+                                            @endif
+                                            @if ($event->value)
+                                            <span class="text-sm font-semibold">
+                                                {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                            </span>
+                                            @endif
+                                            <a href="{{ route('events.show', $event->id) }}"
+                                               wire:navigate
+                                               class="btn btn-ghost btn-xs btn-square"
+                                               title="View event details">
+                                                <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                        <span>{{ $event->time->format('d/m/Y H:i') }}</span>
+                                        @if ($event->domain)
+                                        <span>·</span>
+                                        <x-badge :value="$event->domain" class="badge-xs badge-outline" />
+                                        @endif
+                                        <span>·</span>
+                                        <x-badge :value="$event->service" class="badge-xs badge-outline" />
+                                        @if ($event->integration)
+                                        <span>·</span>
+                                        <x-badge :value="$event->integration->name" class="badge-xs badge-outline" />
+                                        @endif
+                                        @if ($event->tags && count($event->tags) > 0)
+                                        <span>·</span>
+                                        @foreach ($event->tags as $tag)
+                                        <x-tag-ref :tag="$tag" size="xs" />
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         @endforeach
                         </div>

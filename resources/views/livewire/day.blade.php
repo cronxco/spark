@@ -118,7 +118,7 @@
     </div>
 
     <div class="space-y-6">
-        @if (!$coreEventsLoaded)
+        @if (!$progressiveLoadingStarted || !$coreEventsLoaded)
         <!-- Skeleton loader while core events are loading -->
         <div class="bg-base-100 rounded-lg p-2 sm:p-4">
             <div class="space-y-4">
@@ -285,10 +285,36 @@
                                     @if ($firstEvent->blocks && count($firstEvent->blocks) > 0)
                                     <span class="hidden sm:inline">·</span>
                                     <span class="sm:hidden w-full"></span>
-                                    @foreach ($firstEvent->blocks->take(3) as $block)<x-block-ref :block="$block" :showType="false" />@endforeach
-                                    @if (count($firstEvent->blocks) > 3)
-                                    <span class="badge badge-ghost badge-sm">+{{ count($firstEvent->blocks) - 3 }}</span>
-                                    @endif
+                                    <div x-data="{ blocksExpanded: false }" class="inline">
+                                        <template x-if="!blocksExpanded">
+                                            <span class="inline-flex items-center gap-1 flex-wrap">
+                                                @foreach ($firstEvent->blocks->take(3) as $block)
+                                                    <x-block-ref :block="$block" :showType="false" />
+                                                @endforeach
+                                                @if (count($firstEvent->blocks) > 3)
+                                                    <button
+                                                        type="button"
+                                                        @click="blocksExpanded = true"
+                                                        class="badge badge-ghost badge-sm hover:badge-primary cursor-pointer transition-colors"
+                                                    >+{{ count($firstEvent->blocks) - 3 }}</button>
+                                                @endif
+                                            </span>
+                                        </template>
+                                        <template x-if="blocksExpanded">
+                                            <span class="inline-flex items-center gap-1 flex-wrap">
+                                                @foreach ($firstEvent->blocks as $block)
+                                                    <x-block-ref :block="$block" :showType="false" />
+                                                @endforeach
+                                                @if (count($firstEvent->blocks) > 3)
+                                                    <button
+                                                        type="button"
+                                                        @click="blocksExpanded = false"
+                                                        class="badge badge-ghost badge-sm hover:badge-primary cursor-pointer transition-colors"
+                                                    >Show less</button>
+                                                @endif
+                                            </span>
+                                        </template>
+                                    </div>
                                     @endif
                                     @endif
                                 </div>
