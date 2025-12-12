@@ -205,44 +205,47 @@ new class extends Component {
                         <div class="space-y-3">
                             @foreach ($events as $event)
                                 <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                                    <a href="{{ route('events.show', $event->id) }}"
-                                       class="block">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
-                                            </div>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="mb-1">
-                                                    <span class="font-medium hover:text-primary transition-colors">
-                                                        {{ $this->formatAction($event->action) }}
-                                                        @if (should_display_action_with_object($event->action, $event->service))
-                                                            @if ($event->target)
-                                                                {{ $event->target->title }}
-                                                            @elseif ($event->actor)
-                                                                {{ $event->actor->title }}
-                                                            @endif
-                                                        @endif
-                                                        @if ($event->value)
-                                                            <span class="text-primary">
-                                                                ({!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!})
-                                                            </span>
-                                                        @endif
-                                                    </span>
-                                                </div>
-                                                <div class="text-sm text-base-content/70">
-                                                    {{ $event->time->format('M j, Y g:i A') }}
-                                                </div>
-                                                @if ($event->tags->isNotEmpty())
-                                                    <div class="flex flex-wrap gap-1 mt-2">
-                                                        @foreach ($event->tags as $eventTag)
-                                                            <x-tag-ref :tag="$eventTag" />
-                                                        @endforeach
-                                                    </div>
-                                                @endif
-                                            </div>
-                                            <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                            <x-icon name="fas.bolt" class="w-4 h-4 text-primary" />
                                         </div>
-                                    </a>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-2 mb-1">
+                                                <div class="flex items-center flex-wrap gap-1">
+                                                    @if ($event->actor)
+                                                        <x-object-ref :object="$event->actor" />
+                                                    @endif
+                                                    <x-event-ref :event="$event" :showService="false" />
+                                                    @if ($event->target)
+                                                        <x-object-ref :object="$event->target" />
+                                                    @endif
+                                                </div>
+                                                <div class="flex items-center gap-2 flex-shrink-0">
+                                                    @if ($event->value)
+                                                        <span class="text-sm font-semibold text-primary">
+                                                            {!! format_event_value_display($event->formatted_value, $event->value_unit, $event->service, $event->action, 'action') !!}
+                                                        </span>
+                                                    @endif
+                                                    <a href="{{ route('events.show', $event->id) }}"
+                                                       wire:navigate
+                                                       class="btn btn-ghost btn-xs btn-square"
+                                                       title="View event details">
+                                                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div class="text-sm text-base-content/70">
+                                                {{ $event->time->format('M j, Y g:i A') }}
+                                            </div>
+                                            @if ($event->tags->isNotEmpty())
+                                                <div class="flex flex-wrap gap-1 mt-2">
+                                                    @foreach ($event->tags as $eventTag)
+                                                        <x-tag-ref :tag="$eventTag" />
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
@@ -277,35 +280,36 @@ new class extends Component {
                         <div class="space-y-3">
                             @foreach ($objects as $object)
                                 <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                                    <a href="{{ route('objects.show', $object->id) }}"
-                                       class="block">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
-                                                <x-icon name="o-cube" class="w-4 h-4 text-info" />
-                                            </div>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="mb-1">
-                                                    <span class="font-medium hover:text-primary transition-colors">{{ $object->title }}</span>
-                                                    @if ($object->type)
-                                                        <span class="text-sm text-base-content/70 ml-2">({{ $object->type }})</span>
-                                                    @endif
-                                                </div>
-                                                @if ($object->concept)
-                                                    <div class="text-sm text-base-content/70">
-                                                        {{ Str::headline($object->concept) }}
-                                                    </div>
-                                                @endif
-                                                @if ($object->tags->isNotEmpty())
-                                                    <div class="flex flex-wrap gap-1 mt-2">
-                                                        @foreach ($object->tags as $objectTag)
-                                                            <x-tag-ref :tag="$objectTag" />
-                                                        @endforeach
-                                                    </div>
-                                                @endif
-                                            </div>
-                                            <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                            <x-icon name="o-cube" class="w-4 h-4 text-info" />
                                         </div>
-                                    </a>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-2 mb-1">
+                                                <div class="flex items-center flex-wrap gap-1">
+                                                    <x-object-ref :object="$object" :showType="true" />
+                                                </div>
+                                                <a href="{{ route('objects.show', $object->id) }}"
+                                                   wire:navigate
+                                                   class="btn btn-ghost btn-xs btn-square"
+                                                   title="View object details">
+                                                    <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                                </a>
+                                            </div>
+                                            @if ($object->concept)
+                                                <div class="text-sm text-base-content/70">
+                                                    {{ Str::headline($object->concept) }}
+                                                </div>
+                                            @endif
+                                            @if ($object->tags->isNotEmpty())
+                                                <div class="flex flex-wrap gap-1 mt-2">
+                                                    @foreach ($object->tags as $objectTag)
+                                                        <x-tag-ref :tag="$objectTag" />
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
