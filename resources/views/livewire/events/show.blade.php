@@ -1136,82 +1136,83 @@ new class extends Component
                         <div class="space-y-3">
                             @foreach ($this->relatedEvents as $relatedEvent)
                             <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
-                                <a href="{{ route('events.show', $relatedEvent->id) }}"
-                                    class="block hover:text-primary transition-colors">
-                                    <div class="flex items-start gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                                            <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}"
-                                                class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-start justify-between gap-2 mb-1">
-                                                <span class="font-medium">
-                                                    {{ $this->formatAction($relatedEvent->action) }}
-                                                    @if (should_display_action_with_object($relatedEvent->action, $relatedEvent->service))
-                                                    @if ($relatedEvent->target)
-                                                    <span class="text-base-content/80">{{ ' ' . $relatedEvent->target->title }}</span>
-                                                    @elseif ($relatedEvent->actor)
-                                                    <span class="text-base-content/80">{{ ' ' . $relatedEvent->actor->title }}</span>
-                                                    @endif
-                                                    @endif
-                                                </span>
-                                                <div class="flex items-center gap-2 flex-shrink-0">
-                                                    @if (isset($relatedEvent->similarity))
-                                                    @php
-                                                        $similarity = round((1 - $relatedEvent->similarity) * 100);
-                                                        $daysAgo = isset($relatedEvent->days_ago) ? round($relatedEvent->days_ago) : null;
-                                                    @endphp
-                                                    <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
-                                                    @if ($daysAgo !== null)
-                                                        @if ($daysAgo === 0)
-                                                            <span class="text-xs">🔥</span>
-                                                        @elseif ($daysAgo === 1)
-                                                            <span class="text-xs">⏰</span>
-                                                        @elseif ($daysAgo < 7)
-                                                            <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
-                                                        @endif
-                                                    @endif
-                                                    @endif
-                                                    @if ($relatedEvent->value)
-                                                    <span class="text-sm text-primary font-semibold">
-                                                        {!! format_event_value_display($relatedEvent->formatted_value, $relatedEvent->value_unit, $relatedEvent->service, $relatedEvent->action, 'action') !!}
-                                                    </span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                            <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
-                                                <span>{{ to_user_timezone($relatedEvent->time, auth()->user())->format('d/m/Y H:i') }}</span>
-                                                @if ($relatedEvent->domain)
-                                                <span>·</span>
-                                                <x-badge class="badge-xs badge-outline">
-                                                    <x-slot:value>
-                                                        {{ Str::lower($relatedEvent->domain) }}
-                                                    </x-slot:value>
-                                                </x-badge>
-                                                @endif
-                                                <x-badge class="badge-xs badge-outline">
-                                                    <x-slot:value>
-                                                        {{ Str::lower($relatedEvent->service) }}
-                                                    </x-slot:value>
-                                                </x-badge>
-                                                @if ($relatedEvent->integration)
-                                                <x-badge class="badge-xs badge-outline">
-                                                    <x-slot:value>
-                                                        {{ Str::lower($relatedEvent->integration->name) }}
-                                                    </x-slot:value>
-                                                </x-badge>
-                                                @endif
-                                                @if ($relatedEvent->tags && count($relatedEvent->tags) > 0)
-                                                <span>·</span>
-                                                @foreach ($relatedEvent->tags as $tag)
-                                                <x-tag-ref :tag="$tag" size="xs" />
-                                                @endforeach
-                                                @endif
-                                            </div>
-                                        </div>
-                                        <x-icon name="fas.chevron-right" class="w-4 h-4 text-base-content/40 flex-shrink-0 mt-1" />
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                                        <x-icon name="{{ $this->getEventIcon($relatedEvent->action, $relatedEvent->service) }}"
+                                            class="w-4 h-4 {{ $this->getEventColor($relatedEvent->action) }}" />
                                     </div>
-                                </a>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-start justify-between gap-2 mb-1">
+                                            <div class="flex items-center flex-wrap gap-1">
+                                                @if ($relatedEvent->actor)
+                                                    <x-object-ref :object="$relatedEvent->actor" />
+                                                @endif
+                                                <x-event-ref :event="$relatedEvent" :showService="false" />
+                                                @if ($relatedEvent->target)
+                                                    <x-object-ref :object="$relatedEvent->target" />
+                                                @endif
+                                            </div>
+                                            <div class="flex items-center gap-2 flex-shrink-0">
+                                                @if (isset($relatedEvent->similarity))
+                                                @php
+                                                    $similarity = round((1 - $relatedEvent->similarity) * 100);
+                                                    $daysAgo = isset($relatedEvent->days_ago) ? round($relatedEvent->days_ago) : null;
+                                                @endphp
+                                                <span class="badge badge-warning badge-xs">{{ $similarity }}% match</span>
+                                                @if ($daysAgo !== null)
+                                                    @if ($daysAgo === 0)
+                                                        <span class="text-xs">🔥</span>
+                                                    @elseif ($daysAgo === 1)
+                                                        <span class="text-xs">⏰</span>
+                                                    @elseif ($daysAgo < 7)
+                                                        <span class="text-xs opacity-70">{{ $daysAgo }}d</span>
+                                                    @endif
+                                                @endif
+                                                @endif
+                                                @if ($relatedEvent->value)
+                                                <span class="text-sm text-primary font-semibold">
+                                                    {!! format_event_value_display($relatedEvent->formatted_value, $relatedEvent->value_unit, $relatedEvent->service, $relatedEvent->action, 'action') !!}
+                                                </span>
+                                                @endif
+                                                <a href="{{ route('events.show', $relatedEvent->id) }}"
+                                                   wire:navigate
+                                                   class="btn btn-ghost btn-xs btn-square"
+                                                   title="View event details">
+                                                    <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <div class="text-sm text-base-content/70 flex flex-wrap items-center gap-1">
+                                            <span>{{ to_user_timezone($relatedEvent->time, auth()->user())->format('d/m/Y H:i') }}</span>
+                                            @if ($relatedEvent->domain)
+                                            <span>·</span>
+                                            <x-badge class="badge-xs badge-outline">
+                                                <x-slot:value>
+                                                    {{ Str::lower($relatedEvent->domain) }}
+                                                </x-slot:value>
+                                            </x-badge>
+                                            @endif
+                                            <x-badge class="badge-xs badge-outline">
+                                                <x-slot:value>
+                                                    {{ Str::lower($relatedEvent->service) }}
+                                                </x-slot:value>
+                                            </x-badge>
+                                            @if ($relatedEvent->integration)
+                                            <x-badge class="badge-xs badge-outline">
+                                                <x-slot:value>
+                                                    {{ Str::lower($relatedEvent->integration->name) }}
+                                                </x-slot:value>
+                                            </x-badge>
+                                            @endif
+                                            @if ($relatedEvent->tags && count($relatedEvent->tags) > 0)
+                                            <span>·</span>
+                                            @foreach ($relatedEvent->tags as $tag)
+                                            <x-tag-ref :tag="$tag" size="xs" />
+                                            @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             @endforeach
                         </div>
