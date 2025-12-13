@@ -176,6 +176,17 @@ return [
         'retention_days' => 30,
         'auto_match_threshold' => 0.8,
         'review_threshold' => 0.5,
+        'currency_tolerance_percent' => (float) env('RECEIPT_CURRENCY_TOLERANCE', 2.0),
+    ],
+
+    'currency' => [
+        'api_provider' => env('CURRENCY_API_PROVIDER', 'exchangerate'),
+        'api_key' => env('CURRENCY_API_KEY'),
+        'api_url' => env('CURRENCY_API_URL', 'https://v6.exchangerate-api.com/v6'),
+        'base_currency' => env('CURRENCY_BASE', 'GBP'),
+        'cache_ttl_hours' => (int) env('CURRENCY_CACHE_TTL', 24),
+        'fallback_enabled' => env('CURRENCY_FALLBACK_ENABLED', true),
+        'supported_currencies' => ['GBP', 'USD', 'EUR', 'AUD', 'CAD', 'CHF', 'JPY', 'CNY'],
     ],
 
 ];
