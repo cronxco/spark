@@ -312,6 +312,57 @@ class ProcessReceiptEmailJob implements ShouldQueue
             'target_metadata' => [],
         ]);
 
+        // Add currency conversion metadata if not GBP
+        $currency = $receiptData['transaction_summary']['currency'];
+        $baseCurrency = config('services.currency.base_currency', 'GBP');
+
+        if (strtoupper($currency) !== strtoupper($baseCurrency)) {
+            try {
+                $conversionService = app(\App\Services\CurrencyConversionService::class);
+                $originalAmount = $receiptData['transaction_summary']['total_amount'];
+
+                // Convert to base currency (GBP)
+                $convertedAmount = $conversionService->convert(
+                    $originalAmount,
+                    $currency,
+                    $baseCurrency,
+                    $transactionTime
+                );
+
+                // Get the exchange rate used
+                $rate = $conversionService->getRate($currency, $baseCurrency, $transactionTime);
+
+                // Store conversion metadata
+                $metadata = $event->event_metadata;
+                $metadata['currency_conversion'] = [
+                    'original_currency' => strtoupper($currency),
+                    'original_amount' => $originalAmount,
+                    'converted_to_gbp' => $convertedAmount,
+                    'exchange_rate' => $rate,
+                    'conversion_date' => $transactionTime->toDateString(),
+                    'rate_source' => config('services.currency.api_provider', 'exchangerate'),
+                ];
+
+                $event->update(['event_metadata' => $metadata]);
+
+                Log::info('Currency conversion added to receipt', [
+                    'event_id' => $event->id,
+                    'from' => $currency,
+                    'to' => $baseCurrency,
+                    'original_amount' => $originalAmount,
+                    'converted_amount' => $convertedAmount,
+                    'rate' => $rate,
+                ]);
+            } catch (Exception $e) {
+                // Log but don't fail the job if conversion fails
+                Log::warning('Failed to convert receipt currency', [
+                    'event_id' => $event->id,
+                    'currency' => $currency,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // Create line item blocks (only if there are line items with descriptions)
         $lineItems = $receiptData['line_items'] ?? [];
         foreach ($lineItems as $item) {

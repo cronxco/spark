@@ -65,8 +65,8 @@ class ReceiptPlugin extends WebhookPlugin
                 'display_name' => 'Receipt',
                 'description' => 'Receipt received from merchant',
                 'display_with_object' => true,
-                'value_unit' => 'GBP',
-                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'value_unit' => null,
+                'value_formatter' => '@if($unit == "GBP")<span class="text-[0.875em]">£</span>@elseif($unit == "USD")<span class="text-[0.875em]">$</span>@elseif($unit == "EUR")<span class="text-[0.875em]">€</span>@else{{ $unit }} @endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
         ];
@@ -80,7 +80,8 @@ class ReceiptPlugin extends WebhookPlugin
                 'display_name' => 'Line Item',
                 'description' => 'Individual receipt line item',
                 'display_with_object' => true,
-                'value_unit' => 'GBP',
+                'value_unit' => null,
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "USD")$@elseif($unit == "EUR")€@else{{ $unit }} @endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'receipt_tax_summary' => [
@@ -88,7 +89,8 @@ class ReceiptPlugin extends WebhookPlugin
                 'display_name' => 'Tax Summary',
                 'description' => 'Tax breakdown',
                 'display_with_object' => true,
-                'value_unit' => 'GBP',
+                'value_unit' => null,
+                'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "USD")$@elseif($unit == "EUR")€@else{{ $unit }} @endif{{ number_format($value, 2) }}',
                 'hidden' => false,
             ],
             'receipt_payment_method' => [
