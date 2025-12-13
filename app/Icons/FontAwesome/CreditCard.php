@@ -8,6 +8,7 @@ class CreditCard extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-credit-card"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-credit-card', 'w-5 h-5')->toHtml();
     }
 }

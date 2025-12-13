@@ -40,14 +40,14 @@ $customLayoutPath = $block->getCustomCardLayoutPath();
 // Base ID for this popover (unique suffix added via JavaScript)
 $popoverBaseId = 'block-ref-' . $block->id;
 
-// Format value display for pill
+// Format value display for pill using improved helper
 $valueDisplay = null;
 if ($block->value !== null) {
-    $formattedValue = number_format($block->formatted_value, ($block->value_multiplier && $block->value_multiplier > 1) ? 2 : 0);
-    $valueDisplay = $formattedValue;
-    if ($block->value_unit) {
-        $valueDisplay .= $block->value_unit;
-    }
+    $valueDisplay = format_block_value_display(
+        $block->formatted_value,
+        $block->value_unit,
+        $block->value_multiplier
+    );
 }
 @endphp
 
@@ -187,13 +187,16 @@ if ($block->value !== null) {
 
                         {{-- Value display --}}
                         @if ($block->value !== null)
-                            <div class="flex items-baseline gap-2">
-                                <span class="text-3xl font-bold text-{{ $accentColor }}">
-                                    {{ number_format($block->formatted_value, ($block->value_multiplier && $block->value_multiplier > 1) ? 2 : 0) }}
-                                </span>
-                                @if ($block->value_unit)
-                                    <span class="text-sm text-base-content/60">{{ $block->value_unit }}</span>
-                                @endif
+                            @php
+                                // Format value with improved display
+                                $displayValue = format_block_value_display(
+                                    $block->formatted_value,
+                                    $block->value_unit,
+                                    $block->value_multiplier
+                                );
+                            @endphp
+                            <div class="text-3xl font-bold text-{{ $accentColor }}">
+                                {{ $displayValue }}
                             </div>
                         @endif
 

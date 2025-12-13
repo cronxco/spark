@@ -8,6 +8,7 @@ class Play extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-play"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-play', 'w-5 h-5')->toHtml();
     }
 }

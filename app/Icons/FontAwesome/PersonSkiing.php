@@ -8,6 +8,7 @@ class PersonSkiing extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-person-skiing"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-person-skiing', 'w-5 h-5')->toHtml();
     }
 }

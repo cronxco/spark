@@ -8,6 +8,7 @@ class Droplet extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-droplet"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-droplet', 'w-5 h-5')->toHtml();
     }
 }

@@ -18,9 +18,7 @@ class FontAwesomeIcon extends Icon
 
     public function svg(): string
     {
-        // Return Font Awesome icon as HTML
-        return <<<HTML
-        <i class="fa-{$this->style} fa-{$this->iconName}"></i>
-        HTML;
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-font-awesome', 'w-5 h-5')->toHtml();
     }
 }

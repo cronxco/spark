@@ -8,6 +8,7 @@ class ChartLine extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-chart-line"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-chart-line', 'w-5 h-5')->toHtml();
     }
 }
