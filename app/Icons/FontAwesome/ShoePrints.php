@@ -8,6 +8,7 @@ class ShoePrints extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-shoe-prints"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-shoe-prints', 'w-5 h-5')->toHtml();
     }
 }

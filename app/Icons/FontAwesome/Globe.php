@@ -8,6 +8,7 @@ class Globe extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-globe"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-globe', 'w-5 h-5')->toHtml();
     }
 }

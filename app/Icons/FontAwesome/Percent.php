@@ -8,6 +8,7 @@ class Percent extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-percent"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-percent', 'w-5 h-5')->toHtml();
     }
 }
