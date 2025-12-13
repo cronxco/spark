@@ -8,6 +8,7 @@ class Water extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-water"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-water', 'w-5 h-5')->toHtml();
     }
 }

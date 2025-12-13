@@ -8,6 +8,7 @@ class PiggyBank extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-piggy-bank"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-piggy-bank', 'w-5 h-5')->toHtml();
     }
 }

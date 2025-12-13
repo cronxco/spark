@@ -8,6 +8,7 @@ class CodeBranch extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-code-branch"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-code-branch', 'w-5 h-5')->toHtml();
     }
 }

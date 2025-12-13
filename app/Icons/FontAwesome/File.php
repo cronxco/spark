@@ -8,6 +8,7 @@ class File extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-file"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-file', 'w-5 h-5')->toHtml();
     }
 }

@@ -8,6 +8,7 @@ class HeartPulse extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-heart-pulse"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-heart-pulse', 'w-5 h-5')->toHtml();
     }
 }

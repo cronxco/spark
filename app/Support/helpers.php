@@ -241,6 +241,61 @@ if (! function_exists('format_duration')) {
     }
 }
 
+if (! function_exists('format_block_value_display')) {
+    /**
+     * Format a block's value for display with improved unit formatting.
+     *
+     * Improvements:
+     * - 'percentage' unit replaced with '%'
+     * - Currency codes (GBP, USD, EUR) replaced with symbols (£, $, €)
+     * - Time in seconds converted to duration format (e.g., 2h5m, 2m30s)
+     * - Space added between value and unit for other cases
+     *
+     * @param  float|int  $formattedValue  The formatted_value (after division by value_multiplier)
+     * @param  string|null  $unit  The value_unit
+     * @param  float|int|null  $valueMultiplier  The value_multiplier (for decimal places)
+     * @return string The formatted value for display
+     */
+    function format_block_value_display(
+        float|int $formattedValue,
+        ?string $unit,
+        float|int|null $valueMultiplier = null
+    ): string {
+        // Determine decimal places
+        $decimals = ($valueMultiplier && $valueMultiplier > 1) ? 2 : 0;
+        $numericValue = number_format($formattedValue, $decimals);
+
+        // No unit - just return the value
+        if (! $unit) {
+            return $numericValue;
+        }
+
+        // Handle percent
+        if (strtolower($unit) === 'percent') {
+            return $numericValue . '%';
+        }
+
+        // Handle currency codes
+        $currencySymbols = [
+            'GBP' => '£',
+            'USD' => '$',
+            'EUR' => '€',
+        ];
+
+        if (isset($currencySymbols[$unit])) {
+            return $currencySymbols[$unit] . $numericValue;
+        }
+
+        // Handle time in seconds - convert to duration format
+        if (strtolower($unit) === 'seconds' || strtolower($unit) === 's') {
+            return format_duration($formattedValue);
+        }
+
+        // Default: space between value and unit
+        return $numericValue . ' ' . $unit;
+    }
+}
+
 if (! function_exists('format_event_value_display')) {
     /**
      * Format an event's or block's value for display using plugin-defined formatters.

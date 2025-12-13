@@ -8,6 +8,7 @@ class MagnifyingGlass extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-magnifying-glass"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-magnifying-glass', 'w-5 h-5')->toHtml();
     }
 }

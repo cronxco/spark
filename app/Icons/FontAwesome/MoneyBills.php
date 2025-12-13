@@ -8,6 +8,7 @@ class MoneyBills extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-money-bills"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-money-bills', 'w-5 h-5')->toHtml();
     }
 }

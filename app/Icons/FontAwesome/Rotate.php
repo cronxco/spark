@@ -8,6 +8,7 @@ class Rotate extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-rotate"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-rotate', 'w-5 h-5')->toHtml();
     }
 }

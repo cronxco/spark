@@ -8,6 +8,7 @@ class ClipboardCheck extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-clipboard-check"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-clipboard-check', 'w-5 h-5')->toHtml();
     }
 }

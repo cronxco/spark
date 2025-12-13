@@ -8,6 +8,7 @@ class TableTennisPaddleBall extends Icon
 {
     public function svg(): string
     {
-        return '<i class="fa-solid fa-table-tennis-paddle-ball"></i>';
+        // Use blade-svg to render the actual SVG icon
+        return svg('fas-table-tennis-paddle-ball', 'w-5 h-5')->toHtml();
     }
 }

@@ -85,14 +85,16 @@ if (!$isValueBlock) {
 
             {{-- Prominent Value Display --}}
             <div class="text-center py-4">
+                @php
+                    $displayValue = format_block_value_display(
+                        $block->formatted_value,
+                        $block->value_unit,
+                        $block->value_multiplier
+                    );
+                @endphp
                 <div class="text-4xl font-bold text-{{ $badgeColor }}">
-                    {{ $block->formatted_value }}
+                    {{ $displayValue }}
                 </div>
-                @if ($block->value_unit)
-                    <div class="text-sm text-base-content/60 mt-1">
-                        {{ $block->value_unit }}
-                    </div>
-                @endif
             </div>
 
             {{-- Metadata Preview --}}

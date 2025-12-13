@@ -35,6 +35,8 @@ $faIconNames = [
 // Reserved PHP keywords that cannot be used as class names
 $reservedKeywords = ['list', 'echo', 'print', 'continue', 'break', 'default'];
 
+// Build both flat keys (for backward compatibility) and nested structure
+$fontAwesomeIconsNested = [];
 foreach ($faIconNames as $iconName) {
     $className = str_replace(' ', '', ucwords(str_replace('-', ' ', $iconName)));
 
@@ -43,7 +45,13 @@ foreach ($faIconNames as $iconName) {
         $className .= 'Icon';
     }
 
-    $fontAwesomeIcons["fas.{$iconName}"] = 'App\\Icons\\FontAwesome\\' . $className;
+    $fullClassName = 'App\\Icons\\FontAwesome\\' . $className;
+
+    // Add to flat array with dot notation (e.g., 'fas.download')
+    $fontAwesomeIcons["fas.{$iconName}"] = $fullClassName;
+
+    // Add to nested array (e.g., ['fas']['download'])
+    $fontAwesomeIconsNested[$iconName] = $fullClassName;
 }
 
 return [
@@ -470,5 +478,8 @@ return [
         'wrench' => WireElements\Pro\Icons\Wrench::class,
         'x-circle' => WireElements\Pro\Icons\XCircle::class,
         'x-mark' => WireElements\Pro\Icons\XMark::class,
-    ] + $fontAwesomeIcons,
+
+        // Font Awesome nested structure (allows config('wire-elements-pro.icons.fas.download'))
+        'fas' => $fontAwesomeIconsNested,
+    ] + $fontAwesomeIcons, // Also merge flat keys for any direct access
 ];
