@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Relationship;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -178,9 +179,32 @@ class ReceiptTransactionMatcher
     {
         $score = 0.0;
 
-        // Amount match (40% weight)
-        $amountDiff = abs($receipt->value - $transaction->value);
-        $amountScore = 1 - min(1, $amountDiff / max(1, $receipt->value));
+        // Amount match (40% weight) - with currency conversion
+        $receiptCurrency = strtoupper($receipt->value_unit ?? 'GBP');
+        $txnCurrency = strtoupper($transaction->value_unit ?? 'GBP');
+        $receiptAmount = $receipt->value;
+        $txnAmount = $transaction->value;
+
+        // Try to match amounts intelligently with currency conversion
+        [$amountDiff, $matchedInterpretation] = $this->calculateAmountDifference(
+            $receiptAmount,
+            $receiptCurrency,
+            $txnAmount,
+            $txnCurrency,
+            $receipt,
+            $transaction
+        );
+
+        $baseAmount = max(1, abs($receiptAmount));
+        $amountScore = 1 - min(1, $amountDiff / $baseAmount);
+
+        // Apply currency tolerance
+        $currencyTolerance = config('services.receipt.currency_tolerance_percent', 2.0) / 100;
+        if ($receiptCurrency !== $txnCurrency && $amountScore > (1 - $currencyTolerance)) {
+            // Give slight boost for cross-currency matches within tolerance
+            $amountScore = min(1.0, $amountScore + 0.05);
+        }
+
         $score += $amountScore * 0.4;
 
         // Time proximity (20% weight)
@@ -210,6 +234,9 @@ class ReceiptTransactionMatcher
         Log::debug('Receipt: Calculated match confidence', [
             'receipt_id' => $receipt->id,
             'transaction_id' => $transaction->id,
+            'receipt_currency' => $receiptCurrency,
+            'transaction_currency' => $txnCurrency,
+            'matched_interpretation' => $matchedInterpretation,
             'confidence' => $score,
             'amount_score' => $amountScore * 0.4,
             'time_score' => $timeScore * 0.2,
@@ -217,6 +244,101 @@ class ReceiptTransactionMatcher
         ]);
 
         return $score;
+    }
+
+    /**
+     * Calculate amount difference with currency conversion support.
+     * Handles multiple scenarios including Monzo local_currency and ambiguous receipts.
+     *
+     * @return array [amountDiff, matchedInterpretation]
+     */
+    private function calculateAmountDifference(
+        int $receiptAmount,
+        string $receiptCurrency,
+        int $txnAmount,
+        string $txnCurrency,
+        Event $receipt,
+        Event $transaction
+    ): array {
+        $conversionService = app(\App\Services\CurrencyConversionService::class);
+
+        // Scenario 1: Check if receipt has pre-computed GBP conversion in metadata
+        $receiptMetadata = $receipt->event_metadata ?? [];
+        $preConvertedGbp = $receiptMetadata['currency_conversion']['converted_to_gbp'] ?? null;
+
+        if ($preConvertedGbp !== null && $txnCurrency === 'GBP') {
+            // Use pre-converted amount
+            $amountDiff = abs($preConvertedGbp - $txnAmount);
+
+            return [$amountDiff, 'preconverted_to_gbp'];
+        }
+
+        // Scenario 2: Check if transaction has Monzo local_currency matching receipt
+        $txnMetadata = $transaction->event_metadata ?? [];
+        $txnLocalCurrency = strtoupper($txnMetadata['local_currency'] ?? '');
+        $txnLocalAmount = abs((int) ($txnMetadata['local_amount'] ?? 0));
+
+        if ($txnLocalCurrency === $receiptCurrency && $txnLocalAmount > 0) {
+            // Perfect match: receipt currency matches Monzo's foreign currency
+            $amountDiff = abs($receiptAmount - $txnLocalAmount);
+
+            return [$amountDiff, 'monzo_local_currency'];
+        }
+
+        // Scenario 3: Direct match - same currency
+        if ($receiptCurrency === $txnCurrency) {
+            $amountDiff = abs($receiptAmount - $txnAmount);
+
+            return [$amountDiff, 'same_currency'];
+        }
+
+        // Scenario 4: Currency conversion needed - try two interpretations
+        try {
+            // Primary interpretation: use stated receipt currency
+            $convertedPrimary = $conversionService->convert(
+                $receiptAmount,
+                $receiptCurrency,
+                $txnCurrency,
+                $receipt->time
+            );
+            $diffPrimary = abs($convertedPrimary - $txnAmount);
+
+            // Fallback interpretation: assume receipt is actually GBP (misidentified)
+            $convertedFallback = $conversionService->convert(
+                $receiptAmount,
+                'GBP',
+                $txnCurrency,
+                $receipt->time
+            );
+            $diffFallback = abs($convertedFallback - $txnAmount);
+
+            // Use whichever interpretation gives better match
+            if ($diffFallback < $diffPrimary && $receiptCurrency !== 'GBP') {
+                Log::info('Receipt: Using fallback GBP interpretation', [
+                    'receipt_id' => $receipt->id,
+                    'stated_currency' => $receiptCurrency,
+                    'primary_diff' => $diffPrimary,
+                    'fallback_diff' => $diffFallback,
+                ]);
+
+                return [$diffFallback, 'fallback_gbp'];
+            }
+
+            return [$diffPrimary, 'converted_' . strtolower($receiptCurrency) . '_to_' . strtolower($txnCurrency)];
+        } catch (Exception $e) {
+            // Conversion failed - fall back to direct comparison
+            Log::warning('Receipt: Currency conversion failed in matching', [
+                'receipt_id' => $receipt->id,
+                'transaction_id' => $transaction->id,
+                'receipt_currency' => $receiptCurrency,
+                'transaction_currency' => $txnCurrency,
+                'error' => $e->getMessage(),
+            ]);
+
+            $amountDiff = abs($receiptAmount - $txnAmount);
+
+            return [$amountDiff, 'direct_fallback'];
+        }
     }
 
     /**
