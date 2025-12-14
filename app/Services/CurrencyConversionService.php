@@ -39,7 +39,6 @@ class CurrencyConversionService
         'CHF' => 'CHF',
         'A$' => 'AUD',
         'C$' => 'CAD',
-        '¥' => 'CNY',
     ];
 
     /**
@@ -90,6 +89,12 @@ class CurrencyConversionService
         string $toCurrency,
         ?Carbon $date = null
     ): float {
+        // Check API key is configured before proceeding
+        $apiKey = config('services.currency.api_key');
+        if (empty($apiKey)) {
+            throw new Exception('Currency API key not configured');
+        }
+
         // Normalize currency codes
         $fromCurrency = $this->normalizeCurrency($fromCurrency);
         $toCurrency = $this->normalizeCurrency($toCurrency);
@@ -145,9 +150,13 @@ class CurrencyConversionService
         // Convert to uppercase
         $currency = strtoupper($currency);
 
-        // Validate it's a 3-letter code
+        // Validate it's a recognized 3-letter code
         if (strlen($currency) === 3 && ctype_alpha($currency)) {
-            return $currency;
+            // Check if it's a known currency code (exists in fallback rates or is GBP/USD/EUR)
+            $knownCurrencies = ['GBP', 'USD', 'EUR', 'JPY', 'CNY', 'AUD', 'CAD', 'CHF'];
+            if (in_array($currency, $knownCurrencies)) {
+                return $currency;
+            }
         }
 
         // Default to GBP if unrecognized
@@ -218,7 +227,7 @@ class CurrencyConversionService
         $apiKey = config('services.currency.api_key');
         $apiUrl = config('services.currency.api_url', 'https://v6.exchangerate-api.com/v6');
 
-        if (! $apiKey) {
+        if (empty($apiKey)) {
             throw new Exception('Currency API key not configured');
         }
 
