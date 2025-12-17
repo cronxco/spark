@@ -348,6 +348,10 @@ class Block extends Model implements HasMedia
             return $this->value;
         }
 
+        if ($this->value_multiplier === 0) {
+            return $this->value;
+        }
+
         return $this->value / $this->value_multiplier;
     }
 
