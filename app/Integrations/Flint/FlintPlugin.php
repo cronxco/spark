@@ -28,7 +28,7 @@ class FlintPlugin extends ManualPlugin
 
     public static function getAccentColor(): string
     {
-        return '#8B5CF6'; // Purple accent
+        return 'warning'; // Purple for AI features
     }
 
     public static function getDomain(): string
