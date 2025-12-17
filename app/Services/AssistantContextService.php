@@ -331,8 +331,8 @@ class AssistantContextService
         $content = $block->getContent();
 
         // Limit content to 500 chars to save tokens
-        if (strlen($content) > 500) {
-            $content = substr($content, 0, 500) . '...';
+        if (mb_strlen($content, 'UTF-8') > 500) {
+            $content = mb_substr($content, 0, 500, 'UTF-8') . '...';
         }
 
         $data = [
