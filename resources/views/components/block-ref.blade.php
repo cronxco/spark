@@ -5,7 +5,7 @@ use App\Integrations\PluginRegistry;
 
 // Handle null blocks gracefully
 if (!$block) {
-    return;
+return;
 }
 
 // Load event relationship if needed
@@ -25,11 +25,11 @@ $blockDisplayName = $blockTypeInfo['display_name'] ?? Str::headline($block->bloc
 
 // Domain-based colors
 $domainColors = [
-    'health' => 'success',
-    'money' => 'warning',
-    'media' => 'info',
-    'knowledge' => 'primary',
-    'online' => 'accent',
+'health' => 'success',
+'money' => 'warning',
+'media' => 'info',
+'knowledge' => 'primary',
+'online' => 'accent',
 ];
 $accentColor = $domainColors[$domain] ?? 'accent';
 
@@ -43,11 +43,11 @@ $popoverBaseId = 'block-ref-' . $block->id;
 // Format value display for pill using improved helper
 $valueDisplay = null;
 if ($block->value !== null) {
-    $valueDisplay = format_block_value_display(
-        $block->formatted_value,
-        $block->value_unit,
-        $block->value_multiplier
-    );
+$valueDisplay = format_block_value_display(
+$block->formatted_value,
+$block->value_unit,
+$block->value_multiplier
+);
 }
 @endphp
 
@@ -90,8 +90,7 @@ if ($block->value !== null) {
     @mouseleave="hide()"
     @popover-opening.window="closeIfNotMe($event)"
     @keydown.escape="open = false"
-    class="relative inline-block"
->
+    class="relative inline-block">
     {{-- Trigger: The reference link/badge --}}
     {{-- Desktop: navigable link --}}
     <a
@@ -100,17 +99,16 @@ if ($block->value !== null) {
         wire:navigate
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
-               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
-    >
+               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer">
         <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
         <span class="max-w-[180px] truncate">
             {!! $text ?? ($block->title ?? $blockDisplayName) !!}
             @if ($valueDisplay)
-                <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
+            <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
             @endif
         </span>
         @if ($showType && $block->block_type)
-            <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
+        <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
         @endif
     </a>
 
@@ -121,17 +119,16 @@ if ($block->value !== null) {
         @click="toggle()"
         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium
                bg-{{ $accentColor }}/10 text-{{ $accentColor }} hover:bg-{{ $accentColor }}/20
-               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
-    >
+               border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer">
         <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
         <span class="max-w-[180px] truncate">
             {!! $text ?? ($block->title ?? $blockDisplayName) !!}
             @if ($valueDisplay)
-                <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
+            <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
             @endif
         </span>
         @if ($showType && $block->block_type)
-            <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
+        <span class="badge badge-xs badge-ghost opacity-70">{{ $blockDisplayName }}</span>
         @endif
     </button>
 
@@ -148,20 +145,17 @@ if ($block->value !== null) {
         @mouseenter="keepOpen()"
         @click.outside="open = false"
         class="absolute z-50 mt-2 left-0"
-        style="min-width: 320px; max-width: 400px;"
-    >
-        <div class="card bg-base-100 shadow-xl border border-{{ $accentColor }}/30 overflow-hidden">
-            {{-- Accent bar --}}
-            <div class="h-1 bg-gradient-to-r from-{{ $accentColor }} to-{{ $accentColor }}/50"></div>
+        style="min-width: 320px; max-width: 400px;">
+        @if ($hasCustomLayout && $customLayoutPath)
+            {{-- Use custom block type view directly (no wrapper card) --}}
+            @include($customLayoutPath, ['block' => $block])
+        @else
+            {{-- Default block preview with card wrapper --}}
+            <div class="card bg-base-100 shadow-xl border border-{{ $accentColor }}/30 overflow-hidden">
+                {{-- Accent bar --}}
+                <div class="h-1 bg-gradient-to-r from-{{ $accentColor }} to-{{ $accentColor }}/50"></div>
 
-            <div class="card-body p-0">
-                @if ($hasCustomLayout && $customLayoutPath)
-                    {{-- Use custom block type view (scaled down for popover) --}}
-                    <div class="transform scale-95 origin-top-left p-2">
-                        @include($customLayoutPath, ['block' => $block])
-                    </div>
-                @else
-                    {{-- Default block preview --}}
+                <div class="card-body p-0">
                     <div class="p-4 gap-3 flex flex-col">
                         {{-- Header --}}
                         <div class="flex items-center justify-between gap-2">
@@ -172,105 +166,102 @@ if ($block->value !== null) {
                                 </div>
                             </div>
                             @if ($block->time)
-                                <div class="text-xs text-base-content/60">
-                                    {{ $block->time->diffForHumans() }}
-                                </div>
+                            <div class="text-xs text-base-content/60">
+                                {{ $block->time->diffForHumans() }}
+                            </div>
                             @endif
                         </div>
 
                         {{-- Title --}}
                         @if ($block->title)
-                            <h4 class="font-bold text-base leading-tight">
-                                {{ $block->title }}
-                            </h4>
+                        <h4 class="font-bold text-base leading-tight">
+                            {{ $block->title }}
+                        </h4>
                         @endif
 
                         {{-- Value display --}}
                         @if ($block->value !== null)
-                            @php
-                                // Format value with improved display
-                                $displayValue = format_block_value_display(
-                                    $block->formatted_value,
-                                    $block->value_unit,
-                                    $block->value_multiplier
-                                );
-                            @endphp
-                            <div class="text-3xl font-bold text-{{ $accentColor }}">
-                                {{ $displayValue }}
-                            </div>
+                        @php
+                        // Format value with improved display
+                        $displayValue = format_block_value_display(
+                        $block->formatted_value,
+                        $block->value_unit,
+                        $block->value_multiplier
+                        );
+                        @endphp
+                        <div class="text-3xl font-bold text-{{ $accentColor }}">
+                            {{ $displayValue }}
+                        </div>
                         @endif
 
                         {{-- Content preview --}}
                         @php
-                            $contentPreview = $block->getContent();
-                            if ($contentPreview) {
-                                $contentPreview = Str::limit(strip_tags($contentPreview), 150);
-                            }
+                        $contentPreview = $block->getContent();
+                        if ($contentPreview) {
+                        $contentPreview = Str::limit(strip_tags($contentPreview), 150);
+                        }
                         @endphp
                         @if ($contentPreview)
-                            <p class="text-sm text-base-content/70 line-clamp-3 leading-relaxed">
-                                {{ $contentPreview }}
-                            </p>
+                        <p class="text-sm text-base-content/70 line-clamp-3 leading-relaxed">
+                            {{ $contentPreview }}
+                        </p>
                         @endif
 
                         {{-- Metadata preview (select important fields) --}}
                         @if ($block->metadata && count($block->metadata) > 0)
-                            @php
-                                $displayMeta = collect($block->metadata)
-                                    ->except(['content', 'summary', 'text', 'description', 'image', 'image_url', 'article_text'])
-                                    ->filter(fn($v) => !is_array($v) && !is_null($v) && $v !== '')
-                                    ->take(3);
-                            @endphp
-                            @if ($displayMeta->count() > 0)
-                                <div class="text-xs text-base-content/60 space-y-1">
-                                    @foreach ($displayMeta as $key => $value)
-                                        <div class="flex justify-between gap-2">
-                                            <span class="font-medium capitalize">{{ str_replace('_', ' ', $key) }}:</span>
-                                            <span class="text-right truncate max-w-[150px]">{{ Str::limit($value, 30) }}</span>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endif
+                        @php
+                        $displayMeta = collect($block->metadata)
+                        ->except(['content', 'summary', 'text', 'description', 'image', 'image_url', 'article_text'])
+                        ->filter(fn($v) => !is_array($v) && !is_null($v) && $v !== '')
+                        ->take(3);
+                        @endphp
+                        @if ($displayMeta->count() > 0)
+                        <div class="text-xs text-base-content/60 space-y-1">
+                            @foreach ($displayMeta as $key => $value)
+                            <div class="flex justify-between gap-2">
+                                <span class="font-medium capitalize">{{ str_replace('_', ' ', $key) }}:</span>
+                                <span class="text-right truncate max-w-[150px]">{{ Str::limit($value, 30) }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                        @endif
                         @endif
                     </div>
-                @endif
 
-                {{-- Action footer (always shown) --}}
-                <div class="flex items-center gap-2 p-4 pt-0 border-t border-base-300 mt-auto">
-                    <a
-                        href="{{ route('blocks.show', $block) }}"
-                        wire:navigate
-                        @click.stop
-                        class="btn btn-{{ $accentColor }} btn-sm flex-1 gap-1"
-                    >
-                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
-                        View Block
-                    </a>
-                    @if ($block->event)
+                    {{-- Action footer --}}
+                    <div class="flex items-center gap-2 p-4 pt-0 border-t border-base-300 mt-auto">
+                        <a
+                            href="{{ route('blocks.show', $block) }}"
+                            wire:navigate
+                            @click.stop
+                            class="btn btn-{{ $accentColor }} btn-sm flex-1 gap-1">
+                            <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                            View Block
+                        </a>
+                        @if ($block->event)
                         <a
                             href="{{ route('events.show', $block->event) }}"
                             wire:navigate
                             @click.stop
                             class="btn btn-ghost btn-sm btn-square"
-                            title="View Parent Event"
-                        >
+                            title="View Parent Event">
                             <x-icon name="fas.bolt" class="w-4 h-4" />
                         </a>
-                    @endif
-                    @if ($block->url)
+                        @endif
+                        @if ($block->url)
                         <a
                             href="{{ $block->url }}"
                             target="_blank"
                             rel="noopener noreferrer"
                             @click.stop
                             class="btn btn-ghost btn-sm btn-square"
-                            title="Open URL"
-                        >
+                            title="Open URL">
                             <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
                         </a>
-                    @endif
+                        @endif
+                    </div>
                 </div>
             </div>
-        </div>
+        @endif
     </div>
 </span>
