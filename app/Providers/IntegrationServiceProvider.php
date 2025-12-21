@@ -15,6 +15,7 @@ use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Integrations\Hevy\HevyPlugin;
 use App\Integrations\Karakeep\KarakeepPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
+use App\Integrations\Newsletter\NewsletterPlugin;
 use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Outline\OutlinePlugin;
 use App\Integrations\PluginRegistry;
@@ -53,6 +54,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(GoogleCalendarPlugin::class);
         PluginRegistry::register(BlueSkyPlugin::class);
         PluginRegistry::register(ReceiptPlugin::class);
+        PluginRegistry::register(NewsletterPlugin::class);
         PluginRegistry::register(GoodreadsPlugin::class);
         PluginRegistry::register(UntappdPlugin::class);
     }
