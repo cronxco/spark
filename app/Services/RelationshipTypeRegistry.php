@@ -93,6 +93,34 @@ class RelationshipTypeRegistry
                 'supports_value' => true,
                 'default_value_unit' => 'GBP',
             ],
+            'supports' => [
+                'display_name' => 'Supports',
+                'icon' => 'o-hand-thumb-up',
+                'is_directional' => true,
+                'description' => 'Evidence or insight that supports another insight (Flint agent)',
+                'supports_value' => false,
+            ],
+            'correlates_with' => [
+                'display_name' => 'Correlates With',
+                'icon' => 'o-arrows-right-left',
+                'is_directional' => false,
+                'description' => 'Statistical correlation between insights or patterns (Flint agent)',
+                'supports_value' => false,
+            ],
+            'derived_from' => [
+                'display_name' => 'Derived From',
+                'icon' => 'o-arrow-up-right',
+                'is_directional' => true,
+                'description' => 'Insight was derived from source data or another insight (Flint agent)',
+                'supports_value' => false,
+            ],
+            'contradicts' => [
+                'display_name' => 'Contradicts',
+                'icon' => 'o-x-circle',
+                'is_directional' => true,
+                'description' => 'Insight contradicts or conflicts with another insight (Flint agent)',
+                'supports_value' => false,
+            ],
         ];
     }
 
