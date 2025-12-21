@@ -184,6 +184,14 @@ return [
         'currency_tolerance_percent' => (float) env('RECEIPT_CURRENCY_TOLERANCE', 2.0),
     ],
 
+    'newsletter' => [
+        'domain' => env('NEWSLETTER_DOMAIN', 'spark.cronx.co'),
+        'email_address' => env('NEWSLETTER_EMAIL_ADDRESS', 'news@spark.cronx.co'),
+        's3_bucket' => env('AWS_BUCKET_NEWSLETTERS', 'spark-newsletters-emails'),
+        'sns_topic_arn' => env('AWS_SNS_NEWSLETTER_TOPIC_ARN'),
+        'retention_days' => 90,
+    ],
+
     'currency' => [
         'api_provider' => env('CURRENCY_API_PROVIDER', 'exchangerate'),
         'api_key' => env('CURRENCY_API_KEY'),

@@ -131,7 +131,7 @@ Requirements:
 1. summary_tweet: 280 characters maximum, ultra-concise, engaging (Markdown formatted)
 2. summary_short: No more than 40 words, concise overview (Markdown formatted)
 3. summary_paragraph: No more than 150 words, detailed overview with key points (Markdown formatted)
-4. key_takeaways: Array of 3-5 strings, each a bullet point with actionable insight (can include bold, links)
+4. key_takeaways: Array of 3-5 strings, each a bullet point with key insights (can include bold, links)
 5. tldr: Single sentence (max 20 words), absolute minimum summary (Markdown formatted)
 6. emoji: Single emoji that best represents the article's theme or content
 7. tags: Array of 1-5 semantic tags with types. Only include tags that are clearly relevant and mentioned in the content:
