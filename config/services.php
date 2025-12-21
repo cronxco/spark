@@ -166,6 +166,11 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),
         'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+        'models' => [
+            'gpt5_mini' => env('OPENAI_GPT5_MINI_MODEL', 'gpt-4o-mini'),
+            'gpt4o' => 'gpt-4o',
+            'gpt5_nano' => 'gpt-5-nano',
+        ],
     ],
 
     'receipt' => [

@@ -7,6 +7,7 @@ use App\Integrations\BlueSky\BlueSkyPlugin;
 use App\Integrations\DailyCheckin\DailyCheckinPlugin;
 use App\Integrations\Fetch\FetchPlugin;
 use App\Integrations\Financial\FinancialPlugin;
+use App\Integrations\Flint\FlintPlugin;
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\Goodreads\GoodreadsPlugin;
@@ -47,6 +48,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(OutlinePlugin::class);
         PluginRegistry::register(KarakeepPlugin::class);
         PluginRegistry::register(FetchPlugin::class);
+        PluginRegistry::register(FlintPlugin::class);
         PluginRegistry::register(DailyCheckinPlugin::class);
         PluginRegistry::register(GoogleCalendarPlugin::class);
         PluginRegistry::register(BlueSkyPlugin::class);

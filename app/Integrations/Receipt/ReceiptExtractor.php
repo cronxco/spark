@@ -73,15 +73,27 @@ PROMPT;
                 'from' => $emailFrom,
             ]);
 
-            $response = OpenAI::chat()->create([
-                'model' => 'gpt-5-nano',
+            // Start Sentry AI request span
+            $model = 'gpt-5-nano';
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+            ];
+            $aiSpan = start_ai_request_span($model, $messages, [
                 'temperature' => 1,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userPrompt],
-                ],
+            ]);
+
+            $response = OpenAI::chat()->create([
+                'model' => $model,
+                'temperature' => 1,
+                'messages' => $messages,
                 'response_format' => ['type' => 'json_object'],
             ]);
+
+            // Finish AI request span with token usage
+            $usage = $response->usage ? $response->usage->toArray() : [];
+            $finishReason = $response->choices[0]->finishReason ?? null;
+            finish_ai_request_span($aiSpan, $usage, $finishReason);
 
             $extracted = json_decode($response->choices[0]->message->content, true);
 

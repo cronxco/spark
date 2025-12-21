@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AssistantContextController;
 use App\Http\Controllers\Api\FetchApiController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
@@ -87,6 +88,9 @@ Route::middleware('sentry.api.logging')->group(function () {
 
         // Fetch API
         Route::post('fetch/bookmarks', [FetchApiController::class, 'bookmarkUrl'])->name('api.fetch.bookmarks.store');
+
+        // Assistant Context API
+        Route::get('assistant/context', [AssistantContextController::class, 'index'])->name('api.assistant.context');
 
         // Clear card stream cache
         Route::post('clear-card-cache', function (Request $request) {

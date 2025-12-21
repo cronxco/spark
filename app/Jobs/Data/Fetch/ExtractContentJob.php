@@ -180,22 +180,32 @@ The output should be the full, clean article text in Markdown format that a read
 PROMPT;
 
         try {
-            $result = OpenAI::chat()->create([
-                'model' => 'gpt-5-nano',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => $systemPrompt,
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => json_encode([
-                            'title' => $title,
-                            'content' => $contentToSend,
-                        ]),
-                    ],
+            // Start Sentry AI request span
+            $model = 'gpt-5-nano';
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => $systemPrompt,
                 ],
+                [
+                    'role' => 'user',
+                    'content' => json_encode([
+                        'title' => $title,
+                        'content' => $contentToSend,
+                    ]),
+                ],
+            ];
+            $aiSpan = start_ai_request_span($model, $messages, []);
+
+            $result = OpenAI::chat()->create([
+                'model' => $model,
+                'messages' => $messages,
             ]);
+
+            // Finish AI request span with token usage
+            $usage = $result->usage ? $result->usage->toArray() : [];
+            $finishReason = $result->choices[0]->finishReason ?? null;
+            finish_ai_request_span($aiSpan, $usage, $finishReason);
 
             $articleText = trim($result->choices[0]->message->content);
 
