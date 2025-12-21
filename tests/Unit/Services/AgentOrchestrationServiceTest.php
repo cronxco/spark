@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\AgentMemoryService;
 use App\Services\AgentOrchestrationService;
@@ -143,16 +144,21 @@ JSON;
     /** @test */
     public function it_groups_historical_data_by_domain_and_week()
     {
-        // Create test events
-        EventObject::factory()->create([
+        // Create test data
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+        ]);
+
+        $eventObject = EventObject::factory()->create([
             'user_id' => $this->user->id,
             'concept' => 'test',
             'type' => 'test',
             'title' => 'Test Object',
         ]);
 
-        $event = Event::factory()->create([
-            'user_id' => $this->user->id,
+        Event::factory()->create([
+            'source_id' => $eventObject->id,
+            'integration_id' => $integration->id,
             'domain' => 'health',
             'service' => 'oura',
             'action' => 'had_sleep',
@@ -183,7 +189,9 @@ JSON;
         $method->setAccessible(true);
 
         // Mock extractJson to return our test data
-        $mockService = Mockery::mock(AgentOrchestrationService::class)->makePartial();
+        $mockService = Mockery::mock(AgentOrchestrationService::class)
+            ->makePartial()
+            ->shouldAllowMockingProtectedMethods();
         $mockService->shouldReceive('extractJson')->andReturn($response);
 
         $result = $method->invoke($mockService, json_encode($response));
@@ -196,8 +204,8 @@ JSON;
     /** @test */
     public function it_determines_period_correctly()
     {
-        $reflection = new ReflectionClass(\App\Console\Kernel::class);
-        $kernel = app(\Illuminate\Contracts\Console\Kernel::class);
+        $kernel = app(\App\Console\Kernel::class);
+        $reflection = new ReflectionClass($kernel);
 
         $method = $reflection->getMethod('determinePeriod');
         $method->setAccessible(true);
