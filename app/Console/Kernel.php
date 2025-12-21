@@ -59,7 +59,9 @@ class Kernel extends ConsoleKernel
                 $this->dispatchContinuousBackgroundAnalysis();
             })
             ->everyFifteenMinutes()
-            ->name('flint-continuous-background-analysis');
+            ->name('flint-continuous-background-analysis')
+            ->onOneServer()
+            ->withoutOverlapping();
 
         // Flint digest dispatcher (runs every hour to check user-specific schedules)
         $schedule
@@ -67,7 +69,9 @@ class Kernel extends ConsoleKernel
                 $this->dispatchScheduledDigests();
             })
             ->hourly()
-            ->name('flint-digest-dispatcher');
+            ->name('flint-digest-dispatcher')
+            ->onOneServer()
+            ->withoutOverlapping();
 
         // Flint pattern detection (weekly on Sundays at 04:00)
         $schedule
@@ -76,7 +80,9 @@ class Kernel extends ConsoleKernel
             })
             ->weeklyOn(0, '04:00')
             ->timezone('Europe/London')
-            ->name('flint-pattern-detection');
+            ->name('flint-pattern-detection')
+            ->onOneServer()
+            ->withoutOverlapping();
     }
 
     /**
