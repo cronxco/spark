@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ProcessNewsletterEmailJobTest extends TestCase
@@ -119,23 +120,27 @@ class ProcessNewsletterEmailJobTest extends TestCase
     /** @test */
     public function it_can_be_dispatched_with_s3_key()
     {
-        $job = ProcessNewsletterEmailJob::dispatch(
+        Queue::fake();
+
+        ProcessNewsletterEmailJob::dispatch(
             $this->integration,
             'newsletters/test-email.eml'
         );
 
-        $this->assertTrue(true); // If we get here, dispatch worked
+        Queue::assertPushed(ProcessNewsletterEmailJob::class);
     }
 
     /** @test */
     public function it_can_be_dispatched_with_raw_content()
     {
-        $job = ProcessNewsletterEmailJob::dispatch(
+        Queue::fake();
+
+        ProcessNewsletterEmailJob::dispatch(
             $this->integration,
             null,
             'Raw email content'
         );
 
-        $this->assertTrue(true); // If we get here, dispatch worked
+        Queue::assertPushed(ProcessNewsletterEmailJob::class);
     }
 }

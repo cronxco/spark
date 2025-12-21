@@ -44,7 +44,7 @@ class ExtractNewsletterContentJob implements ShouldQueue
         try {
             // Extract clean article text using AI
             $articleText = $this->extractArticleText(
-                $this->event->metadata['email_subject'],
+                $this->event->event_metadata['email_subject'] ?? 'No Subject',
                 $this->rawContent
             );
 
@@ -84,10 +84,10 @@ class ExtractNewsletterContentJob implements ShouldQueue
             ]);
 
             // Update event metadata with error
-            $metadata = $this->event->metadata ?? [];
+            $metadata = $this->event->event_metadata ?? [];
             $metadata['last_extraction_error'] = $e->getMessage();
             $metadata['last_extraction_error_at'] = now()->toIso8601String();
-            $this->event->update(['metadata' => $metadata]);
+            $this->event->update(['event_metadata' => $metadata]);
 
             throw $e;
         }

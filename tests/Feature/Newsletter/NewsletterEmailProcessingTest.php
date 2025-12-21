@@ -131,8 +131,8 @@ class NewsletterEmailProcessingTest extends TestCase
 
         $this->assertNotNull($event);
         $this->assertEquals('knowledge', $event->domain);
-        $this->assertArrayHasKey('email_subject', $event->metadata);
-        $this->assertEquals('Morning Brew: Daily business news - Dec 21', $event->metadata['email_subject']);
+        $this->assertArrayHasKey('email_subject', $event->event_metadata);
+        $this->assertEquals('Morning Brew: Daily business news - Dec 21', $event->event_metadata['email_subject']);
     }
 
     /** @test */

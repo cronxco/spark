@@ -128,9 +128,32 @@ class ProcessNewsletterEmailJob implements ShouldQueue
 
             // Extract basic fields
             $subject = $message->getHeaderValue('subject') ?: 'No Subject';
-            $from = $message->getHeaderValue('from') ?: '';
             $date = $message->getHeaderValue('date') ?: now()->toRfc2822String();
             $messageId = $message->getHeaderValue('message-id') ?: '';
+
+            // Extract sender information properly
+            $fromEmail = '';
+            $fromName = '';
+
+            try {
+                $fromHeader = $message->getHeader('from');
+                // Check if this is an AddressHeader with getAddresses method
+                if ($fromHeader instanceof \ZBateson\MailMimeParser\Header\AddressHeader) {
+                    $fromAddresses = $fromHeader->getAddresses();
+                    if (count($fromAddresses) > 0) {
+                        $fromAddress = $fromAddresses[0];
+                        $fromEmail = $fromAddress->getEmail() ?: '';
+                        $fromName = $fromAddress->getName() ?: '';
+                    }
+                }
+            } catch (Exception $e) {
+                // Fallback to simple header value parsing
+                $fromValue = $message->getHeaderValue('from') ?: '';
+                preg_match('/<([^>]+)>/', $fromValue, $emailMatches);
+                $fromEmail = $emailMatches[1] ?? $fromValue;
+                $fromName = preg_replace('/<[^>]+>/', '', $fromValue);
+                $fromName = trim($fromName, " \t\n\r\0\x0B\"'");
+            }
 
             // Extract content
             $textPlain = $message->getTextContent() ?: '';
@@ -138,7 +161,8 @@ class ProcessNewsletterEmailJob implements ShouldQueue
 
             Log::info('Newsletter: Parsed email', [
                 'subject' => $subject,
-                'from' => $from,
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
                 'message_id' => $messageId,
                 'has_html' => ! empty($textHtml),
                 'has_plain' => ! empty($textPlain),
@@ -146,7 +170,8 @@ class ProcessNewsletterEmailJob implements ShouldQueue
 
             return [
                 'subject' => $subject,
-                'from' => $from,
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
                 'date' => $date,
                 'message_id' => $messageId,
                 'text_plain' => $textPlain,
@@ -166,21 +191,12 @@ class ProcessNewsletterEmailJob implements ShouldQueue
      */
     private function getOrCreatePublication(array $parsedEmail): EventObject
     {
-        // Extract sender information
-        $fromHeader = $parsedEmail['from'];
+        // Extract sender information from parsed email
+        $senderEmail = $parsedEmail['from_email'];
+        $senderName = $parsedEmail['from_name'];
 
-        // Parse sender email and name
-        // Format is typically: "Name" <email@domain.com> or email@domain.com
-        preg_match('/<([^>]+)>/', $fromHeader, $emailMatches);
-        $senderEmail = $emailMatches[1] ?? $fromHeader;
-        $senderEmail = trim($senderEmail);
-
-        // Extract sender name
-        $senderName = preg_replace('/<[^>]+>/', '', $fromHeader);
-        $senderName = trim($senderName, " \t\n\r\0\x0B\"'");
-
+        // If no name was provided, use email prefix as fallback
         if (empty($senderName)) {
-            // Use email prefix as fallback
             $senderName = explode('@', $senderEmail)[0];
             $senderName = ucwords(str_replace(['.', '_', '-'], ' ', $senderName));
         }
@@ -278,9 +294,10 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             'value' => null,
             'value_multiplier' => null,
             'value_unit' => null,
-            'metadata' => [
+            'event_metadata' => [
                 'email_subject' => $parsedEmail['subject'],
-                'email_from' => $parsedEmail['from'],
+                'email_from' => $parsedEmail['from_email'],
+                'email_from_name' => $parsedEmail['from_name'],
                 'email_received_at' => $receivedTime->toIso8601String(),
                 'email_message_id' => $parsedEmail['message_id'],
                 'raw_html' => $parsedEmail['text_html'],
