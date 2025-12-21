@@ -285,8 +285,6 @@ new class extends Component {
                                 class="toggle toggle-primary"
                                 wire:model="enabledDomains"
                                 value="{{ $key }}"
-                                {{ in_array($key, $enabledDomains) ? 'checked' : '' }}
-                                wire:click="toggleDomain('{{ $key }}')"
                             />
                         </div>
                     @endforeach

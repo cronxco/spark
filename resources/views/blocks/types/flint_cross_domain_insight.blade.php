@@ -28,6 +28,44 @@ $domainColors = [
     'knowledge' => 'accent',
     'online' => 'info',
 ];
+
+// Map accent color to static Tailwind class
+$iconColorClass = match($accentColor) {
+    'primary' => 'text-primary',
+    'secondary' => 'text-secondary',
+    'accent' => 'text-accent',
+    'success' => 'text-success',
+    'warning' => 'text-warning',
+    'error' => 'text-error',
+    'info' => 'text-info',
+    'neutral' => 'text-neutral',
+    default => 'text-primary',
+};
+
+// Map domain colors to static badge classes
+$domainBadgeClasses = [];
+foreach ($domains as $domain) {
+    $color = $domainColors[$domain] ?? 'ghost';
+    $domainBadgeClasses[$domain] = match($color) {
+        'primary' => 'badge-primary',
+        'secondary' => 'badge-secondary',
+        'accent' => 'badge-accent',
+        'success' => 'badge-success',
+        'warning' => 'badge-warning',
+        'error' => 'badge-error',
+        'info' => 'badge-info',
+        'neutral' => 'badge-neutral',
+        'ghost' => 'badge-ghost',
+        default => 'badge-ghost',
+    };
+}
+
+// Map confidence to static progress class
+$progressColorClass = match(true) {
+    $confidence >= 0.8 => 'progress-success',
+    $confidence >= 0.6 => 'progress-warning',
+    default => 'progress-error',
+};
 @endphp
 
 <div class="card bg-gradient-to-br from-primary/5 to-secondary/5 shadow hover:shadow-lg transition-all border border-primary/20">
@@ -40,7 +78,7 @@ $domainColors = [
                     Cross-Domain
                 </div>
                 @foreach ($domains as $domain)
-                    <div class="badge badge-{{ $domainColors[$domain] ?? 'ghost' }} badge-outline badge-sm">
+                    <div class="badge {{ $domainBadgeClasses[$domain] ?? 'badge-ghost' }} badge-outline badge-sm">
                         {{ ucfirst($domain) }}
                     </div>
                 @endforeach
@@ -60,7 +98,7 @@ $domainColors = [
             <div class="text-xs text-base-content/70">Confidence:</div>
             <div class="flex-1">
                 <progress
-                    class="progress progress-{{ $confidence >= 0.8 ? 'success' : ($confidence >= 0.6 ? 'warning' : 'error') }} w-full h-2"
+                    class="progress {{ $progressColorClass }} w-full h-2"
                     value="{{ $confidence * 100 }}"
                     max="100"
                 ></progress>
@@ -93,7 +131,7 @@ $domainColors = [
         {{-- Footer --}}
         <div class="flex items-center justify-between gap-2 pt-2 border-t border-primary/20">
             <div class="flex items-center gap-1.5">
-                <x-icon :name="$icon" class="w-4 h-4 text-{{ $accentColor }}" />
+                <x-icon :name="$icon" class="w-4 h-4 {{ $iconColorClass }}" />
                 <span class="text-xs font-medium text-base-content/70">{{ $serviceName }}</span>
             </div>
 
