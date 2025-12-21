@@ -1,0 +1,498 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+
+class DomainAgentService
+{
+    /**
+     * Build a comprehensive prompt for a domain agent
+     */
+    public function buildDomainPrompt(
+        User $user,
+        string $domain,
+        array $events,
+        ?array $learning,
+        array $feedbackStats,
+        array $queries
+    ): string {
+        $systemPrompt = $this->getSystemPrompt($domain);
+        $eventsContext = $this->formatEventsContext($events, $domain);
+        $learningContext = $this->formatLearningContext($learning, $feedbackStats);
+        $queriesContext = $this->formatQueriesContext($queries);
+
+        return <<<PROMPT
+{$systemPrompt}
+
+## Recent Activity ({$domain} domain)
+
+{$eventsContext}
+
+{$learningContext}
+
+{$queriesContext}
+
+## Your Task
+
+Analyze the activity data above and provide insights for the user. Return your response as JSON with this structure:
+
+```json
+{
+  "insights": [
+    {
+      "type": "observation|pattern|anomaly|trend",
+      "title": "Brief insight title",
+      "description": "2-3 sentence explanation",
+      "supporting_data": ["data point 1", "data point 2"],
+      "referenced_event_ids": ["event-uuid-1", "event-uuid-2"],
+      "confidence": 0.0-1.0
+    }
+  ],
+  "suggestions": [
+    {
+      "title": "Actionable suggestion title",
+      "description": "What the user should do and why",
+      "priority": "high|medium|low",
+      "actionable": true|false
+    }
+  ],
+  "metrics": {
+    "key_metric_1": {"value": 123, "change": "+5%", "context": "vs last week"},
+    "key_metric_2": {"value": 456, "trend": "increasing"}
+  },
+  "urgent_flags": [
+    {
+      "reason": "Why this needs immediate attention",
+      "context": {"relevant": "data"}
+    }
+  ],
+  "cross_domain_observations": [
+    {
+      "domains": ["domain1", "domain2"],
+      "observation": "What pattern you noticed across domains",
+      "confidence": 0.0-1.0
+    }
+  ],
+  "query_responses": {
+    "original_question": "your answer to the question"
+  }
+}
+```
+
+Focus on:
+- Patterns and trends in the data
+- Anomalies or unusual behavior
+- Actionable insights the user can act on
+- Cross-domain connections (if you notice them)
+- Answering any queries from other agents
+
+**Important: When referencing specific events in your insights:**
+- Include the event IDs (shown above as "ID: ...") in the `referenced_event_ids` array
+- This allows the user to click on insights and see the source data
+- Always include IDs for events that support your conclusions
+
+Be specific, use numbers, and explain your reasoning.
+PROMPT;
+    }
+
+    /**
+     * Parse agent response
+     */
+    public function parseAgentResponse(string $response): array
+    {
+        // Try to extract JSON from the response
+        $json = $this->extractJson($response);
+
+        if ($json === null) {
+            // Fallback: return basic structure
+            return [
+                'insights' => [],
+                'suggestions' => [],
+                'metrics' => [],
+                'confidence' => 0.5,
+                'reasoning' => $response,
+                'urgent_flags' => [],
+                'cross_domain_observations' => [],
+                'query_responses' => [],
+            ];
+        }
+
+        return array_merge([
+            'insights' => [],
+            'suggestions' => [],
+            'metrics' => [],
+            'confidence' => 0.7,
+            'reasoning' => $response,
+            'urgent_flags' => [],
+            'cross_domain_observations' => [],
+            'query_responses' => [],
+        ], $json);
+    }
+
+    /**
+     * Get domain-specific system prompt
+     */
+    protected function getSystemPrompt(string $domain): string
+    {
+        return match ($domain) {
+            'health' => $this->getHealthSystemPrompt(),
+            'money' => $this->getMoneySystemPrompt(),
+            'media' => $this->getMediaSystemPrompt(),
+            'knowledge' => $this->getKnowledgeSystemPrompt(),
+            'online' => $this->getOnlineSystemPrompt(),
+            default => $this->getGenericSystemPrompt($domain),
+        };
+    }
+
+    protected function getHealthSystemPrompt(): string
+    {
+        return <<<'SYSTEM'
+You are the Health Domain Agent for Flint, an AI assistant specializing in health and fitness data analysis.
+
+**Your Role:**
+- Analyze health metrics from services like Oura, Strava, Withings, and fitness trackers
+- Identify patterns in sleep, activity, heart rate, and recovery
+- Provide coaching-style insights that are supportive and motivating
+- Detect anomalies that might indicate illness, overtraining, or lifestyle changes
+- Make connections between different health metrics
+
+**Tone:**
+- Supportive and encouraging (like a health coach)
+- Use positive reinforcement for good habits
+- Gentle guidance for concerning trends
+- Avoid medical advice (you're not a doctor)
+- Contextualize metrics with explanations
+
+**Key Metrics to Watch:**
+- Sleep quality, duration, and consistency
+- Activity levels and exercise patterns
+- Heart rate variability (HRV) and resting heart rate
+- Recovery scores and readiness
+- Step counts and movement throughout the day
+- Workout intensity and frequency
+
+**What Makes a Good Insight:**
+- Connects multiple metrics (e.g., "Poor sleep might be affecting your HRV")
+- Identifies trends over time (not just single data points)
+- Provides context ("Your RHR is 5 bpm higher than your 30-day average")
+- Suggests specific, actionable improvements
+- Celebrates achievements and positive trends
+SYSTEM;
+    }
+
+    protected function getMoneySystemPrompt(): string
+    {
+        return <<<'SYSTEM'
+You are the Money Domain Agent for Flint, specializing in financial behavior analysis.
+
+**Your Role:**
+- Analyze spending patterns from banking integrations (Monzo, etc.)
+- Identify unusual transactions or spending categories
+- Track income, expenses, and savings trends
+- Detect potential budget issues or opportunities
+- Provide matter-of-fact financial insights
+
+**Tone:**
+- Conversational and neutral (not judgmental)
+- Matter-of-fact about spending patterns
+- Highlight unusual activity without alarm
+- Practical and straightforward
+- Use specific numbers and percentages
+
+**Key Patterns to Watch:**
+- Spending by category (groceries, dining, transport, etc.)
+- Unusual or large transactions
+- Recurring payments and subscriptions
+- Income patterns and timing
+- Savings rate and trends
+- Comparison to historical averages
+
+**What Makes a Good Insight:**
+- Specific numbers ("£450 on dining out this week, up 40% from last week")
+- Category-level analysis, not individual transactions (unless unusual)
+- Trends over time (weekly, monthly comparisons)
+- Identifies subscriptions or recurring costs that might be forgotten
+- Flags potential overspending before it becomes a problem
+SYSTEM;
+    }
+
+    protected function getMediaSystemPrompt(): string
+    {
+        return <<<'SYSTEM'
+You are the Media Domain Agent for Flint, specializing in media consumption analysis.
+
+**Your Role:**
+- Analyze listening habits from Spotify, Last.fm, and other music services
+- Identify music discovery patterns and preferences
+- Track listening time and diversity
+- Detect mood patterns through music choices
+- Provide engaging insights about media consumption
+
+**Tone:**
+- Conversational and engaging
+- Enthusiastic about music discovery
+- Reflective about listening patterns
+- Fun and lighthearted
+- Use music terminology naturally
+
+**Key Patterns to Watch:**
+- Listening time and frequency
+- Genre diversity and exploration
+- Repeat listening (favorite tracks/artists)
+- Discovery of new artists or genres
+- Listening context (time of day, intensity)
+- Mood patterns reflected in music choices
+
+**What Makes a Good Insight:**
+- Connects music choices to broader patterns ("Your late-night jazz sessions increased this week")
+- Celebrates discovery ("You explored 8 new artists this week!")
+- Identifies shifts in taste or mood
+- Highlights interesting listening statistics
+- Compares to historical patterns
+SYSTEM;
+    }
+
+    protected function getKnowledgeSystemPrompt(): string
+    {
+        return <<<'SYSTEM'
+You are the Knowledge Domain Agent for Flint, specializing in learning and information consumption.
+
+**Your Role:**
+- Analyze content from Fetch (web articles), Obsidian (notes), GitHub (code activity)
+- Identify learning patterns and knowledge themes
+- Track information consumption and creation
+- Detect areas of focus and intellectual curiosity
+- Provide structured, informative insights
+
+**Tone:**
+- Factual and informative
+- Structured and organized
+- Encouraging of learning and growth
+- Professional but approachable
+- Use clear, concise language
+
+**Key Patterns to Watch:**
+- Topics and themes in saved content
+- Reading volume and consistency
+- Note-taking patterns (if Obsidian data available)
+- GitHub activity and coding patterns
+- Knowledge domains and focus areas
+- Information sources and variety
+
+**What Makes a Good Insight:**
+- Identifies themes across different content ("You've been researching AI/ML heavily this week")
+- Tracks knowledge accumulation over time
+- Highlights connections between different information sources
+- Suggests related topics based on current interests
+- Celebrates learning milestones
+SYSTEM;
+    }
+
+    protected function getOnlineSystemPrompt(): string
+    {
+        return <<<'SYSTEM'
+You are the Online Domain Agent for Flint, specializing in digital productivity and online activity.
+
+**Your Role:**
+- Analyze task completion from Todoist and productivity tools
+- Track productivity patterns and work rhythms
+- Identify task management trends
+- Detect productivity blockers or improvements
+- Provide practical, task-focused insights
+
+**Tone:**
+- Task-focused and practical
+- Encouraging of productivity
+- Straightforward and efficient
+- Results-oriented
+- Use productivity terminology
+
+**Key Patterns to Watch:**
+- Task completion rates and timing
+- Overdue tasks and recurring delays
+- Project progress and momentum
+- Productivity by time of day
+- Task categories and priorities
+- Workload balance
+
+**What Makes a Good Insight:**
+- Specific completion metrics ("Completed 12 tasks this week, up from 8")
+- Highlights productivity wins and streaks
+- Identifies bottlenecks or stuck projects
+- Suggests task management improvements
+- Celebrates momentum and progress
+SYSTEM;
+    }
+
+    protected function getGenericSystemPrompt(string $domain): string
+    {
+        return <<<SYSTEM
+You are a Domain Agent for Flint, analyzing the {$domain} domain.
+
+Analyze the provided data and identify:
+- Patterns and trends
+- Anomalies or unusual behavior
+- Actionable insights
+- Cross-domain connections
+
+Provide specific, data-driven insights with confidence scores.
+SYSTEM;
+    }
+
+    /**
+     * Format events context for the prompt
+     */
+    protected function formatEventsContext(array $events, string $domain): string
+    {
+        if (empty($events)) {
+            return 'No recent activity in this domain.';
+        }
+
+        $lines = ['Found ' . count($events) . " events in the last analysis window:\n"];
+
+        // Group events by service and action
+        $grouped = [];
+        foreach ($events as $event) {
+            $service = $event['service'] ?? 'unknown';
+            $action = $event['action'] ?? 'unknown';
+            $key = "{$service}:{$action}";
+
+            if (! isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'service' => $service,
+                    'action' => $action,
+                    'count' => 0,
+                    'examples' => [],
+                ];
+            }
+
+            $grouped[$key]['count']++;
+
+            // Keep up to 3 examples with IDs for reference
+            if (count($grouped[$key]['examples']) < 3) {
+                $grouped[$key]['examples'][] = [
+                    'id' => $event['id'] ?? null,
+                    'time' => $event['time'] ?? null,
+                    'value' => $event['value'] ?? null,
+                    'value_unit' => $event['value_unit'] ?? null,
+                    'metadata' => $event['event_metadata'] ?? [],
+                ];
+            }
+        }
+
+        foreach ($grouped as $group) {
+            $lines[] = "**{$group['service']}** - {$group['action']}: {$group['count']} events";
+
+            foreach ($group['examples'] as $example) {
+                $parts = [];
+                if ($example['id']) {
+                    $parts[] = "ID: {$example['id']}";
+                }
+                if ($example['time']) {
+                    $parts[] = "Time: {$example['time']}";
+                }
+                if ($example['value'] !== null && $example['value_unit']) {
+                    $parts[] = "Value: {$example['value']} {$example['value_unit']}";
+                }
+                if (! empty($parts)) {
+                    $lines[] = '  - ' . implode(', ', $parts);
+                }
+            }
+
+            $lines[] = '';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Format learning context
+     */
+    protected function formatLearningContext(?array $learning, array $feedbackStats): string
+    {
+        if (empty($learning) && empty($feedbackStats)) {
+            return '';
+        }
+
+        $lines = ["## Learning from Past Insights\n"];
+
+        if (! empty($learning['successful_insights'])) {
+            $lines[] = '**Successful insight patterns:** ' . count($learning['successful_insights']) . ' recorded';
+            $lines[] = "Focus on similar types of insights that worked well before.\n";
+        }
+
+        if (! empty($learning['user_preferences'])) {
+            $lines[] = '**User preferences:**';
+            foreach ($learning['user_preferences'] as $key => $value) {
+                $lines[] = "- {$key}: {$value}";
+            }
+            $lines[] = '';
+        }
+
+        if (! empty($feedbackStats['rating_average'])) {
+            $lines[] = '**Feedback stats:**';
+            $lines[] = "- Average rating: {$feedbackStats['rating_average']}/5";
+            $lines[] = "- Total feedback: {$feedbackStats['total_feedback_count']}";
+            if ($feedbackStats['dismissed_count'] > 0) {
+                $lines[] = "- Dismissed: {$feedbackStats['dismissed_count']} (avoid similar patterns)";
+            }
+            $lines[] = '';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Format queries from other agents
+     */
+    protected function formatQueriesContext(array $queries): string
+    {
+        if (empty($queries)) {
+            return '';
+        }
+
+        $lines = ["## Questions from Other Agents\n"];
+        $lines[] = "Please answer these questions from other domain agents:\n";
+
+        foreach ($queries as $query) {
+            $lines[] = "**From {$query['from_domain']} agent:**";
+            $lines[] = "Q: {$query['question']}";
+            $lines[] = '';
+        }
+
+        $lines[] = 'Include your answers in the `query_responses` section of your response.';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Extract JSON from response (handles markdown code blocks)
+     */
+    protected function extractJson(string $response): ?array
+    {
+        // Try direct JSON decode
+        $decoded = json_decode($response, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return $decoded;
+        }
+
+        // Try to extract from markdown code block
+        if (preg_match('/```(?:json)?\s*(\{.*?\})\s*```/s', $response, $matches)) {
+            $decoded = json_decode($matches[1], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+
+        // Try to find any JSON object in the response
+        if (preg_match('/(\{.*\})/s', $response, $matches)) {
+            $decoded = json_decode($matches[1], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+}

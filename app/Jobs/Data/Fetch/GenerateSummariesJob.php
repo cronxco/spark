@@ -156,23 +156,33 @@ Return ONLY valid JSON in this exact format:
 PROMPT;
 
         try {
-            $result = OpenAI::chat()->create([
-                'model' => 'gpt-5-nano',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => $systemPrompt,
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => json_encode([
-                            'title' => $title,
-                            'article_text' => $contentToSend,
-                        ]),
-                    ],
+            // Start Sentry AI request span
+            $model = 'gpt-5-nano';
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => $systemPrompt,
                 ],
+                [
+                    'role' => 'user',
+                    'content' => json_encode([
+                        'title' => $title,
+                        'article_text' => $contentToSend,
+                    ]),
+                ],
+            ];
+            $aiSpan = start_ai_request_span($model, $messages, []);
+
+            $result = OpenAI::chat()->create([
+                'model' => $model,
+                'messages' => $messages,
                 'response_format' => ['type' => 'json_object'],
             ]);
+
+            // Finish AI request span with token usage
+            $usage = $result->usage ? $result->usage->toArray() : [];
+            $finishReason = $result->choices[0]->finishReason ?? null;
+            finish_ai_request_span($aiSpan, $usage, $finishReason);
 
             $summaries = json_decode($result->choices[0]->message->content, true);
 
