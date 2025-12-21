@@ -28,6 +28,38 @@ $typeConfig = match($type) {
     'trend' => ['icon' => 'o-arrow-trending-up', 'color' => 'success', 'label' => 'Trend'],
     default => ['icon' => 'o-light-bulb', 'color' => 'primary', 'label' => 'Observation'],
 };
+
+// Map type color to static badge class
+$typeBadgeClass = match($typeConfig['color']) {
+    'primary' => 'badge-primary',
+    'secondary' => 'badge-secondary',
+    'accent' => 'badge-accent',
+    'success' => 'badge-success',
+    'warning' => 'badge-warning',
+    'error' => 'badge-error',
+    'info' => 'badge-info',
+    default => 'badge-primary',
+};
+
+// Map accent color to static text class
+$iconColorClass = match($accentColor) {
+    'primary' => 'text-primary',
+    'secondary' => 'text-secondary',
+    'accent' => 'text-accent',
+    'success' => 'text-success',
+    'warning' => 'text-warning',
+    'error' => 'text-error',
+    'info' => 'text-info',
+    'neutral' => 'text-neutral',
+    default => 'text-primary',
+};
+
+// Map confidence to static progress class
+$progressColorClass = match(true) {
+    $confidence >= 0.8 => 'progress-success',
+    $confidence >= 0.6 => 'progress-warning',
+    default => 'progress-error',
+};
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">
@@ -35,7 +67,7 @@ $typeConfig = match($type) {
         {{-- Header --}}
         <div class="flex items-start justify-between gap-2">
             <div class="flex items-center gap-2 flex-wrap">
-                <div class="badge badge-{{ $typeConfig['color'] }} badge-outline badge-sm gap-1">
+                <div class="badge {{ $typeBadgeClass }} badge-outline badge-sm gap-1">
                     <x-icon :name="$typeConfig['icon']" class="w-3 h-3" />
                     {{ $typeConfig['label'] }}
                 </div>
@@ -56,7 +88,7 @@ $typeConfig = match($type) {
             <div class="text-xs text-base-content/70">Confidence:</div>
             <div class="flex-1">
                 <progress
-                    class="progress progress-{{ $confidence >= 0.8 ? 'success' : ($confidence >= 0.6 ? 'warning' : 'error') }} w-full h-2"
+                    class="progress {{ $progressColorClass }} w-full h-2"
                     value="{{ $confidence * 100 }}"
                     max="100"
                 ></progress>
@@ -98,7 +130,7 @@ $typeConfig = match($type) {
         {{-- Footer --}}
         <div class="flex items-center justify-between gap-2 pt-2 border-t border-base-300">
             <div class="flex items-center gap-1.5">
-                <x-icon :name="$icon" class="w-4 h-4 text-{{ $accentColor }}" />
+                <x-icon :name="$icon" class="w-4 h-4 {{ $iconColorClass }}" />
                 <span class="text-xs font-medium text-base-content/70">{{ $serviceName }}</span>
             </div>
 

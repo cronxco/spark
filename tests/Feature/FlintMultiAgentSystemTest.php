@@ -207,6 +207,29 @@ class FlintMultiAgentSystemTest extends TestCase
     }
 
     /** @test */
+    public function it_deduplicates_flint_events_for_same_day()
+    {
+        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+
+        // Create first event
+        $firstEvent = $blockCreation->getOrCreateFlintEvent($this->user);
+        $firstEventId = $firstEvent->id;
+
+        // Call again - should return the same event
+        $secondEvent = $blockCreation->getOrCreateFlintEvent($this->user);
+        $this->assertEquals($firstEventId, $secondEvent->id, 'Should return the same event for the same day');
+
+        // Verify only one event exists
+        $eventCount = Event::where('integration_id', $firstEvent->integration_id)
+            ->where('action', 'had_analysis')
+            ->where('service', 'flint')
+            ->whereDate('time', now())
+            ->count();
+
+        $this->assertEquals(1, $eventCount, 'Should only have one event for today');
+    }
+
+    /** @test */
     public function it_creates_domain_insight_blocks()
     {
         $blockCreation = app(\App\Services\FlintBlockCreationService::class);

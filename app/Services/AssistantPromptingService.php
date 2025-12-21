@@ -56,7 +56,7 @@ class AssistantPromptingService
         $userId = $options['user_id'] ?? null;
         $context = $options['context'] ?? [];
         $maxTokens = $options['max_tokens'] ?? 2000;
-        $temperature = $options['temperature'] ?? 0.7;
+        $temperature = $options['temperature'] ?? 1;
 
         $attempt = 0;
         $lastException = null;
@@ -375,14 +375,14 @@ USER;
                     ['role' => 'user', 'content' => $userPrompt],
                 ];
                 $aiSpan = start_ai_request_span($model, $messages, [
-                    'temperature' => 0.7,
+                    'temperature' => 1,
                     'max_tokens' => 2000,
                 ]);
 
                 $response = OpenAI::chat()->create([
                     'model' => $model,
                     'messages' => $messages,
-                    'temperature' => 0.7,
+                    'temperature' => 1,
                     'max_tokens' => 2000,
                     'response_format' => ['type' => 'json_object'],
                 ]);

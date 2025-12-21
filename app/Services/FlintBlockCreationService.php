@@ -256,22 +256,42 @@ class FlintBlockCreationService
             ]
         );
 
-        // Create a new event for this analysis run
-        $event = Event::create([
-            'id' => Str::uuid(),
-            'integration_id' => $integration->id,
-            'source_id' => $flintObject->id,
-            'actor_id' => $flintObject->id,
-            'target_id' => $flintObject->id,
-            'time' => now(),
-            'service' => 'flint',
-            'domain' => 'online',
-            'action' => 'had_analysis',
-            'event_metadata' => [
-                'analysis_type' => 'multi_agent',
-                'timestamp' => now()->toIso8601String(),
-            ],
-        ]);
+        // Get or create event for today's analysis run
+        // Deduplicate by integration_id, action, and date
+        $today = now()->startOfDay();
+        $dedupeKey = sprintf(
+            'flint_analysis_%s_%s',
+            $integration->id,
+            $today->format('Y-m-d')
+        );
+
+        // First try to find an existing event for today
+        // Use whereDate to match on date part of timestamp
+        $event = Event::where('integration_id', $integration->id)
+            ->where('action', 'had_analysis')
+            ->where('service', 'flint')
+            ->whereDate('time', $today)
+            ->first();
+
+        // If no event exists, create one
+        if (! $event) {
+            $event = Event::create([
+                'id' => Str::uuid(),
+                'integration_id' => $integration->id,
+                'source_id' => $flintObject->id,
+                'actor_id' => $flintObject->id,
+                'target_id' => $flintObject->id,
+                'time' => $today,
+                'service' => 'flint',
+                'domain' => 'online',
+                'action' => 'had_analysis',
+                'event_metadata' => [
+                    'analysis_type' => 'multi_agent',
+                    'timestamp' => now()->toIso8601String(),
+                    'dedupe_key' => $dedupeKey,
+                ],
+            ]);
+        }
 
         return $event;
     }
