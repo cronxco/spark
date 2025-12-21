@@ -38,7 +38,6 @@ class RunPatternDetectionJob implements ShouldQueue
         \Sentry\configureScope(function (\Sentry\State\Scope $scope) {
             $scope->setUser([
                 'id' => $this->user->id,
-                'email' => $this->user->email,
             ]);
             $scope->setTag('job_type', 'pattern_detection');
             $scope->setTag('flint_mode', 'pattern_detection');
