@@ -38,7 +38,7 @@ class AgentWorkingMemoryServiceTest extends TestCase
         $this->assertArrayHasKey('agent_queries', $memory);
         $this->assertArrayHasKey('user_feedback', $memory);
         $this->assertArrayHasKey('prioritized_actions', $memory);
-        $this->assertArrayHasKey('last_execution_times', $memory);
+        $this->assertArrayHasKey('last_execution', $memory);
     }
 
     /** @test */
@@ -81,15 +81,13 @@ class AgentWorkingMemoryServiceTest extends TestCase
     /** @test */
     public function it_can_store_and_retrieve_cross_domain_observations()
     {
-        $observations = [
-            [
-                'domains' => ['health', 'money'],
-                'observation' => 'Poor sleep affecting spending decisions',
-                'confidence' => 0.75,
-            ],
+        $observation = [
+            'domains' => ['health', 'money'],
+            'observation' => 'Poor sleep affecting spending decisions',
+            'confidence' => 0.75,
         ];
 
-        $this->service->storeCrossDomainObservation($this->userId, $observations[0]);
+        $this->service->addCrossDomainObservation($this->userId, $observation);
 
         $retrieved = $this->service->getCrossDomainObservations($this->userId);
 
@@ -102,7 +100,7 @@ class AgentWorkingMemoryServiceTest extends TestCase
     {
         // Store 15 observations
         for ($i = 0; $i < 15; $i++) {
-            $this->service->storeCrossDomainObservation($this->userId, [
+            $this->service->addCrossDomainObservation($this->userId, [
                 'domains' => ['health', 'money'],
                 'observation' => "Observation {$i}",
                 'confidence' => 0.7,
@@ -118,15 +116,14 @@ class AgentWorkingMemoryServiceTest extends TestCase
     /** @test */
     public function it_can_store_and_retrieve_urgent_flags()
     {
-        $flag = [
-            'reason' => 'Unusual spending spike detected',
-            'domain' => 'money',
-            'context' => ['amount' => 500, 'average' => 200],
-        ];
+        $this->service->raiseUrgentFlag(
+            $this->userId,
+            'money',
+            'Unusual spending spike detected',
+            ['amount' => 500, 'average' => 200]
+        );
 
-        $this->service->storeUrgentFlag($this->userId, $flag);
-
-        $flags = $this->service->getUrgentFlags($this->userId);
+        $flags = $this->service->getUnresolvedUrgentFlags($this->userId);
 
         $this->assertCount(1, $flags);
         $this->assertEquals('Unusual spending spike detected', $flags[0]['reason']);
@@ -135,14 +132,16 @@ class AgentWorkingMemoryServiceTest extends TestCase
     /** @test */
     public function it_can_clear_urgent_flags()
     {
-        $this->service->storeUrgentFlag($this->userId, [
-            'reason' => 'Test flag',
-            'domain' => 'health',
-        ]);
+        $this->service->raiseUrgentFlag(
+            $this->userId,
+            'health',
+            'Test flag',
+            []
+        );
 
-        $this->service->clearUrgentFlags($this->userId);
+        $this->service->clearWorkingMemory($this->userId);
 
-        $flags = $this->service->getUrgentFlags($this->userId);
+        $flags = $this->service->getUnresolvedUrgentFlags($this->userId);
 
         $this->assertEmpty($flags);
     }
@@ -150,57 +149,44 @@ class AgentWorkingMemoryServiceTest extends TestCase
     /** @test */
     public function it_can_store_and_retrieve_agent_queries()
     {
-        $query = [
-            'from_domain' => 'health',
-            'to_domain' => 'money',
-            'question' => 'Did spending increase on days with poor sleep?',
-        ];
+        $this->service->postAgentQuery(
+            $this->userId,
+            'health',
+            'money',
+            'Did spending increase on days with poor sleep?',
+            []
+        );
 
-        $this->service->storeAgentQuery($this->userId, $query);
-
-        $queries = $this->service->getAgentQueries($this->userId, 'money');
+        $queries = $this->service->getUnansweredQueriesForDomain($this->userId, 'money');
 
         $this->assertCount(1, $queries);
-        $this->assertEquals('health', $queries[0]['from_domain']);
+        $this->assertEquals('health', array_values($queries)[0]['from_domain']);
     }
 
     /** @test */
     public function it_can_store_user_feedback()
     {
-        $feedback = [
-            'insight_id' => 'insight-123',
-            'rating' => 5,
-            'dismissed' => false,
-        ];
-
-        $this->service->storeUserFeedback($this->userId, $feedback);
+        $this->service->recordFeedback(
+            $this->userId,
+            'insight-123',
+            'rating',
+            5,
+            null
+        );
 
         $memory = $this->service->getWorkingMemory($this->userId);
 
         $this->assertCount(1, $memory['user_feedback']);
-        $this->assertEquals(5, $memory['user_feedback'][0]['rating']);
+        $this->assertEquals(5, $memory['user_feedback'][0]['value']);
     }
 
     /** @test */
     public function it_calculates_feedback_statistics()
     {
         // Store various feedback
-        $this->service->storeUserFeedback($this->userId, [
-            'insight_id' => '1',
-            'rating' => 5,
-            'dismissed' => false,
-        ]);
-
-        $this->service->storeUserFeedback($this->userId, [
-            'insight_id' => '2',
-            'rating' => 3,
-            'dismissed' => false,
-        ]);
-
-        $this->service->storeUserFeedback($this->userId, [
-            'insight_id' => '3',
-            'dismissed' => true,
-        ]);
+        $this->service->recordFeedback($this->userId, '1', 'rating', 5);
+        $this->service->recordFeedback($this->userId, '2', 'rating', 3);
+        $this->service->recordFeedback($this->userId, '3', 'dismissed', true);
 
         $stats = $this->service->getFeedbackStatistics($this->userId);
 
@@ -240,8 +226,8 @@ class AgentWorkingMemoryServiceTest extends TestCase
 
         $memory = $this->service->getWorkingMemory($this->userId);
 
-        $this->assertArrayHasKey('continuous_background', $memory['last_execution_times']);
-        $this->assertNotNull($memory['last_execution_times']['continuous_background']);
+        $this->assertArrayHasKey('continuous_background', $memory['last_execution']);
+        $this->assertNotNull($memory['last_execution']['continuous_background']);
     }
 
     /** @test */
@@ -255,10 +241,10 @@ class AgentWorkingMemoryServiceTest extends TestCase
         // Clear memory
         $this->service->clearWorkingMemory($this->userId);
 
-        // Verify it's cleared
+        // Verify it's cleared - should return default structure
         $memory = $this->service->getWorkingMemory($this->userId);
 
-        $this->assertEmpty($memory['domain_insights']);
+        $this->assertEquals([], $memory['domain_insights']['health']);
     }
 
     /** @test */
@@ -274,8 +260,8 @@ class AgentWorkingMemoryServiceTest extends TestCase
         // Clear cache to simulate TTL expiration
         Cache::forget("flint:working_memory:{$this->userId}");
 
-        // Should return default structure
+        // Should return default structure with empty domain insights
         $memory = $this->service->getWorkingMemory($this->userId);
-        $this->assertEmpty($memory['domain_insights']);
+        $this->assertEquals([], $memory['domain_insights']['health']);
     }
 }

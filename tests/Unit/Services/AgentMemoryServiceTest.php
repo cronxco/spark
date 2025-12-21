@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\AgentMemoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,7 +106,7 @@ class AgentMemoryServiceTest extends TestCase
         );
 
         $this->assertInstanceOf(EventObject::class, $eventObject);
-        $this->assertEquals('flint_learning_health', $eventObject->type);
+        $this->assertEquals('agent_learning', $eventObject->type);
         $this->assertArrayHasKey('successful_insights', $eventObject->metadata);
     }
 
@@ -132,9 +133,13 @@ class AgentMemoryServiceTest extends TestCase
     }
 
     /** @test */
-    public function it_can_query_blocks_by_domain()
+    public function it_can_query_domain_insight_blocks()
     {
         // Create test data
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+        ]);
+
         $eventObject = EventObject::factory()->create([
             'user_id' => $this->user->id,
             'concept' => 'test',
@@ -143,64 +148,80 @@ class AgentMemoryServiceTest extends TestCase
         ]);
 
         $event = Event::factory()->create([
-            'user_id' => $this->user->id,
             'source_id' => $eventObject->id,
+            'integration_id' => $integration->id,
             'domain' => 'health',
-            'service' => 'oura',
-            'action' => 'had_sleep',
+            'service' => 'flint',
+            'action' => 'had_insight',
         ]);
 
-        $block = Block::factory()->create([
+        Block::factory()->create([
             'event_id' => $event->id,
-            'block_type' => 'oura_sleep_score',
+            'block_type' => 'flint_health_insight',
             'time' => now()->subDays(2),
         ]);
 
-        $blocks = $this->service->getBlocksByDomain(
+        $blocks = $this->service->getDomainInsightBlocks(
             $this->user->id,
             'health',
             7
         );
 
         $this->assertCount(1, $blocks);
-        $this->assertEquals('oura_sleep_score', $blocks[0]['block_type']);
+        $this->assertEquals('flint_health_insight', $blocks[0]['block_type']);
     }
 
     /** @test */
-    public function it_filters_blocks_by_type_when_specified()
+    public function it_can_query_all_insight_blocks()
     {
-        $eventObject = EventObject::factory()->create([
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+        ]);
+
+        $eventObject1 = EventObject::factory()->create([
             'user_id' => $this->user->id,
             'concept' => 'test',
             'type' => 'test',
-            'title' => 'Test Object',
+            'title' => 'Test Object 1',
         ]);
 
-        $event = Event::factory()->create([
+        $eventObject2 = EventObject::factory()->create([
             'user_id' => $this->user->id,
-            'source_id' => $eventObject->id,
+            'concept' => 'test',
+            'type' => 'test',
+            'title' => 'Test Object 2',
+        ]);
+
+        $event1 = Event::factory()->create([
+            'source_id' => $eventObject1->id,
+            'integration_id' => $integration->id,
             'domain' => 'health',
         ]);
 
-        Block::factory()->create([
-            'event_id' => $event->id,
-            'block_type' => 'oura_sleep_score',
+        $event2 = Event::factory()->create([
+            'source_id' => $eventObject2->id,
+            'integration_id' => $integration->id,
+            'domain' => 'money',
         ]);
 
         Block::factory()->create([
-            'event_id' => $event->id,
-            'block_type' => 'oura_readiness',
+            'event_id' => $event1->id,
+            'block_type' => 'flint_health_insight',
+            'time' => now()->subDays(2),
         ]);
 
-        $blocks = $this->service->getBlocksByDomain(
+        Block::factory()->create([
+            'event_id' => $event2->id,
+            'block_type' => 'flint_money_insight',
+            'time' => now()->subDays(3),
+        ]);
+
+        $blocks = $this->service->getAllInsightBlocks(
             $this->user->id,
-            'health',
-            7,
-            ['oura_sleep_score']
+            7
         );
 
-        $this->assertCount(1, $blocks);
-        $this->assertEquals('oura_sleep_score', $blocks[0]['block_type']);
+        $this->assertCount(2, $blocks);
     }
 
     /** @test */

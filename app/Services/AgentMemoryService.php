@@ -44,12 +44,16 @@ class AgentMemoryService
     /**
      * Get all patterns for a user
      */
-    public function getPatterns(string $userId, ?string $patternType = null): array
+    public function getPatterns(string $userId, ?int $days = null, ?string $patternType = null): array
     {
         $query = EventObject::where('user_id', $userId)
             ->where('concept', 'flint')
             ->where('type', 'pattern')
             ->whereNull('deleted_at');
+
+        if ($days !== null) {
+            $query->where('time', '>=', now()->subDays($days));
+        }
 
         if ($patternType !== null) {
             $query->whereRaw("metadata->>'pattern_type' = ?", [$patternType]);
@@ -190,7 +194,7 @@ class AgentMemoryService
     {
         $blockType = "flint_{$domain}_insight";
 
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', $blockType)
@@ -206,7 +210,7 @@ class AgentMemoryService
      */
     public function getAllInsightBlocks(string $userId, ?int $days = 7): array
     {
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', 'like', 'flint_%_insight')
@@ -222,7 +226,7 @@ class AgentMemoryService
      */
     public function getCrossDomainInsightBlocks(string $userId, ?int $days = 7): array
     {
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', 'flint_cross_domain_insight')
@@ -238,7 +242,7 @@ class AgentMemoryService
      */
     public function getPatternDetectionBlocks(string $userId, ?int $days = 90): array
     {
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', 'flint_pattern_detected')
@@ -254,7 +258,7 @@ class AgentMemoryService
      */
     public function getPrioritizedActionBlocks(string $userId, ?int $days = 7): array
     {
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', 'flint_prioritized_action')
@@ -270,7 +274,7 @@ class AgentMemoryService
      */
     public function getDigestBlocks(string $userId, ?int $limit = 10): array
     {
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', 'flint_digest')
@@ -313,7 +317,7 @@ class AgentMemoryService
      */
     public function getHistoricalFeedbackStats(string $userId, int $days = 90): array
     {
-        $blocks = Block::whereHas('event', function ($query) use ($userId) {
+        $blocks = Block::whereHas('event.integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
             ->where('block_type', 'like', 'flint_%')
