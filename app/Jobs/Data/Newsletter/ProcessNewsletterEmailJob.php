@@ -191,6 +191,17 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             $senderDomain = explode('@', $senderEmail)[1];
         }
 
+        // Fetch existing publication to get current post count
+        $existingPublication = EventObject::where('user_id', $this->integration->user_id)
+            ->where('concept', 'publication')
+            ->where('type', 'newsletter_publication')
+            ->where('title', $senderName)
+            ->first();
+
+        // Compute new post count
+        $currentMetadata = $existingPublication?->metadata ?? [];
+        $postCount = ($currentMetadata['post_count'] ?? 0) + 1;
+
         // Create or update publication EventObject
         $publication = EventObject::updateOrCreate(
             [
@@ -207,7 +218,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                     'sender_name' => $senderName,
                     'normalized_name' => strtolower($senderName),
                     'last_post_at' => now()->toIso8601String(),
-                    'post_count' => ($publication->metadata['post_count'] ?? 0) + 1,
+                    'post_count' => $postCount,
                 ],
             ]
         );
