@@ -67,8 +67,10 @@ class AssistantPromptingService
                     log_integration_api_request(
                         'flint',
                         'chat.completions',
-                        $userId,
-                        array_merge(['attempt' => $attempt + 1], $context)
+                        'openai/chat/completions',
+                        [],
+                        array_merge(['attempt' => $attempt + 1], $context),
+                        $userId
                     );
                 }
 
