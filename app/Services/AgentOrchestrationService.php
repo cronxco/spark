@@ -260,7 +260,7 @@ class AgentOrchestrationService
             }
 
             // Get existing patterns for context
-            $existingPatterns = $this->memory->getPatterns($user->id, 30);
+            $existingPatterns = $this->memory->getPatterns($user->id);
 
             // Build prompt for pattern detection
             $prompt = $this->buildPatternDetectionPrompt($user, $historicalData, $existingPatterns);
