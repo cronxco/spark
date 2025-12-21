@@ -177,7 +177,7 @@ class FlintPlugin extends ManualPlugin
                 'display_name' => 'Generated Digest',
                 'display_name_past_tense' => 'Generated Digest',
                 'description' => 'AI-generated daily digest of events and insights',
-                'icon' => 'document-text',
+                'icon' => 'file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -355,7 +355,7 @@ class FlintPlugin extends ManualPlugin
             'flint_digest' => [
                 'display_name' => 'Daily Digest',
                 'description' => 'Comprehensive daily summary with insights and actions',
-                'icon' => 'document-text',
+                'icon' => 'file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,

@@ -294,7 +294,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             'value' => null,
             'value_multiplier' => null,
             'value_unit' => null,
-            'event_metadata' => [
+            'metadata' => [
                 'email_subject' => $parsedEmail['subject'],
                 'email_from' => $parsedEmail['from_email'],
                 'email_from_name' => $parsedEmail['from_name'],
