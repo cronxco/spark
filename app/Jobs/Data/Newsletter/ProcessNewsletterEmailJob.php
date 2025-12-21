@@ -244,7 +244,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
         // Parse email received date
         try {
             $receivedTime = Carbon::parse($parsedEmail['date']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Newsletter: Failed to parse email date, using current time', [
                 'original_date' => $parsedEmail['date'],
                 'error' => $e->getMessage(),
