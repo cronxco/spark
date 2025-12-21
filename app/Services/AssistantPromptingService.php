@@ -362,8 +362,10 @@ USER;
                 log_integration_api_request(
                     'flint',
                     'chat.completions',
-                    $user->id,
-                    ['period' => $period, 'attempt' => $attempt + 1]
+                    'openai/chat/completions',
+                    [],
+                    ['period' => $period, 'attempt' => $attempt + 1],
+                    $user->id
                 );
 
                 // Start Sentry AI request span
@@ -393,8 +395,11 @@ USER;
                 log_integration_api_response(
                     'flint',
                     'chat.completions',
-                    $user->id,
-                    $response->toArray()
+                    'openai/chat/completions',
+                    200,
+                    json_encode($response->toArray()),
+                    [],
+                    $user->id
                 );
 
                 $content = $response->choices[0]->message->content;
