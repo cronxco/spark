@@ -287,7 +287,6 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             'actor_metadata' => [],
             'service' => 'newsletter',
             'domain' => 'knowledge',
-            'concept' => 'post',
             'action' => 'received_post',
             'target_id' => $publication->id,
             'target_metadata' => [],

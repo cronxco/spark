@@ -30,28 +30,32 @@ class Kernel extends ConsoleKernel
             ->command('horizon:snapshot')
             ->everyFiveMinutes()
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
 
         // Check cookie expiry daily at 6am
         $schedule
             ->job(new CheckCookieExpiryJob)
             ->dailyAt('06:00')
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
 
         // Refresh expiring cookies daily at 2am
         $schedule
             ->job(new RefreshExpiringCookies)
             ->dailyAt('02:00')
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
 
         // Clean up old receipt emails from S3 daily at 3am (30 day retention)
         $schedule
             ->job(new CleanupOldReceiptEmailsJob)
             ->dailyAt('03:00')
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
 
         // Flint continuous background analysis (every 15 minutes)
         $schedule
@@ -61,7 +65,8 @@ class Kernel extends ConsoleKernel
             ->everyFifteenMinutes()
             ->name('flint-continuous-background-analysis')
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
 
         // Flint digest dispatcher (runs every hour to check user-specific schedules)
         $schedule
@@ -71,7 +76,8 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->name('flint-digest-dispatcher')
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
 
         // Flint pattern detection (weekly on Sundays at 04:00)
         $schedule
@@ -82,7 +88,8 @@ class Kernel extends ConsoleKernel
             ->timezone('Europe/London')
             ->name('flint-pattern-detection')
             ->onOneServer()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sentryMonitor();
     }
 
     /**
