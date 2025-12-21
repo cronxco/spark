@@ -97,8 +97,11 @@ class AssistantPromptingService
                     log_integration_api_response(
                         'flint',
                         'chat.completions',
-                        $userId,
-                        $response->toArray()
+                        'openai/chat/completions',
+                        200,
+                        json_encode($response->toArray()),
+                        [],
+                        $userId
                     );
                 }
 
