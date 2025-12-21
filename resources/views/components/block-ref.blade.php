@@ -150,18 +150,16 @@ if ($block->value !== null) {
         class="absolute z-50 mt-2 left-0"
         style="min-width: 320px; max-width: 400px;"
     >
-        <div class="card bg-base-100 shadow-xl border border-{{ $accentColor }}/30 overflow-hidden">
-            {{-- Accent bar --}}
-            <div class="h-1 bg-gradient-to-r from-{{ $accentColor }} to-{{ $accentColor }}/50"></div>
+        @if ($hasCustomLayout && $customLayoutPath)
+            {{-- Use custom block type view directly (no wrapper card) --}}
+            @include($customLayoutPath, ['block' => $block])
+        @else
+            {{-- Default block preview with card wrapper --}}
+            <div class="card bg-base-100 shadow-xl border border-{{ $accentColor }}/30 overflow-hidden">
+                {{-- Accent bar --}}
+                <div class="h-1 bg-gradient-to-r from-{{ $accentColor }} to-{{ $accentColor }}/50"></div>
 
-            <div class="card-body p-0">
-                @if ($hasCustomLayout && $customLayoutPath)
-                    {{-- Use custom block type view (scaled down for popover) --}}
-                    <div class="transform scale-95 origin-top-left p-2">
-                        @include($customLayoutPath, ['block' => $block])
-                    </div>
-                @else
-                    {{-- Default block preview --}}
+                <div class="card-body p-0">
                     <div class="p-4 gap-3 flex flex-col">
                         {{-- Header --}}
                         <div class="flex items-center justify-between gap-2">
@@ -233,44 +231,44 @@ if ($block->value !== null) {
                             @endif
                         @endif
                     </div>
-                @endif
 
-                {{-- Action footer (always shown) --}}
-                <div class="flex items-center gap-2 p-4 pt-0 border-t border-base-300 mt-auto">
-                    <a
-                        href="{{ route('blocks.show', $block) }}"
-                        wire:navigate
-                        @click.stop
-                        class="btn btn-{{ $accentColor }} btn-sm flex-1 gap-1"
-                    >
-                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
-                        View Block
-                    </a>
-                    @if ($block->event)
+                    {{-- Action footer --}}
+                    <div class="flex items-center gap-2 p-4 pt-0 border-t border-base-300 mt-auto">
                         <a
-                            href="{{ route('events.show', $block->event) }}"
+                            href="{{ route('blocks.show', $block) }}"
                             wire:navigate
                             @click.stop
-                            class="btn btn-ghost btn-sm btn-square"
-                            title="View Parent Event"
+                            class="btn btn-{{ $accentColor }} btn-sm flex-1 gap-1"
                         >
-                            <x-icon name="fas.bolt" class="w-4 h-4" />
+                            <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                            View Block
                         </a>
-                    @endif
-                    @if ($block->url)
-                        <a
-                            href="{{ $block->url }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            @click.stop
-                            class="btn btn-ghost btn-sm btn-square"
-                            title="Open URL"
-                        >
-                            <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
-                        </a>
-                    @endif
+                        @if ($block->event)
+                            <a
+                                href="{{ route('events.show', $block->event) }}"
+                                wire:navigate
+                                @click.stop
+                                class="btn btn-ghost btn-sm btn-square"
+                                title="View Parent Event"
+                            >
+                                <x-icon name="fas.bolt" class="w-4 h-4" />
+                            </a>
+                        @endif
+                        @if ($block->url)
+                            <a
+                                href="{{ $block->url }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                @click.stop
+                                class="btn btn-ghost btn-sm btn-square"
+                                title="Open URL"
+                            >
+                                <x-icon name="o-arrow-top-right-on-square" class="w-4 h-4" />
+                            </a>
+                        @endif
+                    </div>
                 </div>
             </div>
-        </div>
+        @endif
     </div>
 </span>
