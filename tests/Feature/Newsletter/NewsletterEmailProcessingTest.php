@@ -136,7 +136,7 @@ class NewsletterEmailProcessingTest extends TestCase
     }
 
     /** @test */
-    public function it_dispatches_extract_content_job()
+    public function it_dispatches_process_newsletter_email_job()
     {
         Queue::fake();
 
@@ -148,7 +148,6 @@ class NewsletterEmailProcessingTest extends TestCase
             $rawEmail
         );
 
-        // Process the job
         Queue::assertPushed(ProcessNewsletterEmailJob::class);
     }
 
