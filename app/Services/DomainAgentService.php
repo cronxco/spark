@@ -12,13 +12,13 @@ class DomainAgentService
     public function buildDomainPrompt(
         User $user,
         string $domain,
-        array $events,
+        array $context,
         ?array $learning,
         array $feedbackStats,
         array $queries
     ): string {
         $systemPrompt = $this->getSystemPrompt($domain);
-        $eventsContext = $this->formatEventsContext($events, $domain);
+        $contextJson = json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $learningContext = $this->formatLearningContext($learning, $feedbackStats);
         $queriesContext = $this->formatQueriesContext($queries);
 
@@ -27,7 +27,11 @@ class DomainAgentService
 
 ## Recent Activity ({$domain} domain)
 
-{$eventsContext}
+Here is the full context data as JSON. This includes yesterday's events, today's events, and 7 days of future scheduled events. The data is already grouped by service, action, and hour, with blocks and relationships included:
+
+```json
+{$contextJson}
+```
 
 {$learningContext}
 

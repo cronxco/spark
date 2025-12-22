@@ -19,7 +19,8 @@ class AgentOrchestrationService
         protected AgentMemoryService $memory,
         protected AssistantPromptingService $prompting,
         protected DomainAgentService $domainAgent,
-        protected FlintBlockCreationService $blockCreation
+        protected FlintBlockCreationService $blockCreation,
+        protected AssistantContextService $contextService
     ) {}
 
     /**
@@ -267,7 +268,7 @@ class AgentOrchestrationService
 
             // Call LLM using AssistantPromptingService
             $response = $this->prompting->generateResponse($prompt, [
-                'model' => 'gpt-4-turbo',
+                'model' => 'gpt-5.1',
                 'user_id' => $user->id,
                 'context' => ['agent_type' => 'pattern_detection'],
             ]);
@@ -337,10 +338,28 @@ class AgentOrchestrationService
         ]);
 
         try {
-            // Get recent events for this domain
-            $events = $this->getRecentDomainEvents($user, $domain, $mode);
+            // Get Flint integration for context generation
+            $flintIntegration = $user->integrations()->where('service', 'flint')->first();
+            if (! $flintIntegration) {
+                if ($agentSpan) {
+                    $agentSpan->setData(['skip_reason' => 'no_flint_integration']);
+                    $agentSpan->finish();
+                }
 
-            if (empty($events)) {
+                return null;
+            }
+
+            // Generate full context schema for this domain
+            $context = $this->contextService->generateContext(
+                $user,
+                now(),
+                $flintIntegration,
+                domains: [$domain]
+            );
+
+            // Check if we have any events
+            $totalEvents = $context['yesterday']['event_count'] + $context['today']['event_count'];
+            if ($totalEvents === 0) {
                 if ($agentSpan) {
                     $agentSpan->setData(['skip_reason' => 'no_events']);
                     $agentSpan->finish();
@@ -358,8 +377,8 @@ class AgentOrchestrationService
             // Get unanswered queries for this domain
             $queries = $this->workingMemory->getUnansweredQueriesForDomain($user->id, $domain);
 
-            // Build prompt for domain agent
-            $prompt = $this->buildDomainAgentPrompt($user, $domain, $events, $learning, $feedbackStats, $queries);
+            // Build prompt for domain agent (now receives full JSON context)
+            $prompt = $this->buildDomainAgentPrompt($user, $domain, $context, $learning, $feedbackStats, $queries);
 
             // Call LLM using AssistantPromptingService
             $response = $this->prompting->generateResponse($prompt, [
@@ -368,11 +387,25 @@ class AgentOrchestrationService
                 'context' => [
                     'domain' => $domain,
                     'mode' => $mode,
+                    'prompt_type' => 'domain_agent',
                 ],
             ]);
 
             // Parse and store insights
             $insights = $this->parseDomainAgentResponse($response);
+
+            // Log parse success/failure
+            Log::info('Agent Response Parsed', [
+                'prompt_type' => 'domain_agent',
+                'domain' => $domain,
+                'mode' => $mode,
+                'insights_count' => count($insights['insights'] ?? []),
+                'suggestions_count' => count($insights['suggestions'] ?? []),
+                'metrics_count' => count($insights['metrics'] ?? []),
+                'urgent_flags_count' => count($insights['urgent_flags'] ?? []),
+                'parse_success' => ! empty($insights['insights']) || ! empty($insights['suggestions']),
+            ]);
+
             $this->workingMemory->storeDomainInsight($user->id, $domain, $insights);
 
             // Create insight blocks if we're in pre-digest mode (not continuous)
@@ -481,7 +514,7 @@ class AgentOrchestrationService
 
             // Call LLM using AssistantPromptingService
             $response = $this->prompting->generateResponse($prompt, [
-                'model' => 'gpt-4-turbo',
+                'model' => 'gpt-5.1',
                 'user_id' => $user->id,
                 'context' => ['agent_type' => 'cross_domain_synthesizer'],
             ]);
@@ -552,7 +585,7 @@ class AgentOrchestrationService
 
             // Call LLM using AssistantPromptingService
             $response = $this->prompting->generateResponse($prompt, [
-                'model' => 'gpt-4-turbo',
+                'model' => 'gpt-5.1',
                 'user_id' => $user->id,
                 'context' => ['agent_type' => 'action_prioritization'],
             ]);
@@ -609,7 +642,7 @@ class AgentOrchestrationService
 
         // Call LLM using AssistantPromptingService
         $response = $this->prompting->generateResponse($prompt, [
-            'model' => 'gpt-4-turbo',
+            'model' => 'gpt-5.1',
             'user_id' => $user->id,
             'context' => ['agent_type' => 'digest_generation'],
         ]);
@@ -717,9 +750,9 @@ class AgentOrchestrationService
     /**
      * Build domain agent prompt
      */
-    protected function buildDomainAgentPrompt(User $user, string $domain, array $events, ?array $learning, array $feedbackStats, array $queries): string
+    protected function buildDomainAgentPrompt(User $user, string $domain, array $context, ?array $learning, array $feedbackStats, array $queries): string
     {
-        return $this->domainAgent->buildDomainPrompt($user, $domain, $events, $learning, $feedbackStats, $queries);
+        return $this->domainAgent->buildDomainPrompt($user, $domain, $context, $learning, $feedbackStats, $queries);
     }
 
     /**
