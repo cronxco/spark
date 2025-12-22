@@ -50,114 +50,20 @@ class FlintPlugin extends ManualPlugin
     public static function getConfigurationSchema($instanceType = null): array
     {
         return [
-            // Multi-Agent System Configuration
-            'agents_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Multi-Agent System',
-                'default' => true,
-                'description' => 'Enable domain specialist agents for continuous analysis',
-            ],
-            'enabled_domains' => [
-                'type' => 'array',
-                'label' => 'Enabled Domains',
-                'default' => ['health', 'money', 'media', 'knowledge', 'online'],
-                'description' => 'Which domain agents should be active',
-            ],
-            'continuous_analysis_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Continuous Analysis',
-                'default' => true,
-                'description' => 'Run agents every 15 minutes for fresh insights',
-            ],
+            // Note: User-facing settings are now managed in /settings/flint
+            // This configuration schema is kept minimal for integration-level settings only
 
-            // Digest Schedule Configuration
-            'use_schedule' => [
-                'type' => 'boolean',
-                'label' => 'Use Schedule',
-                'default' => true,
-                'description' => 'Generate digests at specific times',
-            ],
-            'schedule_times_weekday' => [
-                'type' => 'array',
-                'label' => 'Weekday Schedule Times',
-                'default' => ['06:00', '18:00'],
-                'description' => 'Times to generate digest on weekdays (HH:mm format)',
-            ],
-            'schedule_times_weekend' => [
-                'type' => 'array',
-                'label' => 'Weekend Schedule Times',
-                'default' => ['08:00', '19:00'],
-                'description' => 'Times to generate digest on weekends (HH:mm format)',
-            ],
-            'schedule_timezone' => [
-                'type' => 'string',
-                'label' => 'Schedule Timezone',
-                'default' => 'UTC',
-                'description' => 'Timezone for scheduled digest generation',
-            ],
-
-            // Agent Behavior Configuration
-            'pattern_detection_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Pattern Detection',
-                'default' => true,
-                'description' => 'Run weekly pattern detection across domains',
-            ],
-            'cross_domain_synthesis_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Cross-Domain Synthesis',
-                'default' => true,
-                'description' => 'Find correlations across domains',
-            ],
-            'action_prioritization_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Action Prioritization',
-                'default' => true,
-                'description' => 'Prioritize suggested actions',
-            ],
-
-            // Legacy Configuration (kept for backward compatibility)
-            'yesterday_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Include Yesterday',
-                'default' => true,
-            ],
-            'today_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Include Today',
-                'default' => true,
-            ],
-            'tomorrow_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Include Tomorrow',
-                'default' => true,
-            ],
-            'yesterday_services' => [
-                'type' => 'array',
-                'label' => 'Yesterday Services (JSON)',
-                'description' => 'Leave empty to include all services',
-                'default' => [],
-            ],
-            'today_services' => [
-                'type' => 'array',
-                'label' => 'Today Services (JSON)',
-                'default' => [],
-            ],
-            'tomorrow_services' => [
-                'type' => 'array',
-                'label' => 'Tomorrow Services (JSON)',
-                'default' => [],
-            ],
             'excluded_block_types' => [
                 'type' => 'array',
                 'label' => 'Excluded Block Types',
-                'description' => 'Block types to exclude (leave empty to only exclude *_raw blocks)',
+                'description' => 'Block types to exclude from analysis (leave empty to only exclude *_raw blocks)',
                 'default' => [],
             ],
             'include_relationships' => [
                 'type' => 'boolean',
                 'label' => 'Include Relationships',
                 'default' => true,
+                'description' => 'Include relationship data in AI context',
             ],
             'max_events_per_timeframe' => [
                 'type' => 'integer',
@@ -165,7 +71,7 @@ class FlintPlugin extends ManualPlugin
                 'min' => 50,
                 'max' => 1000,
                 'default' => null,
-                'description' => 'Leave empty to use default from environment',
+                'description' => 'Maximum events to include in context (leave empty for default)',
             ],
         ];
     }

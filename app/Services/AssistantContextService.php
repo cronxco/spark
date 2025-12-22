@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -185,9 +186,14 @@ class AssistantContextService
         // Apply max events limit
         $maxEvents = $config['max_events'] ?? 200;
 
-        return $query->orderBy('time', 'desc')
+        $events = $query->orderBy('time', 'desc')
             ->limit($maxEvents)
             ->get();
+
+        // Filter out excluded action types (e.g., had_balance with exclude_from_flint flag)
+        return $events->reject(function ($event) {
+            return $this->shouldExcludeAction($event->service, $event->action);
+        });
     }
 
     /**
@@ -389,6 +395,24 @@ class AssistantContextService
         }
 
         return false;
+    }
+
+    /**
+     * Check if action type should be excluded from Flint context
+     */
+    protected function shouldExcludeAction(string $service, string $action): bool
+    {
+        $plugin = PluginRegistry::getPlugin($service);
+        if (! $plugin) {
+            return false;
+        }
+
+        $actionTypes = $plugin::getActionTypes();
+        if (! isset($actionTypes[$action])) {
+            return false;
+        }
+
+        return $actionTypes[$action]['exclude_from_flint'] ?? false;
     }
 
     /**

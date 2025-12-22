@@ -79,52 +79,54 @@ Schedule::job(new CleanupOldReceiptEmailsJob)
     ->withoutOverlapping()
     ->sentryMonitor();
 
-// Flint continuous background analysis (every 15 minutes)
+// Flint continuous background analysis (DISABLED - moved to scheduled digest system)
+// This has been removed to reduce LLM API costs by 85-95%
+// Analysis now runs 15 minutes before scheduled digest times instead of continuously
+// Schedule::call(function () {
+//     $users = User::query()
+//         ->whereHas('integrations', function ($query) {
+//             $query->where('service', 'flint')
+//                 ->whereRaw("configuration->>'continuous_analysis_enabled' != 'false'");
+//         })
+//         ->get();
+//
+//     if ($users->isEmpty()) {
+//         Log::info('No users found for continuous background analysis', [
+//             'total_users' => User::count(),
+//             'flint_integrations' => User::query()
+//                 ->whereHas('integrations', function ($query) {
+//                     $query->where('service', 'flint');
+//                 })
+//                 ->count(),
+//         ]);
+//
+//         return;
+//     }
+//
+//     Log::info('Dispatching continuous background analysis', [
+//         'user_count' => $users->count(),
+//         'user_ids' => $users->pluck('id')->toArray(),
+//     ]);
+//
+//     foreach ($users as $user) {
+//         dispatch(new RunContinuousBackgroundAnalysisJob($user));
+//     }
+// })
+//     ->everyFifteenMinutes()
+//     ->name('flint-continuous-background-analysis')
+//     ->onOneServer()
+//     ->withoutOverlapping()
+//     ->sentryMonitor();
+
+// Flint digest dispatcher (runs every 15 minutes to check for scheduled digests)
+// New flow: -15min = agents run + digest generation, 0min = send notification
 Schedule::call(function () {
-    $users = User::query()
-        ->whereHas('integrations', function ($query) {
-            $query->where('service', 'flint')
-                ->whereRaw("configuration->>'continuous_analysis_enabled' != 'false'");
-        })
+    $users = User::whereNotNull('settings->flint->digests_enabled')
+        ->where('settings->flint->digests_enabled', '!=', false)
         ->get();
 
-    if ($users->isEmpty()) {
-        Log::info('No users found for continuous background analysis', [
-            'total_users' => User::count(),
-            'flint_integrations' => User::query()
-                ->whereHas('integrations', function ($query) {
-                    $query->where('service', 'flint');
-                })
-                ->count(),
-        ]);
-
-        return;
-    }
-
-    Log::info('Dispatching continuous background analysis', [
-        'user_count' => $users->count(),
-        'user_ids' => $users->pluck('id')->toArray(),
-    ]);
-
-    foreach ($users as $user) {
-        dispatch(new RunContinuousBackgroundAnalysisJob($user));
-    }
-})
-    ->everyFifteenMinutes()
-    ->name('flint-continuous-background-analysis')
-    ->onOneServer()
-    ->withoutOverlapping()
-    ->sentryMonitor();
-
-// Flint digest dispatcher (runs every hour to check user-specific schedules)
-Schedule::call(function () {
-    $users = User::query()
-        ->whereHas('integrations', function ($query) {
-            $query->where('service', 'flint');
-        })
-        ->get();
-
-    $dispatched = 0;
+    $preDigestDispatched = 0;
+    $notificationDispatched = 0;
 
     foreach ($users as $user) {
         $settings = $user->settings['flint'] ?? [];
@@ -141,48 +143,50 @@ Schedule::call(function () {
             ? ($settings['schedule_times_weekend'] ?? ['08:00', '19:00'])
             : ($settings['schedule_times_weekday'] ?? ['06:00', '18:00']);
 
-        // Check if current hour matches any schedule time
-        $currentHourMinute = $now->format('H:00');
-
         foreach ($scheduleTimes as $scheduleTime) {
             // Parse schedule time (e.g., "06:00")
-            $scheduleHour = substr($scheduleTime, 0, 2) . ':00';
+            $scheduleCarbon = Carbon::parse($scheduleTime, $userTimezone);
+            $minutesUntil = $now->diffInMinutes($scheduleCarbon, false);
 
-            // If current hour matches schedule hour, dispatch digest
-            if ($currentHourMinute === $scheduleHour) {
-                $period = match (true) {
-                    ((int) substr($scheduleTime, 0, 2)) < 12 => 'morning',
-                    ((int) substr($scheduleTime, 0, 2)) < 17 => 'afternoon',
-                    default => 'evening',
-                };
-
-                Log::info('Dispatching scheduled digest', [
+            // If digest scheduled in exactly 15 minutes, trigger agent run
+            if ($minutesUntil === 15) {
+                Log::info('Dispatching pre-digest refresh (15 min before digest)', [
                     'user_id' => $user->id,
-                    'period' => $period,
                     'schedule_time' => $scheduleTime,
                     'timezone' => $userTimezone,
                     'is_weekend' => $isWeekend,
                 ]);
 
-                // Dispatch pre-digest refresh 30 minutes before digest
-                dispatch(new RunPreDigestRefreshJob($user));
+                dispatch(new RunPreDigestRefreshJob($user, $scheduleTime));
+                // Job will auto-chain to RunDigestGenerationJob when agents complete
 
-                // Then dispatch digest generation
-                dispatch(new RunDigestGenerationJob($user, $period))
-                    ->delay(now()->addMinutes(30));
+                $preDigestDispatched++;
+            }
 
-                $dispatched++;
+            // If digest scheduled right now, send notification
+            if ($minutesUntil === 0) {
+                Log::info('Dispatching digest notification', [
+                    'user_id' => $user->id,
+                    'schedule_time' => $scheduleTime,
+                    'timezone' => $userTimezone,
+                    'is_weekend' => $isWeekend,
+                ]);
+
+                dispatch(new SendDigestNotificationJob($user, $scheduleTime));
+
+                $notificationDispatched++;
             }
         }
     }
 
-    if ($dispatched > 0) {
-        Log::info('Scheduled digests dispatched', [
-            'count' => $dispatched,
+    if ($preDigestDispatched > 0 || $notificationDispatched > 0) {
+        Log::info('Flint digest jobs dispatched', [
+            'pre_digest_count' => $preDigestDispatched,
+            'notification_count' => $notificationDispatched,
         ]);
     }
 })
-    ->hourly()
+    ->everyFifteenMinutes()
     ->name('flint-digest-dispatcher')
     ->onOneServer()
     ->withoutOverlapping()

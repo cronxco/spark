@@ -25,7 +25,7 @@ class RunDigestGenerationJob implements ShouldQueue
 
     public function __construct(
         public User $user,
-        public string $period = 'morning'
+        public string $scheduleTime
     ) {}
 
     public function handle(AgentOrchestrationService $orchestration): void
@@ -48,15 +48,20 @@ class RunDigestGenerationJob implements ShouldQueue
         });
 
         try {
+            $period = $this->getDigestPeriod($this->scheduleTime);
+
             Log::info('Running digest generation', [
                 'user_id' => $this->user->id,
-                'period' => $this->period,
+                'schedule_time' => $this->scheduleTime,
+                'period' => $period,
             ]);
 
-            $digestBlockId = $orchestration->runDigestGeneration($this->user, $this->period);
+            $digestBlockId = $orchestration->runDigestGeneration($this->user, $period);
 
             $transaction->setData([
                 'user_id' => $this->user->id,
+                'schedule_time' => $this->scheduleTime,
+                'period' => $period,
                 'digest_block_id' => $digestBlockId,
                 'success' => true,
             ]);
@@ -65,6 +70,8 @@ class RunDigestGenerationJob implements ShouldQueue
 
             Log::info('Digest generation completed', [
                 'user_id' => $this->user->id,
+                'schedule_time' => $this->scheduleTime,
+                'period' => $period,
                 'digest_block_id' => $digestBlockId,
             ]);
         } catch (Exception $e) {
@@ -79,6 +86,19 @@ class RunDigestGenerationJob implements ShouldQueue
             ]);
 
             throw $e;
+        }
+    }
+
+    protected function getDigestPeriod(string $scheduleTime): string
+    {
+        $hour = (int) substr($scheduleTime, 0, 2);
+
+        if ($hour < 12) {
+            return 'morning';
+        } elseif ($hour < 17) {
+            return 'afternoon';
+        } else {
+            return 'evening';
         }
     }
 }
