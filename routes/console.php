@@ -88,8 +88,22 @@ Schedule::call(function () {
         })
         ->get();
 
+    if ($users->isEmpty()) {
+        Log::info('No users found for continuous background analysis', [
+            'total_users' => User::count(),
+            'flint_integrations' => User::query()
+                ->whereHas('integrations', function ($query) {
+                    $query->where('service', 'flint');
+                })
+                ->count(),
+        ]);
+
+        return;
+    }
+
     Log::info('Dispatching continuous background analysis', [
         'user_count' => $users->count(),
+        'user_ids' => $users->pluck('id')->toArray(),
     ]);
 
     foreach ($users as $user) {
