@@ -67,7 +67,7 @@ class FlintPlugin extends ManualPlugin
                 'type' => 'boolean',
                 'label' => 'Enable Continuous Analysis',
                 'default' => true,
-                'description' => 'Run agents every 30 minutes for fresh insights',
+                'description' => 'Run agents every 4 hours for fresh insights',
             ],
 
             // Digest Schedule Configuration
