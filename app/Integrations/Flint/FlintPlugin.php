@@ -83,7 +83,7 @@ class FlintPlugin extends ManualPlugin
                 'display_name' => 'Generated Digest',
                 'display_name_past_tense' => 'Generated Digest',
                 'description' => 'AI-generated daily digest of events and insights',
-                'icon' => 'file-lines',
+                'icon' => 'fas.file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -101,7 +101,7 @@ class FlintPlugin extends ManualPlugin
             'flint_summarised_headline' => [
                 'display_name' => 'Daily Headline',
                 'description' => 'AI-generated headline summarizing the day',
-                'icon' => 'newspaper',
+                'icon' => 'fas.newspaper',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -110,7 +110,7 @@ class FlintPlugin extends ManualPlugin
             'flint_five_key_points' => [
                 'display_name' => 'Key Points',
                 'description' => 'Five most important points from the day',
-                'icon' => 'list-bullet',
+                'icon' => 'fas.list-ol',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -119,7 +119,7 @@ class FlintPlugin extends ManualPlugin
             'flint_actions_required' => [
                 'display_name' => 'Actions Required',
                 'description' => 'AI-identified actions that need attention',
-                'icon' => 'check-circle',
+                'icon' => 'fas.circle-check',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -128,7 +128,7 @@ class FlintPlugin extends ManualPlugin
             'flint_things_to_be_aware_of' => [
                 'display_name' => 'Awareness Alerts',
                 'description' => 'Important items to be aware of',
-                'icon' => 'exclamation-triangle',
+                'icon' => 'fas.triangle-exclamation',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -137,7 +137,7 @@ class FlintPlugin extends ManualPlugin
             'flint_insight' => [
                 'display_name' => 'Daily Insight',
                 'description' => 'AI-generated insight from daily data',
-                'icon' => 'light-bulb',
+                'icon' => 'fas.lightbulb',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -146,7 +146,7 @@ class FlintPlugin extends ManualPlugin
             'flint_suggestion' => [
                 'display_name' => 'AI Suggestion',
                 'description' => 'Intelligent suggestion based on patterns',
-                'icon' => 'sparkles',
+                'icon' => 'fas.hexagon-nodes-bolt',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -157,7 +157,7 @@ class FlintPlugin extends ManualPlugin
             'flint_health_insight' => [
                 'display_name' => 'Health Insight',
                 'description' => 'AI analysis of health and fitness data',
-                'icon' => 'heart',
+                'icon' => 'fas.heart',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -167,7 +167,7 @@ class FlintPlugin extends ManualPlugin
             'flint_money_insight' => [
                 'display_name' => 'Money Insight',
                 'description' => 'AI analysis of financial data and spending',
-                'icon' => 'currency-pound',
+                'icon' => 'fas.sterling-sign',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -177,7 +177,7 @@ class FlintPlugin extends ManualPlugin
             'flint_media_insight' => [
                 'display_name' => 'Media Insight',
                 'description' => 'AI analysis of media consumption patterns',
-                'icon' => 'musical-note',
+                'icon' => 'fas.play',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -187,7 +187,7 @@ class FlintPlugin extends ManualPlugin
             'flint_knowledge_insight' => [
                 'display_name' => 'Knowledge Insight',
                 'description' => 'AI analysis of learning and knowledge activities',
-                'icon' => 'book-open',
+                'icon' => 'fas.book-open',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -197,7 +197,7 @@ class FlintPlugin extends ManualPlugin
             'flint_online_insight' => [
                 'display_name' => 'Online Insight',
                 'description' => 'AI analysis of online activities and engagement',
-                'icon' => 'globe-alt',
+                'icon' => 'fab.internet-explorer',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -219,7 +219,7 @@ class FlintPlugin extends ManualPlugin
             'flint_pattern_detected' => [
                 'display_name' => 'Pattern Detected',
                 'description' => 'Recurring pattern identified by AI analysis',
-                'icon' => 'chart-bar',
+                'icon' => 'fas.chart-simple',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -229,7 +229,7 @@ class FlintPlugin extends ManualPlugin
             'flint_correlation' => [
                 'display_name' => 'Correlation',
                 'description' => 'Statistical correlation between data points',
-                'icon' => 'arrow-trending-up',
+                'icon' => 'fas.arrow-trend-up',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -241,7 +241,7 @@ class FlintPlugin extends ManualPlugin
             'flint_prioritized_action' => [
                 'display_name' => 'Prioritized Action',
                 'description' => 'AI-prioritized action item requiring attention',
-                'icon' => 'flag',
+                'icon' => 'fas.flag',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -250,7 +250,7 @@ class FlintPlugin extends ManualPlugin
             'flint_urgent_alert' => [
                 'display_name' => 'Urgent Alert',
                 'description' => 'Time-sensitive alert requiring immediate attention',
-                'icon' => 'bell-alert',
+                'icon' => 'fas.bell',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -261,7 +261,7 @@ class FlintPlugin extends ManualPlugin
             'flint_digest' => [
                 'display_name' => 'Daily Digest',
                 'description' => 'Comprehensive daily summary with insights and actions',
-                'icon' => 'file-lines',
+                'icon' => 'fas.file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
