@@ -16,7 +16,10 @@ class GenerateNewsletterSummariesJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_handles_null_event_metadata_gracefully(): void
+    /**
+     * @test
+     */
+    public function it_handles_null_event_metadata_gracefully(): void
     {
         Queue::fake();
 
@@ -62,7 +65,10 @@ class GenerateNewsletterSummariesJobTest extends TestCase
         $this->assertEquals('No Subject', $subject);
     }
 
-    public function test_it_handles_event_metadata_without_email_subject(): void
+    /**
+     * @test
+     */
+    public function it_handles_event_metadata_without_email_subject(): void
     {
         Queue::fake();
 
@@ -109,7 +115,10 @@ class GenerateNewsletterSummariesJobTest extends TestCase
         $this->assertEquals('No Subject', $subject);
     }
 
-    public function test_unique_id_is_correctly_generated(): void
+    /**
+     * @test
+     */
+    public function unique_id_is_correctly_generated(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create([
@@ -141,7 +150,7 @@ class GenerateNewsletterSummariesJobTest extends TestCase
             'Test content'
         );
 
-        $expectedId = 'generate_newsletter_summaries_'.$integration->id.'_'.$event->id;
+        $expectedId = 'generate_newsletter_summaries_' . $integration->id . '_' . $event->id;
         $this->assertEquals($expectedId, $job->uniqueId());
     }
 }

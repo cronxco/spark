@@ -132,7 +132,7 @@ Schedule::call(function () {
 
         foreach ($scheduleTimes as $scheduleTime) {
             // Parse schedule time (e.g., "06:00")
-            $scheduleHour = substr($scheduleTime, 0, 2).':00';
+            $scheduleHour = substr($scheduleTime, 0, 2) . ':00';
 
             // If current hour matches schedule hour, dispatch digest
             if ($currentHourMinute === $scheduleHour) {
