@@ -157,7 +157,8 @@ class FinancialPlugin extends ManualPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
                 'value_unit' => 'GBP',
-                'hidden' => false,
+                'hidden' => true,
+                'exclude_from_flint' => true,
             ],
         ];
     }
