@@ -7,7 +7,7 @@ if (! function_exists('start_ai_request_span')) {
     /**
      * Start a Sentry AI request span for LLM API calls
      *
-     * @param  string  $model  The model name (e.g., 'gpt-4-turbo', 'claude-3-sonnet')
+     * @param  string  $model  The model name (e.g., 'gpt-5.1', 'claude-3-sonnet')
      * @param  array  $messages  Array of message objects with 'role' and 'content' keys
      * @param  array  $config  Additional configuration (temperature, max_tokens, etc.)
      */

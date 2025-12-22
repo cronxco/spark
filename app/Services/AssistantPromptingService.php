@@ -58,6 +58,11 @@ class AssistantPromptingService
         $maxCompletionTokens = $options['max_completion_tokens'] ?? 2000;
         $temperature = $options['temperature'] ?? 1;
 
+        // Extract AI-specific metadata from context
+        $promptType = $context['prompt_type'] ?? 'unknown';
+        $domain = $context['domain'] ?? null;
+        $mode = $context['mode'] ?? null;
+
         $attempt = 0;
         $lastException = null;
 
@@ -69,7 +74,13 @@ class AssistantPromptingService
                         'chat.completions',
                         'openai/chat/completions',
                         [],
-                        array_merge(['attempt' => $attempt + 1], $context),
+                        array_merge([
+                            'attempt' => $attempt + 1,
+                            'prompt_type' => $promptType,
+                            'domain' => $domain,
+                            'mode' => $mode,
+                            'model' => $model,
+                        ], $context),
                         $userId
                     );
                 }
@@ -100,7 +111,18 @@ class AssistantPromptingService
                         'openai/chat/completions',
                         200,
                         json_encode($response->toArray()),
-                        [],
+                        [
+                            'prompt_type' => $promptType,
+                            'domain' => $domain,
+                            'mode' => $mode,
+                            'model' => $model,
+                            'tokens' => [
+                                'prompt' => $usage['promptTokens'] ?? 0,
+                                'completion' => $usage['completionTokens'] ?? 0,
+                                'total' => $usage['totalTokens'] ?? 0,
+                            ],
+                            'finish_reason' => $finishReason,
+                        ],
                         $userId
                     );
                 }

@@ -15,34 +15,43 @@ use Illuminate\Support\Str;
 class AssistantContextService
 {
     /**
-     * Generate JSON context for assistant (all three timeframes)
+     * Generate JSON context for assistant (all timeframes)
      *
      * @param  Carbon|null  $baseDate  - "Today" reference (defaults to now)
      * @param  Integration  $assistantIntegration  - The Flint integration instance
+     * @param  array|null  $domains  - Optional array of domains to filter by (e.g., ['health', 'money'])
      * @return array - Structured JSON array
      */
-    public function generateContext(User $user, ?Carbon $baseDate, Integration $assistantIntegration): array
+    public function generateContext(User $user, ?Carbon $baseDate, Integration $assistantIntegration, ?array $domains = null): array
     {
         $baseDate = $baseDate ?? now();
 
         return [
-            'yesterday' => $this->generateTimeframeContext($user, 'yesterday', $baseDate, $assistantIntegration),
-            'today' => $this->generateTimeframeContext($user, 'today', $baseDate, $assistantIntegration),
-            'tomorrow' => $this->generateTimeframeContext($user, 'tomorrow', $baseDate, $assistantIntegration),
+            'yesterday' => $this->generateTimeframeContext($user, 'yesterday', $baseDate, $assistantIntegration, $domains),
+            'today' => $this->generateTimeframeContext($user, 'today', $baseDate, $assistantIntegration, $domains),
+            'tomorrow' => $this->generateTimeframeContext($user, 'tomorrow', $baseDate, $assistantIntegration, $domains),
+            'day_2' => $this->generateTimeframeContext($user, 'day_2', $baseDate, $assistantIntegration, $domains),
+            'day_3' => $this->generateTimeframeContext($user, 'day_3', $baseDate, $assistantIntegration, $domains),
+            'day_4' => $this->generateTimeframeContext($user, 'day_4', $baseDate, $assistantIntegration, $domains),
+            'day_5' => $this->generateTimeframeContext($user, 'day_5', $baseDate, $assistantIntegration, $domains),
+            'day_6' => $this->generateTimeframeContext($user, 'day_6', $baseDate, $assistantIntegration, $domains),
+            'day_7' => $this->generateTimeframeContext($user, 'day_7', $baseDate, $assistantIntegration, $domains),
         ];
     }
 
     /**
      * Generate context for a specific timeframe
      *
-     * @param  string  $timeframe  - 'yesterday', 'today', or 'tomorrow'
+     * @param  string  $timeframe  - 'yesterday', 'today', 'tomorrow', 'day_2'...'day_7'
      * @param  Integration  $assistantIntegration  - The Flint integration instance
+     * @param  array|null  $domains  - Optional array of domains to filter by
      */
     public function generateTimeframeContext(
         User $user,
         string $timeframe,
         Carbon $baseDate,
-        Integration $assistantIntegration
+        Integration $assistantIntegration,
+        ?array $domains = null
     ): array {
         $config = $this->getTimeframeConfig($assistantIntegration, $timeframe);
 
@@ -63,7 +72,7 @@ class AssistantContextService
         [$startDate, $endDate] = $this->getDateRangeForTimeframe($timeframe, $baseDate);
 
         // Query events
-        $events = $this->queryEvents($user, $startDate, $endDate, $config);
+        $events = $this->queryEvents($user, $startDate, $endDate, $config, $domains);
 
         // Group events like day view
         $groups = $this->groupEvents($events, $user, $config);
@@ -118,7 +127,12 @@ class AssistantContextService
         return match ($timeframe) {
             'yesterday' => $baseDate->copy()->subDay(),
             'today' => $baseDate->copy(),
-            'tomorrow' => $baseDate->copy()->addDay(),
+            'tomorrow', 'day_2' => $baseDate->copy()->addDay(),
+            'day_3' => $baseDate->copy()->addDays(2),
+            'day_4' => $baseDate->copy()->addDays(3),
+            'day_5' => $baseDate->copy()->addDays(4),
+            'day_6' => $baseDate->copy()->addDays(5),
+            'day_7' => $baseDate->copy()->addDays(6),
             default => $baseDate->copy(),
         };
     }
@@ -143,12 +157,18 @@ class AssistantContextService
         User $user,
         Carbon $startDate,
         Carbon $endDate,
-        array $config
+        array $config,
+        ?array $domains = null
     ): Collection {
         $query = Event::query()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->whereBetween('time', [$startDate, $endDate])
             ->with(['actor', 'target', 'blocks', 'tags']);
+
+        // Apply domain filter (if specified)
+        if (! empty($domains) && is_array($domains)) {
+            $query->whereIn('domain', $domains);
+        }
 
         // Apply service filters (if specified)
         $enabledServices = $config['services'];

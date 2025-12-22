@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AgentMemoryService;
 use App\Services\AgentOrchestrationService;
 use App\Services\AgentWorkingMemoryService;
+use App\Services\AssistantContextService;
 use App\Services\AssistantPromptingService;
 use App\Services\DomainAgentService;
 use App\Services\FlintBlockCreationService;
@@ -44,13 +45,15 @@ class AgentOrchestrationServiceTest extends TestCase
         $this->prompting = Mockery::mock(AssistantPromptingService::class);
         $this->domainAgent = Mockery::mock(DomainAgentService::class);
         $this->blockCreation = Mockery::mock(FlintBlockCreationService::class);
+        $this->contextService = Mockery::mock(AssistantContextService::class);
 
         $this->service = new AgentOrchestrationService(
             $this->workingMemory,
             $this->memory,
             $this->prompting,
             $this->domainAgent,
-            $this->blockCreation
+            $this->blockCreation,
+            $this->contextService
         );
     }
 
