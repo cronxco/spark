@@ -96,7 +96,7 @@ Schedule::call(function () {
         dispatch(new RunContinuousBackgroundAnalysisJob($user));
     }
 })
-    ->everyFourHours($minutes = 45);
+    ->everyFourHours($minutes = 45)
     ->name('flint-continuous-background-analysis')
     ->onOneServer()
     ->withoutOverlapping()
