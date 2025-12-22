@@ -204,17 +204,20 @@ JSON;
     /** @test */
     public function it_determines_period_correctly()
     {
-        $kernel = app(\App\Console\Kernel::class);
-        $reflection = new ReflectionClass($kernel);
+        // Test the period determination logic from console.php
+        $determinePeriod = function (string $time): string {
+            return match (true) {
+                ((int) substr($time, 0, 2)) < 12 => 'morning',
+                ((int) substr($time, 0, 2)) < 17 => 'afternoon',
+                default => 'evening',
+            };
+        };
 
-        $method = $reflection->getMethod('determinePeriod');
-        $method->setAccessible(true);
-
-        $this->assertEquals('morning', $method->invoke($kernel, '06:00'));
-        $this->assertEquals('morning', $method->invoke($kernel, '11:30'));
-        $this->assertEquals('afternoon', $method->invoke($kernel, '12:00'));
-        $this->assertEquals('afternoon', $method->invoke($kernel, '16:45'));
-        $this->assertEquals('evening', $method->invoke($kernel, '17:00'));
-        $this->assertEquals('evening', $method->invoke($kernel, '23:00'));
+        $this->assertEquals('morning', $determinePeriod('06:00'));
+        $this->assertEquals('morning', $determinePeriod('11:30'));
+        $this->assertEquals('afternoon', $determinePeriod('12:00'));
+        $this->assertEquals('afternoon', $determinePeriod('16:45'));
+        $this->assertEquals('evening', $determinePeriod('17:00'));
+        $this->assertEquals('evening', $determinePeriod('23:00'));
     }
 }

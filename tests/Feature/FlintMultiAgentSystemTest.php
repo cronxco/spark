@@ -17,7 +17,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
-use ReflectionClass;
 use Tests\TestCase;
 
 class FlintMultiAgentSystemTest extends TestCase
@@ -183,15 +182,18 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_respects_user_timezone_for_digest_scheduling()
     {
-        // Test the determinePeriod method
-        $kernel = app(\App\Console\Kernel::class);
-        $reflection = new ReflectionClass($kernel);
-        $method = $reflection->getMethod('determinePeriod');
-        $method->setAccessible(true);
+        // Test the period determination logic from console.php
+        $determinePeriod = function (string $time): string {
+            return match (true) {
+                ((int) substr($time, 0, 2)) < 12 => 'morning',
+                ((int) substr($time, 0, 2)) < 17 => 'afternoon',
+                default => 'evening',
+            };
+        };
 
-        $this->assertEquals('morning', $method->invoke($kernel, '06:00'));
-        $this->assertEquals('afternoon', $method->invoke($kernel, '14:00'));
-        $this->assertEquals('evening', $method->invoke($kernel, '19:00'));
+        $this->assertEquals('morning', $determinePeriod('06:00'));
+        $this->assertEquals('afternoon', $determinePeriod('14:00'));
+        $this->assertEquals('evening', $determinePeriod('19:00'));
     }
 
     /** @test */

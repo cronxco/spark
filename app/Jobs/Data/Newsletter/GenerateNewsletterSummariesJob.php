@@ -43,7 +43,7 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
         try {
             // Generate summaries using AI
             $summaries = $this->generateSummaries(
-                $this->event->metadata['email_subject'],
+                $this->event->event_metadata['email_subject'] ?? 'No Subject',
                 $this->articleText
             );
 
@@ -67,10 +67,10 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
             ]);
 
             // Update event metadata with error
-            $metadata = $this->event->metadata ?? [];
+            $metadata = $this->event->event_metadata ?? [];
             $metadata['last_summary_error'] = $e->getMessage();
             $metadata['last_summary_error_at'] = now()->toIso8601String();
-            $this->event->update(['metadata' => $metadata]);
+            $this->event->update(['event_metadata' => $metadata]);
 
             throw $e;
         }
