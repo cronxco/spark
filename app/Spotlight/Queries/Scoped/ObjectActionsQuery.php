@@ -72,7 +72,7 @@ class ObjectActionsQuery
                     SpotlightResult::make()
                         ->setTitle('Manage Relationships')
                         ->setSubtitle('Connect this object to other items')
-                        ->setIcon('arrows-right-left')
+                        ->setIcon('fas.right-left')
                         ->setGroup('commands')
                         ->setPriority(3)
                         ->setAction('dispatch_event', [
@@ -87,7 +87,7 @@ class ObjectActionsQuery
                     SpotlightResult::make()
                         ->setTitle('Add Relationship')
                         ->setSubtitle('Connect this object to other items')
-                        ->setIcon('arrows-right-left')
+                        ->setIcon('fas.right-left')
                         ->setGroup('commands')
                         ->setPriority(3)
                         ->setAction('dispatch_event', [
