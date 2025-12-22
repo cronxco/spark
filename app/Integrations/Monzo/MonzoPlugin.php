@@ -144,6 +144,7 @@ class MonzoPlugin extends OAuthPlugin
                 'value_unit' => 'GBP',
                 'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
                 'hidden' => true,
+                'exclude_from_flint' => true,
             ],
             'salary_received_from' => [
                 'icon' => 'fas.money-bills',

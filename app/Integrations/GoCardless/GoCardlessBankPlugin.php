@@ -179,6 +179,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'value_unit' => 'GBP',
                 'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
                 'hidden' => true,
+                'exclude_from_flint' => true,
             ],
         ];
     }

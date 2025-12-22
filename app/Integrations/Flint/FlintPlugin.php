@@ -50,114 +50,20 @@ class FlintPlugin extends ManualPlugin
     public static function getConfigurationSchema($instanceType = null): array
     {
         return [
-            // Multi-Agent System Configuration
-            'agents_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Multi-Agent System',
-                'default' => true,
-                'description' => 'Enable domain specialist agents for continuous analysis',
-            ],
-            'enabled_domains' => [
-                'type' => 'array',
-                'label' => 'Enabled Domains',
-                'default' => ['health', 'money', 'media', 'knowledge', 'online'],
-                'description' => 'Which domain agents should be active',
-            ],
-            'continuous_analysis_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Continuous Analysis',
-                'default' => true,
-                'description' => 'Run agents every 15 minutes for fresh insights',
-            ],
+            // Note: User-facing settings are now managed in /settings/flint
+            // This configuration schema is kept minimal for integration-level settings only
 
-            // Digest Schedule Configuration
-            'use_schedule' => [
-                'type' => 'boolean',
-                'label' => 'Use Schedule',
-                'default' => true,
-                'description' => 'Generate digests at specific times',
-            ],
-            'schedule_times_weekday' => [
-                'type' => 'array',
-                'label' => 'Weekday Schedule Times',
-                'default' => ['06:00', '18:00'],
-                'description' => 'Times to generate digest on weekdays (HH:mm format)',
-            ],
-            'schedule_times_weekend' => [
-                'type' => 'array',
-                'label' => 'Weekend Schedule Times',
-                'default' => ['08:00', '19:00'],
-                'description' => 'Times to generate digest on weekends (HH:mm format)',
-            ],
-            'schedule_timezone' => [
-                'type' => 'string',
-                'label' => 'Schedule Timezone',
-                'default' => 'UTC',
-                'description' => 'Timezone for scheduled digest generation',
-            ],
-
-            // Agent Behavior Configuration
-            'pattern_detection_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Pattern Detection',
-                'default' => true,
-                'description' => 'Run weekly pattern detection across domains',
-            ],
-            'cross_domain_synthesis_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Cross-Domain Synthesis',
-                'default' => true,
-                'description' => 'Find correlations across domains',
-            ],
-            'action_prioritization_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Enable Action Prioritization',
-                'default' => true,
-                'description' => 'Prioritize suggested actions',
-            ],
-
-            // Legacy Configuration (kept for backward compatibility)
-            'yesterday_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Include Yesterday',
-                'default' => true,
-            ],
-            'today_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Include Today',
-                'default' => true,
-            ],
-            'tomorrow_enabled' => [
-                'type' => 'boolean',
-                'label' => 'Include Tomorrow',
-                'default' => true,
-            ],
-            'yesterday_services' => [
-                'type' => 'array',
-                'label' => 'Yesterday Services (JSON)',
-                'description' => 'Leave empty to include all services',
-                'default' => [],
-            ],
-            'today_services' => [
-                'type' => 'array',
-                'label' => 'Today Services (JSON)',
-                'default' => [],
-            ],
-            'tomorrow_services' => [
-                'type' => 'array',
-                'label' => 'Tomorrow Services (JSON)',
-                'default' => [],
-            ],
             'excluded_block_types' => [
                 'type' => 'array',
                 'label' => 'Excluded Block Types',
-                'description' => 'Block types to exclude (leave empty to only exclude *_raw blocks)',
+                'description' => 'Block types to exclude from analysis (leave empty to only exclude *_raw blocks)',
                 'default' => [],
             ],
             'include_relationships' => [
                 'type' => 'boolean',
                 'label' => 'Include Relationships',
                 'default' => true,
+                'description' => 'Include relationship data in AI context',
             ],
             'max_events_per_timeframe' => [
                 'type' => 'integer',
@@ -165,7 +71,7 @@ class FlintPlugin extends ManualPlugin
                 'min' => 50,
                 'max' => 1000,
                 'default' => null,
-                'description' => 'Leave empty to use default from environment',
+                'description' => 'Maximum events to include in context (leave empty for default)',
             ],
         ];
     }
@@ -177,7 +83,7 @@ class FlintPlugin extends ManualPlugin
                 'display_name' => 'Generated Digest',
                 'display_name_past_tense' => 'Generated Digest',
                 'description' => 'AI-generated daily digest of events and insights',
-                'icon' => 'file-lines',
+                'icon' => 'fas.file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -195,7 +101,7 @@ class FlintPlugin extends ManualPlugin
             'flint_summarised_headline' => [
                 'display_name' => 'Daily Headline',
                 'description' => 'AI-generated headline summarizing the day',
-                'icon' => 'newspaper',
+                'icon' => 'fas.newspaper',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -204,7 +110,7 @@ class FlintPlugin extends ManualPlugin
             'flint_five_key_points' => [
                 'display_name' => 'Key Points',
                 'description' => 'Five most important points from the day',
-                'icon' => 'list-bullet',
+                'icon' => 'fas.list-ol',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -213,7 +119,7 @@ class FlintPlugin extends ManualPlugin
             'flint_actions_required' => [
                 'display_name' => 'Actions Required',
                 'description' => 'AI-identified actions that need attention',
-                'icon' => 'check-circle',
+                'icon' => 'fas.circle-check',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -222,7 +128,7 @@ class FlintPlugin extends ManualPlugin
             'flint_things_to_be_aware_of' => [
                 'display_name' => 'Awareness Alerts',
                 'description' => 'Important items to be aware of',
-                'icon' => 'exclamation-triangle',
+                'icon' => 'fas.triangle-exclamation',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -231,7 +137,7 @@ class FlintPlugin extends ManualPlugin
             'flint_insight' => [
                 'display_name' => 'Daily Insight',
                 'description' => 'AI-generated insight from daily data',
-                'icon' => 'light-bulb',
+                'icon' => 'fas.lightbulb',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -240,7 +146,7 @@ class FlintPlugin extends ManualPlugin
             'flint_suggestion' => [
                 'display_name' => 'AI Suggestion',
                 'description' => 'Intelligent suggestion based on patterns',
-                'icon' => 'sparkles',
+                'icon' => 'fas.hexagon-nodes-bolt',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -251,7 +157,7 @@ class FlintPlugin extends ManualPlugin
             'flint_health_insight' => [
                 'display_name' => 'Health Insight',
                 'description' => 'AI analysis of health and fitness data',
-                'icon' => 'heart',
+                'icon' => 'fas.heart',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -261,7 +167,7 @@ class FlintPlugin extends ManualPlugin
             'flint_money_insight' => [
                 'display_name' => 'Money Insight',
                 'description' => 'AI analysis of financial data and spending',
-                'icon' => 'currency-pound',
+                'icon' => 'fas.sterling-sign',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -271,7 +177,7 @@ class FlintPlugin extends ManualPlugin
             'flint_media_insight' => [
                 'display_name' => 'Media Insight',
                 'description' => 'AI analysis of media consumption patterns',
-                'icon' => 'musical-note',
+                'icon' => 'fas.play',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -281,7 +187,7 @@ class FlintPlugin extends ManualPlugin
             'flint_knowledge_insight' => [
                 'display_name' => 'Knowledge Insight',
                 'description' => 'AI analysis of learning and knowledge activities',
-                'icon' => 'book-open',
+                'icon' => 'fas.book-open',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -291,7 +197,7 @@ class FlintPlugin extends ManualPlugin
             'flint_online_insight' => [
                 'display_name' => 'Online Insight',
                 'description' => 'AI analysis of online activities and engagement',
-                'icon' => 'globe-alt',
+                'icon' => 'fab.internet-explorer',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -313,7 +219,7 @@ class FlintPlugin extends ManualPlugin
             'flint_pattern_detected' => [
                 'display_name' => 'Pattern Detected',
                 'description' => 'Recurring pattern identified by AI analysis',
-                'icon' => 'chart-bar',
+                'icon' => 'fas.chart-simple',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -323,7 +229,7 @@ class FlintPlugin extends ManualPlugin
             'flint_correlation' => [
                 'display_name' => 'Correlation',
                 'description' => 'Statistical correlation between data points',
-                'icon' => 'arrow-trending-up',
+                'icon' => 'fas.arrow-trend-up',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -335,7 +241,7 @@ class FlintPlugin extends ManualPlugin
             'flint_prioritized_action' => [
                 'display_name' => 'Prioritized Action',
                 'description' => 'AI-prioritized action item requiring attention',
-                'icon' => 'flag',
+                'icon' => 'fas.flag',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
@@ -344,7 +250,7 @@ class FlintPlugin extends ManualPlugin
             'flint_urgent_alert' => [
                 'display_name' => 'Urgent Alert',
                 'description' => 'Time-sensitive alert requiring immediate attention',
-                'icon' => 'bell-alert',
+                'icon' => 'fas.bell',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => false,
@@ -355,7 +261,7 @@ class FlintPlugin extends ManualPlugin
             'flint_digest' => [
                 'display_name' => 'Daily Digest',
                 'description' => 'Comprehensive daily summary with insights and actions',
-                'icon' => 'file-lines',
+                'icon' => 'fas.file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,

@@ -23,7 +23,10 @@ class RunPreDigestRefreshJob implements ShouldQueue
 
     public int $timeout = 600; // 10 minutes
 
-    public function __construct(public User $user) {}
+    public function __construct(
+        public User $user,
+        public string $scheduleTime
+    ) {}
 
     public function handle(AgentOrchestrationService $orchestration): void
     {
@@ -47,12 +50,14 @@ class RunPreDigestRefreshJob implements ShouldQueue
         try {
             Log::info('Running pre-digest refresh', [
                 'user_id' => $this->user->id,
+                'schedule_time' => $this->scheduleTime,
             ]);
 
             $results = $orchestration->runPreDigestRefresh($this->user);
 
             $transaction->setData([
                 'user_id' => $this->user->id,
+                'schedule_time' => $this->scheduleTime,
                 'domains_analyzed' => array_keys($results),
                 'success' => true,
             ]);
@@ -61,8 +66,14 @@ class RunPreDigestRefreshJob implements ShouldQueue
 
             Log::info('Pre-digest refresh completed', [
                 'user_id' => $this->user->id,
+                'schedule_time' => $this->scheduleTime,
                 'results' => array_map(fn ($r) => $r !== null, $results),
             ]);
+
+            // Chain to digest generation job immediately after agents complete
+            dispatch(new RunDigestGenerationJob($this->user, $this->scheduleTime))
+                ->onQueue('flint');
+
         } catch (Exception $e) {
             $transaction->setStatus(SpanStatus::internalError());
             $transaction->finish();

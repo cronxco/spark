@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
-use App\Notifications\DailyDigestReady;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Sentry\SentrySdk;
@@ -185,23 +184,11 @@ class AgentOrchestrationService
         }
 
         try {
-            // Ensure we have fresh insights
-            $this->runPreDigestRefresh($user);
+            // NOTE: Pre-digest refresh is now handled by RunPreDigestRefreshJob
+            // which chains to this job. We don't run it again here.
 
             // Generate digest using AssistantPromptingService
             $digestBlockId = $this->generateDigest($user);
-
-            // Load the digest block with its event
-            $digestBlock = Block::with('event.source')->find($digestBlockId);
-
-            if ($digestBlock) {
-                // Send notification
-                $user->notify(new DailyDigestReady(
-                    digestObject: $digestBlock->event->source,
-                    period: $period,
-                    blocks: [$digestBlock]
-                ));
-            }
 
             // Update last execution time
             $this->workingMemory->setLastExecutionTime($user->id, 'digest_generation');
@@ -210,10 +197,12 @@ class AgentOrchestrationService
                 $childSpan->setData([
                     'digest_block_id' => $digestBlockId,
                     'period' => $period,
-                    'notification_sent' => $digestBlock !== null,
                 ]);
                 $childSpan->finish();
             }
+
+            // Notification is now sent separately by SendDigestNotificationJob
+            // at the scheduled time (not immediately after generation)
 
             return $digestBlockId;
         } catch (Exception $e) {

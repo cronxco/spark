@@ -76,7 +76,7 @@ class FlintMultiAgentSystemTest extends TestCase
     {
         Queue::fake();
 
-        $job = new RunPreDigestRefreshJob($this->user);
+        $job = new RunPreDigestRefreshJob($this->user, '06:00');
         $job->handle(app(\App\Services\AgentOrchestrationService::class));
 
         $this->assertTrue(true);
@@ -105,7 +105,7 @@ class FlintMultiAgentSystemTest extends TestCase
                 'watch_points' => [],
             ]));
 
-        $job = new RunDigestGenerationJob($this->user, 'morning');
+        $job = new RunDigestGenerationJob($this->user, '06:00');
         $job->handle(app(\App\Services\AgentOrchestrationService::class));
     }
 
