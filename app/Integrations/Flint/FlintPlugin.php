@@ -303,7 +303,7 @@ class FlintPlugin extends ManualPlugin
             'flint_cross_domain_insight' => [
                 'display_name' => 'Cross-Domain Insight',
                 'description' => 'AI-discovered connections across different life domains',
-                'icon' => 'arrows-right-left',
+                'icon' => 'fas.right-left',
                 'display_with_object' => false,
                 'hidden' => false,
                 'supports_value' => true,
