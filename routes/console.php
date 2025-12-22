@@ -79,7 +79,7 @@ Schedule::job(new CleanupOldReceiptEmailsJob)
     ->withoutOverlapping()
     ->sentryMonitor();
 
-// Flint continuous background analysis (every 30 minutes)
+// Flint continuous background analysis (every 4 hours)
 Schedule::call(function () {
     $users = User::query()
         ->whereHas('integrations', function ($query) {
@@ -96,7 +96,7 @@ Schedule::call(function () {
         dispatch(new RunContinuousBackgroundAnalysisJob($user));
     }
 })
-    ->everyThirtyMinutes()
+    ->everyFourHours($minutes = 45);
     ->name('flint-continuous-background-analysis')
     ->onOneServer()
     ->withoutOverlapping()
