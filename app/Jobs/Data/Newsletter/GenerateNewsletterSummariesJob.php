@@ -43,7 +43,7 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
         try {
             // Generate summaries using AI
             $summaries = $this->generateSummaries(
-                $this->event->metadata['email_subject'],
+                $this->event->event_metadata['email_subject'] ?? 'No Subject',
                 $this->articleText
             );
 
@@ -67,10 +67,10 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
             ]);
 
             // Update event metadata with error
-            $metadata = $this->event->metadata ?? [];
+            $metadata = $this->event->event_metadata ?? [];
             $metadata['last_summary_error'] = $e->getMessage();
             $metadata['last_summary_error_at'] = now()->toIso8601String();
-            $this->event->update(['metadata' => $metadata]);
+            $this->event->update(['event_metadata' => $metadata]);
 
             throw $e;
         }
@@ -78,7 +78,7 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'generate_newsletter_summaries_' . $this->integration->id . '_' . $this->event->id;
+        return 'generate_newsletter_summaries_'.$this->integration->id.'_'.$this->event->id;
     }
 
     private function generateSummaries(string $subject, string $articleText): array
@@ -101,7 +101,7 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
                 'original_length' => $contentLength,
                 'truncated_to' => strlen($contentToSend),
                 'characters_lost' => $contentLength - strlen($contentToSend),
-                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1) . '%',
+                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1).'%',
             ]);
         }
 
