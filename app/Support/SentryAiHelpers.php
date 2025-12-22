@@ -44,8 +44,8 @@ if (! function_exists('start_ai_request_span')) {
         if (isset($config['temperature'])) {
             $childSpan->setData(['gen_ai.request.temperature' => $config['temperature']]);
         }
-        if (isset($config['max_tokens'])) {
-            $childSpan->setData(['gen_ai.request.max_tokens' => $config['max_tokens']]);
+        if (isset($config['max_completion_tokens'])) {
+            $childSpan->setData(['gen_ai.request.max_tokens' => $config['max_completion_tokens']]);
         }
         if (isset($config['top_p'])) {
             $childSpan->setData(['gen_ai.request.top_p' => $config['top_p']]);

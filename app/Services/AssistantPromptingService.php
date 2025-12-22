@@ -55,7 +55,7 @@ class AssistantPromptingService
         $model = $options['model'] ?? config('services.openai.models.gpt5_mini');
         $userId = $options['user_id'] ?? null;
         $context = $options['context'] ?? [];
-        $maxTokens = $options['max_tokens'] ?? 2000;
+        $maxCompletionTokens = $options['max_completion_tokens'] ?? 2000;
         $temperature = $options['temperature'] ?? 1;
 
         $attempt = 0;
@@ -78,14 +78,14 @@ class AssistantPromptingService
                 $messages = [['role' => 'user', 'content' => $prompt]];
                 $aiSpan = start_ai_request_span($model, $messages, [
                     'temperature' => $temperature,
-                    'max_tokens' => $maxTokens,
+                    'max_completion_tokens' => $maxCompletionTokens,
                 ]);
 
                 $response = OpenAI::chat()->create([
                     'model' => $model,
                     'messages' => $messages,
                     'temperature' => $temperature,
-                    'max_tokens' => $maxTokens,
+                    'max_completion_tokens' => $maxCompletionTokens,
                 ]);
 
                 // Finish AI request span with token usage
@@ -376,14 +376,14 @@ USER;
                 ];
                 $aiSpan = start_ai_request_span($model, $messages, [
                     'temperature' => 1,
-                    'max_tokens' => 2000,
+                    'max_completion_tokens' => 2000,
                 ]);
 
                 $response = OpenAI::chat()->create([
                     'model' => $model,
                     'messages' => $messages,
                     'temperature' => 1,
-                    'max_tokens' => 2000,
+                    'max_completion_tokens' => 2000,
                     'response_format' => ['type' => 'json_object'],
                 ]);
 
