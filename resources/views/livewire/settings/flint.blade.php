@@ -165,7 +165,7 @@ new class extends Component {
                     <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
                         <div>
                             <div class="font-medium text-sm">{{ __('Enable Continuous Analysis') }}</div>
-                            <div class="text-xs text-base-content/60">{{ __('Run background analysis every 15 minutes') }}</div>
+                            <div class="text-xs text-base-content/60">{{ __('Run background analysis every 30 minutes') }}</div>
                         </div>
                         <input
                             type="checkbox"
