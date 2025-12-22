@@ -395,7 +395,7 @@ class AgentOrchestrationService
             $insights = $this->parseDomainAgentResponse($response);
 
             // Log parse success/failure
-            Log::info('Agent Response Parsed', [
+            $logData = [
                 'prompt_type' => 'domain_agent',
                 'domain' => $domain,
                 'mode' => $mode,
@@ -404,7 +404,24 @@ class AgentOrchestrationService
                 'metrics_count' => count($insights['metrics'] ?? []),
                 'urgent_flags_count' => count($insights['urgent_flags'] ?? []),
                 'parse_success' => ! empty($insights['insights']) || ! empty($insights['suggestions']),
-            ]);
+            ];
+
+            // Log if insights were filtered for quality
+            if (isset($insights['quality_filtered_count']) && $insights['quality_filtered_count'] > 0) {
+                $logData['quality_filtered_count'] = $insights['quality_filtered_count'];
+                $logData['quality_filter_applied'] = true;
+            }
+
+            // Log if agent explicitly said no insights
+            if (! empty($insights['no_insights_reason'])) {
+                $logData['no_insights_reason'] = $insights['no_insights_reason'];
+                Log::info('Agent returned no insights', $logData);
+            } elseif (empty($insights['insights']) && empty($insights['suggestions'])) {
+                $logData['no_insights_reason'] = 'Empty response after parsing';
+                Log::info('Agent produced no actionable insights', $logData);
+            } else {
+                Log::info('Agent Response Parsed', $logData);
+            }
 
             $this->workingMemory->storeDomainInsight($user->id, $domain, $insights);
 

@@ -84,9 +84,42 @@ Analyze the activity data above and provide insights for the user. Return your r
 }
 ```
 
+## Quality Standards - CRITICAL
+
+**If there are no meaningful insights to share, return:**
+```json
+{
+  "insights": [],
+  "suggestions": [],
+  "metrics": {},
+  "urgent_flags": [],
+  "cross_domain_observations": [],
+  "query_responses": {},
+  "no_insights_reason": "Brief explanation why there are no meaningful insights"
+}
+```
+
+**Only provide insights that meet ALL these criteria:**
+1. **Specific & Data-Driven**: Include actual numbers, percentages, or concrete data points
+2. **Actionable or Informative**: Either the user can act on it, or it genuinely informs them of something meaningful
+3. **Confident (≥60%)**: Only include insights where confidence is 0.6 or higher
+4. **Non-Obvious**: Don't state what's already clearly visible in the raw data
+5. **Meaningful**: Avoid superficial observations like "You did X today" without context or comparison
+
+**Examples of LOW-QUALITY insights to AVOID:**
+- ❌ "You listened to music today" (obvious, no context)
+- ❌ "Your spending was normal" (vague, no specifics)
+- ❌ "You completed some tasks" (no numbers, no context)
+- ❌ Generic observations without supporting data or trends
+
+**Examples of HIGH-QUALITY insights:**
+- ✅ "Your sleep duration averaged 6.2 hours this week, down 18% from your 30-day average of 7.5 hours. This coincides with a 12% drop in HRV."
+- ✅ "Spending on dining out jumped to £156 this week (up 67% from £93 last week), primarily driven by 3 weekend transactions."
+- ✅ "You've been exploring AI/ML content heavily (8 articles saved), suggesting a new learning focus compared to your usual web development topics."
+
 Focus on:
-- Patterns and trends in the data
-- Anomalies or unusual behavior
+- Patterns and trends in the data (with specific comparisons)
+- Anomalies or unusual behavior (quantified changes)
 - Actionable insights the user can act on
 - Cross-domain connections (if you notice them)
 - Answering any queries from other agents
@@ -96,7 +129,7 @@ Focus on:
 - This allows the user to click on insights and see the source data
 - Always include IDs for events that support your conclusions
 
-Be specific, use numbers, and explain your reasoning.
+**Remember:** It's better to return NO insights than to return low-quality, obvious, or superficial insights. Users value quality over quantity.
 PROMPT;
     }
 
@@ -119,10 +152,11 @@ PROMPT;
                 'urgent_flags' => [],
                 'cross_domain_observations' => [],
                 'query_responses' => [],
+                'no_insights_reason' => 'Failed to parse agent response',
             ];
         }
 
-        return array_merge([
+        $parsed = array_merge([
             'insights' => [],
             'suggestions' => [],
             'metrics' => [],
@@ -131,7 +165,32 @@ PROMPT;
             'urgent_flags' => [],
             'cross_domain_observations' => [],
             'query_responses' => [],
+            'no_insights_reason' => null,
         ], $json);
+
+        // Filter insights by minimum quality threshold (confidence >= 0.6)
+        if (! empty($parsed['insights'])) {
+            $originalCount = count($parsed['insights']);
+            $parsed['insights'] = array_values(array_filter(
+                $parsed['insights'],
+                fn ($insight) => ($insight['confidence'] ?? 0) >= 0.6
+            ));
+
+            $filteredCount = $originalCount - count($parsed['insights']);
+            if ($filteredCount > 0) {
+                $parsed['quality_filtered_count'] = $filteredCount;
+            }
+        }
+
+        // Filter cross-domain observations by confidence threshold
+        if (! empty($parsed['cross_domain_observations'])) {
+            $parsed['cross_domain_observations'] = array_values(array_filter(
+                $parsed['cross_domain_observations'],
+                fn ($obs) => ($obs['confidence'] ?? 0) >= 0.6
+            ));
+        }
+
+        return $parsed;
     }
 
     /**
