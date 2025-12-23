@@ -27,6 +27,10 @@ class AgentOrchestrationService
      */
     public function runPreDigestRefresh(User $user): array
     {
+        Log::info('[Flint] [ORCHESTRATION] Starting pre-digest refresh', [
+            'user_id' => $user->id,
+        ]);
+
         $span = SentrySdk::getCurrentHub()->getSpan();
         $childSpan = $span ? $span->startChild(new SpanContext) : null;
         if ($childSpan) {
@@ -38,9 +42,24 @@ class AgentOrchestrationService
             $results = [];
             $enabledDomains = $this->getEnabledDomains($user);
 
+            Log::info('[Flint] [ORCHESTRATION] Enabled domains retrieved', [
+                'user_id' => $user->id,
+                'enabled_domains' => $enabledDomains,
+                'domain_count' => count($enabledDomains),
+            ]);
+
             // Run each domain agent with fresh data
             $previousDomain = null;
-            foreach ($enabledDomains as $domain) {
+            foreach ($enabledDomains as $index => $domain) {
+                Log::info('[Flint] [ORCHESTRATION] Processing domain agent', [
+                    'user_id' => $user->id,
+                    'domain' => $domain,
+                    'domain_index' => $index + 1,
+                    'total_domains' => count($enabledDomains),
+                ]);
+
+                $domainStartTime = microtime(true);
+
                 // Track handoff between domain agents
                 if ($previousDomain !== null) {
                     $handoffSpan = start_ai_handoff_span(
@@ -52,10 +71,26 @@ class AgentOrchestrationService
                 }
 
                 $results[$domain] = $this->runDomainAgent($user, $domain, 'pre_digest');
+                $domainDuration = microtime(true) - $domainStartTime;
+
+                Log::info('[Flint] [ORCHESTRATION] Domain agent completed', [
+                    'user_id' => $user->id,
+                    'domain' => $domain,
+                    'duration_seconds' => round($domainDuration, 2),
+                    'result_type' => $results[$domain] === null ? 'null' : (is_array($results[$domain]) ? 'array(' . count($results[$domain]) . ' items)' : gettype($results[$domain])),
+                ]);
+
                 $previousDomain = $domain;
             }
 
             // Always run cross-domain synthesizer before digest
+            Log::info('[Flint] [ORCHESTRATION] Starting cross-domain synthesizer', [
+                'user_id' => $user->id,
+                'previous_domain' => $previousDomain,
+            ]);
+
+            $synthesizerStartTime = microtime(true);
+
             if ($previousDomain !== null) {
                 $handoffSpan = start_ai_handoff_span(
                     "{$previousDomain}_domain_agent",
@@ -64,9 +99,23 @@ class AgentOrchestrationService
                 );
                 finish_ai_handoff_span($handoffSpan);
             }
+
             $results['cross_domain'] = $this->runCrossDomainSynthesizer($user);
+            $synthesizerDuration = microtime(true) - $synthesizerStartTime;
+
+            Log::info('[Flint] [ORCHESTRATION] Cross-domain synthesizer completed', [
+                'user_id' => $user->id,
+                'duration_seconds' => round($synthesizerDuration, 2),
+                'result_type' => $results['cross_domain'] === null ? 'null' : (is_array($results['cross_domain']) ? 'array(' . count($results['cross_domain']) . ' items)' : gettype($results['cross_domain'])),
+            ]);
 
             // Handoff from synthesizer to action prioritization
+            Log::info('[Flint] [ORCHESTRATION] Starting action prioritization', [
+                'user_id' => $user->id,
+            ]);
+
+            $actionStartTime = microtime(true);
+
             $handoffSpan = start_ai_handoff_span(
                 'cross_domain_synthesizer',
                 'action_prioritization_agent',
@@ -76,22 +125,57 @@ class AgentOrchestrationService
 
             // Always run action prioritization before digest
             $results['actions'] = $this->runActionPrioritization($user);
+            $actionDuration = microtime(true) - $actionStartTime;
+
+            Log::info('[Flint] [ORCHESTRATION] Action prioritization completed', [
+                'user_id' => $user->id,
+                'duration_seconds' => round($actionDuration, 2),
+                'result_type' => $results['actions'] === null ? 'null' : (is_array($results['actions']) ? 'array(' . count($results['actions']) . ' items)' : gettype($results['actions'])),
+            ]);
 
             // Update last execution time
+            Log::info('[Flint] [ORCHESTRATION] Updating last execution time', [
+                'user_id' => $user->id,
+            ]);
+
             $this->workingMemory->setLastExecutionTime($user->id, 'pre_digest_refresh');
 
             if ($childSpan) {
                 $childSpan->finish();
             }
 
+            Log::info('[Flint] [ORCHESTRATION] Pre-digest refresh completed successfully', [
+                'user_id' => $user->id,
+                'results_summary' => array_map(function ($r) {
+                    if ($r === null) {
+                        return 'null';
+                    }
+                    if (is_array($r)) {
+                        return 'array(' . count($r) . ' items)';
+                    }
+
+                    return gettype($r);
+                }, $results),
+            ]);
+
             return $results;
         } catch (Exception $e) {
+            Log::error('[Flint] [ORCHESTRATION] Pre-digest refresh exception', [
+                'user_id' => $user->id,
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+                'exception_code' => $e->getCode(),
+                'exception_file' => $e->getFile(),
+                'exception_line' => $e->getLine(),
+                'stack_trace' => $e->getTraceAsString(),
+            ]);
+
             if ($childSpan) {
                 $childSpan->setStatus(SpanStatus::internalError());
                 $childSpan->finish();
             }
 
-            Log::error('Pre-digest refresh failed', [
+            Log::error('[Flint] Pre-digest refresh failed', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
