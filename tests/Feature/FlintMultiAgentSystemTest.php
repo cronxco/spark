@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\Flint\RunContinuousBackgroundAnalysisJob;
 use App\Jobs\Flint\RunDigestGenerationJob;
 use App\Jobs\Flint\RunPatternDetectionJob;
 use App\Jobs\Flint\RunPreDigestRefreshJob;
@@ -58,17 +57,6 @@ class FlintMultiAgentSystemTest extends TestCase
                 'enabled_domains' => ['health', 'money'],
             ],
         ]);
-    }
-
-    /** @test */
-    public function it_dispatches_continuous_background_analysis_job()
-    {
-        Queue::fake();
-
-        $job = new RunContinuousBackgroundAnalysisJob($this->user);
-        $job->handle(app(\App\Services\AgentOrchestrationService::class));
-
-        $this->assertTrue(true); // If no exception, test passes
     }
 
     /** @test */

@@ -90,6 +90,11 @@ Schedule::call(function () {
     $notificationDispatched = 0;
 
     foreach ($users as $user) {
+
+        Log::info('Checking digest for user', [
+            'user_id' => $user->id,
+        ]);
+
         $settings = $user->settings['flint'] ?? [];
 
         // Get user's timezone (default to Europe/London)
@@ -105,6 +110,12 @@ Schedule::call(function () {
             : ($settings['schedule_times_weekday'] ?? ['06:00', '18:00']);
 
         foreach ($scheduleTimes as $scheduleTime) {
+            Log::info('Evaluating digest schedule', [
+                'user_id' => $user->id,
+                'schedule_time' => $scheduleTime,
+                'timezone' => $userTimezone,
+                'is_weekend' => $isWeekend,
+            ]);
             // Parse schedule time (e.g., "06:00")
             $scheduleCarbon = Carbon::parse($scheduleTime, $userTimezone);
             $minutesUntil = $now->diffInMinutes($scheduleCarbon, false);

@@ -23,77 +23,6 @@ class AgentOrchestrationService
     ) {}
 
     /**
-     * Orchestrate continuous background analysis for a user
-     */
-    public function runContinuousBackgroundAnalysis(User $user): array
-    {
-        $span = SentrySdk::getCurrentHub()->getSpan();
-        $childSpan = $span ? $span->startChild(new SpanContext) : null;
-        if ($childSpan) {
-            $childSpan->setOp('flint.continuous_background');
-            $childSpan->setDescription("Continuous background analysis for user {$user->id}");
-        }
-
-        try {
-            $results = [];
-            $enabledDomains = $this->getEnabledDomains($user);
-
-            // Run each domain agent
-            $previousDomain = null;
-            foreach ($enabledDomains as $domain) {
-                // Track handoff between domain agents
-                if ($previousDomain !== null) {
-                    $handoffSpan = start_ai_handoff_span(
-                        "{$previousDomain}_domain_agent",
-                        "{$domain}_domain_agent",
-                        ['mode' => 'continuous']
-                    );
-                    finish_ai_handoff_span($handoffSpan);
-                }
-
-                $results[$domain] = $this->runDomainAgent($user, $domain, 'continuous');
-                $previousDomain = $domain;
-            }
-
-            // Run cross-domain synthesizer if we have insights from multiple domains
-            if (count(array_filter($results)) >= 2) {
-                // Handoff from domain agents to cross-domain synthesizer
-                if ($previousDomain !== null) {
-                    $handoffSpan = start_ai_handoff_span(
-                        "{$previousDomain}_domain_agent",
-                        'cross_domain_synthesizer',
-                        ['insights_from_domains' => array_keys(array_filter($results))]
-                    );
-                    finish_ai_handoff_span($handoffSpan);
-                }
-
-                $results['cross_domain'] = $this->runCrossDomainSynthesizer($user);
-            }
-
-            // Update last execution time
-            $this->workingMemory->setLastExecutionTime($user->id, 'continuous_background');
-
-            if ($childSpan) {
-                $childSpan->finish();
-            }
-
-            return $results;
-        } catch (Exception $e) {
-            if ($childSpan) {
-                $childSpan->setStatus(SpanStatus::internalError());
-                $childSpan->finish();
-            }
-
-            Log::error('Continuous background analysis failed', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
      * Orchestrate pre-digest refresh for a user
      */
     public function runPreDigestRefresh(User $user): array
@@ -184,8 +113,6 @@ class AgentOrchestrationService
         }
 
         try {
-            // NOTE: Pre-digest refresh is now handled by RunPreDigestRefreshJob
-            // which chains to this job. We don't run it again here.
 
             // Generate digest using AssistantPromptingService
             $digestBlockId = $this->generateDigest($user);
@@ -963,7 +890,7 @@ Analyze all suggestions and observations above. Return your response as JSON:
 - Be specific (not "improve sleep" but "Go to bed by 10:30 PM")
 - Include "why" in the description (connect to insights)
 - Only suggest actionable items (user can actually do something)
-- Limit to top 5-7 actions (avoid overwhelming the user)
+- Limit to top 1-2 actions (avoid overwhelming the user)
 - Consider dependencies (some actions enable others)
 
 Focus on actions that will have the biggest positive impact on the user's life.

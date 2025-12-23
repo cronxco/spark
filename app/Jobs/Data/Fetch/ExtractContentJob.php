@@ -137,7 +137,7 @@ class ExtractContentJob implements ShouldQueue
     private function extractArticleText(string $title, string $content): string
     {
         $contentLength = strlen($content);
-        $maxContentLength = 15000;
+        $maxContentLength = 150000;
         $wasTruncated = $contentLength > $maxContentLength;
         $contentToSend = mb_substr($content, 0, $maxContentLength);
 
