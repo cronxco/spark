@@ -80,12 +80,25 @@ class FlintPlugin extends ManualPlugin
     {
         return [
             'had_summary' => [
-                'display_name' => 'Generated Digest',
+                'display_name' => 'Had Digest',
                 'display_name_past_tense' => 'Generated Digest',
                 'description' => 'AI-generated daily digest of events and insights',
                 'icon' => 'fas.file-lines',
                 'display_with_object' => false,
                 'hidden' => false,
+                'exclude_from_flint' => true,
+                'supports_value' => true,
+                'value_formatter' => null,
+                'value_multiplier' => null,
+                'value_unit' => 'blocks',
+            ],
+            'had_analysis' => [
+                'display_name' => 'Had Analysis',
+                'description' => 'AI-generated analysis',
+                'icon' => 'fas.hexagon-nodes-bolt',
+                'display_with_object' => false,
+                'hidden' => false,
+                'exclude_from_flint' => true,
                 'supports_value' => true,
                 'value_formatter' => null,
                 'value_multiplier' => null,

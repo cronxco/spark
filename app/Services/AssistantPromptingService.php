@@ -158,8 +158,8 @@ class AssistantPromptingService
     private function buildSystemPrompt(string $period): string
     {
         $timeContext = $period === 'morning'
-            ? 'This is a morning digest (06:15). Focus on yesterday\'s activities and today\'s preparation.'
-            : 'This is an afternoon digest (17:15). Focus on today\'s activities and tomorrow\'s preparation.';
+            ? 'This is a morning digest. Focus on yesterday\'s activities and today\'s preparation.'
+            : 'This is an afternoon digest. Focus on today\'s activities and tomorrow\'s preparation.';
 
         $toneGuidance = $this->getDomainToneGuidance();
 

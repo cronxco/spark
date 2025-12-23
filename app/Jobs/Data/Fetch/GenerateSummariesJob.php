@@ -101,7 +101,7 @@ class GenerateSummariesJob implements ShouldQueue
     private function generateSummaries(string $title, string $articleText): array
     {
         $contentLength = strlen($articleText);
-        $maxContentLength = 15000;
+        $maxContentLength = 150000;
         $wasTruncated = $contentLength > $maxContentLength;
         $contentToSend = mb_substr($articleText, 0, $maxContentLength);
 
