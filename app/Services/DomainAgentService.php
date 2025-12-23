@@ -39,7 +39,11 @@ Here is the full context data as JSON. This includes yesterday's events, today's
 
 ## Your Task
 
-Analyze the activity data above and provide insights for the user. Return your response as JSON with this structure:
+Analyze the activity data above and provide insights for the user.
+
+**IMPORTANT:** Each event in the context data includes an "id" field (UUID). When referencing specific events in your insights, use these exact UUID values in the "referenced_event_ids" array. Do not create your own identifiers.
+
+Return your response as JSON with this structure:
 
 ```json
 {

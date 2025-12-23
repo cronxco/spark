@@ -281,6 +281,7 @@ class AssistantContextService
     protected function transformEvent(Event $event, array $config): array
     {
         $data = [
+            'id' => $event->id,
             'time' => $event->time->toISOString(),
             'updated_at' => $event->updated_at->toISOString(),
             'service' => $event->service,

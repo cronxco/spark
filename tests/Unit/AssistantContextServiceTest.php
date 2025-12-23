@@ -91,7 +91,7 @@ class AssistantContextServiceTest extends TestCase
     }
 
     #[Test]
-    public function excludes_embeddings_and_internal_ids_from_events(): void
+    public function includes_id_but_excludes_embeddings_and_internal_fields_from_events(): void
     {
         $user = User::factory()->create();
         $flintIntegration = $this->createFlintIntegration($user);
@@ -104,12 +104,17 @@ class AssistantContextServiceTest extends TestCase
 
         $group = $context['today']['groups'][0];
 
+        // Should include the event ID so AI can reference events
+        $this->assertArrayHasKey('id', $group['first_event']);
+
+        // Should exclude these internal fields
         $this->assertArrayNotHasKey('embeddings', $group['first_event']);
-        $this->assertArrayNotHasKey('id', $group['first_event']);
         $this->assertArrayNotHasKey('integration_id', $group['first_event']);
         $this->assertArrayNotHasKey('created_at', $group['first_event']);
         $this->assertArrayNotHasKey('deleted_at', $group['first_event']);
-        $this->assertArrayHasKey('updated_at', $group['first_event']); // Should have this
+
+        // Should have updated_at for temporal context
+        $this->assertArrayHasKey('updated_at', $group['first_event']);
     }
 
     #[Test]
