@@ -72,11 +72,15 @@ new class extends Component {
         $this->scheduleTimesWeekend = $settings['schedule_times_weekend'] ?? ['08:00', '19:00'];
         $this->enabledDomains = $settings['enabled_domains'] ?? ['health', 'money', 'media', 'knowledge', 'online'];
 
-        // Generate time options (every hour from 00:00 to 23:00)
+        // Generate time options (every 15 minutes from 00:00 to 23:45)
         $this->timeOptions = collect(range(0, 23))
-            ->mapWithKeys(fn($hour) => [
-                sprintf('%02d:00', $hour) => sprintf('%02d:00', $hour)
-            ])
+            ->flatMap(function ($hour) {
+                return collect([0, 15, 30, 45])
+                    ->mapWithKeys(function ($minute) use ($hour) {
+                        $time = sprintf('%02d:%02d', $hour, $minute);
+                        return [$time => $time];
+                    });
+            })
             ->toArray();
 
         // Load memory data if on memory tab

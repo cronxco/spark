@@ -4,14 +4,14 @@ use App\Jobs\CheckIntegrationUpdates;
 use App\Jobs\Data\Receipt\CleanupOldReceiptEmailsJob;
 use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
-use App\Jobs\Flint\RunContinuousBackgroundAnalysisJob;
-use App\Jobs\Flint\RunDigestGenerationJob;
 use App\Jobs\Flint\RunPatternDetectionJob;
 use App\Jobs\Flint\RunPreDigestRefreshJob;
+use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
 use App\Jobs\Metrics\DetectMetricTrendsJob;
 use App\Jobs\Metrics\DetectRetrospectiveMetricAnomaliesJob;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -79,45 +79,6 @@ Schedule::job(new CleanupOldReceiptEmailsJob)
     ->withoutOverlapping()
     ->sentryMonitor();
 
-// Flint continuous background analysis (DISABLED - moved to scheduled digest system)
-// This has been removed to reduce LLM API costs by 85-95%
-// Analysis now runs 15 minutes before scheduled digest times instead of continuously
-// Schedule::call(function () {
-//     $users = User::query()
-//         ->whereHas('integrations', function ($query) {
-//             $query->where('service', 'flint')
-//                 ->whereRaw("configuration->>'continuous_analysis_enabled' != 'false'");
-//         })
-//         ->get();
-//
-//     if ($users->isEmpty()) {
-//         Log::info('No users found for continuous background analysis', [
-//             'total_users' => User::count(),
-//             'flint_integrations' => User::query()
-//                 ->whereHas('integrations', function ($query) {
-//                     $query->where('service', 'flint');
-//                 })
-//                 ->count(),
-//         ]);
-//
-//         return;
-//     }
-//
-//     Log::info('Dispatching continuous background analysis', [
-//         'user_count' => $users->count(),
-//         'user_ids' => $users->pluck('id')->toArray(),
-//     ]);
-//
-//     foreach ($users as $user) {
-//         dispatch(new RunContinuousBackgroundAnalysisJob($user));
-//     }
-// })
-//     ->everyFifteenMinutes()
-//     ->name('flint-continuous-background-analysis')
-//     ->onOneServer()
-//     ->withoutOverlapping()
-//     ->sentryMonitor();
-
 // Flint digest dispatcher (runs every 15 minutes to check for scheduled digests)
 // New flow: -15min = agents run + digest generation, 0min = send notification
 Schedule::call(function () {
@@ -148,8 +109,8 @@ Schedule::call(function () {
             $scheduleCarbon = Carbon::parse($scheduleTime, $userTimezone);
             $minutesUntil = $now->diffInMinutes($scheduleCarbon, false);
 
-            // If digest scheduled in exactly 15 minutes, trigger agent run
-            if ($minutesUntil === 15) {
+            // If digest scheduled in the next 15 minutes or sooner, run pre-digest refresh
+            if ($minutesUntil >= 1 && $minutesUntil <= 15) {
                 Log::info('Dispatching pre-digest refresh (15 min before digest)', [
                     'user_id' => $user->id,
                     'schedule_time' => $scheduleTime,
@@ -164,7 +125,8 @@ Schedule::call(function () {
             }
 
             // If digest scheduled right now, send notification
-            if ($minutesUntil === 0) {
+            // Allow a small window of -5 to 0 minutes to account for scheduling delays
+            if ($minutesUntil >= -5 && $minutesUntil <= 0) {
                 Log::info('Dispatching digest notification', [
                     'user_id' => $user->id,
                     'schedule_time' => $scheduleTime,
