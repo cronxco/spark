@@ -15,10 +15,17 @@ $supportingData = $block->metadata['supporting_data'] ?? [];
 $referencedEventIds = $block->metadata['referenced_event_ids'] ?? [];
 $confidence = $block->metadata['confidence'] ?? 0.7;
 
-// Load referenced events
+// Load referenced events (filter out invalid UUIDs from legacy data)
 $referencedEvents = [];
 if (!empty($referencedEventIds)) {
-    $referencedEvents = Event::whereIn('id', $referencedEventIds)->get();
+    // Filter to only valid UUIDs
+    $validUuids = array_filter($referencedEventIds, function($id) {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id);
+    });
+
+    if (!empty($validUuids)) {
+        $referencedEvents = Event::whereIn('id', $validUuids)->get();
+    }
 }
 
 // Type icons and colors
