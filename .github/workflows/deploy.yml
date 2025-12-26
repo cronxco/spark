@@ -19,7 +19,7 @@ jobs:
 
     services:
       postgres:
-        image: "bsamasi/postgis-pgvector:pg17"
+        image: "bsamasi/postgis-pgvector:pg17@sha256:f3133925f641c093fae3f83607cfe21eb6e401b6961ae1cac84f70ff6f767f59"
         env:
           PGPASSWORD: postgres
           POSTGRES_DB: laravel
