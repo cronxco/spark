@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\GeocodingService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -701,6 +702,9 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
             // Create blocks for event details
             $this->createEventBlocks($eventRecord, $event, $isAllDay, $startTime, $endTime);
+
+            // Geocode location if available and physical
+            $this->geocodeCalendarEvent($eventRecord, $event);
         }
 
         // Handle event deletion - remove events in sync window that are no longer present
@@ -1092,5 +1096,89 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
         // No duplicate found, use the new group
         return $group;
+    }
+
+    /**
+     * Geocode calendar event location if physical
+     */
+    protected function geocodeCalendarEvent(Event $event, array $calendarEvent): void
+    {
+        $location = $calendarEvent['location'] ?? null;
+
+        if (empty($location)) {
+            return;
+        }
+
+        // Skip virtual locations
+        if (! $this->isPhysicalLocation($location)) {
+            return;
+        }
+
+        // Geocode the address
+        $geocodingService = app(GeocodingService::class);
+        $result = $geocodingService->geocode($location);
+
+        if ($result) {
+            $event->setLocation(
+                $result['latitude'],
+                $result['longitude'],
+                $result['formatted_address'] ?? $location,
+                $result['source'] // 'cache' or 'geoapify'
+            );
+
+            // Detect and link to place
+            $this->detectAndLinkPlace($event);
+        }
+    }
+
+    /**
+     * Detect or create a place for this event and link them
+     */
+    protected function detectAndLinkPlace(Event $event): void
+    {
+        if (! $event->hasLocation()) {
+            return;
+        }
+
+        try {
+            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService->detectAndLinkPlaceForEvent($event);
+        } catch (Exception $e) {
+            // Log error but don't fail the calendar event processing
+            Log::error('Failed to detect place for Google Calendar event', [
+                'event_id' => $event->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Check if a location string is physical (not virtual)
+     */
+    protected function isPhysicalLocation(string $location): bool
+    {
+        $location = strtolower($location);
+
+        // List of patterns indicating virtual locations
+        $virtualPatterns = [
+            'zoom',
+            'teams',
+            'meet.google.com',
+            'http://',
+            'https://',
+            'phone',
+            'tel:',
+            'skype',
+            'webex',
+            'gotomeeting',
+        ];
+
+        foreach ($virtualPatterns as $pattern) {
+            if (str_contains($location, $pattern)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

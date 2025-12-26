@@ -6,6 +6,7 @@ use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
 use App\Traits\TracksViews;
 use ArrayAccess;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -46,6 +47,9 @@ class EventObject extends Model implements HasMedia
         'url',
         'media_url',
         'embeddings',
+        'location_address',
+        'location_geocoded_at',
+        'location_source',
     ];
 
     protected $casts = [
@@ -54,6 +58,8 @@ class EventObject extends Model implements HasMedia
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'location_geocoded_at' => 'datetime',
+        'location' => Point::class,
     ];
 
     protected static function booted()
@@ -540,6 +546,60 @@ class EventObject extends Model implements HasMedia
         }
 
         return $value;
+    }
+
+    /**
+     * Set location coordinates and metadata
+     */
+    public function setLocation(float $latitude, float $longitude, ?string $address = null, string $source = 'manual'): void
+    {
+        $this->location = Point::makeGeodetic($latitude, $longitude);
+        $this->location_address = $address;
+        $this->location_geocoded_at = now();
+        $this->location_source = $source;
+        $this->save();
+    }
+
+    /**
+     * Get latitude from location point
+     */
+    public function getLatitudeAttribute(): ?float
+    {
+        return $this->location?->getLatitude();
+    }
+
+    /**
+     * Get longitude from location point
+     */
+    public function getLongitudeAttribute(): ?float
+    {
+        return $this->location?->getLongitude();
+    }
+
+    /**
+     * Scope to filter objects that have a location
+     */
+    public function scopeHasLocation($query)
+    {
+        return $query->whereNotNull('location');
+    }
+
+    /**
+     * Scope to find objects within a radius (in meters) of a point
+     */
+    public function scopeWithinRadius($query, float $latitude, float $longitude, int $radiusMeters)
+    {
+        $point = Point::makeGeodetic($latitude, $longitude);
+
+        return $query->whereRaw('ST_DWithin(location, ST_GeogFromText(?), ?)', [(string) $point, $radiusMeters]);
+    }
+
+    /**
+     * Scope to find objects within a bounding box
+     */
+    public function scopeWithinBounds($query, float $north, float $south, float $east, float $west)
+    {
+        return $query->whereRaw('location && ST_MakeEnvelope(?, ?, ?, ?, 4326)', [$west, $south, $east, $north]);
     }
 
     /**

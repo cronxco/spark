@@ -121,6 +121,13 @@ class RelationshipTypeRegistry
                 'description' => 'Insight contradicts or conflicts with another insight (Flint agent)',
                 'supports_value' => false,
             ],
+            'occurred_at' => [
+                'display_name' => 'Occurred At',
+                'icon' => 'o-map-pin',
+                'is_directional' => true,
+                'description' => 'Event occurred at a specific place',
+                'supports_value' => false,
+            ],
         ];
     }
 

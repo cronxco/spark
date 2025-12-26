@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class EventFactory extends Factory
@@ -47,6 +48,22 @@ class EventFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'embeddings' => array_map(fn () => $this->faker->randomFloat(4, -1, 1), range(1, 1536)),
+        ]);
+    }
+
+    /**
+     * Indicate that the event should have a location
+     */
+    public function withLocation(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'location' => Point::makeGeodetic(
+                $this->faker->latitude(49, 61),
+                $this->faker->longitude(-8, 2)
+            ),
+            'location_address' => $this->faker->address(),
+            'location_geocoded_at' => now(),
+            'location_source' => 'test',
         ]);
     }
 }

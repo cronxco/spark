@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Traits\TracksViews;
 use ArrayAccess;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -48,6 +49,9 @@ class Event extends Model
         'target_id',
         'target_metadata',
         'embeddings',
+        'location_address',
+        'location_geocoded_at',
+        'location_source',
     ];
 
     protected $casts = [
@@ -58,6 +62,8 @@ class Event extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'location_geocoded_at' => 'datetime',
+        'location' => Point::class,
     ];
 
     protected static function booted()
@@ -577,6 +583,88 @@ class Event extends Model
         return $query->whereHas('integration', function ($q) use ($userId) {
             $q->where('user_id', $userId);
         });
+    }
+
+    /**
+     * Set location from coordinates
+     */
+    public function setLocation(float $latitude, float $longitude, ?string $address = null, string $source = 'manual'): void
+    {
+        $this->location = Point::makeGeodetic($latitude, $longitude);
+        $this->location_address = $address;
+        $this->location_geocoded_at = now();
+        $this->location_source = $source;
+        $this->save();
+    }
+
+    /**
+     * Inherit location from target EventObject if available
+     */
+    public function inheritLocationFromTarget(): bool
+    {
+        if (! $this->target_id || ! $this->target) {
+            return false;
+        }
+
+        if (! $this->target->location) {
+            return false;
+        }
+
+        $this->location = $this->target->location;
+        $this->location_address = $this->target->location_address;
+        $this->location_geocoded_at = now();
+        $this->location_source = 'inherited';
+        $this->save();
+
+        return true;
+    }
+
+    /**
+     * Get latitude (convenience method)
+     */
+    public function getLatitudeAttribute(): ?float
+    {
+        return $this->location?->getLatitude();
+    }
+
+    /**
+     * Get longitude (convenience method)
+     */
+    public function getLongitudeAttribute(): ?float
+    {
+        return $this->location?->getLongitude();
+    }
+
+    /**
+     * Scope: events with location
+     */
+    public function scopeHasLocation($query)
+    {
+        return $query->whereNotNull('location');
+    }
+
+    /**
+     * Scope: events within radius (meters)
+     */
+    public function scopeWithinRadius($query, float $latitude, float $longitude, int $radiusMeters)
+    {
+        $point = Point::makeGeodetic($latitude, $longitude);
+
+        return $query->whereRaw(
+            'ST_DWithin(location, ST_GeogFromText(?), ?)',
+            [(string) $point, $radiusMeters]
+        );
+    }
+
+    /**
+     * Scope: events within bounding box
+     */
+    public function scopeWithinBounds($query, float $north, float $south, float $east, float $west)
+    {
+        return $query->whereRaw(
+            'location && ST_MakeEnvelope(?, ?, ?, ?, 4326)',
+            [$west, $south, $east, $north]
+        );
     }
 
     /**

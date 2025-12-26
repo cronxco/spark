@@ -52,6 +52,14 @@
     <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
     <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
 
+    <!-- Leaflet.js for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet MarkerCluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
     @if (env('VITE_SENTRY_DSN'))
     <script>
         window.SENTRY_DSN = "{{ env('VITE_SENTRY_DSN') }}";
@@ -166,14 +174,13 @@
                 <x-menu-item title="Today" icon="fas.calendar-day" link="{{ route('today.main') }}" :active="request()->routeIs('today.*')" data-hotkey="g d" />
                 <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')" data-hotkey="g y" />
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')" />
-
+                <x-menu-item title="Map" icon="fas.map-location-dot" link="{{ route('map.index') }}" :active="request()->routeIs('map.*')" data-hotkey="g l" />
                 <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" data-hotkey="g t" />
                 <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks.index') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />
                 <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" data-hotkey="g m" />
                 <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" data-hotkey="g x" />
                 <x-menu-item title="Media" icon="fas.photo-film" link="{{ route('media.index') }}" :active="request()->routeIs('media.*')" data-hotkey="g g" />
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
-
                 <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')" data-hotkey="g s">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')" />
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')" />

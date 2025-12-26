@@ -1063,6 +1063,13 @@ new class extends Component
                 @endif
             </div>
 
+            <!-- Workout Route (for Apple Health workouts with GPS data) -->
+            @if (!empty($this->event->event_metadata['route_points']))
+            <div>
+                <livewire:route-viewer :event="$this->event" :key="'route-viewer-' . $this->event->id" />
+            </div>
+            @endif
+
             <!-- Media Gallery (Progressive) -->
             @php
                 $actorMedia = $this->actorMedia;
@@ -1406,6 +1413,16 @@ new class extends Component
                         @endif
                     </dl>
                 </div>
+
+                    <!-- Location -->
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
+                                Location
+                            </h3>
+                        </div>
+                        <livewire:location-editor :model="$this->event" :key="'location-event-' . $this->event->id" />
+                    </div>
 
                     <!-- Tags -->
                     <div class="pb-4 border-b border-base-200">

@@ -548,6 +548,26 @@ class AppleHealthPlugin extends WebhookPlugin
         $intensityUnit = Arr::get($workout, 'intensity.units');
         $location = Arr::get($workout, 'location');
 
+        // Extract route data if present
+        $route = Arr::get($workout, 'route', []);
+        $routePoints = [];
+
+        if (! empty($route) && is_array($route)) {
+            foreach ($route as $point) {
+                if (! is_array($point)) {
+                    continue;
+                }
+                $routePoints[] = [
+                    'lat' => $point['latitude'] ?? null,
+                    'lng' => $point['longitude'] ?? null,
+                    'alt' => $point['altitude'] ?? null,
+                    'timestamp' => $point['timestamp'] ?? null,
+                    'speed' => $point['speed'] ?? null,
+                    'accuracy' => $point['horizontalAccuracy'] ?? null,
+                ];
+            }
+        }
+
         [$encEnergy, $energyMult] = $this->encodeNumericValue($energyQty);
 
         $actor = [
@@ -643,6 +663,13 @@ class AppleHealthPlugin extends WebhookPlugin
                 'distance_unit' => $distanceUnit,
                 'intensity' => $intensityQty,
                 'intensity_unit' => $intensityUnit,
+                'location' => $location,
+                'route_points' => $routePoints,
+                'route_summary' => [
+                    'total_points' => count($routePoints),
+                    'start_location' => $routePoints[0] ?? null,
+                    'end_location' => end($routePoints) ?: null,
+                ],
             ],
             'blocks' => $blocks,
             'tags' => $tags,

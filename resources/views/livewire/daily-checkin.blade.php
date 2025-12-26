@@ -20,6 +20,11 @@ state([
     'saving' => false,
     'lastSavedAt' => null,
     'hideSelector' => false,
+    'latitude' => null,
+    'longitude' => null,
+    'address' => null,
+    'locationEnabled' => false,
+    'fetchingLocation' => false,
 ]);
 
 mount(function (?string $date = null, bool $hideSelector = false) {
@@ -115,7 +120,10 @@ $saveCheckin = function (string $period): void {
                 'morning',
                 (int) $this->amPhysical,
                 (int) $this->amMental,
-                $this->date
+                $this->date,
+                $this->latitude,
+                $this->longitude,
+                $this->address
             );
 
             $this->lastSavedAt = now()->toIso8601String();
@@ -142,7 +150,10 @@ $saveCheckin = function (string $period): void {
                 'afternoon',
                 (int) $this->pmPhysical,
                 (int) $this->pmMental,
-                $this->date
+                $this->date,
+                $this->latitude,
+                $this->longitude,
+                $this->address
             );
 
             $this->lastSavedAt = now()->toIso8601String();
@@ -230,28 +241,64 @@ $completionStatus = computed(function () {
     }
 });
 
+$toggleLocation = function (): void {
+    $this->locationEnabled = ! $this->locationEnabled;
+    if ($this->locationEnabled && ! $this->latitude) {
+        $this->js('getLocationFromBrowser()');
+    }
+};
+
+$reverseGeocodeLocation = function (float $lat, float $lng): void {
+    $geocodingService = app(\App\Services\GeocodingService::class);
+    $result = $geocodingService->reverseGeocode($lat, $lng);
+
+    $this->latitude = $lat;
+    $this->longitude = $lng;
+    $this->address = $result['formatted_address'] ?? "{$lat}, {$lng}";
+    $this->fetchingLocation = false;
+};
+
 ?>
 
-<div class="flex items-center justify-between gap-4 flex-wrap">
-    <!-- Tabs for AM/PM -->
-    @unless ($hideSelector)
-        <div role="tablist" class="tabs tabs-boxed tabs-sm flex-none">
-            <a
-                role="tab"
-                class="tab tab-sm gap-1.5 {{ $activeView === 'am' ? 'tab-active' : '' }}"
-                wire:click="switchView('am')">
-                <x-icon name="fas.sun" class="w-3.5 h-3.5" />
-                AM
-            </a>
-            <a
-                role="tab"
-                class="tab tab-sm gap-1.5 {{ $activeView === 'pm' ? 'tab-active' : '' }}"
-                wire:click="switchView('pm')">
-                <x-icon name="fas.moon" class="w-3.5 h-3.5" />
-                PM
-            </a>
-        </div>
-    @endunless
+<div class="space-y-2">
+    {{-- Optional Location Toggle --}}
+    <div class="flex items-center gap-2">
+        <button
+            wire:click="toggleLocation"
+            class="btn btn-xs btn-ghost"
+            type="button">
+            <x-icon name="{{ $locationEnabled ? 'fas.location-dot' : 'o-map-pin' }}"
+                    class="w-3 h-3 {{ $locationEnabled ? 'text-success' : '' }}" />
+            {{ $locationEnabled ? 'Location enabled' : 'Add location' }}
+        </button>
+        @if ($fetchingLocation)
+            <span class="loading loading-spinner loading-xs"></span>
+        @endif
+        @if ($address)
+            <span class="text-xs text-base-content/70 truncate">{{ $address }}</span>
+        @endif
+    </div>
+
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+        <!-- Tabs for AM/PM -->
+        @unless ($hideSelector)
+            <div role="tablist" class="tabs tabs-boxed tabs-sm flex-none">
+                <a
+                    role="tab"
+                    class="tab tab-sm gap-1.5 {{ $activeView === 'am' ? 'tab-active' : '' }}"
+                    wire:click="switchView('am')">
+                    <x-icon name="fas.sun" class="w-3.5 h-3.5" />
+                    AM
+                </a>
+                <a
+                    role="tab"
+                    class="tab tab-sm gap-1.5 {{ $activeView === 'pm' ? 'tab-active' : '' }}"
+                    wire:click="switchView('pm')">
+                    <x-icon name="fas.moon" class="w-3.5 h-3.5" />
+                    PM
+                </a>
+            </div>
+        @endunless
 
     <!-- Morning View -->
     @if ($activeView === 'am')
@@ -288,4 +335,29 @@ $completionStatus = computed(function () {
             @endif
         </div>
     @endif
+    </div>
 </div>
+
+@if ($locationEnabled)
+<script>
+function getLocationFromBrowser() {
+    @this.set('fetchingLocation', true);
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                // Call Livewire method to reverse geocode
+                @this.call('reverseGeocodeLocation', lat, lng);
+            },
+            (error) => {
+                @this.set('fetchingLocation', false);
+                @this.set('locationEnabled', false);
+                alert('Could not get your location. Please enable location services.');
+            }
+        );
+    }
+}
+</script>
+@endif
