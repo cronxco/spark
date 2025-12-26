@@ -568,3 +568,59 @@ pretty-json {
 .EasyMDEContainer .editor-statusbar {
     @apply hidden;
 }
+
+/* Leaflet Map Popup Styling */
+.spark-map-popup .leaflet-popup-content-wrapper {
+    @apply p-0 bg-transparent shadow-none;
+    border-radius: 0.5rem;
+}
+
+.spark-map-popup .leaflet-popup-content {
+    @apply m-0 w-auto;
+}
+
+.spark-map-popup .leaflet-popup-tip {
+    background: #fcfcfc !important;
+}
+
+/* Force light mode in map popups */
+.spark-map-popup .card {
+    background: #fcfcfc !important;
+    color: #161616 !important;
+}
+
+.spark-map-popup .bg-base-100 {
+    background: #fcfcfc !important;
+}
+
+.spark-map-popup .bg-base-200 {
+    background: #f5f5f5 !important;
+}
+
+.spark-map-popup .bg-base-300 {
+    background: #ebebeb !important;
+}
+
+.spark-map-popup .text-base-content {
+    color: #161616 !important;
+}
+
+.spark-map-popup .text-base-content\/60 {
+    color: rgba(22, 22, 22, 0.6) !important;
+}
+
+.spark-map-popup .text-base-content\/70 {
+    color: rgba(22, 22, 22, 0.7) !important;
+}
+
+.spark-map-popup .text-base-content\/80 {
+    color: rgba(22, 22, 22, 0.8) !important;
+}
+
+.spark-map-popup .text-base-content\/50 {
+    color: rgba(22, 22, 22, 0.5) !important;
+}
+
+.spark-map-popup .border-base-300 {
+    border-color: #ebebeb !important;
+}

@@ -115,6 +115,12 @@ Route::middleware(['auth'])->group(function () {
     // Bookmarks routes
     Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks.index');
     Volt::route('bookmarks/fetch', 'bookmarks.fetch.index')->name('bookmarks.fetch');
+
+    // Map route
+    Route::get('map', \App\Livewire\Map\Index::class)->name('map.index');
+
+    // Place detail route
+    Route::get('places/{place}', \App\Livewire\Places\Show::class)->whereUuid('place')->name('places.show');
     // GoCardless bank selection page
     Route::get('integrations/groups/{group}/gocardless/bank-selection', function (IntegrationGroup $group) {
         if ((string) $group->user_id !== (string) Auth::id()) {

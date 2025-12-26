@@ -128,6 +128,9 @@ class DailyCheckinPlugin extends ManualPlugin
      * @param  int  $physical  Physical energy rating (1-5)
      * @param  int  $mental  Mental energy rating (1-5)
      * @param  string  $date  Date in Y-m-d format
+     * @param  float|null  $latitude  Optional latitude coordinate
+     * @param  float|null  $longitude  Optional longitude coordinate
+     * @param  string|null  $address  Optional address string
      * @return Event The created or updated event
      */
     public function createCheckinEvent(
@@ -135,7 +138,10 @@ class DailyCheckinPlugin extends ManualPlugin
         string $period,
         int $physical,
         int $mental,
-        string $date
+        string $date,
+        ?float $latitude = null,
+        ?float $longitude = null,
+        ?string $address = null
     ): Event {
         // Validate period
         if (! in_array($period, ['morning', 'afternoon'])) {
@@ -206,11 +212,21 @@ class DailyCheckinPlugin extends ManualPlugin
                     'physical_energy' => $physical,
                     'mental_energy' => $mental,
                     'date' => $date,
+                    'has_location' => $latitude !== null && $longitude !== null,
                 ],
                 'target_id' => $dayObject->id,
                 'actor_id' => $userObject->id,
             ]
         );
+
+        // Set location if coordinates provided
+        if ($latitude !== null && $longitude !== null) {
+            $event->setLocation($latitude, $longitude, $address, 'daily_checkin');
+
+            // Link to place
+            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService->detectAndLinkPlaceForEvent($event);
+        }
 
         // Create or update blocks for physical and mental energy
         $event->createBlock([

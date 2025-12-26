@@ -1282,6 +1282,16 @@ new class extends Component
                         </div>
                     </div>
 
+                    <!-- Location -->
+                    <div class="pb-4 border-b border-base-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
+                                Location
+                            </h3>
+                        </div>
+                        <livewire:location-editor :model="$this->object" :key="'location-object-' . $this->object->id" />
+                    </div>
+
                     <!-- Tags -->
                     <div class="pb-4 border-b border-base-200">
                         <div class="flex items-center justify-between mb-3">

@@ -227,6 +227,41 @@ abstract class BaseProcessingJob implements ShouldQueue
                     }
                 }
 
+                // Set location and link to place if route data is present (Apple Health workouts)
+                if (isset($data['event_metadata']['route_points']) && ! empty($data['event_metadata']['route_points'])) {
+                    $routePoints = $data['event_metadata']['route_points'];
+                    $firstPoint = $routePoints[0];
+
+                    if (isset($firstPoint['lat'], $firstPoint['lng']) && $firstPoint['lat'] !== null && $firstPoint['lng'] !== null) {
+                        // Get location tag to determine if outdoor
+                        $locationTag = $data['event_metadata']['location'] ?? null;
+                        $isOutdoor = $locationTag !== 'Indoor';
+
+                        // Reverse geocode the starting location
+                        $geocodingService = app(\App\Services\GeocodingService::class);
+                        $geocoded = $geocodingService->reverseGeocode(
+                            $firstPoint['lat'],
+                            $firstPoint['lng']
+                        );
+
+                        $address = $geocoded['formatted_address'] ?? 'Workout location';
+
+                        // Set event location
+                        $event->setLocation(
+                            $firstPoint['lat'],
+                            $firstPoint['lng'],
+                            $address,
+                            'apple_health_route'
+                        );
+
+                        // Link to place only for outdoor workouts
+                        if ($isOutdoor) {
+                            $placeService = app(\App\Services\PlaceDetectionService::class);
+                            $placeService->detectAndLinkPlaceForEvent($event);
+                        }
+                    }
+                }
+
                 $events->push($event);
             } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
                 // Handle race condition where event was created between our check and create

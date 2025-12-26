@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\GeocodingService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -732,6 +733,7 @@ class MonzoPlugin extends OAuthPlugin
 
         $this->tagTransactionEvent($event, $tx);
         $this->maybeAddTransactionBlocks($event, $tx);
+        $this->setLocationFromTransaction($event, $target, $tx);
     }
 
     public function upsertPotObject(Integration $integration, array $pot): EventObject
@@ -1668,6 +1670,107 @@ class MonzoPlugin extends OAuthPlugin
         $txs = $resp->json('transactions') ?? [];
         foreach ($txs as $tx) {
             $this->processTransactionItem($integration, $tx, $account['id']);
+        }
+    }
+
+    /**
+     * Set location for transaction event
+     */
+    protected function setLocationFromTransaction(Event $event, EventObject $target, array $tx): void
+    {
+        // Skip if online transaction
+        if (isset($tx['merchant']['online']) && $tx['merchant']['online'] === true) {
+            return;
+        }
+
+        // Check if target EventObject already has a location (manually assigned)
+        if ($target->location) {
+            $event->location = $target->location;
+            $event->location_address = $target->location_address;
+            $event->location_geocoded_at = now();
+            $event->location_source = 'inherited';
+            $event->save();
+
+            $this->detectAndLinkPlace($event);
+
+            return;
+        }
+
+        // Check if merchant has coordinates
+        if (isset($tx['merchant']['latitude'], $tx['merchant']['longitude'])) {
+            $latitude = (float) $tx['merchant']['latitude'];
+            $longitude = (float) $tx['merchant']['longitude'];
+
+            // Build formatted address from merchant data
+            $addressParts = array_filter([
+                $tx['merchant']['name'] ?? null, // Include merchant name first for place categorization
+                $tx['merchant']['address']['address'] ?? null,
+                $tx['merchant']['address']['city'] ?? null,
+                $tx['merchant']['address']['postcode'] ?? null,
+                $tx['merchant']['address']['country'] ?? null,
+            ]);
+            $formattedAddress = implode(', ', $addressParts);
+
+            $event->setLocation(
+                $latitude,
+                $longitude,
+                $formattedAddress ?: ($tx['merchant']['name'] ?? null),
+                'monzo_api'
+            );
+
+            $this->detectAndLinkPlace($event);
+
+            return;
+        }
+
+        // Fallback: Geocode merchant address if available
+        if (isset($tx['merchant']['address']['address'])) {
+            $addressParts = array_filter([
+                $tx['merchant']['address']['address'] ?? null,
+                $tx['merchant']['address']['city'] ?? null,
+                $tx['merchant']['address']['postcode'] ?? null,
+                $tx['merchant']['address']['country'] ?? null,
+            ]);
+
+            if (! empty($addressParts)) {
+                $address = implode(', ', $addressParts);
+
+                $geocodingService = app(GeocodingService::class);
+                $result = $geocodingService->geocode($address);
+
+                if ($result) {
+                    $event->setLocation(
+                        $result['latitude'],
+                        $result['longitude'],
+                        $result['formatted_address'] ?? $address,
+                        $result['source'] // 'cache' or 'geoapify'
+                    );
+                }
+            }
+        }
+
+        // After setting location, detect and link to place
+        $this->detectAndLinkPlace($event);
+    }
+
+    /**
+     * Detect or create a place for this event and link them
+     */
+    protected function detectAndLinkPlace(Event $event): void
+    {
+        if (! $event->hasLocation()) {
+            return;
+        }
+
+        try {
+            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService->detectAndLinkPlaceForEvent($event);
+        } catch (Exception $e) {
+            // Log error but don't fail the transaction processing
+            Log::error('Failed to detect place for Monzo transaction', [
+                'event_id' => $event->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
