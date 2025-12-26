@@ -1,5 +1,5 @@
 <div>
-    <x-header title="Mapss" subtitle="Events, objects, and places with location data" separator />
+    <x-header title="Maps" subtitle="Events, objects, and places with location data" separator />
 
     <x-tabs wire:model="viewMode" selected="map">
         {{-- Map Tab --}}
