@@ -33,7 +33,7 @@
 
         @script
         <script>
-            const routePoints = @json($this->routePoints);
+            const routePoints = {!! json_encode($this->routePoints) !!};
             const mapId = 'route-map-{{ $this->getId() }}';
 
             if (routePoints && routePoints.length > 0) {

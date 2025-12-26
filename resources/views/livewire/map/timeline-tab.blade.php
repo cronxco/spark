@@ -104,7 +104,7 @@
 
         // Get timeline data
         const timelineData = await component.call('getMapData');
-        const journeyRoutes = @json($this->journeyRoutes);
+        const journeyRoutes = {!! json_encode($this->journeyRoutes) !!};
 
         // Add numbered markers for each event
         let markerNumber = 1;
