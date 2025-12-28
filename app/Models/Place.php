@@ -70,7 +70,7 @@ class Place extends EventObject
     public function eventsHere()
     {
         return Event::query()
-            ->where('user_id', $this->user_id)
+            ->forUser($this->user_id)
             ->hasLocation()
             ->whereHas('relationshipsFrom', function ($query) {
                 $query->where('to_id', $this->id)
@@ -90,7 +90,7 @@ class Place extends EventObject
         }
 
         return Event::query()
-            ->where('user_id', $this->user_id)
+            ->forUser($this->user_id)
             ->withinRadius($this->latitude, $this->longitude, $radiusMeters)
             ->orderByDesc('time');
     }
