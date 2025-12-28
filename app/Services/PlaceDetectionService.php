@@ -129,6 +129,17 @@ class PlaceDetectionService
             return null;
         }
 
+        // Check if place already exists
+        $existingPlace = $this->findNearbyPlace(
+            $event->latitude,
+            $event->longitude,
+            $user,
+            $searchRadiusMeters
+        );
+
+        $isNewPlace = $existingPlace === null;
+
+        // Detect or create the place
         $place = $this->detectOrCreatePlace(
             $event->latitude,
             $event->longitude,
@@ -149,7 +160,12 @@ class PlaceDetectionService
         // Only create relationship and record visit if this is a new link
         if (! $existingRelationship) {
             $this->linkEventToPlace($event, $place);
-            $place->recordVisit();
+
+            // Only record visit if this is an existing place
+            // New places already have visit_count = 1 from creation
+            if (! $isNewPlace) {
+                $place->recordVisit();
+            }
         }
 
         return $place;
