@@ -330,12 +330,10 @@ class PlaceDetectionServiceTest extends TestCase
     public function reprocessing_same_event_does_not_increment_visit_count(): void
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
-        $event = Event::factory()->create([
-            'integration_id' => $integration->id,
-            'latitude' => 51.5074,
-            'longitude' => -0.1278,
-            'location_address' => 'Starbucks, 123 Main St',
-        ]);
+        $event = Event::factory()->create(['integration_id' => $integration->id]);
+
+        // Set location using the proper method
+        $event->setLocation(51.5074, -0.1278, 'Starbucks, 123 Main St', 'manual');
 
         // First processing - creates place with visit_count = 1
         $place = $this->service->detectAndLinkPlaceForEvent($event);
