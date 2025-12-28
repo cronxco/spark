@@ -51,7 +51,7 @@ class FetchMultipleFailures extends SparkNotification
 
     public function getActionUrl(): ?string
     {
-        return route('bookmarks.fetch') . '?domain=' . urlencode($this->webpage->metadata['domain'] ?? '');
+        return route('bookmarks') . '?tab=urls&domain=' . urlencode($this->webpage->metadata['domain'] ?? '');
     }
 
     /**
