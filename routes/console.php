@@ -129,7 +129,7 @@ Schedule::call(function () {
                     'is_weekend' => $isWeekend,
                 ]);
 
-                dispatch(new RunPreDigestRefreshJob($user, $scheduleTime));
+                dispatch(new RunPreDigestRefreshJob($user, $scheduleTime))->onQueue('flint');
                 // Job will auto-chain to RunDigestGenerationJob when agents complete
 
                 $preDigestDispatched++;
@@ -145,7 +145,7 @@ Schedule::call(function () {
                     'is_weekend' => $isWeekend,
                 ]);
 
-                dispatch(new SendDigestNotificationJob($user, $scheduleTime));
+                dispatch(new SendDigestNotificationJob($user, $scheduleTime))->onQueue('flint');
 
                 $notificationDispatched++;
             }
@@ -178,7 +178,7 @@ Schedule::call(function () {
     ]);
 
     foreach ($users as $user) {
-        dispatch(new RunPatternDetectionJob($user));
+        dispatch(new RunPatternDetectionJob($user))->onQueue('flint');
     }
 })
     ->weeklyOn(0, '04:00')
