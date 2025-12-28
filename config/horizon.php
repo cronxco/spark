@@ -75,6 +75,15 @@ return [
                 'memory' => 256,
                 'tries' => 1,
             ],
+            'supervisor-5' => [
+                'connection' => 'redis',
+                'queue' => ['flint'],
+                'balance' => 'auto',
+                'maxProcesses' => 2,
+                'memory' => 512,
+                'tries' => 1,
+                'timeout' => 900,
+            ],
         ],
 
         'staging' => [
@@ -110,6 +119,15 @@ return [
                 'memory' => 256,
                 'tries' => 1,
             ],
+            'supervisor-5' => [
+                'connection' => 'redis',
+                'queue' => ['flint'],
+                'balance' => 'auto',
+                'maxProcesses' => 2,
+                'memory' => 512,
+                'tries' => 1,
+                'timeout' => 900,
+            ],
         ],
 
         'local' => [
@@ -144,6 +162,15 @@ return [
                 'maxProcesses' => 1,
                 'memory' => 256,
                 'tries' => 1,
+            ],
+            'supervisor-5' => [
+                'connection' => 'redis',
+                'queue' => ['flint'],
+                'balance' => 'auto',
+                'maxProcesses' => 2,
+                'memory' => 512,
+                'tries' => 1,
+                'timeout' => 900,
             ],
         ],
     ],
