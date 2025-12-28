@@ -789,6 +789,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
         ], [
             'client_id' => $this->clientId,
             'grant_type' => 'refresh_token',
+            'redirect_uri' => $this->redirectUri,
         ]);
 
         $hub = SentrySdk::getCurrentHub();
@@ -801,6 +802,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
             'client_secret' => $this->clientSecret,
             'grant_type' => 'refresh_token',
             'refresh_token' => $group->refresh_token,
+            'redirect_uri' => $this->redirectUri,
         ]);
         $span?->finish();
 
