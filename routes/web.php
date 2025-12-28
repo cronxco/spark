@@ -113,8 +113,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('money/receipts/{id}', \App\Livewire\ReceiptDetail::class)->whereUuid('id')->name('receipts.show');
 
     // Bookmarks routes
-    Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks.index');
-    Volt::route('bookmarks/fetch', 'bookmarks.fetch.index')->name('bookmarks.fetch');
+    Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks');
+    Route::redirect('bookmarks/fetch', '/bookmarks?tab=urls')->name('bookmarks.fetch');
 
     // Map route
     Route::get('map', \App\Livewire\Map\Index::class)->name('map.index');

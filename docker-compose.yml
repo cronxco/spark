@@ -1,6 +1,6 @@
 services:
     nginx:
-        image: "nginx:latest@sha256:fb01117203ff38c2f9af91db1a7409459182a37c87cced5cb442d1d8fcc66d19"
+        image: "nginx:latest"
         ports:
             - "${HTTP_PORT:-8000}:80"
             - "${SSL_PORT:-443}:443"
@@ -14,7 +14,6 @@ services:
             - "sail-nginx:/etc/nginx/certs"
             - "./vendor/ryoluo/sail-ssl/nginx/templates:/etc/nginx/templates"
             - "./vendor/ryoluo/sail-ssl/nginx/generate-ssl-cert.sh:/docker-entrypoint.d/99-generate-ssl-cert.sh"
-            - "./local-dev/database/create-test-database.sql:/docker-entrypoint-initdb.d/10-create-test-database.sql"
         depends_on:
             - ${APP_SERVICE:-laravel.test}
         networks:
@@ -45,9 +44,7 @@ services:
             - pgsql
             - redis
     pgsql:
-        build:
-            context: ./docker/postgresql
-            dockerfile: Dockerfile
+        image: "bsamasi/postgis-pgvector:pg17@sha256:f3133925f641c093fae3f83607cfe21eb6e401b6961ae1cac84f70ff6f767f59"
         ports:
             - "${FORWARD_DB_PORT:-5432}:5432"
         environment:
