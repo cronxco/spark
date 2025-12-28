@@ -70,13 +70,24 @@ class TaskDefinition
      */
     private function getModelType(Model $model): string
     {
-        return match (get_class($model)) {
-            Event::class => 'event',
-            Block::class => 'block',
-            EventObject::class => 'object',
-            Integration::class => 'integration',
-            default => throw new InvalidArgumentException('Unsupported model type: ' . get_class($model)),
-        };
+        // Check instanceof to handle inheritance (e.g., Place extends EventObject)
+        if ($model instanceof Event) {
+            return 'event';
+        }
+
+        if ($model instanceof Block) {
+            return 'block';
+        }
+
+        if ($model instanceof EventObject) {
+            return 'object';
+        }
+
+        if ($model instanceof Integration) {
+            return 'integration';
+        }
+
+        throw new InvalidArgumentException('Unsupported model type: ' . get_class($model));
     }
 
     /**
