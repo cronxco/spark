@@ -1008,6 +1008,14 @@ class Day extends Component
             return true;
         });
 
+        // Sort events: by time (desc), then service (asc), then action (asc)
+        // This ensures events at the same time are ordered alphabetically
+        $filtered = $filtered->sortBy([
+            ['time', 'desc'],
+            ['service', 'asc'],
+            ['action', 'asc'],
+        ]);
+
         $this->filteredEvents = $filtered->values();
     }
 }
