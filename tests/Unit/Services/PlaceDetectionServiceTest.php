@@ -67,8 +67,8 @@ class PlaceDetectionServiceTest extends TestCase
         // Should return existing place
         $this->assertEquals($existingPlace->id, $place->id);
 
-        // Visit count should increment
-        $this->assertEquals(6, $place->visit_count);
+        // Visit count should NOT increment when just detecting - only when linking an event
+        $this->assertEquals(5, $place->visit_count);
     }
 
     /**
@@ -322,5 +322,31 @@ class PlaceDetectionServiceTest extends TestCase
 
         $this->assertEquals(2, Place::count()); // Two places, one per user
         $this->assertEquals($this->user->id, $newPlace->user_id);
+    }
+
+    /**
+     * @test
+     */
+    public function reprocessing_same_event_does_not_increment_visit_count(): void
+    {
+        $integration = Integration::factory()->create(['user_id' => $this->user->id]);
+        $event = Event::factory()->create(['integration_id' => $integration->id]);
+
+        // Set location using the proper method
+        $event->setLocation(51.5074, -0.1278, 'Starbucks, 123 Main St', 'manual');
+
+        // First processing - creates place with visit_count = 1
+        $place = $this->service->detectAndLinkPlaceForEvent($event);
+
+        $this->assertNotNull($place);
+        $this->assertEquals(1, $place->visit_count);
+        $this->assertEquals(1, Relationship::where('type', 'occurred_at')->count());
+
+        // Reprocess same event (simulating re-sync) - should NOT increment visit count
+        $place2 = $this->service->detectAndLinkPlaceForEvent($event);
+
+        $this->assertEquals($place->id, $place2->id);
+        $this->assertEquals(1, $place2->visit_count); // Still 1, not 2
+        $this->assertEquals(1, Relationship::where('type', 'occurred_at')->count()); // Still only 1 relationship
     }
 }
