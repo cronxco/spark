@@ -176,7 +176,7 @@
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')" />
                 <x-menu-item title="Map" icon="fas.map-location-dot" link="{{ route('map.index') }}" :active="request()->routeIs('map.*')" data-hotkey="g l" />
                 <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" data-hotkey="g t" />
-                <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks.index') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />
+                <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />
                 <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" data-hotkey="g m" />
                 <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" data-hotkey="g x" />
                 <x-menu-item title="Media" icon="fas.photo-film" link="{{ route('media.index') }}" :active="request()->routeIs('media.*')" data-hotkey="g g" />

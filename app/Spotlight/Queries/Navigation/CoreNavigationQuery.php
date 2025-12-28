@@ -76,7 +76,7 @@ class CoreNavigationQuery
                         ->setIcon('bookmark')
                         ->setGroup('navigation')
                         ->setPriority(2)
-                        ->setAction('jump_to', ['path' => route('bookmarks.index')])
+                        ->setAction('jump_to', ['path' => route('bookmarks')])
                 );
             }
 
