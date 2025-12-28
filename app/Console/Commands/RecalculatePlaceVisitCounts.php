@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Event;
 use App\Models\Place;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -134,7 +134,7 @@ class RecalculatePlaceVisitCounts extends Command
                 } else {
                     $stats['unchanged']++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $stats['errors']++;
                 $this->newLine();
                 $this->error("Error processing place {$place->id}: " . $e->getMessage());
