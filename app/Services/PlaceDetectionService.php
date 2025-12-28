@@ -29,7 +29,6 @@ class PlaceDetectionService
         $existing = $this->findNearbyPlace($latitude, $longitude, $user, $searchRadiusMeters);
 
         if ($existing) {
-            $existing->recordVisit();
             Log::info('Matched existing place', [
                 'place_id' => $existing->id,
                 'title' => $existing->title,
@@ -138,7 +137,20 @@ class PlaceDetectionService
             $searchRadiusMeters
         );
 
-        $this->linkEventToPlace($event, $place);
+        // Check if this event is already linked to this place
+        $existingRelationship = Relationship::where('user_id', $user->id)
+            ->where('from_type', Event::class)
+            ->where('from_id', $event->id)
+            ->where('to_type', EventObject::class)
+            ->where('to_id', $place->id)
+            ->where('type', 'occurred_at')
+            ->first();
+
+        // Only create relationship and record visit if this is a new link
+        if (! $existingRelationship) {
+            $this->linkEventToPlace($event, $place);
+            $place->recordVisit();
+        }
 
         return $place;
     }
