@@ -85,7 +85,7 @@ class RecalculatePlaceVisitCounts extends Command
         $updateCount = $placesToUpdate->count();
 
         $this->info("Places needing updates: {$updateCount}");
-        $this->info("Places already correct: " . ($totalPlaces - $updateCount));
+        $this->info('Places already correct: ' . ($totalPlaces - $updateCount));
         $this->newLine();
 
         if ($updateCount === 0) {
