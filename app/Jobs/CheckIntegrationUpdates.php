@@ -12,6 +12,8 @@ use App\Jobs\OAuth\Goodreads\GoodreadsProgressPull;
 use App\Jobs\OAuth\Goodreads\GoodreadsShelfPull;
 use App\Jobs\OAuth\GoogleCalendar\GoogleCalendarEventsPull;
 use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
+use App\Jobs\OAuth\Immich\PeoplePull;
+use App\Jobs\OAuth\Immich\PhotosPull;
 use App\Jobs\OAuth\Karakeep\KarakeepBookmarksPull;
 use App\Jobs\OAuth\Monzo\MonzoAccountPull;
 use App\Jobs\OAuth\Monzo\MonzoBalancePull;
@@ -229,6 +231,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             'fetch' => $this->getFetchFetchJobs($integration),
             'goodreads' => $this->getGoodreadsFetchJobs($integration),
             'untappd' => $this->getUntappdFetchJobs($integration),
+            'immich' => $this->getImmichFetchJobs($integration),
             // Add other services here as they are implemented
             default => [],
         };
@@ -393,5 +396,23 @@ class CheckIntegrationUpdates implements ShouldQueue
             'rss_feed' => [UntappdRssPull::class],
             default => [],
         };
+    }
+
+    private function getImmichFetchJobs(Integration $integration): array
+    {
+        $instanceType = $integration->instance_type ?: 'photos';
+        $syncPeople = $integration->configuration['sync_people'] ?? true;
+
+        $jobs = match ($instanceType) {
+            'photos' => [PhotosPull::class],
+            default => [],
+        };
+
+        // Add PeoplePull if configured to sync people
+        if ($instanceType === 'photos' && $syncPeople) {
+            $jobs[] = PeoplePull::class;
+        }
+
+        return $jobs;
     }
 }

@@ -257,7 +257,8 @@ class FlintBlockCreationService
         );
 
         // Get or create event for today's analysis run
-        // Deduplicate by integration_id, action, and date
+        // Use updateOrCreate to respect the unique constraint on (integration_id, source_id)
+        // and update the timestamp and metadata each time it runs
         $today = now()->startOfDay();
         $dedupeKey = sprintf(
             'flint_analysis_%s_%s',
@@ -265,20 +266,14 @@ class FlintBlockCreationService
             $today->format('Y-m-d')
         );
 
-        // First try to find an existing event for today
-        // Use whereDate to match on date part of timestamp
-        $event = Event::where('integration_id', $integration->id)
-            ->where('action', 'had_analysis')
-            ->where('service', 'flint')
-            ->whereDate('time', $today)
-            ->first();
-
-        // If no event exists, create one
-        if (! $event) {
-            $event = Event::create([
-                'id' => Str::uuid(),
+        // Use updateOrCreate with the unique constraint fields
+        // This will find existing event by integration_id + source_id, or create new one
+        $event = Event::updateOrCreate(
+            [
                 'integration_id' => $integration->id,
                 'source_id' => $flintObject->id,
+            ],
+            [
                 'actor_id' => $flintObject->id,
                 'target_id' => $flintObject->id,
                 'time' => $today,
@@ -290,8 +285,8 @@ class FlintBlockCreationService
                     'timestamp' => now()->toIso8601String(),
                     'dedupe_key' => $dedupeKey,
                 ],
-            ]);
-        }
+            ]
+        );
 
         return $event;
     }
