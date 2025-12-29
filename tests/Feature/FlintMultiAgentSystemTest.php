@@ -197,26 +197,34 @@ class FlintMultiAgentSystemTest extends TestCase
     }
 
     /** @test */
-    public function it_deduplicates_flint_events_for_same_day()
+    public function it_creates_separate_events_per_analysis_run_for_same_day()
     {
         $blockCreation = app(\App\Services\FlintBlockCreationService::class);
 
-        // Create first event
+        // Create first event (e.g., morning analysis)
         $firstEvent = $blockCreation->getOrCreateFlintEvent($this->user);
         $firstEventId = $firstEvent->id;
 
-        // Call again - should return the same event
-        $secondEvent = $blockCreation->getOrCreateFlintEvent($this->user);
-        $this->assertEquals($firstEventId, $secondEvent->id, 'Should return the same event for the same day');
+        // Small delay to ensure different timestamp
+        sleep(1);
 
-        // Verify only one event exists
+        // Call again - should create a new event (e.g., afternoon analysis)
+        $secondEvent = $blockCreation->getOrCreateFlintEvent($this->user);
+        $this->assertNotEquals($firstEventId, $secondEvent->id, 'Should create a new event for each analysis run');
+
+        // Verify both events point to the same day object
+        $this->assertEquals($firstEvent->target_id, $secondEvent->target_id, 'Both events should point to the same day object');
+        $this->assertEquals('day', $firstEvent->target->concept);
+        $this->assertEquals(now()->format('Y-m-d'), $firstEvent->target->title);
+
+        // Verify multiple events exist for today
         $eventCount = Event::where('integration_id', $firstEvent->integration_id)
             ->where('action', 'had_analysis')
             ->where('service', 'flint')
             ->whereDate('time', now())
             ->count();
 
-        $this->assertEquals(1, $eventCount, 'Should only have one event for today');
+        $this->assertEquals(2, $eventCount, 'Should have two separate analysis events for today');
     }
 
     /** @test */

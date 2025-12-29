@@ -208,6 +208,7 @@ class FlintBlockCreationService
 
     /**
      * Get or create Flint event for a user
+     * Creates one event per analysis run (multiple per day), all linked to the day object
      */
     public function getOrCreateFlintEvent(User $user): Event
     {
@@ -240,7 +241,7 @@ class FlintBlockCreationService
             ]
         );
 
-        // Get or create the Flint EventObject
+        // Get or create the Flint EventObject (represents the AI assistant)
         $flintObject = EventObject::firstOrCreate(
             [
                 'user_id' => $user->id,
@@ -256,37 +257,45 @@ class FlintBlockCreationService
             ]
         );
 
-        // Get or create event for today's analysis run
-        // Use updateOrCreate to respect the unique constraint on (integration_id, source_id)
-        // and update the timestamp and metadata each time it runs
+        // Get or create the day object (shared across all events today)
         $today = now()->startOfDay();
-        $dedupeKey = sprintf(
-            'flint_analysis_%s_%s',
-            $integration->id,
-            $today->format('Y-m-d')
-        );
+        $dateString = $today->format('Y-m-d');
 
-        // Use updateOrCreate with the unique constraint fields
-        // This will find existing event by integration_id + source_id, or create new one
-        $event = Event::updateOrCreate(
+        $dayObject = EventObject::firstOrCreate(
             [
-                'integration_id' => $integration->id,
-                'source_id' => $flintObject->id,
+                'user_id' => $user->id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $dateString,
             ],
             [
-                'actor_id' => $flintObject->id,
-                'target_id' => $flintObject->id,
                 'time' => $today,
-                'service' => 'flint',
-                'domain' => 'online',
-                'action' => 'had_analysis',
-                'event_metadata' => [
-                    'analysis_type' => 'multi_agent',
-                    'timestamp' => now()->toIso8601String(),
-                    'dedupe_key' => $dedupeKey,
-                ],
+                'content' => null,
+                'metadata' => [],
             ]
         );
+
+        // Create a new event for this analysis run
+        // Use synthetic source_id (like Monzo) to allow multiple events per day
+        // Day object goes in target_id, allowing all analysis events to relate to same day
+        $timestamp = now()->format('Y-m-d_H-i-s');
+        $syntheticSourceId = "flint_analysis_{$integration->id}_{$timestamp}";
+
+        $event = Event::create([
+            'integration_id' => $integration->id,
+            'source_id' => $syntheticSourceId,  // Unique synthetic ID
+            'actor_id' => $flintObject->id,      // The AI assistant
+            'target_id' => $dayObject->id,       // The day being analyzed
+            'time' => now(),
+            'service' => 'flint',
+            'domain' => 'online',
+            'action' => 'had_analysis',
+            'event_metadata' => [
+                'analysis_type' => 'multi_agent',
+                'timestamp' => now()->toIso8601String(),
+                'analysis_run_id' => $syntheticSourceId,
+            ],
+        ]);
 
         return $event;
     }
