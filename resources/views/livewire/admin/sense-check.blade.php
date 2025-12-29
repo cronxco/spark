@@ -144,7 +144,7 @@ new class extends Component
                 'category' => 'orphaned_events',
                 'severity' => 'error',
                 'issue' => 'Events without integrations',
-                'orphaned_event_ids' => $this->orphanedEvents['all_ids'],
+                'orphaned_event_ids' => $this->orphanedEvents['records']->pluck('id')->toArray(),
                 'count' => $this->orphanedEvents['count'],
             ];
             $issues['summary']['total_issue_types']++;
@@ -157,7 +157,7 @@ new class extends Component
                 'category' => 'orphaned_blocks',
                 'severity' => 'error',
                 'issue' => 'Blocks without events',
-                'orphaned_block_ids' => $this->orphanedBlocks['all_ids'],
+                'orphaned_block_ids' => $this->orphanedBlocks['records']->pluck('id')->toArray(),
                 'count' => $this->orphanedBlocks['count'],
             ];
             $issues['summary']['total_issue_types']++;
@@ -170,7 +170,7 @@ new class extends Component
                 'category' => 'orphaned_objects',
                 'severity' => 'error',
                 'issue' => 'Objects without event references',
-                'orphaned_object_ids' => $this->orphanedObjects['all_ids'],
+                'orphaned_object_ids' => $this->orphanedObjects['records']->pluck('id')->toArray(),
                 'count' => $this->orphanedObjects['count'],
             ];
             $issues['summary']['total_issue_types']++;
@@ -285,43 +285,48 @@ new class extends Component
     }
 
     /**
-     * @return array<int, array{count: int, all_ids: array<int, string>}>
+     * @return array{count: int, records: \Illuminate\Database\Eloquent\Collection}
      */
     public function getOrphanedEventsProperty(): array
     {
-        $orphanedEvents = Event::whereDoesntHave('integration')->get();
+        $orphanedEvents = Event::whereDoesntHave('integration')
+            ->with(['actor', 'target', 'blocks'])
+            ->get();
 
         return [
             'count' => $orphanedEvents->count(),
-            'all_ids' => $orphanedEvents->pluck('id')->toArray(),
+            'records' => $orphanedEvents,
         ];
     }
 
     /**
-     * @return array<int, array{count: int, all_ids: array<int, string>}>
+     * @return array{count: int, records: \Illuminate\Database\Eloquent\Collection}
      */
     public function getOrphanedBlocksProperty(): array
     {
-        $orphanedBlocks = Block::whereDoesntHave('event')->get();
+        $orphanedBlocks = Block::whereDoesntHave('event')
+            ->with('event')
+            ->get();
 
         return [
             'count' => $orphanedBlocks->count(),
-            'all_ids' => $orphanedBlocks->pluck('id')->toArray(),
+            'records' => $orphanedBlocks,
         ];
     }
 
     /**
-     * @return array<int, array{count: int, all_ids: array<int, string>}>
+     * @return array{count: int, records: \Illuminate\Database\Eloquent\Collection}
      */
     public function getOrphanedObjectsProperty(): array
     {
         $orphanedObjects = EventObject::whereDoesntHave('actorEvents')
             ->whereDoesntHave('targetEvents')
+            ->with('tags')
             ->get();
 
         return [
             'count' => $orphanedObjects->count(),
-            'all_ids' => $orphanedObjects->pluck('id')->toArray(),
+            'records' => $orphanedObjects,
         ];
     }
 
@@ -879,58 +884,52 @@ new class extends Component
                 <div class="space-y-3">
                     @if ($orphanedEvents['count'] > 0)
                     <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between mb-3">
                             <div class="font-semibold text-red-700">Events without integrations</div>
                             <a href="{{ route('admin.events.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
                                 {{ $orphanedEvents['count'] }} found
                             </a>
                         </div>
-                        @if (!empty($orphanedEvents['all_ids']))
-                        <div class="text-xs text-red-600 mb-2">All orphaned event IDs:</div>
-                        <div class="flex flex-wrap gap-1 max-h-48 overflow-y-auto">
-                            @foreach ($orphanedEvents['all_ids'] as $eventId)
-                            <code class="badge badge-outline badge-sm font-mono">{{ $eventId }}</code>
+                        <div class="text-xs text-red-600 mb-2">All orphaned events:</div>
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2 bg-white/50 rounded">
+                            @foreach ($orphanedEvents['records'] as $event)
+                            <x-event-ref :event="$event" />
                             @endforeach
                         </div>
-                        @endif
                     </div>
                     @endif
 
                     @if ($orphanedBlocks['count'] > 0)
                     <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between mb-3">
                             <div class="font-semibold text-red-700">Blocks without events</div>
                             <a href="{{ route('admin.blocks.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
                                 {{ $orphanedBlocks['count'] }} found
                             </a>
                         </div>
-                        @if (!empty($orphanedBlocks['all_ids']))
-                        <div class="text-xs text-red-600 mb-2">All orphaned block IDs:</div>
-                        <div class="flex flex-wrap gap-1 max-h-48 overflow-y-auto">
-                            @foreach ($orphanedBlocks['all_ids'] as $blockId)
-                            <code class="badge badge-outline badge-sm font-mono">{{ $blockId }}</code>
+                        <div class="text-xs text-red-600 mb-2">All orphaned blocks:</div>
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2 bg-white/50 rounded">
+                            @foreach ($orphanedBlocks['records'] as $block)
+                            <x-block-ref :block="$block" />
                             @endforeach
                         </div>
-                        @endif
                     </div>
                     @endif
 
                     @if ($orphanedObjects['count'] > 0)
                     <div class="border border-red-200 rounded-lg p-4 bg-red-50">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between mb-3">
                             <div class="font-semibold text-red-700">Objects without event references</div>
                             <a href="{{ route('admin.objects.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
                                 {{ $orphanedObjects['count'] }} found
                             </a>
                         </div>
-                        @if (!empty($orphanedObjects['all_ids']))
-                        <div class="text-xs text-red-600 mb-2">All orphaned object IDs:</div>
-                        <div class="flex flex-wrap gap-1 max-h-48 overflow-y-auto">
-                            @foreach ($orphanedObjects['all_ids'] as $objectId)
-                            <code class="badge badge-outline badge-sm font-mono">{{ $objectId }}</code>
+                        <div class="text-xs text-red-600 mb-2">All orphaned objects:</div>
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2 bg-white/50 rounded">
+                            @foreach ($orphanedObjects['records'] as $object)
+                            <x-object-ref :object="$object" />
                             @endforeach
                         </div>
-                        @endif
                     </div>
                     @endif
                 </div>
