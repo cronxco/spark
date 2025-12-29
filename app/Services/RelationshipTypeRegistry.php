@@ -128,6 +128,13 @@ class RelationshipTypeRegistry
                 'description' => 'Event occurred at a specific place',
                 'supports_value' => false,
             ],
+            'tagged_in' => [
+                'display_name' => 'Tagged In',
+                'icon' => 'fas.user-tag',
+                'is_directional' => true,
+                'description' => 'Person appears in photo cluster',
+                'supports_value' => false,
+            ],
         ];
     }
 

@@ -13,6 +13,7 @@ use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\Goodreads\GoodreadsPlugin;
 use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Integrations\Hevy\HevyPlugin;
+use App\Integrations\Immich\ImmichPlugin;
 use App\Integrations\Karakeep\KarakeepPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Newsletter\NewsletterPlugin;
@@ -42,6 +43,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(OuraPlugin::class);
         PluginRegistry::register(MonzoPlugin::class);
         PluginRegistry::register(HevyPlugin::class);
+        PluginRegistry::register(ImmichPlugin::class);
         PluginRegistry::register(GoCardlessBankPlugin::class);
         PluginRegistry::register(AppleHealthPlugin::class);
         PluginRegistry::register(RedditPlugin::class);
