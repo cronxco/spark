@@ -197,34 +197,38 @@ class FlintMultiAgentSystemTest extends TestCase
     }
 
     /** @test */
-    public function it_creates_separate_events_per_analysis_run_for_same_day()
+    public function it_creates_one_event_per_period_and_reuses_for_same_period()
     {
         $blockCreation = app(\App\Services\FlintBlockCreationService::class);
 
-        // Create first event (e.g., morning analysis)
+        // Create first event (e.g., morning analysis - first agent)
         $firstEvent = $blockCreation->getOrCreateFlintEvent($this->user);
         $firstEventId = $firstEvent->id;
 
-        // Small delay to ensure different timestamp
-        sleep(1);
-
-        // Call again - should create a new event (e.g., afternoon analysis)
+        // Call again in same period (e.g., second agent in same workflow)
+        // Should return/update the same event
         $secondEvent = $blockCreation->getOrCreateFlintEvent($this->user);
-        $this->assertNotEquals($firstEventId, $secondEvent->id, 'Should create a new event for each analysis run');
+        $this->assertEquals($firstEventId, $secondEvent->id, 'Should return same event for same period');
 
-        // Verify both events point to the same day object
-        $this->assertEquals($firstEvent->target_id, $secondEvent->target_id, 'Both events should point to the same day object');
+        // Verify event has correct structure
         $this->assertEquals('day', $firstEvent->target->concept);
         $this->assertEquals(now()->format('Y-m-d'), $firstEvent->target->title);
+        $this->assertStringStartsWith('flint_analysis_', $firstEvent->source_id);
 
-        // Verify multiple events exist for today
+        // Verify period is in metadata
+        $this->assertArrayHasKey('period', $firstEvent->event_metadata);
+        $this->assertContains($firstEvent->event_metadata['period'], ['morning', 'afternoon', 'evening']);
+
+        // Verify source_id format matches expected pattern
+        $expectedPattern = '/^flint_analysis_\d{4}-\d{2}-\d{2}_(morning|afternoon|evening)$/';
+        $this->assertMatchesRegularExpression($expectedPattern, $firstEvent->source_id);
+
+        // Verify only one event exists for this period
         $eventCount = Event::where('integration_id', $firstEvent->integration_id)
-            ->where('action', 'had_analysis')
-            ->where('service', 'flint')
-            ->whereDate('time', now())
+            ->where('source_id', $firstEvent->source_id)
             ->count();
 
-        $this->assertEquals(2, $eventCount, 'Should have two separate analysis events for today');
+        $this->assertEquals(1, $eventCount, 'Should only have one event for this period');
     }
 
     /** @test */
