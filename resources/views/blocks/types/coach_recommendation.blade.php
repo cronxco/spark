@@ -18,6 +18,22 @@ $actionColors = [
 ];
 $badgeColor = $actionColors[$action] ?? 'neutral';
 
+// Map badge colors to full Tailwind class names (for JIT compatibility)
+$borderColorMap = [
+    'success' => 'border-success',
+    'info' => 'border-info',
+    'warning' => 'border-warning',
+    'neutral' => 'border-neutral',
+];
+$bgColorMap = [
+    'success' => 'bg-success/10',
+    'info' => 'bg-info/10',
+    'warning' => 'bg-warning/10',
+    'neutral' => 'bg-neutral/10',
+];
+$borderClass = $borderColorMap[$badgeColor] ?? 'border-neutral';
+$bgClass = $bgColorMap[$badgeColor] ?? 'bg-neutral/10';
+
 $actionIcons = [
     'increase_weight' => 'fas.weight-hanging',
     'increase_reps' => 'fas.hashtag',
@@ -34,7 +50,7 @@ $currentRpe = $metadata['current_rpe'] ?? null;
 $unit = $metadata['current_unit'] ?? 'kg';
 @endphp
 
-<div class="card bg-base-200 shadow hover:shadow-lg transition-all border-l-4 border-{{ $badgeColor }}">
+<div class="card bg-base-200 shadow hover:shadow-lg transition-all border-l-4 {{ $borderClass }}">
     <div class="card-body p-4 gap-3">
         {{-- Header --}}
         <div class="flex items-center justify-between gap-2">
@@ -69,7 +85,7 @@ $unit = $metadata['current_unit'] ?? 'kg';
                 <div class="stat-desc">{{ $currentReps }} reps @ RPE {{ $currentRpe }}</div>
                 @endif
             </div>
-            <div class="stat bg-{{ $badgeColor }}/10 rounded p-2">
+            <div class="stat {{ $bgClass }} rounded p-2">
                 <div class="stat-title text-xs">New Target</div>
                 <div class="stat-value text-sm">{{ $newWeight }}{{ $unit }}</div>
                 @if ($newReps !== null)

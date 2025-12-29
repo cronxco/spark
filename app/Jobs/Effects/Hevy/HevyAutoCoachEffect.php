@@ -8,7 +8,7 @@ class HevyAutoCoachEffect extends BaseEffectJob
 {
     public function uniqueId(): string
     {
-        return 'hevy_auto_coach_' . $this->integration->id . '_' . now()->timestamp;
+        return 'hevy_auto_coach_' . $this->integration->id . '_' . now()->toDateString();
     }
 
     protected function execute(): array

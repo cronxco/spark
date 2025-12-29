@@ -168,7 +168,7 @@ class ProgressionAnalysisServiceTest extends TestCase
 
         // Test rounding to nearest 2 reps
         $this->assertEquals(12.0, $this->service->roundToIncrement(11.5, 2.0));
-        $this->assertEquals(14.0, $this->service->roundToincrement(13.8, 2.0));
+        $this->assertEquals(14.0, $this->service->roundToIncrement(13.8, 2.0));
     }
 
     /**

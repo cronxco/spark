@@ -85,15 +85,25 @@ class HevyRoutineData extends BaseProcessingJob
             'routine_title' => $routine->title,
         ])]);
 
-        // Link template to routine using relationship
-        Relationship::createRelationship([
-            'user_id' => $this->integration->user_id,
-            'from_type' => EventObject::class,
-            'from_id' => $template->id,
-            'to_type' => EventObject::class,
-            'to_id' => $routine->id,
-            'type' => 'part_of',
-        ]);
+        // Link template to routine using relationship (check for existing relationship first)
+        $existingRelationship = Relationship::where('user_id', $this->integration->user_id)
+            ->where('from_type', EventObject::class)
+            ->where('from_id', $template->id)
+            ->where('to_type', EventObject::class)
+            ->where('to_id', $routine->id)
+            ->where('type', 'part_of')
+            ->first();
+
+        if (! $existingRelationship) {
+            Relationship::createRelationship([
+                'user_id' => $this->integration->user_id,
+                'from_type' => EventObject::class,
+                'from_id' => $template->id,
+                'to_type' => EventObject::class,
+                'to_id' => $routine->id,
+                'type' => 'part_of',
+            ]);
+        }
 
         return $template;
     }

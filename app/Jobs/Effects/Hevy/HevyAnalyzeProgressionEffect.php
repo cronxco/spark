@@ -24,6 +24,10 @@ class HevyAnalyzeProgressionEffect extends BaseEffectJob
         // Store recommendations as blocks
         $this->storeRecommendationsAsBlocks($result['recommendations']);
 
+        // Cache the last successful run timestamp (expires in 24 hours)
+        $cacheKey = "hevy_coach_last_run_{$this->integration->id}";
+        cache()->put($cacheKey, now(), now()->addDay());
+
         return [
             'success' => true,
             'message' => 'Analyzed ' . count($result['recommendations']) . ' exercise(s)',
@@ -58,9 +62,14 @@ class HevyAnalyzeProgressionEffect extends BaseEffectJob
                 'url' => null,
             ]);
 
-            // Create recommendation event
+            // Create recommendation event with deterministic source_id
+            $date = now()->format('Ymd');
+            $routineName = $rec['routine'];
+            $exerciseName = $rec['exercise'];
+            $sourceId = 'hevy_coach_' . $this->integration->id . '_' . $routineObject->id . '_' . md5($exerciseName) . '_' . $date;
+
             $event = Event::create([
-                'source_id' => 'hevy_coach_' . $this->integration->id . '_' . now()->timestamp . '_' . md5(json_encode($rec)),
+                'source_id' => $sourceId,
                 'time' => now(),
                 'integration_id' => $this->integration->id,
                 'actor_id' => $userObject->id,

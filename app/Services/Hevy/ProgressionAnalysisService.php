@@ -34,7 +34,7 @@ class ProgressionAnalysisService
         // Group blocks by routine title AND exercise name (to handle per-routine progression)
         $exercisesByRoutineAndName = [];
         foreach ($workouts as $workout) {
-            $routineTitle = $workout->target->title ?? 'Unknown Routine';
+            $routineTitle = $workout->target?->title ?? 'Unknown Routine';
 
             foreach ($workout->blocks as $block) {
                 $exerciseName = $block->metadata['exercise_name'] ?? 'Unknown';

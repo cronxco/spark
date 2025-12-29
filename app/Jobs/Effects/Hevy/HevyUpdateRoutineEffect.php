@@ -12,7 +12,7 @@ class HevyUpdateRoutineEffect extends BaseEffectJob
 {
     public function uniqueId(): string
     {
-        return 'hevy_update_routine_' . $this->integration->id . '_' . now()->timestamp;
+        return 'hevy_update_routine_' . $this->integration->id . '_' . now()->toDateString();
     }
 
     protected function execute(): array
@@ -113,6 +113,7 @@ class HevyUpdateRoutineEffect extends BaseEffectJob
                         $set['reps'] = $rec['new_reps'];
                     }
                 }
+                unset($set); // Remove lingering reference
 
                 // Update notes field with narrative + new target
                 $exercise['notes'] = $analysisService->formatNotes($rec);

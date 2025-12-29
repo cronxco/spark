@@ -358,9 +358,6 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                         return false;
                     }
 
-                    // Cache the last run timestamp (expires in 24 hours)
-                    cache()->put($cacheKey, now(), now()->addDay());
-
                     return true;
                 },
             ),
