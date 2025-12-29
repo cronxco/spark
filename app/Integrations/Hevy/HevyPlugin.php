@@ -8,6 +8,7 @@ use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\Effects\Hevy\HevyAnalyzeProgressionEffect;
 use App\Jobs\Effects\Hevy\HevyAutoCoachEffect;
 use App\Jobs\Effects\Hevy\HevyUpdateRoutineEffect;
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -349,12 +350,18 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                         return false;
                     }
 
-                    // Check if we've already run coach today for this integration
+                    // Check if we've already successfully run coach today for this integration
+                    // by looking for recent coach_recommendation blocks (not cache)
                     // to avoid running multiple times if multiple workouts are logged
-                    $cacheKey = "hevy_coach_last_run_{$integration->id}";
-                    $lastRun = cache()->get($cacheKey);
+                    $hasRecentRecommendation = Block::whereHas('event', function ($q) use ($integration) {
+                        $q->where('integration_id', $integration->id)
+                            ->where('action', 'had_coach_recommendation')
+                            ->where('created_at', '>=', now()->startOfDay());
+                    })
+                        ->where('block_type', 'coach_recommendation')
+                        ->exists();
 
-                    if ($lastRun && $lastRun->isToday()) {
+                    if ($hasRecentRecommendation) {
                         return false;
                     }
 

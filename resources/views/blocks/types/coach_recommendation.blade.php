@@ -31,8 +31,15 @@ $bgColorMap = [
     'warning' => 'bg-warning/10',
     'neutral' => 'bg-neutral/10',
 ];
+$badgeColorMap = [
+    'success' => 'badge-success',
+    'info' => 'badge-info',
+    'warning' => 'badge-warning',
+    'neutral' => 'badge-neutral',
+];
 $borderClass = $borderColorMap[$badgeColor] ?? 'border-neutral';
 $bgClass = $bgColorMap[$badgeColor] ?? 'bg-neutral/10';
+$badgeClass = $badgeColorMap[$badgeColor] ?? 'badge-neutral';
 
 $actionIcons = [
     'increase_weight' => 'fas.weight-hanging',
@@ -54,7 +61,7 @@ $unit = $metadata['current_unit'] ?? 'kg';
     <div class="card-body p-4 gap-3">
         {{-- Header --}}
         <div class="flex items-center justify-between gap-2">
-            <div class="badge badge-{{ $badgeColor }} badge-outline gap-1">
+            <div class="badge {{ $badgeClass }} badge-outline gap-1">
                 <x-icon :name="$actionIcon" class="w-3 h-3" />
                 {{ ucfirst(str_replace('_', ' ', $action)) }}
             </div>
