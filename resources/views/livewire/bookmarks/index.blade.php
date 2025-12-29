@@ -507,11 +507,7 @@ new class extends Component
         $query = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
-            ->where(function ($q) {
-                // Only show subscribed URLs (exclude discovered URLs)
-                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
-                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs without source
-            });
+            ->whereRaw("metadata->>'fetch_mode' = 'recurring'");
 
         // Apply search
         if (! empty($this->urlSearch)) {
@@ -832,23 +828,17 @@ new class extends Component
 
     public function loadStats(): void
     {
-        // Subscribed URLs (URLs tab)
+        // Subscribed URLs (URLs tab) - recurring fetch
         $subscribedUrls = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
-            ->where(function ($q) {
-                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
-                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs
-            })
+            ->whereRaw("metadata->>'fetch_mode' = 'recurring'")
             ->count();
 
         $activeSubscribedUrls = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
-            ->where(function ($q) {
-                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
-                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs
-            })
+            ->whereRaw("metadata->>'fetch_mode' = 'recurring'")
             ->whereRaw("(metadata->>'enabled')::boolean = true")
             ->count();
 
@@ -1111,6 +1101,7 @@ new class extends Component
         return EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
+            ->whereRaw("metadata->>'fetch_mode' = 'recurring'")
             ->select('metadata->domain as domain')
             ->distinct()
             ->pluck('domain')

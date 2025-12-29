@@ -112,6 +112,11 @@ class Event extends Model
         return $this->belongsTo(Integration::class)->withTrashed();
     }
 
+    public function source()
+    {
+        return $this->belongsTo(EventObject::class, 'source_id')->withTrashed();
+    }
+
     public function actor()
     {
         return $this->belongsTo(EventObject::class, 'actor_id')->withTrashed();
@@ -556,7 +561,7 @@ class Event extends Model
      */
     public function scopeWithStandardRelations($query)
     {
-        return $query->with(['actor', 'target', 'integration', 'tags']);
+        return $query->with(['source', 'actor', 'target', 'integration', 'tags']);
     }
 
     /**
@@ -572,7 +577,7 @@ class Event extends Model
      */
     public function scopeForDetail($query)
     {
-        return $query->with(['actor', 'target', 'blocks', 'integration', 'tags']);
+        return $query->with(['source', 'actor', 'target', 'blocks', 'integration', 'tags']);
     }
 
     /**
