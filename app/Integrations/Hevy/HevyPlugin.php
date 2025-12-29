@@ -356,7 +356,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                     $hasRecentRecommendation = Block::whereHas('event', function ($q) use ($integration) {
                         $q->where('integration_id', $integration->id)
                             ->where('action', 'had_coach_recommendation')
-                            ->where('created_at', '>=', now()->startOfDay());
+                            ->where('time', '>=', now()->startOfDay());
                     })
                         ->where('block_type', 'coach_recommendation')
                         ->exists();
