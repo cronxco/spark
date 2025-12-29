@@ -62,6 +62,156 @@ new class extends Component
     }
 
     /**
+     * Get all issues as structured JSON for export
+     *
+     * @return string
+     */
+    public function getIssuesJsonProperty(): string
+    {
+        $issues = [
+            'generated_at' => now()->toIso8601String(),
+            'summary' => [
+                'total_issue_types' => 0,
+                'total_issues' => 0,
+            ],
+            'issues' => [],
+        ];
+
+        // Undefined Actions
+        if (! empty($this->undefinedActions)) {
+            foreach ($this->undefinedActions as $item) {
+                $issues['issues'][] = [
+                    'category' => 'undefined_actions',
+                    'severity' => 'warning',
+                    'service' => $item['service'],
+                    'issue' => 'Actions present in database but not defined in plugin files',
+                    'missing_actions' => $item['actions'],
+                    'count' => count($item['actions']),
+                ];
+                $issues['summary']['total_issues'] += count($item['actions']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Unknown Services
+        if (! empty($this->unknownServices)) {
+            $issues['issues'][] = [
+                'category' => 'unknown_services',
+                'severity' => 'error',
+                'issue' => 'Unknown services in events',
+                'unknown_services' => $this->unknownServices,
+                'count' => count($this->unknownServices),
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += count($this->unknownServices);
+        }
+
+        // Undefined Block Types
+        if (! empty($this->undefinedBlockTypes)) {
+            foreach ($this->undefinedBlockTypes as $item) {
+                $issues['issues'][] = [
+                    'category' => 'undefined_block_types',
+                    'severity' => 'warning',
+                    'service' => $item['service'],
+                    'issue' => 'Block types present in database but not defined in plugin files',
+                    'missing_block_types' => $item['block_types'],
+                    'count' => count($item['block_types']),
+                ];
+                $issues['summary']['total_issues'] += count($item['block_types']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Undefined Object Types
+        if (! empty($this->undefinedObjectTypes)) {
+            foreach ($this->undefinedObjectTypes as $item) {
+                $issues['issues'][] = [
+                    'category' => 'undefined_object_types',
+                    'severity' => 'warning',
+                    'service' => $item['service'],
+                    'issue' => 'Object types present in events but not defined in plugin files',
+                    'missing_object_types' => $item['object_types'],
+                    'count' => count($item['object_types']),
+                ];
+                $issues['summary']['total_issues'] += count($item['object_types']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Orphaned Events
+        if ($this->orphanedEvents['count'] > 0) {
+            $issues['issues'][] = [
+                'category' => 'orphaned_events',
+                'severity' => 'error',
+                'issue' => 'Events without integrations',
+                'orphaned_event_ids' => $this->orphanedEvents['all_ids'],
+                'count' => $this->orphanedEvents['count'],
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += $this->orphanedEvents['count'];
+        }
+
+        // Orphaned Blocks
+        if ($this->orphanedBlocks['count'] > 0) {
+            $issues['issues'][] = [
+                'category' => 'orphaned_blocks',
+                'severity' => 'error',
+                'issue' => 'Blocks without events',
+                'orphaned_block_ids' => $this->orphanedBlocks['all_ids'],
+                'count' => $this->orphanedBlocks['count'],
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += $this->orphanedBlocks['count'];
+        }
+
+        // Orphaned Objects
+        if ($this->orphanedObjects['count'] > 0) {
+            $issues['issues'][] = [
+                'category' => 'orphaned_objects',
+                'severity' => 'error',
+                'issue' => 'Objects without event references',
+                'orphaned_object_ids' => $this->orphanedObjects['all_ids'],
+                'count' => $this->orphanedObjects['count'],
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += $this->orphanedObjects['count'];
+        }
+
+        // Invalid Integrations
+        if (! empty($this->invalidIntegrations)) {
+            foreach ($this->invalidIntegrations as $item) {
+                $issues['issues'][] = [
+                    'category' => 'invalid_integrations',
+                    'severity' => 'error',
+                    'issue' => $item['issue'],
+                    'details' => $item['details'],
+                    'count' => $item['count'],
+                ];
+                $issues['summary']['total_issues'] += $item['count'];
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Plugin Config Issues
+        if (! empty($this->pluginConfigIssues)) {
+            foreach ($this->pluginConfigIssues as $item) {
+                $issues['issues'][] = [
+                    'category' => 'plugin_config_issues',
+                    'severity' => 'error',
+                    'plugin' => $item['plugin'],
+                    'issue' => 'Plugin configuration issues',
+                    'config_issues' => $item['issues'],
+                    'count' => count($item['issues']),
+                ];
+                $issues['summary']['total_issues'] += count($item['issues']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        return json_encode($issues, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
      * @return array<int, array{service: string, actions: array<int, string>}>
      */
     public function getUndefinedActionsProperty(): array
@@ -135,44 +285,43 @@ new class extends Component
     }
 
     /**
-     * @return array<int, array{count: int, sample_ids: array<int, string>}>
+     * @return array<int, array{count: int, all_ids: array<int, string>}>
      */
     public function getOrphanedEventsProperty(): array
     {
-        $orphanedEvents = Event::whereDoesntHave('integration')->limit(100)->get();
+        $orphanedEvents = Event::whereDoesntHave('integration')->get();
 
         return [
             'count' => $orphanedEvents->count(),
-            'sample_ids' => $orphanedEvents->pluck('id')->take(10)->toArray(),
+            'all_ids' => $orphanedEvents->pluck('id')->toArray(),
         ];
     }
 
     /**
-     * @return array<int, array{count: int, sample_ids: array<int, string>}>
+     * @return array<int, array{count: int, all_ids: array<int, string>}>
      */
     public function getOrphanedBlocksProperty(): array
     {
-        $orphanedBlocks = Block::whereDoesntHave('event')->limit(100)->get();
+        $orphanedBlocks = Block::whereDoesntHave('event')->get();
 
         return [
             'count' => $orphanedBlocks->count(),
-            'sample_ids' => $orphanedBlocks->pluck('id')->take(10)->toArray(),
+            'all_ids' => $orphanedBlocks->pluck('id')->toArray(),
         ];
     }
 
     /**
-     * @return array<int, array{count: int, sample_ids: array<int, string>}>
+     * @return array<int, array{count: int, all_ids: array<int, string>}>
      */
     public function getOrphanedObjectsProperty(): array
     {
         $orphanedObjects = EventObject::whereDoesntHave('actorEvents')
             ->whereDoesntHave('targetEvents')
-            ->limit(100)
             ->get();
 
         return [
             'count' => $orphanedObjects->count(),
-            'sample_ids' => $orphanedObjects->pluck('id')->take(10)->toArray(),
+            'all_ids' => $orphanedObjects->pluck('id')->toArray(),
         ];
     }
 
@@ -391,10 +540,19 @@ new class extends Component
     /**
      * Get all sense check sections organized with issues first, then clean sections
      *
-     * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool}>
+     * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool, badge_value: string|null}>
      */
     public function getSenseCheckSectionsProperty(): array
     {
+        // Calculate percentages for informational sections
+        $blockTypesGrouped = $this->blockTypesWithCustomLayouts;
+        $totalBlockTypes = array_sum(array_map('count', $blockTypesGrouped));
+        $blockTypesWithLayouts = collect($blockTypesGrouped)->flatten(1)->where('has_custom_layout', true)->count();
+        $blockTypesCoveragePercent = $totalBlockTypes > 0 ? round(($blockTypesWithLayouts / $totalBlockTypes) * 100, 1) : 0;
+
+        $embeddingHealth = $this->embeddingHealth;
+        $overallEmbeddingCoverage = $embeddingHealth['overall_coverage'];
+
         $sections = [
             [
                 'key' => 'undefined_actions',
@@ -402,6 +560,7 @@ new class extends Component
                 'description' => 'Distinct `events.action` that have no corresponding entry in plugin `getActionTypes()`.',
                 'icon' => 'fas.triangle-exclamation',
                 'issue_count' => count($this->undefinedActions),
+                'badge_value' => null,
             ],
             [
                 'key' => 'unknown_services',
@@ -409,6 +568,7 @@ new class extends Component
                 'description' => '`events.service` values that aren\'t registered in plugins.',
                 'icon' => 'o-question-mark-circle',
                 'issue_count' => count($this->unknownServices),
+                'badge_value' => null,
             ],
             [
                 'key' => 'undefined_block_types',
@@ -416,6 +576,7 @@ new class extends Component
                 'description' => 'Distinct `blocks.block_type` per service with no corresponding entry in plugin `getBlockTypes()`.',
                 'icon' => 'o-cube-transparent',
                 'issue_count' => count($this->undefinedBlockTypes),
+                'badge_value' => null,
             ],
             [
                 'key' => 'undefined_object_types',
@@ -423,6 +584,7 @@ new class extends Component
                 'description' => 'Distinct `objects.type` used as actor/target per service with no corresponding entry in plugin `getObjectTypes()`.',
                 'icon' => 'fas.tag',
                 'issue_count' => count($this->undefinedObjectTypes),
+                'badge_value' => null,
             ],
             [
                 'key' => 'orphaned_events',
@@ -430,6 +592,7 @@ new class extends Component
                 'description' => 'Events without integrations, blocks without events, and objects without references.',
                 'icon' => 'fas.trash',
                 'issue_count' => $this->orphanedEvents['count'] + $this->orphanedBlocks['count'] + $this->orphanedObjects['count'],
+                'badge_value' => null,
             ],
             [
                 'key' => 'invalid_integrations',
@@ -437,6 +600,7 @@ new class extends Component
                 'description' => 'Integrations with missing groups or unknown services.',
                 'icon' => 'fas.circle-xmark',
                 'issue_count' => count($this->invalidIntegrations),
+                'badge_value' => null,
             ],
             [
                 'key' => 'plugin_config_issues',
@@ -444,6 +608,7 @@ new class extends Component
                 'description' => 'Missing required methods, invalid domains, or configuration errors in plugins.',
                 'icon' => 'fas.gear',
                 'issue_count' => count($this->pluginConfigIssues),
+                'badge_value' => null,
             ],
             [
                 'key' => 'embedding_health',
@@ -451,6 +616,7 @@ new class extends Component
                 'description' => 'Monitor semantic search embedding coverage across events, blocks, and objects.',
                 'icon' => 'fas.wand-magic-sparkles',
                 'issue_count' => 0, // Informational only
+                'badge_value' => $overallEmbeddingCoverage . '%',
             ],
             [
                 'key' => 'block_types_custom_layouts',
@@ -458,6 +624,7 @@ new class extends Component
                 'description' => 'Coverage of custom card layouts for block types across all plugins. Shows which block types have custom layouts and highlights high-volume types (>100 blocks) that could benefit from custom layouts.',
                 'icon' => 'fas.layer-group',
                 'issue_count' => 0, // Informational only
+                'badge_value' => $blockTypesCoveragePercent . '%',
             ],
         ];
 
@@ -573,7 +740,25 @@ new class extends Component
 }; ?>
 
 <div>
-    <x-header title="Sense Check" subtitle="Find functional inconsistencies across data and plugins" separator />
+    <x-header title="Sense Check" subtitle="Find functional inconsistencies across data and plugins" separator>
+        <x-slot:actions>
+            <button
+                x-data
+                @click="navigator.clipboard.writeText($wire.issuesJson).then(() => {
+                    $dispatch('mary-toast', {
+                        type: 'success',
+                        title: 'Copied!',
+                        description: 'Issues JSON copied to clipboard',
+                        position: 'toast-top toast-end',
+                        timeout: 3000
+                    });
+                })"
+                class="btn btn-primary btn-sm gap-2">
+                <x-icon name="o-clipboard-document" class="w-4 h-4" />
+                Copy Issues JSON
+            </button>
+        </x-slot:actions>
+    </x-header>
 
     <div class="space-y-2">
         @foreach ($this->senseCheckSections as $section)
@@ -584,6 +769,8 @@ new class extends Component
                     <span class="flex-1 text-left">{{ $section['title'] }}</span>
                     @if ($section['has_issues'])
                     <x-badge :value="$section['issue_count']" class="{{ $section['badge_class'] }}" />
+                    @elseif ($section['badge_value'])
+                    <x-badge :value="$section['badge_value']" class="{{ $section['badge_class'] }}" />
                     @else
                     <x-badge value="✓" class="{{ $section['badge_class'] }}" />
                     @endif
@@ -698,8 +885,13 @@ new class extends Component
                                 {{ $orphanedEvents['count'] }} found
                             </a>
                         </div>
-                        @if (!empty($orphanedEvents['sample_ids']))
-                        <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedEvents['sample_ids'], 0, 3)) }}{{ count($orphanedEvents['sample_ids']) > 3 ? '...' : '' }}</div>
+                        @if (!empty($orphanedEvents['all_ids']))
+                        <div class="text-xs text-red-600 mb-2">All orphaned event IDs:</div>
+                        <div class="flex flex-wrap gap-1 max-h-48 overflow-y-auto">
+                            @foreach ($orphanedEvents['all_ids'] as $eventId)
+                            <code class="badge badge-outline badge-sm font-mono">{{ $eventId }}</code>
+                            @endforeach
+                        </div>
                         @endif
                     </div>
                     @endif
@@ -712,8 +904,13 @@ new class extends Component
                                 {{ $orphanedBlocks['count'] }} found
                             </a>
                         </div>
-                        @if (!empty($orphanedBlocks['sample_ids']))
-                        <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedBlocks['sample_ids'], 0, 3)) }}{{ count($orphanedBlocks['sample_ids']) > 3 ? '...' : '' }}</div>
+                        @if (!empty($orphanedBlocks['all_ids']))
+                        <div class="text-xs text-red-600 mb-2">All orphaned block IDs:</div>
+                        <div class="flex flex-wrap gap-1 max-h-48 overflow-y-auto">
+                            @foreach ($orphanedBlocks['all_ids'] as $blockId)
+                            <code class="badge badge-outline badge-sm font-mono">{{ $blockId }}</code>
+                            @endforeach
+                        </div>
                         @endif
                     </div>
                     @endif
@@ -726,8 +923,13 @@ new class extends Component
                                 {{ $orphanedObjects['count'] }} found
                             </a>
                         </div>
-                        @if (!empty($orphanedObjects['sample_ids']))
-                        <div class="text-sm text-red-600">Sample IDs: {{ implode(', ', array_slice($orphanedObjects['sample_ids'], 0, 3)) }}{{ count($orphanedObjects['sample_ids']) > 3 ? '...' : '' }}</div>
+                        @if (!empty($orphanedObjects['all_ids']))
+                        <div class="text-xs text-red-600 mb-2">All orphaned object IDs:</div>
+                        <div class="flex flex-wrap gap-1 max-h-48 overflow-y-auto">
+                            @foreach ($orphanedObjects['all_ids'] as $objectId)
+                            <code class="badge badge-outline badge-sm font-mono">{{ $objectId }}</code>
+                            @endforeach
+                        </div>
                         @endif
                     </div>
                     @endif
