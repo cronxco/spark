@@ -275,27 +275,40 @@ class FlintBlockCreationService
             ]
         );
 
-        // Create a new event for this analysis run
-        // Use synthetic source_id (like Monzo) to allow multiple events per day
-        // Day object goes in target_id, allowing all analysis events to relate to same day
-        $timestamp = now()->format('Y-m-d_H-i-s');
-        $syntheticSourceId = "flint_analysis_{$integration->id}_{$timestamp}";
+        // Determine period: morning (<12), afternoon (12-18:59), evening (>=19)
+        $hour = (int) now()->format('H');
+        if ($hour < 12) {
+            $period = 'morning';
+        } elseif ($hour < 19) {
+            $period = 'afternoon';
+        } else {
+            $period = 'evening';
+        }
 
-        $event = Event::create([
-            'integration_id' => $integration->id,
-            'source_id' => $syntheticSourceId,  // Unique synthetic ID
-            'actor_id' => $flintObject->id,      // The AI assistant
-            'target_id' => $dayObject->id,       // The day being analyzed
-            'time' => now(),
-            'service' => 'flint',
-            'domain' => 'online',
-            'action' => 'had_analysis',
-            'event_metadata' => [
-                'analysis_type' => 'multi_agent',
-                'timestamp' => now()->toIso8601String(),
-                'analysis_run_id' => $syntheticSourceId,
+        // Create synthetic source_id that's the same for all agents in this period
+        // This allows multiple agent calls (domain, cross-domain, actions, digest) to update the same event
+        $syntheticSourceId = "flint_analysis_{$dateString}_{$period}";
+
+        // Use updateOrCreate so all agents in this analysis run share the same event
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'source_id' => $syntheticSourceId,  // Unique per period
             ],
-        ]);
+            [
+                'actor_id' => $flintObject->id,      // The AI assistant
+                'target_id' => $dayObject->id,       // The day being analyzed
+                'time' => now(),
+                'service' => 'flint',
+                'domain' => 'online',
+                'action' => 'had_analysis',
+                'event_metadata' => [
+                    'analysis_type' => 'multi_agent',
+                    'period' => $period,
+                    'timestamp' => now()->toIso8601String(),
+                ],
+            ]
+        );
 
         return $event;
     }
