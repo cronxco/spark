@@ -30,6 +30,14 @@ class ImmichUrlBuilder
     }
 
     /**
+     * Get URL for person thumbnail
+     */
+    public function getPersonThumbnailUrl(string $serverUrl, string $personId): string
+    {
+        return rtrim($serverUrl, '/') . "/api/people/{$personId}/thumbnail";
+    }
+
+    /**
      * Get URL to view album in Immich
      */
     public function getAlbumUrl(string $serverUrl, string $albumId): string

@@ -106,11 +106,21 @@ class PhotosData extends BaseProcessingJob
     protected function createOrUpdateCluster(array $clusterData): EventObject
     {
         $locationAddress = null;
+        $location = null;
+
         if ($clusterData['has_location']) {
             // Build location address from EXIF or Place
             $locationName = $clusterData['location_name'] ?? null;
             if ($locationName) {
                 $locationAddress = $locationName;
+            }
+
+            // Validate and sanitize coordinates
+            $centerLng = filter_var($clusterData['center_lng'], FILTER_VALIDATE_FLOAT);
+            $centerLat = filter_var($clusterData['center_lat'], FILTER_VALIDATE_FLOAT);
+
+            if ($centerLng !== false && $centerLat !== false && is_finite($centerLng) && is_finite($centerLat)) {
+                $location = DB::raw(sprintf('ST_MakePoint(%F, %F)', $centerLng, $centerLat));
             }
         }
 
@@ -123,11 +133,9 @@ class PhotosData extends BaseProcessingJob
             ],
             [
                 'time' => $clusterData['start_time'],
-                'location' => $clusterData['has_location']
-                    ? DB::raw("ST_MakePoint({$clusterData['center_lng']}, {$clusterData['center_lat']})")
-                    : null,
+                'location' => $location,
                 'location_address' => $locationAddress,
-                'location_source' => $clusterData['has_location'] ? 'immich_exif' : null,
+                'location_source' => $location ? 'immich_exif' : null,
                 'metadata' => [
                     'cluster_id' => $clusterData['cluster_id'],
                     'photo_count' => $clusterData['photo_count'],
@@ -239,6 +247,16 @@ class PhotosData extends BaseProcessingJob
         foreach ($peopleMap as $personName => $info) {
             $personData = $info['data'];
 
+            // Get existing Person to preserve accumulated face_count
+            $existingPerson = Person::where('user_id', $this->integration->user_id)
+                ->where('concept', 'person')
+                ->where('type', 'immich_person')
+                ->where('title', $personName)
+                ->first();
+
+            $existingFaceCount = $existingPerson?->metadata['face_count'] ?? 0;
+            $newFaceCount = $existingFaceCount + $info['count'];
+
             // Create or update Person
             $person = Person::updateOrCreate(
                 [
@@ -253,7 +271,7 @@ class PhotosData extends BaseProcessingJob
                         'immich_person_id' => $personData['id'] ?? null,
                         'birth_date' => $personData['birthDate'] ?? null,
                         'is_hidden' => $personData['isHidden'] ?? false,
-                        'face_count' => ($personData['face_count'] ?? 0) + $info['count'],
+                        'face_count' => $newFaceCount,
                     ],
                 ]
             );

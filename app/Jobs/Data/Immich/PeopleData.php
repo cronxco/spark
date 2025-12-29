@@ -50,7 +50,7 @@ class PeopleData extends BaseProcessingJob
             // Build person thumbnail URL if available
             $thumbnailUrl = null;
             if ($serverUrl && $personId) {
-                $thumbnailUrl = $urlBuilder->getPersonUrl($serverUrl, $personId);
+                $thumbnailUrl = $urlBuilder->getPersonThumbnailUrl($serverUrl, $personId);
             }
 
             // Create or update Person

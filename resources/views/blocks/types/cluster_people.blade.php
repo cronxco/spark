@@ -27,7 +27,7 @@ $people = $block->metadata['people'] ?? [];
                         <div class="flex items-center gap-2">
                             <div class="avatar placeholder">
                                 <div class="bg-primary text-primary-content rounded-full w-8 h-8 flex items-center justify-center">
-                                    <span class="text-xs font-semibold">{{ substr($person['name'], 0, 1) }}</span>
+                                    <span class="text-xs font-semibold">{{ mb_substr($person['name'], 0, 1, 'UTF-8') }}</span>
                                 </div>
                             </div>
                             <span class="font-medium">{{ $person['name'] }}</span>

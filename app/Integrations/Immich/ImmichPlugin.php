@@ -256,6 +256,11 @@ class ImmichPlugin extends ManualPlugin
             unset($initialConfig['server_url'], $initialConfig['api_key']);
         }
 
+        // Pause integration if migration is requested
+        if ($withMigration) {
+            $initialConfig['paused'] = true;
+        }
+
         // Derive instance name
         $defaultName = static::getDisplayName();
         if (method_exists(static::class, 'getInstanceTypes')) {
@@ -388,8 +393,17 @@ class ImmichPlugin extends ManualPlugin
 
         $this->logApiRequest($method, $url, ['x-api-key' => '[REDACTED]'], $params, $integrationId);
 
-        $response = Http::withHeaders(['x-api-key' => $apiKey])
-            ->get($url, $params);
+        $httpClient = Http::withHeaders(['x-api-key' => $apiKey]);
+
+        $methodUpper = strtoupper($method);
+        $response = match ($methodUpper) {
+            'GET' => $httpClient->get($url, $params),
+            'POST' => $httpClient->post($url, $params),
+            'PUT' => $httpClient->put($url, $params),
+            'PATCH' => $httpClient->patch($url, $params),
+            'DELETE' => $httpClient->delete($url, $params),
+            default => throw new Exception("Unsupported HTTP method: {$method}"),
+        };
 
         $span?->finish();
 

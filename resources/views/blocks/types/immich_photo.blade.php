@@ -14,15 +14,21 @@ $viewUrl = $block->metadata['view_url'] ?? null;
 $isFavorite = $block->metadata['is_favorite'] ?? false;
 $people = $block->metadata['people'] ?? [];
 
-// Camera metadata
-$camera = $block->metadata['camera_make'] && $block->metadata['camera_model']
-    ? $block->metadata['camera_make'] . ' ' . $block->metadata['camera_model']
-    : null;
+// Camera metadata - null-safe access
+$cameraMake = $block->metadata['camera_make'] ?? null;
+$cameraModel = $block->metadata['camera_model'] ?? null;
+$camera = $cameraMake && $cameraModel ? $cameraMake . ' ' . $cameraModel : null;
+
 $settings = [];
-if ($block->metadata['f_number']) $settings[] = 'f/' . $block->metadata['f_number'];
-if ($block->metadata['exposure_time']) $settings[] = $block->metadata['exposure_time'];
-if ($block->metadata['iso']) $settings[] = 'ISO ' . $block->metadata['iso'];
-if ($block->metadata['focal_length']) $settings[] = $block->metadata['focal_length'] . 'mm';
+$fNumber = $block->metadata['f_number'] ?? null;
+$exposureTime = $block->metadata['exposure_time'] ?? null;
+$iso = $block->metadata['iso'] ?? null;
+$focalLength = $block->metadata['focal_length'] ?? null;
+
+if ($fNumber) $settings[] = 'f/' . $fNumber;
+if ($exposureTime) $settings[] = $exposureTime;
+if ($iso) $settings[] = 'ISO ' . $iso;
+if ($focalLength) $settings[] = $focalLength . 'mm';
 @endphp
 
 <div class="card bg-base-200 shadow hover:shadow-lg transition-all">

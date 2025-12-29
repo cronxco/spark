@@ -81,7 +81,10 @@ class Person extends EventObject
      */
     public function scopeOrderByPhotoCount(Builder $query, string $direction = 'desc'): void
     {
-        $query->orderByRaw("CAST(metadata->>'face_count' AS INTEGER) {$direction} NULLS LAST");
+        // Validate and normalize direction to prevent SQL injection
+        $validatedDirection = strtolower($direction) === 'asc' ? 'asc' : 'desc';
+
+        $query->orderByRaw("CAST(metadata->>'face_count' AS INTEGER) {$validatedDirection} NULLS LAST");
     }
 
     /**
