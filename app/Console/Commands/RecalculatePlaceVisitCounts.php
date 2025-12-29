@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Place;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -40,9 +39,34 @@ class RecalculatePlaceVisitCounts extends Command
             $this->newLine();
         }
 
-        // Get all places
-        $places = Place::withoutGlobalScopes()->get();
-        $totalPlaces = $places->count();
+        // Step 1: Calculate all visit counts in a single efficient query
+        $this->info('Calculating visit counts...');
+
+        $calculatedData = DB::table('event_objects as eo')
+            ->select([
+                'eo.id',
+                'eo.title',
+                DB::raw("CAST(eo.metadata->>'visit_count' AS INTEGER) as current_count"),
+                DB::raw('COUNT(DISTINCT r.from_id) as actual_count'),
+                DB::raw('MIN(e.time) as first_visit'),
+                DB::raw('MAX(e.time) as last_visit'),
+            ])
+            ->leftJoin('relationships as r', function ($join) {
+                $join->on('r.to_id', '=', 'eo.id')
+                    ->where('r.to_type', '=', 'App\Models\EventObject')
+                    ->where('r.type', '=', 'occurred_at')
+                    ->whereNull('r.deleted_at');
+            })
+            ->leftJoin('events as e', function ($join) {
+                $join->on('e.id', '=', 'r.from_id')
+                    ->whereNull('e.deleted_at');
+            })
+            ->where('eo.concept', '=', 'place')
+            ->whereNull('eo.deleted_at')
+            ->groupBy('eo.id', 'eo.title', 'eo.metadata')
+            ->get();
+
+        $totalPlaces = $calculatedData->count();
 
         if ($totalPlaces === 0) {
             $this->info('No places found.');
@@ -50,12 +74,29 @@ class RecalculatePlaceVisitCounts extends Command
             return self::SUCCESS;
         }
 
-        $this->info("Found {$totalPlaces} places to recalculate.");
+        $this->info("Found {$totalPlaces} places.");
         $this->newLine();
+
+        // Filter to only places that need updating
+        $placesToUpdate = $calculatedData->filter(function ($place) {
+            return ($place->current_count ?? 0) !== $place->actual_count;
+        });
+
+        $updateCount = $placesToUpdate->count();
+
+        $this->info("Places needing updates: {$updateCount}");
+        $this->info("Places already correct: " . ($totalPlaces - $updateCount));
+        $this->newLine();
+
+        if ($updateCount === 0) {
+            $this->info('All place visit counts are already correct!');
+
+            return self::SUCCESS;
+        }
 
         // Confirm unless --force or --dry-run
         if (! $isDryRun && ! $this->option('force')) {
-            if (! $this->confirm('This will update visit counts for all places. Continue?')) {
+            if (! $this->confirm("This will update {$updateCount} places. Continue?")) {
                 $this->warn('Operation cancelled.');
 
                 return self::FAILURE;
@@ -63,88 +104,75 @@ class RecalculatePlaceVisitCounts extends Command
             $this->newLine();
         }
 
-        // Process places
-        $progressBar = $this->output->createProgressBar($totalPlaces);
-        $progressBar->start();
-
+        // Step 2: Bulk update in chunks
         $stats = [
-            'total' => 0,
+            'total' => $totalPlaces,
             'updated' => 0,
-            'unchanged' => 0,
+            'unchanged' => $totalPlaces - $updateCount,
             'errors' => 0,
         ];
 
         $changes = [];
 
-        foreach ($places as $place) {
-            $stats['total']++;
+        if (! $isDryRun) {
+            $this->info('Updating places...');
+            $progressBar = $this->output->createProgressBar($updateCount);
+            $progressBar->start();
 
-            try {
-                // Count unique events linked to this place via "occurred_at" relationships
-                $actualVisitCount = DB::table('relationships')
-                    ->where('to_type', 'App\Models\EventObject')
-                    ->where('to_id', $place->id)
-                    ->where('type', 'occurred_at')
-                    ->whereNull('deleted_at')
-                    ->distinct('from_id')
-                    ->count('from_id');
+            // Process in chunks of 500 for efficient bulk updates
+            $placesToUpdate->chunk(500)->each(function ($chunk) use (&$stats, &$progressBar) {
+                DB::transaction(function () use ($chunk, &$stats, &$progressBar) {
+                    foreach ($chunk as $place) {
+                        try {
+                            // Build updated metadata
+                            $currentMetadata = DB::table('event_objects')
+                                ->where('id', $place->id)
+                                ->value('metadata');
 
-                $currentVisitCount = $place->visit_count ?? 0;
+                            $metadata = $currentMetadata ? json_decode($currentMetadata, true) : [];
+                            $metadata['visit_count'] = $place->actual_count;
 
-                if ($actualVisitCount !== $currentVisitCount) {
-                    $changes[] = [
-                        'id' => $place->id,
-                        'title' => $place->title,
-                        'old_count' => $currentVisitCount,
-                        'new_count' => $actualVisitCount,
-                    ];
+                            if ($place->first_visit) {
+                                $metadata['first_visit_at'] = $place->first_visit;
+                            }
 
-                    if (! $isDryRun) {
-                        // Get first and last visit times from related events
-                        $eventTimes = DB::table('events')
-                            ->join('relationships', function ($join) use ($place) {
-                                $join->on('events.id', '=', 'relationships.from_id')
-                                    ->where('relationships.from_type', '=', 'App\Models\Event')
-                                    ->where('relationships.to_type', '=', 'App\Models\EventObject')
-                                    ->where('relationships.to_id', '=', $place->id)
-                                    ->where('relationships.type', '=', 'occurred_at')
-                                    ->whereNull('relationships.deleted_at');
-                            })
-                            ->whereNull('events.deleted_at')
-                            ->selectRaw('MIN(events.time) as first_visit, MAX(events.time) as last_visit')
-                            ->first();
+                            if ($place->last_visit) {
+                                $metadata['last_visit_at'] = $place->last_visit;
+                            }
 
-                        // Update place metadata
-                        $metadata = $place->metadata ?? [];
-                        $metadata['visit_count'] = $actualVisitCount;
+                            // Update using raw query for efficiency
+                            DB::table('event_objects')
+                                ->where('id', $place->id)
+                                ->update([
+                                    'metadata' => json_encode($metadata),
+                                    'updated_at' => now(),
+                                ]);
 
-                        if ($eventTimes && $eventTimes->first_visit) {
-                            $metadata['first_visit_at'] = $eventTimes->first_visit;
+                            $stats['updated']++;
+                            $progressBar->advance();
+                        } catch (Exception $e) {
+                            $stats['errors']++;
+                            // Continue processing other places
                         }
-
-                        if ($eventTimes && $eventTimes->last_visit) {
-                            $metadata['last_visit_at'] = $eventTimes->last_visit;
-                        }
-
-                        $place->metadata = $metadata;
-                        $place->save();
                     }
+                });
+            });
 
-                    $stats['updated']++;
-                } else {
-                    $stats['unchanged']++;
-                }
-            } catch (Exception $e) {
-                $stats['errors']++;
-                $this->newLine();
-                $this->error("Error processing place {$place->id}: " . $e->getMessage());
-            }
-
-            $progressBar->advance();
+            $progressBar->finish();
+            $this->newLine(2);
+        } else {
+            $stats['updated'] = $updateCount;
         }
 
-        $progressBar->finish();
-        $this->newLine(2);
+        // Track changes for display
+        foreach ($placesToUpdate->take(20) as $place) {
+            $changes[] = [
+                'id' => $place->id,
+                'title' => $place->title,
+                'old_count' => $place->current_count ?? 0,
+                'new_count' => $place->actual_count,
+            ];
+        }
 
         // Show results
         if ($isDryRun) {
