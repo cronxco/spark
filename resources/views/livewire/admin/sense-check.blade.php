@@ -62,6 +62,16 @@ new class extends Component
     }
 
     /**
+     * Get all issues as structured JSON for export (action method for clipboard)
+     *
+     * @return string
+     */
+    public function getIssuesJson(): string
+    {
+        return $this->issuesJson;
+    }
+
+    /**
      * Get all issues as structured JSON for export
      *
      * @return string
@@ -749,13 +759,15 @@ new class extends Component
         <x-slot:actions>
             <button
                 x-data
-                @click="navigator.clipboard.writeText($wire.issuesJson).then(() => {
-                    $dispatch('mary-toast', {
-                        type: 'success',
-                        title: 'Copied!',
-                        description: 'Issues JSON copied to clipboard',
-                        position: 'toast-top toast-end',
-                        timeout: 3000
+                @click="$wire.getIssuesJson().then(json => {
+                    navigator.clipboard.writeText(json).then(() => {
+                        $dispatch('mary-toast', {
+                            type: 'success',
+                            title: 'Copied!',
+                            description: 'Issues JSON copied to clipboard',
+                            position: 'toast-top toast-end',
+                            timeout: 3000
+                        });
                     });
                 })"
                 class="btn btn-primary btn-sm gap-2">
@@ -891,7 +903,7 @@ new class extends Component
                             </a>
                         </div>
                         <div class="text-xs text-red-600 mb-2">All orphaned events:</div>
-                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2 bg-white/50 rounded">
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2">
                             @foreach ($orphanedEvents['records'] as $event)
                             <x-event-ref :event="$event" />
                             @endforeach
@@ -908,7 +920,7 @@ new class extends Component
                             </a>
                         </div>
                         <div class="text-xs text-red-600 mb-2">All orphaned blocks:</div>
-                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2 bg-white/50 rounded">
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2">
                             @foreach ($orphanedBlocks['records'] as $block)
                             <x-block-ref :block="$block" />
                             @endforeach
@@ -925,7 +937,7 @@ new class extends Component
                             </a>
                         </div>
                         <div class="text-xs text-red-600 mb-2">All orphaned objects:</div>
-                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2 bg-white/50 rounded">
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2">
                             @foreach ($orphanedObjects['records'] as $object)
                             <x-object-ref :object="$object" />
                             @endforeach
