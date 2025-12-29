@@ -42,28 +42,31 @@ class RecalculatePlaceVisitCounts extends Command
         // Step 1: Calculate all visit counts in a single efficient query
         $this->info('Calculating visit counts...');
 
-        $calculatedData = DB::table('event_objects as eo')
+        // Get table prefix to handle prefixed environments
+        $prefix = DB::getTablePrefix();
+
+        $calculatedData = DB::table('objects as o')
             ->select([
-                'eo.id',
-                'eo.title',
-                DB::raw("CAST(eo.metadata->>'visit_count' AS INTEGER) as current_count"),
-                DB::raw('COUNT(DISTINCT r.from_id) as actual_count'),
-                DB::raw('MIN(e.time) as first_visit'),
-                DB::raw('MAX(e.time) as last_visit'),
+                'o.id',
+                'o.title',
+                DB::raw("CAST(o.metadata->>'visit_count' AS INTEGER) as current_count"),
+                DB::raw("COUNT(DISTINCT {$prefix}r.from_id) as actual_count"),
+                DB::raw("MIN({$prefix}e.time) as first_visit"),
+                DB::raw("MAX({$prefix}e.time) as last_visit"),
             ])
-            ->leftJoin('relationships as r', function ($join) {
-                $join->on('r.to_id', '=', 'eo.id')
-                    ->where('r.to_type', '=', 'App\Models\EventObject')
-                    ->where('r.type', '=', 'occurred_at')
-                    ->whereNull('r.deleted_at');
+            ->leftJoin('relationships as r', function ($join) use ($prefix) {
+                $join->on("{$prefix}r.to_id", '=', 'o.id')
+                    ->where("{$prefix}r.to_type", '=', 'App\Models\EventObject')
+                    ->where("{$prefix}r.type", '=', 'occurred_at')
+                    ->whereNull("{$prefix}r.deleted_at");
             })
-            ->leftJoin('events as e', function ($join) {
-                $join->on('e.id', '=', 'r.from_id')
-                    ->whereNull('e.deleted_at');
+            ->leftJoin('events as e', function ($join) use ($prefix) {
+                $join->on("{$prefix}e.id", '=', "{$prefix}r.from_id")
+                    ->whereNull("{$prefix}e.deleted_at");
             })
-            ->where('eo.concept', '=', 'place')
-            ->whereNull('eo.deleted_at')
-            ->groupBy('eo.id', 'eo.title', 'eo.metadata')
+            ->where('o.concept', '=', 'place')
+            ->whereNull('o.deleted_at')
+            ->groupBy('o.id', 'o.title', 'o.metadata')
             ->get();
 
         $totalPlaces = $calculatedData->count();
@@ -125,7 +128,7 @@ class RecalculatePlaceVisitCounts extends Command
                     foreach ($chunk as $place) {
                         try {
                             // Build updated metadata
-                            $currentMetadata = DB::table('event_objects')
+                            $currentMetadata = DB::table('objects')
                                 ->where('id', $place->id)
                                 ->value('metadata');
 
@@ -141,7 +144,7 @@ class RecalculatePlaceVisitCounts extends Command
                             }
 
                             // Update using raw query for efficiency
-                            DB::table('event_objects')
+                            DB::table('objects')
                                 ->where('id', $place->id)
                                 ->update([
                                     'metadata' => json_encode($metadata),
