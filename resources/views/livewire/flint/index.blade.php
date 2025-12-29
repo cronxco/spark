@@ -14,7 +14,7 @@ new class extends Component {
     public array $enabledDomains = ['health', 'money', 'media', 'knowledge', 'online'];
 
     // UI state
-    public string $activeTab = 'settings';
+    public string $activeTab = 'digest';
     public string $newWeekdayTime = '09:00';
     public string $newWeekendTime = '09:00';
 
@@ -187,6 +187,161 @@ new class extends Component {
 
     {{-- Tabs --}}
     <x-tabs wire:model="activeTab">
+        <x-tab name="digest" label="Digest" icon="o-newspaper">
+            <div class="space-y-4 lg:space-y-6">
+                {{-- Placeholder for Digest content --}}
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body text-center py-12">
+                        <x-icon name="o-newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                        <h3 class="text-lg font-semibold mb-2">{{ __('Latest Digest') }}</h3>
+                        <p class="text-sm text-base-content/60">
+                            {{ __('Your most recent AI-generated digest will appear here.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </x-tab>
+
+        <x-tab name="coach" label="Coach" icon="fas.dumbbell">
+            <div class="space-y-4 lg:space-y-6">
+                {{-- Coach Status Card --}}
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">{{ __('Hevy Fitness Coach') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            {{ __('Automatically analyzes your workouts and updates your Hevy routine with progressive overload recommendations.') }}
+                        </p>
+
+                        @php
+                        $hevyIntegration = \App\Models\Integration::where('user_id', Auth::id())
+                            ->where('service', 'hevy')
+                            ->where('instance_type', 'workouts')
+                            ->first();
+
+                        $coachEnabled = $hevyIntegration && ($hevyIntegration->configuration['coach_enabled'] ?? false);
+
+                        $lastAnalysis = null;
+                        $recommendationCount = 0;
+
+                        if ($hevyIntegration) {
+                            $lastAnalysis = \App\Models\Event::where('integration_id', $hevyIntegration->id)
+                                ->where('action', 'had_coach_recommendation')
+                                ->latest('time')
+                                ->first();
+
+                            if ($lastAnalysis) {
+                                $recommendationCount = \App\Models\Block::whereHas('event', function($q) use ($hevyIntegration) {
+                                    $q->where('integration_id', $hevyIntegration->id)
+                                      ->where('action', 'had_coach_recommendation');
+                                })
+                                ->where('block_type', 'coach_recommendation')
+                                ->where('created_at', '>=', now()->subDays(7))
+                                ->count();
+                            }
+                        }
+                        @endphp
+
+                        @if (!$hevyIntegration)
+                        <div class="alert alert-info">
+                            <x-icon name="o-information-circle" class="w-5 h-5" />
+                            <div>
+                                <div class="font-medium">{{ __('No Hevy Integration Found') }}</div>
+                                <div class="text-sm">{{ __('Connect your Hevy account to use the fitness coach.') }}</div>
+                            </div>
+                        </div>
+                        @else
+                        {{-- Stats --}}
+                        <div class="stats stats-vertical lg:stats-horizontal shadow mt-4 mb-4">
+                            <div class="stat bg-base-100">
+                                <div class="stat-title">{{ __('Last Analysis') }}</div>
+                                <div class="stat-value text-sm">
+                                    {{ $lastAnalysis ? $lastAnalysis->time->diffForHumans() : __('Never') }}
+                                </div>
+                            </div>
+
+                            <div class="stat bg-base-100">
+                                <div class="stat-title">{{ __('Recommendations') }}</div>
+                                <div class="stat-value text-sm">
+                                    {{ $recommendationCount }}
+                                </div>
+                                <div class="stat-desc">{{ __('Last 7 days') }}</div>
+                            </div>
+
+                            <div class="stat bg-base-100">
+                                <div class="stat-title">{{ __('Coach Status') }}</div>
+                                <div class="stat-value text-sm">
+                                    @if ($coachEnabled)
+                                        <span class="text-success">{{ __('Enabled') }}</span>
+                                    @else
+                                        <span class="text-base-content/50">{{ __('Disabled') }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Quick Actions --}}
+                        <div class="card-actions justify-end">
+                            <a href="{{ route('integrations.show', $hevyIntegration) }}" class="btn btn-outline btn-sm">
+                                <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                                {{ __('Configure') }}
+                            </a>
+                            @if ($coachEnabled)
+                            <button
+                                class="btn btn-primary btn-sm"
+                                onclick="alert('Manual trigger coming soon! This will dispatch the analyze effect.')"
+                            >
+                                <x-icon name="fas.chart-line" class="w-4 h-4" />
+                                {{ __('Analyze Now') }}
+                            </button>
+                            <button
+                                class="btn btn-success btn-sm"
+                                onclick="alert('Manual trigger coming soon! This will dispatch the auto-coach effect.')"
+                            >
+                                <x-icon name="fas.robot" class="w-4 h-4" />
+                                {{ __('Auto-Coach') }}
+                            </button>
+                            @endif
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Recent Recommendations --}}
+                @if ($hevyIntegration && $recommendationCount > 0)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">{{ __('Recent Recommendations') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            {{ __('Latest progression recommendations from your fitness coach') }}
+                        </p>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            @php
+                            $recentBlocks = \App\Models\Block::whereHas('event', function($q) use ($hevyIntegration) {
+                                $q->where('integration_id', $hevyIntegration->id)
+                                  ->where('action', 'had_coach_recommendation');
+                            })
+                            ->where('block_type', 'coach_recommendation')
+                            ->where('created_at', '>=', now()->subDays(7))
+                            ->latest()
+                            ->limit(6)
+                            ->get();
+                            @endphp
+
+                            @foreach ($recentBlocks as $block)
+                                <x-block-card :block="$block" />
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                @endif
+            </div>
+        </x-tab>
+
+        <x-tab name="memory" label="Memory" icon="o-cpu-chip">
+            @include('livewire.flint.memory')
+        </x-tab>
+
         <x-tab name="settings" label="Settings" icon="o-cog-6-tooth">
     <div class="space-y-4 lg:space-y-6">
         {{-- General Settings --}}
@@ -337,185 +492,6 @@ new class extends Component {
                 spinner="save"
             />
         </div>
-    </div>
-        </x-tab>
-
-        <x-tab name="memory" label="Memory" icon="o-cpu-chip">
-    <div class="space-y-4 lg:space-y-6">
-        {{-- Memory Overview --}}
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold mb-4">{{ __('Memory Overview') }}</h3>
-                <p class="text-sm text-base-content/70 mb-4">
-                    {{ __('View what Flint remembers about your data and how it learns from your feedback.') }}
-                </p>
-
-                {{-- Last Execution Times --}}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div class="stat bg-base-100 rounded-lg">
-                        <div class="stat-title">{{ __('Last Digest') }}</div>
-                        <div class="stat-value text-lg">
-                            @if ($workingMemory['last_execution']['digest'] ?? null)
-                                {{ \Carbon\Carbon::parse($workingMemory['last_execution']['digest'])->diffForHumans() }}
-                            @else
-                                {{ __('Never') }}
-                            @endif
-                        </div>
-                    </div>
-                    <div class="stat bg-base-100 rounded-lg">
-                        <div class="stat-title">{{ __('Patterns Detected') }}</div>
-                        <div class="stat-value text-lg">{{ count($patterns) }}</div>
-                        <div class="stat-desc">{{ __('Last 90 days') }}</div>
-                    </div>
-                    <div class="stat bg-base-100 rounded-lg">
-                        <div class="stat-title">{{ __('Feedback Given') }}</div>
-                        <div class="stat-value text-lg">{{ $feedbackStats['total_feedback_count'] ?? 0 }}</div>
-                        <div class="stat-desc">
-                            @if (($feedbackStats['rating_average'] ?? 0) > 0)
-                                {{ __('Avg rating:') }} {{ number_format($feedbackStats['rating_average'], 1) }}/5
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- Domain Insights --}}
-        @if (!empty($workingMemory['domain_insights']))
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold mb-4">{{ __('Current Domain Insights') }}</h3>
-                <p class="text-sm text-base-content/70 mb-4">
-                    {{ __('Active insights from each domain agent in working memory.') }}
-                </p>
-
-                <div class="space-y-4">
-                    @foreach ($workingMemory['domain_insights'] as $domain => $insight)
-                        @if ($insight)
-                        <div class="collapse collapse-arrow bg-base-100">
-                            <input type="checkbox" />
-                            <div class="collapse-title font-medium flex items-center gap-2">
-                                <span class="badge badge-primary badge-sm">{{ ucfirst($domain) }}</span>
-                                @if (isset($insight['last_updated']))
-                                    <span class="text-xs text-base-content/60">
-                                        {{ __('Updated') }} {{ \Carbon\Carbon::parse($insight['last_updated'])->diffForHumans() }}
-                                    </span>
-                                @endif
-                            </div>
-                            <div class="collapse-content">
-                                @if (!empty($insight['insights']))
-                                    <div class="space-y-2 mb-3">
-                                        <div class="text-sm font-semibold">{{ __('Insights:') }}</div>
-                                        @foreach ($insight['insights'] as $item)
-                                            <div class="alert alert-info p-2">
-                                                <div class="flex-1">
-                                                    <div class="text-sm font-medium">{{ $item['title'] ?? 'Insight' }}</div>
-                                                    <div class="text-xs">{{ $item['description'] ?? '' }}</div>
-                                                    @if (isset($item['confidence']))
-                                                        <div class="badge badge-xs mt-1">{{ __('Confidence:') }} {{ round($item['confidence'] * 100) }}%</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-
-                                @if (!empty($insight['suggestions']))
-                                    <div class="space-y-2">
-                                        <div class="text-sm font-semibold">{{ __('Suggestions:') }}</div>
-                                        @foreach ($insight['suggestions'] as $suggestion)
-                                            <div class="alert alert-success p-2">
-                                                <div class="flex-1">
-                                                    <div class="text-sm font-medium">{{ $suggestion['title'] ?? 'Suggestion' }}</div>
-                                                    <div class="text-xs">{{ $suggestion['description'] ?? '' }}</div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                        @endif
-                    @endforeach
-                </div>
-            </div>
-        </div>
-        @endif
-
-        {{-- Prioritized Actions --}}
-        @if (!empty($workingMemory['actions']))
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold mb-4">{{ __('Prioritized Actions') }}</h3>
-                <div class="space-y-2">
-                    @foreach ($workingMemory['actions'] as $action)
-                        <div class="alert {{ $action['priority'] === 'high' ? 'alert-warning' : 'alert-info' }} p-3">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="text-sm font-medium">{{ $action['title'] ?? 'Action' }}</span>
-                                    <span class="badge badge-sm">{{ ucfirst($action['priority'] ?? 'medium') }}</span>
-                                </div>
-                                <div class="text-xs">{{ $action['description'] ?? '' }}</div>
-                                @if (!empty($action['source_domains']))
-                                    <div class="flex gap-1 mt-1">
-                                        @foreach ($action['source_domains'] as $domain)
-                                            <span class="badge badge-xs">{{ ucfirst($domain) }}</span>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        </div>
-        @endif
-
-        {{-- Detected Patterns --}}
-        @if (!empty($patterns))
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold mb-4">{{ __('Detected Patterns') }}</h3>
-                <p class="text-sm text-base-content/70 mb-4">
-                    {{ __('Long-term patterns discovered by analyzing your historical data.') }}
-                </p>
-                <div class="space-y-2">
-                    @foreach (array_slice($patterns, 0, 10) as $pattern)
-                        <div class="collapse collapse-arrow bg-base-100">
-                            <input type="checkbox" />
-                            <div class="collapse-title font-medium text-sm">
-                                {{ $pattern['title'] ?? 'Pattern' }}
-                                @if (isset($pattern['metadata']['confidence']))
-                                    <span class="badge badge-xs ml-2">{{ round($pattern['metadata']['confidence'] * 100) }}%</span>
-                                @endif
-                            </div>
-                            <div class="collapse-content">
-                                <div class="text-xs text-base-content/70">
-                                    {{ $pattern['metadata']['description'] ?? '' }}
-                                </div>
-                                @if (!empty($pattern['metadata']['pattern_type']))
-                                    <div class="badge badge-sm mt-2">{{ ucfirst($pattern['metadata']['pattern_type']) }}</div>
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        </div>
-        @endif
-
-        {{-- Empty State --}}
-        @if (empty($workingMemory['domain_insights']) && empty($workingMemory['actions']) && empty($patterns))
-        <div class="card bg-base-200 shadow">
-            <div class="card-body text-center py-12">
-                <x-icon name="o-cpu-chip" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
-                <h3 class="text-lg font-semibold mb-2">{{ __('No Memory Data Yet') }}</h3>
-                <p class="text-sm text-base-content/60">
-                    {{ __('Flint will start building memory as it analyzes your data and generates digests.') }}
-                </p>
-            </div>
-        </div>
-        @endif
     </div>
         </x-tab>
     </x-tabs>

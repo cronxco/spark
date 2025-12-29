@@ -3,10 +3,16 @@
 namespace App\Integrations\Hevy;
 
 use App\Integrations\Contracts\IntegrationPlugin;
+use App\Integrations\Contracts\SupportsEffects;
+use App\Integrations\Contracts\SupportsTaskPipeline;
+use App\Jobs\Effects\Hevy\HevyAnalyzeProgressionEffect;
+use App\Jobs\Effects\Hevy\HevyAutoCoachEffect;
+use App\Jobs\Effects\Hevy\HevyUpdateRoutineEffect;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\TaskPipeline\TaskDefinition;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Arr;
@@ -16,7 +22,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
-class HevyPlugin implements IntegrationPlugin
+class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipeline
 {
     protected string $baseUrl = 'https://api.hevyapp.com';
 
@@ -83,6 +89,65 @@ class HevyPlugin implements IntegrationPlugin
                     'enabled' => 'Enabled',
                 ],
             ],
+            'coach_enabled' => [
+                'type' => 'boolean',
+                'label' => 'Enable Auto-Coach',
+                'description' => 'Automatically analyze and update routines',
+                'default' => false,
+            ],
+            'coach_schedule_times' => [
+                'type' => 'array',
+                'label' => 'Coach Schedule Times (HH:mm)',
+                'description' => 'When to run auto-coach (e.g., ["18:00"])',
+                'default' => ['18:00'],
+            ],
+            'coach_schedule_timezone' => [
+                'type' => 'string',
+                'label' => 'Coach Timezone',
+                'description' => 'Timezone for scheduled coaching',
+                'default' => 'UTC',
+            ],
+            'goal_reps' => [
+                'type' => 'integer',
+                'label' => 'Target Rep Range',
+                'description' => 'Goal reps for progression decisions',
+                'default' => 12,
+                'min' => 1,
+                'max' => 30,
+            ],
+            'progression_rpe_trigger' => [
+                'type' => 'number',
+                'label' => 'RPE Trigger for Weight Increase',
+                'description' => 'Increase weight when RPE is at or below this',
+                'default' => 9.0,
+                'min' => 1.0,
+                'max' => 10.0,
+                'step' => 0.5,
+            ],
+            'weight_increment_kg' => [
+                'type' => 'number',
+                'label' => 'Weight Increment (kg)',
+                'description' => 'Default weight increment amount',
+                'default' => 5.0,
+                'step' => 0.5,
+            ],
+            'deload_percentage' => [
+                'type' => 'number',
+                'label' => 'Deload Percentage',
+                'description' => 'Percentage of weight to use for deload',
+                'default' => 90.0,
+                'min' => 50.0,
+                'max' => 95.0,
+                'step' => 5.0,
+            ],
+            'analysis_window_days' => [
+                'type' => 'integer',
+                'label' => 'Analysis Window (days)',
+                'description' => 'How many days of workouts to analyze',
+                'default' => 7,
+                'min' => 1,
+                'max' => 30,
+            ],
         ];
     }
 
@@ -127,6 +192,14 @@ class HevyPlugin implements IntegrationPlugin
                 'value_unit' => 'kcal',
                 'hidden' => false,
             ],
+            'had_coach_recommendation' => [
+                'icon' => 'fas.robot',
+                'display_name' => 'Coach Recommendation',
+                'description' => 'Generated progression recommendation from fitness coach',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -149,6 +222,14 @@ class HevyPlugin implements IntegrationPlugin
                 'value_unit' => 'kg',
                 'hidden' => false,
             ],
+            'coach_recommendation' => [
+                'icon' => 'fas.lightbulb',
+                'display_name' => 'Coach Recommendation',
+                'description' => 'Progression recommendation from fitness coach',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -167,6 +248,18 @@ class HevyPlugin implements IntegrationPlugin
                 'description' => 'A Hevy user account',
                 'hidden' => false,
             ],
+            'hevy_routine' => [
+                'icon' => 'fas.list-check',
+                'display_name' => 'Hevy Routine',
+                'description' => 'A workout routine template from Hevy',
+                'hidden' => false,
+            ],
+            'hevy_exercise_template' => [
+                'icon' => 'fas.file-lines',
+                'display_name' => 'Exercise Template',
+                'description' => 'An exercise configuration from a routine',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -181,6 +274,97 @@ class HevyPlugin implements IntegrationPlugin
     public static function getTimeUntilStaleMinutes(): ?int
     {
         return null;
+    }
+
+    /**
+     * Get effects that users can trigger.
+     */
+    public static function getEffects(): array
+    {
+        return [
+            'analyze_progression' => [
+                'title' => 'Analyze Workout Progression',
+                'description' => 'Review recent workouts and generate progression recommendations',
+                'icon' => 'fas.chart-line',
+                'jobClass' => HevyAnalyzeProgressionEffect::class,
+                'queue' => 'effects',
+                'requiresConfirmation' => false,
+                'successMessage' => 'Analyzing workouts...',
+            ],
+            'update_routine' => [
+                'title' => 'Update Hevy Routine',
+                'description' => 'Apply progression recommendations to your Hevy routine',
+                'icon' => 'fas.arrow-up',
+                'jobClass' => HevyUpdateRoutineEffect::class,
+                'queue' => 'effects',
+                'requiresConfirmation' => true,
+                'confirmationMessage' => 'This will update your Hevy routine with new targets. Continue?',
+                'successMessage' => 'Routine update in progress...',
+            ],
+            'auto_coach' => [
+                'title' => 'Auto-Coach Routine',
+                'description' => 'Analyze and update routine automatically',
+                'icon' => 'fas.robot',
+                'jobClass' => HevyAutoCoachEffect::class,
+                'queue' => 'effects',
+                'requiresConfirmation' => true,
+                'confirmationMessage' => 'This will analyze workouts and update your routine. Continue?',
+                'successMessage' => 'Auto-coaching in progress...',
+            ],
+        ];
+    }
+
+    /**
+     * Register task pipeline tasks for automatic coach execution
+     */
+    public static function getTaskDefinitions(): array
+    {
+        return [
+            new TaskDefinition(
+                key: 'hevy_auto_coach',
+                name: 'Hevy Auto Coach',
+                description: 'Automatically analyze workouts and update routines with progressive overload recommendations',
+                jobClass: HevyAutoCoachEffect::class,
+                appliesTo: ['event'],
+                conditions: [
+                    'service' => 'hevy',
+                    'action' => 'completed_workout',
+                ],
+                dependencies: [],
+                queue: 'effects',
+                priority: 50,
+                runOnCreate: true,
+                runOnUpdate: false,
+                shouldRun: function ($model) {
+                    // Get the integration
+                    $integration = $model->integration;
+
+                    if (! $integration) {
+                        return false;
+                    }
+
+                    // Check if coach is enabled
+                    $config = $integration->configuration ?? [];
+                    if (! ($config['coach_enabled'] ?? false)) {
+                        return false;
+                    }
+
+                    // Check if we've already run coach today for this integration
+                    // to avoid running multiple times if multiple workouts are logged
+                    $cacheKey = "hevy_coach_last_run_{$integration->id}";
+                    $lastRun = cache()->get($cacheKey);
+
+                    if ($lastRun && $lastRun->isToday()) {
+                        return false;
+                    }
+
+                    // Cache the last run timestamp (expires in 24 hours)
+                    cache()->put($cacheKey, now(), now()->addDay());
+
+                    return true;
+                },
+            ),
+        ];
     }
 
     public function initializeGroup(\App\Models\User $user): IntegrationGroup
@@ -284,6 +468,97 @@ class HevyPlugin implements IntegrationPlugin
             }
             $this->createWorkoutEvent($integration, $workout);
         }
+    }
+
+    /**
+     * Pull routine data from Hevy API.
+     */
+    public function pullRoutineData(Integration $integration): array
+    {
+        Log::info('Hevy: Fetching routines', [
+            'integration_id' => $integration->id,
+        ]);
+
+        try {
+            $allRoutines = [];
+            $page = 1;
+            $pageCount = 1;
+
+            // Follow pagination with a sensible upper bound
+            $maxPages = 0;
+            do {
+                if ($maxPages++ >= 10) {
+                    Log::warning('Hevy: Routine pagination capped at 10 pages', [
+                        'integration_id' => $integration->id,
+                    ]);
+                    break;
+                }
+
+                $query = http_build_query([
+                    'page' => $page,
+                    'limit' => 100,
+                ]);
+
+                $endpoint = '/v1/routines?' . $query;
+                $json = $this->getJson($endpoint, $integration);
+
+                $routines = $json['routines'] ?? $json['data'] ?? [];
+                $allRoutines = array_merge($allRoutines, $routines);
+
+                $pageCount = (int) ($json['page_count'] ?? 1);
+                $currentPage = (int) ($json['page'] ?? 1);
+
+                Log::info('Hevy: Fetched routine page', [
+                    'integration_id' => $integration->id,
+                    'page' => $currentPage,
+                    'page_count' => $pageCount,
+                    'routines_in_page' => count($routines),
+                    'total_routines' => count($allRoutines),
+                ]);
+
+                $page++;
+            } while ($page <= $pageCount);
+
+            Log::info('Hevy: Completed fetching all routine pages', [
+                'integration_id' => $integration->id,
+                'total_routines' => count($allRoutines),
+                'pages_fetched' => $page - 1,
+            ]);
+
+            return [
+                'routines' => $allRoutines,
+                'page' => 1,
+                'page_count' => 1,
+            ];
+        } catch (Throwable $e) {
+            Log::error('Hevy: Routine fetch failed', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Update a routine on Hevy API.
+     */
+    public function updateRoutine(Integration $integration, string $routineId, array $updates): array
+    {
+        $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
+        $url = $this->baseUrl . '/v1/routines/' . $routineId;
+
+        log_integration_api_request('hevy', 'PUT', "/v1/routines/{$routineId}", ['api-key' => '***'], $updates, $integration->id);
+
+        $response = Http::withHeaders(['api-key' => $apiKey])
+            ->put($url, $updates);
+
+        log_integration_api_response('hevy', 'PUT', "/v1/routines/{$routineId}", $response->status(), $response->body(), $response->headers(), $integration->id);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Hevy routine update failed: ' . $response->status() . ' - ' . $response->body());
+        }
+
+        return $response->json() ?? [];
     }
 
     /**
