@@ -614,7 +614,26 @@ Remember: **Brevity is respect for the reader's time.**
 4. **Online domain**: Project momentum and blockers only
 5. **Drop or minimize cross-domain synthesizer**: Most connections are artificial
 
-#### Phase 7: Monitoring & Iteration (Week 4-5)
+#### Phase 7: Digest Tab UI Implementation (Week 4)
+1. **Implement Digest tab in `/flint` route (currently placeholder):**
+   - Replace "Your most recent AI-generated digest will appear here" with actual implementation
+   - Display latest digest in scannable format (Theme, Top 3 Insights, Wins, Watch Points, Tomorrow Focus)
+   - Weather warnings prominently displayed if present
+   - Archive view of past 7-30 days of digests
+   - Individual insight cards with expand/collapse
+   - Feedback buttons on each insight (helpful/dismiss)
+
+2. **Data loading:**
+   - Query most recent digest blocks from database
+   - Parse structured digest data
+   - Handle empty state (no digests yet)
+
+3. **Archive functionality:**
+   - Calendar view or list of past digests
+   - Quick preview on card
+   - Click to expand full digest
+
+#### Phase 8: Monitoring & Iteration (Week 4-5)
 1. Add insight quality metrics dashboard
 2. Track user engagement (read time, feedback)
 3. Monitor duplication rate
