@@ -135,129 +135,122 @@ Flint currently operates as a **behavior tracker** when it should be a **knowled
 >
 > → Safe to hit legs again today, or pivot to upper body if you prefer"
 
-#### Money Domain: From Transaction List to Financial Narrative
+#### Money Domain: Flag Financial Issues Only
+
+**NEVER DO THIS:**
+- ❌ "You spent £156 on dining" (obvious from bank statement)
+- ❌ Cross-domain connections ("spending correlates with reading patterns")
+- ❌ Behavioral psychology without evidence
+
+**ONLY FLAG:**
+- ✅ Budget violations (if budgets configured)
+- ✅ Cashflow warnings (projected to go negative)
+- ✅ Unusual transactions (potential fraud)
+- ✅ Forgotten subscriptions (recurring charges for unused services)
+
+**Most of the time: Return ZERO insights** (and that's okay)
 
 **Example:**
 
-✅ **After:**
-> "💰 Spending Pattern: Increased Social/Dining
->
-> £156 on dining this week (vs £90 typical) driven by three weekend outings. This coincides with your geopolitical reading heavy period—often when you process complex topics, you prefer social discussion over solo time.
->
-> Pattern holds: Last time you deep-dived a research topic (Sept infrastructure reading), dining spend also jumped 40-50%.
->
-> → This isn't overspending—it's your thinking style. Budget accordingly when entering research mode."
+✅ **When there's an actual issue:**
+> "⚠️ Cashflow warning
+> Current spending pace projects £180 deficit by month-end. Three large transactions this week: £450 XYZ Ltd, £280 dining, £120 subscriptions.
+> → Review discretionary spending or adjust budget"
+
+✅ **When everything is fine:**
+> [No Money insights - nothing requiring attention]
+
+## Data Filtering Ground Rules
+
+**Skip entirely:**
+- Empty daynotes (no content = no insights)
+- Outline documents (personal notes, not insight-worthy)
+- Any data source with zero meaningful events
+
+**Only surface insights when there's something genuinely worth saying.**
 
 ## Proposed Solutions
 
-### 1. Content Synthesis Pipeline (NEW - Priority #1)
+### 1. Use Existing Fetch Content for Knowledge Synthesis
 
-For the Knowledge domain specifically, Flint needs to:
+**Fetch plugin already provides:**
+- Full article text extraction
+- Article summaries
+- Metadata (title, author, publication, date)
 
-**Step 1: Content Extraction**
-- When user bookmarks an article (via Fetch integration), extract:
-  - Full text content
-  - Title, author, publication, date
-  - Key claims and arguments
-  - Data points and evidence cited
-  - Conclusions or recommendations
+**What Knowledge domain needs to do:**
+- Access Fetch summaries for bookmarked articles
+- Group related articles by theme
+- Synthesize key points across articles
+- Surface debates and tensions
+- Present content clearly
 
-**Step 2: Content Analysis**
-- Identify main topic/theme
-- Extract 3-5 key points
-- Categorize type: research paper, opinion piece, news, analysis
-- Assess quality: credible sources, data-backed, speculative
-- Flag controversial claims or novel ideas
+**No new ContentSynthesisService needed - leverage what exists.**
 
-**Step 3: Cross-Article Synthesis**
-- Group articles by theme (AI, geopolitics, infrastructure, etc.)
-- Identify:
-  - Converging arguments (multiple sources agree)
-  - Contradictions (sources disagree)
-  - Evidence chains (one article builds on another)
-  - Emerging patterns (new topic cluster forming)
-- Connect to user's existing knowledge base (past articles, notes)
+**Example prompt for Knowledge domain:**
+```markdown
+You have access to these bookmarked articles with Fetch summaries:
 
-**Step 4: Insight Generation**
-- Synthesize themes across multiple articles
-- Highlight key debates or questions
-- Surface actionable implications
-- Connect to user's other activities (e.g., capital deployment decisions)
+Article 1: "Groq's Deterministic Architecture"
+Summary: [Fetch summary]
 
-**Technical Requirements:**
+Article 2: "AI Training Economics"
+Summary: [Fetch summary]
+
+Article 3: "Chip Export Controls"
+Summary: [Fetch summary]
+
+Synthesize:
+1. What themes connect these articles?
+2. What key debates or questions emerge?
+3. What should the user know from this reading?
+
+Present as: Title, key points from each article, connecting theme/tension, actionable takeaway.
+NO behavioral meta-analysis ("you read X articles").
+```
+
+### 2. Weather Integration (NEW - Practical Utility)
+
+Add genuinely useful weather warnings using Met Office DataHub API.
+
+**Service implementation:**
 ```php
-// New service needed
-class ContentSynthesisService
+class WeatherService
 {
-    public function extractArticleContent(string $url): array
+    public function getForecast(float $lat, float $lon): array
     {
-        // Fetch full article text
-        // Extract key sections, claims, data
-        // Return structured content
+        // Call Met Office DataHub API
+        // GET https://data.hub.api.metoffice.gov.uk/point/hourly
+        // ?latitude={lat}&longitude={lon}
+        // Return next 24 hours forecast
     }
 
-    public function analyzeContent(array $content): array
+    public function getNotableWeather(array $forecast): ?array
     {
-        // Use LLM to extract:
-        // - Main argument
-        // - Key claims (3-5)
-        // - Evidence presented
-        // - Author's conclusion
-        // - Topic tags
-    }
+        // Only flag if weather is notable:
+        // - Heavy rain/storms
+        // - Temperature extremes (>28°C or <2°C)
+        // - High winds (>30mph)
+        // - Poor visibility
 
-    public function synthesizeAcrossArticles(array $articles, int $days = 7): array
-    {
-        // Group by theme
-        // Find connections
-        // Identify debates
-        // Generate insights
-    }
-
-    public function connectToUserContext(array $synthesis, User $user): array
-    {
-        // Link to user's past reading
-        // Connect to other domains (e.g., financial decisions)
-        // Suggest related topics
+        // Return null if weather unremarkable
     }
 }
 ```
 
-**Prompt for Article Analysis:**
-```markdown
-You are analyzing an article the user bookmarked to extract its core value.
+**Usage:**
+- Get user's latest location from check-ins
+- Fetch hourly forecast for next 24 hours
+- Flag notable weather in morning digest
+- Make it actionable
 
-Article: {title}
-Content: {full_text}
+**Example insights:**
+- ✅ "⛈️ Heavy rain 2-4 PM - reschedule outdoor run or pack waterproofs"
+- ✅ "🌡️ Peak 32°C today - hydrate well before workout, consider indoor training"
+- ✅ "❄️ Sub-zero temps tonight - layer up for evening commute"
+- ❌ "It will be 18°C and cloudy" (unremarkable, skip it)
 
-Extract:
-1. Main argument/thesis (1 sentence)
-2. Key claims (3-5 specific points)
-3. Evidence presented (data, studies, examples)
-4. Author's conclusion
-5. Novel or controversial ideas
-6. Topics/themes (tags)
-
-Return as structured JSON.
-```
-
-**Prompt for Multi-Article Synthesis:**
-```markdown
-The user has bookmarked these {N} articles in the past week:
-
-{article_summaries}
-
-Synthesize insights:
-1. What themes connect these articles?
-2. What key questions or debates emerge?
-3. Do any articles contradict each other?
-4. What does this reading pattern suggest about the user's current intellectual focus?
-5. What are the actionable implications?
-
-Focus on CONTENT synthesis, not reading behavior.
-```
-
-### 2. Insight Quality Framework
+### 3. Insight Quality Framework
 
 #### A. The "So What?" Test
 Every insight must answer three questions:
@@ -537,68 +530,91 @@ Remember: **Brevity is respect for the reader's time.**
 
 ### 5. Technical Implementation Plan
 
-#### Phase 0: Content Synthesis Infrastructure (Week 1-2) **NEW - CRITICAL**
-1. Create `ContentSynthesisService.php`:
-   - Article content extraction (full text, metadata)
-   - LLM-based content analysis (extract key claims, arguments)
-   - Multi-article synthesis (find themes, connections, debates)
-   - Context integration (connect to user's interests, decisions)
+#### Phase 1: Quality Filters & Data Filtering (Week 1)
+1. **Add data filtering rules:**
+   - Skip empty daynotes
+   - Skip Outline documents (personal notes)
+   - Skip any data source with zero events
 
-2. Enhance event/block storage:
-   - Store full article content when bookmarked
-   - Cache article analyses (avoid re-processing)
-   - Add theme/topic tagging to articles
-   - Build article relationship graph
-
-3. Update Knowledge domain agent:
-   - Remove behavioral counting entirely
-   - Focus on content synthesis prompts
-   - Pass article content to agent, not just metadata
-   - Generate theme-based insights, not activity-based
-
-**Key deliverable**: Knowledge domain insights shift from "You read X articles" to "Here's what your reading says about [topic]"
-
-#### Phase 1: Quality Filters (Week 2)
-1. Update `DomainAgentService.php`:
+2. **Update `DomainAgentService.php`:**
    - Add insight validation method
    - Implement "So What?" test logic
    - Raise confidence threshold to 0.7
    - Add minimum viable criteria checks
-   - **Add content-based validation**: Insights must reference actual content, not just activity
+   - **Filter meta-analysis**: Block "you did X" insights
+   - **Make zero insights acceptable**: Better than noise
 
-2. Update `parseAgentResponse()`:
+3. **Update `parseAgentResponse()`:**
    - Add quality scoring function
-   - Filter out meta-analysis insights (counting, percentages)
-   - Filter out low-quality insights before storage
+   - Filter out behavioral counting (bookmarks, task counts, etc.)
+   - Filter out low-confidence insights (<0.7)
    - Log rejected insights for analysis
 
-#### Phase 2: Deduplication (Week 2-3)
-1. Create `InsightDeduplicationService.php`:
+4. **Update all domain agent prompts:**
+   - Add "RETURN EMPTY ARRAY if nothing meaningful to say"
+   - Emphasize quality over quantity
+   - Examples of what NOT to do
+
+#### Phase 2: Weather Integration (Week 1-2)
+1. **Create `WeatherService.php`:**
+   - Integrate Met Office DataHub API
+   - Fetch hourly forecast for user location
+   - Flag notable weather only (rain, extremes, storms)
+   - Return null if weather unremarkable
+
+2. **Add to morning digest generation:**
+   - Get user's latest location from check-ins
+   - Call WeatherService
+   - Surface actionable weather warnings
+   - Skip if weather is normal
+
+#### Phase 3: Knowledge Domain Synthesis (Week 2)
+1. **Update Knowledge domain agent prompt:**
+   - Access Fetch summaries (already available)
+   - Group articles by theme
+   - Synthesize across related articles
+   - Surface debates and key questions
+   - NO behavioral counting ("you read X articles")
+
+2. **Update context service:**
+   - Include Fetch summaries in Knowledge domain context
+   - Group by theme/topic
+   - Pass to domain agent for synthesis
+
+#### Phase 4: Deduplication (Week 2-3)
+1. **Create `InsightDeduplicationService.php`:**
    - Implement insight hashing
    - Add temporal memory (24hr cache)
    - Build similarity detection algorithm
 
-2. Update `AgentOrchestrationService.php`:
+2. **Update `AgentOrchestrationService.php`:**
    - Check for duplicates before creating blocks
    - Implement update/suppress logic
    - Add duplicate tracking metrics
 
-#### Phase 3: Digest Redesign (Week 3)
-1. Update digest generation prompt in `AgentOrchestrationService.php`
-2. Modify `parseDigestResponse()` to handle new structure
-3. Update `GenerateDailyDigestJob.php` to create blocks for new format
-4. Update Blade templates for new presentation
+#### Phase 5: Digest Redesign (Week 3)
+1. **Update digest generation prompt:**
+   - New scannable structure (Theme, Top 3 Insights, Wins, Watch Points)
+   - 15-word headline maximum
+   - Max 2 sentences per insight
+   - Include weather warnings if notable
 
-#### Phase 4: Domain-Specific Prompt Overhaul (Week 3-4)
-1. **Knowledge domain**: Complete rewrite for content synthesis
-2. **Health domain**: Shift to performance coaching / recovery analysis
-3. **Money domain**: Narrative patterns, not just transaction summaries
-4. **Media domain**: Musical themes and mood analysis
-5. **Online domain**: Project momentum and blockers
-6. Cross-domain synthesizer: Focus on meaningful connections only
-7. A/B test old vs new prompts
+2. **Update digest response parsing:**
+   - Handle new structure
+   - Create appropriate blocks
 
-#### Phase 5: Monitoring & Iteration (Week 4-5)
+3. **Update Blade templates:**
+   - New presentation format
+   - Weather warning display
+
+#### Phase 6: Domain-Specific Refinement (Week 3-4)
+1. **Health domain**: Performance coaching prompts (recovery status, training readiness)
+2. **Money domain**: Only flag actual financial issues (budget violations, cashflow warnings)
+3. **Media domain**: If insights are low-value, consider reducing priority
+4. **Online domain**: Project momentum and blockers only
+5. **Drop or minimize cross-domain synthesizer**: Most connections are artificial
+
+#### Phase 7: Monitoring & Iteration (Week 4-5)
 1. Add insight quality metrics dashboard
 2. Track user engagement (read time, feedback)
 3. Monitor duplication rate
@@ -626,8 +642,8 @@ Remember: **Brevity is respect for the reader's time.**
 **System Metrics:**
 - Insights generated per domain: 0-3 (quality over quantity)
 - Digest length: < 200 words
-- Processing time: < 60 seconds per digest (accounting for content extraction)
-- **Article analysis cache hit rate**: > 80% (avoid re-processing same articles)
+- Processing time: < 30 seconds per digest
+- **Zero-insight rate**: 40-60% of domains per day (most days, most domains have nothing meaningful to say)
 
 ### 7. Example: Before & After
 
@@ -687,8 +703,8 @@ Recovery & Deep Research
 2. ✅ **Strong recovery from Dec 29 workout**
    HRV rebounding, RHR normalizing—body has processed the leg session. Green light for training today.
 
-3. 💰 **Social spending pattern during research mode**
-   Dining up to £156 (vs £90 typical) coinciding with heavy geopolitical reading. Same pattern as Sept when you researched infrastructure topics—you process complex ideas socially.
+3. ⛈️ **Heavy rain this afternoon**
+   Forecast shows 15mm rainfall 2-4 PM. Reschedule outdoor run or pack waterproofs.
 
 ## ✅ Wins
 - Recovery metrics all trending positive
