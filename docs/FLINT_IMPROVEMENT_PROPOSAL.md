@@ -13,15 +13,26 @@ This proposal outlines a comprehensive redesign to transform Flint from a data r
 
 ### Current Issues (With Examples)
 
-#### 1. Superficial Observations
+#### 1. Superficial Observations (Meta-Analysis Instead of Content Synthesis)
 **Current output:**
 > "You fetched/bookmarked 7 webpages yesterday (2025-12-29) and only 1 today (2025-12-30), a decline of ~85.7%. That suggests either a short pause in active article capture or a shift from discovery to deeper work (notes/outlines) today."
 
 **Problems:**
-- Obvious statement of what the data shows
+- Tells you ABOUT your behavior, not ABOUT the content you're consuming
+- Obvious statement of what the data shows (you can count your own bookmarks)
 - Speculative conclusion without evidence
 - No actionable insight
 - Percentage calculation adds false precision
+- **FUNDAMENTALLY WRONG APPROACH**: User wants synthesis of *what* they're reading, not *how much*
+
+**What the user actually wants:**
+> "📚 Emerging research focus: AI infrastructure economics
+>
+> Your recent reading explores the capital intensity of AI training (£100M+ per frontier model) and inference costs. Three articles converge on a key tension: current LLM architectures don't scale economically for mass deployment.
+>
+> Key debate: Will efficiency gains (quantization, distillation) outpace demand growth, or do we need architectural breakthroughs? Two researchers argue for neuromorphic approaches; one suggests we're hitting a Moore's Law equivalent for transformers.
+>
+> → Worth watching: Groq's deterministic architecture and Google's TPU v5 economics"
 
 #### 2. Duplication Across Digests
 **Morning insight:**
@@ -46,9 +57,207 @@ This proposal outlines a comprehensive redesign to transform Flint from a data r
 - Exhausting to read
 - No clear hierarchy of importance
 
+## Fundamental Shift: From Behavioral Tracking to Content Synthesis
+
+### The Core Problem
+
+Flint currently operates as a **behavior tracker** when it should be a **knowledge synthesizer**.
+
+**Current approach (WRONG):**
+- "You bookmarked 7 articles" → Meta-analysis of behavior
+- "You spent £156 on dining" → Numerical summary
+- "You completed 12 tasks" → Activity counting
+
+**Correct approach:**
+- **Knowledge domain**: Synthesize the *content* of articles, identify themes, extract key arguments
+- **Health domain**: Interpret the *meaning* of metrics in context (training load, recovery status)
+- **Money domain**: Understand spending *patterns* and their implications, not just totals
+- **Media domain**: Identify musical themes, mood patterns, discovery trends
+- **Online domain**: Surface project momentum, blockers, meaningful progress
+
+### Domain-Specific Transformations
+
+#### Knowledge Domain: From Activity Counter to Research Assistant
+
+**NEVER DO THIS:**
+- ❌ "You bookmarked 7 articles on AI" (counting)
+- ❌ "Your reading volume declined 85.7%" (meta-analysis)
+- ❌ "You're reading about geopolitics" (obvious categorization)
+
+**ALWAYS DO THIS:**
+- ✅ Read the actual content of bookmarked articles
+- ✅ Extract key arguments, findings, and claims
+- ✅ Identify themes and connections across articles
+- ✅ Highlight debates, contradictions, or converging evidence
+- ✅ Surface actionable insights or implications
+- ✅ Connect to user's other interests or activities
+
+**Example transformation:**
+
+❌ **Before:**
+> "You've been exploring AI/ML content heavily (8 articles saved), suggesting a new learning focus compared to your usual web development topics."
+
+✅ **After:**
+> "🧠 AI Economics & Infrastructure Themes
+>
+> Your reading this week explores three interconnected questions:
+>
+> 1. **Capital requirements**: Training GPT-4-class models now costs $100M+. Two articles argue this creates a natural oligopoly; one counters that open-source distillation democratizes access.
+>
+> 2. **Inference economics**: Current LLMs cost $0.01-0.10 per query at scale. For consumer apps to work, this needs to drop 10-100x. Article from a16z suggests MoE architectures as the path.
+>
+> 3. **Geopolitical implications**: Your bookmarked Foreign Affairs piece connects this to the chip export controls—argues AI infrastructure becomes as strategically important as energy infrastructure.
+>
+> **Key tension**: All three themes point to the same question: Is AI infrastructure a natural monopoly, or can we engineer around it?
+>
+> **Connects to**: Your £251k capital deployment question—infrastructure plays vs. application layer?"
+
+#### Health Domain: From Metric Reporter to Performance Coach
+
+**NEVER DO THIS:**
+- ❌ "Your HRV was 65 today" (just reporting the number)
+- ❌ "Heart rate averaged 145 bpm during workout" (obvious from device)
+
+**ALWAYS DO THIS:**
+- ✅ Interpret metrics in context of training load
+- ✅ Identify recovery status and readiness
+- ✅ Flag performance trends or concerns
+- ✅ Connect to other life domains (sleep, stress, workload)
+
+**Example:**
+
+✅ **After:**
+> "💪 Recovery Status: Green Light for Training
+>
+> HRV rebounded to 68 (from 58 post-workout), RHR dropped to 52 (baseline: 54). Your body has fully processed the Dec 29 leg session.
+>
+> Combined with 8.1 hrs sleep and low respiratory rate, all systems show readiness for another hard session. The earlier HR spike is explained by Strava data (HIIT intervals).
+>
+> → Safe to hit legs again today, or pivot to upper body if you prefer"
+
+#### Money Domain: From Transaction List to Financial Narrative
+
+**Example:**
+
+✅ **After:**
+> "💰 Spending Pattern: Increased Social/Dining
+>
+> £156 on dining this week (vs £90 typical) driven by three weekend outings. This coincides with your geopolitical reading heavy period—often when you process complex topics, you prefer social discussion over solo time.
+>
+> Pattern holds: Last time you deep-dived a research topic (Sept infrastructure reading), dining spend also jumped 40-50%.
+>
+> → This isn't overspending—it's your thinking style. Budget accordingly when entering research mode."
+
 ## Proposed Solutions
 
-### 1. Insight Quality Framework
+### 1. Content Synthesis Pipeline (NEW - Priority #1)
+
+For the Knowledge domain specifically, Flint needs to:
+
+**Step 1: Content Extraction**
+- When user bookmarks an article (via Fetch integration), extract:
+  - Full text content
+  - Title, author, publication, date
+  - Key claims and arguments
+  - Data points and evidence cited
+  - Conclusions or recommendations
+
+**Step 2: Content Analysis**
+- Identify main topic/theme
+- Extract 3-5 key points
+- Categorize type: research paper, opinion piece, news, analysis
+- Assess quality: credible sources, data-backed, speculative
+- Flag controversial claims or novel ideas
+
+**Step 3: Cross-Article Synthesis**
+- Group articles by theme (AI, geopolitics, infrastructure, etc.)
+- Identify:
+  - Converging arguments (multiple sources agree)
+  - Contradictions (sources disagree)
+  - Evidence chains (one article builds on another)
+  - Emerging patterns (new topic cluster forming)
+- Connect to user's existing knowledge base (past articles, notes)
+
+**Step 4: Insight Generation**
+- Synthesize themes across multiple articles
+- Highlight key debates or questions
+- Surface actionable implications
+- Connect to user's other activities (e.g., capital deployment decisions)
+
+**Technical Requirements:**
+```php
+// New service needed
+class ContentSynthesisService
+{
+    public function extractArticleContent(string $url): array
+    {
+        // Fetch full article text
+        // Extract key sections, claims, data
+        // Return structured content
+    }
+
+    public function analyzeContent(array $content): array
+    {
+        // Use LLM to extract:
+        // - Main argument
+        // - Key claims (3-5)
+        // - Evidence presented
+        // - Author's conclusion
+        // - Topic tags
+    }
+
+    public function synthesizeAcrossArticles(array $articles, int $days = 7): array
+    {
+        // Group by theme
+        // Find connections
+        // Identify debates
+        // Generate insights
+    }
+
+    public function connectToUserContext(array $synthesis, User $user): array
+    {
+        // Link to user's past reading
+        // Connect to other domains (e.g., financial decisions)
+        // Suggest related topics
+    }
+}
+```
+
+**Prompt for Article Analysis:**
+```markdown
+You are analyzing an article the user bookmarked to extract its core value.
+
+Article: {title}
+Content: {full_text}
+
+Extract:
+1. Main argument/thesis (1 sentence)
+2. Key claims (3-5 specific points)
+3. Evidence presented (data, studies, examples)
+4. Author's conclusion
+5. Novel or controversial ideas
+6. Topics/themes (tags)
+
+Return as structured JSON.
+```
+
+**Prompt for Multi-Article Synthesis:**
+```markdown
+The user has bookmarked these {N} articles in the past week:
+
+{article_summaries}
+
+Synthesize insights:
+1. What themes connect these articles?
+2. What key questions or debates emerge?
+3. Do any articles contradict each other?
+4. What does this reading pattern suggest about the user's current intellectual focus?
+5. What are the actionable implications?
+
+Focus on CONTENT synthesis, not reading behavior.
+```
+
+### 2. Insight Quality Framework
 
 #### A. The "So What?" Test
 Every insight must answer three questions:
@@ -328,19 +537,42 @@ Remember: **Brevity is respect for the reader's time.**
 
 ### 5. Technical Implementation Plan
 
-#### Phase 1: Quality Filters (Week 1)
+#### Phase 0: Content Synthesis Infrastructure (Week 1-2) **NEW - CRITICAL**
+1. Create `ContentSynthesisService.php`:
+   - Article content extraction (full text, metadata)
+   - LLM-based content analysis (extract key claims, arguments)
+   - Multi-article synthesis (find themes, connections, debates)
+   - Context integration (connect to user's interests, decisions)
+
+2. Enhance event/block storage:
+   - Store full article content when bookmarked
+   - Cache article analyses (avoid re-processing)
+   - Add theme/topic tagging to articles
+   - Build article relationship graph
+
+3. Update Knowledge domain agent:
+   - Remove behavioral counting entirely
+   - Focus on content synthesis prompts
+   - Pass article content to agent, not just metadata
+   - Generate theme-based insights, not activity-based
+
+**Key deliverable**: Knowledge domain insights shift from "You read X articles" to "Here's what your reading says about [topic]"
+
+#### Phase 1: Quality Filters (Week 2)
 1. Update `DomainAgentService.php`:
    - Add insight validation method
    - Implement "So What?" test logic
    - Raise confidence threshold to 0.7
    - Add minimum viable criteria checks
+   - **Add content-based validation**: Insights must reference actual content, not just activity
 
 2. Update `parseAgentResponse()`:
    - Add quality scoring function
+   - Filter out meta-analysis insights (counting, percentages)
    - Filter out low-quality insights before storage
    - Log rejected insights for analysis
 
-#### Phase 2: Deduplication (Week 1-2)
+#### Phase 2: Deduplication (Week 2-3)
 1. Create `InsightDeduplicationService.php`:
    - Implement insight hashing
    - Add temporal memory (24hr cache)
@@ -351,24 +583,28 @@ Remember: **Brevity is respect for the reader's time.**
    - Implement update/suppress logic
    - Add duplicate tracking metrics
 
-#### Phase 3: Digest Redesign (Week 2)
+#### Phase 3: Digest Redesign (Week 3)
 1. Update digest generation prompt in `AgentOrchestrationService.php`
 2. Modify `parseDigestResponse()` to handle new structure
 3. Update `GenerateDailyDigestJob.php` to create blocks for new format
 4. Update Blade templates for new presentation
 
-#### Phase 4: Prompt Engineering (Week 2-3)
-1. Rewrite all domain agent prompts
-2. Update cross-domain synthesizer prompt
-3. Refine action prioritization prompt
-4. A/B test old vs new prompts
+#### Phase 4: Domain-Specific Prompt Overhaul (Week 3-4)
+1. **Knowledge domain**: Complete rewrite for content synthesis
+2. **Health domain**: Shift to performance coaching / recovery analysis
+3. **Money domain**: Narrative patterns, not just transaction summaries
+4. **Media domain**: Musical themes and mood analysis
+5. **Online domain**: Project momentum and blockers
+6. Cross-domain synthesizer: Focus on meaningful connections only
+7. A/B test old vs new prompts
 
-#### Phase 5: Monitoring & Iteration (Week 3-4)
+#### Phase 5: Monitoring & Iteration (Week 4-5)
 1. Add insight quality metrics dashboard
 2. Track user engagement (read time, feedback)
 3. Monitor duplication rate
-4. Collect user feedback
-5. Iterate based on data
+4. Track content synthesis quality (theme accuracy, insight relevance)
+5. Collect user feedback
+6. Iterate based on data
 
 ### 6. Success Metrics
 
@@ -377,39 +613,59 @@ Remember: **Brevity is respect for the reader's time.**
 - Zero duplicate insights within 24hr window
 - Digest read time < 90 seconds
 - Insight-to-action ratio > 0.6 (60% of insights have clear actions)
+- **Content synthesis rate**: Knowledge insights reference actual article content (not just "you read X")
+- **Meta-analysis rejection rate**: >90% of "you did X" insights filtered out
 
 **Engagement Metrics:**
 - User feedback rating > 4.0/5.0
 - Dismissed insight rate < 10%
 - Digest open rate > 80%
 - Time spent on insights > 2 min/day
+- **Content relevance**: User acts on synthesized insights (clicks through to articles, takes notes)
 
 **System Metrics:**
 - Insights generated per domain: 0-3 (quality over quantity)
 - Digest length: < 200 words
-- Processing time: < 30 seconds per digest
+- Processing time: < 60 seconds per digest (accounting for content extraction)
+- **Article analysis cache hit rate**: > 80% (avoid re-processing same articles)
 
 ### 7. Example: Before & After
 
 #### Before
 
-**Health Insight (Morning):**
+**Knowledge Insight (Morning - Behavioral Meta-Analysis):**
+> "You fetched/bookmarked 7 webpages yesterday (2025-12-29) and only 1 today (2025-12-30), a decline of ~85.7%. That suggests either a short pause in active article capture or a shift from discovery to deeper work (notes/outlines) today."
+
+**Health Insight (Morning - Duplicative):**
 > "Apple Health reported a maximum heart rate of 200 bpm for 2025-12-29 while Oura's max heart rate that day was 147 bpm; average heart-rate measures are otherwise in the mid-60s to low-90s. This large discrepancy suggests either a sensor spike/artifact in Apple Health or an unusually high exertion/arrhythmia episode — check workout timestamps and how you felt at that moment."
 
-**Health Insight (Afternoon, same day):**
+**Health Insight (Afternoon, same day - Duplicate):**
 > "Apple Health shows a maximum heart rate of 200 bpm on 2025-12-29 while that day's average heart rate values were much lower — this large spike stands out relative to surrounding metrics and may be an exercise peak or a sensor artifact."
 
-**Digest Headline:**
+**Digest Headline (241 words - Too verbose):**
 > "Today shows you in a deliberate setup phase: you're recovering well from heavy training, quietly optimizing your money systems, and sharpening your learning focus around AI, infrastructure, and geopolitics. On the health side, your body is bouncing back strongly from a high-volume leg session, even though there was a slight uptick in night-time breathing disturbance..." [continues for 241 words]
 
 #### After
 
-**Health Insight (Morning):**
+**Knowledge Insight (Morning - Content Synthesis):**
+> "🧠 AI Infrastructure Economics: Emerging Debate
+>
+> Your recent articles converge on a critical question: Can AI scale economically? Three pieces explore this:
+>
+> 1. Training costs now exceed $100M per frontier model (per your Semianalysis bookmark). Two authors argue this creates natural oligopoly.
+> 2. Inference economics: Current LLM queries cost $0.01-0.10 at scale—needs 10-100x reduction for consumer viability (a16z analysis).
+> 3. Geopolitical angle: Your Foreign Affairs piece connects chip export controls to AI infrastructure becoming as strategic as energy infrastructure.
+>
+> **Key tension**: Is AI infrastructure a natural monopoly, or can we engineer around it (open-source distillation vs. architectural breakthroughs)?
+>
+> → Connects to your £251k capital question: infrastructure layer vs. application bets?"
+
+**Health Insight (Morning - Contextual):**
 > "⚠️ Heart rate discrepancy
 > Dec 29 shows 200 bpm max on Apple Health vs 147 bpm on Oura (your typical max during hard efforts is ~165 bpm). Cross-check your Strava log around 2-3 PM to see if you did a hard interval session.
 > → Investigate to rule out sensor error"
 
-**Health Insight (Afternoon, same day):**
+**Health Insight (Afternoon, same day - Suppressed or Updated):**
 > [SUPPRESSED - awaiting Strava cross-reference]
 
 **Or, if new data available:**
@@ -422,28 +678,28 @@ Remember: **Brevity is respect for the reader's time.**
 # Daily Digest - Dec 30 AM
 
 ## 🎯 Today's Theme
-Recovery & Consolidation
+Recovery & Deep Research
 
 ## 📊 Key Insights
-1. ✅ **Strong recovery metrics**
-   Body bouncing back well from Dec 29 leg session—HRV rising, RHR normalizing. Light day or rest recommended.
+1. 🧠 **AI infrastructure economics debate**
+   Your reading explores a key tension: $100M+ training costs suggest natural oligopoly, but open-source advocates argue distillation democratizes access. Connects to your capital deployment question.
 
-2. 📚 **Learning mode shift**
-   After a week of heavy reading, you're in consolidation mode (1 bookmark vs usual 7+). Healthy pattern.
+2. ✅ **Strong recovery from Dec 29 workout**
+   HRV rebounding, RHR normalizing—body has processed the leg session. Green light for training today.
 
-3. ⚠️ **Heart rate data conflict**
-   Apple Health vs Oura discrepancy on Dec 29—cross-check Strava to verify.
+3. 💰 **Social spending pattern during research mode**
+   Dining up to £156 (vs £90 typical) coinciding with heavy geopolitical reading. Same pattern as Sept when you researched infrastructure topics—you process complex ideas socially.
 
 ## ✅ Wins
-- Recovery trending positive after heavy training
-- Financial systems running on autopilot
+- Recovery metrics all trending positive
+- Deep dive into AI economics yielding clear questions
 
 ## 🎬 For Tomorrow
-- Keep training load light to lock in recovery
-- Verify heart rate spike with workout data
+- Continue light-to-moderate training to lock in recovery
+- Consider: infrastructure vs. application layer for capital deployment
 
 ---
-*12 insights analyzed • 3 patterns detected • 2 actions recommended*
+*8 insights analyzed • 3 themes identified • 2 cross-domain connections*
 ```
 
 ## Risks & Mitigations
@@ -468,15 +724,22 @@ Recovery & Consolidation
 
 ## Open Questions for Discussion
 
-1. **Personality:** How much personality should Flint have? Should it be more neutral/professional or more conversational/friendly?
+1. **Content Depth:** How deep should article synthesis go? Full multi-paragraph analysis vs. bullet-point summaries?
 
-2. **Frequency:** Should we reduce digest frequency (e.g., once per day instead of AM/PM) to reduce duplication risk?
+2. **Article Selection:** Should Flint synthesize ALL bookmarked articles or filter to the most substantial/relevant ones?
 
-3. **Customization:** Should users be able to configure verbosity level (concise/moderate/detailed)?
+3. **Frequency:** Should we reduce digest frequency (e.g., once per day instead of AM/PM) to reduce duplication risk?
 
-4. **Learning:** How should Flint learn from user feedback? Explicit ratings, implicit engagement signals, or both?
+4. **Customization:** Should users be able to configure:
+   - Verbosity level (concise/moderate/detailed)
+   - Domains to emphasize (e.g., prioritize Knowledge over Media)
+   - Content synthesis depth
 
-5. **Proactivity:** Should Flint proactively ask clarifying questions (e.g., "I see a HR spike—did you do a hard workout?") or just note the discrepancy?
+5. **Learning:** How should Flint learn from user feedback? Explicit ratings, implicit engagement signals (clicks, time spent), or both?
+
+6. **Proactivity:** Should Flint proactively ask clarifying questions (e.g., "I see a HR spike—did you do a hard workout?") or just note the discrepancy?
+
+7. **Article Retention:** How long should article content be cached for synthesis? 7 days? 30 days? User-configurable?
 
 ## Next Steps
 
