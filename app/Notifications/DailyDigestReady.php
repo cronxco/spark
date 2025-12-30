@@ -7,6 +7,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
 class DailyDigestReady extends Notification implements ShouldQueue
 {
@@ -26,8 +28,8 @@ class DailyDigestReady extends Notification implements ShouldQueue
             $channels[] = 'mail';
         }
 
-        if ($notifiable->hasPushNotificationsEnabled()) {
-            $channels[] = 'push';
+        if ($notifiable->hasPushNotificationsEnabled() && $notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
         }
 
         return $channels;
@@ -65,18 +67,50 @@ class DailyDigestReady extends Notification implements ShouldQueue
         ];
     }
 
-    public function toPush($notifiable): array
+    public function toWebPush($notifiable, $notification): WebPushMessage
     {
         $headline = $this->findBlockContent('flint_summarised_headline');
+        $greeting = $this->getTimeBasedGreeting();
+        $body = $headline ? $this->toSentenceCase($headline) : 'Your daily digest is ready to review.';
 
-        return [
-            'title' => ucfirst($this->period) . ' Digest Ready',
-            'body' => $headline ?? 'Your daily digest is ready to review.',
-            'data' => [
+        return (new WebPushMessage)
+            ->title($greeting)
+            ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
+            ->body($body)
+            ->badge('/favicon.ico')
+            ->tag('daily-digest-' . $this->period)
+            ->data([
+                'url' => route('objects.show', $this->digestObject->id),
+                'type' => 'daily_digest',
                 'digest_object_id' => $this->digestObject->id,
                 'period' => $this->period,
-            ],
-        ];
+            ])
+            ->options([
+                'TTL' => 86400, // 24 hours
+                'urgency' => 'normal',
+            ]);
+    }
+
+    private function getTimeBasedGreeting(): string
+    {
+        $hour = now()->hour;
+
+        if ($hour < 12) {
+            return 'Good Morning';
+        }
+
+        if ($hour < 19) {
+            return 'Good Afternoon';
+        }
+
+        return 'Good Evening';
+    }
+
+    private function toSentenceCase(string $text): string
+    {
+        $text = mb_strtolower($text);
+
+        return mb_strtoupper(mb_substr($text, 0, 1)) . mb_substr($text, 1);
     }
 
     private function findBlockContent(string $blockType): ?string

@@ -63,64 +63,67 @@ class ImmichPlugin extends ManualPlugin
 
     public static function getConfigurationSchema($instanceType = null): array
     {
-        return [
-            'update_frequency_minutes' => [
-                'type' => 'integer',
-                'label' => 'Update Frequency (minutes)',
-                'required' => false,
-                'min' => 15,
-                'max' => 1440,
-                'default' => 60,
-                'description' => 'How often to sync photos (15-1440 minutes)',
-            ],
-            'sync_mode' => [
-                'type' => 'string',
-                'label' => 'Sync Mode',
-                'required' => false,
-                'default' => 'recent',
-                'options' => ['recent', 'full'],
-                'description' => 'Recent (last 30 days) or Full history',
-            ],
-            'include_videos' => [
-                'type' => 'boolean',
-                'label' => 'Include Videos',
-                'required' => false,
-                'default' => true,
-                'description' => 'Sync video files in addition to photos',
-            ],
-            'include_archived' => [
-                'type' => 'boolean',
-                'label' => 'Include Archived',
-                'required' => false,
-                'default' => false,
-                'description' => 'Include archived photos in sync',
-            ],
-            'sync_people' => [
-                'type' => 'boolean',
-                'label' => 'Sync People',
-                'required' => false,
-                'default' => true,
-                'description' => 'Sync recognized people/faces from Immich',
-            ],
-            'cluster_radius_km' => [
-                'type' => 'integer',
-                'label' => 'Cluster Radius (km)',
-                'required' => false,
-                'min' => 1,
-                'max' => 50,
-                'default' => 5,
-                'description' => 'Maximum distance for grouping photos (1-50 km)',
-            ],
-            'cluster_window_minutes' => [
-                'type' => 'integer',
-                'label' => 'Cluster Time Window (minutes)',
-                'required' => false,
-                'min' => 15,
-                'max' => 360,
-                'default' => 60,
-                'description' => 'Maximum time window for grouping photos (15-360 min)',
-            ],
-        ];
+        return array_merge(
+            static::getGroupConfigurationSchema(),
+            [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => false,
+                    'min' => 15,
+                    'max' => 1440,
+                    'default' => 60,
+                    'description' => 'How often to sync photos (15-1440 minutes)',
+                ],
+                'sync_mode' => [
+                    'type' => 'string',
+                    'label' => 'Sync Mode',
+                    'required' => false,
+                    'default' => 'recent',
+                    'options' => ['recent', 'full'],
+                    'description' => 'Recent (last 30 days) or Full history',
+                ],
+                'include_videos' => [
+                    'type' => 'boolean',
+                    'label' => 'Include Videos',
+                    'required' => false,
+                    'default' => true,
+                    'description' => 'Sync video files in addition to photos',
+                ],
+                'include_archived' => [
+                    'type' => 'boolean',
+                    'label' => 'Include Archived',
+                    'required' => false,
+                    'default' => false,
+                    'description' => 'Include archived photos in sync',
+                ],
+                'sync_people' => [
+                    'type' => 'boolean',
+                    'label' => 'Sync People',
+                    'required' => false,
+                    'default' => true,
+                    'description' => 'Sync recognized people/faces from Immich',
+                ],
+                'cluster_radius_km' => [
+                    'type' => 'integer',
+                    'label' => 'Cluster Radius (km)',
+                    'required' => false,
+                    'min' => 1,
+                    'max' => 50,
+                    'default' => 5,
+                    'description' => 'Maximum distance for grouping photos (1-50 km)',
+                ],
+                'cluster_window_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Cluster Time Window (minutes)',
+                    'required' => false,
+                    'min' => 15,
+                    'max' => 360,
+                    'default' => 60,
+                    'description' => 'Maximum time window for grouping photos (15-360 min)',
+                ],
+            ]
+        );
     }
 
     public static function getInstanceTypes(): array
