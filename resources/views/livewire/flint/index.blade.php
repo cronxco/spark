@@ -281,7 +281,7 @@ new class extends Component {
 
                         {{-- Quick Actions --}}
                         <div class="card-actions justify-end">
-                            <a href="{{ route('integrations.show', $hevyIntegration) }}" class="btn btn-outline btn-sm">
+                            <a href="{{ route('integrations.details', $hevyIntegration) }}" class="btn btn-outline btn-sm">
                                 <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
                                 {{ __('Configure') }}
                             </a>
