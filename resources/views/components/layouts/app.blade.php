@@ -109,7 +109,6 @@
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')" />
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
                     <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('settings.notifications') }}" :active="request()->routeIs('settings.notifications')" />
-                    <x-menu-item title="Flint" icon="fas.hexagon-nodes" link="{{ route('settings.flint') }}" :active="request()->routeIs('settings.flint')" />
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                     <x-menu-item
                         title="Reset Card Views"
@@ -174,19 +173,18 @@
                 <x-menu-item title="Today" icon="fas.calendar-day" link="{{ route('today.main') }}" :active="request()->routeIs('today.*')" data-hotkey="g d" />
                 <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')" data-hotkey="g y" />
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')" />
+                <x-menu-item title="Flint" icon="fas.hexagon-nodes" link="{{ route('flint.index') }}" :active="request()->routeIs('flint.index')" />
                 <x-menu-item title="Map" icon="fas.map-location-dot" link="{{ route('map.index') }}" :active="request()->routeIs('map.*')" data-hotkey="g l" />
-                <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" data-hotkey="g t" />
                 <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />
                 <x-menu-item title="Money" icon="fas.pound-sign" link="{{ route('money') }}" :active="request()->routeIs('money.*')" data-hotkey="g m" />
                 <x-menu-item title="Metrics" icon="fas.chart-line" link="{{ route('metrics.index') }}" :active="request()->routeIs('metrics.*')" data-hotkey="g x" />
+                <x-menu-item title="Tags" icon="fas.tag" link="{{ route('tags.index') }}" :active="request()->routeIs('tags.*')" data-hotkey="g t" />
                 <x-menu-item title="Media" icon="fas.photo-film" link="{{ route('media.index') }}" :active="request()->routeIs('media.*')" data-hotkey="g g" />
-                <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
                 <x-menu-sub title="Settings" icon="fas.cog" :active="request()->routeIs('settings.*')" data-hotkey="g s">
                     <x-menu-item title="Profile" icon="fas.user" link="{{ route('settings.profile') }}" :active="request()->routeIs('settings.profile')" />
                     <x-menu-item title="Password" icon="fas.lock" link="{{ route('settings.password') }}" :active="request()->routeIs('settings.password')" />
                     <x-menu-item title="Sessions" icon="fas.desktop" link="{{ route('settings.sessions') }}" :active="request()->routeIs('settings.sessions')" />
                     <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('settings.notifications') }}" :active="request()->routeIs('settings.notifications')" />
-                    <x-menu-item title="Flint" icon="fas.hexagon-nodes" link="{{ route('settings.flint') }}" :active="request()->routeIs('settings.flint')" />
                     <x-menu-item title="Integrations" icon="fas.puzzle-piece" link="{{ route('integrations.index') }}" :active="request()->routeIs('integrations.*')" />
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                 </x-menu-sub>
@@ -206,6 +204,7 @@
                     <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
                 </x-menu-sub>
+                <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
             </x-menu>
         </x-slot:sidebar>
 

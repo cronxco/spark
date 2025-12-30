@@ -68,7 +68,7 @@ class SendDigestNotificationJob implements ShouldQueue
                         })
                         ->where('time', '>=', $today);
                 })
-                ->with(['event.source'])
+                ->with(['event.target'])
                 ->orderBy('created_at', 'desc')
                 ->first();
 
@@ -93,9 +93,9 @@ class SendDigestNotificationJob implements ShouldQueue
             // Get all blocks for this event (insights, actions, etc.)
             $allBlocks = Block::where('event_id', $digestBlock->event_id)->get();
 
-            // Send notification
+            // Send notification (target is the day object)
             $this->user->notify(new DailyDigestReady(
-                digestObject: $digestBlock->event->source,
+                digestObject: $digestBlock->event->target,
                 period: $period,
                 blocks: $allBlocks->toArray()
             ));
