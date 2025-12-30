@@ -217,6 +217,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         ]);
 
         // Create individual blocks for each set (matches real Hevy structure)
+        // All sets achieve goal reps with acceptable RPE
         $event->createBlock([
             'block_type' => 'exercise',
             'title' => 'Bench Press - Set 1',
@@ -241,7 +242,7 @@ class ProgressionAnalysisServiceTest extends TestCase
                 'exercise_name' => 'Bench Press',
                 'set_number' => 2,
                 'weight' => 60,
-                'reps' => 11,
+                'reps' => 12,
                 'rpe' => 8.8,
                 'unit' => 'kg',
             ],
@@ -256,7 +257,7 @@ class ProgressionAnalysisServiceTest extends TestCase
                 'exercise_name' => 'Bench Press',
                 'set_number' => 3,
                 'weight' => 60,
-                'reps' => 10,
+                'reps' => 12,
                 'rpe' => 9.0,
                 'unit' => 'kg',
             ],
