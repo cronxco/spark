@@ -44,6 +44,11 @@ class FetchPlaywrightTest extends TestCase
     {
         config(['services.playwright.enabled' => false]);
 
+        // Mock HTTP responses
+        Http::fake([
+            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
+        ]);
+
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
 
@@ -75,7 +80,7 @@ class FetchPlaywrightTest extends TestCase
         // Mock Playwright worker as unavailable
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'example.com' => Http::response('<html><body>Test</body></html>', 200),
+            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -164,6 +169,12 @@ class FetchPlaywrightTest extends TestCase
     {
         config(['services.playwright.enabled' => true]);
 
+        // Mock HTTP responses
+        Http::fake([
+            '*/health' => Http::response(['status' => 'error'], 500),
+            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
+        ]);
+
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
 
@@ -205,6 +216,12 @@ class FetchPlaywrightTest extends TestCase
             'services.playwright.js_required_domains' => 'twitter.com,instagram.com',
         ]);
 
+        // Mock HTTP responses
+        Http::fake([
+            '*/health' => Http::response(['status' => 'error'], 500),
+            'https://twitter.com*' => Http::response('<html><body>Test Tweet</body></html>', 200),
+        ]);
+
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
 
@@ -238,7 +255,7 @@ class FetchPlaywrightTest extends TestCase
 
         // Fake HTTP responses
         Http::fake([
-            'example.com' => Http::response('<html><head><title>Test Page</title></head><body><article><h1>Test Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
+            'https://example.com*' => Http::response('<html><head><title>Test Page</title></head><body><article><h1>Test Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
             '*' => Http::response('', 404),
         ]);
 

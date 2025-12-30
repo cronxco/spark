@@ -3,6 +3,7 @@
 namespace App\Integrations;
 
 use App\Integrations\Contracts\IntegrationPlugin;
+use App\Integrations\Contracts\SupportsEffects;
 use App\Integrations\Contracts\SupportsSpotlightCommands;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -162,5 +163,48 @@ class PluginRegistry
     public static function clearSpotlightCommandsCache(): void
     {
         self::$cachedSpotlightCommands = null;
+    }
+
+    /**
+     * Get effects for a specific service.
+     *
+     * @return array<string, array>
+     */
+    public static function getEffects(string $service): array
+    {
+        $pluginClass = self::getPlugin($service);
+
+        if (! $pluginClass) {
+            return [];
+        }
+
+        if (! is_subclass_of($pluginClass, SupportsEffects::class)) {
+            return [];
+        }
+
+        return $pluginClass::getEffects();
+    }
+
+    /**
+     * Get all effects from all plugins that support them.
+     *
+     * @return Collection<array{plugin: string, key: string, effect: array}>
+     */
+    public static function getAllEffects(): Collection
+    {
+        return self::getAllPlugins()
+            ->filter(fn ($pluginClass) => is_subclass_of($pluginClass, SupportsEffects::class))
+            ->flatMap(function ($pluginClass) {
+                $identifier = $pluginClass::getIdentifier();
+                $effects = $pluginClass::getEffects();
+
+                return collect($effects)->map(function ($effect, $key) use ($identifier) {
+                    return [
+                        'plugin' => $identifier,
+                        'key' => $key,
+                        'effect' => $effect,
+                    ];
+                });
+            });
     }
 }
