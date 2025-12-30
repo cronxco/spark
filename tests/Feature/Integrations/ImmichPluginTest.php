@@ -58,6 +58,23 @@ class ImmichPluginTest extends TestCase
     }
 
     /** @test */
+    public function it_merges_group_schema_into_configuration_schema()
+    {
+        $configSchema = $this->plugin->getConfigurationSchema();
+
+        // Group-level fields should be included in the configuration schema
+        $this->assertArrayHasKey('server_url', $configSchema);
+        $this->assertArrayHasKey('api_key', $configSchema);
+
+        // Verify they have the correct properties
+        $this->assertEquals('string', $configSchema['server_url']['type']);
+        $this->assertTrue($configSchema['server_url']['required']);
+        $this->assertEquals('string', $configSchema['api_key']['type']);
+        $this->assertTrue($configSchema['api_key']['required']);
+        $this->assertTrue($configSchema['api_key']['secure']);
+    }
+
+    /** @test */
     public function it_defines_took_photos_action_type()
     {
         $actionTypes = $this->plugin->getActionTypes();

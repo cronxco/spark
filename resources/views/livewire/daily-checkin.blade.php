@@ -23,7 +23,7 @@ state([
     'latitude' => null,
     'longitude' => null,
     'address' => null,
-    'locationEnabled' => false,
+    'locationEnabled' => true,
     'fetchingLocation' => false,
 ]);
 
@@ -38,6 +38,11 @@ mount(function (?string $date = null, bool $hideSelector = false) {
 
     // Load existing check-ins
     $this->loadCheckins();
+
+    // Automatically request location if not already set
+    if ($this->locationEnabled && ! $this->latitude) {
+        $this->js('getLocationFromBrowser()');
+    }
 });
 
 $loadCheckins = function (): void {
@@ -54,6 +59,13 @@ $loadCheckins = function (): void {
         $metadata = $checkins['morning']->event_metadata ?? [];
         $this->amPhysical = $metadata['physical_energy'] ?? null;
         $this->amMental = $metadata['mental_energy'] ?? null;
+
+        // Load location from morning check-in if available
+        if ($checkins['morning']->location) {
+            $this->latitude = $checkins['morning']->location->getLatitude();
+            $this->longitude = $checkins['morning']->location->getLongitude();
+            $this->address = $checkins['morning']->location_address;
+        }
     }
 
     // Load afternoon check-in
@@ -61,6 +73,13 @@ $loadCheckins = function (): void {
         $metadata = $checkins['afternoon']->event_metadata ?? [];
         $this->pmPhysical = $metadata['physical_energy'] ?? null;
         $this->pmMental = $metadata['mental_energy'] ?? null;
+
+        // Load location from afternoon check-in if available (and not already loaded from morning)
+        if (! $this->latitude && $checkins['afternoon']->location) {
+            $this->latitude = $checkins['afternoon']->location->getLatitude();
+            $this->longitude = $checkins['afternoon']->location->getLongitude();
+            $this->address = $checkins['afternoon']->location_address;
+        }
     }
 
     // Update parent status after loading
@@ -338,7 +357,7 @@ $reverseGeocodeLocation = function (float $lat, float $lng): void {
     </div>
 </div>
 
-@if ($locationEnabled)
+{{-- Geolocation script - must be loaded before toggleLocation() calls it --}}
 <script>
 function getLocationFromBrowser() {
     @this.set('fetchingLocation', true);
@@ -357,7 +376,10 @@ function getLocationFromBrowser() {
                 alert('Could not get your location. Please enable location services.');
             }
         );
+    } else {
+        @this.set('fetchingLocation', false);
+        @this.set('locationEnabled', false);
+        alert('Geolocation is not supported by your browser.');
     }
 }
 </script>
-@endif
