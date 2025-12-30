@@ -8,9 +8,20 @@ Domain agents receive raw events but are expected to identify patterns and trend
 - No baseline comparisons
 - Vague insights without numbers
 
-## Solution: Pre-Calculate Metrics
+## Discovery: Metrics Already Exist!
 
-Enhance `AssistantContextService` to include aggregated metrics for numerical domains.
+Spark **already calculates** comprehensive metrics via:
+- `MetricStatistic` model: min, max, mean, stddev, normal bounds (mean ± 2σ)
+- `MetricTrend` model: weekly/monthly/quarterly trends, anomaly detection
+- Background jobs (`CalculateMetricStatisticsJob`, `DetectMetricTrendsJob`) that keep these updated
+- At least 30 days of historical data required for statistics
+- At least 10 events required per metric
+
+**The problem:** These metrics aren't included in the AssistantContext JSON sent to Flint agents.
+
+## Solution: Include Existing Metrics in Context
+
+Much simpler than originally proposed - just query and include existing metrics!
 
 ## Proposed Context Structure
 
@@ -20,355 +31,100 @@ Enhance `AssistantContextService` to include aggregated metrics for numerical do
     "date": "2025-12-29",
     "timezone": "Europe/London",
     "event_count": 45,
-    "group_count": 12,
-    "service_breakdown": {...},
     "groups": [...],
     "relationships": [...],
 
-    // NEW: Pre-calculated metrics
+    // NEW: Metrics from MetricStatistic/MetricTrend tables
     "metrics": {
-      "sleep": {
-        "duration": {
-          "current": 7.2,
-          "unit": "hours",
-          "baseline_7d_avg": 6.8,
-          "baseline_30d_avg": 7.5,
-          "vs_baseline_30d": -0.3,
-          "vs_baseline_30d_pct": -4.0,
-          "trend_7d": "stable",
-          "min_7d": 6.1,
-          "max_7d": 7.8
+      "oura.logged_sleep": {
+        "unit": "hours",
+        "current": 7.2,
+        "baseline": {
+          "mean": 7.5,
+          "min": 6.1,
+          "max": 8.3,
+          "stddev": 0.6
         },
-        "hrv": {
-          "current": 65,
-          "unit": "ms",
-          "baseline_30d_avg": 72,
-          "vs_baseline_30d": -7,
-          "vs_baseline_30d_pct": -9.7,
-          "trend_7d": "declining"
+        "normal_range": {
+          "lower": 6.3,
+          "upper": 8.7
         },
-        "resting_hr": {
-          "current": 54,
-          "unit": "bpm",
-          "baseline_30d_avg": 52,
-          "vs_baseline_30d": 2,
-          "vs_baseline_30d_pct": 3.8,
-          "trend_7d": "increasing"
-        }
-      },
-
-      "activity": {
-        "steps": {
-          "current": 8234,
-          "baseline_7d_avg": 7500,
-          "baseline_30d_avg": 8100,
-          "vs_baseline_30d_pct": 1.7,
-          "trend_7d": "stable"
-        },
-        "workouts": {
-          "count_7d": 4,
-          "avg_per_week_30d": 3.5,
-          "types_7d": ["strength", "cardio", "strength", "strength"]
-        }
-      },
-
-      "spending": {
-        "total": {
-          "today": 45.60,
-          "currency": "GBP",
-          "week_to_date": 156.20,
-          "avg_week_30d": 93.00,
-          "vs_avg_week_pct": 67.9
-        },
-        "by_category": {
-          "groceries": {
-            "today": 25.30,
-            "week_to_date": 67.50,
-            "avg_week_30d": 55.00,
-            "vs_avg_pct": 22.7
-          },
-          "dining": {
-            "today": 11.80,
-            "week_to_date": 52.40,
-            "avg_week_30d": 28.00,
-            "vs_avg_pct": 87.1
-          },
-          "transport": {
-            "today": 8.50,
-            "week_to_date": 36.30,
-            "avg_week_30d": 10.00,
-            "vs_avg_pct": 263.0
-          }
-        },
-        "unusual_transactions": [
+        "vs_baseline": -0.3,
+        "vs_baseline_pct": -4.0,
+        "is_anomaly": false,
+        "recent_trends": [
           {
-            "amount": 450.00,
-            "description": "XYZ Ltd",
-            "z_score": 3.2,
-            "reason": ">3 std dev from mean transaction"
+            "type": "trend_down_weekly",
+            "detected_at": "2025-12-28T10:00:00Z",
+            "deviation": -0.4,
+            "significance": 0.85
           }
         ]
       },
-
-      "media": {
-        "listening_time": {
-          "today_minutes": 120,
-          "avg_day_7d": 85,
-          "vs_avg_pct": 41.2
+      "oura.logged_hrv": {
+        "unit": "ms",
+        "current": 65,
+        "baseline": {
+          "mean": 72,
+          "min": 55,
+          "max": 95,
+          "stddev": 8.5
         },
-        "artists": {
-          "unique_7d": 45,
-          "new_discoveries_7d": 8,
-          "top_genre_7d": "indie"
-        }
-      },
-
-      "productivity": {
-        "tasks": {
-          "completed_today": 5,
-          "completed_7d": 28,
-          "avg_week_30d": 22,
-          "vs_avg_pct": 27.3,
-          "overdue_count": 3
-        }
-      },
-
-      "content": {
-        "articles_saved": {
-          "today": 1,
-          "week_7d": 12,
-          "avg_week_30d": 8,
-          "vs_avg_pct": 50.0
+        "normal_range": {
+          "lower": 55.0,
+          "upper": 89.0
         },
-        "top_topics_7d": [
-          {"topic": "AI Infrastructure", "count": 5},
-          {"topic": "Geopolitics", "count": 3},
-          {"topic": "Economics", "count": 2}
+        "vs_baseline": -7,
+        "vs_baseline_pct": -9.7,
+        "is_anomaly": false,
+        "recent_trends": []
+      },
+      "monzo.had_transaction": {
+        "unit": "GBP",
+        "current": -45.60,
+        "baseline": {
+          "mean": -35.20,
+          "min": -450.00,
+          "max": -2.50,
+          "stddev": 45.30
+        },
+        "normal_range": {
+          "lower": -125.80,
+          "upper": 55.40
+        },
+        "vs_baseline": -10.40,
+        "vs_baseline_pct": 29.5,
+        "is_anomaly": false,
+        "recent_trends": [
+          {
+            "type": "anomaly_high",
+            "detected_at": "2025-12-27T15:30:00Z",
+            "deviation": 414.80,
+            "significance": 0.95
+          }
         ]
       }
     }
-  },
-
-  "today": {
-    // Same structure
   }
 }
 ```
 
-## Implementation Details
+## Implementation
 
-### 1. Metric Calculation Service
-
-Create `app/Services/MetricsCalculationService.php`:
+### 1. Add Metrics Query Method to AssistantContextService
 
 ```php
-class MetricsCalculationService
+// In app/Services/AssistantContextService.php
+
+use App\Models\MetricStatistic;
+use App\Models\MetricTrend;
+
+protected function generateTimeframeContext(...): array
 {
-    /**
-     * Calculate metrics for a timeframe's events
-     */
-    public function calculateMetrics(
-        User $user,
-        Collection $events,
-        Carbon $date,
-        array $domains
-    ): array {
-        $metrics = [];
-
-        if (in_array('health', $domains)) {
-            $metrics['sleep'] = $this->calculateSleepMetrics($user, $events, $date);
-            $metrics['activity'] = $this->calculateActivityMetrics($user, $events, $date);
-        }
-
-        if (in_array('money', $domains)) {
-            $metrics['spending'] = $this->calculateSpendingMetrics($user, $events, $date);
-        }
-
-        if (in_array('media', $domains)) {
-            $metrics['media'] = $this->calculateMediaMetrics($user, $events, $date);
-        }
-
-        if (in_array('online', $domains)) {
-            $metrics['productivity'] = $this->calculateProductivityMetrics($user, $events, $date);
-        }
-
-        if (in_array('knowledge', $domains)) {
-            $metrics['content'] = $this->calculateContentMetrics($user, $events, $date);
-        }
-
-        return $metrics;
-    }
-
-    protected function calculateSleepMetrics(User $user, Collection $events, Carbon $date): array
-    {
-        // Get today's sleep event
-        $sleepEvent = $events->first(fn($e) =>
-            $e->service === 'oura' && $e->action === 'logged_sleep'
-        );
-
-        if (!$sleepEvent) {
-            return [];
-        }
-
-        // Get historical sleep data (7d and 30d)
-        $sleep7d = Event::forUser($user->id)
-            ->where('service', 'oura')
-            ->where('action', 'logged_sleep')
-            ->whereBetween('time', [$date->copy()->subDays(7), $date])
-            ->get();
-
-        $sleep30d = Event::forUser($user->id)
-            ->where('service', 'oura')
-            ->where('action', 'logged_sleep')
-            ->whereBetween('time', [$date->copy()->subDays(30), $date])
-            ->get();
-
-        // Extract duration values
-        $current = $sleepEvent->value; // Assuming value is duration in hours
-        $baseline7d = $sleep7d->avg('value');
-        $baseline30d = $sleep30d->avg('value');
-
-        return [
-            'duration' => [
-                'current' => round($current, 1),
-                'unit' => 'hours',
-                'baseline_7d_avg' => round($baseline7d, 1),
-                'baseline_30d_avg' => round($baseline30d, 1),
-                'vs_baseline_30d' => round($current - $baseline30d, 1),
-                'vs_baseline_30d_pct' => round((($current - $baseline30d) / $baseline30d) * 100, 1),
-                'trend_7d' => $this->calculateTrend($sleep7d->pluck('value')->toArray()),
-                'min_7d' => round($sleep7d->min('value'), 1),
-                'max_7d' => round($sleep7d->max('value'), 1),
-            ],
-            // Similar for HRV, resting_hr, etc.
-        ];
-    }
-
-    protected function calculateSpendingMetrics(User $user, Collection $events, Carbon $date): array
-    {
-        // Filter to spending events (had_transaction with negative value)
-        $transactions = $events->filter(fn($e) =>
-            $e->service === 'monzo' &&
-            $e->action === 'had_transaction' &&
-            ($e->value ?? 0) < 0
-        );
-
-        // Get week-to-date and historical data
-        $weekStart = $date->copy()->startOfWeek();
-        $wtdTransactions = Event::forUser($user->id)
-            ->where('service', 'monzo')
-            ->where('action', 'had_transaction')
-            ->whereBetween('time', [$weekStart, $date->copy()->endOfDay()])
-            ->where('value', '<', 0)
-            ->get();
-
-        // Calculate by category
-        $byCategory = [];
-        $categories = $wtdTransactions->pluck('event_metadata.category')->unique();
-
-        foreach ($categories as $category) {
-            if (!$category) continue;
-
-            $categoryTotal = $wtdTransactions
-                ->where('event_metadata.category', $category)
-                ->sum('value');
-
-            // Get 30d average for this category
-            $avg30d = $this->getAverageWeeklySpending($user, $category, $date);
-
-            $byCategory[$category] = [
-                'week_to_date' => abs(round($categoryTotal, 2)),
-                'avg_week_30d' => round($avg30d, 2),
-                'vs_avg_pct' => $avg30d > 0 ? round(((abs($categoryTotal) - $avg30d) / $avg30d) * 100, 1) : 0,
-            ];
-        }
-
-        return [
-            'total' => [
-                'week_to_date' => abs(round($wtdTransactions->sum('value'), 2)),
-                'currency' => 'GBP',
-                // ... more metrics
-            ],
-            'by_category' => $byCategory,
-            'unusual_transactions' => $this->findUnusualTransactions($user, $transactions, $date),
-        ];
-    }
-
-    protected function calculateTrend(array $values): string
-    {
-        if (count($values) < 2) {
-            return 'stable';
-        }
-
-        // Simple linear regression slope
-        $n = count($values);
-        $x = range(1, $n);
-        $y = $values;
-
-        $xy = array_sum(array_map(fn($i) => $x[$i] * $y[$i], range(0, $n-1)));
-        $xx = array_sum(array_map(fn($v) => $v * $v, $x));
-        $sumX = array_sum($x);
-        $sumY = array_sum($y);
-
-        $slope = ($n * $xy - $sumX * $sumY) / ($n * $xx - $sumX * $sumX);
-
-        if (abs($slope) < 0.1) {
-            return 'stable';
-        }
-
-        return $slope > 0 ? 'increasing' : 'declining';
-    }
-
-    protected function findUnusualTransactions(User $user, Collection $transactions, Carbon $date): array
-    {
-        // Get 90 days of transaction history for statistical baseline
-        $historical = Event::forUser($user->id)
-            ->where('service', 'monzo')
-            ->where('action', 'had_transaction')
-            ->whereBetween('time', [$date->copy()->subDays(90), $date])
-            ->get();
-
-        $amounts = $historical->pluck('value')->map(fn($v) => abs($v))->toArray();
-        $mean = collect($amounts)->avg();
-        $stdDev = $this->standardDeviation($amounts);
-
-        $unusual = [];
-        foreach ($transactions as $txn) {
-            $amount = abs($txn->value);
-            $zScore = ($amount - $mean) / $stdDev;
-
-            if ($zScore > 2.5) { // More than 2.5 std dev
-                $unusual[] = [
-                    'amount' => $amount,
-                    'description' => $txn->event_metadata['description'] ?? 'Unknown',
-                    'z_score' => round($zScore, 1),
-                    'reason' => '>2.5 std dev from mean',
-                ];
-            }
-        }
-
-        return $unusual;
-    }
-}
-```
-
-### 2. Integration with AssistantContextService
-
-Update `generateTimeframeContext()`:
-
-```php
-protected function generateTimeframeContext(
-    User $user,
-    string $timeframe,
-    Carbon $baseDate,
-    Integration $assistantIntegration,
-    ?array $domains = null
-): array {
     // ... existing code to get events and groups ...
 
-    // NEW: Calculate metrics
-    $metricsService = app(MetricsCalculationService::class);
-    $metrics = $metricsService->calculateMetrics($user, $events, $startDate, $domains ?? []);
+    // NEW: Include metrics from existing MetricStatistic records
+    $metrics = $this->getMetricsForTimeframe($user, $events, $domains);
 
     return [
         'date' => $startDate->toDateString(),
@@ -381,56 +137,178 @@ protected function generateTimeframeContext(
         'metrics' => $metrics, // NEW
     ];
 }
+
+protected function getMetricsForTimeframe(
+    User $user,
+    Collection $events,
+    ?array $domains
+): array {
+    $metrics = [];
+
+    // Get unique service::action::unit combinations from events in this timeframe
+    $metricKeys = $events
+        ->filter(fn($e) => $e->value !== null && $e->value_unit !== null)
+        ->map(fn($e) => [
+            'service' => $e->service,
+            'action' => $e->action,
+            'unit' => $e->value_unit,
+            'domain' => $e->domain,
+        ])
+        ->unique(fn($m) => "{$m['service']}.{$m['action']}.{$m['unit']}")
+        ->filter(fn($m) => !$domains || in_array($m['domain'], $domains));
+
+    foreach ($metricKeys as $key) {
+        // Get the pre-calculated statistic
+        $statistic = MetricStatistic::where('user_id', $user->id)
+            ->where('service', $key['service'])
+            ->where('action', $key['action'])
+            ->where('value_unit', $key['unit'])
+            ->first();
+
+        if (!$statistic || !$statistic->hasValidStatistics()) {
+            continue;
+        }
+
+        // Get recent trends/anomalies for this metric (last 7 days, unacknowledged)
+        $recentTrends = MetricTrend::where('metric_statistic_id', $statistic->id)
+            ->where('detected_at', '>=', now()->subDays(7))
+            ->unacknowledged()
+            ->get();
+
+        // Get current value from events in this timeframe
+        $currentEvents = $events->filter(fn($e) =>
+            $e->service === $key['service'] &&
+            $e->action === $key['action'] &&
+            $e->value_unit === $key['unit']
+        );
+
+        if ($currentEvents->isEmpty()) {
+            continue;
+        }
+
+        $currentValue = $currentEvents->avg('formatted_value');
+
+        // Build metric entry
+        $metricKey = "{$key['service']}.{$key['action']}";
+        $metrics[$metricKey] = [
+            'unit' => $key['unit'],
+            'current' => round($currentValue, 2),
+            'baseline' => [
+                'mean' => round($statistic->mean_value, 2),
+                'min' => round($statistic->min_value, 2),
+                'max' => round($statistic->max_value, 2),
+                'stddev' => round($statistic->stddev_value, 2),
+            ],
+            'normal_range' => [
+                'lower' => round($statistic->normal_lower_bound, 2),
+                'upper' => round($statistic->normal_upper_bound, 2),
+            ],
+            'vs_baseline' => round($currentValue - $statistic->mean_value, 2),
+            'vs_baseline_pct' => $statistic->mean_value > 0
+                ? round((($currentValue - $statistic->mean_value) / $statistic->mean_value) * 100, 1)
+                : 0,
+            'is_anomaly' => $currentValue < $statistic->normal_lower_bound ||
+                           $currentValue > $statistic->normal_upper_bound,
+            'recent_trends' => $recentTrends->map(fn($t) => [
+                'type' => $t->type,
+                'detected_at' => $t->detected_at->toISOString(),
+                'deviation' => round($t->deviation, 2),
+                'significance' => round($t->significance_score, 2),
+            ])->toArray(),
+        ];
+    }
+
+    return $metrics;
+}
 ```
 
-### 3. Update Domain Agent Prompts
+### 2. Update Domain Agent Prompts
 
-Update prompts to reference metrics:
+Update all domain agent prompts in `DomainAgentService.php` to reference metrics:
 
 ```markdown
 ## Context Data Structure
 
 You receive a JSON object with:
+
 - `groups`: Events grouped by service::action::hour with full details
-- `metrics`: Pre-calculated statistics including:
-  - Current values vs baselines (7-day, 30-day averages)
-  - Trends (increasing, declining, stable)
-  - Min/max ranges
-  - Percentage changes
-  - Unusual patterns flagged
+- `metrics`: Pre-calculated statistics from MetricStatistic/MetricTrend tables
 
-**Use metrics for comparisons and trends. Use groups/events for specific examples and context.**
-
-Example:
-- ✅ "Sleep averaged 6.2 hours this week (metrics.sleep.duration.baseline_7d_avg), down 18% from your 30-day baseline (metrics.sleep.duration.vs_baseline_30d_pct)"
-- ❌ Trying to calculate these yourself from raw events
+**Metrics object structure:**
+```json
+"metrics": {
+  "service.action": {
+    "unit": "hours|bpm|GBP|etc",
+    "current": 7.2,              // Current value in this timeframe
+    "baseline": {
+      "mean": 7.5,               // Historical average (30+ days)
+      "min": 6.1,                // Historical minimum
+      "max": 8.3,                // Historical maximum
+      "stddev": 0.6              // Standard deviation
+    },
+    "normal_range": {
+      "lower": 6.3,              // Mean - 2σ
+      "upper": 8.7               // Mean + 2σ
+    },
+    "vs_baseline": -0.3,         // Difference from mean
+    "vs_baseline_pct": -4.0,     // Percentage change from mean
+    "is_anomaly": false,         // True if outside normal_range
+    "recent_trends": [...]       // Detected trends in last 7 days
+  }
+}
 ```
 
-## Benefits
+**Use metrics for all comparisons and trends:**
+- ✅ "Sleep averaged {metrics.oura.logged_sleep.current} hours, down {metrics.oura.logged_sleep.vs_baseline_pct}% from your baseline of {metrics.oura.logged_sleep.baseline.mean} hours"
+- ❌ Trying to calculate these yourself from raw events
 
-1. **Accurate Statistics**: No LLM arithmetic errors
-2. **Enables Proposal Examples**: All the "X% change from baseline" examples become achievable
-3. **Better Insights**: Agents can focus on interpretation, not calculation
-4. **Anomaly Detection**: Pre-flagged unusual transactions, HR spikes, etc.
-5. **Consistent Baselines**: Same 30-day average used across all insights
+**Anomaly detection:**
+- If `is_anomaly: true`, the value is >2σ from historical mean - flag this!
+- Check `recent_trends` array for detected patterns (trend_up_weekly, anomaly_high, etc.)
 
-## Performance Considerations
+**When metrics are unavailable:**
+- Not all actions have metrics (need 30+ days of data, 10+ events)
+- Fall back to raw event data for newer services/actions
+```
 
-- Metrics calculated once per timeframe (9 timeframes × ~50ms = ~450ms overhead)
-- Can cache baseline calculations (30d avg rarely changes)
-- Only calculate for enabled domains
-- Use database indexes on (user_id, service, action, time)
+### 3. Benefits
 
-## Testing Strategy
+1. **Accurate Statistics**: Uses pre-calculated mean/stddev from database
+2. **Anomaly Detection**: Automatically flags values outside normal range
+3. **Trend Detection**: Recent trends already detected and included
+4. **No LLM Math**: All calculations done in PHP with proper precision
+5. **Consistent Baselines**: Same historical baseline used across all insights
+6. **Already Maintained**: Background jobs keep metrics up-to-date
 
-1. Unit test each metric calculation function
-2. Integration test context generation with metrics
-3. Verify LLM actually uses metrics (not hallucinating numbers)
-4. Performance test with large event volumes
+### 4. Performance Considerations
+
+- Minimal overhead: ~1 query per unique metric in timeframe
+- Metrics already indexed by (user_id, service, action, value_unit)
+- Trends query limited to last 7 days + unacknowledged only
+- Can cache metric statistics (updated hourly at most)
+
+### 5. Testing Strategy
+
+1. Unit test `getMetricsForTimeframe()` with various scenarios
+2. Integration test context generation includes metrics
+3. Verify domain agents actually use metrics (not hallucinating numbers)
+4. Test with users who have insufficient data (< 30 days)
+5. Test edge cases (zero baseline, negative values, etc.)
+
+### 6. Fallback Behavior
+
+- If MetricStatistic doesn't exist for a metric → skip it from context
+- If insufficient data (< 30 days, < 10 events) → skip it
+- Agents can still analyze raw events, just without baseline comparisons
+- Gracefully degrades for new users or new integrations
 
 ## Implementation Priority
 
-**Phase 1.5: Metrics Enhancement** (before quality filters)
-- Enables all subsequent phases
-- Makes proposal examples realistic
-- Required for high-quality insights
+**Phase 0: Add Existing Metrics to Context**
+1. Add `getMetricsForTimeframe()` method to `AssistantContextService`
+2. Update `generateTimeframeContext()` to include metrics
+3. Add unit tests
+4. Update domain agent prompts to reference metrics
+5. Test with real user data
+
+Much simpler than creating a new metrics system - just expose what already exists!
