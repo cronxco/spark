@@ -530,6 +530,33 @@ Remember: **Brevity is respect for the reader's time.**
 
 ### 5. Technical Implementation Plan
 
+#### Phase 0: Context Metrics Enhancement (Week 1) - **CRITICAL FOUNDATION**
+
+**Problem:** Domain agents receive raw events but proposal examples require statistics like "down 18% from 30-day average." LLMs are terrible at arithmetic and aggregation.
+
+**Solution:** Pre-calculate metrics in `AssistantContextService`.
+
+See detailed specification in [CONTEXT_METRICS_PROPOSAL.md](./CONTEXT_METRICS_PROPOSAL.md)
+
+**Key additions to context:**
+- Sleep: current vs 7d/30d baselines, trend, min/max
+- Spending: by category, vs averages, unusual transactions flagged
+- Activity: steps, workout frequency vs baselines
+- Media: listening time, new artists, genre diversity
+- Content: article counts, topic clustering
+
+**Why this comes first:**
+- Enables accurate comparisons in all domains
+- Makes proposal examples achievable
+- Prevents LLM hallucination of statistics
+- Required for quality insights
+
+**Implementation:**
+1. Create `MetricsCalculationService.php`
+2. Update `AssistantContextService::generateTimeframeContext()` to include metrics
+3. Update all domain agent prompts to reference metrics object
+4. Add unit tests for each metric calculation
+
 #### Phase 1: Quality Filters & Data Filtering (Week 1)
 1. **Add data filtering rules:**
    - Skip empty daynotes
@@ -569,17 +596,20 @@ Remember: **Brevity is respect for the reader's time.**
    - Skip if weather is normal
 
 #### Phase 3: Knowledge Domain Synthesis (Week 2)
+
+**REVISED UNDERSTANDING:** Fetch summaries are already in the context! Events include blocks, and Fetch creates 5 summary blocks (`fetch_summary_paragraph`, `fetch_key_takeaways`, etc.) attached to bookmark events.
+
+**No context service changes needed.** Just update the prompt:
+
 1. **Update Knowledge domain agent prompt:**
-   - Access Fetch summaries (already available)
-   - Group articles by theme
+   - Explicitly show how to access block metadata from context
+   - Example: `groups[x].all_events[y].blocks` contains summary blocks
+   - Instruct to read `metadata.content` from `fetch_summary_paragraph` and `fetch_key_takeaways` blocks
+   - Group articles by theme using topics from `metrics.content.top_topics_7d`
    - Synthesize across related articles
    - Surface debates and key questions
-   - NO behavioral counting ("you read X articles")
-
-2. **Update context service:**
-   - Include Fetch summaries in Knowledge domain context
-   - Group by theme/topic
-   - Pass to domain agent for synthesis
+   - **CRITICAL:** NO behavioral counting ("you read X articles")
+   - **CRITICAL:** YES content synthesis ("Your reading explores X theme...")
 
 #### Phase 4: Deduplication (Week 2-3)
 1. **Create `InsightDeduplicationService.php`:**
@@ -633,7 +663,7 @@ Remember: **Brevity is respect for the reader's time.**
    - Quick preview on card
    - Click to expand full digest
 
-#### Phase 8: Monitoring & Iteration (Week 4-5)
+#### Phase 8: Monitoring & Iteration (Week 5-6)
 1. Add insight quality metrics dashboard
 2. Track user engagement (read time, feedback)
 3. Monitor duplication rate
