@@ -716,18 +716,16 @@ class AgentOrchestrationService
         // Parse digest response
         $digestData = $this->parseDigestResponse($response);
 
-        // Prepare digest data for block creation
+        // Prepare digest data for block creation (new scannable structure)
         $digestBlockData = [
-            'summary' => $digestData['summary'] ?? '',
             'headline' => $digestData['headline'] ?? 'Daily Digest',
+            'top_insights' => $digestData['top_insights'] ?? [],
+            'wins' => $digestData['wins'] ?? [],
+            'watch_points' => $digestData['watch_points'] ?? [],
+            'tomorrow_focus' => $digestData['tomorrow_focus'] ?? [],
             'domain_insights' => $domainInsights,
             'cross_domain_insights' => $observations,
             'prioritized_actions' => $actions,
-            'key_takeaways' => $digestData['key_takeaways'] ?? [],
-            'sentiment' => $digestData['sentiment'] ?? [],
-            'top_priorities_tomorrow' => $digestData['top_priorities_tomorrow'] ?? [],
-            'celebrations' => $digestData['celebrations'] ?? [],
-            'watch_points' => $digestData['watch_points'] ?? [],
             'metrics' => [
                 'total_insights' => array_sum(array_map(fn ($d) => count($d['insights'] ?? []), $domainInsights)),
                 'cross_domain_connections' => count($observations),
@@ -769,15 +767,13 @@ class AgentOrchestrationService
             }
         }
 
-        // Fallback: return basic structure
+        // Fallback: return basic scannable structure
         return [
-            'summary' => $response,
             'headline' => 'Daily Digest',
-            'key_takeaways' => [],
-            'sentiment' => ['overall' => 'neutral'],
-            'top_priorities_tomorrow' => [],
-            'celebrations' => [],
+            'top_insights' => [],
+            'wins' => [],
             'watch_points' => [],
+            'tomorrow_focus' => [],
         ];
     }
 
@@ -860,19 +856,25 @@ class AgentOrchestrationService
         }
 
         return <<<PROMPT
-You are the Cross-Domain Synthesizer for Flint, an AI assistant that finds connections and correlations across different life domains.
+You are the Cross-Domain Synthesizer for Flint, with a highly conservative approach to finding connections.
 
 **Your Role:**
-- Identify patterns that span multiple domains (e.g., poor sleep affecting productivity)
-- Find correlations between different types of data
-- Detect cascading effects (e.g., overspending causing stress affecting health)
-- Highlight reinforcing patterns (positive and negative spirals)
+- Identify ONLY obvious, strong cross-domain connections
+- Focus on clear causation or timing correlations with strong evidence
+- Be extremely skeptical - most apparent connections are coincidental
+- Silence is better than weak speculation
 
-**Tone:**
-- Insightful and connecting-the-dots
-- Specific about which domains are connected
-- Data-driven with clear evidence
-- Avoid speculation - only report strong signals
+**CRITICAL - High Bar for Connections:**
+- **DO**: Report clear patterns with temporal correlation AND logical mechanism
+- **DON'T**: Speculate about correlations without strong supporting evidence
+- **DON'T**: Make obvious connections ("poor sleep affects energy" - too generic)
+- **DON'T**: Report single-instance patterns (need 3+ occurrences)
+
+**Strong Connection Examples:**
+- ✅ "High spending weeks consistently precede poor sleep (4/5 occurrences, likely financial stress)"
+- ✅ "Intense training days followed by 20% higher knowledge work next day (6 instances, pattern holds)"
+- ❌ "You slept poorly and spent more yesterday" (single instance, no pattern)
+- ❌ "Poor sleep might affect productivity" (generic, obvious)
 
 **Domain Insights Available:**
 
@@ -880,22 +882,26 @@ You are the Cross-Domain Synthesizer for Flint, an AI assistant that finds conne
 
 ## Your Task
 
-Analyze the insights above and identify cross-domain connections. Return your response as JSON:
+Analyze the insights above for STRONG cross-domain connections only. Return your response as JSON:
 
 ```json
 [
   {
     "domains": ["domain1", "domain2"],
-    "observation": "Clear description of the connection you observed",
+    "observation": "Specific pattern with evidence",
     "confidence": 0.0-1.0,
-    "supporting_evidence": ["specific data point 1", "specific data point 2"]
+    "supporting_evidence": ["specific data point 1", "specific data point 2"],
+    "frequency": "How often this pattern appears (e.g., '4 out of 5 weeks')"
   }
 ]
 ```
 
 **Guidelines:**
-- Only report connections with confidence >= 0.6
-- Be specific about the relationship (correlation, causation, temporal pattern)
+- ONLY report connections with confidence >= 0.85 (very high bar)
+- Need 3+ instances to establish pattern
+- Be specific about temporal relationship (leads to, follows, coincides with)
+- Include frequency/consistency data
+- **Return empty array if no strong connections found** (most of the time)
 - Provide concrete evidence from the domain insights
 - Avoid generic observations - be data-specific
 
@@ -1108,19 +1114,19 @@ PROMPT;
         }
 
         return <<<PROMPT
-You are the Digest Generator for Flint, responsible for creating a comprehensive yet concise daily summary for the user.
+You are the Digest Generator for Flint, responsible for creating a scannable, action-oriented daily summary.
 
 **Your Role:**
-- Synthesize all domain insights, cross-domain connections, and recommended actions
-- Create a narrative summary that tells the story of the user's day
-- Highlight key takeaways and most important actions
-- Provide an overall sentiment/health check
+- Create a *scannable* digest that can be read in 30 seconds
+- Focus on what matters most: key insights, wins, and watch points
+- Be concise and direct - no fluff
+- Include weather context if relevant to scheduled activities
 
 **Tone:**
-- Conversational and friendly
-- Balanced (celebrate wins, gently highlight concerns)
-- Forward-looking (what to focus on tomorrow)
-- Concise but informative
+- Direct and scannable (no long paragraphs)
+- Celebrate wins prominently
+- Flag concerns clearly but not alarmist
+- Forward-looking
 
 **Today's Analysis:**
 
@@ -1132,46 +1138,45 @@ You are the Digest Generator for Flint, responsible for creating a comprehensive
 
 ## Your Task
 
-Create a comprehensive daily digest. Return your response as JSON:
+Create a scannable daily digest. Return your response as JSON:
 
 ```json
 {
-  "summary": "2-3 paragraph narrative summary of the user's day across all domains",
-  "headline": "One-sentence headline capturing the essence of today (e.g., 'Great sleep powered a productive day')",
-  "key_takeaways": [
-    "Most important insight or pattern from today",
-    "Second key insight",
-    "Third key insight (if relevant)"
+  "headline": "15-word max headline capturing the day's theme (e.g., 'Strong recovery and focused work, watch tomorrow's rainy outdoor plans')",
+  "top_insights": [
+    {
+      "title": "Insight title (6-8 words max)",
+      "description": "Max 2 sentences. Be specific with numbers.",
+      "domain": "health|money|media|knowledge|online|future",
+      "type": "win|concern|neutral"
+    }
   ],
-  "sentiment": {
-    "overall": "positive|neutral|concerning",
-    "health": "positive|neutral|concerning",
-    "productivity": "positive|neutral|concerning",
-    "wellbeing": "positive|neutral|concerning"
-  },
-  "top_priorities_tomorrow": [
-    "First action to focus on",
-    "Second action to focus on",
-    "Third action (if relevant)"
-  ],
-  "celebrations": [
-    "Positive achievements or improvements to celebrate"
+  "wins": [
+    "Brief celebration (1 sentence max)"
   ],
   "watch_points": [
-    "Areas that need attention (if any)"
+    "Brief concern or upcoming challenge (1 sentence max)"
+  ],
+  "tomorrow_focus": [
+    "Top 1-2 priorities for tomorrow (brief, actionable)"
   ]
 }
 ```
 
-**Guidelines:**
-- Summary should flow naturally, not be a bullet list
-- Connect insights across domains where relevant
-- Be specific with numbers and data points
-- Celebrate progress and positive patterns
-- Flag concerns without being alarmist
-- Keep it digestible (user should read this in 2-3 minutes)
+**Critical Guidelines:**
+- **Headline**: 15 words maximum, captures day's theme
+- **Top Insights**: Maximum 3 insights, prioritize by importance
+- **Each insight description**: 2 sentences maximum, include specific numbers
+- **Wins**: Celebrate prominently - users need positive reinforcement
+- **Watch Points**: Only real concerns, not hypotheticals
+- **Tomorrow Focus**: 1-2 actions maximum, highly specific
 
-Focus on creating a digest that helps the user understand their day and plan tomorrow effectively.
+**Scannability Test:**
+- User should grasp the key points in 30 seconds
+- No long paragraphs or narrative summaries
+- Every word must earn its place
+
+Focus on creating a digest that respects the user's time and highlights what truly matters.
 PROMPT;
     }
 
