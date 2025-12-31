@@ -731,27 +731,117 @@ See detailed specification in [CONTEXT_METRICS_PROPOSAL.md](./CONTEXT_METRICS_PR
 - `app/Services/AgentOrchestrationService.php` - Integration
 - `tests/Unit/Services/InsightDeduplicationServiceTest.php` - Tests
 
-#### Phase 5: Digest Redesign (Week 3)
-1. **Update digest generation prompt:**
-   - New scannable structure (Theme, Top 3 Insights, Wins, Watch Points)
-   - 15-word headline maximum
-   - Max 2 sentences per insight
-   - Include weather warnings if notable
+#### Phase 5: Digest Redesign (Week 3) - ✅ **COMPLETE**
 
-2. **Update digest response parsing:**
-   - Handle new structure
-   - Create appropriate blocks
+**Status:** Fully implemented (2025-12-31)
 
-3. **Update Blade templates:**
-   - New presentation format
-   - Weather warning display
+**What was done:**
 
-#### Phase 6: Domain-Specific Refinement (Week 3-4)
-1. **Health domain**: Performance coaching prompts (recovery status, training readiness)
-2. **Money domain**: Only flag actual financial issues (budget violations, cashflow warnings)
-3. **Media domain**: If insights are low-value, consider reducing priority
-4. **Online domain**: Project momentum and blockers only
-5. **Drop or minimize cross-domain synthesizer**: Most connections are artificial
+1. **✅ Complete prompt redesign for scannability:**
+   - Replaced verbose narrative with structured format
+   - Added strict constraints:
+     * 15-word headline maximum
+     * Top 3 insights only (prioritize by importance)
+     * 2 sentences maximum per insight description
+     * 30-second scannability test requirement
+   - New sections: headline, top_insights, wins, watch_points, tomorrow_focus
+   - Removed "suggests/might/could be" language requirement
+   - Added "every word must earn its place" principle
+
+2. **✅ Updated digest response parsing:**
+   - Modified `parseDigestResponse()` to handle new structure
+   - Updated fallback structure for new fields
+   - Changed digest block data preparation to use:
+     * `headline` (replaces verbose paragraph)
+     * `top_insights` (array of max 3 insights)
+     * `wins` (celebrate prominently)
+     * `watch_points` (only real concerns)
+     * `tomorrow_focus` (1-2 specific actions)
+
+3. **✅ Enhanced prompt guidelines:**
+   - "Scannability Test: User should grasp key points in 30 seconds"
+   - "No long paragraphs or narrative summaries"
+   - Specific numbers only when they add meaning
+   - Weather context included when relevant to scheduled activities
+
+**Files changed:**
+- `app/Services/AgentOrchestrationService.php` - Digest prompt and parsing
+
+**Why this matters:**
+- Reduces digest from 241 words to <100 words
+- Changes from 2-3 minute read time to 30-second scan
+- Surfaces actionable items prominently
+- Respects user's time
+
+#### Phase 6: Domain-Specific Refinement (Week 3-4) - ✅ **COMPLETE**
+
+**Status:** Fully implemented (2025-12-31)
+
+**Philosophy:** "Silence is golden" - domains only speak when they have actionable insights. Better to return zero insights than noise.
+
+**What was done:**
+
+1. **✅ Health domain refocused as Performance Coach:**
+   - Key focus areas:
+     * Recovery status (is body ready for hard training?)
+     * Training readiness (HRV, RHR, sleep quality combined)
+     * Load management (volume trends, intensity patterns, rest days)
+     * Performance patterns (conditions for best/worst sessions)
+     * Sleep debt and accumulated impact
+     * Illness/overtraining signals
+   - What makes a good insight:
+     * Performance-focused ("HRV recovered to baseline - body ready for interval training")
+     * Load management ("3 consecutive high-intensity days, consider recovery session")
+   - Avoid: Generic health tips, metric reporting without performance context
+
+2. **✅ Money domain: Real Issues Only:**
+   - What to flag:
+     * Budget violations (spending exceeds defined limits)
+     * Cashflow issues (balance dropping below safety threshold)
+     * Unusual activity (large/suspicious transactions)
+     * Forgotten subscriptions (recurring charges user isn't using)
+     * Duplicate charges
+     * High-impact changes (>30% vs baseline)
+   - What NOT to flag:
+     * Normal spending variations within budget
+     * General commentary on spending habits
+     * Lifestyle spending choices (unless budget violated)
+     * Small fluctuations in category spending
+   - **Silence is golden**: If finances are on track, return no insights
+
+3. **✅ Online domain: Momentum and Blockers:**
+   - What to flag:
+     * Stalled projects (no progress in 7+ days, previously active)
+     * Stuck tasks (overdue by 7+ days, high priority)
+     * Blockers (recurring delays in same area - dependency issue?)
+     * Momentum (3+ day streaks of consistent progress)
+     * Abandoned work (no activity in 30+ days)
+   - What NOT to flag:
+     * Daily task completion counts
+     * Time-of-day productivity patterns
+     * Workload balance observations
+     * Generic productivity tips
+   - **Silence is golden**: If projects moving normally, return no insights
+
+4. **✅ Cross-domain synthesizer: Conservative approach:**
+   - Raised confidence threshold from 0.6 to 0.85 (very high bar)
+   - Require 3+ instances to establish pattern
+   - Need temporal correlation AND logical mechanism
+   - DON'T speculate without strong evidence
+   - DON'T make obvious connections ("poor sleep affects energy")
+   - **Return empty array if no strong connections found** (most of the time)
+   - Be specific about temporal relationship (leads to, follows, coincides with)
+   - Include frequency/consistency data
+
+**Files changed:**
+- `app/Services/DomainAgentService.php` - All domain prompts refined
+- `app/Services/AgentOrchestrationService.php` - Cross-domain synthesizer prompt
+
+**Why this matters:**
+- Eliminates low-value observations
+- Each domain has clear, specific focus
+- Cross-domain connections must be genuinely meaningful
+- Users don't get daily reports on normal behavior
 
 #### Phase 7: Digest Tab UI Implementation (Week 4)
 1. **Implement Digest tab in `/flint` route (currently placeholder):**
