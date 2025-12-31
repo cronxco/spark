@@ -616,18 +616,64 @@ See detailed specification in [CONTEXT_METRICS_PROPOSAL.md](./CONTEXT_METRICS_PR
 - `tests/Unit/Services/DomainAgentServiceTest.php` - Quality tests
 - `tests/Unit/AssistantContextServiceTest.php` - Content filter tests
 
-#### Phase 2: Weather Integration (Week 1-2)
-1. **Create `WeatherService.php`:**
-   - Integrate Met Office DataHub API
-   - Fetch hourly forecast for user location
-   - Flag notable weather only (rain, extremes, storms)
-   - Return null if weather unremarkable
+#### Phase 2: Future Agent with Weather Integration (Week 1-2) - ✅ **COMPLETE**
 
-2. **Add to morning digest generation:**
-   - Get user's latest location from check-ins
-   - Call WeatherService
-   - Surface actionable weather warnings
-   - Skip if weather is normal
+**Status:** Fully implemented and tested (2025-12-31)
+
+**Architecture Decision:** Created dedicated "Future Agent" instead of embedding weather in Health domain. This separates backward-looking analysis (domain agents) from forward-looking planning (future agent).
+
+**What was done:**
+
+1. **✅ WeatherService.php created:**
+   - Integrates with Met Office DataHub API
+   - Fetches hourly forecasts (up to 168 hours / 7 days)
+   - Intelligent notable weather detection:
+     * High precipitation (>50%)
+     * Temperature extremes (<2°C or >30°C)
+     * High winds (>25mph)
+     * Poor visibility (<1000m)
+     * Heavy conditions (rain, snow, thunder)
+   - 30 weather type codes with human-readable descriptions
+   - 1-hour caching per location
+   - Returns null for unremarkable weather
+
+2. **✅ FutureAgentService.php created:**
+   - Analyzes next 24-48 hours (configurable)
+   - Queries upcoming Google Calendar events from database
+   - Combines calendar + weather forecast
+   - AI-powered insights via GPT-4o
+   - Categories: weather_impact, preparation, scheduling, general
+   - Confidence threshold ≥0.7
+   - Returns empty if nothing notable
+
+3. **✅ AgentOrchestrationService updated:**
+   - Future Agent runs FIRST in pre-digest refresh
+   - Before all domain agents (health, money, media, knowledge, online)
+   - Domain agents can reference upcoming context
+   - Proper Sentry tracing and logging
+
+4. **✅ Configuration added:**
+   - Added `metoffice` section to `config/services.php`
+   - Environment variables: METOFFICE_API_KEY, METOFFICE_BASE_URL
+
+**Tests added:**
+- 10 tests for WeatherService (forecast, caching, notable detection, summaries)
+- 6 tests for FutureAgentService (calendar integration, confidence filtering, weather+events)
+
+**Files changed:**
+- `app/Services/WeatherService.php` - Met Office API integration
+- `app/Services/FutureAgentService.php` - Future insights generation
+- `app/Services/AgentOrchestrationService.php` - Integration point
+- `config/services.php` - Met Office config
+- `tests/Unit/Services/WeatherServiceTest.php`
+- `tests/Unit/Services/FutureAgentServiceTest.php`
+
+**Why Future Agent Architecture:**
+- Cleaner separation: past analysis vs. future planning
+- Calendar + weather naturally coupled
+- Proactive suggestions ("bring umbrella to 3pm meeting")
+- Doesn't clutter domain agents with forecast data
+- Reuses existing Google Calendar events
 
 #### Phase 3: Knowledge Domain Synthesis (Week 2)
 
