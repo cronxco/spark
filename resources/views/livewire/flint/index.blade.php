@@ -24,6 +24,12 @@ new class extends Component {
     public array $patterns = [];
     public array $recentInsights = [];
 
+    // Digest data
+    public ?array $latestDigest = null;
+    public array $digestArchive = [];
+    public bool $showArchive = false;
+    public ?string $expandedArchiveDigestId = null;
+
     public array $availableDomains = [
         'health' => [
             'label' => 'Health & Fitness',
@@ -83,10 +89,68 @@ new class extends Component {
             })
             ->toArray();
 
-        // Load memory data if on memory tab
+        // Load data based on active tab
         if ($this->activeTab === 'memory') {
             $this->loadMemoryData();
+        } elseif ($this->activeTab === 'digest') {
+            $this->loadDigestData();
         }
+    }
+
+    public function loadDigestData(): void
+    {
+        $user = Auth::user();
+
+        // Load latest digest
+        $latestDigestBlock = \App\Models\Block::where('block_type', 'flint_digest')
+            ->whereHas('event', function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->where('service', 'flint');
+            })
+            ->with(['event'])
+            ->latest('time')
+            ->first();
+
+        if ($latestDigestBlock) {
+            $this->latestDigest = [
+                'id' => $latestDigestBlock->id,
+                'time' => $latestDigestBlock->time,
+                'metadata' => $latestDigestBlock->metadata,
+            ];
+        }
+
+        // Load archive (past 30 days, excluding latest)
+        $this->digestArchive = \App\Models\Block::where('block_type', 'flint_digest')
+            ->whereHas('event', function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->where('service', 'flint');
+            })
+            ->when($latestDigestBlock, fn($query) => $query->where('id', '!=', $latestDigestBlock->id))
+            ->where('time', '>=', now()->subDays(30))
+            ->with(['event'])
+            ->latest('time')
+            ->get()
+            ->map(function ($block) {
+                return [
+                    'id' => $block->id,
+                    'time' => $block->time,
+                    'metadata' => $block->metadata,
+                ];
+            })
+            ->toArray();
+    }
+
+    public function toggleArchive(): void
+    {
+        $this->showArchive = !$this->showArchive;
+        if ($this->showArchive && empty($this->digestArchive) && empty($this->latestDigest)) {
+            $this->loadDigestData();
+        }
+    }
+
+    public function expandArchiveDigest(string $digestId): void
+    {
+        $this->expandedArchiveDigestId = $this->expandedArchiveDigestId === $digestId ? null : $digestId;
     }
 
     public function loadMemoryData(): void
@@ -118,6 +182,8 @@ new class extends Component {
     {
         if ($this->activeTab === 'memory') {
             $this->loadMemoryData();
+        } elseif ($this->activeTab === 'digest') {
+            $this->loadDigestData();
         }
     }
 
@@ -189,16 +255,209 @@ new class extends Component {
     <x-tabs wire:model="activeTab">
         <x-tab name="digest" label="Digest" icon="o-newspaper">
             <div class="space-y-4 lg:space-y-6">
-                {{-- Placeholder for Digest content --}}
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body text-center py-12">
-                        <x-icon name="o-newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
-                        <h3 class="text-lg font-semibold mb-2">{{ __('Latest Digest') }}</h3>
-                        <p class="text-sm text-base-content/60">
-                            {{ __('Your most recent AI-generated digest will appear here.') }}
-                        </p>
+                @if ($latestDigest)
+                    {{-- Latest Digest --}}
+                    <div class="card bg-base-200 shadow">
+                        <div class="card-body p-6 space-y-6">
+                            {{-- Header --}}
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <x-icon name="o-newspaper" class="w-5 h-5 text-primary" />
+                                        <span class="text-xs font-medium text-base-content/60 uppercase tracking-wide">
+                                            {{ $latestDigest['time']->format('l, F j, Y') }}
+                                        </span>
+                                    </div>
+                                    <h2 class="text-2xl font-bold text-base-content">
+                                        {{ $latestDigest['metadata']['headline'] ?? 'Daily Digest' }}
+                                    </h2>
+                                    <p class="text-sm text-base-content/60 mt-1">
+                                        Generated {{ $latestDigest['time']->diffForHumans() }}
+                                    </p>
+                                </div>
+                                <div class="badge badge-primary badge-lg">
+                                    {{ $latestDigest['metadata']['metrics']['total_insights'] ?? 0 }} insights
+                                </div>
+                            </div>
+
+                            {{-- Top Insights --}}
+                            @if (!empty($latestDigest['metadata']['top_insights']))
+                            <div>
+                                <h3 class="text-sm font-semibold text-base-content/80 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <x-icon name="o-light-bulb" class="w-4 h-4 text-warning" />
+                                    Key Insights
+                                </h3>
+                                <div class="space-y-3">
+                                    @foreach ($latestDigest['metadata']['top_insights'] as $index => $insight)
+                                        <div class="card bg-base-100 shadow-sm">
+                                            <div class="card-body p-4">
+                                                <div class="flex items-start gap-3">
+                                                    <div class="text-2xl mt-1">{{ $insight['icon'] ?? '💡' }}</div>
+                                                    <div class="flex-1 space-y-1">
+                                                        <h4 class="font-semibold text-base">{{ $insight['title'] ?? 'Insight ' . ($index + 1) }}</h4>
+                                                        <p class="text-sm text-base-content/80 leading-relaxed">{{ $insight['description'] ?? '' }}</p>
+                                                        @if (!empty($insight['action_needed']) && $insight['action_needed'] !== 'None')
+                                                            <div class="flex items-center gap-2 mt-2 text-xs text-primary">
+                                                                <x-icon name="o-arrow-right" class="w-3 h-3" />
+                                                                <span class="font-medium">{{ $insight['action_needed'] }}</span>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
+
+                            {{-- Wins --}}
+                            @if (!empty($latestDigest['metadata']['wins']))
+                            <div>
+                                <h3 class="text-sm font-semibold text-success uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <x-icon name="o-check-circle" class="w-4 h-4" />
+                                    Wins
+                                </h3>
+                                <div class="space-y-2">
+                                    @foreach ($latestDigest['metadata']['wins'] as $win)
+                                        <div class="flex items-start gap-2 p-3 bg-success/10 rounded-lg">
+                                            <x-icon name="o-check" class="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                                            <span class="text-sm text-base-content/90">{{ $win }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
+
+                            {{-- Watch Points --}}
+                            @if (!empty($latestDigest['metadata']['watch_points']))
+                            <div>
+                                <h3 class="text-sm font-semibold text-warning uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <x-icon name="o-exclamation-triangle" class="w-4 h-4" />
+                                    Watch Points
+                                </h3>
+                                <div class="space-y-2">
+                                    @foreach ($latestDigest['metadata']['watch_points'] as $watchPoint)
+                                        <div class="flex items-start gap-2 p-3 bg-warning/10 rounded-lg">
+                                            <x-icon name="o-exclamation-circle" class="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                                            <span class="text-sm text-base-content/90">{{ $watchPoint }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
+
+                            {{-- Tomorrow Focus --}}
+                            @if (!empty($latestDigest['metadata']['tomorrow_focus']))
+                            <div>
+                                <h3 class="text-sm font-semibold text-info uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <x-icon name="o-calendar" class="w-4 h-4" />
+                                    Tomorrow's Focus
+                                </h3>
+                                <div class="space-y-2">
+                                    @foreach ($latestDigest['metadata']['tomorrow_focus'] as $focus)
+                                        <div class="flex items-start gap-2 p-3 bg-info/10 rounded-lg">
+                                            <x-icon name="o-arrow-right" class="w-4 h-4 text-info mt-0.5 flex-shrink-0" />
+                                            <span class="text-sm text-base-content/90">{{ $focus }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
+
+                            {{-- Footer Stats --}}
+                            <div class="pt-4 border-t border-base-300">
+                                <div class="flex items-center justify-between text-xs text-base-content/50">
+                                    <span>
+                                        {{ $latestDigest['metadata']['metrics']['total_insights'] ?? 0 }} insights analyzed •
+                                        {{ $latestDigest['metadata']['metrics']['cross_domain_connections'] ?? 0 }} patterns detected •
+                                        {{ $latestDigest['metadata']['metrics']['recommended_actions'] ?? 0 }} actions recommended
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+
+                    {{-- Archive Toggle --}}
+                    <div class="flex justify-center">
+                        <button
+                            wire:click="toggleArchive"
+                            class="btn btn-outline btn-sm"
+                        >
+                            <x-icon name="o-clock" class="w-4 h-4" />
+                            {{ $showArchive ? 'Hide Archive' : 'View Past Digests' }}
+                            @if (!empty($digestArchive))
+                                <span class="badge badge-sm">{{ count($digestArchive) }}</span>
+                            @endif
+                        </button>
+                    </div>
+
+                    {{-- Archive --}}
+                    @if ($showArchive)
+                        <div class="space-y-3">
+                            <h3 class="text-lg font-semibold">Past 30 Days</h3>
+                            @forelse ($digestArchive as $digest)
+                                <div class="card bg-base-200 shadow">
+                                    <div class="card-body p-4">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <span class="text-xs font-medium text-base-content/60">
+                                                        {{ $digest['time']->format('M j, Y g:i A') }}
+                                                    </span>
+                                                    <span class="badge badge-xs badge-ghost">
+                                                        {{ $digest['metadata']['metrics']['total_insights'] ?? 0 }} insights
+                                                    </span>
+                                                </div>
+                                                <h4 class="font-medium text-sm">{{ $digest['metadata']['headline'] ?? 'Daily Digest' }}</h4>
+
+                                                {{-- Expandable content --}}
+                                                @if ($expandedArchiveDigestId === $digest['id'])
+                                                    <div class="mt-3 space-y-3 text-sm">
+                                                        @if (!empty($digest['metadata']['top_insights']))
+                                                            <div class="space-y-2">
+                                                                @foreach (array_slice($digest['metadata']['top_insights'], 0, 2) as $insight)
+                                                                    <div class="flex items-start gap-2">
+                                                                        <span>{{ $insight['icon'] ?? '💡' }}</span>
+                                                                        <span class="text-base-content/80">{{ $insight['title'] ?? '' }}</span>
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <button
+                                                wire:click="expandArchiveDigest('{{ $digest['id'] }}')"
+                                                class="btn btn-ghost btn-xs"
+                                            >
+                                                <x-icon name="o-chevron-{{ $expandedArchiveDigestId === $digest['id'] ? 'up' : 'down' }}" class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="text-center py-8 text-base-content/50 text-sm">
+                                    No archive digests found
+                                </div>
+                            @endforelse
+                        </div>
+                    @endif
+                @else
+                    {{-- Empty State --}}
+                    <div class="card bg-base-200 shadow">
+                        <div class="card-body text-center py-12">
+                            <x-icon name="o-newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                            <h3 class="text-lg font-semibold mb-2">{{ __('No Digests Yet') }}</h3>
+                            <p class="text-sm text-base-content/60 mb-4">
+                                {{ __('Your AI-generated digests will appear here once Flint starts analyzing your data.') }}
+                            </p>
+                            <p class="text-xs text-base-content/50">
+                                {{ __('Digests are generated based on your schedule in Settings.') }}
+                            </p>
+                        </div>
+                    </div>
+                @endif
             </div>
         </x-tab>
 
