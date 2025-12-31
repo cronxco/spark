@@ -25,93 +25,107 @@ Much simpler than originally proposed - just query and include existing metrics!
 
 ## Proposed Context Structure
 
+Metrics embedded **within each event** for locality and ease of access:
+
 ```json
 {
   "yesterday": {
     "date": "2025-12-29",
     "timezone": "Europe/London",
     "event_count": 45,
-    "groups": [...],
-    "relationships": [...],
-
-    // NEW: Metrics from MetricStatistic/MetricTrend tables
-    "metrics": {
-      "oura.logged_sleep": {
-        "unit": "hours",
-        "current": 7.2,
-        "baseline": {
-          "mean": 7.5,
-          "min": 6.1,
-          "max": 8.3,
-          "stddev": 0.6
-        },
-        "normal_range": {
-          "lower": 6.3,
-          "upper": 8.7
-        },
-        "vs_baseline": -0.3,
-        "vs_baseline_pct": -4.0,
-        "is_anomaly": false,
-        "recent_trends": [
+    "groups": [
+      {
+        "service": "oura",
+        "action": "logged_hrv",
+        "hour": "08",
+        "count": 1,
+        "all_events": [
           {
-            "type": "trend_down_weekly",
-            "detected_at": "2025-12-28T10:00:00Z",
-            "deviation": -0.4,
-            "significance": 0.85
+            "id": "abc-123",
+            "time": "2025-12-29T08:15:00Z",
+            "service": "oura",
+            "action": "logged_hrv",
+            "value": 50,
+            "unit": "ms",
+
+            // NEW: Metrics embedded in event
+            "metrics": {
+              "baseline": {
+                "mean": 52,
+                "min": 23.7,
+                "max": 86.9,
+                "stddev": 10.72
+              },
+              "normal_bounds": {
+                "lower": 30.6,
+                "upper": 73.5
+              },
+              "vs_baseline": -2,
+              "vs_baseline_pct": -3.8,
+              "is_anomaly": false,
+              "recent_trends": [
+                {
+                  "type": "trend_down_weekly",
+                  "detected_at": "2025-12-28T10:00:00Z",
+                  "deviation": -4.2,
+                  "significance": 0.78
+                }
+              ]
+            }
           }
         ]
       },
-      "oura.logged_hrv": {
-        "unit": "ms",
-        "current": 65,
-        "baseline": {
-          "mean": 72,
-          "min": 55,
-          "max": 95,
-          "stddev": 8.5
-        },
-        "normal_range": {
-          "lower": 55.0,
-          "upper": 89.0
-        },
-        "vs_baseline": -7,
-        "vs_baseline_pct": -9.7,
-        "is_anomaly": false,
-        "recent_trends": []
-      },
-      "monzo.had_transaction": {
-        "unit": "GBP",
-        "current": -45.60,
-        "baseline": {
-          "mean": -35.20,
-          "min": -450.00,
-          "max": -2.50,
-          "stddev": 45.30
-        },
-        "normal_range": {
-          "lower": -125.80,
-          "upper": 55.40
-        },
-        "vs_baseline": -10.40,
-        "vs_baseline_pct": 29.5,
-        "is_anomaly": false,
-        "recent_trends": [
+      {
+        "service": "monzo",
+        "action": "had_transaction",
+        "hour": "14",
+        "count": 3,
+        "all_events": [
           {
-            "type": "anomaly_high",
-            "detected_at": "2025-12-27T15:30:00Z",
-            "deviation": 414.80,
-            "significance": 0.95
+            "id": "def-456",
+            "time": "2025-12-29T14:32:00Z",
+            "service": "monzo",
+            "action": "had_transaction",
+            "value": -45.60,
+            "unit": "GBP",
+
+            // Metrics embedded here too
+            "metrics": {
+              "baseline": {
+                "mean": -35.20,
+                "min": -450.00,
+                "max": -2.50,
+                "stddev": 45.30
+              },
+              "normal_bounds": {
+                "lower": -125.80,
+                "upper": 55.40
+              },
+              "vs_baseline": -10.40,
+              "vs_baseline_pct": 29.5,
+              "is_anomaly": false,
+              "recent_trends": [
+                {
+                  "type": "anomaly_high",
+                  "detected_at": "2025-12-27T15:30:00Z",
+                  "deviation": 414.80,
+                  "significance": 0.95
+                }
+              ]
+            }
           }
         ]
       }
-    }
+    ]
   }
 }
 ```
 
 ## Implementation
 
-### 1. Add Metrics Query Method to AssistantContextService
+### 1. Embed Metrics in transformEvent() Method
+
+Update `AssistantContextService.php` to enrich each event with metrics:
 
 ```php
 // In app/Services/AssistantContextService.php
@@ -121,10 +135,13 @@ use App\Models\MetricTrend;
 
 protected function generateTimeframeContext(...): array
 {
-    // ... existing code to get events and groups ...
+    // ... existing code to get events ...
 
-    // NEW: Include metrics from existing MetricStatistic records
-    $metrics = $this->getMetricsForTimeframe($user, $events, $domains);
+    // NEW: Pre-load all metric statistics for this timeframe
+    $metricsCache = $this->loadMetricsForEvents($user, $events);
+
+    // Pass metrics cache to groupEvents
+    $groups = $this->groupEvents($events, $user, $config, $metricsCache);
 
     return [
         'date' => $startDate->toDateString(),
@@ -134,30 +151,30 @@ protected function generateTimeframeContext(...): array
         'service_breakdown' => $serviceBreakdown,
         'groups' => $groups,
         'relationships' => $relationships,
-        'metrics' => $metrics, // NEW
     ];
 }
 
-protected function getMetricsForTimeframe(
-    User $user,
-    Collection $events,
-    ?array $domains
-): array {
-    $metrics = [];
+/**
+ * Pre-load metric statistics for all events in collection
+ */
+protected function loadMetricsForEvents(User $user, Collection $events): array
+{
+    $metricsCache = [];
 
-    // Get unique service::action::unit combinations from events in this timeframe
+    // Get unique service::action::unit combinations
     $metricKeys = $events
         ->filter(fn($e) => $e->value !== null && $e->value_unit !== null)
         ->map(fn($e) => [
             'service' => $e->service,
             'action' => $e->action,
             'unit' => $e->value_unit,
-            'domain' => $e->domain,
         ])
         ->unique(fn($m) => "{$m['service']}.{$m['action']}.{$m['unit']}")
-        ->filter(fn($m) => !$domains || in_array($m['domain'], $domains));
+        ->values();
 
     foreach ($metricKeys as $key) {
+        $cacheKey = "{$key['service']}.{$key['action']}.{$key['unit']}";
+
         // Get the pre-calculated statistic
         $statistic = MetricStatistic::where('user_id', $user->id)
             ->where('service', $key['service'])
@@ -169,106 +186,163 @@ protected function getMetricsForTimeframe(
             continue;
         }
 
-        // Get recent trends/anomalies for this metric (last 7 days, unacknowledged)
+        // Get recent trends/anomalies (last 7 days, unacknowledged)
         $recentTrends = MetricTrend::where('metric_statistic_id', $statistic->id)
             ->where('detected_at', '>=', now()->subDays(7))
             ->unacknowledged()
             ->get();
 
-        // Get current value from events in this timeframe
-        $currentEvents = $events->filter(fn($e) =>
-            $e->service === $key['service'] &&
-            $e->action === $key['action'] &&
-            $e->value_unit === $key['unit']
-        );
-
-        if ($currentEvents->isEmpty()) {
-            continue;
-        }
-
-        $currentValue = $currentEvents->avg('formatted_value');
-
-        // Build metric entry
-        $metricKey = "{$key['service']}.{$key['action']}";
-        $metrics[$metricKey] = [
-            'unit' => $key['unit'],
-            'current' => round($currentValue, 2),
-            'baseline' => [
-                'mean' => round($statistic->mean_value, 2),
-                'min' => round($statistic->min_value, 2),
-                'max' => round($statistic->max_value, 2),
-                'stddev' => round($statistic->stddev_value, 2),
-            ],
-            'normal_range' => [
-                'lower' => round($statistic->normal_lower_bound, 2),
-                'upper' => round($statistic->normal_upper_bound, 2),
-            ],
-            'vs_baseline' => round($currentValue - $statistic->mean_value, 2),
-            'vs_baseline_pct' => $statistic->mean_value > 0
-                ? round((($currentValue - $statistic->mean_value) / $statistic->mean_value) * 100, 1)
-                : 0,
-            'is_anomaly' => $currentValue < $statistic->normal_lower_bound ||
-                           $currentValue > $statistic->normal_upper_bound,
-            'recent_trends' => $recentTrends->map(fn($t) => [
-                'type' => $t->type,
-                'detected_at' => $t->detected_at->toISOString(),
-                'deviation' => round($t->deviation, 2),
-                'significance' => round($t->significance_score, 2),
-            ])->toArray(),
+        $metricsCache[$cacheKey] = [
+            'statistic' => $statistic,
+            'trends' => $recentTrends,
         ];
     }
 
-    return $metrics;
+    return $metricsCache;
+}
+
+/**
+ * Group events (updated to pass metrics cache)
+ */
+protected function groupEvents(Collection $events, User $user, array $config, array $metricsCache): array
+{
+    // ... existing grouping logic ...
+
+    return [
+        // ... existing group data ...
+        'all_events' => array_map(
+            fn ($e) => $this->transformEvent($e, $config, $metricsCache),
+            $group['events']
+        ),
+    ];
+}
+
+/**
+ * Transform Event model to clean JSON (updated signature)
+ */
+protected function transformEvent(Event $event, array $config, array $metricsCache = []): array
+{
+    $data = [
+        'id' => $event->id,
+        'time' => $event->time->toISOString(),
+        'service' => $event->service,
+        'action' => $event->action,
+        // ... existing event data ...
+    ];
+
+    // NEW: Attach metrics if available for this event
+    if ($event->value !== null && $event->value_unit !== null) {
+        $metricKey = "{$event->service}.{$event->action}.{$event->value_unit}";
+
+        if (isset($metricsCache[$metricKey])) {
+            $data['metrics'] = $this->formatMetricsForEvent(
+                $event,
+                $metricsCache[$metricKey]['statistic'],
+                $metricsCache[$metricKey]['trends']
+            );
+        }
+    }
+
+    return $data;
+}
+
+/**
+ * Format metrics data for a single event
+ */
+protected function formatMetricsForEvent(
+    Event $event,
+    MetricStatistic $statistic,
+    Collection $trends
+): array {
+    $currentValue = $event->formatted_value;
+    $baseline = $statistic->mean_value;
+
+    return [
+        'baseline' => [
+            'mean' => round($statistic->mean_value, 2),
+            'min' => round($statistic->min_value, 2),
+            'max' => round($statistic->max_value, 2),
+            'stddev' => round($statistic->stddev_value, 2),
+        ],
+        'normal_bounds' => [
+            'lower' => round($statistic->normal_lower_bound, 2),
+            'upper' => round($statistic->normal_upper_bound, 2),
+        ],
+        'vs_baseline' => round($currentValue - $baseline, 2),
+        'vs_baseline_pct' => $baseline != 0
+            ? round((($currentValue - $baseline) / abs($baseline)) * 100, 1)
+            : 0,
+        'is_anomaly' => $currentValue < $statistic->normal_lower_bound ||
+                       $currentValue > $statistic->normal_upper_bound,
+        'recent_trends' => $trends->map(fn($t) => [
+            'type' => $t->type,
+            'detected_at' => $t->detected_at->toISOString(),
+            'deviation' => round($t->deviation, 2),
+            'significance' => round($t->significance_score, 2),
+        ])->toArray(),
+    ];
 }
 ```
 
 ### 2. Update Domain Agent Prompts
 
-Update all domain agent prompts in `DomainAgentService.php` to reference metrics:
+Update all domain agent prompts in `DomainAgentService.php` to reference embedded metrics:
 
 ```markdown
 ## Context Data Structure
 
-You receive a JSON object with:
+You receive events grouped by service::action::hour. Each event includes:
 
-- `groups`: Events grouped by service::action::hour with full details
-- `metrics`: Pre-calculated statistics from MetricStatistic/MetricTrend tables
+- Standard fields: `id`, `time`, `service`, `action`, `value`, `unit`
+- **`metrics` object** (if available): Pre-calculated statistics embedded in the event
 
-**Metrics object structure:**
+**Event with metrics example:**
 ```json
-"metrics": {
-  "service.action": {
-    "unit": "hours|bpm|GBP|etc",
-    "current": 7.2,              // Current value in this timeframe
+{
+  "id": "abc-123",
+  "service": "oura",
+  "action": "logged_hrv",
+  "value": 50,
+  "unit": "ms",
+  "metrics": {
     "baseline": {
-      "mean": 7.5,               // Historical average (30+ days)
-      "min": 6.1,                // Historical minimum
-      "max": 8.3,                // Historical maximum
-      "stddev": 0.6              // Standard deviation
+      "mean": 52,          // Historical average (30+ days)
+      "min": 23.7,         // Historical minimum
+      "max": 86.9,         // Historical maximum
+      "stddev": 10.72      // Standard deviation
     },
-    "normal_range": {
-      "lower": 6.3,              // Mean - 2σ
-      "upper": 8.7               // Mean + 2σ
+    "normal_bounds": {
+      "lower": 30.6,       // Mean - 2σ
+      "upper": 73.5        // Mean + 2σ
     },
-    "vs_baseline": -0.3,         // Difference from mean
-    "vs_baseline_pct": -4.0,     // Percentage change from mean
-    "is_anomaly": false,         // True if outside normal_range
-    "recent_trends": [...]       // Detected trends in last 7 days
+    "vs_baseline": -2,     // Difference from mean
+    "vs_baseline_pct": -3.8,  // Percentage change
+    "is_anomaly": false,   // True if outside normal_bounds
+    "recent_trends": [
+      {
+        "type": "trend_down_weekly",
+        "detected_at": "2025-12-28T10:00:00Z",
+        "deviation": -4.2,
+        "significance": 0.78
+      }
+    ]
   }
 }
 ```
 
-**Use metrics for all comparisons and trends:**
-- ✅ "Sleep averaged {metrics.oura.logged_sleep.current} hours, down {metrics.oura.logged_sleep.vs_baseline_pct}% from your baseline of {metrics.oura.logged_sleep.baseline.mean} hours"
-- ❌ Trying to calculate these yourself from raw events
+**Using metrics in insights:**
+- ✅ Access directly from event: `event.metrics.vs_baseline_pct`
+- ✅ "HRV was {event.value} ms, down {event.metrics.vs_baseline_pct}% from your {event.metrics.baseline.mean} ms baseline"
+- ❌ Don't calculate statistics yourself - use the pre-calculated metrics
 
 **Anomaly detection:**
-- If `is_anomaly: true`, the value is >2σ from historical mean - flag this!
-- Check `recent_trends` array for detected patterns (trend_up_weekly, anomaly_high, etc.)
+- If `event.metrics.is_anomaly` is `true`, value is >2σ from baseline → flag this!
+- Check `event.metrics.recent_trends` for detected patterns
 
-**When metrics are unavailable:**
-- Not all actions have metrics (need 30+ days of data, 10+ events)
-- Fall back to raw event data for newer services/actions
+**When metrics are missing:**
+- Not all events have metrics (need 30+ days data, 10+ events)
+- `metrics` field won't exist on newer integrations
+- Fall back to raw event values without baseline comparisons
 ```
 
 ### 3. Benefits
