@@ -691,6 +691,109 @@ class AssistantContextServiceTest extends TestCase
         $this->assertArrayNotHasKey('metrics', $transformedEvent);
     }
 
+    #[Test]
+    public function filters_empty_obsidian_daynotes(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'obsidian']);
+
+        // Create empty daynote (should be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'metadata' => [
+                'title' => '2024-01-15',
+                'content' => '<p></p>', // Empty content
+            ],
+        ]);
+
+        // Create daynote with substantial content (should NOT be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'metadata' => [
+                'title' => '2024-01-16',
+                'content' => '<p>This is a substantial note with meaningful content about my day and thoughts.</p>',
+            ],
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        // Should only have 1 event (the one with content)
+        $this->assertEquals(1, $context['today']['event_count']);
+    }
+
+    #[Test]
+    public function filters_outline_plugin_documents(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'obsidian']);
+
+        // Create Outline document (should be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'metadata' => [
+                'title' => 'Outline - My Notes',
+                'content' => 'Auto-generated outline structure',
+            ],
+        ]);
+
+        // Create regular note (should NOT be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'metadata' => [
+                'title' => 'My Research Notes',
+                'content' => 'Important research findings',
+            ],
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        // Should only have 1 event (the regular note)
+        $this->assertEquals(1, $context['today']['event_count']);
+    }
+
+    #[Test]
+    public function allows_daynotes_with_sufficient_content(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'obsidian']);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'metadata' => [
+                'title' => '2024-01-15',
+                'content' => '<p>Today was productive. I worked on the new feature and made significant progress. Had a great conversation with the team about architecture.</p>',
+            ],
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $this->assertEquals(1, $context['today']['event_count']);
+    }
+
     protected function createFlintIntegration(User $user, array $config = []): Integration
     {
         $group = IntegrationGroup::factory()->create([

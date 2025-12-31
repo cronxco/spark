@@ -106,15 +106,26 @@ Return your response as JSON with this structure:
 **Only provide insights that meet ALL these criteria:**
 1. **Specific & Data-Driven**: Include actual numbers, percentages, or concrete data points
 2. **Actionable or Informative**: Either the user can act on it, or it genuinely informs them of something meaningful
-3. **Confident (≥60%)**: Only include insights where confidence is 0.6 or higher
+3. **Confident (≥70%)**: Only include insights where confidence is 0.7 or higher
 4. **Non-Obvious**: Don't state what's already clearly visible in the raw data
 5. **Meaningful**: Avoid superficial observations like "You did X today" without context or comparison
+6. **"So What?" Test**: Every insight must answer "Why does this matter?" - explain the significance, not just the observation
 
 **Examples of LOW-QUALITY insights to AVOID:**
 - ❌ "You listened to music today" (obvious, no context)
 - ❌ "Your spending was normal" (vague, no specifics)
 - ❌ "You completed some tasks" (no numbers, no context)
+- ❌ "You bookmarked 7 articles yesterday" (meta-analysis of behavior, not content analysis)
+- ❌ "You fetched 12 webpages this week" (counting actions, not synthesizing content)
 - ❌ Generic observations without supporting data or trends
+
+**META-ANALYSIS BLOCKER:**
+**NEVER** produce insights that simply count or describe the user's actions without analyzing the actual content or deeper meaning. Examples of prohibited meta-analysis:
+- ❌ "You saved X bookmarks"
+- ❌ "You fetched X webpages"
+- ❌ "You completed X tasks"
+
+Instead, analyze WHAT those bookmarks/articles/tasks were ABOUT, what themes emerged, what debates they surfaced, what knowledge they represent.
 
 **Examples of HIGH-QUALITY insights:**
 - ✅ "Your sleep duration averaged 6.2 hours this week, down 18% from your 30-day average of 7.5 hours. This coincides with a 12% drop in HRV."
@@ -172,12 +183,12 @@ PROMPT;
             'no_insights_reason' => null,
         ], $json);
 
-        // Filter insights by minimum quality threshold (confidence >= 0.6)
+        // Filter insights by minimum quality threshold (confidence >= 0.7)
         if (! empty($parsed['insights'])) {
             $originalCount = count($parsed['insights']);
             $parsed['insights'] = array_values(array_filter(
                 $parsed['insights'],
-                fn ($insight) => ($insight['confidence'] ?? 0) >= 0.6
+                fn ($insight) => ($insight['confidence'] ?? 0) >= 0.7 && ! $this->isMetaAnalysis($insight)
             ));
 
             $filteredCount = $originalCount - count($parsed['insights']);
@@ -190,11 +201,37 @@ PROMPT;
         if (! empty($parsed['cross_domain_observations'])) {
             $parsed['cross_domain_observations'] = array_values(array_filter(
                 $parsed['cross_domain_observations'],
-                fn ($obs) => ($obs['confidence'] ?? 0) >= 0.6
+                fn ($obs) => ($obs['confidence'] ?? 0) >= 0.7
             ));
         }
 
         return $parsed;
+    }
+
+    /**
+     * Detect if an insight is meta-analysis (counting actions without analyzing content)
+     */
+    protected function isMetaAnalysis(array $insight): bool
+    {
+        $title = strtolower($insight['title'] ?? '');
+        $description = strtolower($insight['description'] ?? '');
+        $combined = $title . ' ' . $description;
+
+        // Patterns that indicate behavioral counting rather than content analysis
+        $metaAnalysisPatterns = [
+            '/you (saved|bookmarked|fetched|completed|created|added|logged|recorded|tracked) \d+/',
+            '/\d+ (bookmarks?|webpages?|articles?|tasks?|items?|entries?) (saved|fetched|created|added)/',
+            '/you (saved|bookmarked|fetched) .* (articles?|webpages?|links?)/',
+            '/total of \d+ (bookmarks?|articles?|tasks?|entries?)/',
+        ];
+
+        foreach ($metaAnalysisPatterns as $pattern) {
+            if (preg_match($pattern, $combined)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -326,33 +363,42 @@ SYSTEM;
 You are the Knowledge Domain Agent for Flint, specializing in learning and information consumption.
 
 **Your Role:**
-- Analyze content from Fetch (web articles), Obsidian (notes), GitHub (code activity)
-- Identify learning patterns and knowledge themes
-- Track information consumption and creation
-- Detect areas of focus and intellectual curiosity
-- Provide structured, informative insights
+- Synthesize WHAT the user is reading, learning, and thinking about
+- Analyze content from Fetch blocks (summaries, key takeaways, tags), Obsidian notes, GitHub activity
+- Identify intellectual themes, debates, and knowledge threads
+- Detect shifts in focus areas and emerging interests
+- Provide synthesis-focused insights about content meaning, not consumption behavior
+
+**CRITICAL - Content Synthesis, NOT Behavioral Counting:**
+- ✅ DO: Analyze what articles/notes are ABOUT, what themes emerged, what debates they surface
+- ✅ DO: Synthesize knowledge threads ("Your reading on distributed systems is converging on consensus algorithms")
+- ✅ DO: Highlight intellectual contradictions or debates across sources
+- ❌ DON'T: Count bookmarks, articles, or tasks ("You saved 10 bookmarks")
+- ❌ DON'T: Report volume metrics without analyzing content
+- ❌ DON'T: State obvious behaviors visible in raw data
+
+**Leverage Existing Fetch Blocks:**
+Events may include blocks with AI-generated summaries:
+- `fetch_summary`: Concise article summary
+- `fetch_key_takeaways`: Bullet points of main insights
+- `fetch_tags`: Topics and themes
+- `bookmark_summary`: AI analysis of bookmarked content
+
+Use these blocks to understand WHAT was read, not just THAT it was read.
 
 **Tone:**
-- Factual and informative
-- Structured and organized
-- Encouraging of learning and growth
+- Intellectually curious and synthesizing
+- Structured around themes and ideas
+- Encouraging of deep learning
 - Professional but approachable
-- Use clear, concise language
-
-**Key Patterns to Watch:**
-- Topics and themes in saved content
-- Reading volume and consistency
-- Note-taking patterns (if Obsidian data available)
-- GitHub activity and coding patterns
-- Knowledge domains and focus areas
-- Information sources and variety
+- Use precise, knowledge-oriented language
 
 **What Makes a Good Insight:**
-- Identifies themes across different content ("You've been researching AI/ML heavily this week")
-- Tracks knowledge accumulation over time
-- Highlights connections between different information sources
-- Suggests related topics based on current interests
-- Celebrates learning milestones
+- Synthesizes themes across articles ("Recurring interest in CAP theorem trade-offs this week")
+- Identifies intellectual debates or contradictions
+- Connects knowledge domains ("Your AI ethics reading intersects with your privacy work")
+- Highlights knowledge gaps or follow-up questions
+- Detects shifts in learning focus areas
 SYSTEM;
     }
 

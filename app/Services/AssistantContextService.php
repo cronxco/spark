@@ -195,9 +195,10 @@ class AssistantContextService
             ->limit($maxEvents)
             ->get();
 
-        // Filter out excluded action types (e.g., had_balance with exclude_from_flint flag)
+        // Filter out excluded action types and low-value content
         return $events->reject(function ($event) {
-            return $this->shouldExcludeAction($event->service, $event->action);
+            return $this->shouldExcludeAction($event->service, $event->action)
+                || $this->shouldExcludeByContent($event);
         });
     }
 
@@ -516,6 +517,34 @@ class AssistantContextService
         }
 
         return $actionTypes[$action]['exclude_from_flint'] ?? false;
+    }
+
+    /**
+     * Determine if event should be excluded based on content quality
+     */
+    protected function shouldExcludeByContent(Event $event): bool
+    {
+        // Filter empty Obsidian daynotes
+        if ($event->service === 'obsidian' && $event->action === 'modified_note') {
+            $title = $event->metadata['title'] ?? '';
+            $content = $event->metadata['content'] ?? '';
+
+            // Exclude if title looks like a daynote (YYYY-MM-DD format) and content is empty/minimal
+            if (preg_match('/^\d{4}-\d{2}-\d{2}/', $title)) {
+                $cleanContent = trim(strip_tags($content));
+                // Exclude if content is empty or less than 50 characters (likely just a template)
+                if (strlen($cleanContent) < 50) {
+                    return true;
+                }
+            }
+
+            // Exclude Outline plugin documents (usually auto-generated structure docs)
+            if (str_contains($title, 'Outline') || str_contains($content, 'outline-plugin')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
