@@ -7,6 +7,8 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\MetricStatistic;
+use App\Models\MetricTrend;
 use App\Models\Relationship;
 use App\Models\User;
 use Carbon\Carbon;
@@ -75,8 +77,11 @@ class AssistantContextService
         // Query events
         $events = $this->queryEvents($user, $startDate, $endDate, $config, $domains);
 
+        // Pre-load metric statistics for all events in this timeframe
+        $metricsCache = $this->loadMetricsForEvents($user, $events);
+
         // Group events like day view
-        $groups = $this->groupEvents($events, $user, $config);
+        $groups = $this->groupEvents($events, $user, $config, $metricsCache);
 
         // Service breakdown
         $serviceBreakdown = $events->groupBy('service')
@@ -197,9 +202,56 @@ class AssistantContextService
     }
 
     /**
+     * Pre-load metric statistics for all events in collection
+     */
+    protected function loadMetricsForEvents(User $user, Collection $events): array
+    {
+        $metricsCache = [];
+
+        // Get unique service::action::unit combinations
+        $metricKeys = $events
+            ->filter(fn ($e) => $e->value !== null && $e->value_unit !== null)
+            ->map(fn ($e) => [
+                'service' => $e->service,
+                'action' => $e->action,
+                'unit' => $e->value_unit,
+            ])
+            ->unique(fn ($m) => "{$m['service']}.{$m['action']}.{$m['unit']}")
+            ->values();
+
+        foreach ($metricKeys as $key) {
+            $cacheKey = "{$key['service']}.{$key['action']}.{$key['unit']}";
+
+            // Get the pre-calculated statistic
+            $statistic = MetricStatistic::where('user_id', $user->id)
+                ->where('service', $key['service'])
+                ->where('action', $key['action'])
+                ->where('value_unit', $key['unit'])
+                ->first();
+
+            if (! $statistic || ! $statistic->hasValidStatistics()) {
+                continue;
+            }
+
+            // Get recent trends/anomalies (last 7 days, unacknowledged)
+            $recentTrends = MetricTrend::where('metric_statistic_id', $statistic->id)
+                ->where('detected_at', '>=', now()->subDays(7))
+                ->unacknowledged()
+                ->get();
+
+            $metricsCache[$cacheKey] = [
+                'statistic' => $statistic,
+                'trends' => $recentTrends,
+            ];
+        }
+
+        return $metricsCache;
+    }
+
+    /**
      * Group events like day view (service::action::hour)
      */
-    protected function groupEvents(Collection $events, User $user, array $config): array
+    protected function groupEvents(Collection $events, User $user, array $config, array $metricsCache = []): array
     {
         $groups = [];
         $currentKey = null;
@@ -213,7 +265,7 @@ class AssistantContextService
             if ($currentKey !== $key || $currentHour !== $hour) {
                 // Save previous group
                 if ($currentGroup) {
-                    $groups[] = $this->finalizeGroup($currentGroup, $user, $config);
+                    $groups[] = $this->finalizeGroup($currentGroup, $user, $config, $metricsCache);
                 }
 
                 // Start new group
@@ -231,7 +283,7 @@ class AssistantContextService
         }
 
         if ($currentGroup) {
-            $groups[] = $this->finalizeGroup($currentGroup, $user, $config);
+            $groups[] = $this->finalizeGroup($currentGroup, $user, $config, $metricsCache);
         }
 
         return $groups;
@@ -240,7 +292,7 @@ class AssistantContextService
     /**
      * Finalize a group with metadata and transformed events
      */
-    protected function finalizeGroup(array $group, User $user, array $config): array
+    protected function finalizeGroup(array $group, User $user, array $config, array $metricsCache = []): array
     {
         $count = count($group['events']);
         $sample = $group['events'][0] ?? null;
@@ -267,9 +319,9 @@ class AssistantContextService
             'summary' => $formattedAction . ' ' . $count . ' ' . $objectTypePlural,
             'is_condensed' => $count >= 4,
             'formatted_action' => $formattedAction,
-            'first_event' => $this->transformEvent($group['events'][0], $config),
+            'first_event' => $this->transformEvent($group['events'][0], $config, $metricsCache),
             'all_events' => array_map(
-                fn ($e) => $this->transformEvent($e, $config),
+                fn ($e) => $this->transformEvent($e, $config, $metricsCache),
                 $group['events']
             ),
         ];
@@ -278,7 +330,7 @@ class AssistantContextService
     /**
      * Transform Event model to clean JSON
      */
-    protected function transformEvent(Event $event, array $config): array
+    protected function transformEvent(Event $event, array $config, array $metricsCache = []): array
     {
         $data = [
             'id' => $event->id,
@@ -321,7 +373,57 @@ class AssistantContextService
             $data['blocks'] = $filteredBlocks->map(fn ($b) => $this->transformBlock($b))->values()->all();
         }
 
+        // Attach metrics if available for this event
+        if ($event->value !== null && $event->value_unit !== null) {
+            $metricKey = "{$event->service}.{$event->action}.{$event->value_unit}";
+
+            if (isset($metricsCache[$metricKey])) {
+                $data['metrics'] = $this->formatMetricsForEvent(
+                    $event,
+                    $metricsCache[$metricKey]['statistic'],
+                    $metricsCache[$metricKey]['trends']
+                );
+            }
+        }
+
         return $data;
+    }
+
+    /**
+     * Format metrics data for a single event
+     */
+    protected function formatMetricsForEvent(
+        Event $event,
+        MetricStatistic $statistic,
+        Collection $trends
+    ): array {
+        $currentValue = $event->formatted_value;
+        $baseline = $statistic->mean_value;
+
+        return [
+            'baseline' => [
+                'mean' => round($statistic->mean_value, 2),
+                'min' => round($statistic->min_value, 2),
+                'max' => round($statistic->max_value, 2),
+                'stddev' => round($statistic->stddev_value, 2),
+            ],
+            'normal_bounds' => [
+                'lower' => round($statistic->normal_lower_bound, 2),
+                'upper' => round($statistic->normal_upper_bound, 2),
+            ],
+            'vs_baseline' => round($currentValue - $baseline, 2),
+            'vs_baseline_pct' => $baseline != 0
+                ? round((($currentValue - $baseline) / abs($baseline)) * 100, 1)
+                : 0,
+            'is_anomaly' => $currentValue < $statistic->normal_lower_bound ||
+                           $currentValue > $statistic->normal_upper_bound,
+            'recent_trends' => $trends->map(fn ($t) => [
+                'type' => $t->type,
+                'detected_at' => $t->detected_at->toISOString(),
+                'deviation' => round($t->deviation, 2),
+                'significance' => round($t->significance_score, 2),
+            ])->toArray(),
+        ];
     }
 
     /**
