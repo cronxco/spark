@@ -675,32 +675,61 @@ See detailed specification in [CONTEXT_METRICS_PROPOSAL.md](./CONTEXT_METRICS_PR
 - Doesn't clutter domain agents with forecast data
 - Reuses existing Google Calendar events
 
-#### Phase 3: Knowledge Domain Synthesis (Week 2)
+#### Phase 3: Knowledge Domain Synthesis (Week 2) - ✅ **COMPLETE**
+
+**Status:** Fully implemented (2025-12-31)
 
 **REVISED UNDERSTANDING:** Fetch summaries are already in the context! Events include blocks, and Fetch creates 5 summary blocks (`fetch_summary_paragraph`, `fetch_key_takeaways`, etc.) attached to bookmark events.
 
-**No context service changes needed.** Just update the prompt:
+**What was done:**
 
-1. **Update Knowledge domain agent prompt:**
-   - Explicitly show how to access block metadata from context
-   - Example: `groups[x].all_events[y].blocks` contains summary blocks
-   - Instruct to read `metadata.content` from `fetch_summary_paragraph` and `fetch_key_takeaways` blocks
-   - Group articles by theme using topics from `metrics.content.top_topics_7d`
-   - Synthesize across related articles
-   - Surface debates and key questions
-   - **CRITICAL:** NO behavioral counting ("you read X articles")
-   - **CRITICAL:** YES content synthesis ("Your reading explores X theme...")
+1. **✅ Enhanced Knowledge domain prompt** with technical details:
+   - Added exact JSON structure showing how to access blocks
+   - Specified block types to prioritize: `fetch_summary_paragraph`, `fetch_key_takeaways`, `fetch_tags`
+   - Added step-by-step synthesis instructions:
+     1. Read summaries and takeaways from Fetch blocks
+     2. Group articles by themes using tags
+     3. Look for recurring concepts
+     4. Identify debates (conflicting viewpoints)
+     5. Surface knowledge threads (how ideas build on each other)
+     6. Highlight gaps or questions that emerged
+   - Reinforced NO behavioral counting, YES content synthesis
 
-#### Phase 4: Deduplication (Week 2-3)
-1. **Create `InsightDeduplicationService.php`:**
-   - Implement insight hashing
-   - Add temporal memory (24hr cache)
-   - Build similarity detection algorithm
+**Files changed:**
+- `app/Services/DomainAgentService.php` - Enhanced Knowledge prompt
 
-2. **Update `AgentOrchestrationService.php`:**
-   - Check for duplicates before creating blocks
-   - Implement update/suppress logic
-   - Add duplicate tracking metrics
+#### Phase 4: Deduplication (Week 2-3) - ✅ **COMPLETE**
+
+**Status:** Fully implemented and tested (2025-12-31)
+
+**What was done:**
+
+1. **✅ InsightDeduplicationService.php created:**
+   - MD5 signature generation via normalized text
+   - Exact duplicate detection (fastest path)
+   - Similarity detection using dual algorithms:
+     * Levenshtein distance for short texts (<255 chars)
+     * Word overlap (Jaccard) for long texts (>255 chars)
+   - 24-hour cache memory per user/domain
+   - Configurable similarity threshold (default: 0.85)
+   - Text normalization (lowercase, remove punctuation, trim)
+   - Statistics and debugging tools
+
+2. **✅ AgentOrchestrationService.php updated:**
+   - Deduplication runs BEFORE creating blocks
+   - Filters each insight through isDuplicate() check
+   - Marks non-duplicate insights as seen after block creation
+   - Comprehensive logging (duplicate counts, similarity scores)
+   - Graceful handling when all insights are duplicates
+
+**Tests added:**
+- 15 comprehensive tests for deduplication service
+- Tests cover: exact duplicates, similarity detection, text normalization, scoping, long text handling, edge cases
+
+**Files changed:**
+- `app/Services/InsightDeduplicationService.php` - Deduplication logic
+- `app/Services/AgentOrchestrationService.php` - Integration
+- `tests/Unit/Services/InsightDeduplicationServiceTest.php` - Tests
 
 #### Phase 5: Digest Redesign (Week 3)
 1. **Update digest generation prompt:**
