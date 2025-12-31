@@ -263,7 +263,7 @@ new class extends Component {
                             <div class="flex items-start justify-between gap-4">
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2 mb-2">
-                                        <x-icon name="o-newspaper" class="w-5 h-5 text-primary" />
+                                        <x-icon name="fas.newspaper" class="w-5 h-5 text-primary" />
                                         <span class="text-xs font-medium text-base-content/60 uppercase tracking-wide">
                                             {{ $latestDigest['time']->format('l, F j, Y') }}
                                         </span>
@@ -284,7 +284,7 @@ new class extends Component {
                             @if (!empty($latestDigest['metadata']['top_insights']))
                             <div>
                                 <h3 class="text-sm font-semibold text-base-content/80 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <x-icon name="o-light-bulb" class="w-4 h-4 text-warning" />
+                                    <x-icon name="fas.lightbulb" class="w-4 h-4 text-warning" />
                                     Key Insights
                                 </h3>
                                 <div class="space-y-3">
@@ -298,7 +298,7 @@ new class extends Component {
                                                         <p class="text-sm text-base-content/80 leading-relaxed">{{ $insight['description'] ?? '' }}</p>
                                                         @if (!empty($insight['action_needed']) && $insight['action_needed'] !== 'None')
                                                             <div class="flex items-center gap-2 mt-2 text-xs text-primary">
-                                                                <x-icon name="o-arrow-right" class="w-3 h-3" />
+                                                                <x-icon name="fas.arrow-right" class="w-3 h-3" />
                                                                 <span class="font-medium">{{ $insight['action_needed'] }}</span>
                                                             </div>
                                                         @endif
@@ -315,13 +315,13 @@ new class extends Component {
                             @if (!empty($latestDigest['metadata']['wins']))
                             <div>
                                 <h3 class="text-sm font-semibold text-success uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <x-icon name="o-check-circle" class="w-4 h-4" />
+                                    <x-icon name="fas.check-circle" class="w-4 h-4" />
                                     Wins
                                 </h3>
                                 <div class="space-y-2">
                                     @foreach ($latestDigest['metadata']['wins'] as $win)
                                         <div class="flex items-start gap-2 p-3 bg-success/10 rounded-lg">
-                                            <x-icon name="o-check" class="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                                            <x-icon name="fas.check" class="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
                                             <span class="text-sm text-base-content/90">{{ $win }}</span>
                                         </div>
                                     @endforeach
@@ -333,13 +333,13 @@ new class extends Component {
                             @if (!empty($latestDigest['metadata']['watch_points']))
                             <div>
                                 <h3 class="text-sm font-semibold text-warning uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <x-icon name="o-exclamation-triangle" class="w-4 h-4" />
+                                    <x-icon name="fas.exclamation-triangle" class="w-4 h-4" />
                                     Watch Points
                                 </h3>
                                 <div class="space-y-2">
                                     @foreach ($latestDigest['metadata']['watch_points'] as $watchPoint)
                                         <div class="flex items-start gap-2 p-3 bg-warning/10 rounded-lg">
-                                            <x-icon name="o-exclamation-circle" class="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                                            <x-icon name="fas.exclamation-circle" class="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
                                             <span class="text-sm text-base-content/90">{{ $watchPoint }}</span>
                                         </div>
                                     @endforeach
@@ -351,13 +351,13 @@ new class extends Component {
                             @if (!empty($latestDigest['metadata']['tomorrow_focus']))
                             <div>
                                 <h3 class="text-sm font-semibold text-info uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <x-icon name="o-calendar" class="w-4 h-4" />
+                                    <x-icon name="fas.calendar" class="w-4 h-4" />
                                     Tomorrow's Focus
                                 </h3>
                                 <div class="space-y-2">
                                     @foreach ($latestDigest['metadata']['tomorrow_focus'] as $focus)
                                         <div class="flex items-start gap-2 p-3 bg-info/10 rounded-lg">
-                                            <x-icon name="o-arrow-right" class="w-4 h-4 text-info mt-0.5 flex-shrink-0" />
+                                            <x-icon name="fas.arrow-right" class="w-4 h-4 text-info mt-0.5 flex-shrink-0" />
                                             <span class="text-sm text-base-content/90">{{ $focus }}</span>
                                         </div>
                                     @endforeach
@@ -384,7 +384,7 @@ new class extends Component {
                             wire:click="toggleArchive"
                             class="btn btn-outline btn-sm"
                         >
-                            <x-icon name="o-clock" class="w-4 h-4" />
+                            <x-icon name="fas.clock" class="w-4 h-4" />
                             {{ $showArchive ? 'Hide Archive' : 'View Past Digests' }}
                             @if (!empty($digestArchive))
                                 <span class="badge badge-sm">{{ count($digestArchive) }}</span>
@@ -431,7 +431,7 @@ new class extends Component {
                                                 wire:click="expandArchiveDigest('{{ $digest['id'] }}')"
                                                 class="btn btn-ghost btn-xs"
                                             >
-                                                <x-icon name="o-chevron-{{ $expandedArchiveDigestId === $digest['id'] ? 'up' : 'down' }}" class="w-4 h-4" />
+                                                <x-icon name="fas.chevron-{{ $expandedArchiveDigestId === $digest['id'] ? 'up' : 'down' }}" class="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
@@ -447,7 +447,7 @@ new class extends Component {
                     {{-- Empty State --}}
                     <div class="card bg-base-200 shadow">
                         <div class="card-body text-center py-12">
-                            <x-icon name="o-newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                            <x-icon name="fas.newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
                             <h3 class="text-lg font-semibold mb-2">{{ __('No Digests Yet') }}</h3>
                             <p class="text-sm text-base-content/60 mb-4">
                                 {{ __('Your AI-generated digests will appear here once Flint starts analyzing your data.') }}
