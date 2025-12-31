@@ -19,7 +19,8 @@ class AgentOrchestrationService
         protected AssistantPromptingService $prompting,
         protected DomainAgentService $domainAgent,
         protected FlintBlockCreationService $blockCreation,
-        protected AssistantContextService $contextService
+        protected AssistantContextService $contextService,
+        protected FutureAgentService $futureAgent
     ) {}
 
     /**
@@ -48,8 +49,24 @@ class AgentOrchestrationService
                 'domain_count' => count($enabledDomains),
             ]);
 
+            // Run future agent first (calendar + weather)
+            Log::info('[Flint] [ORCHESTRATION] Running future agent', [
+                'user_id' => $user->id,
+            ]);
+
+            $futureStartTime = microtime(true);
+            $results['future'] = $this->futureAgent->generateFutureInsights($user, hoursAhead: 48);
+            $futureDuration = microtime(true) - $futureStartTime;
+
+            Log::info('[Flint] [ORCHESTRATION] Future agent completed', [
+                'user_id' => $user->id,
+                'duration_seconds' => round($futureDuration, 2),
+                'insights_count' => count($results['future']['insights'] ?? []),
+                'suggestions_count' => count($results['future']['suggestions'] ?? []),
+            ]);
+
             // Run each domain agent with fresh data
-            $previousDomain = null;
+            $previousDomain = 'future';
             foreach ($enabledDomains as $index => $domain) {
                 Log::info('[Flint] [ORCHESTRATION] Processing domain agent', [
                     'user_id' => $user->id,

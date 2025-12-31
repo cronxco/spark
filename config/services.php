@@ -208,4 +208,10 @@ return [
         'daily_limit' => (int) env('GEOAPIFY_DAILY_LIMIT', 3000),
     ],
 
+    'metoffice' => [
+        'api_key' => env('METOFFICE_API_KEY'),
+        'base_url' => env('METOFFICE_BASE_URL', 'https://data.hub.api.metoffice.gov.uk/sitespecific/v0'),
+        'cache_ttl_hours' => (int) env('METOFFICE_CACHE_TTL', 1),
+    ],
+
 ];
