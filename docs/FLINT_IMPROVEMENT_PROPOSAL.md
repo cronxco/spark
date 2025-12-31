@@ -530,57 +530,91 @@ Remember: **Brevity is respect for the reader's time.**
 
 ### 5. Technical Implementation Plan
 
-#### Phase 0: Context Metrics Enhancement (Week 1) - **CRITICAL FOUNDATION**
+#### Phase 0: Context Metrics Enhancement (Week 1) - ✅ **COMPLETE**
+
+**Status:** Fully implemented and tested (2025-12-30)
 
 **Problem:** Domain agents receive raw events but proposal examples require statistics like "down 18% from 30-day average." LLMs are terrible at arithmetic and aggregation.
 
-**Solution:** Pre-calculate metrics in `AssistantContextService`.
+**Solution:** Leverage existing `MetricStatistic` and `MetricTrend` models and embed within events.
 
 See detailed specification in [CONTEXT_METRICS_PROPOSAL.md](./CONTEXT_METRICS_PROPOSAL.md)
 
-**Key additions to context:**
-- Sleep: current vs 7d/30d baselines, trend, min/max
-- Spending: by category, vs averages, unusual transactions flagged
-- Activity: steps, workout frequency vs baselines
-- Media: listening time, new artists, genre diversity
-- Content: article counts, topic clustering
+**What was done:**
 
-**Why this comes first:**
+1. **✅ Metrics embedded within events:**
+   - Added `loadMetricsForEvents()` method to pre-load statistics
+   - Added `formatMetricsForEvent()` method to format metrics structure
+   - Metrics embedded directly in event JSON (not separate array)
+   - Includes: baseline (mean/min/max/stddev), normal_bounds, vs_baseline, vs_baseline_pct, is_anomaly, recent_trends
+
+2. **✅ Leverages existing infrastructure:**
+   - Uses `MetricStatistic` model (min, max, mean, stddev, normal bounds)
+   - Uses `MetricTrend` model (weekly/monthly/quarterly trends, anomalies)
+   - Requires 30+ days data, 10+ events minimum
+   - Background jobs keep metrics updated
+
+3. **✅ Performance optimized:**
+   - Single query per unique metric (service::action::unit)
+   - Metrics cached by key for entire timeframe
+   - Trends filtered to last 7 days, unacknowledged only
+
+**Tests added:**
+- 8 comprehensive tests for metrics embedding
+- Tests cover: presence, fallback, calculations, anomalies, trends
+
+**Files changed:**
+- `app/Services/AssistantContextService.php` - Metrics embedding
+- `tests/Unit/AssistantContextServiceTest.php` - Metrics tests
+
+**Why this came first:**
 - Enables accurate comparisons in all domains
 - Makes proposal examples achievable
 - Prevents LLM hallucination of statistics
 - Required for quality insights
 
-**Implementation:**
-1. Create `MetricsCalculationService.php`
-2. Update `AssistantContextService::generateTimeframeContext()` to include metrics
-3. Update all domain agent prompts to reference metrics object
-4. Add unit tests for each metric calculation
+#### Phase 1: Quality Filters & Data Filtering (Week 1) - ✅ **COMPLETE**
 
-#### Phase 1: Quality Filters & Data Filtering (Week 1)
-1. **Add data filtering rules:**
-   - Skip empty daynotes
-   - Skip Outline documents (personal notes)
-   - Skip any data source with zero events
+**Status:** Fully implemented and tested (2025-12-31)
 
-2. **Update `DomainAgentService.php`:**
-   - Add insight validation method
-   - Implement "So What?" test logic
-   - Raise confidence threshold to 0.7
-   - Add minimum viable criteria checks
-   - **Filter meta-analysis**: Block "you did X" insights
-   - **Make zero insights acceptable**: Better than noise
+**What was done:**
 
-3. **Update `parseAgentResponse()`:**
-   - Add quality scoring function
-   - Filter out behavioral counting (bookmarks, task counts, etc.)
-   - Filter out low-confidence insights (<0.7)
-   - Log rejected insights for analysis
+1. **✅ Data filtering rules implemented:**
+   - Added `shouldExcludeByContent()` method to filter low-value events
+   - Filters empty Obsidian daynotes (< 50 chars after stripping HTML)
+   - Filters Outline plugin documents (auto-generated structure)
+   - Maintains daynotes with substantial content
 
-4. **Update all domain agent prompts:**
-   - Add "RETURN EMPTY ARRAY if nothing meaningful to say"
-   - Emphasize quality over quantity
-   - Examples of what NOT to do
+2. **✅ `DomainAgentService.php` updated:**
+   - Added `isMetaAnalysis()` method to detect behavioral counting
+   - Raised confidence threshold from 0.6 to 0.7
+   - Added "So What?" test to quality criteria (criterion #6)
+   - Added META-ANALYSIS BLOCKER section with examples
+   - Zero insights now acceptable (better than noise)
+
+3. **✅ `parseAgentResponse()` enhanced:**
+   - Filters insights with confidence < 0.7
+   - Filters meta-analysis patterns (bookmarks, tasks, webpages)
+   - Tracks filtered count via `quality_filtered_count` field
+   - Combined filtering: confidence AND meta-analysis check
+
+4. **✅ Knowledge domain prompt updated:**
+   - Emphasizes content synthesis over behavioral counting
+   - Explicit DO/DON'T examples for content analysis
+   - References existing Fetch blocks (summaries, key takeaways, tags)
+   - Focuses on WHAT user reads, not HOW MUCH
+
+**Tests added:**
+- 5 tests for meta-analysis detection patterns
+- 2 tests for confidence threshold filtering
+- 3 tests for content-based event filtering
+- All tests verify proper allowance of valid insights
+
+**Files changed:**
+- `app/Services/DomainAgentService.php` - Quality filtering logic
+- `app/Services/AssistantContextService.php` - Content filtering
+- `tests/Unit/Services/DomainAgentServiceTest.php` - Quality tests
+- `tests/Unit/AssistantContextServiceTest.php` - Content filter tests
 
 #### Phase 2: Weather Integration (Week 1-2)
 1. **Create `WeatherService.php`:**
