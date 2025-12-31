@@ -20,7 +20,8 @@ class AgentOrchestrationService
         protected DomainAgentService $domainAgent,
         protected FlintBlockCreationService $blockCreation,
         protected AssistantContextService $contextService,
-        protected FutureAgentService $futureAgent
+        protected FutureAgentService $futureAgent,
+        protected InsightDeduplicationService $deduplication
     ) {}
 
     /**
@@ -445,13 +446,44 @@ class AgentOrchestrationService
             // Create insight blocks if we're in pre-digest mode (not continuous)
             $createdBlocks = [];
             if ($mode === 'pre_digest' && ! empty($insights['insights'])) {
-                $flintEvent = $this->blockCreation->getOrCreateFlintEvent($user);
-                $createdBlocks = $this->blockCreation->createDomainInsightBlocks(
-                    $user,
-                    $domain,
-                    $insights,
-                    $flintEvent
-                );
+                // Deduplicate insights before creating blocks
+                $originalCount = count($insights['insights']);
+                $deduplicatedInsights = $this->deduplicateInsights($user->id, $domain, $insights['insights']);
+                $duplicateCount = $originalCount - count($deduplicatedInsights);
+
+                if ($duplicateCount > 0) {
+                    Log::info('[Flint] [DEDUP] Filtered duplicate insights', [
+                        'user_id' => $user->id,
+                        'domain' => $domain,
+                        'original_count' => $originalCount,
+                        'deduplicated_count' => count($deduplicatedInsights),
+                        'duplicates_removed' => $duplicateCount,
+                    ]);
+                }
+
+                // Update insights array with deduplicated version
+                $insights['insights'] = $deduplicatedInsights;
+
+                // Only create blocks if we have non-duplicate insights
+                if (! empty($deduplicatedInsights)) {
+                    $flintEvent = $this->blockCreation->getOrCreateFlintEvent($user);
+                    $createdBlocks = $this->blockCreation->createDomainInsightBlocks(
+                        $user,
+                        $domain,
+                        $insights,
+                        $flintEvent
+                    );
+
+                    // Mark these insights as seen
+                    foreach ($deduplicatedInsights as $insight) {
+                        $this->deduplication->markAsSeen($insight, $domain, $user->id);
+                    }
+                } else {
+                    Log::info('[Flint] [DEDUP] All insights were duplicates - no blocks created', [
+                        'user_id' => $user->id,
+                        'domain' => $domain,
+                    ]);
+                }
 
                 // Handle urgent flags if any
                 if (! empty($insights['urgent_flags'])) {
@@ -1353,5 +1385,38 @@ PROMPT;
         }
 
         return null;
+    }
+
+    /**
+     * Deduplicate insights using the deduplication service
+     *
+     * @param  int  $userId
+     * @param  string  $domain
+     * @param  array  $insights
+     * @return array Deduplicated insights
+     */
+    protected function deduplicateInsights(int $userId, string $domain, array $insights): array
+    {
+        $deduplicated = [];
+
+        foreach ($insights as $insight) {
+            $duplicateCheck = $this->deduplication->isDuplicate($insight, $domain, $userId);
+
+            if ($duplicateCheck['is_duplicate']) {
+                Log::debug('[Flint] [DEDUP] Skipping duplicate insight', [
+                    'user_id' => $userId,
+                    'domain' => $domain,
+                    'title' => $insight['title'] ?? 'N/A',
+                    'similarity_score' => $duplicateCheck['similarity_score'],
+                    'seen_at' => $duplicateCheck['seen_at'] ?? null,
+                ]);
+
+                continue;
+            }
+
+            $deduplicated[] = $insight;
+        }
+
+        return $deduplicated;
     }
 }
