@@ -52,7 +52,7 @@ class FutureAgentService
 
         // Call AI service via AssistantPromptingService
         try {
-            $fullPrompt = $this->getSystemPrompt()."\n\n".$prompt;
+            $fullPrompt = $this->getSystemPrompt() . "\n\n" . $prompt;
 
             $response = $this->prompting->generateResponse($fullPrompt, [
                 'model' => config('services.openai.models.gpt4o'),
@@ -143,7 +143,7 @@ class FutureAgentService
 
             if ($notableSummary) {
                 $prompt .= "**Weather Forecast ({$weatherForecast['location']}):**\n";
-                $prompt .= $notableSummary['summary']."\n\n";
+                $prompt .= $notableSummary['summary'] . "\n\n";
 
                 $prompt .= "**Detailed notable periods:**\n";
                 foreach ($notableSummary['notable_periods'] as $period) {
