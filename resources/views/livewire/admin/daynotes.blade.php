@@ -101,7 +101,7 @@ new class extends Component {
 <div>
     <x-header title="Outline Day Notes" subtitle="Generate and manage day note documents" separator>
         <x-slot:actions>
-            @if($group)
+            @if ($group)
                 <a href="{{ $group->auth_metadata['api_url'] ?? config('services.outline.url') }}"
                    target="_blank"
                    class="btn btn-sm btn-outline">
@@ -116,7 +116,7 @@ new class extends Component {
         </x-slot:actions>
     </x-header>
 
-    @if(!$group)
+    @if (!$group)
         <div class="alert alert-warning">
             <x-icon name="o-exclamation-triangle" class="w-6 h-6" />
             <div>
@@ -129,7 +129,7 @@ new class extends Component {
         </div>
     @else
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            @foreach([2026, 2027, 2028] as $year)
+            @foreach ([2026, 2027, 2028] as $year)
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
                         <h3 class="card-title">{{ $year }}</h3>
@@ -139,22 +139,22 @@ new class extends Component {
                             $progress = $yearStatuses[$year]['progress'] ?? null;
                         @endphp
 
-                        @if($status === 'completed')
+                        @if ($status === 'completed')
                             <div class="badge badge-success gap-1">
                                 <x-icon name="o-check-circle" class="w-3 h-3" />
                                 Generated
                             </div>
-                            @if($progress)
+                            @if ($progress)
                                 <p class="text-xs text-base-content/70">
                                     {{ $progress->updated_at->diffForHumans() }}
                                 </p>
                             @endif
-                        @elseif($status === 'in_progress')
+                        @elseif ($status === 'in_progress')
                             <div class="badge badge-warning gap-1">
                                 <span class="loading loading-spinner loading-xs"></span>
                                 In Progress
                             </div>
-                            @if($progress && isset($progress->metadata['completed_months']))
+                            @if ($progress && isset($progress->metadata['completed_months']))
                                 <progress
                                     class="progress progress-warning mt-2"
                                     value="{{ $progress->metadata['completed_months'] }}"
@@ -167,12 +167,12 @@ new class extends Component {
                                     </span>
                                 </p>
                             @endif
-                        @elseif($status === 'failed')
+                        @elseif ($status === 'failed')
                             <div class="badge badge-error gap-1">
                                 <x-icon name="o-x-circle" class="w-3 h-3" />
                                 Failed
                             </div>
-                            @if($progress)
+                            @if ($progress)
                                 <p class="text-xs text-error">
                                     {{ $progress->updated_at->diffForHumans() }}
                                 </p>
@@ -185,11 +185,11 @@ new class extends Component {
                             wire:click="generateYear({{ $year }})"
                             wire:loading.attr="disabled"
                             class="btn btn-primary btn-sm mt-2"
-                            @if($status === 'in_progress') disabled @endif>
+                            @if ($status === 'in_progress') disabled @endif>
                             <span wire:loading.remove wire:target="generateYear({{ $year }})">
-                                @if($status === 'completed')
+                                @if ($status === 'completed')
                                     Regenerate
-                                @elseif($status === 'failed')
+                                @elseif ($status === 'failed')
                                     Retry
                                 @else
                                     Generate
@@ -203,7 +203,7 @@ new class extends Component {
             @endforeach
         </div>
 
-        @if(!$taskIntegration)
+        @if (!$taskIntegration)
             <div class="alert alert-info mt-4">
                 <x-icon name="o-information-circle" class="w-6 h-6" />
                 <div>
