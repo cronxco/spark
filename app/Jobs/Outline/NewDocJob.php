@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class NewDocJob implements ShouldQueue
 {
@@ -24,6 +25,22 @@ class NewDocJob implements ShouldQueue
     public function handle(): void
     {
         $api = new OutlineApi($this->integration);
+
+        // Check if document already exists
+        $existing = $api->searchSingleDocument([
+            'collectionId' => $this->collectionId,
+            'query' => $this->title,
+        ]);
+
+        if ($existing && ($existing['document']['title'] ?? '') === $this->title) {
+            Log::info('NewDocJob: Document already exists, skipping', [
+                'title' => $this->title,
+                'collection_id' => $this->collectionId,
+            ]);
+
+            return;
+        }
+
         $api->createDocument($this->title, $this->collectionId, $this->parentId, true);
     }
 }
