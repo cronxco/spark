@@ -2,7 +2,6 @@
 
 namespace App\Jobs\Outline;
 
-use App\Events\ActionProgressUpdated;
 use App\Integrations\Outline\OutlineApi;
 use App\Models\ActionProgress;
 use App\Models\Integration;
@@ -40,7 +39,7 @@ class GenerateDayNotes implements ShouldQueue
         if (! $yearId) {
             // Mark progress as failed
             if ($this->progressId) {
-                ActionProgress::find($this->progressId)?->update(['status' => 'failed']);
+                ActionProgress::find($this->progressId)?->markFailed('Failed to create year document');
             }
 
             return;
@@ -71,18 +70,17 @@ class GenerateDayNotes implements ShouldQueue
             if ($this->progressId) {
                 $progress = ActionProgress::find($this->progressId);
                 if ($progress) {
-                    $metadata = $progress->metadata;
-                    $metadata['completed_months'] = $i;
-                    $metadata['completed_days'] = ($metadata['completed_days'] ?? 0) + $daysInMonth;
-                    $progress->update(['metadata' => $metadata]);
-                    event(new ActionProgressUpdated($progress));
+                    $details = $progress->details ?? [];
+                    $details['completed_months'] = $i;
+                    $details['completed_days'] = ($details['completed_days'] ?? 0) + $daysInMonth;
+                    $progress->update(['details' => $details]);
                 }
             }
         }
 
         // Mark as completed
         if ($this->progressId) {
-            ActionProgress::find($this->progressId)?->update(['status' => 'completed']);
+            ActionProgress::find($this->progressId)?->markCompleted();
         }
     }
 }

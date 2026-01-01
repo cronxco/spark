@@ -26,7 +26,7 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
     {
         $integration = $this->integration instanceof Integration
             ? $this->integration
-            : Integration::find($this->integration);
+            : Integration::findOrFail($this->integration);
 
         return 'pin-today-' . $integration->id . '-' . now('UTC')->format('Y-m-d');
     }
@@ -124,16 +124,7 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
             'daynotes_to_unpin' => count($daynotePinsToUnpin),
         ]);
 
-        // Check pin limit before attempting to pin
         $maxPinsAllowed = 10;
-        if (count($pins) >= $maxPinsAllowed && ! $todayIsAlreadyPinned) {
-            Log::error('PinTodayDayNote: at Outline pin limit, cannot pin today', [
-                'current_pins' => count($pins),
-                'max_allowed' => $maxPinsAllowed,
-            ]);
-
-            return;
-        }
 
         // Unpin old daynotes
         $unpinnedCount = 0;
@@ -161,6 +152,19 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
             'unpinned_count' => $unpinnedCount,
             'attempted_count' => count($daynotePinsToUnpin),
         ]);
+
+        // Re-count current pins after unpinning
+        $currentPinCount = count($pins) - $unpinnedCount;
+
+        // Check pin limit after unpinning
+        if ($currentPinCount >= $maxPinsAllowed && ! $todayIsAlreadyPinned) {
+            Log::error('PinTodayDayNote: at Outline pin limit, cannot pin today', [
+                'current_pins' => $currentPinCount,
+                'max_allowed' => $maxPinsAllowed,
+            ]);
+
+            return;
+        }
 
         // Only pin if not already pinned
         if (! $todayIsAlreadyPinned) {

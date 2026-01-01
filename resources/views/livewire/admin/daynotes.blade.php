@@ -43,13 +43,24 @@ new class extends Component {
 
         foreach ($years as $year) {
             $progress = ActionProgress::where('user_id', Auth::id())
-                ->where('type', 'outline_generate_daynotes')
-                ->where('metadata->year', $year)
+                ->where('action_type', 'outline_generate_daynotes')
+                ->where('details->year', $year)
                 ->latest()
                 ->first();
 
+            $status = 'not_started';
+            if ($progress) {
+                if ($progress->isCompleted()) {
+                    $status = 'completed';
+                } elseif ($progress->isFailed()) {
+                    $status = 'failed';
+                } elseif ($progress->isInProgress()) {
+                    $status = 'in_progress';
+                }
+            }
+
             $this->yearStatuses[$year] = [
-                'status' => $progress?->status ?? 'not_started',
+                'status' => $status,
                 'progress' => $progress,
             ];
         }
@@ -64,19 +75,23 @@ new class extends Component {
         }
 
         // Create progress tracker
-        $progress = ActionProgress::create([
-            'user_id' => Auth::id(),
-            'type' => 'outline_generate_daynotes',
-            'status' => 'in_progress',
-            'metadata' => [
+        $progress = ActionProgress::createProgress(
+            (string) Auth::id(),
+            'outline_generate_daynotes',
+            "year_{$year}",
+            'starting',
+            "Generating day notes for {$year}",
+            0,
+            100,
+            [
                 'year' => $year,
                 'integration_group_id' => $this->group->id,
                 'total_months' => 12,
                 'completed_months' => 0,
                 'total_days' => $this->getDaysInYear($year),
                 'completed_days' => 0,
-            ],
-        ]);
+            ]
+        );
 
         // Dispatch job with progress ID
         GenerateDayNotes::dispatch($this->taskIntegration, $year, (string) $progress->id)
@@ -154,16 +169,16 @@ new class extends Component {
                                 <span class="loading loading-spinner loading-xs"></span>
                                 In Progress
                             </div>
-                            @if ($progress && isset($progress->metadata['completed_months']))
+                            @if ($progress && isset($progress->details['completed_months']))
                                 <progress
                                     class="progress progress-warning mt-2"
-                                    value="{{ $progress->metadata['completed_months'] }}"
+                                    value="{{ $progress->details['completed_months'] }}"
                                     max="12">
                                 </progress>
                                 <p class="text-xs mt-1">
-                                    Month {{ $progress->metadata['completed_months'] }} of 12
+                                    Month {{ $progress->details['completed_months'] }} of 12
                                     <span class="text-base-content/50">
-                                        ({{ $progress->metadata['completed_days'] ?? 0 }}/{{ $progress->metadata['total_days'] ?? 0 }} days)
+                                        ({{ $progress->details['completed_days'] ?? 0 }}/{{ $progress->details['total_days'] ?? 0 }} days)
                                     </span>
                                 </p>
                             @endif
@@ -204,12 +219,15 @@ new class extends Component {
         </div>
 
         @if (!$taskIntegration)
-            <div class="alert alert-info mt-4">
-                <x-icon name="o-information-circle" class="w-6 h-6" />
+            <div class="alert alert-warning mt-4">
+                <x-icon name="o-exclamation-triangle" class="w-6 h-6" />
                 <div>
                     <h3 class="font-bold">No task integration found</h3>
-                    <p class="text-sm">A task integration will be created automatically when you generate a year.</p>
+                    <p class="text-sm">You must create an Outline task integration before you can generate day notes. Please configure your Outline integration with instance type "task".</p>
                 </div>
+                <a href="{{ route('integrations.index') }}" class="btn btn-sm">
+                    Configure Integration
+                </a>
             </div>
         @endif
     @endif
