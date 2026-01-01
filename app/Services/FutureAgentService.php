@@ -5,20 +5,21 @@ namespace App\Services;
 use App\Models\Event;
 use App\Models\User;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use JsonException;
 
 class FutureAgentService
 {
     public function __construct(
         protected WeatherService $weatherService,
-        protected AIService $aiService
+        protected AssistantPromptingService $prompting
     ) {}
 
     /**
      * Generate future-looking insights combining calendar + weather
      *
-     * @param  User  $user
      * @param  int  $hoursAhead  How many hours ahead to analyze (default 48)
      * @return array Agent response with insights
      */
@@ -49,21 +50,21 @@ class FutureAgentService
         // Build prompt for AI analysis
         $prompt = $this->buildFuturePrompt($user, $upcomingEvents, $weatherForecast, $hoursAhead);
 
-        // Call AI service
+        // Call AI service via AssistantPromptingService
         try {
-            $response = $this->aiService->chat([
-                [
-                    'role' => 'system',
-                    'content' => $this->getSystemPrompt(),
+            $fullPrompt = $this->getSystemPrompt() . "\n\n" . $prompt;
+
+            $response = $this->prompting->generateResponse($fullPrompt, [
+                'model' => config('services.openai.models.gpt4o'),
+                'user_id' => $user->id,
+                'context' => [
+                    'prompt_type' => 'future_insights',
+                    'mode' => 'future',
                 ],
-                [
-                    'role' => 'user',
-                    'content' => $prompt,
-                ],
-            ], model: 'gpt4o');
+            ]);
 
             return $this->parseAgentResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Future agent AI call failed', [
                 'error' => $e->getMessage(),
                 'user_id' => $user->id,
@@ -274,7 +275,7 @@ SYSTEM;
 
         try {
             return json_decode($cleaned, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
+        } catch (JsonException $e) {
             Log::warning('Failed to parse future agent JSON response', [
                 'error' => $e->getMessage(),
                 'response' => substr($response, 0, 500),

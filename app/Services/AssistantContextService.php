@@ -526,8 +526,8 @@ class AssistantContextService
     {
         // Filter empty Obsidian daynotes
         if ($event->service === 'obsidian' && $event->action === 'modified_note') {
-            $title = $event->metadata['title'] ?? '';
-            $content = $event->metadata['content'] ?? '';
+            $title = $event->event_metadata['title'] ?? '';
+            $content = $event->event_metadata['content'] ?? '';
 
             // Exclude if title looks like a daynote (YYYY-MM-DD format) and content is empty/minimal
             if (preg_match('/^\d{4}-\d{2}-\d{2}/', $title)) {

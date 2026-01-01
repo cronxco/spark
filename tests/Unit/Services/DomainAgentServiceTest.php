@@ -79,7 +79,7 @@ class DomainAgentServiceTest extends TestCase
         $prompt = $method->invoke($this->service, 'health');
 
         $this->assertStringContainsString('Health Domain Agent', $prompt);
-        $this->assertStringContainsString('health coach', $prompt);
+        $this->assertStringContainsString('performance coaching', $prompt);
         $this->assertStringContainsString('sleep', $prompt);
         $this->assertStringContainsString('HRV', $prompt);
     }
@@ -94,8 +94,8 @@ class DomainAgentServiceTest extends TestCase
         $prompt = $method->invoke($this->service, 'money');
 
         $this->assertStringContainsString('Money Domain Agent', $prompt);
-        $this->assertStringContainsString('spending patterns', $prompt);
-        $this->assertStringContainsString('matter-of-fact', $prompt);
+        $this->assertStringContainsString('financial issues', $prompt);
+        $this->assertStringContainsString('Direct and factual', $prompt);
     }
 
     /** @test */
@@ -136,8 +136,8 @@ class DomainAgentServiceTest extends TestCase
         $prompt = $method->invoke($this->service, 'online');
 
         $this->assertStringContainsString('Online Domain Agent', $prompt);
-        $this->assertStringContainsString('productivity', $prompt);
-        $this->assertStringContainsString('Todoist', $prompt);
+        $this->assertStringContainsString('project momentum', $prompt);
+        $this->assertStringContainsString('blockers', $prompt);
     }
 
     /** @test */

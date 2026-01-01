@@ -705,7 +705,7 @@ class AssistantContextServiceTest extends TestCase
             'service' => 'obsidian',
             'action' => 'modified_note',
             'time' => now(),
-            'metadata' => [
+            'event_metadata' => [
                 'title' => '2024-01-15',
                 'content' => '<p></p>', // Empty content
             ],
@@ -717,7 +717,7 @@ class AssistantContextServiceTest extends TestCase
             'service' => 'obsidian',
             'action' => 'modified_note',
             'time' => now(),
-            'metadata' => [
+            'event_metadata' => [
                 'title' => '2024-01-16',
                 'content' => '<p>This is a substantial note with meaningful content about my day and thoughts.</p>',
             ],
@@ -744,7 +744,7 @@ class AssistantContextServiceTest extends TestCase
             'service' => 'obsidian',
             'action' => 'modified_note',
             'time' => now(),
-            'metadata' => [
+            'event_metadata' => [
                 'title' => 'Outline - My Notes',
                 'content' => 'Auto-generated outline structure',
             ],
@@ -756,7 +756,7 @@ class AssistantContextServiceTest extends TestCase
             'service' => 'obsidian',
             'action' => 'modified_note',
             'time' => now(),
-            'metadata' => [
+            'event_metadata' => [
                 'title' => 'My Research Notes',
                 'content' => 'Important research findings',
             ],
@@ -782,7 +782,7 @@ class AssistantContextServiceTest extends TestCase
             'service' => 'obsidian',
             'action' => 'modified_note',
             'time' => now(),
-            'metadata' => [
+            'event_metadata' => [
                 'title' => '2024-01-15',
                 'content' => '<p>Today was productive. I worked on the new feature and made significant progress. Had a great conversation with the team about architecture.</p>',
             ],

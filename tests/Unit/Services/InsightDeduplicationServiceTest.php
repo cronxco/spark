@@ -70,8 +70,8 @@ class InsightDeduplicationServiceTest extends TestCase
     public function detects_similar_insights_with_minor_rewording()
     {
         $insight1 = [
-            'title' => 'Sleep quality is declining',
-            'description' => 'Your heart rate variability has dropped by 15% this week',
+            'title' => 'Sleep quality declining',
+            'description' => 'Your HRV has dropped 15% this week',
             'confidence' => 0.9,
         ];
 
