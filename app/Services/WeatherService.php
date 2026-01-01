@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -22,8 +23,6 @@ class WeatherService
     /**
      * Get weather forecast for a location
      *
-     * @param  float  $latitude
-     * @param  float  $longitude
      * @param  int  $hoursAhead  How many hours ahead to fetch (max 168 = 7 days)
      * @return array|null Weather forecast data or null on failure
      */
@@ -70,7 +69,7 @@ class WeatherService
                     'forecasts' => $forecasts,
                     'fetched_at' => now()->toISOString(),
                 ];
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error('Weather service error', [
                     'error' => $e->getMessage(),
                     'latitude' => $latitude,
@@ -80,6 +79,65 @@ class WeatherService
                 return null;
             }
         });
+    }
+
+    /**
+     * Determine if weather is "notable" (worth mentioning to user)
+     */
+    public function isNotableWeather(array $forecast): bool
+    {
+        // Notable conditions:
+        // - Precipitation probability > 50%
+        // - Heavy rain/snow
+        // - Thunder
+        // - Temperature extremes (< 2°C or > 30°C)
+        // - High wind (> 25mph)
+        // - Poor visibility (< 1000m)
+
+        if (($forecast['precipitation_probability'] ?? 0) > 50) {
+            return true;
+        }
+
+        if (str_contains(strtolower($forecast['weather_type'] ?? ''), 'heavy')) {
+            return true;
+        }
+
+        if (str_contains(strtolower($forecast['weather_type'] ?? ''), 'thunder')) {
+            return true;
+        }
+
+        $temp = $forecast['temperature'] ?? null;
+        if ($temp !== null && ($temp < 2 || $temp > 30)) {
+            return true;
+        }
+
+        if (($forecast['wind_speed'] ?? 0) > 25) {
+            return true;
+        }
+
+        if (($forecast['visibility'] ?? PHP_INT_MAX) < 1000) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get a summary of notable weather conditions
+     */
+    public function getNotableWeatherSummary(array $forecasts): ?array
+    {
+        $notable = array_filter($forecasts, fn ($f) => $this->isNotableWeather($f));
+
+        if (empty($notable)) {
+            return null;
+        }
+
+        return [
+            'has_notable_weather' => true,
+            'notable_periods' => $notable,
+            'summary' => $this->generateWeatherSummary($notable),
+        ];
     }
 
     /**
@@ -159,65 +217,6 @@ class WeatherService
             30 => 'Thunder',
             default => "Unknown code: {$code}",
         };
-    }
-
-    /**
-     * Determine if weather is "notable" (worth mentioning to user)
-     */
-    public function isNotableWeather(array $forecast): bool
-    {
-        // Notable conditions:
-        // - Precipitation probability > 50%
-        // - Heavy rain/snow
-        // - Thunder
-        // - Temperature extremes (< 2°C or > 30°C)
-        // - High wind (> 25mph)
-        // - Poor visibility (< 1000m)
-
-        if (($forecast['precipitation_probability'] ?? 0) > 50) {
-            return true;
-        }
-
-        if (str_contains(strtolower($forecast['weather_type'] ?? ''), 'heavy')) {
-            return true;
-        }
-
-        if (str_contains(strtolower($forecast['weather_type'] ?? ''), 'thunder')) {
-            return true;
-        }
-
-        $temp = $forecast['temperature'] ?? null;
-        if ($temp !== null && ($temp < 2 || $temp > 30)) {
-            return true;
-        }
-
-        if (($forecast['wind_speed'] ?? 0) > 25) {
-            return true;
-        }
-
-        if (($forecast['visibility'] ?? PHP_INT_MAX) < 1000) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Get a summary of notable weather conditions
-     */
-    public function getNotableWeatherSummary(array $forecasts): ?array
-    {
-        $notable = array_filter($forecasts, fn ($f) => $this->isNotableWeather($f));
-
-        if (empty($notable)) {
-            return null;
-        }
-
-        return [
-            'has_notable_weather' => true,
-            'notable_periods' => $notable,
-            'summary' => $this->generateWeatherSummary($notable),
-        ];
     }
 
     /**

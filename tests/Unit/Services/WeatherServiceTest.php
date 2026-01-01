@@ -83,7 +83,7 @@ class WeatherServiceTest extends TestCase
             ->with(
                 'weather:forecast:51.5074:-0.1278:24',
                 3600,
-                \Mockery::type('Closure')
+                Mockery::type('Closure')
             )
             ->andReturn(['cached' => true]);
 

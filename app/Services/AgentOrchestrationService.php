@@ -1395,9 +1395,6 @@ PROMPT;
     /**
      * Deduplicate insights using the deduplication service
      *
-     * @param  int  $userId
-     * @param  string  $domain
-     * @param  array  $insights
      * @return array Deduplicated insights
      */
     protected function deduplicateInsights(int $userId, string $domain, array $insights): array

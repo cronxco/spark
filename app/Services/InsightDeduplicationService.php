@@ -108,10 +108,62 @@ class InsightDeduplicationService
     }
 
     /**
+     * Clear all seen insights for a user (useful for testing)
+     *
+     * @param  string|null  $domain  Specific domain or null for all domains
+     */
+    public function clearSeenInsights(int $userId, ?string $domain = null): void
+    {
+        if ($domain) {
+            Cache::forget($this->getCacheKey($userId, $domain));
+        } else {
+            // Clear all domains
+            $domains = ['health', 'money', 'media', 'knowledge', 'online', 'future', 'cross_domain'];
+            foreach ($domains as $dom) {
+                Cache::forget($this->getCacheKey($userId, $dom));
+            }
+        }
+    }
+
+    /**
+     * Get deduplication statistics for a user
+     */
+    public function getStatistics(int $userId): array
+    {
+        $domains = ['health', 'money', 'media', 'knowledge', 'online', 'future', 'cross_domain'];
+        $stats = [];
+
+        foreach ($domains as $domain) {
+            $seenInsights = $this->getSeenInsights($userId, $domain);
+            $stats[$domain] = count($seenInsights);
+        }
+
+        $stats['total'] = array_sum($stats);
+
+        return $stats;
+    }
+
+    /**
+     * Set custom similarity threshold
+     *
+     * @param  float  $threshold  Value between 0.0 and 1.0
+     */
+    public function setSimilarityThreshold(float $threshold): void
+    {
+        $this->similarityThreshold = max(0.0, min(1.0, $threshold));
+    }
+
+    /**
+     * Get current similarity threshold
+     */
+    public function getSimilarityThreshold(): float
+    {
+        return $this->similarityThreshold;
+    }
+
+    /**
      * Get all seen insights for a user/domain
      *
-     * @param  int  $userId
-     * @param  string  $domain
      * @return array Keyed by signature
      */
     protected function getSeenInsights(int $userId, string $domain): array
@@ -125,9 +177,6 @@ class InsightDeduplicationService
      * Generate a unique signature/hash for an insight
      *
      * This uses normalized text to create a consistent hash
-     *
-     * @param  array  $insight
-     * @return string
      */
     protected function generateSignature(array $insight): string
     {
@@ -141,10 +190,6 @@ class InsightDeduplicationService
      * Calculate text similarity between two strings using Levenshtein distance
      *
      * Returns a similarity score between 0.0 (completely different) and 1.0 (identical)
-     *
-     * @param  string  $text1
-     * @param  string  $text2
-     * @return float
      */
     protected function calculateSimilarity(string $text1, string $text2): float
     {
@@ -186,10 +231,6 @@ class InsightDeduplicationService
 
     /**
      * Calculate similarity using word overlap (for longer texts)
-     *
-     * @param  string  $text1
-     * @param  string  $text2
-     * @return float
      */
     protected function calculateWordSimilarity(string $text1, string $text2): float
     {
@@ -213,9 +254,6 @@ class InsightDeduplicationService
 
     /**
      * Normalize text for comparison
-     *
-     * @param  string  $text
-     * @return string
      */
     protected function normalizeText(string $text): string
     {
@@ -233,73 +271,9 @@ class InsightDeduplicationService
 
     /**
      * Generate cache key for user/domain insights
-     *
-     * @param  int  $userId
-     * @param  string  $domain
-     * @return string
      */
     protected function getCacheKey(int $userId, string $domain): string
     {
         return "{$this->cachePrefix}:{$userId}:{$domain}";
-    }
-
-    /**
-     * Clear all seen insights for a user (useful for testing)
-     *
-     * @param  int  $userId
-     * @param  string|null  $domain  Specific domain or null for all domains
-     */
-    public function clearSeenInsights(int $userId, ?string $domain = null): void
-    {
-        if ($domain) {
-            Cache::forget($this->getCacheKey($userId, $domain));
-        } else {
-            // Clear all domains
-            $domains = ['health', 'money', 'media', 'knowledge', 'online', 'future', 'cross_domain'];
-            foreach ($domains as $dom) {
-                Cache::forget($this->getCacheKey($userId, $dom));
-            }
-        }
-    }
-
-    /**
-     * Get deduplication statistics for a user
-     *
-     * @param  int  $userId
-     * @return array
-     */
-    public function getStatistics(int $userId): array
-    {
-        $domains = ['health', 'money', 'media', 'knowledge', 'online', 'future', 'cross_domain'];
-        $stats = [];
-
-        foreach ($domains as $domain) {
-            $seenInsights = $this->getSeenInsights($userId, $domain);
-            $stats[$domain] = count($seenInsights);
-        }
-
-        $stats['total'] = array_sum($stats);
-
-        return $stats;
-    }
-
-    /**
-     * Set custom similarity threshold
-     *
-     * @param  float  $threshold  Value between 0.0 and 1.0
-     */
-    public function setSimilarityThreshold(float $threshold): void
-    {
-        $this->similarityThreshold = max(0.0, min(1.0, $threshold));
-    }
-
-    /**
-     * Get current similarity threshold
-     *
-     * @return float
-     */
-    public function getSimilarityThreshold(): float
-    {
-        return $this->similarityThreshold;
     }
 }

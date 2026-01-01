@@ -102,7 +102,7 @@ new class extends Component {
         $user = Auth::user();
 
         // Load latest digest
-        $latestDigestBlock = \App\Models\Block::where('block_type', 'flint_digest')
+        $latestDigestBlock = App\Models\Block::where('block_type', 'flint_digest')
             ->whereHas('event', function ($query) use ($user) {
                 $query->where('user_id', $user->id)
                     ->where('service', 'flint');
@@ -120,7 +120,7 @@ new class extends Component {
         }
 
         // Load archive (past 30 days, excluding latest)
-        $this->digestArchive = \App\Models\Block::where('block_type', 'flint_digest')
+        $this->digestArchive = App\Models\Block::where('block_type', 'flint_digest')
             ->whereHas('event', function ($query) use ($user) {
                 $query->where('user_id', $user->id)
                     ->where('service', 'flint');
