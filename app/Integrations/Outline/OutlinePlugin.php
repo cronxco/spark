@@ -255,8 +255,8 @@ class OutlinePlugin extends ManualPlugin
                         ],
                     ],
                     [
-                        'key' => 'generate_year',
-                        'name' => 'Generate Day Notes for Year',
+                        'key' => 'generate_current_year',
+                        'name' => 'Generate Day Notes for Current Year',
                         'configuration' => [
                             'task_mode' => 'job',
                             'task_job_class' => 'App\\Jobs\\Outline\\GenerateDayNotes',
@@ -265,7 +265,21 @@ class OutlinePlugin extends ManualPlugin
                             'use_schedule' => false,
                             'schedule_times' => [],
                             'schedule_timezone' => 'UTC',
-                            'paused' => false,
+                            'paused' => true,
+                        ],
+                    ],
+                    [
+                        'key' => 'generate_next_year',
+                        'name' => 'Generate Day Notes for Next Year',
+                        'configuration' => [
+                            'task_mode' => 'job',
+                            'task_job_class' => 'App\\Jobs\\Outline\\GenerateDayNotes',
+                            'task_payload' => ['year' => (int) date('Y') + 1],
+                            'task_queue' => 'pull',
+                            'use_schedule' => false,
+                            'schedule_times' => [],
+                            'schedule_timezone' => 'UTC',
+                            'paused' => true,
                         ],
                     ],
                 ],

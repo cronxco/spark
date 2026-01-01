@@ -8,6 +8,14 @@
                 <x-slot:actions>
                     <!-- Desktop: Full buttons -->
                     <div class="hidden sm:flex gap-2">
+                        @if ($integration->instance_type === 'task')
+                        <x-button
+                            label="Run Now"
+                            wire:click="triggerIntegrationUpdate"
+                            class="btn-primary"
+                            icon="fas.play"
+                        />
+                        @endif
                         <x-button
                             label="Configure"
                             link="{{ route('integrations.configure', $integration->id) }}"
@@ -29,6 +37,9 @@
                                     <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                                 </x-button>
                             </x-slot:trigger>
+                            @if ($integration->instance_type === 'task')
+                            <x-menu-item title="Run Now" icon="fas.play" wire:click="triggerIntegrationUpdate" />
+                            @endif
                             <x-menu-item title="Configure" icon="fas.gear" link="{{ route('integrations.configure', $integration->id) }}" />
                             <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="fas.sliders" wire:click="toggleSidebar" />
                         </x-dropdown>

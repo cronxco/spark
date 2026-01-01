@@ -109,6 +109,7 @@ class IntegrationDetails extends Component
         $this->integration->trigger();
 
         $this->dispatch('integration-update-triggered');
+        $this->dispatch('mary-toast', message: 'Task queued for execution', type: 'success');
     }
 
     public function toggleIntegrationPause(): void

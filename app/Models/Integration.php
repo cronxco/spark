@@ -457,6 +457,19 @@ class Integration extends Model
     }
 
     /**
+     * Manually trigger this integration to run immediately
+     */
+    public function trigger(): void
+    {
+        $config = $this->configuration ?? [];
+        $queue = (string) ($config['task_queue'] ?? 'pull');
+
+        \App\Jobs\RunIntegrationTask::dispatch($this)->onQueue($queue);
+
+        $this->update(['last_triggered_at' => now()]);
+    }
+
+    /**
      * Check if this integration is currently being processed
      */
     public function isProcessing(): bool

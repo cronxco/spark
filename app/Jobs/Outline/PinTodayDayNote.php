@@ -68,10 +68,21 @@ class PinTodayDayNote implements ShouldQueue
             'url' => $todayDoc['url'] ?? null,
         ]);
 
-        // Pins
+        // Pins - the API returns both pins and documents
         $pinsData = $api->listPins(100);
-        $pins = (array) ($pinsData['pins'] ?? ($pinsData['data'] ?? []));
+        $pins = (array) ($pinsData['pins'] ?? ($pinsData['data']['pins'] ?? []));
+        $documents = (array) ($pinsData['documents'] ?? ($pinsData['data']['documents'] ?? []));
 
+        // Build a map of document IDs to document data for efficient lookup
+        $docMap = [];
+        foreach ($documents as $doc) {
+            $docId = $doc['id'] ?? null;
+            if ($docId) {
+                $docMap[$docId] = $doc;
+            }
+        }
+
+        // Build pin map
         $pinMap = [];
         foreach ($pins as $pin) {
             $docId = $pin['documentId'] ?? null;
@@ -83,6 +94,7 @@ class PinTodayDayNote implements ShouldQueue
 
         Log::info('PinTodayDayNote: loaded pins', [
             'pin_count' => is_countable($pins) ? count($pins) : 0,
+            'doc_count' => count($docMap),
             'mapped' => count($pinMap),
         ]);
 
@@ -93,15 +105,25 @@ class PinTodayDayNote implements ShouldQueue
             }
 
             try {
-                // Get minimal document info to check collection without triggering full processing
-                $docInfo = $api->getDocument($docId);
-                $doc = $docInfo['data'] ?? $docInfo;
+                // Use the document data from the pins API response
+                $doc = $docMap[$docId] ?? null;
+
+                // If document wasn't included in pins response, fetch it
+                if (! $doc) {
+                    Log::debug('PinTodayDayNote: document not in pins response, fetching', [
+                        'doc_id' => $docId,
+                    ]);
+                    $docInfo = $api->getDocument($docId);
+                    $doc = $docInfo['data'] ?? $docInfo;
+                }
+
                 $docCollectionId = $doc['collectionId'] ?? null;
 
                 if ($docCollectionId === $collectionId) {
                     Log::debug('PinTodayDayNote: unpinning previous day note', [
                         'doc_id' => $docId,
                         'pin_id' => $pinId,
+                        'doc_title' => $doc['title'] ?? 'Unknown',
                     ]);
 
                     $deleteResult = $api->deletePin($pinId);
