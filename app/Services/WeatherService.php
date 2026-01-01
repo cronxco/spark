@@ -229,13 +229,14 @@ class WeatherService
         foreach ($notableForecasts as $forecast) {
             $time = Carbon::parse($forecast['time']);
             $condition = $forecast['weather_type'];
+            $temp = $forecast['temperature'] ?? null;
 
             if (($forecast['precipitation_probability'] ?? 0) > 50) {
                 $conditions[] = "{$condition} at {$time->format('H:i')} ({$forecast['precipitation_probability']}% chance)";
-            } elseif ($forecast['temperature'] < 2) {
-                $conditions[] = "Freezing conditions at {$time->format('H:i')} ({$forecast['temperature']}°C)";
-            } elseif ($forecast['temperature'] > 30) {
-                $conditions[] = "Hot weather at {$time->format('H:i')} ({$forecast['temperature']}°C)";
+            } elseif ($temp !== null && $temp < 2) {
+                $conditions[] = "Freezing conditions at {$time->format('H:i')} ({$temp}°C)";
+            } elseif ($temp !== null && $temp > 30) {
+                $conditions[] = "Hot weather at {$time->format('H:i')} ({$temp}°C)";
             } elseif (($forecast['wind_speed'] ?? 0) > 25) {
                 $conditions[] = "High winds at {$time->format('H:i')} ({$forecast['wind_speed']}mph)";
             }

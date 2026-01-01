@@ -95,7 +95,7 @@ class AgentOrchestrationService
                     'user_id' => $user->id,
                     'domain' => $domain,
                     'duration_seconds' => round($domainDuration, 2),
-                    'result_type' => $results[$domain] === null ? 'null' : (is_array($results[$domain]) ? 'array(' . count($results[$domain]) . ' items)' : gettype($results[$domain])),
+                    'result_type' => $results[$domain] === null ? 'null' : (is_array($results[$domain]) ? 'array('.count($results[$domain]).' items)' : gettype($results[$domain])),
                 ]);
 
                 $previousDomain = $domain;
@@ -124,7 +124,7 @@ class AgentOrchestrationService
             Log::info('[Flint] [ORCHESTRATION] Cross-domain synthesizer completed', [
                 'user_id' => $user->id,
                 'duration_seconds' => round($synthesizerDuration, 2),
-                'result_type' => $results['cross_domain'] === null ? 'null' : (is_array($results['cross_domain']) ? 'array(' . count($results['cross_domain']) . ' items)' : gettype($results['cross_domain'])),
+                'result_type' => $results['cross_domain'] === null ? 'null' : (is_array($results['cross_domain']) ? 'array('.count($results['cross_domain']).' items)' : gettype($results['cross_domain'])),
             ]);
 
             // Handoff from synthesizer to action prioritization
@@ -148,7 +148,7 @@ class AgentOrchestrationService
             Log::info('[Flint] [ORCHESTRATION] Action prioritization completed', [
                 'user_id' => $user->id,
                 'duration_seconds' => round($actionDuration, 2),
-                'result_type' => $results['actions'] === null ? 'null' : (is_array($results['actions']) ? 'array(' . count($results['actions']) . ' items)' : gettype($results['actions'])),
+                'result_type' => $results['actions'] === null ? 'null' : (is_array($results['actions']) ? 'array('.count($results['actions']).' items)' : gettype($results['actions'])),
             ]);
 
             // Update last execution time
@@ -169,7 +169,7 @@ class AgentOrchestrationService
                         return 'null';
                     }
                     if (is_array($r)) {
-                        return 'array(' . count($r) . ' items)';
+                        return 'array('.count($r).' items)';
                     }
 
                     return gettype($r);
@@ -464,9 +464,14 @@ class AgentOrchestrationService
                 // Update insights array with deduplicated version
                 $insights['insights'] = $deduplicatedInsights;
 
+                // Get or create FlintEvent if we have insights or urgent flags
+                $flintEvent = null;
+                if (! empty($deduplicatedInsights) || ! empty($insights['urgent_flags'])) {
+                    $flintEvent = $this->blockCreation->getOrCreateFlintEvent($user);
+                }
+
                 // Only create blocks if we have non-duplicate insights
                 if (! empty($deduplicatedInsights)) {
-                    $flintEvent = $this->blockCreation->getOrCreateFlintEvent($user);
                     $createdBlocks = $this->blockCreation->createDomainInsightBlocks(
                         $user,
                         $domain,
@@ -964,8 +969,8 @@ PROMPT;
             $observationsText = "## Cross-Domain Observations\n\n";
             foreach ($observations as $obs) {
                 $observationsText .= "- **{$obs['observation']}**\n";
-                $observationsText .= '  Affects: ' . implode(', ', $obs['domains']) . "\n";
-                $observationsText .= '  Confidence: ' . round($obs['confidence'] * 100) . "%\n\n";
+                $observationsText .= '  Affects: '.implode(', ', $obs['domains'])."\n";
+                $observationsText .= '  Confidence: '.round($obs['confidence'] * 100)."%\n\n";
             }
         }
 
@@ -976,7 +981,7 @@ PROMPT;
             foreach ($urgentFlags as $flag) {
                 $urgentText .= "- **{$flag['reason']}** (Domain: {$flag['domain']})\n";
                 if (! empty($flag['context'])) {
-                    $urgentText .= '  Context: ' . json_encode($flag['context']) . "\n";
+                    $urgentText .= '  Context: '.json_encode($flag['context'])."\n";
                 }
                 $urgentText .= "\n";
             }
@@ -1250,11 +1255,11 @@ PROMPT;
                         array_keys($topActions),
                         $topActions
                     );
-                    $dataText .= implode(', ', $actionStrings) . "\n";
+                    $dataText .= implode(', ', $actionStrings)."\n";
                 }
 
                 if (! empty($weekData['services'])) {
-                    $dataText .= '- Services: ' . implode(', ', $weekData['services']) . "\n";
+                    $dataText .= '- Services: '.implode(', ', $weekData['services'])."\n";
                 }
 
                 $dataText .= "\n";

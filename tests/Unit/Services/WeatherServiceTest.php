@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Services\WeatherService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 use Tests\TestCase;
 
 class WeatherServiceTest extends TestCase
