@@ -290,6 +290,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('migrations', [App\Http\Controllers\Admin\MigrationsController::class, 'index'])->name('migrations.index');
     Route::post('migrations/oura', [App\Http\Controllers\Admin\MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
 
+    Volt::route('daynotes', 'admin.daynotes')->name('daynotes.index');
     Volt::route('events', 'admin.events')->name('events.index');
     Volt::route('objects', 'admin.objects')->name('objects.index');
     Volt::route('blocks', 'admin.blocks')->name('blocks.index');

@@ -7,17 +7,29 @@ use App\Models\Integration;
 use Carbon\CarbonImmutable;
 use Exception;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class PinTodayDayNote implements ShouldQueue
+class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $uniqueFor = 3600; // 1 hour
+
     public function __construct(public Integration|string $integration) {}
+
+    public function uniqueId(): string
+    {
+        $integration = $this->integration instanceof Integration
+            ? $this->integration
+            : Integration::findOrFail($this->integration);
+
+        return 'pin-today-' . $integration->id . '-' . now('UTC')->format('Y-m-d');
+    }
 
     public function handle(): void
     {
@@ -68,94 +80,140 @@ class PinTodayDayNote implements ShouldQueue
             'url' => $todayDoc['url'] ?? null,
         ]);
 
-        // Pins
+        // Get all pins ONCE
         $pinsData = $api->listPins(100);
         $pins = (array) ($pinsData['pins'] ?? ($pinsData['data'] ?? []));
 
-        $pinMap = [];
+        Log::info('PinTodayDayNote: loaded pins', [
+            'total_pins' => count($pins),
+        ]);
+
+        // Build map using embedded document data (NO extra getDocument calls!)
+        $todayIsAlreadyPinned = false;
+        $daynotePinsToUnpin = [];
+
         foreach ($pins as $pin) {
             $docId = $pin['documentId'] ?? null;
             $pinId = $pin['id'] ?? null;
-            if ($docId && $pinId) {
-                $pinMap[$docId] = $pinId;
-            }
-        }
+            $doc = $pin['document'] ?? null; // Use embedded data!
 
-        Log::info('PinTodayDayNote: loaded pins', [
-            'pin_count' => is_countable($pins) ? count($pins) : 0,
-            'mapped' => count($pinMap),
-        ]);
-
-        // Unpin all pinned docs that belong to the day notes collection (except today's)
-        foreach ($pinMap as $docId => $pinId) {
-            if (($todayDoc['id'] ?? null) === $docId) {
+            if (! $docId || ! $pinId || ! $doc) {
                 continue;
             }
 
-            try {
-                // Get minimal document info to check collection without triggering full processing
-                $docInfo = $api->getDocument($docId);
-                $doc = $docInfo['data'] ?? $docInfo;
-                $docCollectionId = $doc['collectionId'] ?? null;
-
-                if ($docCollectionId === $collectionId) {
-                    Log::debug('PinTodayDayNote: unpinning previous day note', [
+            // Pattern match daynote titles: "YYYY-MM-DD: DayName"
+            $docTitle = $doc['title'] ?? '';
+            if (preg_match('/^\d{4}-\d{2}-\d{2}: \w+$/', $docTitle)) {
+                if ($docId === ($todayDoc['id'] ?? null)) {
+                    $todayIsAlreadyPinned = true;
+                    Log::info('PinTodayDayNote: today note already pinned', [
                         'doc_id' => $docId,
-                        'pin_id' => $pinId,
+                        'title' => $docTitle,
                     ]);
-
-                    $deleteResult = $api->deletePin($pinId);
-
-                    // Verify the pin was actually deleted
-                    if ($deleteResult && ! isset($deleteResult['error'])) {
-                        Log::debug('PinTodayDayNote: successfully unpinned', [
-                            'doc_id' => $docId,
-                            'pin_id' => $pinId,
-                        ]);
-                    } else {
-                        Log::warning('PinTodayDayNote: failed to unpin', [
-                            'doc_id' => $docId,
-                            'pin_id' => $pinId,
-                            'result' => $deleteResult,
-                        ]);
-                    }
                 } else {
-                    Log::debug('PinTodayDayNote: keeping pin (different collection)', [
-                        'doc_id' => $docId,
+                    $daynotePinsToUnpin[$docId] = [
                         'pin_id' => $pinId,
-                        'doc_collection_id' => $docCollectionId,
-                    ]);
+                        'title' => $docTitle,
+                    ];
                 }
-            } catch (Exception $e) {
-                Log::error('PinTodayDayNote: error processing pin', [
+            }
+        }
+
+        Log::info('PinTodayDayNote: reconciliation complete', [
+            'today_already_pinned' => $todayIsAlreadyPinned,
+            'daynotes_to_unpin' => count($daynotePinsToUnpin),
+        ]);
+
+        $maxPinsAllowed = 10;
+
+        // Unpin old daynotes
+        $unpinnedCount = 0;
+        foreach ($daynotePinsToUnpin as $docId => $data) {
+            try {
+                $api->deletePin($data['pin_id']);
+                $unpinnedCount++;
+                Log::debug('PinTodayDayNote: unpinned daynote', [
                     'doc_id' => $docId,
-                    'pin_id' => $pinId,
+                    'pin_id' => $data['pin_id'],
+                    'title' => $data['title'],
+                ]);
+            } catch (Exception $e) {
+                Log::warning('PinTodayDayNote: failed to unpin daynote', [
+                    'doc_id' => $docId,
+                    'pin_id' => $data['pin_id'],
+                    'title' => $data['title'],
                     'error' => $e->getMessage(),
                 ]);
                 // Continue with other pins even if one fails
             }
         }
 
-        // Pin today's note
-        try {
-            $pinResult = $api->createPin($todayDoc['id']);
+        Log::info('PinTodayDayNote: unpinning complete', [
+            'unpinned_count' => $unpinnedCount,
+            'attempted_count' => count($daynotePinsToUnpin),
+        ]);
 
-            if ($pinResult && ! isset($pinResult['error'])) {
-                Log::info('PinTodayDayNote: successfully pinned today note', [
+        // Re-count current pins after unpinning
+        $currentPinCount = count($pins) - $unpinnedCount;
+
+        // Check pin limit after unpinning
+        if ($currentPinCount >= $maxPinsAllowed && ! $todayIsAlreadyPinned) {
+            Log::error('PinTodayDayNote: at Outline pin limit, cannot pin today', [
+                'current_pins' => $currentPinCount,
+                'max_allowed' => $maxPinsAllowed,
+            ]);
+
+            return;
+        }
+
+        // Only pin if not already pinned
+        if (! $todayIsAlreadyPinned) {
+            try {
+                $pinResult = $api->createPin($todayDoc['id']);
+
+                if ($pinResult && ! isset($pinResult['error'])) {
+                    Log::info('PinTodayDayNote: successfully pinned today note', [
+                        'doc_id' => $todayDoc['id'] ?? null,
+                        'pin_id' => $pinResult['id'] ?? null,
+                    ]);
+
+                    // Track last pin metadata
+                    $integration->update([
+                        'configuration' => array_merge($integration->configuration ?? [], [
+                            'last_pin_attempt_at' => now()->toISOString(),
+                            'last_pin_success_at' => now()->toISOString(),
+                            'last_pinned_doc_id' => $todayDoc['id'],
+                            'last_pinned_doc_title' => $title,
+                        ]),
+                    ]);
+                } else {
+                    Log::error('PinTodayDayNote: failed to pin today note', [
+                        'doc_id' => $todayDoc['id'] ?? null,
+                        'result' => $pinResult,
+                    ]);
+
+                    // Track failed attempt
+                    $integration->update([
+                        'configuration' => array_merge($integration->configuration ?? [], [
+                            'last_pin_attempt_at' => now()->toISOString(),
+                        ]),
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::error('PinTodayDayNote: error pinning today note', [
                     'doc_id' => $todayDoc['id'] ?? null,
-                    'pin_id' => $pinResult['id'] ?? null,
+                    'error' => $e->getMessage(),
                 ]);
-            } else {
-                Log::error('PinTodayDayNote: failed to pin today note', [
-                    'doc_id' => $todayDoc['id'] ?? null,
-                    'result' => $pinResult,
+
+                // Track failed attempt
+                $integration->update([
+                    'configuration' => array_merge($integration->configuration ?? [], [
+                        'last_pin_attempt_at' => now()->toISOString(),
+                    ]),
                 ]);
             }
-        } catch (Exception $e) {
-            Log::error('PinTodayDayNote: error pinning today note', [
-                'doc_id' => $todayDoc['id'] ?? null,
-                'error' => $e->getMessage(),
-            ]);
+        } else {
+            Log::info('PinTodayDayNote: skipping pin (already pinned)');
         }
     }
 }

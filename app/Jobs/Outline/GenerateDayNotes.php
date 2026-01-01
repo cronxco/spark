@@ -3,6 +3,7 @@
 namespace App\Jobs\Outline;
 
 use App\Integrations\Outline\OutlineApi;
+use App\Models\ActionProgress;
 use App\Models\Integration;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +16,11 @@ class GenerateDayNotes implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Integration|string $integration, public int $year) {}
+    public function __construct(
+        public Integration|string $integration,
+        public int $year,
+        public ?string $progressId = null
+    ) {}
 
     public function handle(): void
     {
@@ -32,6 +37,11 @@ class GenerateDayNotes implements ShouldQueue
         $yearId = $yearDoc['data']['id'] ?? null;
 
         if (! $yearId) {
+            // Mark progress as failed
+            if ($this->progressId) {
+                ActionProgress::find($this->progressId)?->markFailed('Failed to create year document');
+            }
+
             return;
         }
 
@@ -55,6 +65,22 @@ class GenerateDayNotes implements ShouldQueue
             }
 
             Bus::chain($jobs->all())->onQueue('pull')->dispatch();
+
+            // Update progress after each month
+            if ($this->progressId) {
+                $progress = ActionProgress::find($this->progressId);
+                if ($progress) {
+                    $details = $progress->details ?? [];
+                    $details['completed_months'] = $i;
+                    $details['completed_days'] = ($details['completed_days'] ?? 0) + $daysInMonth;
+                    $progress->update(['details' => $details]);
+                }
+            }
+        }
+
+        // Mark as completed
+        if ($this->progressId) {
+            ActionProgress::find($this->progressId)?->markCompleted();
         }
     }
 }
