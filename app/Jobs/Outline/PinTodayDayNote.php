@@ -28,7 +28,7 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
             ? $this->integration
             : Integration::findOrFail($this->integration);
 
-        return 'pin-today-'.$integration->id.'-'.now('UTC')->format('Y-m-d');
+        return 'pin-today-' . $integration->id . '-' . now('UTC')->format('Y-m-d');
     }
 
     public function handle(): void
