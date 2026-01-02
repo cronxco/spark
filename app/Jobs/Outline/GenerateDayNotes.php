@@ -46,6 +46,9 @@ class GenerateDayNotes implements ShouldQueue
         }
 
         // Create 12 months with chained day creations
+        $totalDays = 0;
+        $batches = [];
+
         for ($i = 1; $i <= 12; $i++) {
             $monthNum = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
             $monthName = date('F', strtotime("{$this->year}-{$monthNum}-01"));
@@ -58,33 +61,51 @@ class GenerateDayNotes implements ShouldQueue
 
             $jobs = collect();
             $daysInMonth = cal_days_in_month(CAL_GREGORIAN, (int) $i, (int) $this->year);
+            $totalDays += $daysInMonth;
+
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $dayNum = str_pad((string) $d, 2, '0', STR_PAD_LEFT);
                 $dayName = date('l', strtotime("{$this->year}-{$monthNum}-{$dayNum}"));
                 $jobs->push(new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayName}", $collectionId, $monthId));
             }
 
-            Bus::batch($jobs->all())
+            $batch = Bus::batch($jobs->all())
+                ->name("Generate {$this->year}-{$monthNum} ({$monthName}) daynotes")
                 ->onQueue('pull')
-                ->allowFailures()
-                ->finally(function () use ($i, $daysInMonth) {
-                    // Update progress after each month batch completes
-                    if ($this->progressId) {
-                        $progress = ActionProgress::find($this->progressId);
-                        if ($progress) {
-                            $details = $progress->details ?? [];
-                            $details['completed_months'] = $i;
-                            $details['completed_days'] = ($details['completed_days'] ?? 0) + $daysInMonth;
-                            $progress->update(['details' => $details]);
-                        }
-                    }
-                })
-                ->dispatch();
+                ->allowFailures();
+
+            // Add progress tracking callback if progressId is set
+            if ($this->progressId) {
+                $isFinalMonth = ($i === 12);
+                $batch->then(function () use ($i, $daysInMonth, $isFinalMonth) {
+                    UpdateDayNoteProgress::dispatch(
+                        $this->progressId,
+                        $i,
+                        $daysInMonth,
+                        $isFinalMonth
+                    );
+                });
+            }
+
+            $batch->dispatch();
+
+            $batches[] = $batch;
         }
 
-        // Mark as completed
+        // Initialize progress tracking
         if ($this->progressId) {
-            ActionProgress::find($this->progressId)?->markCompleted();
+            $progress = ActionProgress::find($this->progressId);
+            if ($progress) {
+                $details = [
+                    'total_months' => 12,
+                    'total_days' => $totalDays,
+                    'completed_months' => 0,
+                    'completed_days' => 0,
+                    'batches_dispatched' => count($batches),
+                    'message' => 'Batches dispatched. Processing in background.',
+                ];
+                $progress->update(['details' => $details]);
+            }
         }
     }
 }

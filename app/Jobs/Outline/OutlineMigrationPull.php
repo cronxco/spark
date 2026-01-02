@@ -18,8 +18,11 @@ class OutlineMigrationPull extends BaseFetchJob
     use MigrationPauser;
 
     private int $offset;
+
     private int $limit;
+
     private array $context;
+
     private ?ActionProgress $progressRecord = null;
 
     public function __construct(Integration $integration, int $offset = 0, int $limit = 50, array $context = [])
