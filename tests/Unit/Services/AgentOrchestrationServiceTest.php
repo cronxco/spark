@@ -13,6 +13,8 @@ use App\Services\AssistantContextService;
 use App\Services\AssistantPromptingService;
 use App\Services\DomainAgentService;
 use App\Services\FlintBlockCreationService;
+use App\Services\FutureAgentService;
+use App\Services\InsightDeduplicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use ReflectionClass;
@@ -46,6 +48,8 @@ class AgentOrchestrationServiceTest extends TestCase
         $this->domainAgent = Mockery::mock(DomainAgentService::class);
         $this->blockCreation = Mockery::mock(FlintBlockCreationService::class);
         $this->contextService = Mockery::mock(AssistantContextService::class);
+        $this->futureAgent = Mockery::mock(FutureAgentService::class);
+        $this->deduplication = Mockery::mock(InsightDeduplicationService::class);
 
         $this->service = new AgentOrchestrationService(
             $this->workingMemory,
@@ -53,7 +57,9 @@ class AgentOrchestrationServiceTest extends TestCase
             $this->prompting,
             $this->domainAgent,
             $this->blockCreation,
-            $this->contextService
+            $this->contextService,
+            $this->futureAgent,
+            $this->deduplication
         );
     }
 

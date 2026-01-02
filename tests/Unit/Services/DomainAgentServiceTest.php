@@ -79,7 +79,7 @@ class DomainAgentServiceTest extends TestCase
         $prompt = $method->invoke($this->service, 'health');
 
         $this->assertStringContainsString('Health Domain Agent', $prompt);
-        $this->assertStringContainsString('health coach', $prompt);
+        $this->assertStringContainsString('performance coaching', $prompt);
         $this->assertStringContainsString('sleep', $prompt);
         $this->assertStringContainsString('HRV', $prompt);
     }
@@ -94,8 +94,8 @@ class DomainAgentServiceTest extends TestCase
         $prompt = $method->invoke($this->service, 'money');
 
         $this->assertStringContainsString('Money Domain Agent', $prompt);
-        $this->assertStringContainsString('spending patterns', $prompt);
-        $this->assertStringContainsString('matter-of-fact', $prompt);
+        $this->assertStringContainsString('financial issues', $prompt);
+        $this->assertStringContainsString('Direct and factual', $prompt);
     }
 
     /** @test */
@@ -136,8 +136,8 @@ class DomainAgentServiceTest extends TestCase
         $prompt = $method->invoke($this->service, 'online');
 
         $this->assertStringContainsString('Online Domain Agent', $prompt);
-        $this->assertStringContainsString('productivity', $prompt);
-        $this->assertStringContainsString('Todoist', $prompt);
+        $this->assertStringContainsString('project momentum', $prompt);
+        $this->assertStringContainsString('blockers', $prompt);
     }
 
     /** @test */
@@ -335,5 +335,125 @@ JSON;
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('insights', $result);
+    }
+
+    /** @test */
+    public function it_detects_meta_analysis_in_bookmark_counting()
+    {
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('isMetaAnalysis');
+        $method->setAccessible(true);
+
+        $insight = [
+            'title' => 'You saved 10 bookmarks this week',
+            'description' => 'Bookmark activity increased',
+        ];
+
+        $result = $method->invoke($this->service, $insight);
+
+        $this->assertTrue($result);
+    }
+
+    /** @test */
+    public function it_detects_meta_analysis_in_webpage_fetching()
+    {
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('isMetaAnalysis');
+        $method->setAccessible(true);
+
+        $insight = [
+            'title' => 'Article consumption',
+            'description' => 'You fetched 15 webpages about AI',
+        ];
+
+        $result = $method->invoke($this->service, $insight);
+
+        $this->assertTrue($result);
+    }
+
+    /** @test */
+    public function it_detects_meta_analysis_in_task_completion()
+    {
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('isMetaAnalysis');
+        $method->setAccessible(true);
+
+        $insight = [
+            'title' => 'Productivity update',
+            'description' => 'You completed 8 tasks today',
+        ];
+
+        $result = $method->invoke($this->service, $insight);
+
+        $this->assertTrue($result);
+    }
+
+    /** @test */
+    public function it_allows_content_synthesis_insights()
+    {
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('isMetaAnalysis');
+        $method->setAccessible(true);
+
+        $insight = [
+            'title' => 'Distributed systems focus',
+            'description' => 'Your reading is converging on consensus algorithms and CAP theorem trade-offs',
+        ];
+
+        $result = $method->invoke($this->service, $insight);
+
+        $this->assertFalse($result);
+    }
+
+    /** @test */
+    public function it_allows_insights_about_themes_not_counts()
+    {
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('isMetaAnalysis');
+        $method->setAccessible(true);
+
+        $insight = [
+            'title' => 'AI Ethics Debate',
+            'description' => 'Your recent articles show tension between AI progress and privacy concerns',
+        ];
+
+        $result = $method->invoke($this->service, $insight);
+
+        $this->assertFalse($result);
+    }
+
+    /** @test */
+    public function it_filters_insights_below_confidence_threshold()
+    {
+        $response = json_encode([
+            'insights' => [
+                ['title' => 'High confidence', 'confidence' => 0.8],
+                ['title' => 'Low confidence', 'confidence' => 0.5],
+                ['title' => 'Exactly at threshold', 'confidence' => 0.7],
+            ],
+        ]);
+
+        $parsed = $this->service->parseAgentResponse($response);
+
+        $this->assertCount(2, $parsed['insights']);
+        $this->assertEquals('High confidence', $parsed['insights'][0]['title']);
+        $this->assertEquals('Exactly at threshold', $parsed['insights'][1]['title']);
+    }
+
+    /** @test */
+    public function it_filters_both_low_confidence_and_meta_analysis()
+    {
+        $response = json_encode([
+            'insights' => [
+                ['title' => 'Valid insight', 'confidence' => 0.8, 'description' => 'Good analysis'],
+                ['title' => 'You saved 10 bookmarks', 'confidence' => 0.9, 'description' => 'Meta-analysis'],
+                ['title' => 'Weak insight', 'confidence' => 0.5, 'description' => 'Low confidence'],
+            ],
+        ]);
+
+        $parsed = $this->service->parseAgentResponse($response);
+
+        $this->assertCount(1, $parsed['insights']);
+        $this->assertEquals('Valid insight', $parsed['insights'][0]['title']);
     }
 }

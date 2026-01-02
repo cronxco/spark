@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\MetricStatistic;
+use App\Models\MetricTrend;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\AssistantContextService;
@@ -414,6 +416,382 @@ class AssistantContextServiceTest extends TestCase
         $this->assertArrayHasKey('spotify', $context['today']['service_breakdown']);
         $this->assertEquals(3, $context['today']['service_breakdown']['monzo']);
         $this->assertEquals(7, $context['today']['service_breakdown']['spotify']);
+    }
+
+    #[Test]
+    public function embeds_metrics_in_events_when_available(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
+
+        // Create metric statistic for HRV
+        $statistic = MetricStatistic::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'logged_hrv',
+            'value_unit' => 'ms',
+            'event_count' => 30,
+            'min_value' => 30.0,
+            'max_value' => 80.0,
+            'mean_value' => 55.0,
+            'stddev_value' => 10.0,
+            'normal_lower_bound' => 35.0,
+            'normal_upper_bound' => 75.0,
+        ]);
+
+        // Create event with HRV value
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'action' => 'logged_hrv',
+            'time' => now(),
+            'value' => 50.0,
+            'value_unit' => 'ms',
+            'value_multiplier' => 1,
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertArrayHasKey('metrics', $transformedEvent);
+        $this->assertArrayHasKey('baseline', $transformedEvent['metrics']);
+        $this->assertArrayHasKey('normal_bounds', $transformedEvent['metrics']);
+        $this->assertArrayHasKey('vs_baseline', $transformedEvent['metrics']);
+        $this->assertArrayHasKey('vs_baseline_pct', $transformedEvent['metrics']);
+        $this->assertArrayHasKey('is_anomaly', $transformedEvent['metrics']);
+        $this->assertArrayHasKey('recent_trends', $transformedEvent['metrics']);
+
+        $this->assertEquals(55.0, $transformedEvent['metrics']['baseline']['mean']);
+        $this->assertEquals(30.0, $transformedEvent['metrics']['baseline']['min']);
+        $this->assertEquals(80.0, $transformedEvent['metrics']['baseline']['max']);
+        $this->assertEquals(10.0, $transformedEvent['metrics']['baseline']['stddev']);
+    }
+
+    #[Test]
+    public function does_not_embed_metrics_when_no_statistics_available(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+
+        // Create event without any metric statistics
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'time' => now(),
+            'value' => 100.0,
+            'value_unit' => 'bpm',
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertArrayNotHasKey('metrics', $transformedEvent);
+    }
+
+    #[Test]
+    public function calculates_vs_baseline_percentage_correctly(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
+
+        MetricStatistic::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'logged_sleep',
+            'value_unit' => 'hours',
+            'mean_value' => 7.5,
+            'normal_lower_bound' => 6.3,
+            'normal_upper_bound' => 8.7,
+        ]);
+
+        // Create event with sleep duration 20% below baseline
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'action' => 'logged_sleep',
+            'time' => now(),
+            'value' => 6.0,
+            'value_unit' => 'hours',
+            'value_multiplier' => 1,
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertEquals(-1.5, $transformedEvent['metrics']['vs_baseline']);
+        $this->assertEquals(-20.0, $transformedEvent['metrics']['vs_baseline_pct']);
+    }
+
+    #[Test]
+    public function detects_anomalies_correctly(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
+
+        MetricStatistic::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'logged_hrv',
+            'value_unit' => 'ms',
+            'mean_value' => 55.0,
+            'normal_lower_bound' => 35.0,
+            'normal_upper_bound' => 75.0,
+        ]);
+
+        // Create event with HRV value outside normal bounds (anomaly)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'action' => 'logged_hrv',
+            'time' => now(),
+            'value' => 85.0, // Above upper bound
+            'value_unit' => 'ms',
+            'value_multiplier' => 1,
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertTrue($transformedEvent['metrics']['is_anomaly']);
+    }
+
+    #[Test]
+    public function includes_recent_trends_when_available(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
+
+        $statistic = MetricStatistic::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'logged_sleep',
+            'value_unit' => 'hours',
+            'mean_value' => 7.5,
+        ]);
+
+        // Create recent trend
+        MetricTrend::factory()->create([
+            'metric_statistic_id' => $statistic->id,
+            'type' => 'trend_down_weekly',
+            'detected_at' => now()->subDays(2),
+            'deviation' => -0.8,
+            'significance_score' => 0.85,
+            'acknowledged_at' => null, // Unacknowledged
+        ]);
+
+        // Create old trend (should not be included)
+        MetricTrend::factory()->create([
+            'metric_statistic_id' => $statistic->id,
+            'type' => 'trend_up_monthly',
+            'detected_at' => now()->subDays(10),
+            'acknowledged_at' => null,
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'action' => 'logged_sleep',
+            'time' => now(),
+            'value' => 7.0,
+            'value_unit' => 'hours',
+            'value_multiplier' => 1,
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertCount(1, $transformedEvent['metrics']['recent_trends']);
+        $this->assertEquals('trend_down_weekly', $transformedEvent['metrics']['recent_trends'][0]['type']);
+        $this->assertEquals(-0.8, $transformedEvent['metrics']['recent_trends'][0]['deviation']);
+        $this->assertEquals(0.85, $transformedEvent['metrics']['recent_trends'][0]['significance']);
+    }
+
+    #[Test]
+    public function excludes_acknowledged_trends(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
+
+        $statistic = MetricStatistic::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'logged_hrv',
+            'value_unit' => 'ms',
+            'mean_value' => 55.0,
+        ]);
+
+        // Create acknowledged trend (should not be included)
+        MetricTrend::factory()->create([
+            'metric_statistic_id' => $statistic->id,
+            'type' => 'anomaly_high',
+            'detected_at' => now()->subDay(),
+            'acknowledged_at' => now()->subHours(12), // Already acknowledged
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'action' => 'logged_hrv',
+            'time' => now(),
+            'value' => 50.0,
+            'value_unit' => 'ms',
+            'value_multiplier' => 1,
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertEmpty($transformedEvent['metrics']['recent_trends']);
+    }
+
+    #[Test]
+    public function does_not_embed_metrics_for_events_without_values(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+
+        // Create event without value (e.g., qualitative event)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'time' => now(),
+            'value' => null,
+            'value_unit' => null,
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $transformedEvent = $context['today']['groups'][0]['first_event'];
+
+        $this->assertArrayNotHasKey('metrics', $transformedEvent);
+    }
+
+    #[Test]
+    public function filters_empty_obsidian_daynotes(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'obsidian']);
+
+        // Create empty daynote (should be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'event_metadata' => [
+                'title' => '2024-01-15',
+                'content' => '<p></p>', // Empty content
+            ],
+        ]);
+
+        // Create daynote with substantial content (should NOT be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'event_metadata' => [
+                'title' => '2024-01-16',
+                'content' => '<p>This is a substantial note with meaningful content about my day and thoughts.</p>',
+            ],
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        // Should only have 1 event (the one with content)
+        $this->assertEquals(1, $context['today']['event_count']);
+    }
+
+    #[Test]
+    public function filters_outline_plugin_documents(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'obsidian']);
+
+        // Create Outline document (should be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'event_metadata' => [
+                'title' => 'Outline - My Notes',
+                'content' => 'Auto-generated outline structure',
+            ],
+        ]);
+
+        // Create regular note (should NOT be filtered)
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'event_metadata' => [
+                'title' => 'My Research Notes',
+                'content' => 'Important research findings',
+            ],
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        // Should only have 1 event (the regular note)
+        $this->assertEquals(1, $context['today']['event_count']);
+    }
+
+    #[Test]
+    public function allows_daynotes_with_sufficient_content(): void
+    {
+        $user = User::factory()->create();
+        $flintIntegration = $this->createFlintIntegration($user);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'obsidian']);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'obsidian',
+            'action' => 'modified_note',
+            'time' => now(),
+            'event_metadata' => [
+                'title' => '2024-01-15',
+                'content' => '<p>Today was productive. I worked on the new feature and made significant progress. Had a great conversation with the team about architecture.</p>',
+            ],
+        ]);
+
+        $service = app(AssistantContextService::class);
+        $context = $service->generateContext($user, now(), $flintIntegration);
+
+        $this->assertEquals(1, $context['today']['event_count']);
     }
 
     protected function createFlintIntegration(User $user, array $config = []): Integration
