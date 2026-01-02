@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class NewDocJob implements ShouldQueue
 {
@@ -19,6 +20,8 @@ class NewDocJob implements ShouldQueue
     public $tries = 3;
 
     public $backoff = [10, 30, 60];
+
+    public $failOnTimeout = true;
 
     public function __construct(
         public Integration $integration,
@@ -52,5 +55,15 @@ class NewDocJob implements ShouldQueue
         }
 
         $api->createDocument($this->title, $this->collectionId, $this->parentId, true);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::error('NewDocJob: Failed after all retries', [
+            'title' => $this->title,
+            'collection_id' => $this->collectionId,
+            'attempts' => $this->attempts(),
+            'error' => $exception->getMessage(),
+        ]);
     }
 }
