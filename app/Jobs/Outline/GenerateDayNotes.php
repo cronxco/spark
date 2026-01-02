@@ -66,18 +66,29 @@ class GenerateDayNotes implements ShouldQueue
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $dayNum = str_pad((string) $d, 2, '0', STR_PAD_LEFT);
                 $dayName = date('l', strtotime("{$this->year}-{$monthNum}-{$dayNum}"));
-                $jobs->push(new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayNum}: {$dayName}", $collectionId, $monthId));
+
+                // Delay each job by 5 seconds per job to avoid rate limiting
+                $delaySeconds = ($d - 1) * 5;
+                $job = (new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayNum}: {$dayName}", $collectionId, $monthId))
+                    ->delay(now()->addSeconds($delaySeconds));
+
+                $jobs->push($job);
             }
 
             // Add progress update job as the final job in this batch if progressId is set
             if ($this->progressId) {
                 $isFinalMonth = ($i === 12);
-                $jobs->push(new UpdateDayNoteProgress($this->progressId, $i, $daysInMonth, $isFinalMonth));
+                // Delay progress update until all day jobs have had time to run
+                $progressDelaySeconds = $daysInMonth * 5;
+                $progressJob = (new UpdateDayNoteProgress($this->progressId, $i, $daysInMonth, $isFinalMonth))
+                    ->delay(now()->addSeconds($progressDelaySeconds));
+
+                $jobs->push($progressJob);
             }
 
             $batch = Bus::batch($jobs->all())
                 ->name("Generate {$this->year}-{$monthNum} ({$monthName}) daynotes")
-                ->onQueue('pull')
+                ->onQueue('migration')
                 ->allowFailures()
                 ->dispatch();
 
