@@ -4,6 +4,7 @@ namespace App\Jobs\Outline;
 
 use App\Integrations\Outline\OutlineApi;
 use App\Models\Integration;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 class NewDocJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
 
@@ -28,6 +29,11 @@ class NewDocJob implements ShouldQueue
 
     public function handle(): void
     {
+        // Skip if batch was cancelled
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
         $api = new OutlineApi($this->integration);
 
         // Check if document already exists
