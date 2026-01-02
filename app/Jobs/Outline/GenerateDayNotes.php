@@ -76,10 +76,11 @@ class GenerateDayNotes implements ShouldQueue
 
             // Add progress tracking callback if progressId is set
             if ($this->progressId) {
+                $progressId = $this->progressId; // Capture value for serialization
                 $isFinalMonth = ($i === 12);
-                $batch->then(function () use ($i, $daysInMonth, $isFinalMonth) {
+                $batch->then(function () use ($progressId, $i, $daysInMonth, $isFinalMonth) {
                     UpdateDayNoteProgress::dispatch(
-                        $this->progressId,
+                        $progressId,
                         $i,
                         $daysInMonth,
                         $isFinalMonth
