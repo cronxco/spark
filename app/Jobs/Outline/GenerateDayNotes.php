@@ -61,21 +61,25 @@ class GenerateDayNotes implements ShouldQueue
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $dayNum = str_pad((string) $d, 2, '0', STR_PAD_LEFT);
                 $dayName = date('l', strtotime("{$this->year}-{$monthNum}-{$dayNum}"));
-                $jobs->push(new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayNum}: {$dayName}", $collectionId, $monthId));
+                $jobs->push(new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayName}", $collectionId, $monthId));
             }
 
-            Bus::chain($jobs->all())->onQueue('pull')->dispatch();
-
-            // Update progress after each month
-            if ($this->progressId) {
-                $progress = ActionProgress::find($this->progressId);
-                if ($progress) {
-                    $details = $progress->details ?? [];
-                    $details['completed_months'] = $i;
-                    $details['completed_days'] = ($details['completed_days'] ?? 0) + $daysInMonth;
-                    $progress->update(['details' => $details]);
-                }
-            }
+            Bus::batch($jobs->all())
+                ->onQueue('pull')
+                ->allowFailures()
+                ->finally(function () use ($i, $daysInMonth) {
+                    // Update progress after each month batch completes
+                    if ($this->progressId) {
+                        $progress = ActionProgress::find($this->progressId);
+                        if ($progress) {
+                            $details = $progress->details ?? [];
+                            $details['completed_months'] = $i;
+                            $details['completed_days'] = ($details['completed_days'] ?? 0) + $daysInMonth;
+                            $progress->update(['details' => $details]);
+                        }
+                    }
+                })
+                ->dispatch();
         }
 
         // Mark as completed
