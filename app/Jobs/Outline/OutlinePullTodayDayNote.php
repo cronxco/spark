@@ -24,7 +24,7 @@ class OutlinePullTodayDayNote extends BaseFetchJob
 
     public function uniqueId(): string
     {
-        return $this->getServiceName() . '_' . $this->getJobType() . '_' . $this->integration->id . '_' . $this->forDate;
+        return $this->getServiceName().'_'.$this->getJobType().'_'.$this->integration->id.'_'.$this->forDate;
     }
 
     protected function getServiceName(): string

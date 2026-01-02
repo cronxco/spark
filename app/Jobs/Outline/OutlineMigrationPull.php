@@ -35,7 +35,7 @@ class OutlineMigrationPull extends BaseFetchJob
 
     public function uniqueId(): string
     {
-        return $this->getServiceName() . '_migration_' . $this->integration->id . '_' . $this->offset;
+        return $this->getServiceName().'_migration_'.$this->integration->id.'_'.$this->offset;
     }
 
     protected function getServiceName(): string
@@ -163,7 +163,7 @@ class OutlineMigrationPull extends BaseFetchJob
             }
         } catch (Exception $e) {
             // Handle migration failure - update progress and unpause
-            $this->updateProgress('failed', 'Outline migration failed: ' . $e->getMessage(), 0, [
+            $this->updateProgress('failed', 'Outline migration failed: '.$e->getMessage(), 0, [
                 'error' => $e->getMessage(),
                 'offset' => $this->offset,
                 'integration_id' => $this->integration->id,
@@ -395,7 +395,7 @@ class OutlineMigrationPull extends BaseFetchJob
             if ($oldestTime->format('Y-m') === $newestTime->format('Y-m')) {
                 $statistics['date_range'] = $newestTime->format('M Y');
             } else {
-                $statistics['date_range'] = $oldestTime->format('M Y') . ' - ' . $newestTime->format('M Y');
+                $statistics['date_range'] = $oldestTime->format('M Y').' - '.$newestTime->format('M Y');
             }
         }
 

@@ -66,29 +66,20 @@ class GenerateDayNotes implements ShouldQueue
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $dayNum = str_pad((string) $d, 2, '0', STR_PAD_LEFT);
                 $dayName = date('l', strtotime("{$this->year}-{$monthNum}-{$dayNum}"));
-                $jobs->push(new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayName}", $collectionId, $monthId));
+                $jobs->push(new NewDocJob($integration, "{$this->year}-{$monthNum}-{$dayNum}: {$dayName}", $collectionId, $monthId));
+            }
+
+            // Add progress update job as the final job in this batch if progressId is set
+            if ($this->progressId) {
+                $isFinalMonth = ($i === 12);
+                $jobs->push(new UpdateDayNoteProgress($this->progressId, $i, $daysInMonth, $isFinalMonth));
             }
 
             $batch = Bus::batch($jobs->all())
                 ->name("Generate {$this->year}-{$monthNum} ({$monthName}) daynotes")
                 ->onQueue('pull')
-                ->allowFailures();
-
-            // Add progress tracking callback if progressId is set
-            if ($this->progressId) {
-                $progressId = $this->progressId; // Capture value for serialization
-                $isFinalMonth = ($i === 12);
-                $batch->then(function () use ($progressId, $i, $daysInMonth, $isFinalMonth) {
-                    UpdateDayNoteProgress::dispatch(
-                        $progressId,
-                        $i,
-                        $daysInMonth,
-                        $isFinalMonth
-                    );
-                });
-            }
-
-            $batch->dispatch();
+                ->allowFailures()
+                ->dispatch();
 
             $batches[] = $batch;
         }

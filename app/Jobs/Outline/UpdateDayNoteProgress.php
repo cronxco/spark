@@ -3,6 +3,7 @@
 namespace App\Jobs\Outline;
 
 use App\Models\ActionProgress;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
 
 class UpdateDayNoteProgress implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
         public string $progressId,
@@ -22,6 +23,11 @@ class UpdateDayNoteProgress implements ShouldQueue
 
     public function handle(): void
     {
+        // Skip if batch was cancelled
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
         $progress = ActionProgress::find($this->progressId);
 
         if (! $progress) {

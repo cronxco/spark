@@ -20,6 +20,8 @@ class NewDocJob implements ShouldQueue
 
     public $backoff = [10, 30, 60];
 
+    public $failOnTimeout = true;
+
     public function __construct(
         public Integration $integration,
         public string $title,
@@ -52,5 +54,15 @@ class NewDocJob implements ShouldQueue
         }
 
         $api->createDocument($this->title, $this->collectionId, $this->parentId, true);
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('NewDocJob: Failed after all retries', [
+            'title' => $this->title,
+            'collection_id' => $this->collectionId,
+            'attempts' => $this->attempts(),
+            'error' => $exception->getMessage(),
+        ]);
     }
 }
