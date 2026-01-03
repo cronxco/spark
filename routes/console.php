@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\CheckIntegrationUpdates;
-use App\Jobs\Data\Receipt\CleanupOldReceiptEmailsJob;
 use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\RunPatternDetectionJob;
@@ -68,13 +67,6 @@ Schedule::job(new CheckCookieExpiryJob)
 // Refresh expiring cookies daily at 2am
 Schedule::job(new RefreshExpiringCookies)
     ->dailyAt('02:00')
-    ->onOneServer()
-    ->withoutOverlapping()
-    ->sentryMonitor();
-
-// Clean up old receipt emails from S3 daily at 3am (30 day retention)
-Schedule::job(new CleanupOldReceiptEmailsJob)
-    ->dailyAt('03:00')
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();
