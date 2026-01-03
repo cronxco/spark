@@ -4,7 +4,6 @@ namespace App\Jobs\Flint;
 
 use App\Models\User;
 use App\Services\AgentOrchestrationService;
-use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,6 +14,7 @@ use Sentry\SentrySdk;
 use Sentry\Severity;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
+use Throwable;
 
 class RunPreDigestRefreshJob implements ShouldQueue
 {
@@ -29,7 +29,7 @@ class RunPreDigestRefreshJob implements ShouldQueue
         public string $scheduleTime
     ) {}
 
-    public function failed(?Exception $exception = null): void
+    public function failed(?Throwable $exception = null): void
     {
         Log::error('[Flint] [PRE-DIGEST] Job failed without exception being caught', [
             'user_id' => $this->user->id,
@@ -149,7 +149,7 @@ class RunPreDigestRefreshJob implements ShouldQueue
                 'total_duration_seconds' => round(microtime(true) - $startTime, 2),
             ]);
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             Log::error('[Flint] [PRE-DIGEST] Exception caught', [
                 'job_id' => $jobId,
                 'user_id' => $this->user->id,
