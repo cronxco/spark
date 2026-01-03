@@ -103,9 +103,11 @@ new class extends Component {
 
         // Load latest digest
         $latestDigestBlock = App\Models\Block::where('block_type', 'flint_digest')
-            ->whereHas('event', function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                    ->where('service', 'flint');
+            ->whereHas('event.integration', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->whereHas('event', function ($query) {
+                $query->where('service', 'flint');
             })
             ->with(['event'])
             ->latest('time')
@@ -121,9 +123,11 @@ new class extends Component {
 
         // Load archive (past 30 days, excluding latest)
         $this->digestArchive = App\Models\Block::where('block_type', 'flint_digest')
-            ->whereHas('event', function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                    ->where('service', 'flint');
+            ->whereHas('event.integration', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->whereHas('event', function ($query) {
+                $query->where('service', 'flint');
             })
             ->when($latestDigestBlock, fn($query) => $query->where('id', '!=', $latestDigestBlock->id))
             ->where('time', '>=', now()->subDays(30))
