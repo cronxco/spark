@@ -27,10 +27,10 @@ class InsightDeduplicationService
      *
      * @param  array  $insight  Insight to check (must have 'title' and 'description')
      * @param  string  $domain  Domain the insight belongs to (health, money, etc.)
-     * @param  int  $userId  User ID
+     * @param  string  $userId  User ID
      * @return array ['is_duplicate' => bool, 'similar_to' => string|null, 'similarity_score' => float|null]
      */
-    public function isDuplicate(array $insight, string $domain, int $userId): array
+    public function isDuplicate(array $insight, string $domain, string $userId): array
     {
         if (! isset($insight['title']) || ! isset($insight['description'])) {
             return [
@@ -85,10 +85,10 @@ class InsightDeduplicationService
      *
      * @param  array  $insight  Insight to remember
      * @param  string  $domain  Domain the insight belongs to
-     * @param  int  $userId  User ID
+     * @param  string  $userId  User ID
      * @return string The signature/hash of the insight
      */
-    public function markAsSeen(array $insight, string $domain, int $userId): string
+    public function markAsSeen(array $insight, string $domain, string $userId): string
     {
         $signature = $this->generateSignature($insight);
         $cacheKey = $this->getCacheKey($userId, $domain);
@@ -112,7 +112,7 @@ class InsightDeduplicationService
      *
      * @param  string|null  $domain  Specific domain or null for all domains
      */
-    public function clearSeenInsights(int $userId, ?string $domain = null): void
+    public function clearSeenInsights(string $userId, ?string $domain = null): void
     {
         if ($domain) {
             Cache::forget($this->getCacheKey($userId, $domain));
@@ -128,7 +128,7 @@ class InsightDeduplicationService
     /**
      * Get deduplication statistics for a user
      */
-    public function getStatistics(int $userId): array
+    public function getStatistics(string $userId): array
     {
         $domains = ['health', 'money', 'media', 'knowledge', 'online', 'future', 'cross_domain'];
         $stats = [];
@@ -166,7 +166,7 @@ class InsightDeduplicationService
      *
      * @return array Keyed by signature
      */
-    protected function getSeenInsights(int $userId, string $domain): array
+    protected function getSeenInsights(string $userId, string $domain): array
     {
         $cacheKey = $this->getCacheKey($userId, $domain);
 
@@ -272,7 +272,7 @@ class InsightDeduplicationService
     /**
      * Generate cache key for user/domain insights
      */
-    protected function getCacheKey(int $userId, string $domain): string
+    protected function getCacheKey(string $userId, string $domain): string
     {
         return "{$this->cachePrefix}:{$userId}:{$domain}";
     }
