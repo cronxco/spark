@@ -20,7 +20,7 @@ class InsightDeduplicationServiceTest extends TestCase
     protected function tearDown(): void
     {
         // Clear all seen insights after each test
-        $this->service->clearSeenInsights(1);
+        $this->service->clearSeenInsights('test-user-id');
 
         parent::tearDown();
     }
@@ -35,10 +35,10 @@ class InsightDeduplicationServiceTest extends TestCase
         ];
 
         // Mark as seen
-        $this->service->markAsSeen($insight, 'health', 1);
+        $this->service->markAsSeen($insight, 'health', 'test-user-id');
 
         // Check if duplicate
-        $result = $this->service->isDuplicate($insight, 'health', 1);
+        $result = $this->service->isDuplicate($insight, 'health', 'test-user-id');
 
         $this->assertTrue($result['is_duplicate']);
         $this->assertEquals(1.0, $result['similarity_score']);
@@ -59,9 +59,9 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.85,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
 
-        $result = $this->service->isDuplicate($insight2, 'health', 1);
+        $result = $this->service->isDuplicate($insight2, 'health', 'test-user-id');
 
         $this->assertFalse($result['is_duplicate']);
     }
@@ -81,9 +81,9 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.88,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
 
-        $result = $this->service->isDuplicate($insight2, 'health', 1);
+        $result = $this->service->isDuplicate($insight2, 'health', 'test-user-id');
 
         $this->assertTrue($result['is_duplicate']);
         $this->assertGreaterThan(0.85, $result['similarity_score']);
@@ -104,9 +104,9 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
 
-        $result = $this->service->isDuplicate($insight2, 'health', 1);
+        $result = $this->service->isDuplicate($insight2, 'health', 'test-user-id');
 
         $this->assertTrue($result['is_duplicate']);
         $this->assertEquals(1.0, $result['similarity_score']);
@@ -122,10 +122,10 @@ class InsightDeduplicationServiceTest extends TestCase
         ];
 
         // Mark as seen in health domain
-        $this->service->markAsSeen($insight, 'health', 1);
+        $this->service->markAsSeen($insight, 'health', 'test-user-id');
 
         // Check in money domain (should not be duplicate)
-        $result = $this->service->isDuplicate($insight, 'money', 1);
+        $result = $this->service->isDuplicate($insight, 'money', 'test-user-id');
 
         $this->assertFalse($result['is_duplicate']);
     }
@@ -140,7 +140,7 @@ class InsightDeduplicationServiceTest extends TestCase
         ];
 
         // Mark as seen for user 1
-        $this->service->markAsSeen($insight, 'health', 1);
+        $this->service->markAsSeen($insight, 'health', 'test-user-id');
 
         // Check for user 2 (should not be duplicate)
         $result = $this->service->isDuplicate($insight, 'health', 2);
@@ -166,10 +166,10 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.85,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
-        $this->service->markAsSeen($insight2, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
+        $this->service->markAsSeen($insight2, 'health', 'test-user-id');
 
-        $stats = $this->service->getStatistics(1);
+        $stats = $this->service->getStatistics('test-user-id');
 
         $this->assertEquals(2, $stats['health']);
         $this->assertEquals(2, $stats['total']);
@@ -184,14 +184,14 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $this->service->markAsSeen($insight, 'health', 1);
+        $this->service->markAsSeen($insight, 'health', 'test-user-id');
 
-        $stats = $this->service->getStatistics(1);
+        $stats = $this->service->getStatistics('test-user-id');
         $this->assertEquals(1, $stats['health']);
 
-        $this->service->clearSeenInsights(1, 'health');
+        $this->service->clearSeenInsights('test-user-id', 'health');
 
-        $stats = $this->service->getStatistics(1);
+        $stats = $this->service->getStatistics('test-user-id');
         $this->assertEquals(0, $stats['health']);
     }
 
@@ -204,15 +204,15 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $this->service->markAsSeen($insight, 'health', 1);
-        $this->service->markAsSeen($insight, 'money', 1);
+        $this->service->markAsSeen($insight, 'health', 'test-user-id');
+        $this->service->markAsSeen($insight, 'money', 'test-user-id');
 
-        $stats = $this->service->getStatistics(1);
+        $stats = $this->service->getStatistics('test-user-id');
         $this->assertEquals(2, $stats['total']);
 
-        $this->service->clearSeenInsights(1);
+        $this->service->clearSeenInsights('test-user-id');
 
-        $stats = $this->service->getStatistics(1);
+        $stats = $this->service->getStatistics('test-user-id');
         $this->assertEquals(0, $stats['total']);
     }
 
@@ -233,9 +233,9 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
 
-        $result = $this->service->isDuplicate($insight2, 'health', 1);
+        $result = $this->service->isDuplicate($insight2, 'health', 'test-user-id');
 
         $this->assertTrue($result['is_duplicate']);
         $this->assertGreaterThan(0.85, $result['similarity_score']);
@@ -259,9 +259,9 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
 
-        $result = $this->service->isDuplicate($insight2, 'health', 1);
+        $result = $this->service->isDuplicate($insight2, 'health', 'test-user-id');
 
         // Should NOT be duplicate with high threshold
         $this->assertFalse($result['is_duplicate']);
@@ -282,9 +282,9 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.85,
         ];
 
-        $this->service->markAsSeen($insight1, 'health', 1);
+        $this->service->markAsSeen($insight1, 'health', 'test-user-id');
 
-        $result = $this->service->isDuplicate($insight2, 'health', 1);
+        $result = $this->service->isDuplicate($insight2, 'health', 'test-user-id');
 
         $this->assertFalse($result['is_duplicate']);
         $this->assertNull($result['similarity_score']); // No similar match found
@@ -299,10 +299,10 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $cacheKey = 'insight_dedup:1:health';
+        $cacheKey = 'insight_dedup:test-user-id:health';
 
         // Mark as seen
-        $this->service->markAsSeen($insight, 'health', 1);
+        $this->service->markAsSeen($insight, 'health', 'test-user-id');
 
         // Verify it's in cache
         $this->assertTrue(Cache::has($cacheKey));
@@ -319,7 +319,7 @@ class InsightDeduplicationServiceTest extends TestCase
             'confidence' => 0.9,
         ];
 
-        $result = $this->service->isDuplicate($invalidInsight, 'health', 1);
+        $result = $this->service->isDuplicate($invalidInsight, 'health', 'test-user-id');
 
         $this->assertFalse($result['is_duplicate']);
         $this->assertNull($result['similarity_score']);
