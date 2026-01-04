@@ -1402,7 +1402,7 @@ PROMPT;
      *
      * @return array Deduplicated insights
      */
-    protected function deduplicateInsights(int $userId, string $domain, array $insights): array
+    protected function deduplicateInsights(string $userId, string $domain, array $insights): array
     {
         $deduplicated = [];
 

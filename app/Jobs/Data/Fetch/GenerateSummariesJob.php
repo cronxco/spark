@@ -222,13 +222,14 @@ PROMPT;
         $this->webpage->update(['metadata' => $webpageMetadata]);
 
         // Block 1: Tweet Summary
+        $tweetContent = is_array($summaries['summary_tweet']) ? json_encode($summaries['summary_tweet']) : $summaries['summary_tweet'];
         $this->event->createBlock([
             'title' => 'Tweet Summary',
             'block_type' => 'fetch_summary_tweet',
             'time' => $eventTime,
             'metadata' => [
-                'content' => $summaries['summary_tweet'],
-                'char_count' => strlen($summaries['summary_tweet']),
+                'content' => $tweetContent,
+                'char_count' => strlen($tweetContent),
                 'generated_at' => now()->toIso8601String(),
                 'model' => 'gpt-5-nano',
             ],

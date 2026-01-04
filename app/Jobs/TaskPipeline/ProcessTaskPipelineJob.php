@@ -83,7 +83,36 @@ class ProcessTaskPipelineJob implements ShouldQueue
 
         // Dispatch to appropriate queue
         $jobClass = $task->jobClass;
-        dispatch(new $jobClass($this->model, $task))->onQueue($task->queue);
+
+        // Check if job extends BaseEffectJob - they expect (Integration, array) instead of (Model, TaskDefinition)
+        if (is_subclass_of($jobClass, \App\Jobs\Base\BaseEffectJob::class)) {
+            // Extract integration from the model
+            $integration = $this->model instanceof \App\Models\Integration
+                ? $this->model
+                : $this->model->integration;
+
+            if (! $integration) {
+                $this->updateTaskStatus($task, 'failed', [
+                    'error' => 'No integration found for effect job',
+                    'completed_at' => now()->toIso8601String(),
+                ]);
+
+                return;
+            }
+
+            // Prepare parameters from task metadata
+            $parameters = [
+                'task_key' => $task->key,
+                'triggered_by' => $this->trigger,
+                'model_type' => class_basename($this->model),
+                'model_id' => $this->model->id,
+            ];
+
+            dispatch(new $jobClass($integration, $parameters))->onQueue($task->queue);
+        } else {
+            // Standard task jobs expect (Model, TaskDefinition)
+            dispatch(new $jobClass($this->model, $task))->onQueue($task->queue);
+        }
     }
 
     /**
