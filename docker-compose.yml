@@ -1,6 +1,6 @@
 services:
     nginx:
-        image: "nginx:latest@sha256:ca871a86d45a3ec6864dc45f014b11fe626145569ef0e74deaffc95a3b15b430"
+        image: "nginx:latest@sha256:7272239bd21472f311aa3e86a85fdca0f1ad648995f983ab6e5e7dea665cd233"
         ports:
             - "${HTTP_PORT:-8000}:80"
             - "${SSL_PORT:-443}:443"
