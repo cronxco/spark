@@ -118,7 +118,7 @@
             @if ($page['last_error'])
             <div class="alert alert-error mt-2">
                 <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
-                <span class="text-sm">{{ $page['last_error'] }}</span>
+                <span class="text-sm">{{ is_array($page['last_error']) ? ($page['last_error']['message'] ?? json_encode($page['last_error'])) : $page['last_error'] }}</span>
             </div>
             @endif
         </div>
