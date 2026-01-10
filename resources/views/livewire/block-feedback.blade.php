@@ -100,13 +100,25 @@ new class extends Component {
         $workingMemory = app(AgentWorkingMemoryService::class);
         $user = Auth::user();
 
-        $workingMemory->storeUserFeedback($user->id, [
-            'insight_id' => $this->block->id,
-            'block_type' => $this->block->block_type,
-            'rating' => $rating,
-            'dismissed' => $dismissed,
-            'timestamp' => now()->toIso8601String(),
-        ]);
+        if ($rating !== null) {
+            $workingMemory->recordFeedback(
+                $user->id,
+                (string) $this->block->id,
+                'rating',
+                $rating,
+                "Block type: {$this->block->block_type}"
+            );
+        }
+
+        if ($dismissed) {
+            $workingMemory->recordFeedback(
+                $user->id,
+                (string) $this->block->id,
+                'dismissed',
+                true,
+                "Block type: {$this->block->block_type}"
+            );
+        }
     }
 
     #[On('block-updated')]
