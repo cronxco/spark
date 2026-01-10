@@ -73,64 +73,9 @@ sail artisan queue:flush
 
 ## Architecture
 
-Full architecture docs are found in the `docs/Architecture` folder.
+> **Full Documentation**: See [`docs/Architecture/`](docs/Architecture/) for comprehensive architecture documentation.
 
-### Integration Plugin System
-
-This application uses a plugin-based architecture for integrations with external services (Monzo, Oura, Spotify, GitHub, etc.). Understanding this system is critical to working in the codebase.
-
-**Key Concepts:**
-
-- **PluginRegistry**: Central registry (`app/Integrations/PluginRegistry.php`) that maintains all available integration plugins. Plugins register themselves via `IntegrationServiceProvider`.
-- **Plugin Classes**: Each service has a plugin class (e.g., `MonzoPlugin`, `OuraPlugin`) in `app/Integrations/{Service}/` that extends base classes like `OAuthPlugin`, `WebhookPlugin`, or `ManualPlugin`.
-- **Plugin Interface**: All plugins implement `IntegrationPlugin` contract which defines metadata (display name, icon, accent color, domain) and configuration (action types, block types, object types, instance types).
-- **Service Types**: Plugins are categorized by service type: `oauth`, `webhook`, `manual`, or `apikey`.
-- **Domains**: Integrations are grouped into domains: `health`, `money`, `media`, `knowledge`, `online`.
-
-**Plugin Configuration:** Each plugin defines:
-
-- **Action Types**: Event actions (e.g., "listened_to", "had_balance") with display settings
-- **Block Types**: Data visualization blocks with metadata
-- **Object Types**: Entity types the integration manages (e.g., accounts, playlists)
-- **Instance Types**: Different integration modes (e.g., "account", "collection")
-
-**Value Formatters:**
-
-Action types and block types support custom value display formatting via the `value_formatter` field. This allows you to control how values are displayed in the UI using Laravel Blade templates.
-
-Common use cases:
-
-- **Word replacement**: Convert numeric codes to human-readable labels (e.g., resilience levels)
-- **Duration formatting**: Display seconds/minutes in human-friendly format using `format_duration()` helper
-- **Custom rounding**: Control decimal places for specific value types
-- **Unit formatting**: Add currency symbols or format units with HTML (e.g., superscripts)
-
-Example formatters:
-
-```php
-// Word replacement (conditional display)
-'value_formatter' => '@if($value == 5)Exceptional@elseif($value == 4)Strong@elseif($value == 3)Solid@elseif($value == 2)Adequate@elseif($value == 1)Limited@else{{ $value }}@endif'
-
-// Duration formatting (uses format_duration helper)
-'value_formatter' => '{{ format_duration($value) }}'
-
-// Currency formatting with symbol
-'value_formatter' => '£{{ number_format($value, 2) }}'
-```
-
-Available variables in formatter templates:
-
-- `$value`: The numeric value (after applying value_multiplier)
-- `$unit`: The value_unit string
-
-The `format_duration()` helper intelligently formats durations:
-
-- Less than 60s: shows seconds only (e.g., "45s")
-- Less than 1hr: shows minutes+seconds (e.g., "2m30s")
-- Less than 1 day: shows hours+minutes (e.g., "3h15m")
-- 1 day or more: shows days+hours (e.g., "2d5h")
-
-### Data Model Hierarchy
+### Core Data Model
 
 The data model follows a hierarchical structure:
 
@@ -142,161 +87,130 @@ IntegrationGroup (stores OAuth tokens/credentials)
               └─> Block (data visualizations for specific time periods)
 ```
 
-**Key Models:**
+**Critical:** EventObjects are scoped by `user_id` only (NOT `integration_id`). They are identified by: `user_id`, `concept`, `type`, `title` and are shared across integrations for the same user.
 
-- **IntegrationGroup**: Manages shared credentials and OAuth tokens for a service
-- **Integration**: A specific integration instance with its own configuration, update schedule, and state
-- **EventObject (also known as Object)**: Named entities that events are associated with (e.g., "Current Account", "Daily Notes")
-    - Scoped by `user_id` only (NOT by `integration_id`)
-    - Identified by: `user_id`, `concept`, `type`, `title`
-    - Shared across integrations for the same user
-- **Event**: Individual timestamped data points with action, value, and metadata
-- **Block**: Aggregated/formatted data for display (e.g., daily summaries, visualizations)
-- **Relationship**: Polymorphic relationships between Events, EventObjects, and Blocks
-    - User-scoped connections between any model types
-    - Supports directional and bi-directional relationship types
-    - Optional value/unit/multiplier fields for monetary tracking
-    - Managed via `RelationshipTypeRegistry` for type configuration
+**Learn more:**
 
-### Job Architecture
+- [Events](docs/Architecture/EVENTS.md) - Timestamped data points with actor/target pattern
+- [Objects](docs/Architecture/OBJECTS.md) - User-scoped entities (EventObjects)
+- [Blocks](docs/Architecture/BLOCKS.md) - Aggregated visualizations and displays
+- [Relationships](docs/Architecture/RELATIONSHIPS.md) - Typed connections between models
 
-**Base Job Classes:**
+### Integration System
 
-- `BaseFetchJob`: Template for fetching data from external APIs
-    - Handles Sentry tracing, error logging, retry logic
-    - Subclasses implement `fetchData()` and `dispatchProcessingJobs()`
-    - Uses `EnhancedIdempotency` trait to prevent duplicate executions
-- `BaseInitializationJob`: For one-time historical data backfills
+**Plugin-based architecture** for connecting external services (Monzo, Oura, Spotify, GitHub, etc.).
 
-**Job Patterns:**
+**Key Concepts:**
 
-1. **Fetch Jobs** (`app/Jobs/OAuth/{Service}/{Type}Pull.php`): Pull data from APIs
-2. **Data Jobs** (`app/Jobs/Data/{Service}/{Type}Data.php`): Process and store fetched data
-3. **Migration Jobs** (`app/Jobs/Migrations/`): Handle data migrations with batching and progress tracking
-4. **Integration Group Deletion Jobs**: Cascading deletion with progress events
+- **PluginRegistry**: Central registry (`app/Integrations/PluginRegistry.php`)
+- **Plugin Types**: `OAuthPlugin`, `WebhookPlugin`, `ManualPlugin`, `ApiKeyPlugin`
+- **Domains**: `health`, `money`, `media`, `knowledge`, `online`
+- **Configuration**: Action types, block types, object types, instance types
 
-**Important:**
+**Value Formatters** allow custom display formatting via Blade templates:
 
-- Jobs use Laravel Horizon for queue management
-- Jobs support idempotency via unique IDs (service + type + integration + date)
-- Failed jobs automatically retry with exponential backoff
-- Integration state tracking: `last_triggered_at`, `last_successful_update_at`, `isProcessing()`
+```php
+// Duration formatting
+'value_formatter' => '{{ format_duration($value) }}'
 
-### Integration Scheduling
+// Currency with symbol
+'value_formatter' => '£{{ number_format($value, 2) }}'
 
-Integrations support two scheduling modes:
+// Word replacement
+'value_formatter' => '@if($value == 5)Exceptional@elseif($value == 4)Strong@else{{ $value }}@endif'
+```
 
-1. **Frequency-based** (default): Update every N minutes (`update_frequency_minutes` in configuration)
-2. **Schedule-based**: Run at specific times of day with timezone support
-    - Configured via `use_schedule`, `schedule_times` (array of "HH:mm"), `schedule_timezone`
-    - See `Integration::isDue()`, `getNextScheduledRun()` for logic
+Available variables: `$value` (after value_multiplier), `$unit`
 
-Integrations can be paused via `paused` configuration flag.
+**Learn more:**
 
-### API Logging System
+- [Integration Plugins](docs/Architecture/INTEGRATION_PLUGINS.md) - Plugin system and implementation
+- [Jobs](docs/Architecture/JOBS.md) - Fetch and processing job architecture
+- [Scheduled Updates](docs/Architecture/SCHEDULED_INTEGRATION_UPDATES.md) - Automatic update system
+- [REST API](docs/Architecture/API.md) - External programmatic access
 
-The codebase has helper functions for structured API logging:
+### Advanced Features
 
-- `log_integration_api_request()`: Log outgoing API requests
-- `log_integration_api_response()`: Log API responses
-- `log_integration_webhook()`: Log incoming webhooks
-- `generate_api_log_filename()`: Creates per-service or per-instance log files
-- All logging automatically sanitizes sensitive data (tokens, keys, passwords)
+**Semantic Search**
 
-Logs are stored in `storage/logs/api_{service}_{uuid_block}.log` with 2-day retention.
+- Natural language queries using OpenAI embeddings and pgvector
+- See [SEMANTIC_SEARCH.md](docs/Architecture/SEMANTIC_SEARCH.md)
 
-### Migration System
+**Places & Locations**
 
-Data migrations use a batched processing system:
+- PostGIS-based geographic tracking with geocoding and visit detection
+- See [PLACES.md](docs/Architecture/PLACES.md)
 
-1. `StartIntegrationMigration`: Initiates migration, creates batch
-2. `MonitorBatchAndStartProcessing`: Waits for batch completion, triggers processing
-3. `StartProcessingIntegrationMigration`: Processes fetched data
-4. `CompleteMigration`: Finalizes migration, cleans up
+**Media Management**
 
-Progress is tracked via `ActionProgress` model and broadcast using events.
+- Spatie Media Library with MD5-based deduplication
+- **Always use `MediaDownloadHelper`** for attaching media
+- Files stored once in S3, referenced by multiple models
+- See [MEDIA.md](docs/Architecture/MEDIA.md)
 
-## Code Style & Conventions
+**Action Progress Tracking**
 
-### PHP Standards
+- Real-time updates for long-running tasks
+- See [ACTION_PROGRESS.md](docs/Architecture/ACTION_PROGRESS.md)
 
-- Follow PSR-1, PSR-2, PSR-12
-- Use typed properties (not docblocks)
-- Always specify return types including `void`
-- Use short nullable syntax: `?Type` not `Type|null`
-- Use constructor property promotion when all properties can be promoted
-- For iterables in docblocks, use generics: `@return Collection<int, User>`
+**Task Pipeline**
 
-### Control Flow
+- Extensible system for automated tasks triggered by events/objects/blocks
+- See [TASK_PIPELINE.md](docs/Architecture/TASK_PIPELINE.md)
 
-- **Happy path last**: Handle error conditions first, success case at the end
-- **Avoid else**: Use early returns instead of nested conditions
-- **Always use curly brackets** even for single-line statements
-- **Separate conditions**: Prefer multiple if statements over compound conditions
+**Playwright Browser Automation**
 
-### Laravel Conventions
+- JavaScript-heavy sites, robot detection bypass, cookie management
+- See [PLAYWRIGHT.md](docs/Architecture/PLAYWRIGHT.md)
 
-- URLs: kebab-case (`/open-source`)
-- Route names: camelCase (`->name('openSource')`)
-- Controllers: Plural resource names (`PostsController`), stick to CRUD methods
-- Configuration: Files in kebab-case, keys in snake_case
-- Add service configs to `config/services.php`, don't create new config files
-- Use `config()` helper, avoid `env()` outside config files
-- Artisan commands: kebab-case (`delete-old-records`)
-- Commands should provide feedback and show progress for loops
+### UI & Display Systems
 
-### Frontend
+**Spotlight Command Palette**
 
-- Uses Livewire 3 + Volt for reactive components
-- MaryUI blade components based on daisyUI 5
-- Use daisyUI semantic color names (primary, secondary, accent, etc.) instead of Tailwind colors
-- Avoid custom CSS - prefer daisyUI classes and Tailwind utilities
-- Follow Refactoring UI best practices for design decisions
+- Keyboard-driven navigation: `Cmd+K` / `Ctrl+K`
+- Modes: `>` (actions), `#` (tags), `$` (metrics), `@` (integrations), `!` (admin), `?` (help)
+- See [SPOTLIGHT.md](docs/Architecture/SPOTLIGHT.md)
 
-### Testing
+**Block Cards**
 
-- Uses PHPUnit with database: PostgreSQL
-- Test environment configured in `phpunit.xml`
-- Keep test classes in same file when possible
-- Use descriptive test method names
-- Follow arrange-act-assert pattern
+- Default value/content card variants with custom layout support
+- See [BLOCKS.md](docs/Architecture/BLOCKS.md)
 
-## Important Files
+**Card Streams**
 
-- `app/Support/helpers.php`: Global helper functions (loaded via composer autoload)
-- `app/Integrations/PluginRegistry.php`: Central plugin registry
-- `app/Models/Integration.php`: Core integration model with scheduling logic
-- `app/Jobs/Base/BaseFetchJob.php`: Template for all fetch jobs
-- `composer.json`: Defines `dev` script for running all services concurrently
-- `routes/api.php`: API routes for integration webhooks and external access
+- Instagram Stories-like UI for contextual, interactive cards
+- See [CARD_STREAMS.md](docs/Architecture/CARD_STREAMS.md)
+
+### Infrastructure
+
+**Notifications**
+
+- Real-time in-app and email with user preferences
+- See [NOTIFICATIONS.md](docs/Architecture/NOTIFICATIONS.md)
+
+**Soft Deletes**
+
+- Recovery support across all core models
+- See [SOFT_DELETES.md](docs/Architecture/SOFT_DELETES.md)
+
+**Tags**
+
+- Spatie Laravel Tags for categorizing events and objects
+- See [TAGS.md](docs/Architecture/TAGS.md)
+
+**Testing**
+
+- PHPUnit organization and patterns
+- See [TESTING.md](docs/Architecture/TESTING.md)
 
 ## Common Tasks
 
-### Adding a New Integration Plugin
-
-1. Create plugin class in `app/Integrations/{Service}/`
-2. Extend `OAuthPlugin`, `WebhookPlugin`, or `ManualPlugin`
-3. Implement `IntegrationPlugin` contract methods
-4. Define action types, block types, object types, instance types
-5. Register in `IntegrationServiceProvider::boot()`
-6. Create fetch jobs extending `BaseFetchJob`
-7. Create data processing jobs
-8. Add migration if needed for historical data
-
-### Creating Jobs
-
-- Extend `BaseFetchJob` for data fetching
-- Use `EnhancedIdempotency` trait for uniqueness
-- Implement `getServiceName()`, `getJobType()`, `fetchData()`, `dispatchProcessingJobs()`
-- Use Sentry tracing for monitoring (already built into `BaseFetchJob`)
-- Add proper error handling and logging
-
 ### Creating EventObjects
 
-EventObjects represent entities (accounts, playlists, devices, etc.) and are user-scoped, NOT integration-scoped:
+EventObjects are **user-scoped, NOT integration-scoped**:
 
 ```php
-// CORRECT: Query by user_id, concept, type, title
+// ✅ CORRECT: Query by user_id, concept, type, title
 $eventObject = EventObject::firstOrCreate(
     [
         'user_id' => $integration->user_id,
@@ -310,11 +224,11 @@ $eventObject = EventObject::firstOrCreate(
     ]
 );
 
-// INCORRECT: Do NOT use integration_id in queries
+// ❌ INCORRECT: Do NOT use integration_id
 $eventObject = EventObject::firstOrCreate(
     [
         'user_id' => $integration->user_id,
-        'integration_id' => $integration->id, // ❌ This column doesn't exist!
+        'integration_id' => $integration->id, // This column doesn't exist!
         'concept' => 'user',
         'type' => 'fetch_user',
     ],
@@ -322,197 +236,47 @@ $eventObject = EventObject::firstOrCreate(
 );
 ```
 
-**Important:** EventObjects are shared across integrations for the same user. Use unique `title` values to differentiate between instances if needed.
-
 ### Creating Relationships
 
-Relationships connect Events, EventObjects, and Blocks with typed, directional or bi-directional links:
+See [RELATIONSHIPS.md](docs/Architecture/RELATIONSHIPS.md) for full documentation.
 
 ```php
-
 use App\Models\Relationship;
-use App\Models\EventObject;
 
-// Create a directional relationship (e.g., A links to B)
+// Directional relationship
 Relationship::createRelationship([
     'user_id' => $user->id,
     'from_type' => EventObject::class,
     'from_id' => $sourceObject->id,
     'to_type' => EventObject::class,
     'to_id' => $targetObject->id,
-    'type' => 'linked_to', // Directional
-    'metadata' => ['url' => 'https://example.com'],
-]);
-
-// Create a bi-directional relationship (e.g., A related to B = B related to A)
-Relationship::createRelationship([
-    'user_id' => $user->id,
-    'from_type' => EventObject::class,
-    'from_id' => $object1->id,
-    'to_type' => EventObject::class,
-    'to_id' => $object2->id,
-    'type' => 'related_to', // Bi-directional (won't create duplicates)
-]);
-
-// Create a monetary relationship
-
-Relationship::createRelationship([
-    'user_id' => $user->id,
-    'from_type' => EventObject::class,
-    'from_id' => $fromAccount->id,
-    'to_type' => EventObject::class,
-    'to_id' => $toAccount->id,
-    'type' => 'transferred_to',
-    'value' => 10000, // £100.00 in pence
-    'value_multiplier' => 100,
-    'value_unit' => 'GBP',
+    'type' => 'linked_to',
 ]);
 
 // Query relationships
-$object->relationshipsFrom()->get(); // Where this is "from"
-$object->relationshipsTo()->get();   // Where this is "to"
-$object->allRelationships()->get();  // All relationships
-
-// Get related entities
-$object->relatedObjects()->get();           // All related objects
-$object->relatedObjects('linked_to')->get(); // Only "linked_to" type
-$object->relatedEvents()->get();            // All related events
-$object->relatedBlocks()->get();            // All related blocks
+$object->relatedObjects()->get();
+$object->relatedObjects('linked_to')->get();
 ```
 
-**Available Relationship Types** (see `app/Services/RelationshipTypeRegistry.php`):
+**Available Types**: `linked_to`, `related_to`, `caused_by`, `part_of`, `similar_to`, `transferred_to`
 
-- `linked_to` - Directional, source links to target
-- `related_to` - Bi-directional, general association
-- `caused_by` - Directional, causal relationship
-- `part_of` - Directional, hierarchical relationship
-- `similar_to` - Bi-directional, similarity relationship
-- `transferred_to` - Directional, money/value transfer (supports value fields)
+### Adding Integration Plugins
 
-**Important:** The old `had_link_to` event type has been migrated to the `linked_to` relationship type. Use `Relationship` model instead of creating events with `action: 'had_link_to'`.
+See [INTEGRATION_PLUGINS.md](docs/Architecture/INTEGRATION_PLUGINS.md) for full guide.
 
-### Working with Integration Configuration
+1. Create plugin class in `app/Integrations/{Service}/`
+2. Extend `OAuthPlugin`, `WebhookPlugin`, or `ManualPlugin`
+3. Define action types, block types, object types, instance types
+4. Register in `IntegrationServiceProvider::boot()`
+5. Create fetch and processing jobs
 
-Integration configuration is stored as JSON in `configuration` column:
+### Creating Jobs
 
-```php
-$integration->configuration = [
-    'update_frequency_minutes' => 15,
-    'paused' => false,
-    'use_schedule' => true,
-    'schedule_times' => ['06:00', '12:00', '18:00'],
-    'schedule_timezone' => 'Europe/London',
-    // Service-specific config...
-];
-```
+See [JOBS.md](docs/Architecture/JOBS.md) for full patterns.
 
-Access via helper methods: `getUpdateFrequencyMinutes()`, `isPaused()`, `useSchedule()`, etc.
-
-## Spotlight Command Palette
-
-Spark uses Wire Elements Spotlight as a keyboard-driven command palette for power users to navigate, search, and execute actions.
-
-### Quick Reference
-
-- **Activation**: `Cmd+K` / `Ctrl+K` or click Search button in header
-- **Modes**: `>` (actions), `#` (tags), `$` (metrics), `@` (integrations), `!` (admin), `?` (help)
-- **Configuration**: All registration in `app/Providers/SpotlightServiceProvider.php`
-- **Queries**: Organized in `app/Spotlight/Queries/` by category (Navigation, Search, Actions, Integration)
-- **Custom Actions**: `app/Spotlight/Actions/`
-- **Styling**: Custom CSS in `resources/css/app.css` (lines 140-566) using Spark theme variables
-
-### Adding Commands
-
-Create query classes that return `SpotlightResult` objects:
-
-```php
-// In app/Spotlight/Queries/...
-public static function make(): SpotlightQuery
-{
-    return SpotlightQuery::asDefault(function (string $query) {
-        return collect([
-            SpotlightResult::make()
-                ->setTitle('Command Name')
-                ->setSubtitle('Description')
-                ->setIcon('fontawesome-icon')
-                ->setGroup('group-name')
-                ->setPriority(10)
-                ->setAction('jump_to', ['path' => route('...')])
-        ]);
-    });
-}
-```
-
-Register in `SpotlightServiceProvider::registerQueries()`.
-
-### Integration Plugin Commands
-
-Plugins can provide Spotlight commands by implementing `SupportsSpotlightCommands`:
-
-```php
-
-use App\Integrations\Contracts\SupportsSpotlightCommands;
-
-class YourPlugin extends OAuthPlugin implements SupportsSpotlightCommands
-{
-    public static function getSpotlightCommands(): array
-    {
-        return [
-            'command-key' => [
-                'title' => 'Command Title',
-                'subtitle' => 'Description',
-                'icon' => 'icon-name',
-                'action' => 'dispatch_event',
-                'actionParams' => ['name' => 'event-name', 'close' => true],
-                'priority' => 5,
-            ],
-        ];
-    }
-}
-```
-
-Commands are auto-discovered via `PluginRegistry::getSpotlightCommands()` - no manual registration needed.
-
-### Context-Aware Commands
-
-Commands can be context-aware by checking the current route:
-
-```php
-$routeName = request()->route()->getName();
-if ($routeName === 'metrics.show') {
-    // Show metric-specific commands
-}
-```
-
-Context commands appear only on relevant pages and are prioritized first.
-
-### Full Documentation
-
-See `SPOTLIGHT.md` for comprehensive documentation including:
-
-- User guide with all modes and shortcuts
-- Developer guide with examples
-- Architecture overview
-- Adding custom commands and actions
-- Integration plugin support
-- Troubleshooting and best practices
-
-## Media Management
-
-Spark uses Spatie Media Library with MD5-based deduplication. Identical files are stored once in S3 while multiple models may reference the same file.
-
-**Rules / invariants**
-
-- Always attach media via `MediaDownloadHelper`
-- Deduplication is based on MD5 hash
-- Files are only removed when the last reference is deleted
-- S3 storage is private; access uses temporary signed URLs
-
-**Models**
-
-- EventObject and Block support media attachments (images, videos, documents)
-
-See `docs/Architecture/MEDIA.md` for full architecture, helpers, migrations, conversions, and operational details.
+- Extend `BaseFetchJob` for data fetching
+- Use `EnhancedIdempotency` trait for uniqueness
+- Implement `getServiceName()`, `getJobType()`, `fetchData()`, `dispatchProcessingJobs()`
 
 # Laravel Boost Guidelines
 
