@@ -1,50 +1,46 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code ([claude.ai/code](http://claude.ai/code)) when working with code in this repository.
+
+## Quick Start (TL;DR)
+
+**Spark** is a Laravel 12 + Livewire 3 integration platform that connects external services (health, finance, media, etc.) and transforms their data into a unified event/object/block system using a sophisticated job pipeline.
 
 ## Development Commands
 
 ### Running the Application
 
 ```bash
-# Start all services (server, horizon, logs, vite) - recommended
-composer dev
-
-# Individual services (using Laravel Sail)
+# Run all services (using Laravel Sail)
 sail up -d
-sail artisan serve
 sail artisan horizon
 sail artisan pail --timeout=0
-npm run dev
+sail npm run dev
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-composer test
-# Or:
 sail artisan test
 
 # Run a single test
 sail artisan test --filter TestName
 
 # Run specific test suite
+
 sail artisan test tests/Feature
 sail artisan test tests/Unit
-
-# Run parallel tests (faster)
-sail artisan test --parallel
 ```
 
 ### Code Quality
 
 ```bash
 # Format with Duster (includes Pint + more)
-sail vendor/bin/duster fix
+sail bin duster fix
 
 # Lint check only (no changes)
-sail vendor/bin/duster lint
+sail bin duster lint
 ```
 
 ### Database
@@ -68,7 +64,16 @@ sail artisan queue:monitor
 sail artisan queue:flush
 ```
 
+### Git Conventions
+
+- **Gitmoji**: Use semantic emojis in commit messages following [gitmoji.dev](https://gitmoji.dev/) conventions
+- **Commit Format**: `{emoji} {descriptive message}`
+- **Branch from dev:** the dev branch is our primary development branch, new feature branches should be created from `dev` and NOT `main`.
+- **Versioning depends on gitmoji:** The gitmoji are really important as our CI/CD pipeline uses them to automatically determine version number increments.
+
 ## Architecture
+
+Full architecture docs are found in the `docs/Architecture` folder.
 
 ### Integration Plugin System
 
@@ -82,8 +87,7 @@ This application uses a plugin-based architecture for integrations with external
 - **Service Types**: Plugins are categorized by service type: `oauth`, `webhook`, `manual`, or `apikey`.
 - **Domains**: Integrations are grouped into domains: `health`, `money`, `media`, `knowledge`, `online`.
 
-**Plugin Configuration:**
-Each plugin defines:
+**Plugin Configuration:** Each plugin defines:
 
 - **Action Types**: Event actions (e.g., "listened_to", "had_balance") with display settings
 - **Block Types**: Data visualization blocks with metadata
@@ -142,9 +146,8 @@ IntegrationGroup (stores OAuth tokens/credentials)
 
 - **IntegrationGroup**: Manages shared credentials and OAuth tokens for a service
 - **Integration**: A specific integration instance with its own configuration, update schedule, and state
-- **EventObject**: Named entities that events are associated with (e.g., "Current Account", "Daily Notes")
+- **EventObject (also known as Object)**: Named entities that events are associated with (e.g., "Current Account", "Daily Notes")
     - Scoped by `user_id` only (NOT by `integration_id`)
-    - Has relationship to `Integration` but stores no `integration_id` column
     - Identified by: `user_id`, `concept`, `type`, `title`
     - Shared across integrations for the same user
 - **Event**: Individual timestamped data points with action, value, and metadata
@@ -326,6 +329,7 @@ $eventObject = EventObject::firstOrCreate(
 Relationships connect Events, EventObjects, and Blocks with typed, directional or bi-directional links:
 
 ```php
+
 use App\Models\Relationship;
 use App\Models\EventObject;
 
@@ -351,6 +355,7 @@ Relationship::createRelationship([
 ]);
 
 // Create a monetary relationship
+
 Relationship::createRelationship([
     'user_id' => $user->id,
     'from_type' => EventObject::class,
@@ -403,166 +408,6 @@ $integration->configuration = [
 
 Access via helper methods: `getUpdateFrequencyMinutes()`, `isPaused()`, `useSchedule()`, etc.
 
-## Block Card Display System
-
-Spark uses a flexible card-based system for displaying blocks throughout the application. Blocks are automatically rendered using smart defaults with support for custom layouts.
-
-### Overview
-
-The block card system provides:
-
-- Two default card variants: **value cards** (for numeric blocks) and **content cards** (for text/summary blocks)
-- Custom layout support per block type
-- Automatic fallback to default layouts
-- Consistent styling across the application
-
-### Using Block Cards
-
-Display blocks using the `<x-block-card>` component:
-
-```blade
-{{-- Single block --}}
-<x-block-card :block="$block" />
-
-{{-- Grid of blocks --}}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    @foreach ($blocks as $block)
-        <x-block-card :block="$block" />
-    @endforeach
-</div>
-```
-
-The component automatically:
-
-1. Checks if a custom layout exists for the block type
-2. Falls back to appropriate default variant (value or content)
-3. Displays all relevant metadata, timestamps, and actions
-
-### Default Card Variants
-
-**Value Card** (for blocks with numeric values):
-
-- Prominent stat-style value display at top
-- Block type badge and timestamp
-- Title centered below value
-- Compact metadata preview
-- Footer with integration badge and actions
-
-**Content Card** (for blocks without values):
-
-- Block type badge and timestamp
-- Optional image (h-48)
-- Title with line-clamp-2
-- Content preview with line-clamp-5
-- Footer with integration badge and actions
-
-### Creating Custom Layouts
-
-Create custom blade files in `resources/views/blocks/types/` named after the block type:
-
-**File naming:** `{block_type}.blade.php` (e.g., `fetch_summary_tweet.blade.php`)
-
-**Available props:**
-
-- `$block` - The Block model instance with all relationships loaded
-
-**Example custom layout:**
-
-```blade
-{{-- resources/views/blocks/types/fetch_summary_tweet.blade.php --}}
-@props(['block'])
-
-@php
-use App\Integrations\PluginRegistry;
-
-$pluginClass = PluginRegistry::getPlugin($block->event->service);
-$summary = $block->metadata['content'] ?? '';
-$charCount = mb_strlen($summary);
-@endphp
-
-<div class="card bg-base-200 shadow hover:shadow-lg transition-all">
-    <div class="card-body p-4 gap-3">
-        {{-- Custom header --}}
-        <div class="flex items-center justify-between gap-2">
-            <div class="badge badge-info badge-outline badge-sm gap-1">
-                <x-icon name="o-chat-bubble-left-right" class="w-3 h-3" />
-                Tweet Summary
-            </div>
-            <div class="badge badge-ghost badge-xs">{{ $charCount }}/280</div>
-        </div>
-
-        {{-- Custom content --}}
-        <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-            <p class="text-sm">{{ $summary }}</p>
-        </div>
-
-        {{-- Footer (keep consistent) --}}
-        <div class="flex items-center gap-2 pt-2 border-t border-base-300">
-            {{-- ... standard footer elements ... --}}
-        </div>
-    </div>
-</div>
-```
-
-### Block Model Helper Methods
-
-The Block model provides methods for working with custom layouts:
-
-```php
-// Check if custom layout exists
-$block->hasCustomCardLayout(); // returns bool
-
-// Get custom layout path
-$block->getCustomCardLayoutPath(); // returns "blocks.types.{type}" or null
-
-// Get all block types with custom layouts
-Block::getBlockTypesWithCustomLayouts(); // returns array
-```
-
-### Sense-Check Page
-
-View custom layout coverage at `/admin/sense-check`:
-
-The "Block Types with Custom Layouts" section shows:
-
-- Total block types defined across all plugins
-- Which types have custom layouts (✓)
-- High-volume types (>100 blocks) without custom layouts (highlighted)
-- Block counts per type
-- Service grouping
-
-This helps identify which block types would benefit most from custom layouts.
-
-### Best Practices
-
-1. **Only create custom layouts when needed** - The defaults work well for most cases
-2. **Keep styling consistent** - Use daisyUI classes and maintain the card structure
-3. **Test responsive behavior** - Ensure layouts work on mobile, tablet, and desktop
-4. **Consider accessibility** - Use semantic HTML and ARIA labels where appropriate
-5. **Focus on high-volume types** - Prioritize custom layouts for frequently-used block types
-
-### Where Blocks Display
-
-Blocks using the card system appear in:
-
-- Event detail pages (`/events/{event}`) - Shows all blocks linked to the event
-- EventObject pages (`/objects/{object}`) - Shows blocks related via relationships
-- Any custom views using the `<x-block-card>` component
-
-The admin blocks table (`/admin/blocks`) maintains its table format for management purposes.
-
-### Custom Layout Examples
-
-The codebase includes example custom layouts:
-
-- `fetch_summary_tweet` - Twitter-style card with character count
-- `fetch_key_takeaways` - Bullet list with checkmarks
-- `fetch_tags` - Tag cloud with emoji support
-- `bookmark_summary` - AI-focused card with gradient styling
-- `bookmark_metadata` - Preview card with larger image
-
-Use these as references when creating new custom layouts.
-
 ## Spotlight Command Palette
 
 Spark uses Wire Elements Spotlight as a keyboard-driven command palette for power users to navigate, search, and execute actions.
@@ -589,7 +434,7 @@ public static function make(): SpotlightQuery
             SpotlightResult::make()
                 ->setTitle('Command Name')
                 ->setSubtitle('Description')
-                ->setIcon('heroicon-name')
+                ->setIcon('fontawesome-icon')
                 ->setGroup('group-name')
                 ->setPriority(10)
                 ->setAction('jump_to', ['path' => route('...')])
@@ -605,6 +450,7 @@ Register in `SpotlightServiceProvider::registerQueries()`.
 Plugins can provide Spotlight commands by implementing `SupportsSpotlightCommands`:
 
 ```php
+
 use App\Integrations\Contracts\SupportsSpotlightCommands;
 
 class YourPlugin extends OAuthPlugin implements SupportsSpotlightCommands
@@ -651,485 +497,22 @@ See `SPOTLIGHT.md` for comprehensive documentation including:
 - Integration plugin support
 - Troubleshooting and best practices
 
-## Playwright Browser Automation (Fetch Integration)
+## Media Management
 
-The Fetch integration supports optional browser automation via Playwright for fetching JavaScript-heavy sites, bypassing robot detection, and managing cookie sessions.
+Spark uses Spatie Media Library with MD5-based deduplication. Identical files are stored once in S3 while multiple models may reference the same file.
 
-### Architecture
+**Rules / invariants**
 
-```
-Laravel (PHP) → FetchEngineManager → Smart Router
-                                        ├─→ HTTP (default, fast)
-                                        └─→ Playwright (when needed)
-                                              ↓
-                                        Node.js Worker (Express API)
-                                              ↓
-                                        Chrome (CDP on port 9222)
-                                              ↓
-                                        VNC (debugging on port 5900)
-```
+- Always attach media via `MediaDownloadHelper`
+- Deduplication is based on MD5 hash
+- Files are only removed when the last reference is deleted
+- S3 storage is private; access uses temporary signed URLs
 
-### Key Components
+**Models**
 
-**PHP Layer:**
+- EventObject and Block support media attachments (images, videos, documents)
 
-- `FetchEngineManager`: Smart routing between HTTP and Playwright
-- `PlaywrightFetchClient`: HTTP client to communicate with Node.js worker
-- `FetchSingleUrl` job: Updated to use engine manager
-
-**Node.js Worker:**
-
-- Location: `docker/playwright/index.js`
-- Express REST API with endpoints: `/fetch`, `/cookies/:domain`, `/health`
-- Connects to Chrome via CDP (Chrome DevTools Protocol)
-- Automatic reconnection on disconnect (max 5 attempts)
-
-**Docker Services:**
-
-- `chrome`: Chromium browser with VNC and CDP endpoint
-- `playwright-worker`: Node.js service running Playwright
-
-### Starting Playwright Services
-
-```bash
-# Start with Docker Compose profile
-sail up -d --profile playwright
-
-# Or start individual services
-docker-compose up chrome playwright-worker -d
-
-# Check service status
-sail ps
-curl http://localhost:3000/health
-```
-
-### Smart Routing Logic
-
-The `FetchEngineManager` automatically selects the appropriate fetch method:
-
-1. **Always HTTP if:**
-    - Playwright disabled globally (`PLAYWRIGHT_ENABLED=false`)
-    - Webpage has `playwright_preference: 'http'`
-
-2. **Always Playwright if:**
-    - Webpage has `requires_playwright: true` (learned from past success)
-    - Webpage has `playwright_preference: 'playwright'`
-    - Domain in JS-required list (`PLAYWRIGHT_JS_DOMAINS` env var)
-
-3. **Auto-escalate to Playwright if:**
-    - Recent HTTP errors with robot/CAPTCHA detection
-    - Paywall detected
-    - 2+ consecutive failures
-
-4. **Fallback to HTTP if:**
-    - Playwright worker unavailable
-    - Playwright fetch fails
-
-### Cookie Extraction from Browser
-
-Users can manually interact with the VNC browser to log in, then extract cookies:
-
-1. Open VNC client to `localhost:5900` (password from env)
-2. Navigate and log in to target site
-3. In Fetch UI (Cookies tab), enter domain and click "Extract from Browser"
-4. Cookies are captured from Playwright browser context and stored
-
-**UI Flow:**
-
-- Cookies tab shows "Extract from Browser" button when Playwright available
-- Alert box with VNC link for manual browser access
-- Extracted cookies stored in same `auth_metadata.domains` structure
-
-### Configuration
-
-**Environment Variables:**
-
-```env
-PLAYWRIGHT_ENABLED=true
-PLAYWRIGHT_WORKER_URL=http://playwright-worker:3000
-PLAYWRIGHT_TIMEOUT=30000
-PLAYWRIGHT_SCREENSHOT_ENABLED=true
-PLAYWRIGHT_AUTO_ESCALATE=true
-PLAYWRIGHT_JS_DOMAINS=twitter.com,x.com,instagram.com,facebook.com
-CHROME_VNC_PORT=5900
-CHROME_CDP_PORT=9222
-CHROME_VNC_URL=vnc://localhost:5900
-CHROME_VNC_PASSWORD=spark-dev-vnc
-```
-
-**Services Configuration:**
-
-See `config/services.php` -> `'playwright'` array
-
-### Metadata Tracking
-
-EventObject (fetch_webpage) metadata includes:
-
-- `last_fetch_method`: "http", "playwright", or "http (fallback)"
-- `requires_playwright`: Boolean flag (learned automatically)
-- `playwright_learned_at`: Timestamp when Playwright requirement was learned
-- `playwright_preference`: User override ("auto", "http", "playwright")
-
-### UI Features
-
-**Subscribed URLs Tab:**
-
-- Badge showing fetch method (HTTP/Playwright) on each URL card
-
-**Cookies Tab:**
-
-- "Extract from Browser" button (when Playwright available)
-- VNC link in info alert
-- Same cookie formats supported
-
-**Playwright Tab (new, conditional):**
-
-- Service status indicator
-- Fetch method statistics (requires Playwright, prefers HTTP, auto)
-- How it works explanation
-- VNC access button
-- JavaScript-required domains list
-
-### Testing
-
-Playwright integration includes comprehensive tests:
-
-```bash
-sail artisan test --filter FetchPlaywrightTest
-```
-
-Tests cover:
-
-- Engine manager routing logic
-- HTTP fallback when Playwright unavailable
-- Learning Playwright requirements
-- Auto-escalation on robot detection
-- JS-required domain handling
-- Metadata storage
-
-### Troubleshooting
-
-**Worker not connecting:**
-
-```bash
-# Check Chrome service
-curl http://chrome:9222/json/version
-
-# Check worker health
-curl http://localhost:3000/health
-
-# View worker logs
-sail logs -f playwright-worker
-```
-
-**VNC not accessible:**
-
-- Ensure port 5900 is forwarded in docker-compose.yml
-- Check VNC password matches `CHROME_VNC_PASSWORD`
-- Use VNC client (e.g., RealVNC, TigerVNC, macOS Screen Sharing)
-
-**High resource usage:**
-
-- Limit concurrent Playwright jobs in Horizon config
-- Disable screenshots if not needed
-- Consider using Playwright only for problematic URLs
-
-### Worker API Reference
-
-See `docker/playwright/README.md` for full API documentation.
-
-### Production Considerations
-
-- **Resource limits**: Set memory limits in docker-compose.yml
-- **VNC access**: Disable VNC port in production or use SSH tunnel
-- **CDP security**: Never expose port 9222 publicly
-- **Scaling**: Use multiple worker instances with load balancer for high volume
-- **Monitoring**: Track Playwright success/failure rates in Sentry
-
-## Media Management with Spatie Media Library
-
-Spark uses Spatie Media Library for managing media attachments (images, videos, documents) with MD5-based deduplication to ensure storage efficiency and minimize costs.
-
-### Overview
-
-The media system ensures that identical files (by MD5 hash) are only stored once in S3, while multiple EventObjects and Blocks can reference the same file. This provides:
-
-- **Storage efficiency**: One copy per unique file, regardless of how many models reference it
-- **Bandwidth optimization**: Deduplicated uploads save API calls and transfer costs
-- **Automatic conversions**: Thumbnails, responsive images, and WebP variants
-- **Private S3 storage**: Temporary signed URLs for secure access
-- **Smart deletion**: Media is only removed when the last reference is deleted
-
-### Architecture
-
-**Models with Media Support:**
-
-- `EventObject` - Supports collections: `screenshots`, `pdfs`, `downloaded_images`, `downloaded_videos`, `downloaded_documents`
-- `Block` - Supports collections: `downloaded_images`, `downloaded_videos`, `downloaded_documents`
-
-**Key Components:**
-
-- `MD5PathGenerator` - Generates storage paths based on MD5 hash (ensures deduplication)
-- `MediaDeduplicationService` - Handles finding existing media and reference counting
-- `MediaDownloadHelper` - Main interface for downloading and attaching media with deduplication
-- `MigrateExternalMediaUrlJob` - Migrates legacy `media_url` fields to Media Library
-
-### Using MediaDownloadHelper
-
-This is the primary interface for working with media in integration jobs:
-
-```php
-use App\Services\Media\MediaDownloadHelper;
-
-$helper = app(MediaDownloadHelper::class);
-
-// Download from URL
-$media = $helper->downloadAndAttachMedia(
-    'https://example.com/image.jpg',
-    $eventObject,                    // Model instance
-    'downloaded_images',             // Collection name
-    ['custom_field' => 'value']      // Optional custom properties
-);
-
-// Attach from base64 (e.g., screenshots)
-$media = $helper->attachMediaFromBase64(
-    $base64Data,
-    $eventObject,
-    'screenshot.png',                // Filename
-    'screenshots'                    // Collection name
-);
-```
-
-**Deduplication behavior:**
-
-- If the MD5 hash already exists, a new media record is created that references the same file
-- The file itself is NOT re-uploaded to S3
-- Both models will have their own media records, but share the same file
-
-### Media Collections
-
-**EventObject Collections:**
-
-- `screenshots` - Browser screenshots from Playwright/Fetch
-- `pdfs` - PDF documents
-- `downloaded_images` - Images from integration APIs
-- `downloaded_videos` - Video files
-- `downloaded_documents` - Other document types
-
-**Block Collections:**
-
-- `downloaded_images` - Images (album art, previews, etc.)
-- `downloaded_videos` - Video content
-- `downloaded_documents` - Documents
-
-**Choose the right collection** based on the source and type of media.
-
-### Image Conversions
-
-Automatic conversions are generated for images:
-
-- **thumbnail** (300x300) - For card grids, non-queued for immediate availability
-- **medium** (800px width) - For detail views and modals
-- **webp** (800px width) - WebP format for better compression
-
-Conversions are queued by default (except thumbnail) and processed via Horizon.
-
-### Displaying Media in Views
-
-Use the helper functions in blade templates:
-
-```blade
-{{-- Get media URL with fallback to media_url field --}}
-@php
-$imageUrl = get_media_url($block, 'downloaded_images', 'thumbnail');
-@endphp
-
-@if ($imageUrl)
-    <img src="{{ $imageUrl }}" alt="{{ $block->title }}" loading="lazy">
-@endif
-
-{{-- For private S3, use temporary signed URLs --}}
-@php
-$imageUrl = get_media_temporary_url(
-    $block,
-    'downloaded_images',  // Collection
-    'medium',             // Conversion
-    60                    // Expiration minutes (default: 60)
-);
-@endphp
-```
-
-**Helper functions:**
-
-- `get_media_url($model, $collection, $conversion)` - Gets Media Library URL or falls back to `media_url`
-- `get_media_temporary_url($model, $collection, $conversion, $expirationMinutes)` - Gets signed URL for private S3
-
-These helpers automatically:
-
-- Check for Media Library attachments first
-- Fall back to `media_url` field for backward compatibility
-- Handle conversion selection
-- Generate temporary URLs for S3 private buckets
-
-### Migrating Existing Media URLs
-
-For existing records with `media_url` fields pointing to external URLs:
-
-```bash
-# Dry run to see what would be migrated
-sail artisan media:migrate-external-urls --dry-run
-
-# Migrate EventObjects only
-sail artisan media:migrate-external-urls --model=EventObject
-
-# Migrate Blocks only
-sail artisan media:migrate-external-urls --model=Block
-
-# Migrate both (default)
-sail artisan media:migrate-external-urls
-
-# Limit for testing
-sail artisan media:migrate-external-urls --limit=100
-```
-
-The migration:
-
-- Runs on the `migration` queue
-- Downloads each external URL
-- Deduplicates by MD5 hash
-- Attaches to Media Library
-- Keeps `media_url` field intact (for rollback safety)
-- Tracks progress via ActionProgress model
-
-### Soft Deletion and Reference Counting
-
-When a model with media is soft-deleted:
-
-```php
-// Automatic behavior in EventObject/Block models
-static::deleting(function ($model) {
-    $deduplicationService = app(MediaDeduplicationService::class);
-
-    foreach ($model->media as $media) {
-        // Only deletes file if this is the last reference
-        $deduplicationService->deleteMedia($media, forceDelete: false);
-    }
-});
-```
-
-**Reference counting logic:**
-
-- If multiple models reference the same file (same MD5), only the media record is soft-deleted
-- The file remains in S3 until the last reference is deleted
-- Force delete is supported for cleanup operations
-
-### Storage Configuration
-
-**Local Development:**
-
-```env
-MEDIA_DISK=local
-```
-
-**Production (S3):**
-
-```env
-MEDIA_DISK=s3
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-AWS_DEFAULT_REGION=eu-west-2
-AWS_BUCKET=your_bucket_name
-MEDIA_TEMPORARY_URL_DEFAULT_LIFETIME=60
-```
-
-**Path Structure:**
-Files are stored using MD5 hash paths to enable deduplication:
-
-```
-s3://bucket/ab/cd/abcdef123.../original.jpg
-s3://bucket/ab/cd/abcdef123.../conversions/thumbnail.jpg
-s3://bucket/ab/cd/abcdef123.../conversions/medium.jpg
-```
-
-Different files with the same hash share the same directory.
-
-### Activity Logging
-
-Media operations are automatically logged via Spatie ActivityLog:
-
-- Media attachments are logged when models are updated
-- Media deletions are logged
-- Integrates with existing changelog system
-
-### Testing
-
-**Unit tests** for deduplication logic:
-
-```bash
-sail artisan test --filter MD5PathGeneratorTest
-sail artisan test --filter MediaDeduplicationServiceTest
-```
-
-**Storage::fake() for feature tests:**
-
-```php
-use Illuminate\Support\Facades\Storage;
-
-Storage::fake('public');
-config(['media-library.disk_name' => 'public']);
-
-// Now test media operations
-```
-
-### Troubleshooting
-
-**Media not appearing:**
-
-- Check that model has `HasMedia` trait
-- Verify media collection is registered in `registerMediaCollections()`
-- Ensure `MEDIA_DISK` is correctly configured
-
-**Conversions not generating:**
-
-- Check Horizon is running: `sail artisan horizon`
-- Verify queue workers are processing the `default` queue
-- Check logs for ImageMagick/GD errors
-
-**S3 upload failures:**
-
-- Verify AWS credentials are correct
-- Check IAM policy allows `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`
-- Ensure bucket exists and region matches
-
-**Duplicate files in S3:**
-
-- This shouldn't happen - MD5PathGenerator ensures deduplication
-- Check that custom properties include `md5_hash`
-- Verify MediaDownloadHelper is being used (not direct addMedia calls)
-
-### Best Practices
-
-1. **Always use MediaDownloadHelper** - Don't call `addMedia()` or `addMediaFromUrl()` directly
-2. **Choose appropriate collections** - Use `screenshots` for screenshots, `downloaded_images` for API images, etc.
-3. **Leverage conversions** - Use `thumbnail` for cards, `medium` for detail views
-4. **Monitor storage costs** - Deduplication significantly reduces S3 costs, but monitor usage
-5. **Queue conversions** - Let Horizon handle image processing asynchronously
-6. **Use signed URLs in production** - Set S3 bucket to private and use `get_media_temporary_url()`
-7. **Test migration on staging** - Run `--dry-run` first, then migrate a limited batch
-
-### AWS S3 Setup
-
-See the dedicated AWS setup guide below for:
-
-- Creating an S3 bucket (eu-west-2, private)
-- Configuring IAM policies
-- Setting up CORS for signed URLs
-- Security best practices
-
-===
-
-<laravel-boost-guidelines>
-=== foundation rules ===
+See `docs/Architecture/MEDIA.md` for full architecture, helpers, migrations, conversions, and operational details.
 
 # Laravel Boost Guidelines
 
@@ -1168,6 +551,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 - Stick to existing directory structure - don't create new base folders without approval.
 - Do not change the application's dependencies without approval.
+- Do not create or modify models or migrations without explicit approval.
 
 ## Frontend Bundling
 
@@ -1180,6 +564,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 ## Documentation Files
 
 - You must only create documentation files if explicitly requested by the user.
+- You should obey the document folder structure.
 
 === boost rules ===
 
@@ -1222,7 +607,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit"
 3. Quoted Phrases (Exact Position) - query="infinite scroll" - Words must be adjacent and in that order
 4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit"
-5. Multiple Queries - queries=["authentication", "middleware"] - ANY of these terms
+5. Multiple Queries - queries=\["authentication", "middleware"\] - ANY of these terms
 
 === php rules ===
 
@@ -1241,12 +626,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - Always use explicit return type declarations for methods and functions.
 - Use appropriate PHP type hints for method parameters.
 
-<code-snippet name="Explicit Return Types and Method Params" lang="php">
-protected function isAccessible(User $user, ?string $path = null): bool
-{
-    ...
-}
-</code-snippet>
+<code-snippet name="Explicit Return Types and Method Params" lang="php"> protected function isAccessible(User $user, ?string $path = null): bool { ... } </code-snippet>
 
 ## Comments
 
@@ -1279,7 +659,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 ## Test Enforcement
 
 - Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `vendor/bin/sail artisan test` with a specific filename or filter.
+- Run the **minimum** number of tests needed to ensure code quality and speed. Use `vendor/bin/sail artisan test` with a specific filename or filter.
 
 === laravel/core rules ===
 
@@ -1334,7 +714,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ### Vite Error
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `vendor/bin/sail npm run build` or ask the user to run `vendor/bin/sail npm run dev` or `vendor/bin/sail composer run dev`.
+- If you receive an "Illuminate\\Foundation\\ViteException: Unable to locate file in Vite manifest" error, you can run `vendor/bin/sail npm run build` or ask the user to run `vendor/bin/sail npm run dev` or `vendor/bin/sail composer run dev`.
 
 === laravel/v12 rules ===
 
@@ -1348,7 +728,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - No middleware files in `app/Http/Middleware/`.
 - `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
 - `bootstrap/providers.php` contains application specific service providers.
-- **No app\Console\Kernel.php** - use `bootstrap/app.php` or `routes/console.php` for console configuration.
+- **No app\\Console\\Kernel.php** - use `bootstrap/app.php` or `routes/console.php` for console configuration.
 - **Commands auto-register** - files in `app/Console/Commands/` are automatically available and do not require manual registration.
 
 ### Database
@@ -1385,26 +765,18 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 - Prefer lifecycle hooks like `mount()`, `updatedFoo()` for initialization and reactive side effects:
 
-<code-snippet name="Lifecycle hook examples" lang="php">
-    public function mount(User $user) { $this->user = $user; }
-    public function updatedSearch() { $this->resetPage(); }
-</code-snippet>
+<code-snippet name="Lifecycle hook examples" lang="php"> public function mount(User $user) { $this->user = $user; } public function updatedSearch() { $this->resetPage(); } </code-snippet>
 
 ## Testing Livewire
 
-<code-snippet name="Example Livewire component test" lang="php">
-    Livewire::test(Counter::class)
-        ->assertSet('count', 0)
-        ->call('increment')
-        ->assertSet('count', 1)
-        ->assertSee(1)
-        ->assertStatus(200);
-</code-snippet>
+<code-snippet name="Example Livewire component test" lang="php"> Livewire::test(Counter::class) ->assertSet('count', 0) ->call('increment') ->assertSet('count', 1) ->assertSee(1) ->assertStatus(200); </code-snippet>
 
-    <code-snippet name="Testing a Livewire component exists within a page" lang="php">
-        $this->get('/posts/create')
-        ->assertSeeLivewire(CreatePost::class);
-    </code-snippet>
+```
+<code-snippet name="Testing a Livewire component exists within a page" lang="php">
+    $this->get('/posts/create')
+    ->assertSeeLivewire(CreatePost::class);
+</code-snippet>
+```
 
 === livewire/v3 rules ===
 
@@ -1431,20 +803,15 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 - You can listen for `livewire:init` to hook into Livewire initialization, and `fail.status === 419` for the page expiring:
 
-<code-snippet name="livewire:load example" lang="js">
-document.addEventListener('livewire:init', function () {
-    Livewire.hook('request', ({ fail }) => {
-        if (fail && fail.status === 419) {
-            alert('Your session expired');
-        }
-    });
+<code-snippet name="livewire:load example" lang="js"> document.addEventListener('livewire:init', function () { Livewire.hook('request', ({ fail }) => { if (fail && fail.status === 419) { alert('Your session expired'); } });
 
-    Livewire.hook('message.failed', (message, component) => {
-        console.error(message);
-    });
-
+```
+Livewire.hook('message.failed', (message, component) => {
+    console.error(message);
 });
-</code-snippet>
+```
+
+}); </code-snippet>
 
 === volt/core rules ===
 
@@ -1458,123 +825,84 @@ document.addEventListener('livewire:init', function () {
 
 ### Volt Functional Component Example
 
-<code-snippet name="Volt Functional Component Example" lang="php">
-@volt
-<?php
-use function Livewire\Volt\{state, computed};
+<code-snippet name="Volt Functional Component Example" lang="php"> @volt <?php
 
-state(['count' => 0]);
+use function Livewire\\Volt{state, computed};
 
-$increment = fn () => $this->count++;
-$decrement = fn () => $this->count--;
+state(\['count' => 0\]);
 
-$double = computed(fn () => $this->count \* 2);
-?>
+$increment = fn () => $this->count++;$decrement = fn () => $this->count--;
 
-<div>
-    <h1>Count: {{ $count }}</h1>
-    <h2>Double: {{ $this->double }}</h2>
-    <button wire:click="increment">+</button>
-    <button wire:click="decrement">-</button>
-</div>
-@endvolt
-</code-snippet>
+$double = computed(fn () => $this->count \* 2); ?>
+
+<div> <h1>Count: {{ $count }}</h1> <h2>Double: {{ $this->double }}</h2> <button wire:click="increment">+</button> <button wire:click="decrement">-</button> </div> @endvolt </code-snippet>
 
 ### Volt Class Based Component Example
 
-To get started, define an anonymous class that extends Livewire\Volt\Component. Within the class, you may utilize all of the features of Livewire using traditional Livewire syntax:
+To get started, define an anonymous class that extends Livewire\\Volt\\Component. Within the class, you may utilize all of the features of Livewire using traditional Livewire syntax:
 
-<code-snippet name="Volt Class-based Volt Component Example" lang="php">
-use Livewire\Volt\Component;
+<code-snippet name="Volt Class-based Volt Component Example" lang="php"> use Livewire\\Volt\\Component;
 
-new class extends Component {
-public $count = 0;
+new class extends Component { public $count = 0;
 
-    public function increment()
-    {
-        $this->count++;
-    }
+```
+public function increment()
+{
+    $this->count++;
+}
+```
 
 } ?>
 
-<div>
-    <h1>{{ $count }}</h1>
-    <button wire:click="increment">+</button>
-</div>
-</code-snippet>
+<div> <h1>{{ $count }}</h1> <button wire:click="increment">+</button> </div> </code-snippet>
 
 ### Testing Volt & Volt Components
 
 - Use the existing directory for tests if it already exists. Otherwise, fallback to `tests/Feature/Volt`.
 
-<code-snippet name="Livewire Test Example" lang="php">
-use Livewire\Volt\Volt;
+<code-snippet name="Livewire Test Example" lang="php"> use Livewire\\Volt\\Volt;
 
-test('counter increments', function () {
-Volt::test('counter')
-->assertSee('Count: 0')
-->call('increment')
-->assertSee('Count: 1');
-});
-</code-snippet>
+test('counter increments', function () { Volt::test('counter') ->assertSee('Count: 0') ->call('increment') ->assertSee('Count: 1'); }); </code-snippet>
 
-<code-snippet name="Volt Component Test Using Pest" lang="php">
-declare(strict_types=1);
+<code-snippet name="Volt Component Test Using Pest" lang="php"> declare(strict_types=1);
 
-use App\Models\{User, Product};
-use Livewire\Volt\Volt;
+use App\\Models{User, Product}; use Livewire\\Volt\\Volt;
 
-test('product form creates product', function () {
-$user = User::factory()->create();
+test('product form creates product', function () { $user = User::factory()->create();
 
-    Volt::test('pages.products.create')
-        ->actingAs($user)
-        ->set('form.name', 'Test Product')
-        ->set('form.description', 'Test Description')
-        ->set('form.price', 99.99)
-        ->call('create')
-        ->assertHasNoErrors();
+```
+Volt::test('pages.products.create')
+    ->actingAs($user)
+    ->set('form.name', 'Test Product')
+    ->set('form.description', 'Test Description')
+    ->set('form.price', 99.99)
+    ->call('create')
+    ->assertHasNoErrors();
 
-    expect(Product::where('name', 'Test Product')->exists())->toBeTrue();
+expect(Product::where('name', 'Test Product')->exists())->toBeTrue();
+```
 
-});
-</code-snippet>
+}); </code-snippet>
 
 ### Common Patterns
 
-<code-snippet name="CRUD With Volt" lang="php">
-<?php
+<code-snippet name="CRUD With Volt" lang="php"> <?php
 
-use App\Models\Product;
-use function Livewire\Volt\{state, computed};
+use App\\Models\\Product; use function Livewire\\Volt{state, computed};
 
-state(['editing' => null, 'search' => '']);
+state(\['editing' => null, 'search' => ''\]);
 
-$products = computed(fn() => Product::when($this->search,
-fn($q) => $q->where('name', 'like', "%{$this->search}%")
-)->get());
+$products = computed(fn() => Product::when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%") )->get());
 
-$edit = fn(Product $product) => $this->editing = $product->id;
-$delete = fn(Product $product) => $product->delete();
+$edit = fn(Product $product) => $this->editing = $product->id;$delete = fn(Product $product) => $product->delete();
 
 ?>
 
-<!-- HTML / UI Here -->
-</code-snippet>
+<!-- HTML / UI Here --> </code-snippet>
 
-<code-snippet name="Real-Time Search With Volt" lang="php">
-    <flux:input
-        wire:model.live.debounce.300ms="search"
-        placeholder="Search..."
-    />
-</code-snippet>
+<code-snippet name="Real-Time Search With Volt" lang="php"> <flux:input wire:model.live.debounce.300ms="search" placeholder="Search..." /> </code-snippet>
 
-<code-snippet name="Loading States With Volt" lang="php">
-    <flux:button wire:click="save" wire:loading.attr="disabled">
-        <span wire:loading.remove>Save</span>
-        <span wire:loading>Saving...</span>
-    </flux:button>
-</code-snippet>
+<code-snippet name="Loading States With Volt" lang="php"> <flux:button wire:click="save" wire:loading.attr="disabled"> <span wire:loading.remove>Save</span> <span wire:loading>Saving...</span> </flux:button> </code-snippet>
 
 === pint/core rules ===
 
@@ -1614,13 +942,15 @@ $delete = fn(Product $product) => $product->delete();
 
 - When listing items, use gap utilities for spacing, don't use margins.
 
-        <code-snippet name="Valid Flex Gap Spacing Example" lang="html">
-            <div class="flex gap-8">
-                <div>Superior</div>
-                <div>Michigan</div>
-                <div>Erie</div>
-            </div>
-        </code-snippet>
+    ```
+      <code-snippet name="Valid Flex Gap Spacing Example" lang="html">
+          <div class="flex gap-8">
+              <div>Superior</div>
+              <div>Michigan</div>
+              <div>Erie</div>
+          </div>
+      </code-snippet>
+    ```
 
 ### Dark Mode
 
@@ -1632,38 +962,20 @@ $delete = fn(Product $product) => $product->delete();
 
 - Always use Tailwind CSS v4 - do not use the deprecated utilities.
 - `corePlugins` is not supported in Tailwind v4.
-- In Tailwind v4, configuration is CSS-first using the `@theme` directive — no separate `tailwind.config.js` file is needed.
-  <code-snippet name="Extending Theme in CSS" lang="css">
-  @theme {
-  --color-brand: oklch(0.72 0.11 178);
-  }
-  </code-snippet>
-
+- In Tailwind v4, configuration is CSS-first using the `@theme` directive — no separate `tailwind.config.js` file is needed. <code-snippet name="Extending Theme in CSS" lang="css"> @theme { --color-brand: oklch(0.72 0.11 178); } </code-snippet>
 - In Tailwind v4, you import Tailwind using a regular CSS `@import` statement, not using the `@tailwind` directives used in v3:
 
 <code-snippet name="Tailwind v4 Import Tailwind Diff" lang="diff">
-   - @tailwind base;
-   - @tailwind components;
-   - @tailwind utilities;
-   + @import "tailwindcss";
-</code-snippet>
+
+- @tailwind base;
+- @tailwind components;
+- @tailwind utilities;
+
+- @import "tailwindcss"; </code-snippet>
 
 ### Replaced Utilities
 
 - Tailwind v4 removed deprecated utilities. Do not use the deprecated option - use the replacement.
 - Opacity values are still numeric.
 
-| Deprecated | Replacement |
-|------------+--------------|
-| bg-opacity-_ | bg-black/_ |
-| text-opacity-_ | text-black/_ |
-| border-opacity-_ | border-black/_ |
-| divide-opacity-_ | divide-black/_ |
-| ring-opacity-_ | ring-black/_ |
-| placeholder-opacity-_ | placeholder-black/_ |
-| flex-shrink-_ | shrink-_ |
-| flex-grow-_ | grow-_ |
-| overflow-ellipsis | text-ellipsis |
-| decoration-slice | box-decoration-slice |
-| decoration-clone | box-decoration-clone |
-</laravel-boost-guidelines>
+| Deprecated | Replacement | |------------+--------------| | bg-opacity-_ | bg-black/_ | | text-opacity-_ | text-black/_ | | border-opacity-_ | border-black/_ | | divide-opacity-_ | divide-black/_ | | ring-opacity-_ | ring-black/_ | | placeholder-opacity-_ | placeholder-black/_ | | flex-shrink-_ | shrink-_ | | flex-grow-_ | grow-_ | | overflow-ellipsis | text-ellipsis | | decoration-slice | box-decoration-slice | | decoration-clone | box-decoration-clone | </laravel-boost-guidelines>
