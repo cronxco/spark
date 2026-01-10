@@ -197,19 +197,14 @@
                         @if ($this->eventsAtPlace->count() > 0)
                         <div class="space-y-2">
                             @foreach ($this->eventsAtPlace as $event)
-                            <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                                <div class="flex-1">
-                                    <a href="{{ route('events.show', $event) }}" class="font-medium hover:underline">
-                                        {{ $event->action_display }}
-                                    </a>
-                                    <div class="text-xs text-base-content/70 mt-1">
-                                        {{ $event->time->format('M j, Y g:i A') }}
-                                    </div>
+                            <div class="flex items-center justify-between gap-2 p-3 bg-base-100 rounded-lg">
+                                <div class="flex-1 min-w-0">
+                                    <x-event-ref :event="$event" :showService="true" />
                                 </div>
                                 <button
                                     wire:click="unlinkEvent('{{ $event->id }}')"
                                     wire:confirm="Unlink this event from this place?"
-                                    class="btn btn-ghost btn-xs">
+                                    class="btn btn-ghost btn-xs flex-shrink-0">
                                     <x-icon name="o-x-mark" class="w-4 h-4" />
                                 </button>
                             </div>
@@ -240,18 +235,13 @@
 
                         <div class="space-y-2">
                             @foreach ($this->nearbyEvents as $event)
-                            <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                                <div class="flex-1">
-                                    <a href="{{ route('events.show', $event) }}" class="font-medium hover:underline">
-                                        {{ $event->action_display }}
-                                    </a>
-                                    <div class="text-xs text-base-content/70 mt-1">
-                                        {{ $event->time->format('M j, Y g:i A') }}
-                                    </div>
+                            <div class="flex items-center justify-between gap-2 p-3 bg-base-100 rounded-lg">
+                                <div class="flex-1 min-w-0">
+                                    <x-event-ref :event="$event" :showService="true" />
                                 </div>
                                 <button
                                     wire:click="linkNearbyEvent('{{ $event->id }}')"
-                                    class="btn btn-primary btn-xs">
+                                    class="btn btn-primary btn-xs flex-shrink-0">
                                     <x-icon name="o-link" class="w-4 h-4" />
                                     Link
                                 </button>
