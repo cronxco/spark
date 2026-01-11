@@ -1,6 +1,6 @@
 <div>
     {{-- GoCardless EUA Reconfirmation Banner --}}
-    @if($integration->group && $integration->group->service === 'gocardless' &&
+    @if ($integration->group && $integration->group->service === 'gocardless' &&
         ($integration->group->auth_metadata['requires_reconfirmation'] ?? false))
         <livewire:go-cardless-reconfirm-banner :group="$integration->group" />
     @endif

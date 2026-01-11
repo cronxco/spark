@@ -76,15 +76,15 @@ class IntegrationAuthenticationFailed extends SparkNotification
         if ($isEuaExpiry) {
             $bankName = $this->details['bank_name'] ?? 'bank';
             $mail->line("Your {$bankName} connection has expired and needs to be renewed.")
-                 ->line('This is required every 90 days for security purposes. Your transaction history will remain intact.')
-                 ->line('Click the button below to reconnect your account and resume syncing.');
+                ->line('This is required every 90 days for security purposes. Your transaction history will remain intact.')
+                ->line('Click the button below to reconnect your account and resume syncing.');
         } else {
             $mail->line("Your {$serviceName} integration has lost authentication and needs to be reconnected.")
-                 ->line("**Error:** {$this->errorMessage}")
-                 ->line('Please click the button below to re-authorize your connection and resume data syncing.');
+                ->line("**Error:** {$this->errorMessage}")
+                ->line('Please click the button below to re-authorize your connection and resume data syncing.');
         }
 
         return $mail->action($isEuaExpiry ? 'Reconnect Bank' : 'Re-authorize Connection', $this->getActionUrl())
-                    ->line('If you continue to experience issues, please contact support.');
+            ->line('If you continue to experience issues, please contact support.');
     }
 }

@@ -91,6 +91,15 @@ class HandleExpiredEuaJob implements ShouldQueue
         ]);
     }
 
+    public function failed(Exception $exception): void
+    {
+        Log::error('HandleExpiredEuaJob: Job failed permanently', [
+            'group_id' => $this->groupId,
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+    }
+
     protected function deletePendingJobs(IntegrationGroup $group): void
     {
         try {
@@ -180,14 +189,5 @@ class HandleExpiredEuaJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
-    }
-
-    public function failed(Exception $exception): void
-    {
-        Log::error('HandleExpiredEuaJob: Job failed permanently', [
-            'group_id' => $this->groupId,
-            'error' => $exception->getMessage(),
-            'trace' => $exception->getTraceAsString(),
-        ]);
     }
 }
