@@ -103,7 +103,7 @@ class GoCardlessReconfirmBanner extends Component
                 'error' => $e->getMessage(),
             ]);
 
-            $this->addError('general', 'Failed to create new authorization: '.$e->getMessage());
+            $this->addError('general', 'Failed to create new authorization: ' . $e->getMessage());
             $this->loading = false;
         }
     }
