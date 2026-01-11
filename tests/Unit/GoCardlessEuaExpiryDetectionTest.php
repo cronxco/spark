@@ -10,6 +10,7 @@ use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -76,7 +77,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         try {
             $job->handle();
             $this->fail('Expected job to fail with GoCardlessEuaExpiredException');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Job should have failed, triggering the failed() method
             $this->assertTrue(true);
         }
