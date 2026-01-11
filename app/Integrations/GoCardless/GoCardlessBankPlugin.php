@@ -3695,12 +3695,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
             // Check if error is about reconfirmation not being supported
             $error = $response->json();
-            if (str_contains($error['summary'] ?? '', 'Reconfirmation not supported') ||
+            $is404 = $response->status() === 404 || ($error['status_code'] ?? null) === 404;
+            if ($is404 ||
+                str_contains($error['summary'] ?? '', 'Reconfirmation not supported') ||
                 str_contains($error['summary'] ?? '', 'Reconfirmation is not allowed') ||
                 str_contains($error['detail'] ?? '', 'Reconfirmation')) {
                 // Retry without reconfirmation
                 Log::info('GoCardless: Reconfirmation not supported for institution, retrying without', [
                     'institution_id' => $institutionId,
+                    'reason' => $is404 ? 'Not found (404)' : 'Reconfirmation not allowed',
                 ]);
             } else {
                 throw new Exception('Failed to create EUA: ' . $response->body());
