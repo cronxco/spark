@@ -19,6 +19,7 @@ use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Newsletter\NewsletterPlugin;
 use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Outline\OutlinePlugin;
+use App\Integrations\Oyster\OysterPlugin;
 use App\Integrations\PluginRegistry;
 use App\Integrations\Receipt\ReceiptPlugin;
 use App\Integrations\Reddit\RedditPlugin;
@@ -57,6 +58,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(BlueSkyPlugin::class);
         PluginRegistry::register(ReceiptPlugin::class);
         PluginRegistry::register(NewsletterPlugin::class);
+        PluginRegistry::register(OysterPlugin::class);
         PluginRegistry::register(GoodreadsPlugin::class);
         PluginRegistry::register(UntappdPlugin::class);
     }
