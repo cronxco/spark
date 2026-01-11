@@ -86,48 +86,44 @@ class TflStationLookup
     {
         $normalizedTitle = $this->formatStationTitle($stationName);
 
-        // Find existing station for this user
-        $station = EventObject::where('user_id', $userId)
-            ->where('concept', 'place')
-            ->where('type', 'tfl_station')
-            ->whereRaw('LOWER(title) = ?', [strtolower($normalizedTitle)])
-            ->first();
-
-        if ($station) {
-            return $station;
-        }
-
-        // Create new station
-        $station = EventObject::create([
-            'user_id' => $userId,
-            'concept' => 'place',
-            'type' => 'tfl_station',
-            'title' => $normalizedTitle,
-            'time' => now(),
-            'metadata' => [
-                'category' => 'transport',
-                'original_name' => $stationName,
+        // Atomically get or create station using normalized title
+        // The unique constraint on (user_id, concept, type, LOWER(title)) prevents duplicates
+        $station = EventObject::firstOrCreate(
+            [
+                'user_id' => $userId,
+                'concept' => 'place',
+                'type' => 'tfl_station',
+                'title' => $normalizedTitle,
             ],
-        ]);
+            [
+                'time' => now(),
+                'metadata' => [
+                    'category' => 'transport',
+                    'original_name' => $stationName,
+                ],
+            ]
+        );
 
-        // Try to geocode the station
-        $location = $this->getStationLocation($stationName);
+        // Try to geocode the station if it doesn't have location data
+        if (! $station->location) {
+            $location = $this->getStationLocation($stationName);
 
-        if ($location && $location['latitude'] && $location['longitude']) {
-            $station->setLocation(
-                $location['latitude'],
-                $location['longitude'],
-                $location['address'] ?? $normalizedTitle,
-                'tfl_api'
-            );
+            if ($location && $location['latitude'] && $location['longitude']) {
+                $station->setLocation(
+                    $location['latitude'],
+                    $location['longitude'],
+                    $location['address'] ?? $normalizedTitle,
+                    'tfl_api'
+                );
 
-            // Update metadata with TfL data
-            $station->metadata = array_merge($station->metadata ?? [], array_filter([
-                'naptan_id' => $location['naptan_id'] ?? null,
-                'tfl_modes' => $location['modes'] ?? null,
-                'zone' => $location['zone'] ?? null,
-            ]));
-            $station->save();
+                // Update metadata with TfL data
+                $station->metadata = array_merge($station->metadata ?? [], array_filter([
+                    'naptan_id' => $location['naptan_id'] ?? null,
+                    'tfl_modes' => $location['modes'] ?? null,
+                    'zone' => $location['zone'] ?? null,
+                ]));
+                $station->save();
+            }
         }
 
         return $station;
