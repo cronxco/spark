@@ -3,50 +3,52 @@
         $bankName = $group->auth_metadata['gocardless_institution_name'] ?? 'Bank';
     @endphp
 
-    <flux:card class="mb-6 border-l-4 border-orange-500">
-        <div class="flex items-start gap-4">
+    <div class="alert alert-warning mb-6 border-l-4 border-warning">
+        <div class="flex items-start gap-4 w-full">
             <div class="flex-shrink-0">
-                <flux:icon.exclamation-triangle variant="solid" class="size-6 text-orange-500"/>
+                <x-icon name="fas.triangle-exclamation" class="w-6 h-6 text-warning" />
             </div>
 
             <div class="flex-1">
-                <flux:heading size="lg" class="mb-2">
+                <h3 class="text-lg font-semibold text-base-content mb-2">
                     {{ $bankName }} Connection Expired
-                </flux:heading>
+                </h3>
 
-                <flux:text class="mb-4 text-zinc-600 dark:text-zinc-400">
+                <p class="text-sm text-base-content/80 mb-4">
                     Your {{ $bankName }} connection needs to be renewed. This is required every 90 days for security. Your transaction history will not be affected.
-                </flux:text>
+                </p>
 
                 @error('general')
-                    <flux:error class="mb-4">
-                        {{ $message }}
-                    </flux:error>
+                    <div class="alert alert-error mb-4">
+                        <x-icon name="fas.circle-exclamation" class="w-5 h-5" />
+                        <span>{{ $message }}</span>
+                    </div>
                 @enderror
 
                 <div class="flex gap-3">
-                    <flux:button
+                    <button
                         wire:click="attemptReconfirmation"
                         wire:loading.attr="disabled"
-                        variant="primary"
+                        class="btn btn-primary"
                     >
                         <span wire:loading.remove wire:target="attemptReconfirmation,createNewEua">
                             Reconnect {{ $bankName }}
                         </span>
                         <span wire:loading wire:target="attemptReconfirmation,createNewEua">
+                            <span class="loading loading-spinner loading-sm"></span>
                             Loading...
                         </span>
-                    </flux:button>
+                    </button>
 
-                    <flux:button
+                    <button
                         wire:click="createNewEua"
                         wire:loading.attr="disabled"
-                        variant="ghost"
+                        class="btn btn-ghost"
                     >
                         Connect Different Account
-                    </flux:button>
+                    </button>
                 </div>
             </div>
         </div>
-    </flux:card>
+    </div>
 </div>
