@@ -36,8 +36,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     // Rate limit cache keys
     private const TRANSACTION_CALLS_CACHE_KEY = 'gocardless_transaction_calls';
+
     private const MAX_DAILY_TRANSACTION_CALLS = 10; // GoCardless limit
+
     private const BALANCE_CALLS_CACHE_KEY = 'gocardless_balance_calls';
+
     private const MAX_DAILY_BALANCE_CALLS = 10; // GoCardless limit
 
     // 1 hour
@@ -1740,9 +1743,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['message']) &&
-                str_contains($errorBody['message'], 'End User Agreement') &&
-                str_contains($errorBody['message'], 'has expired')) {
+            $errorMessage = $errorBody['summary'] ?? $errorBody['message'] ?? '';
+            if (str_contains($errorMessage, 'End User Agreement') &&
+                str_contains($errorMessage, 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
@@ -1923,9 +1926,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['message']) &&
-                str_contains($errorBody['message'], 'End User Agreement') &&
-                str_contains($errorBody['message'], 'has expired')) {
+            $errorMessage = $errorBody['summary'] ?? $errorBody['message'] ?? '';
+            if (str_contains($errorMessage, 'End User Agreement') &&
+                str_contains($errorMessage, 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
@@ -2040,9 +2043,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['message']) &&
-                str_contains($errorBody['message'], 'End User Agreement') &&
-                str_contains($errorBody['message'], 'has expired')) {
+            $errorMessage = $errorBody['summary'] ?? $errorBody['message'] ?? '';
+            if (str_contains($errorMessage, 'End User Agreement') &&
+                str_contains($errorMessage, 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
