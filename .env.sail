@@ -1,0 +1,195 @@
+APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+APP_MAINTENANCE_DRIVER=file
+# APP_MAINTENANCE_STORE=database
+
+PHP_CLI_SERVER_WORKERS=4
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=stack
+LOG_STACK=daily,info
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=pgsql
+DB_HOST=pgsql
+DB_PORT=5432
+DB_DATABASE=laravel
+DB_USERNAME=sail
+DB_PASSWORD=password
+DB_PREFIX=dev_
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=redis
+
+# Media Library
+MEDIA_DISK=local
+# MEDIA_DISK=s3  # Use this in production
+MEDIA_QUEUE=default
+QUEUE_CONVERSIONS_BY_DEFAULT=true
+QUEUE_CONVERSIONS_AFTER_DB_COMMIT=true
+MEDIA_TEMPORARY_URL_DEFAULT_LIFETIME=60
+MEDIA_DOWNLOADER_SSL=true
+
+CACHE_STORE=database
+# CACHE_PREFIX=
+
+MEMCACHED_HOST=127.0.0.1
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=log
+MAIL_SCHEME=null
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=eu-west-2
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+# AWS_URL=  # Optional: Custom S3 endpoint URL
+
+VITE_APP_NAME="${APP_NAME}"
+
+# GitHub OAuth credentials
+GITHUB_CLIENT_ID=test
+GITHUB_CLIENT_SECRET=test
+GITHUB_REDIRECT_URI=https://localhost/integrations/github/callback
+
+# Spotify OAuth credentials
+SPOTIFY_CLIENT_ID=test
+SPOTIFY_CLIENT_SECRET=test
+SPOTIFY_REDIRECT_URI=https://localhost/integrations/spotify/callback
+
+# Sentry Backend (Laravel)
+SENTRY_LARAVEL_DSN=https://fe021cdd20bed202e5d5f8a1bdc773f2@sentry.cronx.co/2
+SENTRY_TRACES_SAMPLE_RATE=1.0
+SENTRY_PROFILES_SAMPLE_RATE=1.0
+SENTRY_RELEASE=
+SENTRY_SEND_DEFAULT_PII=true
+SENTRY_PROJECT_NAME=sparkapp
+
+# Sentry Frontend (Browser)
+VITE_SENTRY_DSN=
+
+
+OURA_CLIENT_ID=test
+OURA_CLIENT_SECRET=test
+OURA_REDIRECT_URI=https://localhost/integrations/oura/callback
+
+MONZO_CLIENT_ID=test
+MONZO_CLIENT_SECRET=test
+MONZO_REDIRECT_URI=https://localhost/integrations/monzo/callback
+MONZO_SALARY_NAME=Employer
+
+HEVY_API_KEY=
+
+# GoCardless Bank Account Data API
+GOCARDLESS_SECRET_ID=
+GOCARDLESS_SECRET_KEY=
+GOCARDLESS_API_BASE=https://bankaccountdata.gocardless.com/api/v2
+GOCARDLESS_COUNTRY=GB
+GOCARDLESS_INSTITUTION_ID=
+GOCARDLESS_REDIRECT_URI=
+
+KARAKEEP_URL=https://karakeep.url.tld
+KARAKEEP_ACCESS_TOKEN=your_jwt_token_here
+
+GOOGLE_CALENDAR_CLIENT_ID=test
+GOOGLE_CALENDAR_CLIENT_SECRET=test
+GOOGLE_CALENDAR_REDIRECT_URI=https://localhost/integrations/google-calendar/callback
+
+# Geoapify Geocoding API (for location support)
+GEOAPIFY_API_KEY=
+GEOAPIFY_BASE_URL=https://api.geoapify.com/v1
+GEOAPIFY_DAILY_LIMIT=3000
+
+# Playwright Browser Automation (for Fetch integration)
+PLAYWRIGHT_ENABLED=false
+PLAYWRIGHT_WORKER_URL=http://playwright-worker:3000
+PLAYWRIGHT_TIMEOUT=30000
+PLAYWRIGHT_SCREENSHOT_ENABLED=true
+PLAYWRIGHT_AUTO_ESCALATE=true
+PLAYWRIGHT_JS_DOMAINS=twitter.com,x.com,instagram.com,facebook.com
+
+# Stealth mode (anti-bot detection)
+PLAYWRIGHT_STEALTH_ENABLED=true
+
+# Cookie auto-refresh
+PLAYWRIGHT_AUTO_UPDATE_COOKIES=true
+
+# Browser context persistence (caching)
+PLAYWRIGHT_CONTEXT_PERSISTENCE=true
+PLAYWRIGHT_CONTEXT_TTL=1800
+
+# Use default browser context (includes extensions like cookie popup blocker)
+PLAYWRIGHT_USE_DEFAULT_CONTEXT=true
+
+# Scheduled cookie refresh
+PLAYWRIGHT_COOKIE_REFRESH_ENABLED=true
+PLAYWRIGHT_COOKIE_REFRESH_THRESHOLD=7
+
+# Docker ports
+CHROME_VNC_PORT=5900
+CHROME_CDP_PORT=9222
+CHROME_VNC_URL=vnc://localhost:5900
+CHROME_VNC_PASSWORD=spark-dev-vnc
+
+
+OPENAI_API_KEY=thisisademoapikey
+OPENAI_ORGANIZATION=
+
+# Web Push Notifications (VAPID)
+# Generate keys with: php artisan webpush:vapid
+VAPID_SUBJECT=mailto:support@example.com
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+
+## Currency Conversion
+CURRENCY_API_KEY=your_key_here
+CURRENCY_BASE=GBP
+CURRENCY_CACHE_TTL=24
+
+## Flint Assistant
+ASSISTANT_MAX_EVENTS=200
+
+# Receipt Plugin Configuration
+RECEIPT_DOMAIN=domain.com
+RECEIPT_EMAIL_ADDRESS=receipts@domain.com
+RECEIPT_WEBHOOK_SECRET=your_webhook_secret_here
+
+# AWS Receipt Storage (may differ from main AWS config)
+AWS_REGION_RECEIPTS=eu-west-2
+AWS_BUCKET_RECEIPTS=spark-receipts-emails
+AWS_SNS_RECEIPT_TOPIC_ARN=arn:your_key_here
+
+# Newsletter Integration
+NEWSLETTER_DOMAIN=domain.com
+NEWSLETTER_EMAIL_ADDRESS=news@domain.com
+AWS_BUCKET_NEWSLETTERS=spark-newsletters-emails
+AWS_REGION_NEWSLETTERS=eu-west-2
+AWS_SNS_NEWSLETTER_TOPIC_ARN=arn:your_key_here

@@ -2,6 +2,7 @@
 
 namespace App\Integrations\GoCardless;
 
+use App\Exceptions\GoCardlessEuaExpiredException;
 use App\Integrations\Base\OAuthPlugin;
 use App\Models\Block;
 use App\Models\Event;
@@ -403,12 +404,52 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 $this->cacheAccountList($group->id, $accountIds);
             }
 
-            // Update group with the confirmed requisition id
+            // Extract and store institution_id for future reconfirmation
+            $institutionId = $requisition['institution_id'] ?? null;
+            $authMetadata = $group->auth_metadata ?? [];
+
+            // Check if this was a reconfirmation (old requisition exists)
+            $oldRequisitionId = $authMetadata['old_requisition_id'] ?? null;
+
+            if ($oldRequisitionId) {
+                Log::info('GoCardless: This was a reconfirmation, deleting old requisition', [
+                    'group_id' => $group->id,
+                    'old_requisition_id' => $oldRequisitionId,
+                    'new_requisition_id' => $requisitionId,
+                ]);
+
+                // This was a reconfirmation - delete the old requisition
+                $this->deleteOldRequisition($oldRequisitionId);
+
+                // Clear the old requisition ID from metadata
+                unset($authMetadata['old_requisition_id']);
+            }
+
+            // Store institution_id in metadata (for future reconfirmation)
+            if ($institutionId) {
+                $authMetadata['institution_id'] = $institutionId;
+            }
+
+            // Update group with the confirmed requisition id and metadata
             $group->update([
                 'account_id' => $requisitionId,
                 // Store a non-null token surrogate so scheduler includes this group
                 'access_token' => 'requisition:' . $requisitionId,
+                'auth_metadata' => $authMetadata,
             ]);
+
+            // Resume all paused instances in this group (in case this was a reconfirmation)
+            $group->integrations()->each(function ($integration) {
+                $config = $integration->configuration ?? [];
+                if ($config['paused'] ?? false) {
+                    $config['paused'] = false;
+                    $integration->update(['configuration' => $config]);
+
+                    Log::info('GoCardless: Resumed integration after reconfirmation', [
+                        'integration_id' => $integration->id,
+                    ]);
+                }
+            });
 
             Log::info('GoCardless requisition successfully linked', [
                 'group_id' => $group->id,
@@ -416,6 +457,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'reference' => $reference,
                 'status' => $requisition['status'],
                 'account_count' => count($accountIds),
+                'institution_id' => $institutionId,
+                'was_reconfirmation' => $oldRequisitionId !== null,
             ]);
         } catch (Throwable $e) {
             Log::error('GoCardless OAuth callback failed', [
@@ -1695,6 +1738,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         if (! $response->successful()) {
+            // Check if this is an EUA expiry error
+            $errorBody = $response->json();
+            if (isset($errorBody['message']) &&
+                str_contains($errorBody['message'], 'End User Agreement') &&
+                str_contains($errorBody['message'], 'has expired')) {
+                throw new GoCardlessEuaExpiredException(
+                    $integration->integration_group_id,
+                    $errorBody
+                );
+            }
+
             throw new Exception('Failed to fetch transactions from GoCardless API: ' . $response->body());
         }
 
@@ -1867,6 +1921,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         if (! $response->successful()) {
+            // Check if this is an EUA expiry error
+            $errorBody = $response->json();
+            if (isset($errorBody['message']) &&
+                str_contains($errorBody['message'], 'End User Agreement') &&
+                str_contains($errorBody['message'], 'has expired')) {
+                throw new GoCardlessEuaExpiredException(
+                    $integration->integration_group_id,
+                    $errorBody
+                );
+            }
+
             throw new Exception('Failed to fetch balances from GoCardless API: ' . $response->body());
         }
 
@@ -1973,6 +2038,17 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         if (! $response->successful()) {
+            // Check if this is an EUA expiry error
+            $errorBody = $response->json();
+            if (isset($errorBody['message']) &&
+                str_contains($errorBody['message'], 'End User Agreement') &&
+                str_contains($errorBody['message'], 'has expired')) {
+                throw new GoCardlessEuaExpiredException(
+                    $integration->integration_group_id,
+                    $errorBody
+                );
+            }
+
             throw new Exception('Failed to fetch account details from GoCardless API: ' . $response->body());
         }
 
@@ -2188,6 +2264,148 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
             return $accountData;
         });
+    }
+
+    /**
+     * Attempt to reconfirm an existing EUA
+     *
+     * @throws Exception if reconfirmation not enabled or fails
+     */
+    public function attemptReconfirmation(IntegrationGroup $group): array
+    {
+        $euaId = $group->auth_metadata['gocardless_agreement_id'] ?? null;
+
+        if (! $euaId) {
+            throw new Exception('No EUA ID found in integration group metadata');
+        }
+
+        Log::info('GoCardless: Attempting reconfirmation', [
+            'group_id' => $group->id,
+            'eua_id' => $euaId,
+        ]);
+
+        // First check if reconfirmation is available
+        $checkResponse = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ])->get($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/");
+
+        $this->logApiResponse('GET', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $checkResponse->status(), $checkResponse->body(), $checkResponse->headers());
+
+        if ($checkResponse->status() === 400) {
+            $error = $checkResponse->json();
+            if (str_contains($error['summary'] ?? '', 'Reconfirmation is not enabled')) {
+                // Reconfirmation not available, need to create new EUA
+                throw new Exception('Reconfirmation not enabled for this EUA');
+            }
+        }
+
+        // Create reconfirmation
+        $requestData = [
+            'redirect' => route('integrations.oauth.callback', ['service' => 'gocardless']),
+        ];
+
+        $this->logApiRequest('POST', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", [
+            'Authorization' => '[REDACTED]',
+        ], $requestData);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ])->post($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $requestData);
+
+        $this->logApiResponse('POST', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            throw new Exception('Failed to create reconfirmation: ' . $response->body());
+        }
+
+        $data = $response->json();
+
+        Log::info('GoCardless: Reconfirmation created successfully', [
+            'group_id' => $group->id,
+            'eua_id' => $euaId,
+            'reconfirmation_url' => $data['reconfirmation_url'] ?? 'missing',
+        ]);
+
+        return $data;
+    }
+
+    /**
+     * Create a new EUA and requisition for an existing integration group
+     */
+    public function createNewEuaAndRequisition(IntegrationGroup $group, string $institutionId): array
+    {
+        Log::info('GoCardless: Creating new EUA and requisition for reconfirmation', [
+            'group_id' => $group->id,
+            'institution_id' => $institutionId,
+        ]);
+
+        // Get the old requisition ID so we can delete it later
+        $oldRequisitionId = $group->account_id;
+
+        // Create new EUA with reconfirmation enabled (if supported)
+        $agreement = $this->createEndUserAgreementWithReconfirmation($institutionId);
+
+        // Create new requisition
+        $requisition = $this->createRequisition($institutionId, $agreement['id']);
+
+        // Update integration group with new details
+        $authMetadata = $group->auth_metadata ?? [];
+        $authMetadata['gocardless_agreement_id'] = $agreement['id'];
+        $authMetadata['gocardless_requisition_id'] = $requisition['id'];
+        $authMetadata['gocardless_reference'] = $requisition['reference'];
+        $authMetadata['old_requisition_id'] = $oldRequisitionId; // Store for cleanup
+        $authMetadata['eua_expired'] = false;
+        $authMetadata['requires_reconfirmation'] = false;
+
+        $group->update([
+            'account_id' => $requisition['id'],
+            'access_token' => 'requisition:' . $requisition['id'],
+            'auth_metadata' => $authMetadata,
+        ]);
+
+        Log::info('GoCardless: New EUA and requisition created successfully', [
+            'group_id' => $group->id,
+            'old_requisition_id' => $oldRequisitionId,
+            'new_requisition_id' => $requisition['id'],
+            'agreement_id' => $agreement['id'],
+        ]);
+
+        return [
+            'agreement' => $agreement,
+            'requisition' => $requisition,
+            'link' => $requisition['link'],
+        ];
+    }
+
+    /**
+     * Delete the old requisition after successful reconfirmation
+     */
+    public function deleteOldRequisition(string $requisitionId): void
+    {
+        Log::info('GoCardless: Deleting old requisition', [
+            'requisition_id' => $requisitionId,
+        ]);
+
+        $this->logApiRequest('DELETE', "/api/v2/requisitions/{$requisitionId}/", [
+            'Authorization' => '[REDACTED]',
+        ], []);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ])->delete($this->getBaseUrl() . "/api/v2/requisitions/{$requisitionId}/");
+
+        $this->logApiResponse('DELETE', "/api/v2/requisitions/{$requisitionId}/", $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            Log::warning('GoCardless: Failed to delete old requisition', [
+                'requisition_id' => $requisitionId,
+                'error' => $response->body(),
+            ]);
+        } else {
+            Log::info('GoCardless: Old requisition deleted successfully', [
+                'requisition_id' => $requisitionId,
+            ]);
+        }
     }
 
     protected function getRequiredScopes(): string
@@ -2906,63 +3124,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'institution_id' => $institutionId,
         ]);
 
-        // Always create a new agreement instead of checking for existing ones
-        Log::info('Creating new GoCardless agreement (Step 3)', [
-            'group_id' => $group->id,
-            'institution_id' => $institutionId,
-            'api_endpoint' => $this->apiBase . '/agreements/enduser/',
-        ]);
-
-        $requestData = [
-            'institution_id' => $institutionId,
-            'max_historical_days' => 90,
-            'access_valid_for_days' => 90,
-            'access_scope' => ['balances', 'details', 'transactions'],
-            'reconfirmation' => false,
-        ];
-
-        Log::info('GoCardless agreement request data', [
-            'request_data' => $requestData,
-        ]);
-
-        // Log the API request
-        $this->logApiRequest('POST', '/api/v2/agreements/enduser/', [
-            'Authorization' => '[REDACTED]',
-            'Content-Type' => 'application/json',
-        ], $requestData);
-
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            'Content-Type' => 'application/json',
-        ])->post($this->apiBase . '/agreements/enduser/', $requestData);
-
-        // Log the API response
-        $this->logApiResponse('POST', '/api/v2/agreements/enduser/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Failed to create agreement (Step 3): ' . $response->body());
-        }
-
-        $data = $response->json();
-
-        // Check if the response has the expected structure
-        if (! isset($data['id'])) {
-            Log::error('GoCardless new agreement response missing ID', [
-                'response_data' => $data,
-                'response_keys' => array_keys($data),
-                'response_type' => is_array($data) ? 'array' : gettype($data),
-                'response_length' => is_array($data) ? count($data) : 'N/A',
-            ]);
-            throw new RuntimeException('Invalid response from GoCardless API: missing agreement ID');
-        }
-
-        Log::info('Successfully created GoCardless agreement (Step 3)', [
-            'agreement_id' => $data['id'],
-            'institution_id' => $data['institution_id'] ?? 'unknown',
-            'status' => $data['status'] ?? 'unknown',
-        ]);
-
-        return $data;
+        // Use the new method that attempts reconfirmation with fallback
+        return $this->createEndUserAgreementWithReconfirmation($institutionId);
     }
 
     /**
@@ -3488,5 +3651,91 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'cache_hit_rate' => $report['cache_hit_rate'] . '%',
             'top_endpoints' => array_slice($report['calls_by_endpoint'], 0, 5),
         ]);
+    }
+
+    /**
+     * Create EUA with reconfirmation enabled, fallback to no reconfirmation if not supported
+     */
+    protected function createEndUserAgreementWithReconfirmation(string $institutionId): array
+    {
+        Log::info('GoCardless: Creating EUA with reconfirmation', [
+            'institution_id' => $institutionId,
+        ]);
+
+        // Try with reconfirmation first
+        try {
+            $requestData = [
+                'institution_id' => $institutionId,
+                'access_scope' => ['balances', 'details', 'transactions'],
+                'access_valid_for_days' => 90,
+                'max_historical_days' => 90,
+                'reconfirmation' => true, // Try with reconfirmation
+            ];
+
+            $this->logApiRequest('POST', '/api/v2/agreements/enduser/', [
+                'Authorization' => '[REDACTED]',
+            ], $requestData);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ])->post($this->getBaseUrl() . '/api/v2/agreements/enduser/', $requestData);
+
+            $this->logApiResponse('POST', '/api/v2/agreements/enduser/', $response->status(), $response->body(), $response->headers());
+
+            if ($response->successful()) {
+                Log::info('GoCardless: EUA created with reconfirmation enabled', [
+                    'institution_id' => $institutionId,
+                ]);
+
+                return $response->json();
+            }
+
+            // Check if error is about reconfirmation not being supported
+            $error = $response->json();
+            if (str_contains($error['summary'] ?? '', 'Reconfirmation not supported') ||
+                str_contains($error['summary'] ?? '', 'Reconfirmation is not allowed') ||
+                str_contains($error['detail'] ?? '', 'Reconfirmation')) {
+                // Retry without reconfirmation
+                Log::info('GoCardless: Reconfirmation not supported for institution, retrying without', [
+                    'institution_id' => $institutionId,
+                ]);
+            } else {
+                throw new Exception('Failed to create EUA: ' . $response->body());
+            }
+        } catch (Exception $e) {
+            Log::warning('GoCardless: Failed to create EUA with reconfirmation, retrying without', [
+                'institution_id' => $institutionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // Fallback: create without reconfirmation
+        $requestData = [
+            'institution_id' => $institutionId,
+            'access_scope' => ['balances', 'details', 'transactions'],
+            'access_valid_for_days' => 90,
+            'max_historical_days' => 90,
+            'reconfirmation' => false,
+        ];
+
+        $this->logApiRequest('POST', '/api/v2/agreements/enduser/ (fallback)', [
+            'Authorization' => '[REDACTED]',
+        ], $requestData);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ])->post($this->getBaseUrl() . '/api/v2/agreements/enduser/', $requestData);
+
+        $this->logApiResponse('POST', '/api/v2/agreements/enduser/ (fallback)', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            throw new Exception('Failed to create EUA: ' . $response->body());
+        }
+
+        Log::info('GoCardless: EUA created without reconfirmation', [
+            'institution_id' => $institutionId,
+        ]);
+
+        return $response->json();
     }
 }

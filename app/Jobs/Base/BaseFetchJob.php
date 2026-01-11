@@ -2,7 +2,9 @@
 
 namespace App\Jobs\Base;
 
+use App\Exceptions\GoCardlessEuaExpiredException;
 use App\Jobs\Concerns\EnhancedIdempotency;
+use App\Jobs\GoCardless\HandleExpiredEuaJob;
 use App\Models\Integration;
 use App\Notifications\IntegrationFailed;
 use Exception;
@@ -102,6 +104,24 @@ abstract class BaseFetchJob implements ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
+        // Check if this is a GoCardless EUA expiry
+        if ($exception instanceof GoCardlessEuaExpiredException) {
+            Log::info('BaseFetchJob: Detected GoCardless EUA expiry, dispatching HandleExpiredEuaJob', [
+                'integration_id' => $this->integration->id,
+                'group_id' => $exception->getGroupId(),
+            ]);
+
+            // Dispatch special handling job
+            dispatch(new HandleExpiredEuaJob(
+                $exception->getGroupId(),
+                $exception->getEuaId(),
+                $exception->getErrorResponse()
+            ));
+
+            // Don't send the normal failure notification - HandleExpiredEuaJob will handle it
+            return;
+        }
+
         // Log permanent failure to all levels
         log_hierarchical($this->integration, 'critical', "{$this->getJobType()} fetch job failed permanently", [
             'integration_id' => $this->integration->id,

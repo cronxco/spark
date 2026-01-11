@@ -43,6 +43,14 @@ class IntegrationAuthenticationFailed extends SparkNotification
     {
         $serviceName = ucfirst($this->integration->service);
 
+        // Check if this is a GoCardless EUA expiry
+        if ($this->integration->service === 'gocardless' &&
+            ($this->details['eua_expired'] ?? false)) {
+            $bankName = $this->details['bank_name'] ?? 'bank';
+
+            return "Your {$bankName} connection has expired. {$this->errorMessage}";
+        }
+
         return "Your {$serviceName} connection needs to be re-authorized. {$this->errorMessage}";
     }
 
@@ -54,14 +62,29 @@ class IntegrationAuthenticationFailed extends SparkNotification
     public function toMail(User $notifiable): MailMessage
     {
         $serviceName = ucfirst($this->integration->service);
+        $isEuaExpiry = $this->integration->service === 'gocardless' &&
+                       ($this->details['eua_expired'] ?? false);
 
-        return (new MailMessage)
-            ->subject("Action Required: {$serviceName} Authentication Failed")
-            ->greeting("Hello {$notifiable->name}!")
-            ->line("Your {$serviceName} integration has lost authentication and needs to be reconnected.")
-            ->line("**Error:** {$this->errorMessage}")
-            ->line('Please click the button below to re-authorize your connection and resume data syncing.')
-            ->action('Re-authorize Connection', $this->getActionUrl())
+        $subject = $isEuaExpiry
+            ? 'Action Required: Bank Connection Expired'
+            : "Action Required: {$serviceName} Authentication Failed";
+
+        $mail = (new MailMessage)
+            ->subject($subject)
+            ->greeting("Hello {$notifiable->name}!");
+
+        if ($isEuaExpiry) {
+            $bankName = $this->details['bank_name'] ?? 'bank';
+            $mail->line("Your {$bankName} connection has expired and needs to be renewed.")
+                ->line('This is required every 90 days for security purposes. Your transaction history will remain intact.')
+                ->line('Click the button below to reconnect your account and resume syncing.');
+        } else {
+            $mail->line("Your {$serviceName} integration has lost authentication and needs to be reconnected.")
+                ->line("**Error:** {$this->errorMessage}")
+                ->line('Please click the button below to re-authorize your connection and resume data syncing.');
+        }
+
+        return $mail->action($isEuaExpiry ? 'Reconnect Bank' : 'Re-authorize Connection', $this->getActionUrl())
             ->line('If you continue to experience issues, please contact support.');
     }
 }
