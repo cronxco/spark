@@ -36,8 +36,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
     // Rate limit cache keys
     private const TRANSACTION_CALLS_CACHE_KEY = 'gocardless_transaction_calls';
+
     private const MAX_DAILY_TRANSACTION_CALLS = 10; // GoCardless limit
+
     private const BALANCE_CALLS_CACHE_KEY = 'gocardless_balance_calls';
+
     private const MAX_DAILY_BALANCE_CALLS = 10; // GoCardless limit
 
     // 1 hour
@@ -264,11 +267,11 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (isset($account['details']) && ! empty(trim($account['details']))) {
             return trim($account['details']);
         } elseif (isset($account['ownerName']) && ! empty(trim($account['ownerName']))) {
-            return trim($account['ownerName']) . "'s Account";
+            return trim($account['ownerName'])."'s Account";
         } else {
             $fallback = $account['resourceId'] ?? $account['id'] ?? 'Unknown';
 
-            return 'Account ' . substr($fallback, 0, 8);
+            return 'Account '.substr($fallback, 0, 8);
         }
     }
 
@@ -288,13 +291,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Get the selected institution from session
-        $institutionId = (string) (Session::get('gocardless_institution_id_' . $group->id)
+        $institutionId = (string) (Session::get('gocardless_institution_id_'.$group->id)
             ?? config('services.gocardless.institution_id', ''));
 
         Log::info('GoCardless institution ID from session', [
             'group_id' => $group->id,
             'institution_id' => $institutionId,
-            'session_key' => 'gocardless_institution_id_' . $group->id,
+            'session_key' => 'gocardless_institution_id_'.$group->id,
         ]);
 
         if (empty($institutionId)) {
@@ -395,7 +398,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $requisition = $this->getRequisition($requisitionId);
 
             if (($requisition['status'] ?? '') !== 'LN') {
-                throw new RuntimeException('Requisition not linked: ' . ($requisition['status'] ?? 'unknown'));
+                throw new RuntimeException('Requisition not linked: '.($requisition['status'] ?? 'unknown'));
             }
 
             // Cache the account IDs for faster future access
@@ -434,7 +437,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             $group->update([
                 'account_id' => $requisitionId,
                 // Store a non-null token surrogate so scheduler includes this group
-                'access_token' => 'requisition:' . $requisitionId,
+                'access_token' => 'requisition:'.$requisitionId,
                 'auth_metadata' => $authMetadata,
             ]);
 
@@ -748,7 +751,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
             return [
                 'success' => false,
-                'message' => 'Failed to update names: ' . $e->getMessage(),
+                'message' => 'Failed to update names: '.$e->getMessage(),
                 'error' => $e->getMessage(),
             ];
         }
@@ -857,8 +860,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ]);
 
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->get($this->apiBase . '/institutions/', [
+                'Authorization' => 'Bearer '.$this->getAccessToken(),
+            ])->get($this->apiBase.'/institutions/', [
                 'country' => $country,
             ]);
 
@@ -966,7 +969,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
             return [
                 'success' => false,
-                'message' => 'Cache refresh failed: ' . $e->getMessage(),
+                'message' => 'Cache refresh failed: '.$e->getMessage(),
                 'error' => $e->getMessage(),
             ];
         }
@@ -1168,7 +1171,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to get access token: ' . $response->body());
+            throw new RuntimeException('Failed to get access token: '.$response->body());
         }
 
         $tokenData = $response->json();
@@ -1364,7 +1367,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $balanceType = $balance['balanceType'] ?? 'unknown';
         $accountId = $integration->configuration['account_id'] ?? 'unknown';
 
-        $sourceId = 'balance_' . $accountId . '_' . $balanceReferenceDate;
+        $sourceId = 'balance_'.$accountId.'_'.$balanceReferenceDate;
 
         // Ensure account object exists by upserting with minimal data
         // This matches Monzo's approach of inline upsert to guarantee the object exists
@@ -1401,7 +1404,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'title' => $balanceReferenceDate,
             ],
             [
-                'time' => $balanceReferenceDate . ' 00:00:00',
+                'time' => $balanceReferenceDate.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -1489,7 +1492,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ->where(function ($query) use ($accountId, $integration) {
                 // Search by account_id in metadata OR by onboarding integration ID
                 $query->whereJsonContains('metadata->account_id', $accountId)
-                    ->orWhereJsonContains('metadata->integration_id', 'onboarding_' . $integration->group_id . '_' . $accountId);
+                    ->orWhereJsonContains('metadata->integration_id', 'onboarding_'.$integration->group_id.'_'.$accountId);
             })
             ->first();
 
@@ -1723,9 +1726,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], $integration->id);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
         ])
-            ->get($this->getBaseUrl() . "/accounts/{$accountId}/transactions/", [
+            ->get($this->getBaseUrl()."/accounts/{$accountId}/transactions/", [
                 'date_from' => $startDate,
                 'date_to' => $endDate,
             ]);
@@ -1740,16 +1743,16 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['message']) &&
-                str_contains($errorBody['message'], 'End User Agreement') &&
-                str_contains($errorBody['message'], 'has expired')) {
+            $errorMessage = $errorBody['summary'] ?? $errorBody['message'] ?? '';
+            if (str_contains($errorMessage, 'End User Agreement') &&
+                str_contains($errorMessage, 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
                 );
             }
 
-            throw new Exception('Failed to fetch transactions from GoCardless API: ' . $response->body());
+            throw new Exception('Failed to fetch transactions from GoCardless API: '.$response->body());
         }
 
         $data = $response->json();
@@ -1822,9 +1825,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ], [], $integration->id);
 
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+                'Authorization' => 'Bearer '.$this->getAccessToken(),
             ])
-                ->get($this->getBaseUrl() . "/accounts/{$accountId}/");
+                ->get($this->getBaseUrl()."/accounts/{$accountId}/");
 
             $this->logApiResponse('GET', "/accounts/{$accountId}/", $response->status(), $response->body(), $response->headers(), $integration->id);
 
@@ -1909,9 +1912,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], [], $integration->id);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
         ])
-            ->get($this->getBaseUrl() . "/accounts/{$accountId}/balances/");
+            ->get($this->getBaseUrl()."/accounts/{$accountId}/balances/");
 
         $this->logApiResponse('GET', "/accounts/{$accountId}/balances/", $response->status(), $response->body(), $response->headers(), $integration->id);
 
@@ -1923,16 +1926,16 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['message']) &&
-                str_contains($errorBody['message'], 'End User Agreement') &&
-                str_contains($errorBody['message'], 'has expired')) {
+            $errorMessage = $errorBody['summary'] ?? $errorBody['message'] ?? '';
+            if (str_contains($errorMessage, 'End User Agreement') &&
+                str_contains($errorMessage, 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
                 );
             }
 
-            throw new Exception('Failed to fetch balances from GoCardless API: ' . $response->body());
+            throw new Exception('Failed to fetch balances from GoCardless API: '.$response->body());
         }
 
         $data = $response->json();
@@ -2026,9 +2029,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], [], $integration->id);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
         ])
-            ->get($this->getBaseUrl() . "/accounts/{$accountId}/details/");
+            ->get($this->getBaseUrl()."/accounts/{$accountId}/details/");
 
         $this->logApiResponse('GET', "/accounts/{$accountId}/details/", $response->status(), $response->body(), $response->headers(), $integration->id);
 
@@ -2040,16 +2043,16 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['message']) &&
-                str_contains($errorBody['message'], 'End User Agreement') &&
-                str_contains($errorBody['message'], 'has expired')) {
+            $errorMessage = $errorBody['summary'] ?? $errorBody['message'] ?? '';
+            if (str_contains($errorMessage, 'End User Agreement') &&
+                str_contains($errorMessage, 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
                 );
             }
 
-            throw new Exception('Failed to fetch account details from GoCardless API: ' . $response->body());
+            throw new Exception('Failed to fetch account details from GoCardless API: '.$response->body());
         }
 
         $data = $response->json();
@@ -2200,18 +2203,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ]);
 
             // Log the API request
-            $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/details/', [
+            $this->logApiRequest('GET', '/api/v2/accounts/'.$accountId.'/details/', [
                 'Authorization' => '[REDACTED]',
             ]);
 
             $startTime = microtime(true);
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->get($this->apiBase . '/accounts/' . $accountId . '/details/');
+                'Authorization' => 'Bearer '.$this->getAccessToken(),
+            ])->get($this->apiBase.'/accounts/'.$accountId.'/details/');
             $responseTime = (int) ((microtime(true) - $startTime) * 1000); // Convert to milliseconds
 
             // Log the API response
-            $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/details/', $response->status(), $response->body(), $response->headers());
+            $this->logApiResponse('GET', '/api/v2/accounts/'.$accountId.'/details/', $response->status(), $response->body(), $response->headers());
 
             // Track API call for monitoring
             $this->trackApiCall('/api/v2/accounts/{id}/details/', 'GET', false, $responseTime);
@@ -2225,13 +2228,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'account_id' => $accountId,
                         'status' => $response->status(),
                         'rate_limit_detail' => $errorData['detail'] ?? 'unknown',
-                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
+                        'api_endpoint' => $this->apiBase.'/accounts/'.$accountId.'/details/',
                     ]);
 
                     // Return a fallback account structure when rate limited
                     return [
                         'id' => $accountId,
-                        'details' => 'Account ' . substr($accountId, 0, 8),
+                        'details' => 'Account '.substr($accountId, 0, 8),
                         'currency' => 'Unknown',
                         'cashAccountType' => 'Unknown',
                         'ownerName' => 'Unknown',
@@ -2243,7 +2246,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                         'account_id' => $accountId,
                         'status' => $response->status(),
                         'response' => $response->body(),
-                        'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/details/',
+                        'api_endpoint' => $this->apiBase.'/accounts/'.$accountId.'/details/',
                     ]);
 
                     return null;
@@ -2286,8 +2289,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         // First check if reconfirmation is available
         $checkResponse = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/");
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->get($this->getBaseUrl()."/api/v2/agreements/enduser/{$euaId}/reconfirm/");
 
         $this->logApiResponse('GET', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $checkResponse->status(), $checkResponse->body(), $checkResponse->headers());
 
@@ -2309,13 +2312,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], $requestData);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->post($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $requestData);
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->post($this->getBaseUrl()."/api/v2/agreements/enduser/{$euaId}/reconfirm/", $requestData);
 
         $this->logApiResponse('POST', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new Exception('Failed to create reconfirmation: ' . $response->body());
+            throw new Exception('Failed to create reconfirmation: '.$response->body());
         }
 
         $data = $response->json();
@@ -2359,7 +2362,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         $group->update([
             'account_id' => $requisition['id'],
-            'access_token' => 'requisition:' . $requisition['id'],
+            'access_token' => 'requisition:'.$requisition['id'],
             'auth_metadata' => $authMetadata,
         ]);
 
@@ -2391,8 +2394,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], []);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->delete($this->getBaseUrl() . "/api/v2/requisitions/{$requisitionId}/");
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->delete($this->getBaseUrl()."/api/v2/requisitions/{$requisitionId}/");
 
         $this->logApiResponse('DELETE', "/api/v2/requisitions/{$requisitionId}/", $response->status(), $response->body(), $response->headers());
 
@@ -2695,7 +2698,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     protected function getAccountTransactionsWindowed(string $accountId, ?string $dateFrom, ?string $dateTo): array
     {
         // Log the API request
-        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/transactions/', [
+        $this->logApiRequest('GET', '/api/v2/accounts/'.$accountId.'/transactions/', [
             'Authorization' => '[REDACTED]',
         ], [
             // Some BADA providers ignore date params; include if accepted
@@ -2712,10 +2715,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
         }
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->apiBase . '/accounts/' . $accountId . '/transactions/', $query);
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->get($this->apiBase.'/accounts/'.$accountId.'/transactions/', $query);
 
-        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/transactions/', $response->status(), $response->body(), $response->headers());
+        $this->logApiResponse('GET', '/api/v2/accounts/'.$accountId.'/transactions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Failed to get account transactions (windowed)', [
@@ -2773,12 +2776,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $amount = abs((float) ($transaction['transactionAmount']['amount'] ?? 0));
 
         // Create content-based hash that's consistent between pending and booked states
-        $contentString = $date . '_' .
-            Str::headline(Str::lower($counterparty)) . '_' .
-            $amount . '_' .
+        $contentString = $date.'_'.
+            Str::headline(Str::lower($counterparty)).'_'.
+            $amount.'_'.
             ($transaction['transactionAmount']['currency'] ?? 'EUR');
 
-        return 'gc_' . md5($contentString);
+        return 'gc_'.md5($contentString);
     }
 
     /**
@@ -2942,7 +2945,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         // Use onboarding-specific integration ID to avoid conflicts
         $accountId = $account['id'] ?? 'unknown';
-        $onboardingIntegrationId = 'onboarding_' . $group->id . '_' . $accountId;
+        $onboardingIntegrationId = 'onboarding_'.$group->id.'_'.$accountId;
 
         return EventObject::updateOrCreate(
             [
@@ -3007,7 +3010,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         Log::info('Creating GoCardless requisition without agreement (Step 4)', [
             'institution_id' => $institutionId,
-            'api_endpoint' => $this->apiBase . '/requisitions/',
+            'api_endpoint' => $this->apiBase.'/requisitions/',
         ]);
 
         // Log the API request
@@ -3018,9 +3021,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         // First, check if there are existing requisitions we can reuse
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
             'Content-Type' => 'application/json',
-        ])->get($this->apiBase . '/requisitions/');
+        ])->get($this->apiBase.'/requisitions/');
 
         // Log the API response
         $this->logApiResponse('GET', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
@@ -3049,12 +3052,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // If no existing requisition found, create a new one
         Log::info('No existing requisition found, creating new GoCardless requisition (Step 4)', [
             'institution_id' => $institutionId,
-            'api_endpoint' => $this->apiBase . '/requisitions/',
+            'api_endpoint' => $this->apiBase.'/requisitions/',
         ]);
 
         $requestData = [
             'institution_id' => $institutionId,
-            'reference' => 'spark_integration_' . time(),
+            'reference' => 'spark_integration_'.time(),
             'user_language' => 'EN',
             'redirect' => config('services.gocardless.redirect'), // URL where user will be redirected after authentication
             // Note: Not including agreement_id - using default terms
@@ -3065,9 +3068,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ]);
 
         // Debug: Log the exact request details
-        $requestUrl = $this->apiBase . '/requisitions/';
+        $requestUrl = $this->apiBase.'/requisitions/';
         $requestHeaders = [
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
             'Content-Type' => 'application/json',
         ];
 
@@ -3088,7 +3091,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         $this->logApiResponse('POST', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
+            throw new RuntimeException('Failed to create requisition (Step 4): '.$response->body());
         }
 
         $data = $response->json();
@@ -3136,7 +3139,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
         Log::info('Creating GoCardless requisition (Step 4)', [
             'institution_id' => $institutionId,
             'agreement_id' => $agreementId,
-            'api_endpoint' => $this->apiBase . '/requisitions/',
+            'api_endpoint' => $this->apiBase.'/requisitions/',
             'redirect_uri' => $this->redirectUri,
         ]);
 
@@ -3148,15 +3151,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         // First, try to get existing requisitions to see if we can reuse one
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
             'Content-Type' => 'application/json',
-        ])->get($this->apiBase . '/requisitions/');
+        ])->get($this->apiBase.'/requisitions/');
 
         // Log the API response
         $this->logApiResponse('GET', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to check existing requisitions: ' . $response->body());
+            throw new RuntimeException('Failed to check existing requisitions: '.$response->body());
         }
 
         $data = $response->json();
@@ -3188,12 +3191,12 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // If no existing requisition found, create a new one
         Log::info('No existing requisition found, creating new GoCardless requisition (Step 4)', [
             'institution_id' => $institutionId,
-            'api_endpoint' => $this->apiBase . '/requisitions/',
+            'api_endpoint' => $this->apiBase.'/requisitions/',
         ]);
 
         $requestData = [
             'institution_id' => $institutionId,
-            'reference' => 'integration_' . time(), // Unique reference as required
+            'reference' => 'integration_'.time(), // Unique reference as required
             'redirect' => $this->redirectUri, // URL where user will be redirected after authentication
             'agreement' => $agreementId, // End user agreement ID from Step 3
         ];
@@ -3210,15 +3213,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], $requestData);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
             'Content-Type' => 'application/json',
-        ])->post($this->apiBase . '/requisitions/', $requestData);
+        ])->post($this->apiBase.'/requisitions/', $requestData);
 
         // Log the API response
         $this->logApiResponse('POST', '/api/v2/requisitions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to create requisition (Step 4): ' . $response->body());
+            throw new RuntimeException('Failed to create requisition (Step 4): '.$response->body());
         }
 
         $data = $response->json();
@@ -3280,22 +3283,22 @@ class GoCardlessBankPlugin extends OAuthPlugin
         return Cache::remember($cacheKey, self::REQUISITION_CACHE_TTL, function () use ($requisitionId) {
             Log::info('GoCardless getRequisition called (API call)', [
                 'requisition_id' => $requisitionId,
-                'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
+                'api_endpoint' => $this->apiBase.'/requisitions/'.$requisitionId.'/',
             ]);
 
             // Log the API request
-            $this->logApiRequest('GET', '/api/v2/requisitions/' . $requisitionId . '/', [
+            $this->logApiRequest('GET', '/api/v2/requisitions/'.$requisitionId.'/', [
                 'Authorization' => '[REDACTED]',
             ]);
 
             $startTime = microtime(true);
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->get($this->apiBase . '/requisitions/' . $requisitionId . '/');
+                'Authorization' => 'Bearer '.$this->getAccessToken(),
+            ])->get($this->apiBase.'/requisitions/'.$requisitionId.'/');
             $responseTime = (int) ((microtime(true) - $startTime) * 1000); // Convert to milliseconds
 
             // Log the API response
-            $this->logApiResponse('GET', '/api/v2/requisitions/' . $requisitionId . '/', $response->status(), $response->body(), $response->headers());
+            $this->logApiResponse('GET', '/api/v2/requisitions/'.$requisitionId.'/', $response->status(), $response->body(), $response->headers());
 
             // Track API call for monitoring
             $this->trackApiCall('/api/v2/requisitions/{id}/', 'GET', false, $responseTime);
@@ -3305,9 +3308,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'requisition_id' => $requisitionId,
                     'status' => $response->status(),
                     'response' => $response->body(),
-                    'api_endpoint' => $this->apiBase . '/requisitions/' . $requisitionId . '/',
+                    'api_endpoint' => $this->apiBase.'/requisitions/'.$requisitionId.'/',
                 ]);
-                throw new RuntimeException('Failed to get requisition: ' . $response->body());
+                throw new RuntimeException('Failed to get requisition: '.$response->body());
             }
 
             $data = $response->json();
@@ -3419,27 +3422,27 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         Log::info('GoCardless getAccountBalances called', [
             'account_id' => $accountId,
-            'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/balances/',
+            'api_endpoint' => $this->apiBase.'/accounts/'.$accountId.'/balances/',
         ]);
 
         // Log the API request
-        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/balances/', [
+        $this->logApiRequest('GET', '/api/v2/accounts/'.$accountId.'/balances/', [
             'Authorization' => '[REDACTED]',
         ]);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->apiBase . '/accounts/' . $accountId . '/balances/');
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->get($this->apiBase.'/accounts/'.$accountId.'/balances/');
 
         // Log the API response
-        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/balances/', $response->status(), $response->body(), $response->headers());
+        $this->logApiResponse('GET', '/api/v2/accounts/'.$accountId.'/balances/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Failed to get account balances', [
                 'account_id' => $accountId,
                 'status' => $response->status(),
                 'response' => $response->body(),
-                'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/balances/',
+                'api_endpoint' => $this->apiBase.'/accounts/'.$accountId.'/balances/',
             ]);
 
             return [];
@@ -3476,27 +3479,27 @@ class GoCardlessBankPlugin extends OAuthPlugin
     {
         Log::info('GoCardless getAccountTransactions called', [
             'account_id' => $accountId,
-            'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/transactions/',
+            'api_endpoint' => $this->apiBase.'/accounts/'.$accountId.'/transactions/',
         ]);
 
         // Log the API request
-        $this->logApiRequest('GET', '/api/v2/accounts/' . $accountId . '/transactions/', [
+        $this->logApiRequest('GET', '/api/v2/accounts/'.$accountId.'/transactions/', [
             'Authorization' => '[REDACTED]',
         ]);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->apiBase . '/accounts/' . $accountId . '/transactions/');
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->get($this->apiBase.'/accounts/'.$accountId.'/transactions/');
 
         // Log the API response
-        $this->logApiResponse('GET', '/api/v2/accounts/' . $accountId . '/transactions/', $response->status(), $response->body(), $response->headers());
+        $this->logApiResponse('GET', '/api/v2/accounts/'.$accountId.'/transactions/', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             Log::error('Failed to get account transactions', [
                 'account_id' => $accountId,
                 'status' => $response->status(),
                 'response' => $response->body(),
-                'api_endpoint' => $this->apiBase . '/accounts/' . $accountId . '/transactions/',
+                'api_endpoint' => $this->apiBase.'/accounts/'.$accountId.'/transactions/',
             ]);
 
             return [];
@@ -3528,9 +3531,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
      */
     protected function getLogChannel(): string
     {
-        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
+        $pluginChannel = 'api_debug_'.str_replace([' ', '-', '_'], '_', static::getIdentifier());
 
-        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
+        return config('logging.channels.'.$pluginChannel) ? $pluginChannel : 'api_debug';
     }
 
     /**
@@ -3648,7 +3651,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'total_calls' => $report['total_calls'],
             'cached_calls' => $report['cached_calls'],
             'api_calls' => $report['api_calls'],
-            'cache_hit_rate' => $report['cache_hit_rate'] . '%',
+            'cache_hit_rate' => $report['cache_hit_rate'].'%',
             'top_endpoints' => array_slice($report['calls_by_endpoint'], 0, 5),
         ]);
     }
@@ -3677,8 +3680,8 @@ class GoCardlessBankPlugin extends OAuthPlugin
             ], $requestData);
 
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->post($this->getBaseUrl() . '/api/v2/agreements/enduser/', $requestData);
+                'Authorization' => 'Bearer '.$this->getAccessToken(),
+            ])->post($this->getBaseUrl().'/api/v2/agreements/enduser/', $requestData);
 
             $this->logApiResponse('POST', '/api/v2/agreements/enduser/', $response->status(), $response->body(), $response->headers());
 
@@ -3700,7 +3703,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
                     'institution_id' => $institutionId,
                 ]);
             } else {
-                throw new Exception('Failed to create EUA: ' . $response->body());
+                throw new Exception('Failed to create EUA: '.$response->body());
             }
         } catch (Exception $e) {
             Log::warning('GoCardless: Failed to create EUA with reconfirmation, retrying without', [
@@ -3723,13 +3726,13 @@ class GoCardlessBankPlugin extends OAuthPlugin
         ], $requestData);
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->post($this->getBaseUrl() . '/api/v2/agreements/enduser/', $requestData);
+            'Authorization' => 'Bearer '.$this->getAccessToken(),
+        ])->post($this->getBaseUrl().'/api/v2/agreements/enduser/', $requestData);
 
         $this->logApiResponse('POST', '/api/v2/agreements/enduser/ (fallback)', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new Exception('Failed to create EUA: ' . $response->body());
+            throw new Exception('Failed to create EUA: '.$response->body());
         }
 
         Log::info('GoCardless: EUA created without reconfirmation', [
