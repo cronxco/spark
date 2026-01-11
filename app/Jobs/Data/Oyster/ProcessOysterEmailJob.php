@@ -332,6 +332,15 @@ class ProcessOysterEmailJob implements ShouldQueue
             $value = null;
             if ($actionType === 'topped_up_balance' && $entry['credit']) {
                 $value = (int) round($entry['credit'] * 100); // Convert to pence
+            } elseif ($actionType === 'received_refund' && $entry['credit']) {
+                $value = (int) round($entry['credit'] * 100); // Refund credit
+            } elseif ($actionType === 'fare_adjustment') {
+                // Fare adjustments could be credits or charges
+                if ($entry['credit']) {
+                    $value = (int) round($entry['credit'] * 100);
+                } elseif ($entry['charge']) {
+                    $value = (int) round($entry['charge'] * 100);
+                }
             }
 
             // Get or create station if present

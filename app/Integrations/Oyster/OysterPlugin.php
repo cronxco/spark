@@ -355,7 +355,7 @@ class OysterPlugin extends WebhookPlugin
     private function verifySnsSignature(array $payload): bool
     {
         // Required fields for signature verification
-        $requiredFields = ['SigningCertURL', 'Signature', 'Type'];
+        $requiredFields = ['SigningCertURL', 'Signature', 'Type', 'SignatureVersion'];
         foreach ($requiredFields as $field) {
             if (! isset($payload[$field])) {
                 Log::warning('Oyster: SNS message missing required field for verification', [
@@ -364,6 +364,15 @@ class OysterPlugin extends WebhookPlugin
 
                 return false;
             }
+        }
+
+        // Only support SignatureVersion 1 (SHA1)
+        if ($payload['SignatureVersion'] !== '1') {
+            Log::warning('Oyster: Unsupported SNS signature version', [
+                'version' => $payload['SignatureVersion'],
+            ]);
+
+            return false;
         }
 
         // Validate that the certificate URL is from AWS
