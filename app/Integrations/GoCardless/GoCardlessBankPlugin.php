@@ -3532,10 +3532,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // First check if reconfirmation is available
         $checkResponse = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/");
+        ])->get($this->apiBase . "/agreements/enduser/{$euaId}/reconfirm/");
 
         $this->logApiResponse('GET', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $checkResponse->status(), $checkResponse->body(), $checkResponse->headers());
-
         if ($checkResponse->status() === 400) {
             $error = $checkResponse->json();
             if (str_contains($error['summary'] ?? '', 'Reconfirmation is not enabled')) {
