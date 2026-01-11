@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\Relationship;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -143,7 +144,7 @@ class LinkOysterJourneyEventsJob implements ShouldQueue
                 );
 
                 $linkedCount++;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('Oyster: Failed to create journey relationship', [
                     'touched_in_id' => $touchedInEvent->id,
                     'touched_out_id' => $touchedOutEvent->id,
@@ -165,6 +166,6 @@ class LinkOysterJourneyEventsJob implements ShouldQueue
             ? md5(json_encode($this->statementPeriod))
             : 'all';
 
-        return 'link_oyster_journeys_'.$this->integration->id.'_'.$periodHash;
+        return 'link_oyster_journeys_' . $this->integration->id . '_' . $periodHash;
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Integrations\Oyster;
 
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class OysterCsvParser
@@ -76,7 +77,7 @@ class OysterCsvParser
                 } else {
                     $nonJourneys[] = $parsed;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning('Oyster CSV: Failed to parse row', [
                     'line' => $lineNum + 2,
                     'error' => $e->getMessage(),
@@ -198,7 +199,7 @@ class OysterCsvParser
             $dateStr = "{$date} {$time}";
 
             return Carbon::createFromFormat('d-M-Y H:i', $dateStr, 'Europe/London');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Oyster CSV: Failed to parse datetime', [
                 'date' => $date,
                 'time' => $time,

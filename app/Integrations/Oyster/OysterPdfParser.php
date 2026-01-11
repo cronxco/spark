@@ -3,6 +3,7 @@
 namespace App\Integrations\Oyster;
 
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Smalot\PdfParser\Parser as PdfParser;
 
@@ -44,7 +45,7 @@ class OysterPdfParser
             ]);
 
             return null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Oyster PDF: Failed to parse PDF', [
                 'error' => $e->getMessage(),
             ]);
@@ -104,7 +105,7 @@ class OysterPdfParser
             ]);
 
             return null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Oyster PDF: Failed to extract statement period', [
                 'error' => $e->getMessage(),
             ]);
@@ -129,7 +130,7 @@ class OysterPdfParser
             }
 
             return null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
     }
@@ -144,7 +145,7 @@ class OysterPdfParser
             $pdf = $parser->parseContent($pdfContent);
 
             return $pdf->getText();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
     }

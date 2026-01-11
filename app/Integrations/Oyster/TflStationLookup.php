@@ -3,6 +3,7 @@
 namespace App\Integrations\Oyster;
 
 use App\Models\EventObject;
+use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -40,84 +41,6 @@ class TflStationLookup
         Cache::put($cacheKey, $result ?? false, $ttl);
 
         return $result;
-    }
-
-    /**
-     * Search TfL API for station by name
-     */
-    private function searchTflApi(string $stationName, ?string $mode): ?array
-    {
-        try {
-            // TfL API allows up to 500 requests per minute without authentication
-            $modes = $mode ?? 'tube,dlr,overground,elizabeth-line,tram,national-rail,bus';
-
-            $response = Http::timeout(10)
-                ->get(self::TFL_API_BASE.'/StopPoint/Search', [
-                    'query' => $stationName,
-                    'modes' => $modes,
-                    'maxResults' => 5,
-                ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                $matches = $data['matches'] ?? [];
-
-                if (! empty($matches)) {
-                    // Try to find the best match
-                    $match = $this->findBestMatch($matches, $stationName);
-
-                    if ($match) {
-                        return [
-                            'latitude' => $match['lat'] ?? null,
-                            'longitude' => $match['lon'] ?? null,
-                            'address' => $match['name'] ?? $stationName,
-                            'naptan_id' => $match['id'] ?? null,
-                            'modes' => $match['modes'] ?? [],
-                            'zone' => $match['zone'] ?? null,
-                        ];
-                    }
-                }
-            }
-
-            Log::debug('TflStationLookup: No results from API', [
-                'station' => $stationName,
-                'status' => $response->status(),
-            ]);
-        } catch (\Exception $e) {
-            Log::warning('TflStationLookup: API request failed', [
-                'station' => $stationName,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return null;
-    }
-
-    /**
-     * Find the best matching station from search results
-     */
-    private function findBestMatch(array $matches, string $searchName): ?array
-    {
-        $normalizedSearch = $this->normalizeStationName($searchName);
-
-        // First pass: exact name match
-        foreach ($matches as $match) {
-            $matchName = $this->normalizeStationName($match['name'] ?? '');
-            if ($matchName === $normalizedSearch) {
-                return $match;
-            }
-        }
-
-        // Second pass: name contains search term
-        foreach ($matches as $match) {
-            $matchName = strtolower($match['name'] ?? '');
-            if (str_contains($matchName, $normalizedSearch)) {
-                return $match;
-            }
-        }
-
-        // Fallback: return first result
-        return $matches[0] ?? null;
     }
 
     /**
@@ -211,6 +134,103 @@ class TflStationLookup
     }
 
     /**
+     * Map transport mode constant to TfL API mode string
+     */
+    public function modeToTflApiMode(string $mode): string
+    {
+        return match ($mode) {
+            OysterTransportModeDetector::MODE_TUBE => 'tube',
+            OysterTransportModeDetector::MODE_DLR => 'dlr',
+            OysterTransportModeDetector::MODE_OVERGROUND => 'overground',
+            OysterTransportModeDetector::MODE_ELIZABETH => 'elizabeth-line',
+            OysterTransportModeDetector::MODE_TRAM => 'tram',
+            OysterTransportModeDetector::MODE_NATIONAL_RAIL => 'national-rail',
+            OysterTransportModeDetector::MODE_BUS => 'bus',
+            OysterTransportModeDetector::MODE_CABLE_CAR => 'cable-car',
+            OysterTransportModeDetector::MODE_RIVER_BUS => 'river-bus',
+            default => 'tube,dlr,overground,elizabeth-line,tram,national-rail',
+        };
+    }
+
+    /**
+     * Search TfL API for station by name
+     */
+    private function searchTflApi(string $stationName, ?string $mode): ?array
+    {
+        try {
+            // TfL API allows up to 500 requests per minute without authentication
+            $modes = $mode ?? 'tube,dlr,overground,elizabeth-line,tram,national-rail,bus';
+
+            $response = Http::timeout(10)
+                ->get(self::TFL_API_BASE . '/StopPoint/Search', [
+                    'query' => $stationName,
+                    'modes' => $modes,
+                    'maxResults' => 5,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $matches = $data['matches'] ?? [];
+
+                if (! empty($matches)) {
+                    // Try to find the best match
+                    $match = $this->findBestMatch($matches, $stationName);
+
+                    if ($match) {
+                        return [
+                            'latitude' => $match['lat'] ?? null,
+                            'longitude' => $match['lon'] ?? null,
+                            'address' => $match['name'] ?? $stationName,
+                            'naptan_id' => $match['id'] ?? null,
+                            'modes' => $match['modes'] ?? [],
+                            'zone' => $match['zone'] ?? null,
+                        ];
+                    }
+                }
+            }
+
+            Log::debug('TflStationLookup: No results from API', [
+                'station' => $stationName,
+                'status' => $response->status(),
+            ]);
+        } catch (Exception $e) {
+            Log::warning('TflStationLookup: API request failed', [
+                'station' => $stationName,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Find the best matching station from search results
+     */
+    private function findBestMatch(array $matches, string $searchName): ?array
+    {
+        $normalizedSearch = $this->normalizeStationName($searchName);
+
+        // First pass: exact name match
+        foreach ($matches as $match) {
+            $matchName = $this->normalizeStationName($match['name'] ?? '');
+            if ($matchName === $normalizedSearch) {
+                return $match;
+            }
+        }
+
+        // Second pass: name contains search term
+        foreach ($matches as $match) {
+            $matchName = strtolower($match['name'] ?? '');
+            if (str_contains($matchName, $normalizedSearch)) {
+                return $match;
+            }
+        }
+
+        // Fallback: return first result
+        return $matches[0] ?? null;
+    }
+
+    /**
      * Format station name for display as title
      */
     private function formatStationTitle(string $name): string
@@ -232,24 +252,5 @@ class TflStationLookup
         $name = str_replace(' Dlr', ' DLR', $name);
 
         return trim($name);
-    }
-
-    /**
-     * Map transport mode constant to TfL API mode string
-     */
-    public function modeToTflApiMode(string $mode): string
-    {
-        return match ($mode) {
-            OysterTransportModeDetector::MODE_TUBE => 'tube',
-            OysterTransportModeDetector::MODE_DLR => 'dlr',
-            OysterTransportModeDetector::MODE_OVERGROUND => 'overground',
-            OysterTransportModeDetector::MODE_ELIZABETH => 'elizabeth-line',
-            OysterTransportModeDetector::MODE_TRAM => 'tram',
-            OysterTransportModeDetector::MODE_NATIONAL_RAIL => 'national-rail',
-            OysterTransportModeDetector::MODE_BUS => 'bus',
-            OysterTransportModeDetector::MODE_CABLE_CAR => 'cable-car',
-            OysterTransportModeDetector::MODE_RIVER_BUS => 'river-bus',
-            default => 'tube,dlr,overground,elizabeth-line,tram,national-rail',
-        };
     }
 }

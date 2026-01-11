@@ -161,20 +161,6 @@ class OysterTransportModeDetector
     }
 
     /**
-     * Clean up station name by removing common suffixes and annotations
-     */
-    private function cleanStationName(string $name): string
-    {
-        // Remove trailing parenthetical info like "(platforms 9-19)"
-        $name = preg_replace('/\s*\(.*?\)\s*$/', '', $name);
-
-        // Remove trailing transport mode suffixes
-        $name = preg_replace('/\s+(DLR|Elizabeth line)$/i', '', $name);
-
-        return trim($name);
-    }
-
-    /**
      * Check if a journey action represents a non-journey entry (top-up, season ticket, etc.)
      */
     public function isNonJourney(string $journeyText): bool
@@ -212,5 +198,19 @@ class OysterTransportModeDetector
         }
 
         return null;
+    }
+
+    /**
+     * Clean up station name by removing common suffixes and annotations
+     */
+    private function cleanStationName(string $name): string
+    {
+        // Remove trailing parenthetical info like "(platforms 9-19)"
+        $name = preg_replace('/\s*\(.*?\)\s*$/', '', $name);
+
+        // Remove trailing transport mode suffixes
+        $name = preg_replace('/\s+(DLR|Elizabeth line)$/i', '', $name);
+
+        return trim($name);
     }
 }
