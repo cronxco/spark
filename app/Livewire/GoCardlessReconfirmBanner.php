@@ -52,7 +52,7 @@ class GoCardlessReconfirmBanner extends Component
         $this->loading = true;
 
         // Get the institution ID from the group metadata
-        $institutionId = $this->group->auth_metadata['institution_id'] ?? null;
+        $institutionId = $this->group->auth_metadata['gocardless_institution_id'] ?? null;
 
         if (! $institutionId) {
             $this->addError('general', 'Cannot determine bank institution. Please contact support.');
