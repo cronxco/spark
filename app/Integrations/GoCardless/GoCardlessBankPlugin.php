@@ -1740,9 +1740,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['summary']) &&
-                str_contains($errorBody['summary'], 'End User Agreement') &&
-                str_contains($errorBody['summary'], 'has expired')) {
+            if (isset($errorBody['message']) &&
+                str_contains($errorBody['message'], 'End User Agreement') &&
+                str_contains($errorBody['message'], 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
@@ -1923,9 +1923,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['summary']) &&
-                str_contains($errorBody['summary'], 'End User Agreement') &&
-                str_contains($errorBody['summary'], 'has expired')) {
+            if (isset($errorBody['message']) &&
+                str_contains($errorBody['message'], 'End User Agreement') &&
+                str_contains($errorBody['message'], 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
@@ -2040,9 +2040,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! $response->successful()) {
             // Check if this is an EUA expiry error
             $errorBody = $response->json();
-            if (isset($errorBody['summary']) &&
-                str_contains($errorBody['summary'], 'End User Agreement') &&
-                str_contains($errorBody['summary'], 'has expired')) {
+            if (isset($errorBody['message']) &&
+                str_contains($errorBody['message'], 'End User Agreement') &&
+                str_contains($errorBody['message'], 'has expired')) {
                 throw new GoCardlessEuaExpiredException(
                     $integration->integration_group_id,
                     $errorBody
@@ -2287,9 +2287,10 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // First check if reconfirmation is available
         $checkResponse = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->apiBase . "/agreements/enduser/{$euaId}/reconfirm/");
+        ])->get($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/");
 
         $this->logApiResponse('GET', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $checkResponse->status(), $checkResponse->body(), $checkResponse->headers());
+
         if ($checkResponse->status() === 400) {
             $error = $checkResponse->json();
             if (str_contains($error['summary'] ?? '', 'Reconfirmation is not enabled')) {
@@ -2300,7 +2301,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
 
         // Create reconfirmation
         $requestData = [
-            'redirect' => route('oauth.callback', ['service' => 'gocardless']),
+            'redirect' => route('integrations.oauth.callback', ['service' => 'gocardless']),
         ];
 
         $this->logApiRequest('POST', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", [
