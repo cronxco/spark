@@ -54,6 +54,12 @@ class GoCardlessReconfirmBanner extends Component
         // Get the institution ID from the group metadata
         $institutionId = $this->group->auth_metadata['gocardless_institution_id'] ?? null;
 
+        Log::info('GoCardlessReconfirmBanner: Attempting to create new EUA', [
+            'group_id' => $this->group->id,
+            'institution_id' => $institutionId,
+            'auth_metadata_keys' => array_keys($this->group->auth_metadata ?? []),
+        ]);
+
         if (! $institutionId) {
             $this->addError('general', 'Cannot determine bank institution. Please contact support.');
             $this->loading = false;
@@ -63,6 +69,24 @@ class GoCardlessReconfirmBanner extends Component
 
         try {
             $plugin = app(GoCardlessBankPlugin::class);
+
+            // Validate institution ID is still valid
+            $institutions = $plugin->getInstitutions();
+            $validInstitution = collect($institutions)->firstWhere('id', $institutionId);
+
+            if (! $validInstitution) {
+                Log::warning('GoCardlessReconfirmBanner: Institution ID no longer valid', [
+                    'group_id' => $this->group->id,
+                    'institution_id' => $institutionId,
+                    'institution_name' => $this->group->auth_metadata['gocardless_institution_name'] ?? 'unknown',
+                ]);
+
+                $this->addError('general', 'Your bank institution is no longer available. Please reconnect your account from the integrations page.');
+                $this->loading = false;
+
+                return;
+            }
+
             $result = $plugin->createNewEuaAndRequisition($this->group, $institutionId);
 
             Log::info('GoCardlessReconfirmBanner: New EUA created', [
@@ -79,7 +103,7 @@ class GoCardlessReconfirmBanner extends Component
                 'error' => $e->getMessage(),
             ]);
 
-            $this->addError('general', 'Failed to create new authorization: ' . $e->getMessage());
+            $this->addError('general', 'Failed to create new authorization: '.$e->getMessage());
             $this->loading = false;
         }
     }
