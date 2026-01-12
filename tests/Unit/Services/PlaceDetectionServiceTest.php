@@ -288,8 +288,19 @@ class PlaceDetectionServiceTest extends TestCase
         // Relationships should be moved to keepPlace
         $this->assertEquals(2, $keepPlace->relationshipsTo()->where('type', 'occurred_at')->count());
 
-        // removePlace should be soft deleted
-        $this->assertSoftDeleted($removePlace);
+        // removePlace should have 'merged_into' relationship to keepPlace (not soft-deleted)
+        $this->assertNotSoftDeleted($removePlace);
+        $this->assertTrue($removePlace->isMerged());
+        $this->assertEquals($keepPlace->id, $removePlace->parent()->id);
+
+        // Verify merged_into relationship exists
+        $this->assertDatabaseHas('relationships', [
+            'from_type' => EventObject::class,
+            'from_id' => $removePlace->id,
+            'to_type' => EventObject::class,
+            'to_id' => $keepPlace->id,
+            'type' => 'merged_into',
+        ]);
     }
 
     /**

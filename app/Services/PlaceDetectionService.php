@@ -7,7 +7,9 @@ use App\Models\EventObject;
 use App\Models\Place;
 use App\Models\Relationship;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class PlaceDetectionService
 {
@@ -81,9 +83,23 @@ class PlaceDetectionService
 
     /**
      * Link an event to a place via relationship
+     * Automatically redirects to parent if place has been merged
      */
     public function linkEventToPlace(Event $event, Place $place): Relationship
     {
+        // Check if place has been merged, redirect to parent
+        $effectivePlace = $place->getEffectivePlace();
+
+        if ($effectivePlace->id !== $place->id) {
+            Log::info('Redirecting event link to parent place', [
+                'event_id' => $event->id,
+                'child_place_id' => $place->id,
+                'parent_place_id' => $effectivePlace->id,
+            ]);
+
+            $place = $effectivePlace;
+        }
+
         // Events don't have user_id directly - get it from integration
         $event->loadMissing('integration');
 
@@ -220,48 +236,103 @@ class PlaceDetectionService
 
     /**
      * Merge two places into one (when duplicates are detected)
+     * Creates a 'merged_into' relationship instead of soft-deleting
      */
     public function mergePlaces(Place $keepPlace, Place $removePlace): Place
     {
-        // Move all relationships from removePlace to keepPlace
-        Relationship::where('to_type', EventObject::class)
-            ->where('to_id', $removePlace->id)
-            ->update(['to_id' => $keepPlace->id]);
-
-        Relationship::where('from_type', EventObject::class)
-            ->where('from_id', $removePlace->id)
-            ->update(['from_id' => $keepPlace->id]);
-
-        // Merge visit counts
-        $keepMetadata = $keepPlace->metadata ?? [];
-        $removeMetadata = $removePlace->metadata ?? [];
-
-        $keepMetadata['visit_count'] = ($keepMetadata['visit_count'] ?? 0) + ($removeMetadata['visit_count'] ?? 0);
-
-        // Keep earliest first_visit_at
-        if (isset($removeMetadata['first_visit_at'])) {
-            if (! isset($keepMetadata['first_visit_at']) ||
-                $removeMetadata['first_visit_at'] < $keepMetadata['first_visit_at']) {
-                $keepMetadata['first_visit_at'] = $removeMetadata['first_visit_at'];
-            }
+        // Prevent self-merge
+        if ($keepPlace->id === $removePlace->id) {
+            throw new InvalidArgumentException('Cannot merge a place into itself');
         }
 
-        $keepPlace->metadata = $keepMetadata;
-        $keepPlace->save();
+        // Prevent circular merges
+        if ($keepPlace->isMerged() && $keepPlace->getEffectivePlace()->id === $removePlace->id) {
+            throw new InvalidArgumentException('Cannot create circular merge: keep place is already a child of remove place');
+        }
 
-        // Soft delete the removed place
-        $removePlace->delete();
+        DB::transaction(function () use ($keepPlace, $removePlace) {
+            // Redirect any children of removePlace to keepPlace
+            Relationship::where('to_id', $removePlace->id)
+                ->where('to_type', EventObject::class)
+                ->where('from_type', EventObject::class)
+                ->where('type', 'merged_into')
+                ->update(['to_id' => $keepPlace->id]);
 
-        // Refresh the keepPlace model to get the updated relationships
+            // Move all 'occurred_at' relationships from removePlace to keepPlace
+            Relationship::where('to_id', $removePlace->id)
+                ->where('to_type', EventObject::class)
+                ->where('type', 'occurred_at')
+                ->update(['to_id' => $keepPlace->id]);
+
+            // Merge visit counts and metadata
+            $keepMetadata = $keepPlace->metadata ?? [];
+            $removeMetadata = $removePlace->metadata ?? [];
+
+            $keepMetadata['visit_count'] =
+                ($keepMetadata['visit_count'] ?? 0) +
+                ($removeMetadata['visit_count'] ?? 0);
+
+            // Keep earliest first_visit_at
+            if (isset($removeMetadata['first_visit_at'])) {
+                if (! isset($keepMetadata['first_visit_at']) ||
+                    $removeMetadata['first_visit_at'] < $keepMetadata['first_visit_at']) {
+                    $keepMetadata['first_visit_at'] = $removeMetadata['first_visit_at'];
+                }
+            }
+
+            $keepPlace->metadata = $keepMetadata;
+            $keepPlace->save();
+
+            // Create 'merged_into' relationship instead of soft-deleting
+            Relationship::createRelationship([
+                'user_id' => $removePlace->user_id,
+                'from_type' => EventObject::class,
+                'from_id' => $removePlace->id,
+                'to_type' => EventObject::class,
+                'to_id' => $keepPlace->id,
+                'type' => 'merged_into',
+                'metadata' => [
+                    'merged_at' => now()->toIso8601String(),
+                    'merged_visit_count' => $removeMetadata['visit_count'] ?? 0,
+                ],
+            ]);
+        });
+
         $keepPlace->refresh();
 
         Log::info('Merged places', [
             'kept_place_id' => $keepPlace->id,
-            'removed_place_id' => $removePlace->id,
-            'new_visit_count' => $keepMetadata['visit_count'],
+            'child_place_id' => $removePlace->id,
+            'new_visit_count' => $keepPlace->visit_count,
         ]);
 
         return $keepPlace;
+    }
+
+    /**
+     * Unmerge a place by removing its 'merged_into' relationship
+     */
+    public function unmergePlaces(Place $childPlace): Place
+    {
+        if (! $childPlace->isMerged()) {
+            throw new InvalidArgumentException('Place is not merged');
+        }
+
+        // Soft delete the 'merged_into' relationship
+        $relationship = $childPlace->relationshipsFrom()
+            ->where('type', 'merged_into')
+            ->first();
+
+        if ($relationship) {
+            $relationship->delete();
+        }
+
+        Log::info('Unmerged place', [
+            'place_id' => $childPlace->id,
+            'former_parent_id' => $relationship?->to_id,
+        ]);
+
+        return $childPlace->refresh();
     }
 
     /**

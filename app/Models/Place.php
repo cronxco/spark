@@ -66,9 +66,17 @@ class Place extends EventObject
 
     /**
      * Get all events that occurred at this place
+     * If this place is merged into another, redirects to the parent place
      */
     public function eventsHere()
     {
+        $effectivePlace = $this->getEffectivePlace();
+
+        // If redirected to parent, use parent's query
+        if ($effectivePlace->id !== $this->id) {
+            return $effectivePlace->eventsHere();
+        }
+
         return Event::query()
             ->forUser($this->user_id)
             ->hasLocation()
@@ -93,6 +101,84 @@ class Place extends EventObject
             ->forUser($this->user_id)
             ->withinRadius($this->latitude, $this->longitude, $radiusMeters)
             ->orderByDesc('time');
+    }
+
+    /**
+     * Get parent place via 'merged_into' relationship
+     */
+    public function parent(): ?Place
+    {
+        $relationship = $this->relationshipsFrom()
+            ->where('type', 'merged_into')
+            ->where('from_type', EventObject::class)
+            ->where('to_type', EventObject::class)
+            ->first();
+
+        return $relationship ? Place::find($relationship->to_id) : null;
+    }
+
+    /**
+     * Get child places (places merged into this one)
+     */
+    public function children()
+    {
+        return Place::whereIn('id', function ($query) {
+            $query->select('from_id')
+                ->from('relationships')
+                ->where('to_id', $this->id)
+                ->where('to_type', EventObject::class)
+                ->where('from_type', EventObject::class)
+                ->where('type', 'merged_into')
+                ->whereNull('deleted_at');
+        });
+    }
+
+    /**
+     * Check if this place has been merged into another
+     */
+    public function isMerged(): bool
+    {
+        return $this->relationshipsFrom()
+            ->where('type', 'merged_into')
+            ->exists();
+    }
+
+    /**
+     * Get the effective place (follows parent chain to top-level parent)
+     */
+    public function getEffectivePlace(): Place
+    {
+        if (! $this->isMerged()) {
+            return $this;
+        }
+
+        // Follow parent chain with infinite loop protection
+        $place = $this;
+        $visited = [$this->id];
+        $maxDepth = 10;
+        $depth = 0;
+
+        while ($place->isMerged() && $depth < $maxDepth) {
+            $parent = $place->parent();
+
+            if (! $parent || in_array($parent->id, $visited)) {
+                break;
+            }
+
+            $visited[] = $parent->id;
+            $place = $parent;
+            $depth++;
+        }
+
+        return $place;
+    }
+
+    /**
+     * Get merged_into attribute (for convenience)
+     */
+    public function getMergedIntoAttribute(): ?Place
+    {
+        return $this->parent();
     }
 
     /**
