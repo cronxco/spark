@@ -25,6 +25,16 @@
             </button>
             @endif
 
+            {{-- Merge Button --}}
+            @if (!$this->isMerged)
+            <button
+                wire:click="showMergeModal"
+                class="btn btn-sm btn-ghost">
+                <x-icon name="o-arrows-pointing-in" class="w-4 h-4" />
+                Merge
+            </button>
+            @endif
+
             {{-- Delete Button --}}
             <button
                 wire:click="deletePlace"
@@ -42,6 +52,33 @@
         <div class="alert alert-success">
             <x-icon name="o-check-circle" class="w-5 h-5" />
             <span>{{ session('message') }}</span>
+        </div>
+        @endif
+
+        {{-- Merged Indicator --}}
+        @if ($this->isMerged)
+        <div class="alert alert-info">
+            <x-icon name="o-arrows-pointing-in" class="w-5 h-5" />
+            <div class="flex-1">
+                <span>This place has been merged into</span>
+                <x-place-ref :place="$this->parentPlace" />
+            </div>
+            <div class="flex gap-2">
+                <a
+                    href="{{ route('places.show', $this->parentPlace) }}"
+                    wire:navigate
+                    class="btn btn-sm btn-info">
+                    <x-icon name="o-arrow-right" class="w-4 h-4" />
+                    View Parent
+                </a>
+                <button
+                    wire:click="unmergePlace"
+                    wire:confirm="Unmerge this place? It will become independent again."
+                    class="btn btn-sm btn-ghost">
+                    <x-icon name="o-arrow-uturn-left" class="w-4 h-4" />
+                    Unmerge
+                </button>
+            </div>
         </div>
         @endif
 
@@ -271,6 +308,14 @@
                                 <div class="stat-value text-2xl">{{ $this->stats['linked_events'] }}</div>
                             </div>
 
+                            @if ($this->childPlaces->count() > 0)
+                            <div class="stat p-4">
+                                <div class="stat-title text-xs">Merged Places</div>
+                                <div class="stat-value text-2xl">{{ $this->childPlaces->count() }}</div>
+                                <div class="stat-desc">Places merged into this one</div>
+                            </div>
+                            @endif
+
                             @if ($this->stats['first_visit_at'])
                             <div class="stat p-4">
                                 <div class="stat-title text-xs">First Visit</div>
@@ -315,6 +360,76 @@
             </div>
         </div>
     </div>
+
+    {{-- Merge Modal --}}
+    @if ($showingMergeModal)
+    <div class="modal modal-open">
+        <div class="modal-box max-w-2xl">
+            <h3 class="font-bold text-lg mb-4">
+                <x-icon name="o-arrows-pointing-in" class="w-5 h-5 inline-block" />
+                Merge Place
+            </h3>
+
+            <p class="mb-4 text-sm text-base-content/70">
+                Select a place to merge <strong>{{ $place->title }}</strong> into. All events and data will be moved to the target place.
+            </p>
+
+            <div class="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                @forelse ($nearbyPlaces as $candidate)
+                <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-base-200 transition-colors
+                              @if ($mergeTargetId === $candidate['id']) border-primary bg-primary/5 @else border-base-300 @endif">
+                    <input
+                        type="radio"
+                        name="mergeTarget"
+                        value="{{ $candidate['id'] }}"
+                        wire:model.live="mergeTargetId"
+                        class="radio radio-primary" />
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium truncate">{{ $candidate['title'] }}</div>
+                        <div class="text-sm text-base-content/60 flex items-center gap-3">
+                            <span class="flex items-center gap-1">
+                                <x-icon name="o-eye" class="w-3 h-3" />
+                                {{ $candidate['metadata']['visit_count'] ?? 0 }} visits
+                            </span>
+                            @if (isset($candidate['metadata']['category']))
+                                <span class="badge badge-xs">{{ ucfirst($candidate['metadata']['category']) }}</span>
+                            @endif
+                            @if (isset($candidate['metadata']['is_favorite']) && $candidate['metadata']['is_favorite'])
+                                <x-icon name="fas.star" class="w-3 h-3 text-warning" />
+                            @endif
+                        </div>
+                        @if (isset($candidate['location_address']))
+                        <div class="text-xs text-base-content/50 truncate mt-1">{{ $candidate['location_address'] }}</div>
+                        @endif
+                    </div>
+                </label>
+                @empty
+                <div class="text-center text-base-content/60 py-8">
+                    <x-icon name="o-map-pin" class="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No nearby places found</p>
+                    <p class="text-sm mt-1">Create more places or try searching for duplicates.</p>
+                </div>
+                @endforelse
+            </div>
+
+            <div class="modal-action">
+                <button
+                    wire:click="closeMergeModal"
+                    class="btn btn-ghost">
+                    Cancel
+                </button>
+                <button
+                    wire:click="mergePlaceIntoTarget"
+                    class="btn btn-primary"
+                    @disabled(empty($mergeTargetId))>
+                    <x-icon name="o-arrows-pointing-in" class="w-4 h-4" />
+                    Merge Places
+                </button>
+            </div>
+        </div>
+        <div class="modal-backdrop" wire:click="closeMergeModal"></div>
+    </div>
+    @endif
 
     @script
     <script>

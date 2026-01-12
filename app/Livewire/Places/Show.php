@@ -30,6 +30,13 @@ class Show extends Component
 
     public int $editDetectionRadius = 50;
 
+    // Merge functionality
+    public string $mergeTargetId = '';
+
+    public bool $showingMergeModal = false;
+
+    public array $nearbyPlaces = [];
+
     public function mount(Place $place): void
     {
         // Ensure user owns this place
@@ -122,7 +129,7 @@ class Show extends Component
 
     public function linkNearbyEvent(string $eventId): void
     {
-        $event = Event::where('user_id', Auth::id())->findOrFail($eventId);
+        $event = Event::query()->forUser(Auth::id())->findOrFail($eventId);
 
         $service = app(PlaceDetectionService::class);
         $service->linkEventToPlace($event, $this->place);
@@ -147,6 +154,80 @@ class Show extends Component
     {
         $this->place->delete();
         $this->redirect(route('places.index'));
+    }
+
+    #[Computed]
+    public function isMerged(): bool
+    {
+        return $this->place->isMerged();
+    }
+
+    #[Computed]
+    public function parentPlace(): ?Place
+    {
+        return $this->place->parent();
+    }
+
+    #[Computed]
+    public function childPlaces()
+    {
+        return $this->place->children()->get();
+    }
+
+    public function showMergeModal(): void
+    {
+        // Find nearby places as merge candidates
+        $this->nearbyPlaces = Place::query()
+            ->where('user_id', Auth::id())
+            ->where('id', '!=', $this->place->id)
+            ->whereDoesntHave('relationshipsFrom', function ($query) {
+                $query->where('type', 'merged_into');
+            }) // Only show non-merged places
+            ->orderByVisitCount('desc')
+            ->limit(10)
+            ->get()
+            ->toArray();
+
+        $this->showingMergeModal = true;
+    }
+
+    public function closeMergeModal(): void
+    {
+        $this->showingMergeModal = false;
+        $this->mergeTargetId = '';
+    }
+
+    public function mergePlaceIntoTarget(): void
+    {
+        $this->validate([
+            'mergeTargetId' => 'required|uuid|exists:objects,id',
+        ]);
+
+        $targetPlace = Place::findOrFail($this->mergeTargetId);
+
+        // Ensure user owns target place
+        if ($targetPlace->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $service = app(PlaceDetectionService::class);
+        $service->mergePlaces($targetPlace, $this->place);
+
+        // Redirect to parent place
+        $this->redirect(route('places.show', $targetPlace));
+    }
+
+    public function unmergePlace(): void
+    {
+        if (! $this->place->isMerged()) {
+            return;
+        }
+
+        $service = app(PlaceDetectionService::class);
+        $service->unmergePlaces($this->place);
+
+        $this->place->refresh();
+        session()->flash('message', 'Place unmerged successfully');
     }
 
     public function render(): View
