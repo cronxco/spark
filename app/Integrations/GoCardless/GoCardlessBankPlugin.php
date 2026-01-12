@@ -2290,9 +2290,9 @@ class GoCardlessBankPlugin extends OAuthPlugin
         // First check if reconfirmation is available
         $checkResponse = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->get($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/");
+        ])->get($this->getBaseUrl() . "/agreements/enduser/{$euaId}/reconfirm/");
 
-        $this->logApiResponse('GET', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $checkResponse->status(), $checkResponse->body(), $checkResponse->headers());
+        $this->logApiResponse('GET', "/agreements/enduser/{$euaId}/reconfirm/", $checkResponse->status(), $checkResponse->body(), $checkResponse->headers());
 
         if ($checkResponse->status() === 400) {
             $error = $checkResponse->json();
@@ -2307,15 +2307,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'redirect' => route('integrations.oauth.callback', ['service' => 'gocardless']),
         ];
 
-        $this->logApiRequest('POST', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", [
+        $this->logApiRequest('POST', "/agreements/enduser/{$euaId}/reconfirm/", [
             'Authorization' => '[REDACTED]',
         ], $requestData);
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->post($this->getBaseUrl() . "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $requestData);
+        ])->post($this->getBaseUrl() . "/agreements/enduser/{$euaId}/reconfirm/", $requestData);
 
-        $this->logApiResponse('POST', "/api/v2/agreements/enduser/{$euaId}/reconfirm/", $response->status(), $response->body(), $response->headers());
+        $this->logApiResponse('POST', "/agreements/enduser/{$euaId}/reconfirm/", $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new Exception('Failed to create reconfirmation: ' . $response->body());
@@ -3675,15 +3675,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'reconfirmation' => true, // Try with reconfirmation
             ];
 
-            $this->logApiRequest('POST', '/api/v2/agreements/enduser/', [
+            $this->logApiRequest('POST', '/agreements/enduser/', [
                 'Authorization' => '[REDACTED]',
             ], $requestData);
 
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ])->post($this->getBaseUrl() . '/api/v2/agreements/enduser/', $requestData);
+            ])->post($this->getBaseUrl() . '/agreements/enduser/', $requestData);
 
-            $this->logApiResponse('POST', '/api/v2/agreements/enduser/', $response->status(), $response->body(), $response->headers());
+            $this->logApiResponse('POST', '/agreements/enduser/', $response->status(), $response->body(), $response->headers());
 
             if ($response->successful()) {
                 Log::info('GoCardless: EUA created with reconfirmation enabled', [
@@ -3724,15 +3724,15 @@ class GoCardlessBankPlugin extends OAuthPlugin
             'reconfirmation' => false,
         ];
 
-        $this->logApiRequest('POST', '/api/v2/agreements/enduser/ (fallback)', [
+        $this->logApiRequest('POST', '/agreements/enduser/ (fallback)', [
             'Authorization' => '[REDACTED]',
         ], $requestData);
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->post($this->getBaseUrl() . '/api/v2/agreements/enduser/', $requestData);
+        ])->post($this->getBaseUrl() . '/agreements/enduser/', $requestData);
 
-        $this->logApiResponse('POST', '/api/v2/agreements/enduser/ (fallback)', $response->status(), $response->body(), $response->headers());
+        $this->logApiResponse('POST', '/agreements/enduser/ (fallback)', $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
             throw new Exception('Failed to create EUA: ' . $response->body());
