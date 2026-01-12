@@ -46,7 +46,7 @@ class FindReceiptForTransactionJob implements ShouldQueue
                 ->whereBetween('time', [$startTime, $endTime])
                 ->where(function ($query) {
                     // Amount within ±10% of transaction
-                    $tolerance = $this->transactionEvent->value * 0.1;
+                    $tolerance = (int) ($this->transactionEvent->value * 0.1);
                     $query->whereBetween('value', [
                         max(0, $this->transactionEvent->value - $tolerance),
                         $this->transactionEvent->value + $tolerance,
