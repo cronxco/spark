@@ -81,7 +81,6 @@ class ErrorHandlingTest extends TestCase
 
         // Create coaching session
         $coachingSession = EventObject::factory()->create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'metadata' => [
@@ -125,7 +124,6 @@ class ErrorHandlingTest extends TestCase
 
         // Create a coaching session with minimal metadata
         $coachingSession = EventObject::factory()->create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'metadata' => [
@@ -207,7 +205,6 @@ class ErrorHandlingTest extends TestCase
 
         // Create coaching session
         $coachingSession = EventObject::factory()->create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'metadata' => [

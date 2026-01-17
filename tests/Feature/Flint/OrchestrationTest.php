@@ -41,7 +41,7 @@ class OrchestrationTest extends TestCase
 
         // Run the pre-digest refresh job
         $job = new RunPreDigestRefreshJob($this->user, '06:00');
-        $job->handle();
+        $job->handle(app(\App\Services\AgentOrchestrationService::class));
 
         // Assert all sub-jobs were dispatched
         Queue::assertPushed(DetectHealthAnomaliesForDigestJob::class, function ($job) {
@@ -68,7 +68,7 @@ class OrchestrationTest extends TestCase
         $this->travelTo(now()->setHour(6)->setMinute(0));
 
         $job = new RunDigestGenerationJob($this->user, '06:00');
-        $job->handle();
+        $job->handle(app(\App\Services\AgentOrchestrationService::class));
 
         Queue::assertPushed(GenerateDailyDigestJob::class, function ($job) {
             return $job->user->id === $this->user->id && $job->period === 'morning';
@@ -81,7 +81,7 @@ class OrchestrationTest extends TestCase
         $this->travelTo(now()->setHour(18)->setMinute(0));
 
         $job = new RunDigestGenerationJob($this->user, '18:00');
-        $job->handle();
+        $job->handle(app(\App\Services\AgentOrchestrationService::class));
 
         Queue::assertPushed(GenerateDailyDigestJob::class, function ($job) {
             return $job->user->id === $this->user->id && $job->period === 'evening';
@@ -97,7 +97,7 @@ class OrchestrationTest extends TestCase
 
         // Run the digest generation job
         $job = new RunDigestGenerationJob($this->user, '06:00');
-        $job->handle();
+        $job->handle(app(\App\Services\AgentOrchestrationService::class));
 
         // Assert both digest and notification jobs were dispatched
         Queue::assertPushed(GenerateDailyDigestJob::class, 1);
@@ -123,7 +123,7 @@ class OrchestrationTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         try {
-            $job->handle();
+            $job->handle(app(\App\Services\AgentOrchestrationService::class));
         } catch (Exception $e) {
             $this->fail('Orchestration job should not throw exceptions: ' . $e->getMessage());
         }
@@ -145,13 +145,13 @@ class OrchestrationTest extends TestCase
 
         // Run for multiple users
         $job1 = new RunPreDigestRefreshJob($this->user, '06:00');
-        $job1->handle();
+        $job1->handle(app(\App\Services\AgentOrchestrationService::class));
 
         $job2 = new RunPreDigestRefreshJob($user2, '06:00');
-        $job2->handle();
+        $job2->handle(app(\App\Services\AgentOrchestrationService::class));
 
         $job3 = new RunPreDigestRefreshJob($user3, '06:00');
-        $job3->handle();
+        $job3->handle(app(\App\Services\AgentOrchestrationService::class));
 
         // Assert jobs were dispatched for all users
         Queue::assertPushed(DetectHealthAnomaliesForDigestJob::class, 3);

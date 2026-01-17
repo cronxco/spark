@@ -45,7 +45,6 @@ class CoachingFlowTest extends TestCase
 
         // Create a metric statistic and anomaly for the user
         $metricStatistic = MetricStatistic::create([
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -81,7 +80,6 @@ class CoachingFlowTest extends TestCase
         Queue::fake();
 
         $metricStatistic = MetricStatistic::create([
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -102,7 +100,6 @@ class CoachingFlowTest extends TestCase
 
         // Create existing coaching session for this anomaly
         EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'title' => 'Existing Session',
@@ -132,7 +129,6 @@ class CoachingFlowTest extends TestCase
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         $metricStatistic = MetricStatistic::create([
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -181,7 +177,6 @@ class CoachingFlowTest extends TestCase
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         $session = EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'title' => 'Test Session',
@@ -231,7 +226,6 @@ class CoachingFlowTest extends TestCase
     public function coaching_session_can_be_dismissed(): void
     {
         $session = EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'title' => 'Test Session',
@@ -261,7 +255,6 @@ class CoachingFlowTest extends TestCase
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         $metricStatistic = MetricStatistic::create([
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -281,7 +274,6 @@ class CoachingFlowTest extends TestCase
         ]);
 
         $session = EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
             'title' => 'Test Session',

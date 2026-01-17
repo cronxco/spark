@@ -5,9 +5,10 @@ namespace Tests\Feature\Flint;
 use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
-use App\Notifications\FlintDigestNotification;
+use App\Notifications\DailyDigestReady;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -42,12 +43,20 @@ class NotificationTest extends TestCase
     {
         Notification::fake();
 
+        // Create a day object to be the target
+        $dayObject = EventObject::factory()->create([
+            'concept' => 'day',
+            'type' => 'day',
+            'title' => now()->format('Y-m-d'),
+            'time' => now()->startOfDay(),
+        ]);
+
         // Create a flint event
         $flintEvent = Event::factory()->create([
             'integration_id' => $this->flintIntegration->id,
-            'user_id' => $this->user->id,
+            'target_id' => $dayObject->id,
             'service' => 'flint',
-            'action' => 'generated_digest',
+            'action' => 'had_analysis',
             'time' => now(),
         ]);
 
@@ -72,18 +81,17 @@ class NotificationTest extends TestCase
             ],
         ]);
 
-        // Run the notification job
-        $job = new SendDigestNotificationJob($this->user, 'morning');
+        // Run the notification job (06:00 is morning)
+        $job = new SendDigestNotificationJob($this->user, '06:00');
         $job->handle();
 
         // Assert notification was sent
         Notification::assertSentTo(
             [$this->user],
-            FlintDigestNotification::class,
-            function ($notification) {
-                $mailData = $notification->toMail($this->user);
-
-                return str_contains($mailData->subject, 'Morning Digest');
+            DailyDigestReady::class,
+            function ($notification) use ($dayObject) {
+                return $notification->digestObject->id === $dayObject->id
+                    && $notification->period === 'morning';
             }
         );
     }
@@ -96,7 +104,7 @@ class NotificationTest extends TestCase
         Notification::fake();
 
         // Run the notification job without creating a digest
-        $job = new SendDigestNotificationJob($this->user, 'morning');
+        $job = new SendDigestNotificationJob($this->user, '06:00');
         $job->handle();
 
         // Assert no notification was sent
@@ -110,17 +118,25 @@ class NotificationTest extends TestCase
     {
         Notification::fake();
 
+        // Create a day object to be the target
+        $dayObject = EventObject::factory()->create([
+            'concept' => 'day',
+            'type' => 'day',
+            'title' => now()->format('Y-m-d'),
+            'time' => now()->startOfDay(),
+        ]);
+
         // Create a flint event
         $flintEvent = Event::factory()->create([
             'integration_id' => $this->flintIntegration->id,
-            'user_id' => $this->user->id,
+            'target_id' => $dayObject->id,
             'service' => 'flint',
-            'action' => 'generated_digest',
+            'action' => 'had_analysis',
             'time' => now(),
         ]);
 
         // Create a digest with specific data
-        Block::create([
+        $digestBlock = Block::create([
             'event_id' => $flintEvent->id,
             'block_type' => 'flint_digest',
             'time' => now(),
@@ -140,18 +156,18 @@ class NotificationTest extends TestCase
             ],
         ]);
 
-        // Run the notification job
-        $job = new SendDigestNotificationJob($this->user, 'evening');
+        // Run the notification job (18:00 is evening)
+        $job = new SendDigestNotificationJob($this->user, '18:00');
         $job->handle();
 
         // Assert notification was sent with correct data
         Notification::assertSentTo(
             [$this->user],
-            FlintDigestNotification::class,
-            function ($notification) {
-                $mailData = $notification->toMail($this->user);
-
-                return str_contains($mailData->subject, 'Evening Digest');
+            DailyDigestReady::class,
+            function ($notification) use ($dayObject, $digestBlock) {
+                return $notification->digestObject->id === $dayObject->id
+                    && $notification->period === 'evening'
+                    && count($notification->blocks) > 0;
             }
         );
     }

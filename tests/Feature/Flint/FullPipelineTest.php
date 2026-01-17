@@ -90,7 +90,6 @@ class FullPipelineTest extends TestCase
     {
         // Step 1: Create health anomaly
         $metricStatistic = MetricStatistic::create([
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -117,7 +116,6 @@ class FullPipelineTest extends TestCase
 
         // Assert coaching session was created
         $this->assertDatabaseHas('event_objects', [
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
         ]);
@@ -148,7 +146,6 @@ class FullPipelineTest extends TestCase
 
         // Assert learned patterns were created
         $this->assertDatabaseHas('event_objects', [
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'learned_pattern',
         ]);
@@ -200,7 +197,6 @@ class FullPipelineTest extends TestCase
 
         Event::factory()->create([
             'integration_id' => $integration->id,
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'time' => now()->subHours(2),
@@ -238,7 +234,6 @@ class FullPipelineTest extends TestCase
 
         // Create a pattern with multiple domains
         $pattern = EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'learned_pattern',
             'title' => 'Late Night Work Affects Sleep',

@@ -133,7 +133,8 @@ JSON;
 
         $domains = $method->invoke($this->service, $this->user);
 
-        $this->assertEquals(['health', 'money'], $domains);
+        // money and media domains are deprecated and filtered out
+        $this->assertEquals(['health'], $domains);
     }
 
     /** @test */
@@ -147,7 +148,8 @@ JSON;
 
         $domains = $method->invoke($this->service, $user);
 
-        $this->assertEquals(['health', 'money', 'media', 'knowledge', 'online'], $domains);
+        // Default excludes deprecated 'money' and 'media' domains
+        $this->assertEquals(['health', 'knowledge', 'online'], $domains);
     }
 
     /** @test */

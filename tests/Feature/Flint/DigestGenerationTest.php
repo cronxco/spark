@@ -108,7 +108,6 @@ class DigestGenerationTest extends TestCase
         // Create some events for the user
         $event1 = Event::factory()->create([
             'integration_id' => $this->flintIntegration->id,
-            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'time' => now()->subHours(2),
@@ -116,7 +115,6 @@ class DigestGenerationTest extends TestCase
 
         $event2 = Event::factory()->create([
             'integration_id' => $this->flintIntegration->id,
-            'user_id' => $this->user->id,
             'service' => 'hevy',
             'action' => 'had_workout',
             'time' => now()->subHours(4),

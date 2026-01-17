@@ -58,7 +58,6 @@ class NewspaperGenerationTest extends TestCase
 
         // Create a one-time bookmark with content
         EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
             'title' => 'Test Article',
@@ -103,7 +102,6 @@ class NewspaperGenerationTest extends TestCase
 
         // Create a one-time bookmark that has been read
         EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
             'title' => 'Read Article',
@@ -140,7 +138,6 @@ class NewspaperGenerationTest extends TestCase
 
         // Create a recurring fetch (not one-time bookmark)
         EventObject::create([
-            'user_id' => $this->user->id,
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
             'title' => 'Recurring Feed',
