@@ -1,4 +1,13 @@
 <div class="space-y-4 lg:space-y-6">
+    {{-- Loading State --}}
+    <div wire:loading wire:target="loadMemoryData" class="card bg-base-200 shadow">
+        <div class="card-body text-center py-12">
+            <div class="loading loading-spinner loading-lg mx-auto mb-4"></div>
+            <p class="text-sm text-base-content/60">Loading memory data...</p>
+        </div>
+    </div>
+
+    <div wire:loading.remove wire:target="loadMemoryData">
     {{-- Memory Overview --}}
     <div class="card bg-base-200 shadow">
         <div class="card-body">
@@ -173,4 +182,5 @@
         </div>
     </div>
     @endif
+    </div>
 </div>

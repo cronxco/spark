@@ -9,6 +9,7 @@ use Spatie\MediaLibrary\ResponsiveImages\ResponsiveImageGenerator;
 class GenerateMissingResponsiveImages extends Command
 {
     protected $signature = 'media:fix-responsive-images';
+
     protected $description = 'Generate responsive images for any media items missing them';
 
     public function handle()

@@ -15,8 +15,11 @@ class MonzoTokenRefreshTest extends TestCase
     use RefreshDatabase;
 
     private MonzoPlugin $plugin;
+
     private User $user;
+
     private IntegrationGroup $group;
+
     private Integration $integration;
 
     protected function setUp(): void

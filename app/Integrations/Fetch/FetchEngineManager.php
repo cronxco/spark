@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\Log;
 class FetchEngineManager
 {
     protected bool $playwrightEnabled;
+
     protected bool $autoEscalate;
+
     protected array $jsRequiredDomains;
 
     public function __construct()

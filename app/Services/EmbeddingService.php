@@ -10,9 +10,13 @@ use Illuminate\Support\Facades\Log;
 class EmbeddingService
 {
     private ?string $apiKey;
+
     private ?string $organization;
+
     private string $model;
+
     private string $apiUrl = 'https://api.openai.com/v1/embeddings';
+
     private int $dimensions = 1536;
 
     public function __construct()

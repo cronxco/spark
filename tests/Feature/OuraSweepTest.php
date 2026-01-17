@@ -17,8 +17,11 @@ class OuraSweepTest extends TestCase
     use RefreshDatabase;
 
     private OuraPlugin $plugin;
+
     private User $user;
+
     private IntegrationGroup $group;
+
     private Integration $integration;
 
     protected function setUp(): void

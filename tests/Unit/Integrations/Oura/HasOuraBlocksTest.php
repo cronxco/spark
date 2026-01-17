@@ -18,8 +18,11 @@ class HasOuraBlocksTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Integration $integration;
+
     private Event $event;
+
     private OuraPlugin $plugin;
 
     protected function setUp(): void

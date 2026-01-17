@@ -12,9 +12,13 @@ class EditEvent extends Component
     public Event $event;
 
     public ?string $action = null;
+
     public ?float $value = null;
+
     public ?float $value_multiplier = null;
+
     public ?string $value_unit = null;
+
     public ?string $time = null;
 
     public function mount(Event $event): void

@@ -280,6 +280,47 @@ class FlintPlugin extends ManualPlugin
                 'supports_value' => true,
                 'value_unit' => 'insights',
             ],
+
+            // Newspaper Blocks
+            'flint_news_briefing' => [
+                'display_name' => 'News Briefing',
+                'description' => 'Synthesized news from recurring fetch sources',
+                'icon' => 'fas.newspaper',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => true,
+                'value_unit' => 'sources',
+            ],
+            'flint_articles_waiting' => [
+                'display_name' => 'Articles Waiting',
+                'description' => 'Bookmarked articles with compelling pitches',
+                'icon' => 'fas.bookmark',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => true,
+                'value_unit' => 'articles',
+            ],
+
+            // Coaching Blocks
+            'flint_coaching_check_in' => [
+                'display_name' => 'Health Check-In',
+                'description' => 'Health anomaly Q&A for coaching insights',
+                'icon' => 'fas.heart-pulse',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => false,
+                'value_unit' => null,
+            ],
+            'flint_coaching_insight' => [
+                'display_name' => 'Coaching Insight',
+                'description' => 'Insight learned from user coaching response',
+                'icon' => 'fas.brain',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => true,
+                'value_unit' => 'confidence',
+                'value_multiplier' => 100,
+            ],
         ];
     }
 

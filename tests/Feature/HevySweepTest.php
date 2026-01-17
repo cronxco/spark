@@ -18,8 +18,11 @@ class HevySweepTest extends TestCase
     use RefreshDatabase;
 
     private HevyPlugin $plugin;
+
     private User $user;
+
     private IntegrationGroup $group;
+
     private Integration $integration;
 
     protected function setUp(): void

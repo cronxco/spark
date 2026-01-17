@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\Log;
 class PlaywrightFetchClient
 {
     protected string $workerUrl;
+
     protected int $timeout;
+
     protected bool $screenshotEnabled;
 
     public function __construct()
