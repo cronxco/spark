@@ -164,7 +164,7 @@ class NotificationTest extends TestCase
         Notification::assertSentTo(
             [$this->user],
             DailyDigestReady::class,
-            function ($notification) use ($dayObject, $digestBlock) {
+            function ($notification) use ($dayObject) {
                 return $notification->digestObject->id === $dayObject->id
                     && $notification->period === 'evening'
                     && count($notification->blocks) > 0;
