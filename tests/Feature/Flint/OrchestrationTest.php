@@ -139,7 +139,7 @@ class OrchestrationTest extends TestCase
             $job->handle(app(\App\Services\AgentOrchestrationService::class));
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
-            $this->fail('Orchestration job should not throw exceptions: '.$e->getMessage());
+            $this->fail('Orchestration job should not throw exceptions: ' . $e->getMessage());
         }
     }
 
