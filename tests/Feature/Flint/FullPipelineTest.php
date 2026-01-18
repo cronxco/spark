@@ -90,6 +90,7 @@ class FullPipelineTest extends TestCase
     {
         // Step 1: Create health anomaly
         $metricStatistic = MetricStatistic::create([
+            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -99,6 +100,7 @@ class FullPipelineTest extends TestCase
         ]);
 
         $anomaly = MetricTrend::create([
+            'user_id' => $this->user->id,
             'metric_statistic_id' => $metricStatistic->id,
             'type' => 'anomaly_low',
             'baseline_value' => 75,

@@ -45,6 +45,8 @@ class CoachingFlowTest extends TestCase
 
         // Create a metric statistic and anomaly for the user
         $metricStatistic = MetricStatistic::create([
+            'user_id' => $this->user->id,
+            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -54,6 +56,8 @@ class CoachingFlowTest extends TestCase
         ]);
 
         MetricTrend::create([
+            'user_id' => $this->user->id,
+            'user_id' => $this->user->id,
             'metric_statistic_id' => $metricStatistic->id,
             'type' => 'anomaly_low',
             'detected_at' => now(),
@@ -80,6 +84,7 @@ class CoachingFlowTest extends TestCase
         Queue::fake();
 
         $metricStatistic = MetricStatistic::create([
+            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -89,6 +94,7 @@ class CoachingFlowTest extends TestCase
         ]);
 
         $anomaly = MetricTrend::create([
+            'user_id' => $this->user->id,
             'metric_statistic_id' => $metricStatistic->id,
             'type' => 'anomaly_low',
             'detected_at' => now(),
@@ -129,6 +135,7 @@ class CoachingFlowTest extends TestCase
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         $metricStatistic = MetricStatistic::create([
+            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -138,6 +145,7 @@ class CoachingFlowTest extends TestCase
         ]);
 
         $anomaly = MetricTrend::create([
+            'user_id' => $this->user->id,
             'metric_statistic_id' => $metricStatistic->id,
             'type' => 'anomaly_low',
             'detected_at' => now(),
@@ -255,6 +263,7 @@ class CoachingFlowTest extends TestCase
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         $metricStatistic = MetricStatistic::create([
+            'user_id' => $this->user->id,
             'service' => 'oura',
             'action' => 'had_sleep_score',
             'value_unit' => 'score',
@@ -264,6 +273,7 @@ class CoachingFlowTest extends TestCase
         ]);
 
         $anomaly = MetricTrend::create([
+            'user_id' => $this->user->id,
             'metric_statistic_id' => $metricStatistic->id,
             'type' => 'anomaly_low',
             'detected_at' => now(),

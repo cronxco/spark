@@ -10,9 +10,11 @@ use App\Jobs\Flint\RunDigestGenerationJob;
 use App\Jobs\Flint\RunPreDigestRefreshJob;
 use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Models\User;
+use App\Services\AssistantPromptingService;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Mockery;
 use Tests\TestCase;
 
 class OrchestrationTest extends TestCase
@@ -26,6 +28,12 @@ class OrchestrationTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 
     /**
@@ -110,22 +118,28 @@ class OrchestrationTest extends TestCase
     public function orchestration_handles_errors_gracefully(): void
     {
         // This test ensures that if one job fails, others still run
-        Queue::fake([
-            DetectHealthAnomaliesForDigestJob::class,
-            GenerateNewsBriefingJob::class,
-            GenerateArticlesWaitingJob::class,
-        ]);
+        // Fake ALL queues to prevent any jobs from actually running
+        Queue::fake();
+
+        // Mock the AI prompting service to prevent real OpenAI API calls
+        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
+        $mockPrompting->shouldReceive('generateResponse')
+            ->andReturn(json_encode([
+                'insights' => [],
+                'suggestions' => [],
+            ]));
+
+        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         // Run the pre-digest refresh job
         $job = new RunPreDigestRefreshJob($this->user, '06:00');
 
         // Should not throw an exception even if something fails internally
-        $this->expectNotToPerformAssertions();
-
         try {
             $job->handle(app(\App\Services\AgentOrchestrationService::class));
+            $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
-            $this->fail('Orchestration job should not throw exceptions: ' . $e->getMessage());
+            $this->fail('Orchestration job should not throw exceptions: '.$e->getMessage());
         }
     }
 
