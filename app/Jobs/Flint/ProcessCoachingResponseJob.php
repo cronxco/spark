@@ -80,7 +80,7 @@ class ProcessCoachingResponseJob implements ShouldQueue
         $anomalyContext = $metadata['anomaly_context'] ?? [];
         $questions = $metadata['ai_questions'] ?? [];
 
-        $questionsText = implode("\n", array_map(fn ($q, $i) => ($i + 1) . ". {$q}", $questions, array_keys($questions)));
+        $questionsText = implode("\n", array_map(fn ($q, $i) => ($i + 1) . ". {$q}", $questions, range(0, count($questions) - 1)));
 
         $metricName = $anomalyContext['metric_name'] ?? 'Unknown Metric';
         $typeLabel = $anomalyContext['type_label'] ?? 'Anomaly';

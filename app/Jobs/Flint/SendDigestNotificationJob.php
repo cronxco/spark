@@ -59,10 +59,10 @@ class SendDigestNotificationJob implements ShouldQueue
 
             // Find the most recent digest block for this user created today
             $today = now()->startOfDay();
-            $digestBlock = Block::where('block_type', 'flint_digest')
+            $digestBlock = Block::whereIn('block_type', ['flint_summarised_headline', 'flint_digest'])
                 ->whereHas('event', function ($query) use ($today) {
                     $query->where('service', 'flint')
-                        ->where('action', 'had_analysis')
+                        ->whereIn('action', ['had_summary', 'had_analysis'])
                         ->whereHas('integration', function ($q) {
                             $q->where('user_id', $this->user->id);
                         })

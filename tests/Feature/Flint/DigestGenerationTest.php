@@ -31,6 +31,48 @@ class DigestGenerationTest extends TestCase
             'service' => 'flint',
             'instance_type' => 'digest',
         ]);
+
+        // Mock AI service for all tests
+        $this->mockAIService();
+    }
+
+    protected function mockAIService(): void
+    {
+        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
+
+        // Mock generateResponse (for pattern extraction, etc.)
+        $mockPrompting->shouldReceive('generateResponse')
+            ->andReturn(json_encode([
+                'headline' => 'Test Daily Digest',
+                'summary' => 'Test summary',
+                'top_insights' => [],
+                'wins' => [],
+                'watch_points' => [],
+                'tomorrow_focus' => [],
+                'metrics' => ['total_insights' => 0],
+            ]));
+
+        // Mock generateDigest (for digest generation)
+        $mockPrompting->shouldReceive('generateDigest')
+            ->andReturn([
+                'headline' => 'Your Morning Digest',
+                'key_points' => ['Point 1', 'Point 2', 'Point 3'],
+                'actions_required' => [],
+                'things_to_be_aware_of' => null,
+                'insight' => [
+                    'title' => 'Test Insight',
+                    'content' => 'Test insight content',
+                    'supporting_data' => [],
+                ],
+                'suggestion' => [
+                    'title' => 'Test Suggestion',
+                    'content' => 'Test suggestion content',
+                    'actionable' => true,
+                    'automation_hint' => null,
+                ],
+            ]);
+
+        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
     }
 
     protected function tearDown(): void
@@ -44,45 +86,18 @@ class DigestGenerationTest extends TestCase
      */
     public function generate_daily_digest_creates_block(): void
     {
-        // Mock the AI service
-        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-        $mockPrompting->shouldReceive('generateResponse')
-            ->once()
-            ->andReturn(json_encode([
-                'headline' => 'Test Daily Digest',
-                'summary' => 'This is a test digest summary.',
-                'top_insights' => [
-                    [
-                        'icon' => '💡',
-                        'title' => 'Test Insight',
-                        'description' => 'This is a test insight.',
-                    ],
-                ],
-                'wins' => ['Completed workout'],
-                'watch_points' => ['Low sleep score'],
-                'tomorrow_focus' => ['Get more sleep'],
-                'metrics' => [
-                    'total_insights' => 1,
-                    'domains_analyzed' => 2,
-                ],
-            ]));
-
-        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
-
         // Run the job
         $job = new GenerateDailyDigestJob($this->user, 'morning');
         $job->handle(app(AssistantPromptingService::class));
 
-        // Assert digest block was created
+        // Assert digest blocks were created
         $this->assertDatabaseHas('blocks', [
-            'block_type' => 'flint_digest',
+            'block_type' => 'flint_summarised_headline',
         ]);
 
-        $digestBlock = Block::where('block_type', 'flint_digest')->first();
-        $this->assertNotNull($digestBlock);
-        $this->assertEquals('Test Daily Digest', $digestBlock->metadata['headline']);
-        $this->assertArrayHasKey('top_insights', $digestBlock->metadata);
-        $this->assertCount(1, $digestBlock->metadata['top_insights']);
+        $headlineBlock = Block::where('block_type', 'flint_summarised_headline')->first();
+        $this->assertNotNull($headlineBlock);
+        $this->assertEquals('Your Morning Digest', $headlineBlock->metadata['content']);
     }
 
     /**
@@ -90,21 +105,6 @@ class DigestGenerationTest extends TestCase
      */
     public function digest_links_to_source_events(): void
     {
-        // Mock the AI service
-        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-        $mockPrompting->shouldReceive('generateResponse')
-            ->andReturn(json_encode([
-                'headline' => 'Test Digest',
-                'summary' => 'Summary',
-                'top_insights' => [],
-                'wins' => [],
-                'watch_points' => [],
-                'tomorrow_focus' => [],
-                'metrics' => ['total_insights' => 0],
-            ]));
-
-        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
-
         // Create some events for the user
         $event1 = Event::factory()->create([
             'integration_id' => $this->flintIntegration->id,
@@ -124,12 +124,13 @@ class DigestGenerationTest extends TestCase
         $job = new GenerateDailyDigestJob($this->user, 'evening');
         $job->handle(app(AssistantPromptingService::class));
 
-        // Assert digest was created
-        $digestBlock = Block::where('block_type', 'flint_digest')->first();
-        $this->assertNotNull($digestBlock);
+        // Assert digest blocks were created
+        $this->assertDatabaseHas('blocks', [
+            'block_type' => 'flint_summarised_headline',
+        ]);
 
-        // Assert relationships exist (if implemented)
-        // This depends on whether GenerateDailyDigestJob creates relationships
+        $headlineBlock = Block::where('block_type', 'flint_summarised_headline')->first();
+        $this->assertNotNull($headlineBlock);
     }
 
     /**
@@ -137,32 +138,17 @@ class DigestGenerationTest extends TestCase
      */
     public function digest_handles_empty_data_gracefully(): void
     {
-        // Mock the AI service to return minimal data
-        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-        $mockPrompting->shouldReceive('generateResponse')
-            ->andReturn(json_encode([
-                'headline' => 'No Activity Today',
-                'summary' => 'Not much happened today.',
-                'top_insights' => [],
-                'wins' => [],
-                'watch_points' => [],
-                'tomorrow_focus' => [],
-                'metrics' => ['total_insights' => 0],
-            ]));
-
-        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
-
         // Run the job with no events
         $job = new GenerateDailyDigestJob($this->user, 'morning');
         $job->handle(app(AssistantPromptingService::class));
 
-        // Assert digest was still created
+        // Assert digest blocks were still created
         $this->assertDatabaseHas('blocks', [
-            'block_type' => 'flint_digest',
+            'block_type' => 'flint_summarised_headline',
         ]);
 
-        $digestBlock = Block::where('block_type', 'flint_digest')->first();
-        $this->assertNotNull($digestBlock);
-        $this->assertEquals('No Activity Today', $digestBlock->metadata['headline']);
+        $headlineBlock = Block::where('block_type', 'flint_summarised_headline')->first();
+        $this->assertNotNull($headlineBlock);
+        $this->assertEquals('Your Morning Digest', $headlineBlock->metadata['content']);
     }
 }

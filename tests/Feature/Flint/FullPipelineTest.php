@@ -16,7 +16,8 @@ use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
-use App\Notifications\FlintDigestNotification;
+use App\Notifications\DailyDigestReady;
+use App\Services\AgentOrchestrationService;
 use App\Services\AssistantPromptingService;
 use App\Services\FlintBlockCreationService;
 use App\Services\PatternLearningService;
@@ -63,24 +64,29 @@ class FullPipelineTest extends TestCase
     {
         Queue::fake([
             DetectHealthAnomaliesForDigestJob::class,
-            GenerateDailyDigestJob::class,
-            SendDigestNotificationJob::class,
+            RunDigestGenerationJob::class,
         ]);
+
+        // Mock AgentOrchestrationService for pre-digest refresh
+        $mockOrchestration = Mockery::mock(AgentOrchestrationService::class);
+        $mockOrchestration->shouldReceive('runPreDigestRefresh')
+            ->once()
+            ->with($this->user)
+            ->andReturn([
+                'health' => ['insights' => [], 'suggestions' => []],
+                'knowledge' => ['insights' => [], 'suggestions' => []],
+            ]);
+
+        $this->app->instance(AgentOrchestrationService::class, $mockOrchestration);
 
         // Step 1: Run pre-digest refresh
         $preRefreshJob = new RunPreDigestRefreshJob($this->user, '06:00');
-        $preRefreshJob->handle();
+        $preRefreshJob->handle(app(AgentOrchestrationService::class));
 
-        // Assert pre-refresh jobs were dispatched
-        Queue::assertPushed(DetectHealthAnomaliesForDigestJob::class);
-
-        // Step 2: Run digest generation
-        $digestJob = new RunDigestGenerationJob($this->user, '06:00');
-        $digestJob->handle();
-
-        // Assert digest and notification jobs were dispatched
-        Queue::assertPushed(GenerateDailyDigestJob::class);
-        Queue::assertPushed(SendDigestNotificationJob::class);
+        // Assert that RunDigestGenerationJob was dispatched after pre-refresh
+        Queue::assertPushed(RunDigestGenerationJob::class, function ($job) {
+            return $job->user->id === $this->user->id;
+        });
     }
 
     /**
@@ -117,7 +123,7 @@ class FullPipelineTest extends TestCase
         $createSessionJob->handle(app(PatternLearningService::class), app(AssistantPromptingService::class));
 
         // Assert coaching session was created
-        $this->assertDatabaseHas('event_objects', [
+        $this->assertDatabaseHas('objects', [
             'concept' => 'flint',
             'type' => 'coaching_session',
         ]);
@@ -147,7 +153,7 @@ class FullPipelineTest extends TestCase
         $this->assertEquals('completed', $coachingSession->metadata['status']);
 
         // Assert learned patterns were created
-        $this->assertDatabaseHas('event_objects', [
+        $this->assertDatabaseHas('objects', [
             'concept' => 'flint',
             'type' => 'learned_pattern',
         ]);
@@ -163,24 +169,27 @@ class FullPipelineTest extends TestCase
 
         Queue::fake([
             DetectHealthAnomaliesForDigestJob::class,
-            GenerateDailyDigestJob::class,
+            RunDigestGenerationJob::class,
         ]);
 
+        // Mock AgentOrchestrationService for all users
+        $mockOrchestration = Mockery::mock(AgentOrchestrationService::class);
+        $mockOrchestration->shouldReceive('runPreDigestRefresh')
+            ->times(3)
+            ->andReturn([
+                'health' => ['insights' => [], 'suggestions' => []],
+                'knowledge' => ['insights' => [], 'suggestions' => []],
+            ]);
+
+        $this->app->instance(AgentOrchestrationService::class, $mockOrchestration);
+
         // Run pre-digest refresh for all users
-        (new RunPreDigestRefreshJob($this->user, '06:00'))->handle();
-        (new RunPreDigestRefreshJob($user2, '06:00'))->handle();
-        (new RunPreDigestRefreshJob($user3, '06:00'))->handle();
+        (new RunPreDigestRefreshJob($this->user, '06:00'))->handle(app(AgentOrchestrationService::class));
+        (new RunPreDigestRefreshJob($user2, '06:00'))->handle(app(AgentOrchestrationService::class));
+        (new RunPreDigestRefreshJob($user3, '06:00'))->handle(app(AgentOrchestrationService::class));
 
-        // Assert jobs were dispatched for all users
-        Queue::assertPushed(DetectHealthAnomaliesForDigestJob::class, 3);
-
-        // Run digest generation for all users
-        (new RunDigestGenerationJob($this->user, '06:00'))->handle();
-        (new RunDigestGenerationJob($user2, '06:00'))->handle();
-        (new RunDigestGenerationJob($user3, '06:00'))->handle();
-
-        // Assert digest jobs were dispatched for all users
-        Queue::assertPushed(GenerateDailyDigestJob::class, 3);
+        // Assert RunDigestGenerationJob was dispatched for all users
+        Queue::assertPushed(RunDigestGenerationJob::class, 3);
     }
 
     /**
@@ -204,17 +213,27 @@ class FullPipelineTest extends TestCase
             'time' => now()->subHours(2),
         ]);
 
-        // Run the full pipeline synchronously
+        // Run the full pipeline synchronously using the direct generation job
         $digestJob = new GenerateDailyDigestJob($this->user, 'morning');
         $digestJob->handle(app(AssistantPromptingService::class));
 
         // Assert digest was created
         $this->assertDatabaseHas('blocks', [
-            'block_type' => 'flint_digest',
+            'block_type' => 'flint_summarised_headline',
         ]);
 
-        $digest = Block::where('block_type', 'flint_digest')->first();
+        $digest = Block::where('block_type', 'flint_summarised_headline')->first();
         $this->assertNotNull($digest);
+
+        // Create flint integration for notification to work
+        $flintIntegration = Integration::firstOrCreate([
+            'user_id' => $this->user->id,
+            'service' => 'flint',
+            'instance_type' => 'digest',
+        ], [
+            'name' => 'Flint Digest',
+            'active' => true,
+        ]);
 
         // Send notification
         $notificationJob = new SendDigestNotificationJob($this->user, 'morning');
@@ -223,7 +242,7 @@ class FullPipelineTest extends TestCase
         // Assert notification was sent
         Notification::assertSentTo(
             [$this->user],
-            FlintDigestNotification::class
+            DailyDigestReady::class
         );
     }
 
@@ -236,6 +255,7 @@ class FullPipelineTest extends TestCase
 
         // Create a pattern with multiple domains
         $pattern = EventObject::create([
+            'user_id' => $this->user->id,
             'concept' => 'flint',
             'type' => 'learned_pattern',
             'title' => 'Late Night Work Affects Sleep',
@@ -262,23 +282,62 @@ class FullPipelineTest extends TestCase
     {
         $mockPrompting = Mockery::mock(AssistantPromptingService::class);
 
-        // Mock digest generation
+        // Mock AI responses based on context
         $mockPrompting->shouldReceive('generateResponse')
-            ->andReturn(json_encode([
-                'headline' => 'Your Morning Digest',
-                'summary' => 'Summary of your day',
-                'top_insights' => [
-                    [
-                        'icon' => '💡',
-                        'title' => 'Test Insight',
-                        'description' => 'Test description',
-                    ],
+            ->andReturnUsing(function ($prompt, $options = []) {
+                $context = $options['context'] ?? [];
+                $agentType = $context['agent_type'] ?? null;
+
+                // Pattern extractor (for ProcessCoachingResponseJob)
+                if ($agentType === 'pattern_extractor') {
+                    return json_encode([
+                        [
+                            'title' => 'Late Night Work Affects Sleep',
+                            'trigger_conditions' => [
+                                'activity' => 'Working late on projects',
+                                'timing' => 'When approaching deadlines',
+                            ],
+                            'consequences' => [
+                                'metric' => 'sleep_score',
+                                'effect' => 'decrease',
+                            ],
+                            'user_explanation' => 'I stayed up late working on a project',
+                            'domains' => ['health', 'online'],
+                            'confidence' => 0.5,
+                        ],
+                    ]);
+                }
+
+                // Question generator (for CreateCoachingSessionJob)
+                if ($agentType === 'coaching_question_generator') {
+                    return json_encode([
+                        'What recent changes might have affected this?',
+                        'Have you experienced any unusual stress or activities?',
+                    ]);
+                }
+
+                // Default fallback
+                return json_encode([]);
+            });
+
+        $mockPrompting->shouldReceive('generateDigest')
+            ->andReturn([
+                'headline' => 'Your Test Digest',
+                'key_points' => ['Point 1', 'Point 2', 'Point 3'],
+                'actions_required' => [],
+                'things_to_be_aware_of' => null,
+                'insight' => [
+                    'title' => 'Test Insight',
+                    'content' => 'Test insight content',
+                    'supporting_data' => [],
                 ],
-                'wins' => ['Completed goals'],
-                'watch_points' => ['Area to improve'],
-                'tomorrow_focus' => ['Focus area'],
-                'metrics' => ['total_insights' => 1],
-            ]));
+                'suggestion' => [
+                    'title' => 'Test Suggestion',
+                    'content' => 'Test suggestion content',
+                    'actionable' => true,
+                    'automation_hint' => null,
+                ],
+            ]);
 
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
     }

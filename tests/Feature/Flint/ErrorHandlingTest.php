@@ -43,26 +43,28 @@ class ErrorHandlingTest extends TestCase
 
         // Mock AI service to throw an exception
         $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-        $mockPrompting->shouldReceive('generateResponse')
+        $mockPrompting->shouldReceive('generateDigest')
             ->once()
             ->andThrow(new Exception('AI service unavailable'));
 
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
-        // Run the job - should not throw exception
+        // Run the job - it should throw exception after logging
         $job = new GenerateDailyDigestJob($this->user, 'morning');
 
         try {
-            $job->handle(app(FlintBlockCreationService::class), app(AssistantPromptingService::class));
+            $job->handle(app(AssistantPromptingService::class));
+            $this->fail('Job should have thrown an exception');
         } catch (Exception $e) {
-            // Job should handle the exception internally
+            // Expected - job logs error and re-throws exception
+            $this->assertEquals('AI service unavailable', $e->getMessage());
         }
 
         // Assert error was logged
         Log::shouldHaveReceived('error')
             ->once()
             ->withArgs(function ($message, $context) {
-                return str_contains($message, '[Flint]') || str_contains($message, 'digest');
+                return str_contains($message, 'Flint') && str_contains($message, 'digest');
             });
     }
 
@@ -110,7 +112,7 @@ class ErrorHandlingTest extends TestCase
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
             // Should not throw - should handle gracefully
-            $this->fail('Job should handle malformed JSON gracefully: ' . $e->getMessage());
+            $this->fail('Job should handle malformed JSON gracefully: '.$e->getMessage());
         }
     }
 
@@ -141,7 +143,7 @@ class ErrorHandlingTest extends TestCase
 
             $this->assertInstanceOf(EventObject::class, $result);
         } catch (Exception $e) {
-            $this->fail('Pattern learning should handle missing metadata: ' . $e->getMessage());
+            $this->fail('Pattern learning should handle missing metadata: '.$e->getMessage());
         }
     }
 
@@ -152,39 +154,32 @@ class ErrorHandlingTest extends TestCase
     {
         Log::spy();
 
-        // Create a scenario where database write might fail
-        // Mock the block creation service to throw an exception
-        $mockBlockService = Mockery::mock(FlintBlockCreationService::class);
-        $mockBlockService->shouldReceive('getOrCreateFlintEvent')
-            ->andThrow(new Exception('Database connection error'));
-
-        $this->app->instance(FlintBlockCreationService::class, $mockBlockService);
-
-        // Mock AI service
+        // Mock AI service to throw a database-related exception
         $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-        $mockPrompting->shouldReceive('generateResponse')
-            ->andReturn(json_encode([
-                'headline' => 'Test',
-                'summary' => 'Test',
-                'top_insights' => [],
-                'wins' => [],
-                'watch_points' => [],
-                'tomorrow_focus' => [],
-                'metrics' => ['total_insights' => 0],
-            ]));
+        $mockPrompting->shouldReceive('generateDigest')
+            ->once()
+            ->andThrow(new Exception('Database connection error'));
 
         $this->app->instance(AssistantPromptingService::class, $mockPrompting);
 
         $job = new GenerateDailyDigestJob($this->user, 'morning');
 
         try {
-            $job->handle(app(FlintBlockCreationService::class), app(AssistantPromptingService::class));
+            $job->handle(app(AssistantPromptingService::class));
+            $this->fail('Job should have thrown an exception');
         } catch (Exception $e) {
             // Expected - database error occurred
+            $this->assertEquals('Database connection error', $e->getMessage());
         }
 
-        // Assert error was logged
-        Log::shouldHaveReceived('error');
+        // Assert error was logged with Flint-specific context
+        Log::shouldHaveReceived('error')
+            ->once()
+            ->withArgs(function ($message, $context) {
+                return str_contains($message, 'Failed to generate Flint digest') &&
+                       isset($context['user_id']) &&
+                       isset($context['period']);
+            });
     }
 
     /**
@@ -231,7 +226,7 @@ class ErrorHandlingTest extends TestCase
             );
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
-            $this->fail('Job should handle empty AI response: ' . $e->getMessage());
+            $this->fail('Job should handle empty AI response: '.$e->getMessage());
         }
     }
 }

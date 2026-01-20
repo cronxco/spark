@@ -296,8 +296,8 @@ class PatternLearningService
             ->where('concept', 'flint')
             ->where('type', 'learned_pattern')
             ->whereNull('deleted_at')
-            ->whereRaw("jsonb_array_length(metadata->'domains') > 1")
-            ->whereRaw("metadata->'domains' @> ?", [json_encode([$primaryDomain])])
+            ->whereRaw("jsonb_array_length((metadata::jsonb)->'domains') > 1")
+            ->whereRaw("(metadata::jsonb)->'domains' @> ?", [json_encode([$primaryDomain])])
             ->where('time', '>=', now()->subDays($days))
             ->orderByRaw("(metadata->>'confidence_score')::numeric DESC")
             ->get();
