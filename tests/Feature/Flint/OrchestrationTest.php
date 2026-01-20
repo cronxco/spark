@@ -29,25 +29,6 @@ class OrchestrationTest extends TestCase
         $this->mockAIService();
     }
 
-    protected function mockAIService(): void
-    {
-        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-        $mockPrompting->shouldReceive('generateResponse')
-            ->andReturn(json_encode([
-                'insights' => [],
-                'suggestions' => [],
-                'headline' => 'Test Digest',
-                'summary' => 'Test Summary',
-                'top_insights' => [],
-                'wins' => [],
-                'watch_points' => [],
-                'tomorrow_focus' => [],
-                'metrics' => ['total_insights' => 0],
-            ]));
-
-        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
-    }
-
     protected function tearDown(): void
     {
         Mockery::close();
@@ -164,7 +145,7 @@ class OrchestrationTest extends TestCase
             $job->handle(app(\App\Services\AgentOrchestrationService::class));
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
-            $this->fail('Orchestration job should not throw exceptions: '.$e->getMessage());
+            $this->fail('Orchestration job should not throw exceptions: ' . $e->getMessage());
         }
     }
 
@@ -197,5 +178,24 @@ class OrchestrationTest extends TestCase
 
         // Verify all three jobs completed successfully
         $this->assertTrue(true);
+    }
+
+    protected function mockAIService(): void
+    {
+        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
+        $mockPrompting->shouldReceive('generateResponse')
+            ->andReturn(json_encode([
+                'insights' => [],
+                'suggestions' => [],
+                'headline' => 'Test Digest',
+                'summary' => 'Test Summary',
+                'top_insights' => [],
+                'wins' => [],
+                'watch_points' => [],
+                'tomorrow_focus' => [],
+                'metrics' => ['total_insights' => 0],
+            ]));
+
+        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
     }
 }

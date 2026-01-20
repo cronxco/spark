@@ -36,45 +36,6 @@ class DigestGenerationTest extends TestCase
         $this->mockAIService();
     }
 
-    protected function mockAIService(): void
-    {
-        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
-
-        // Mock generateResponse (for pattern extraction, etc.)
-        $mockPrompting->shouldReceive('generateResponse')
-            ->andReturn(json_encode([
-                'headline' => 'Test Daily Digest',
-                'summary' => 'Test summary',
-                'top_insights' => [],
-                'wins' => [],
-                'watch_points' => [],
-                'tomorrow_focus' => [],
-                'metrics' => ['total_insights' => 0],
-            ]));
-
-        // Mock generateDigest (for digest generation)
-        $mockPrompting->shouldReceive('generateDigest')
-            ->andReturn([
-                'headline' => 'Your Morning Digest',
-                'key_points' => ['Point 1', 'Point 2', 'Point 3'],
-                'actions_required' => [],
-                'things_to_be_aware_of' => null,
-                'insight' => [
-                    'title' => 'Test Insight',
-                    'content' => 'Test insight content',
-                    'supporting_data' => [],
-                ],
-                'suggestion' => [
-                    'title' => 'Test Suggestion',
-                    'content' => 'Test suggestion content',
-                    'actionable' => true,
-                    'automation_hint' => null,
-                ],
-            ]);
-
-        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
-    }
-
     protected function tearDown(): void
     {
         Mockery::close();
@@ -150,5 +111,44 @@ class DigestGenerationTest extends TestCase
         $headlineBlock = Block::where('block_type', 'flint_summarised_headline')->first();
         $this->assertNotNull($headlineBlock);
         $this->assertEquals('Your Morning Digest', $headlineBlock->metadata['content']);
+    }
+
+    protected function mockAIService(): void
+    {
+        $mockPrompting = Mockery::mock(AssistantPromptingService::class);
+
+        // Mock generateResponse (for pattern extraction, etc.)
+        $mockPrompting->shouldReceive('generateResponse')
+            ->andReturn(json_encode([
+                'headline' => 'Test Daily Digest',
+                'summary' => 'Test summary',
+                'top_insights' => [],
+                'wins' => [],
+                'watch_points' => [],
+                'tomorrow_focus' => [],
+                'metrics' => ['total_insights' => 0],
+            ]));
+
+        // Mock generateDigest (for digest generation)
+        $mockPrompting->shouldReceive('generateDigest')
+            ->andReturn([
+                'headline' => 'Your Morning Digest',
+                'key_points' => ['Point 1', 'Point 2', 'Point 3'],
+                'actions_required' => [],
+                'things_to_be_aware_of' => null,
+                'insight' => [
+                    'title' => 'Test Insight',
+                    'content' => 'Test insight content',
+                    'supporting_data' => [],
+                ],
+                'suggestion' => [
+                    'title' => 'Test Suggestion',
+                    'content' => 'Test suggestion content',
+                    'actionable' => true,
+                    'automation_hint' => null,
+                ],
+            ]);
+
+        $this->app->instance(AssistantPromptingService::class, $mockPrompting);
     }
 }
