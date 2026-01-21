@@ -12,11 +12,17 @@ class EditBlock extends Component
     public Block $block;
 
     public ?string $title = null;
+
     public ?string $block_type = null;
+
     public ?float $value = null;
+
     public ?float $value_multiplier = null;
+
     public ?string $value_unit = null;
+
     public ?string $time = null;
+
     public ?string $url = null;
 
     public function mount(Block $block): void

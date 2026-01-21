@@ -17,7 +17,9 @@ abstract class BaseTaskJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
 
     public $timeout = 120;
+
     public $tries = 3;
+
     public $backoff = [30, 120, 300]; // 30s, 2m, 5m
 
     public function __construct(

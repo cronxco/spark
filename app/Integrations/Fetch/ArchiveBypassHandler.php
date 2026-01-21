@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Log;
 class ArchiveBypassHandler
 {
     protected const ARCHIVE_BASE_URL = 'https://archive.is';
+
     protected const ARCHIVE_TODAY_URL = 'https://archive.today';
 
     protected Client $httpClient;
+
     protected int $timeout;
 
     public function __construct()

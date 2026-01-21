@@ -25,29 +25,44 @@ class Day extends Component
 
     // UI State
     public string $view = 'index';
+
     public ?string $eventId = null;
+
     public string $search = '';
+
     public string $date;
+
     public string $pollMode = 'visible';
+
     public bool $dayNoteOpen = false;
 
     // Day Note State
     public ?string $dayNoteDocId = null;
+
     public ?string $dayNoteIntegrationId = null;
+
     public string $dayNoteText = '';
+
     public bool $dayNoteSaving = false;
+
     public ?string $dayNoteSavedAt = null;
+
     public int $dayNoteAutoSaveMs = 800;
 
     // Progressive Loading State Flags
     public bool $coreEventsLoaded = false;
+
     public bool $additionalDataLoaded = false;
+
     public bool $dayNoteLoaded = false;
+
     public bool $checkinStatusLoaded = false;
+
     public bool $cardStreamsLoaded = false;
 
     // Cached Data (for filtering)
     public ?Collection $allEvents = null;
+
     public ?Collection $filteredEvents = null;
 
     public function mount(): void

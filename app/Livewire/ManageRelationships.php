@@ -14,6 +14,7 @@ use Livewire\Component;
 class ManageRelationships extends Component
 {
     public string $modelType;
+
     public string $modelId;
 
     protected $listeners = [

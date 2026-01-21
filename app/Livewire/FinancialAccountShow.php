@@ -18,13 +18,21 @@ class FinancialAccountShow extends Component
     use WithPagination;
 
     public EventObject $account;
+
     public bool $showSidebar = false;
+
     public bool $metadataOpen = false;
+
     public bool $showEditModal = false;
+
     public bool $showArchiveModal = false;
+
     public bool $showAddBalanceModal = false;
+
     public bool $showCreateTagModal = false;
+
     public int $perPage = 25;
+
     public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
     public function mount(EventObject $account): void

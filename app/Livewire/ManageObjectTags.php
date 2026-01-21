@@ -11,6 +11,7 @@ use Spatie\Tags\Tag;
 class ManageObjectTags extends Component
 {
     public EventObject $object;
+
     public bool $showCreateTagModal = false;
 
     protected $listeners = [

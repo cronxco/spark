@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Jobs\Flint\DetectHealthAnomaliesForDigestJob;
+use App\Jobs\Flint\GenerateArticlesWaitingJob;
+use App\Jobs\Flint\GenerateNewsBriefingJob;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
@@ -151,6 +154,20 @@ class AgentOrchestrationService
                 'result_type' => $results['actions'] === null ? 'null' : (is_array($results['actions']) ? 'array(' . count($results['actions']) . ' items)' : gettype($results['actions'])),
             ]);
 
+            // Run coaching detection for health anomalies
+            Log::info('[Flint] [ORCHESTRATION] Starting health coaching detection', [
+                'user_id' => $user->id,
+            ]);
+
+            $coachingStartTime = microtime(true);
+            $this->runCoachingDetection($user);
+            $coachingDuration = microtime(true) - $coachingStartTime;
+
+            Log::info('[Flint] [ORCHESTRATION] Health coaching detection completed', [
+                'user_id' => $user->id,
+                'duration_seconds' => round($coachingDuration, 2),
+            ]);
+
             // Update last execution time
             Log::info('[Flint] [ORCHESTRATION] Updating last execution time', [
                 'user_id' => $user->id,
@@ -215,6 +232,8 @@ class AgentOrchestrationService
         }
 
         try {
+            // Generate newspaper sections (news briefing and articles waiting)
+            $this->generateNewspaperSections($user);
 
             // Generate digest using AssistantPromptingService
             $digestBlockId = $this->generateDigest($user);
@@ -784,13 +803,19 @@ class AgentOrchestrationService
 
     /**
      * Get enabled domains for a user
+     * Note: Finance (money) and media domains removed as per newspaper redesign
      */
     protected function getEnabledDomains(User $user): array
     {
         $settings = $user->settings ?? [];
         $flintSettings = $settings['flint'] ?? [];
 
-        $enabledDomains = $flintSettings['enabled_domains'] ?? ['health', 'money', 'media', 'knowledge', 'online'];
+        // Default domains exclude finance and media (deemed superficial)
+        $enabledDomains = $flintSettings['enabled_domains'] ?? ['health', 'knowledge', 'online'];
+
+        // Filter out deprecated domains if they were previously enabled
+        $deprecatedDomains = ['money', 'media'];
+        $enabledDomains = array_values(array_filter($enabledDomains, fn ($d) => ! in_array($d, $deprecatedDomains)));
 
         return $enabledDomains;
     }
@@ -1425,5 +1450,45 @@ PROMPT;
         }
 
         return $deduplicated;
+    }
+
+    /**
+     * Run coaching detection for health anomalies.
+     * Dispatches DetectHealthAnomaliesForDigestJob to find and create coaching sessions.
+     */
+    protected function runCoachingDetection(User $user): void
+    {
+        try {
+            // Dispatch the job synchronously during pre-digest refresh
+            // so coaching sessions are ready when the digest is generated
+            DetectHealthAnomaliesForDigestJob::dispatchSync($user);
+        } catch (Exception $e) {
+            Log::warning('[Flint] [ORCHESTRATION] Coaching detection failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Don't throw - coaching is optional, continue with digest
+        }
+    }
+
+    /**
+     * Generate newspaper sections (news briefing and articles waiting).
+     * Dispatches jobs synchronously so blocks are ready for the digest.
+     */
+    protected function generateNewspaperSections(User $user): void
+    {
+        try {
+            // Generate news briefing from recurring fetch sources
+            GenerateNewsBriefingJob::dispatchSync($user);
+
+            // Generate articles waiting from one-time bookmarks
+            GenerateArticlesWaitingJob::dispatchSync($user);
+        } catch (Exception $e) {
+            Log::warning('[Flint] [ORCHESTRATION] Newspaper section generation failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Don't throw - newspaper sections are optional, continue with digest
+        }
     }
 }

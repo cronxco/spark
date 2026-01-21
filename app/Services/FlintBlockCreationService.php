@@ -314,6 +314,104 @@ class FlintBlockCreationService
     }
 
     /**
+     * Create news briefing block from synthesized recurring fetch sources
+     */
+    public function createNewsBriefingBlock(User $user, array $briefingData, Event $flintEvent): Block
+    {
+        return Block::create([
+            'id' => Str::uuid(),
+            'event_id' => $flintEvent->id,
+            'block_type' => 'flint_news_briefing',
+            'time' => now(),
+            'title' => $briefingData['title'] ?? 'News Briefing',
+            'value' => count($briefingData['sources'] ?? []),
+            'value_unit' => 'sources',
+            'metadata' => [
+                'summary' => $briefingData['summary'] ?? '',
+                'sources' => $briefingData['sources'] ?? [],
+                'key_stories' => $briefingData['key_stories'] ?? [],
+                'themes' => $briefingData['themes'] ?? [],
+                'period' => $briefingData['period'] ?? [
+                    'start' => now()->subDay()->toIso8601String(),
+                    'end' => now()->toIso8601String(),
+                ],
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Create articles waiting block for unread one-time bookmarks
+     */
+    public function createArticlesWaitingBlock(User $user, array $articlesData, Event $flintEvent): Block
+    {
+        return Block::create([
+            'id' => Str::uuid(),
+            'event_id' => $flintEvent->id,
+            'block_type' => 'flint_articles_waiting',
+            'time' => now(),
+            'title' => $articlesData['title'] ?? 'Articles Waiting',
+            'value' => count($articlesData['articles'] ?? []),
+            'value_unit' => 'articles',
+            'metadata' => [
+                'articles' => $articlesData['articles'] ?? [],
+                'total_unread' => $articlesData['total_unread'] ?? 0,
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Create coaching check-in block for health anomaly Q&A
+     */
+    public function createCoachingCheckInBlock(User $user, array $checkInData, Event $flintEvent): Block
+    {
+        return Block::create([
+            'id' => Str::uuid(),
+            'event_id' => $flintEvent->id,
+            'block_type' => 'flint_coaching_check_in',
+            'time' => now(),
+            'title' => $checkInData['title'] ?? 'Health Check-In',
+            'metadata' => [
+                'coaching_session_id' => $checkInData['coaching_session_id'] ?? null,
+                'anomaly_context' => $checkInData['anomaly_context'] ?? [],
+                'questions' => $checkInData['questions'] ?? [],
+                'pattern_suggestions' => $checkInData['pattern_suggestions'] ?? [],
+                'status' => 'pending',
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Create coaching insight block from learned pattern
+     */
+    public function createCoachingInsightBlock(User $user, array $insightData, Event $flintEvent): Block
+    {
+        $confidence = $insightData['confidence'] ?? 0.5;
+
+        return Block::create([
+            'id' => Str::uuid(),
+            'event_id' => $flintEvent->id,
+            'block_type' => 'flint_coaching_insight',
+            'time' => now(),
+            'title' => $insightData['title'] ?? 'Coaching Insight',
+            'value' => (int) ($confidence * 100),
+            'value_multiplier' => 100,
+            'value_unit' => 'confidence',
+            'metadata' => [
+                'learned_pattern_id' => $insightData['learned_pattern_id'] ?? null,
+                'insight' => $insightData['insight'] ?? '',
+                'trigger_conditions' => $insightData['trigger_conditions'] ?? [],
+                'consequences' => $insightData['consequences'] ?? [],
+                'confirmation_count' => $insightData['confirmation_count'] ?? 1,
+                'confidence' => $confidence,
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
      * Create a single insight block
      */
     protected function createInsightBlock(User $user, Event $event, string $blockType, array $insightData): ?Block

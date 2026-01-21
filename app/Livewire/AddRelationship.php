@@ -15,16 +15,23 @@ use Livewire\Component;
 class AddRelationship extends Component
 {
     public string $fromType;
+
     public string $fromId;
 
     public string $relationshipType = 'related_to';
+
     public string $toType = '';
+
     public string $searchQuery = '';
+
     public ?string $selectedToId = null;
 
     public ?float $value = null;
+
     public ?float $valueMultiplier = null;
+
     public ?string $valueUnit = null;
+
     public ?string $metadata = null;
 
     public bool $showAdvanced = false;

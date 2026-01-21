@@ -16,8 +16,11 @@ class FetchDiscoveryTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected IntegrationGroup $fetchGroup;
+
     protected Integration $fetchIntegration;
+
     protected Integration $sourceIntegration;
 
     protected function setUp(): void

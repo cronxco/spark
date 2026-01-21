@@ -11,8 +11,11 @@ class EditObject extends Component
     public EventObject $object;
 
     public ?string $title = null;
+
     public ?string $type = null;
+
     public ?string $concept = null;
+
     public ?string $url = null;
 
     public function mount(EventObject $object): void

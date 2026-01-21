@@ -15,7 +15,9 @@ class DispatchTrendDetectionTasksJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 900; // 15 minutes
+
     public $tries = 2;
+
     public $backoff = [300, 600]; // 5m, 10m
 
     /**
