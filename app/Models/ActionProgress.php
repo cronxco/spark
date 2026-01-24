@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property string $action_type
  * @property string $action_id
- * @property string $step
+ * @property string|null $step
  * @property string $message
  * @property int $progress
  * @property int $total

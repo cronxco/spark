@@ -78,7 +78,7 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'generate_newsletter_summaries_' . $this->integration->id . '_' . $this->event->id;
+        return 'generate_newsletter_summaries_'.$this->integration->id.'_'.$this->event->id;
     }
 
     private function generateSummaries(string $subject, string $articleText): array
@@ -101,7 +101,7 @@ class GenerateNewsletterSummariesJob implements ShouldQueue
                 'original_length' => $contentLength,
                 'truncated_to' => strlen($contentToSend),
                 'characters_lost' => $contentLength - strlen($contentToSend),
-                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1) . '%',
+                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1).'%',
             ]);
         }
 

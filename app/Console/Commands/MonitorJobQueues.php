@@ -120,7 +120,7 @@ class MonitorJobQueues extends Command
             ];
 
         } catch (Exception $e) {
-            $this->error('Failed to check pending jobs: ' . $e->getMessage());
+            $this->error('Failed to check pending jobs: '.$e->getMessage());
 
             return ['queues' => [], 'total' => 0, 'issues' => []];
         }
@@ -162,7 +162,7 @@ class MonitorJobQueues extends Command
             ];
 
         } catch (Exception $e) {
-            $this->error('Failed to check stale jobs: ' . $e->getMessage());
+            $this->error('Failed to check stale jobs: '.$e->getMessage());
 
             return ['stale_jobs' => collect(), 'issues' => []];
         }
@@ -204,7 +204,7 @@ class MonitorJobQueues extends Command
             ];
 
         } catch (Exception $e) {
-            $this->error('Failed to check failed jobs: ' . $e->getMessage());
+            $this->error('Failed to check failed jobs: '.$e->getMessage());
 
             return ['failed_count' => 0, 'issues' => []];
         }
@@ -242,7 +242,7 @@ class MonitorJobQueues extends Command
             ];
 
         } catch (Exception $e) {
-            $this->error('Failed to check integration status: ' . $e->getMessage());
+            $this->error('Failed to check integration status: '.$e->getMessage());
 
             return ['stuck_integrations' => collect(), 'issues' => []];
         }
@@ -280,7 +280,7 @@ class MonitorJobQueues extends Command
             ];
 
         } catch (Exception $e) {
-            $this->error('Failed to check integration error rates: ' . $e->getMessage());
+            $this->error('Failed to check integration error rates: '.$e->getMessage());
 
             return ['error_integrations' => collect(), 'issues' => []];
         }
@@ -294,7 +294,7 @@ class MonitorJobQueues extends Command
         if (empty($issues)) {
             $this->info('✅ All systems healthy!');
         } else {
-            $this->warn('⚠️  Found ' . count($issues) . ' issues:');
+            $this->warn('⚠️  Found '.count($issues).' issues:');
             foreach ($issues as $issue) {
                 $this->line("  • {$issue['message']}");
             }
@@ -314,7 +314,7 @@ class MonitorJobQueues extends Command
         if (empty($issues)) {
             $this->info('✅ All integrations healthy!');
         } else {
-            $this->warn('⚠️  Found ' . count($issues) . ' issues:');
+            $this->warn('⚠️  Found '.count($issues).' issues:');
             foreach ($issues as $issue) {
                 $this->line("  • {$issue['message']}");
             }

@@ -230,7 +230,7 @@ class NewsletterEmailProcessingTest extends TestCase
         string $from = 'Morning Brew <crew@morningbrew.com>',
         string $subject = 'Morning Brew: Daily business news - Dec 21'
     ): string {
-        $messageId = '<' . uniqid() . '@morningbrew.com>';
+        $messageId = '<'.uniqid().'@morningbrew.com>';
         $date = now()->toRfc2822String();
 
         return <<<EMAIL

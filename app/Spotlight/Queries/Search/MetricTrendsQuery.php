@@ -28,14 +28,14 @@ class MetricTrendsQuery
                 ->get()
                 ->map(function (MetricTrend $trend) {
                     $subtitle = ucfirst(str_replace('_', ' ', $trend->type));
-                    $subtitle .= ' • Detected ' . $trend->detected_at->diffForHumans();
+                    $subtitle .= ' • Detected '.$trend->detected_at->diffForHumans();
 
                     if (! $trend->acknowledged_at) {
                         $subtitle .= ' • Unacknowledged';
                     }
 
                     return SpotlightResult::make()
-                        ->setTitle('Trend: ' . ucfirst(str_replace('_', ' ', $trend->type)))
+                        ->setTitle('Trend: '.ucfirst(str_replace('_', ' ', $trend->type)))
                         ->setSubtitle($subtitle)
                         ->setIcon('chart-bar')
                         ->setGroup('metrics')

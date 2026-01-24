@@ -134,7 +134,7 @@ class PopulateInitialTaskExecutionState extends Command
         }
 
         if ($this->option('dry-run')) {
-            $this->line("  Would update {$modelType} #{$model->id} with " . count($executions) . ' task executions');
+            $this->line("  Would update {$modelType} #{$model->id} with ".count($executions).' task executions');
 
             return true;
         }

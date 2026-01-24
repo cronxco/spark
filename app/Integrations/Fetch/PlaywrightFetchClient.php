@@ -299,7 +299,7 @@ class PlaywrightFetchClient
             $playwrightCookies[] = [
                 'name' => $name,
                 'value' => $value,
-                'domain' => '.' . $domain, // Leading dot for subdomain support
+                'domain' => '.'.$domain, // Leading dot for subdomain support
                 'path' => '/',
                 'secure' => true,
                 'httpOnly' => true,
@@ -319,7 +319,7 @@ class PlaywrightFetchClient
         $simpleCookies = [];
         foreach ($newCookies as $cookie) {
             $cookieDomain = ltrim($cookie['domain'] ?? '', '.');
-            if ($cookieDomain === $domain || str_ends_with($cookieDomain, '.' . $domain)) {
+            if ($cookieDomain === $domain || str_ends_with($cookieDomain, '.'.$domain)) {
                 $simpleCookies[$cookie['name']] = $cookie['value'];
             }
         }

@@ -304,7 +304,7 @@ CSV;
         $email .= "--{$boundary}\r\n";
         $email .= "Content-Type: text/csv; name=\"journey-history.csv\"\r\n";
         $email .= "Content-Disposition: attachment; filename=\"journey-history.csv\"\r\n\r\n";
-        $email .= $csvContent . "\r\n\r\n";
+        $email .= $csvContent."\r\n\r\n";
 
         $email .= "--{$boundary}--\r\n";
 

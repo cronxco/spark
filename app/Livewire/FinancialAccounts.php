@@ -355,7 +355,7 @@ class FinancialAccounts extends Component
 
                 return [
                     'type' => $type,
-                    'label' => $this->getAccountTypeLabel($type) . 's',
+                    'label' => $this->getAccountTypeLabel($type).'s',
                     'accounts' => $groupAccounts->sortByDesc(function ($account) {
                         return $this->getFormattedBalance($account) ?? 0;
                     })->values(),

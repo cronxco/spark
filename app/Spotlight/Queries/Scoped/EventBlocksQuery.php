@@ -33,7 +33,7 @@ class EventBlocksQuery
                     if (blank($query)) {
                         return true;
                     }
-                    $searchText = strtolower($block->title . ' ' . $block->block_type);
+                    $searchText = strtolower($block->title.' '.$block->block_type);
 
                     return str_contains($searchText, strtolower($query));
                 })

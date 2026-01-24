@@ -131,7 +131,7 @@ if (! function_exists('start_ai_agent_span')) {
         if (! empty($input)) {
             $sanitizedInput = array_map(function ($value) {
                 if (is_string($value) && strlen($value) > 200) {
-                    return substr($value, 0, 200) . '... [truncated]';
+                    return substr($value, 0, 200).'... [truncated]';
                 }
 
                 return $value;
@@ -179,7 +179,7 @@ if (! function_exists('finish_ai_agent_span')) {
             if (empty($outputSummary)) {
                 $serialized = json_encode($output);
                 if (strlen($serialized) > 500) {
-                    $serialized = substr($serialized, 0, 500) . '... [truncated]';
+                    $serialized = substr($serialized, 0, 500).'... [truncated]';
                 }
                 $outputSummary['output'] = $serialized;
             }
@@ -217,7 +217,7 @@ if (! function_exists('start_ai_tool_span')) {
         if (! empty($parameters)) {
             $sanitizedParams = array_map(function ($value) {
                 if (is_string($value) && strlen($value) > 100) {
-                    return substr($value, 0, 100) . '... [truncated]';
+                    return substr($value, 0, 100).'... [truncated]';
                 }
 
                 return $value;
@@ -251,7 +251,7 @@ if (! function_exists('finish_ai_tool_span')) {
 
             $serialized = json_encode($resultData);
             if (strlen($serialized) > 200) {
-                $serialized = substr($serialized, 0, 200) . '... [truncated]';
+                $serialized = substr($serialized, 0, 200).'... [truncated]';
             }
 
             $span->setData(['gen_ai.tool.result' => $serialized]);
@@ -289,7 +289,7 @@ if (! function_exists('start_ai_handoff_span')) {
         if (! empty($context)) {
             $sanitizedContext = array_map(function ($value) {
                 if (is_string($value) && strlen($value) > 100) {
-                    return substr($value, 0, 100) . '... [truncated]';
+                    return substr($value, 0, 100).'... [truncated]';
                 }
 
                 return $value;

@@ -266,8 +266,8 @@ class TaskPipelineServiceProvider extends ServiceProvider
             }
 
             // Convert file path to class name
-            $relativePath = str_replace($integrationPath . '/', '', $file->getPathname());
-            $className = 'App\\Integrations\\' . str_replace(
+            $relativePath = str_replace($integrationPath.'/', '', $file->getPathname());
+            $className = 'App\\Integrations\\'.str_replace(
                 ['/', '.php'],
                 ['\\', ''],
                 $relativePath

@@ -274,7 +274,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         $csrfToken = Str::random(32);
 
         // Store CSRF token in session for validation
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -295,7 +295,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         ];
 
         // Spotify uses accounts.spotify.com for authorization
-        return $this->authUrl . '/authorize?' . http_build_query($params);
+        return $this->authUrl.'/authorize?'.http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -307,7 +307,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'error' => $error,
                 'error_description' => $request->get('error_description'),
             ]);
-            throw new Exception('Spotify authorization failed: ' . $error);
+            throw new Exception('Spotify authorization failed: '.$error);
         }
 
         $code = $request->get('code');
@@ -384,7 +384,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new Exception('Failed to exchange code for tokens: ' . $response->body());
+            throw new Exception('Failed to exchange code for tokens: '.$response->body());
         }
 
         $tokenData = $response->json();
@@ -751,7 +751,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'integration_id' => $integration->id,
                 'total_tracks' => count($recentlyPlayed),
                 'potential_duplicates' => $duplicateCount,
-                'percentage' => round(($duplicateCount / count($recentlyPlayed)) * 100, 1) . '%',
+                'percentage' => round(($duplicateCount / count($recentlyPlayed)) * 100, 1).'%',
             ]);
         }
     }
@@ -798,7 +798,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new Exception('Failed to refresh token: ' . $response->body());
+            throw new Exception('Failed to refresh token: '.$response->body());
         }
 
         $tokenData = $response->json();
@@ -836,7 +836,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         try {
             $hub = SentrySdk::getCurrentHub();
             $parentSpan = $hub->getSpan();
-            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/me/player/currently-playing'));
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/me/player/currently-playing'));
             // Use group token if available (new architecture)
             $group = $integration->group;
             $token = $integration->access_token; // legacy fallback
@@ -856,7 +856,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             ], $params, $integration->id);
 
             $response = Http::withToken($token)
-                ->get($this->baseUrl . '/me/player/currently-playing', $params);
+                ->get($this->baseUrl.'/me/player/currently-playing', $params);
             $span?->finish();
 
             // Log the API response
@@ -893,7 +893,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         try {
             $hub = SentrySdk::getCurrentHub();
             $parentSpan = $hub->getSpan();
-            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/me/player/recently-played'));
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/me/player/recently-played'));
             // Use group token if available (new architecture)
             $group = $integration->group;
             $token = $integration->access_token; // legacy fallback
@@ -911,7 +911,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             ], $integration->id);
 
             $response = Http::withToken($token)
-                ->get($this->baseUrl . '/me/player/recently-played', [
+                ->get($this->baseUrl.'/me/player/recently-played', [
                     'limit' => 50,
                 ]);
             $span?->finish();
@@ -1005,7 +1005,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         // Auto-tag the event
         $this->autoTagEvent($event, $track, $integration, $playData);
 
-        Log::info("Created event for track: {$track['name']} by " . collect($track['artists'])->pluck('name')->implode(', '));
+        Log::info("Created event for track: {$track['name']} by ".collect($track['artists'])->pluck('name')->implode(', '));
     }
 
     protected function createOrUpdateUser(Integration $integration): EventObject
@@ -1420,9 +1420,9 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
      */
     protected function getLogChannel(): string
     {
-        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
+        $pluginChannel = 'api_debug_'.str_replace([' ', '-', '_'], '_', static::getIdentifier());
 
-        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
+        return config('logging.channels.'.$pluginChannel) ? $pluginChannel : 'api_debug';
     }
 
     /**
@@ -1489,7 +1489,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         // Limit response body size to prevent huge logs
         $maxLength = 10000;
         if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
+            return substr($body, 0, $maxLength).'... [TRUNCATED]';
         }
 
         // Try to parse as JSON and sanitize sensitive fields

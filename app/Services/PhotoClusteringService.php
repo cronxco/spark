@@ -370,7 +370,7 @@ class PhotoClusteringService
         $components = [
             $cluster['start_time']->format('Y-m-d H'), // Hour precision
             $locationName ?? 'no-location',
-            $cluster['has_location'] ? round($cluster['center_lat'], 2) . '-' . round($cluster['center_lng'], 2) : 'no-gps',
+            $cluster['has_location'] ? round($cluster['center_lat'], 2).'-'.round($cluster['center_lng'], 2) : 'no-gps',
         ];
 
         return md5(implode('|', $components));

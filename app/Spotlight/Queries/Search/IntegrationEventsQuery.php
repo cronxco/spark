@@ -36,7 +36,7 @@ class IntegrationEventsQuery
 
                     return SpotlightResult::make()
                         ->setTitle(ucfirst(str_replace('_', ' ', $event->action)))
-                        ->setSubtitle($formattedValue . ' • ' . $event->time->diffForHumans())
+                        ->setSubtitle($formattedValue.' • '.$event->time->diffForHumans())
                         ->setIcon('list-bullet')
                         ->setGroup('events')
                         ->setPriority($event->time->isToday() ? 1 : 2)

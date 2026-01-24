@@ -104,7 +104,7 @@ class MetricAnomaliesQuery
                     ->setIcon($icon)
                     ->setGroup('metrics')
                     ->setPriority($priority)
-                    ->setAction('jump_to', ['path' => route('metrics.show', $trend->metric_statistic_id) . '#trend-' . $trend->id]);
+                    ->setAction('jump_to', ['path' => route('metrics.show', $trend->metric_statistic_id).'#trend-'.$trend->id]);
             });
         });
     }

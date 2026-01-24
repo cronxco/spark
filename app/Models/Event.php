@@ -445,7 +445,7 @@ class Event extends Model
             $parts[] = $summaryBlock->getContent();
         } elseif ($this->formatted_value !== null && $this->value_unit) {
             // Use formatted value (value / value_multiplier)
-            $parts[] = $this->formatted_value . ' ' . $this->value_unit;
+            $parts[] = $this->formatted_value.' '.$this->value_unit;
         }
 
         // Add domain and service at the end with separator
@@ -470,7 +470,7 @@ class Event extends Model
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
-        $embeddingString = '[' . implode(',', $embedding) . ']';
+        $embeddingString = '['.implode(',', $embedding).']';
 
         if ($temporalWeight > 0) {
             // Apply temporal weighting: recent events get a small boost
@@ -509,7 +509,7 @@ class Event extends Model
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
-        $embeddingString = '[' . implode(',', $embedding) . ']';
+        $embeddingString = '['.implode(',', $embedding).']';
 
         if ($temporalWeight > 0) {
             $query->selectRaw('

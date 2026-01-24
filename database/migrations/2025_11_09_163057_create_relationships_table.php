@@ -41,22 +41,22 @@ return new class extends Migration
             $table->timestampTz('deleted_at')->nullable();
 
             // Foreign key to users
-            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'relationships_user_id_foreign')
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix().'relationships_user_id_foreign')
                 ->references('id')
                 ->on('users')
                 ->cascadeOnDelete();
 
             // Indexes for polymorphic relationships
-            $table->index(['from_type', 'from_id'], Schema::getConnection()->getTablePrefix() . 'relationships_from_index');
-            $table->index(['to_type', 'to_id'], Schema::getConnection()->getTablePrefix() . 'relationships_to_index');
-            $table->index('type', Schema::getConnection()->getTablePrefix() . 'relationships_type_index');
-            $table->index('user_id', Schema::getConnection()->getTablePrefix() . 'relationships_user_id_index');
+            $table->index(['from_type', 'from_id'], Schema::getConnection()->getTablePrefix().'relationships_from_index');
+            $table->index(['to_type', 'to_id'], Schema::getConnection()->getTablePrefix().'relationships_to_index');
+            $table->index('type', Schema::getConnection()->getTablePrefix().'relationships_type_index');
+            $table->index('user_id', Schema::getConnection()->getTablePrefix().'relationships_user_id_index');
 
             // Unique constraint: one relationship per user + from + to + type combination
             // This prevents duplicate relationships
             $table->unique(
                 ['user_id', 'from_type', 'from_id', 'to_type', 'to_id', 'type'],
-                Schema::getConnection()->getTablePrefix() . 'relationships_unique'
+                Schema::getConnection()->getTablePrefix().'relationships_unique'
             );
         });
     }

@@ -47,7 +47,7 @@ class FixGoCardlessAccountNames extends Command
         $failed = 0;
 
         foreach ($brokenAccounts as $account) {
-            $this->line("Processing: {$account->title} (ID: " . substr($account->id, 0, 8) . '...)');
+            $this->line("Processing: {$account->title} (ID: ".substr($account->id, 0, 8).'...)');
 
             $integrationId = $account->metadata['integration_id'] ?? null;
             $accountId = $account->metadata['account_id'] ?? null;
@@ -125,7 +125,7 @@ class FixGoCardlessAccountNames extends Command
                 ->first();
 
             if ($existingGoodAccount) {
-                $this->line("  ✨ Found existing proper account: {$existingGoodAccount->title} (ID: " . substr($existingGoodAccount->id, 0, 8) . '...)');
+                $this->line("  ✨ Found existing proper account: {$existingGoodAccount->title} (ID: ".substr($existingGoodAccount->id, 0, 8).'...)');
 
                 // Count events and blocks that need to be moved
                 $eventsCount = Event::where('actor_id', $account->id)->count();

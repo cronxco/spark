@@ -45,7 +45,7 @@ foreach ($faIconNames as $iconName) {
         $className .= 'Icon';
     }
 
-    $fullClassName = 'App\\Icons\\FontAwesome\\' . $className;
+    $fullClassName = 'App\\Icons\\FontAwesome\\'.$className;
 
     // Add to flat array with dot notation (e.g., 'fas.download')
     $fontAwesomeIcons["fas.{$iconName}"] = $fullClassName;

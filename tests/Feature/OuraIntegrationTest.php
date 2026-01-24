@@ -253,9 +253,9 @@ class OuraIntegrationTest extends TestCase
             'https://api.ouraring.com/v2/usercollection/personal_info*' => Http::response(['data' => [['user_id' => 'user_abc']]], 200),
             'https://api.ouraring.com/v2/usercollection/heartrate*' => Http::response([
                 'data' => [
-                    ['timestamp' => $day . 'T00:00:00Z', 'bpm' => 50],
-                    ['timestamp' => $day . 'T01:00:00Z', 'bpm' => 70],
-                    ['timestamp' => $day . 'T02:00:00Z', 'bpm' => 60],
+                    ['timestamp' => $day.'T00:00:00Z', 'bpm' => 50],
+                    ['timestamp' => $day.'T01:00:00Z', 'bpm' => 70],
+                    ['timestamp' => $day.'T02:00:00Z', 'bpm' => 60],
                 ],
             ], 200),
         ]);

@@ -118,7 +118,7 @@ class ExtractArticleImages extends Command
         $progress = ActionProgress::create([
             'user_id' => $this->userId,
             'action_type' => 'article_image_extraction',
-            'action_id' => 'extract_article_images_' . now()->format('Y-m-d_H-i-s'),
+            'action_id' => 'extract_article_images_'.now()->format('Y-m-d_H-i-s'),
             'step' => 'dispatching',
             'total' => $totalCount,
             'processed' => 0,

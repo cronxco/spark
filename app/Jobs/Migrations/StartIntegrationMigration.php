@@ -353,7 +353,7 @@ class StartIntegrationMigration implements ShouldQueue
             new FetchIntegrationPage($this->integration, $contextTx),
             new FetchIntegrationPage($this->integration, $contextPots),
             new FetchIntegrationPage($this->integration, $contextBalances),
-        ])->name('monzo_fetch_' . $this->integration->id)
+        ])->name('monzo_fetch_'.$this->integration->id)
             ->onConnection('redis')->onQueue('migration');
 
         $batch = $batchBuilder->dispatch();
@@ -408,7 +408,7 @@ class StartIntegrationMigration implements ShouldQueue
         $batch = Bus::batch([
             new FetchIntegrationPage($this->integration, $contextTx),
             new FetchIntegrationPage($this->integration, $contextBalances),
-        ])->name('gocardless_fetch_' . $this->integration->id)
+        ])->name('gocardless_fetch_'.$this->integration->id)
             ->onConnection('redis')->onQueue('migration')
             ->dispatch();
 

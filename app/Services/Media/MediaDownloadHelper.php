@@ -247,7 +247,7 @@ class MediaDownloadHelper
             mkdir($tempDir, 0755, recursive: true);
         }
 
-        $tempPath = $tempDir . '/' . uniqid() . '_' . $fileName;
+        $tempPath = $tempDir.'/'.uniqid().'_'.$fileName;
         file_put_contents($tempPath, $content);
 
         return $tempPath;
@@ -263,7 +263,7 @@ class MediaDownloadHelper
 
         // If no file name or extension, generate one
         if (empty($fileName) || ! str_contains($fileName, '.')) {
-            $fileName = uniqid() . '.jpg'; // Default to .jpg
+            $fileName = uniqid().'.jpg'; // Default to .jpg
         }
 
         return $fileName;

@@ -41,14 +41,14 @@ class DailyDigestReady extends Notification implements ShouldQueue
         $keyPoints = $this->findBlockMetadata('flint_five_key_points', 'points') ?? [];
 
         $message = (new MailMessage)
-            ->subject('Your ' . ucfirst($this->period) . ' Digest is Ready')
+            ->subject('Your '.ucfirst($this->period).' Digest is Ready')
             ->greeting('Hello!')
             ->line($headline ?? 'Your daily digest is ready to review.');
 
         if (! empty($keyPoints)) {
             $message->line('**Key Points:**');
             foreach (array_slice($keyPoints, 0, 3) as $point) {
-                $message->line('• ' . $point);
+                $message->line('• '.$point);
             }
         }
 
@@ -78,7 +78,7 @@ class DailyDigestReady extends Notification implements ShouldQueue
             ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
             ->body($body)
             ->badge('/favicon.ico')
-            ->tag('daily-digest-' . $this->period)
+            ->tag('daily-digest-'.$this->period)
             ->data([
                 'url' => route('objects.show', $this->digestObject->id),
                 'type' => 'daily_digest',
@@ -110,7 +110,7 @@ class DailyDigestReady extends Notification implements ShouldQueue
     {
         $text = mb_strtolower($text);
 
-        return mb_strtoupper(mb_substr($text, 0, 1)) . mb_substr($text, 1);
+        return mb_strtoupper(mb_substr($text, 0, 1)).mb_substr($text, 1);
     }
 
     private function findBlockContent(string $blockType): ?string

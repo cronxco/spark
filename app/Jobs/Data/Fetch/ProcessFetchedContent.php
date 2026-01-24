@@ -34,7 +34,7 @@ class ProcessFetchedContent implements ShouldQueue
     {
         // Use content hash to ensure we don't process the same content multiple times
         // This prevents race conditions when multiple fetches return the same content
-        return 'process_fetch_' . $this->integration->id . '_' . $this->webpage->id . '_' . $this->contentHash;
+        return 'process_fetch_'.$this->integration->id.'_'.$this->webpage->id.'_'.$this->contentHash;
     }
 
     public function handle(): void
@@ -99,7 +99,7 @@ class ProcessFetchedContent implements ShouldQueue
                 );
 
                 // Create or update today's Event
-                $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
+                $sourceId = 'fetch_'.$this->webpage->id.'_'.now()->format('Y-m-d');
                 if ($fetchMode === 'once') {
                     $action = 'bookmarked';
                 } else {

@@ -150,7 +150,7 @@ class MigrationProgressUITest extends TestCase
 
             $response->assertStatus(200);
             $response->assertSee($stepData['message']);
-            $response->assertSee($stepData['progress'] . '%');
+            $response->assertSee($stepData['progress'].'%');
 
             // Clean up for next iteration
             $progress->delete();

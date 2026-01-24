@@ -223,11 +223,11 @@ class SpotlightServiceProvider extends ServiceProvider
                     // From setTokens - extract from model
                     $token->setParameters([
                         'id' => $event->id,
-                        'display' => format_action_title($event->action) . ' • ' . $event->time->format('M j, g:ia'),
+                        'display' => format_action_title($event->action).' • '.$event->time->format('M j, g:ia'),
                         'action' => $event->action,
                         'service' => $event->service,
                     ]);
-                    $token->setText(format_action_title($event->action) . ' • ' . $event->time->format('M j, g:ia'));
+                    $token->setText(format_action_title($event->action).' • '.$event->time->format('M j, g:ia'));
                 } else {
                     // No data - use existing parameters
                     $token->setText($token->getParameter('display') ?? 'Event');
@@ -264,7 +264,7 @@ class SpotlightServiceProvider extends ServiceProvider
                     $blockTitle = $block->title ?? ucfirst(str_replace('_', ' ', $block->block_type ?? 'Block'));
                     $token->setParameters([
                         'id' => $block->id,
-                        'display' => $blockTitle . ($block->block_type ? ' • ' . ucfirst(str_replace('_', ' ', $block->block_type)) : ''),
+                        'display' => $blockTitle.($block->block_type ? ' • '.ucfirst(str_replace('_', ' ', $block->block_type)) : ''),
                         'title' => $blockTitle,
                         'block_type' => $block->block_type,
                     ]);

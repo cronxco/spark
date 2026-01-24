@@ -45,20 +45,20 @@ class OuraSessionsData extends BaseProcessingJob
     {
         $start = Arr::get($item, 'start_datetime') ?? Arr::get($item, 'timestamp');
         $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
-        $sourceId = "oura_session_{$this->integration->id}_" . (Arr::get($item, 'id') ?? ($day . '_' . md5(json_encode($item))));
+        $sourceId = "oura_session_{$this->integration->id}_".(Arr::get($item, 'id') ?? ($day.'_'.md5(json_encode($item))));
 
         $actor = [
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
         ];
 
         $target = [
             'concept' => 'mindfulness_session',
             'type' => Arr::get($item, 'type', 'session'),
             'title' => Str::title((string) Arr::get($item, 'type', 'Session')),
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'metadata' => $item,
         ];
 
@@ -68,7 +68,7 @@ class OuraSessionsData extends BaseProcessingJob
         $state = Arr::get($item, 'mood', Arr::get($item, 'state'));
         if ($state) {
             $blocks[] = [
-                'time' => $start ?? ($day . ' 00:00:00'),
+                'time' => $start ?? ($day.' 00:00:00'),
                 'title' => 'State',
                 'metadata' => [
                     'state' => [
@@ -84,7 +84,7 @@ class OuraSessionsData extends BaseProcessingJob
 
         return [
             'source_id' => $sourceId,
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'actor' => $actor,
             'target' => $target,
             'domain' => 'health',

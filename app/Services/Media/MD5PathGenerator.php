@@ -21,7 +21,7 @@ class MD5PathGenerator implements PathGenerator
      */
     public function getPath(Media $media): string
     {
-        return $this->getBasePath($media) . '/';
+        return $this->getBasePath($media).'/';
     }
 
     /**
@@ -29,7 +29,7 @@ class MD5PathGenerator implements PathGenerator
      */
     public function getPathForConversions(Media $media): string
     {
-        return $this->getBasePath($media) . '/conversions/';
+        return $this->getBasePath($media).'/conversions/';
     }
 
     /**
@@ -37,7 +37,7 @@ class MD5PathGenerator implements PathGenerator
      */
     public function getPathForResponsiveImages(Media $media): string
     {
-        return $this->getBasePath($media) . '/responsive/';
+        return $this->getBasePath($media).'/responsive/';
     }
 
     /**
@@ -54,7 +54,7 @@ class MD5PathGenerator implements PathGenerator
         $prefix1 = substr($hash, 0, 2);
         $prefix2 = substr($hash, 2, 2);
 
-        return $prefix1 . '/' . $prefix2 . '/' . $hash;
+        return $prefix1.'/'.$prefix2.'/'.$hash;
     }
 
     /**

@@ -647,7 +647,7 @@ class AppleHealthPlugin extends WebhookPlugin
         }
 
         return [
-            'source_id' => 'apple_workout_' . $id,
+            'source_id' => 'apple_workout_'.$id,
             'time' => $start,
             'actor' => $actor,
             'target' => $target,
@@ -679,7 +679,7 @@ class AppleHealthPlugin extends WebhookPlugin
     public function mapMetricPointToEvent(string $name, ?string $unit, array $point, Integration $integration): array
     {
         $date = (string) (Arr::get($point, 'date') ?? now()->toDateString());
-        $sourceId = 'apple_metric_' . $name . '_' . str_replace([' ', ':', '+'], ['_', '', ''], $date);
+        $sourceId = 'apple_metric_'.$name.'_'.str_replace([' ', ':', '+'], ['_', '', ''], $date);
 
         // Prefer Avg if present for series like heart_rate
         $value = Arr::get($point, 'Avg');
@@ -743,7 +743,7 @@ class AppleHealthPlugin extends WebhookPlugin
             'actor' => $actor,
             'target' => $target,
             'domain' => self::getDomain(),
-            'action' => 'had_' . $name,
+            'action' => 'had_'.$name,
             'value' => $enc,
             'value_multiplier' => $mult,
             'value_unit' => $unit,

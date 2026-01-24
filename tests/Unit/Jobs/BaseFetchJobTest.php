@@ -44,7 +44,7 @@ class BaseFetchJobTest extends TestCase
         };
 
         $uniqueId = $job->uniqueId();
-        $expectedPattern = '/test_service_test_type_' . $integration->id . '_\d{4}-\d{2}-\d{2}/';
+        $expectedPattern = '/test_service_test_type_'.$integration->id.'_\d{4}-\d{2}-\d{2}/';
 
         $this->assertMatchesRegularExpression($expectedPattern, $uniqueId);
     }

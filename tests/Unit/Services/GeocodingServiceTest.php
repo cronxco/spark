@@ -183,7 +183,7 @@ class GeocodingServiceTest extends TestCase
      */
     public function can_make_request_returns_true_when_under_limit(): void
     {
-        Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 100, now()->endOfDay());
+        Cache::put('geoapify_requests_'.now()->format('Y-m-d'), 100, now()->endOfDay());
 
         $this->assertTrue($this->service->canMakeRequest());
     }
@@ -193,7 +193,7 @@ class GeocodingServiceTest extends TestCase
      */
     public function can_make_request_returns_false_when_at_limit(): void
     {
-        Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 3000, now()->endOfDay());
+        Cache::put('geoapify_requests_'.now()->format('Y-m-d'), 3000, now()->endOfDay());
 
         $this->assertFalse($this->service->canMakeRequest());
     }
@@ -205,11 +205,11 @@ class GeocodingServiceTest extends TestCase
     {
         $this->service->incrementRequestCount();
 
-        $count = Cache::get('geoapify_requests_' . now()->format('Y-m-d'));
+        $count = Cache::get('geoapify_requests_'.now()->format('Y-m-d'));
         $this->assertEquals(1, $count);
 
         $this->service->incrementRequestCount();
-        $count = Cache::get('geoapify_requests_' . now()->format('Y-m-d'));
+        $count = Cache::get('geoapify_requests_'.now()->format('Y-m-d'));
         $this->assertEquals(2, $count);
     }
 
@@ -218,7 +218,7 @@ class GeocodingServiceTest extends TestCase
      */
     public function get_rate_limit_status(): void
     {
-        Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 150, now()->endOfDay());
+        Cache::put('geoapify_requests_'.now()->format('Y-m-d'), 150, now()->endOfDay());
 
         $status = $this->service->getRateLimitStatus();
 
@@ -233,7 +233,7 @@ class GeocodingServiceTest extends TestCase
     public function geocode_respects_rate_limit(): void
     {
         // Set cache to limit
-        Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 3000, now()->endOfDay());
+        Cache::put('geoapify_requests_'.now()->format('Y-m-d'), 3000, now()->endOfDay());
 
         Http::fake();
 
@@ -351,7 +351,7 @@ class GeocodingServiceTest extends TestCase
      */
     public function reverse_geocode_respects_rate_limit(): void
     {
-        Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 3000, now()->endOfDay());
+        Cache::put('geoapify_requests_'.now()->format('Y-m-d'), 3000, now()->endOfDay());
 
         Http::fake();
 

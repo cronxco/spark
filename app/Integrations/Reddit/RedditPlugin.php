@@ -166,7 +166,7 @@ class RedditPlugin extends OAuthPlugin
 
         // CSRF token
         $csrfToken = Str::random(32);
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -187,7 +187,7 @@ class RedditPlugin extends OAuthPlugin
             'code_challenge_method' => 'S256',
         ];
 
-        return $this->authBase . '/authorize?' . http_build_query($params);
+        return $this->authBase.'/authorize?'.http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -227,13 +227,13 @@ class RedditPlugin extends OAuthPlugin
         // Exchange code for tokens
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $this->authBase . '/access_token'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$this->authBase.'/access_token'));
         $response = Http::asForm()
             ->withHeaders([
                 'User-Agent' => config('services.reddit.useragent') ?? 'SparkApp/1.0',
             ])
             ->withBasicAuth($this->clientId, $this->clientSecret)
-            ->post($this->authBase . '/access_token', [
+            ->post($this->authBase.'/access_token', [
                 'grant_type' => 'authorization_code',
                 'code' => $code,
                 'redirect_uri' => $this->redirectUri,
@@ -340,13 +340,13 @@ class RedditPlugin extends OAuthPlugin
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $this->authBase . '/access_token'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$this->authBase.'/access_token'));
         $response = Http::asForm()
             ->withHeaders([
                 'User-Agent' => config('services.reddit.useragent') ?? 'SparkApp/1.0',
             ])
             ->withBasicAuth($this->clientId, $this->clientSecret)
-            ->post($this->authBase . '/access_token', [
+            ->post($this->authBase.'/access_token', [
                 'grant_type' => 'refresh_token',
                 'refresh_token' => $group->refresh_token,
             ]);
@@ -390,18 +390,18 @@ class RedditPlugin extends OAuthPlugin
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . $endpoint));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.$endpoint));
         $response = Http::withToken($token)
             ->withHeaders([
                 'User-Agent' => config('services.reddit.useragent') ?? 'SparkApp/1.0',
             ])
-            ->get($this->baseUrl . $endpoint);
+            ->get($this->baseUrl.$endpoint);
         $span?->finish();
 
         $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new Exception('API request failed: ' . $response->body());
+            throw new Exception('API request failed: '.$response->body());
         }
 
         return $response->json() ?? [];

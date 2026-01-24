@@ -112,7 +112,7 @@ class ErrorHandlingTest extends TestCase
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
             // Should not throw - should handle gracefully
-            $this->fail('Job should handle malformed JSON gracefully: ' . $e->getMessage());
+            $this->fail('Job should handle malformed JSON gracefully: '.$e->getMessage());
         }
     }
 
@@ -143,7 +143,7 @@ class ErrorHandlingTest extends TestCase
 
             $this->assertInstanceOf(EventObject::class, $result);
         } catch (Exception $e) {
-            $this->fail('Pattern learning should handle missing metadata: ' . $e->getMessage());
+            $this->fail('Pattern learning should handle missing metadata: '.$e->getMessage());
         }
     }
 
@@ -226,7 +226,7 @@ class ErrorHandlingTest extends TestCase
             );
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
-            $this->fail('Job should handle empty AI response: ' . $e->getMessage());
+            $this->fail('Job should handle empty AI response: '.$e->getMessage());
         }
     }
 }

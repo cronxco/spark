@@ -52,7 +52,7 @@ class RedditPluginTest extends TestCase
         ]);
 
         // Bypass CSRF check by seeding the expected session key
-        session()->put('oauth_csrf_' . session_id() . '_' . $group->id, 'token');
+        session()->put('oauth_csrf_'.session_id().'_'.$group->id, 'token');
 
         $plugin->handleOAuthCallback($request, $group);
 

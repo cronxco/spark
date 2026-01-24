@@ -16,7 +16,7 @@ class EventDetailScope
                 $scope->applyToken('event', [
                     'event' => [
                         'id' => $event->id,
-                        'display' => format_action_title($event->action) . ' • ' . $event->time->format('M j, g:ia'),
+                        'display' => format_action_title($event->action).' • '.$event->time->format('M j, g:ia'),
                         'action' => $event->action,
                         'service' => $event->service,
                     ],

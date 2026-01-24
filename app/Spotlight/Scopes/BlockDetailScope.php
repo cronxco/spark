@@ -17,7 +17,7 @@ class BlockDetailScope
                 $scope->applyToken('block', [
                     'block' => [
                         'id' => $block->id,
-                        'display' => $blockTitle . ($block->block_type ? ' • ' . ucfirst(str_replace('_', ' ', $block->block_type)) : ''),
+                        'display' => $blockTitle.($block->block_type ? ' • '.ucfirst(str_replace('_', ' ', $block->block_type)) : ''),
                         'title' => $blockTitle,
                         'block_type' => $block->block_type,
                     ],

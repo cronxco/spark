@@ -67,7 +67,7 @@ class ScheduleSpotifyFetch extends Command
                 $scheduledCount++;
 
             } catch (Exception $e) {
-                $this->error("Failed to schedule job for integration {$integration->id}: " . $e->getMessage());
+                $this->error("Failed to schedule job for integration {$integration->id}: ".$e->getMessage());
             }
         }
 

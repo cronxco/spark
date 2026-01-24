@@ -142,7 +142,7 @@ class BookmarkUrl extends Component
     private function normalizeUrl(string $url): string
     {
         if (! preg_match('~^(?:f|ht)tps?://~i', $url)) {
-            return 'https://' . $url;
+            return 'https://'.$url;
         }
 
         return $url;

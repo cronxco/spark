@@ -560,7 +560,7 @@ class GoogleCalendarIntegrationTest extends TestCase
 
         $oldEvent = Event::create([
             'integration_id' => $this->integration->id,
-            'source_id' => 'google_calendar_primary_old_event_' . $now->timestamp,
+            'source_id' => 'google_calendar_primary_old_event_'.$now->timestamp,
             'actor_id' => $calendarObject->id,
             'target_id' => $eventObject->id,
             'service' => 'google_calendar',

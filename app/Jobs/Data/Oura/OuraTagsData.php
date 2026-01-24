@@ -45,7 +45,7 @@ class OuraTagsData extends BaseProcessingJob
     {
         $timestamp = Arr::get($item, 'timestamp') ?? Arr::get($item, 'time') ?? now()->toIso8601String();
         $day = Str::substr($timestamp, 0, 10);
-        $sourceId = "oura_tag_{$this->integration->id}_" . md5(json_encode($item));
+        $sourceId = "oura_tag_{$this->integration->id}_".md5(json_encode($item));
 
         $actor = [
             'concept' => 'user',

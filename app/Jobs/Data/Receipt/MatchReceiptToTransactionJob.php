@@ -113,6 +113,6 @@ class MatchReceiptToTransactionJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'match_receipt_' . $this->receiptEvent->id;
+        return 'match_receipt_'.$this->receiptEvent->id;
     }
 }

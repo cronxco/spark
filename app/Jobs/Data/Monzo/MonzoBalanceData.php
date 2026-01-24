@@ -57,7 +57,7 @@ class MonzoBalanceData extends BaseProcessingJob
             ],
             [
                 'integration_id' => $this->integration->id,
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -66,10 +66,10 @@ class MonzoBalanceData extends BaseProcessingJob
         $event = Event::updateOrCreate(
             [
                 'integration_id' => $this->integration->id,
-                'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
+                'source_id' => 'monzo_balance_'.$account['id'].'_'.$date,
             ],
             [
-                'time' => $date . ' 23:59:59',
+                'time' => $date.' 23:59:59',
                 'actor_id' => $plugin->upsertAccountObject($this->integration, $account)->id,
                 'service' => 'monzo',
                 'domain' => 'money',

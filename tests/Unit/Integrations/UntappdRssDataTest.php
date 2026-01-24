@@ -269,7 +269,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertCount(1, $events);
 
         $event = $events->first();
-        $this->assertEquals('untappd_' . md5('https://untappd.com/user/george/checkin/9999999999'), $event->source_id);
+        $this->assertEquals('untappd_'.md5('https://untappd.com/user/george/checkin/9999999999'), $event->source_id);
     }
 
     /** @test */

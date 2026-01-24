@@ -386,7 +386,7 @@ class FinancialIntegrationEventTest extends TestCase
         ]);
 
         $this->assertEquals('manual_account', $balanceEvent->service);
-        $this->assertEquals('manual_balance_' . $accountObject->id . '_2025-01-27', $balanceEvent->source_id);
+        $this->assertEquals('manual_balance_'.$accountObject->id.'_2025-01-27', $balanceEvent->source_id);
     }
 
     #[Test]

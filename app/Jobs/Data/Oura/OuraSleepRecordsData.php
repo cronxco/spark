@@ -66,14 +66,14 @@ class OuraSleepRecordsData extends BaseProcessingJob
             'concept' => 'user',
             'type' => 'oura_user',
             'title' => 'Oura User',
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
         ];
 
         $target = [
             'concept' => 'sleep',
             'type' => 'oura_sleep_record',
             'title' => 'Sleep Record',
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'metadata' => $item,
         ];
 
@@ -187,7 +187,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
             if ($value !== null) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $blocks[] = [
-                    'time' => $start ?? ($day . ' 00:00:00'),
+                    'time' => $start ?? ($day.' 00:00:00'),
                     'block_type' => 'sleep_stage',
                     'title' => $config['title'],
                     'metadata' => [
@@ -206,7 +206,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
         if (! empty($heartRateData)) {
             [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($heartRateData['min'] ?? null);
             $blocks[] = [
-                'time' => $start ?? ($day . ' 00:00:00'),
+                'time' => $start ?? ($day.' 00:00:00'),
                 'block_type' => 'heart_rate',
                 'title' => 'Heart Rate',
                 'metadata' => [
@@ -225,7 +225,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
         if (! empty($hrvData)) {
             [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($hrvData['avg'] ?? null);
             $blocks[] = [
-                'time' => $start ?? ($day . ' 00:00:00'),
+                'time' => $start ?? ($day.' 00:00:00'),
                 'block_type' => 'heart_rate',
                 'title' => 'Heart Rate Variability',
                 'metadata' => [
@@ -244,7 +244,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
             $value = $item[$field] ?? null;
             if ($value) {
                 $blocks[] = [
-                    'time' => $start ?? ($day . ' 00:00:00'),
+                    'time' => $start ?? ($day.' 00:00:00'),
                     'block_type' => 'sleep_stage',
                     'title' => $title,
                     'metadata' => [
@@ -258,7 +258,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
 
         return [
             'source_id' => $sourceId,
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'actor' => $actor,
             'target' => $target,
             'domain' => 'health',

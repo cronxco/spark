@@ -28,7 +28,7 @@ class FetchNavigationQuery
                         ->setIcon('link')
                         ->setGroup('navigation')
                         ->setPriority(1)
-                        ->setAction('jump_to', ['path' => route('bookmarks') . '?tab=urls'])
+                        ->setAction('jump_to', ['path' => route('bookmarks').'?tab=urls'])
                 );
             }
 
@@ -42,7 +42,7 @@ class FetchNavigationQuery
                         ->setIcon('sparkles')
                         ->setGroup('navigation')
                         ->setPriority(2)
-                        ->setAction('jump_to', ['path' => route('bookmarks') . '?tab=discovery'])
+                        ->setAction('jump_to', ['path' => route('bookmarks').'?tab=discovery'])
                 );
             }
 
@@ -56,7 +56,7 @@ class FetchNavigationQuery
                         ->setIcon('lock-open')
                         ->setGroup('navigation')
                         ->setPriority(3)
-                        ->setAction('jump_to', ['path' => route('bookmarks') . '?tab=cookies'])
+                        ->setAction('jump_to', ['path' => route('bookmarks').'?tab=cookies'])
                 );
             }
 
@@ -70,7 +70,7 @@ class FetchNavigationQuery
                         ->setIcon('cpu-chip')
                         ->setGroup('navigation')
                         ->setPriority(4)
-                        ->setAction('jump_to', ['path' => route('bookmarks') . '?tab=playwright'])
+                        ->setAction('jump_to', ['path' => route('bookmarks').'?tab=playwright'])
                 );
             }
 
@@ -84,7 +84,7 @@ class FetchNavigationQuery
                         ->setIcon('key')
                         ->setGroup('navigation')
                         ->setPriority(5)
-                        ->setAction('jump_to', ['path' => route('bookmarks') . '?tab=api'])
+                        ->setAction('jump_to', ['path' => route('bookmarks').'?tab=api'])
                 );
             }
 

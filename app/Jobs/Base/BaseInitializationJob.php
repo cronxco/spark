@@ -44,7 +44,7 @@ abstract class BaseInitializationJob implements ShouldQueue
     {
         $hub = SentrySdk::getCurrentHub();
         $txContext = new TransactionContext;
-        $txContext->setName('job.init:' . $this->serviceName . ':' . $this->getJobType());
+        $txContext->setName('job.init:'.$this->serviceName.':'.$this->getJobType());
         $txContext->setOp('job');
         $transaction = $hub->startTransaction($txContext);
         $hub->setSpan($transaction);
@@ -95,7 +95,7 @@ abstract class BaseInitializationJob implements ShouldQueue
      */
     public function uniqueId(): string
     {
-        return $this->serviceName . '_init_' . $this->integration->id . '_' . $this->getJobType();
+        return $this->serviceName.'_init_'.$this->integration->id.'_'.$this->getJobType();
     }
 
     /**

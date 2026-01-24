@@ -12,7 +12,7 @@ class HevyUpdateRoutineEffect extends BaseEffectJob
 {
     public function uniqueId(): string
     {
-        return 'hevy_update_routine_' . $this->integration->id . '_' . now()->toDateString();
+        return 'hevy_update_routine_'.$this->integration->id.'_'.now()->toDateString();
     }
 
     protected function execute(): array
@@ -53,13 +53,13 @@ class HevyUpdateRoutineEffect extends BaseEffectJob
                     $updated++;
                 }
             } catch (Throwable $e) {
-                $errors[] = ($routine['title'] ?? 'Unknown') . ': ' . $e->getMessage();
+                $errors[] = ($routine['title'] ?? 'Unknown').': '.$e->getMessage();
             }
         }
 
         return [
             'success' => $updated > 0,
-            'message' => "Updated {$updated} routine(s)" . (! empty($errors) ? ' with ' . count($errors) . ' error(s)' : ''),
+            'message' => "Updated {$updated} routine(s)".(! empty($errors) ? ' with '.count($errors).' error(s)' : ''),
             'data' => [
                 'updated_count' => $updated,
                 'errors' => $errors,

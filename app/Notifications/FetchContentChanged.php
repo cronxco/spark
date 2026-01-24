@@ -58,7 +58,7 @@ class FetchContentChanged extends SparkNotification
     public function toMail(User $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Content Updated: ' . $this->webpage->title)
+            ->subject('Content Updated: '.$this->webpage->title)
             ->greeting("Hello {$notifiable->name}!")
             ->line($this->getMessage())
             ->line('The content has changed since the last fetch.')

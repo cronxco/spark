@@ -29,15 +29,15 @@ return new class extends Migration
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
 
             // Foreign key
-            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'metric_statistics_user_id_foreign')
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix().'metric_statistics_user_id_foreign')
                 ->references('id')->on('users')->onDelete('cascade');
 
             // Unique constraint: one metric per user/service/action/unit combination
             $table->unique(['user_id', 'service', 'action', 'value_unit'],
-                Schema::getConnection()->getTablePrefix() . 'metric_statistics_unique');
+                Schema::getConnection()->getTablePrefix().'metric_statistics_unique');
 
             // Index for batch processing
-            $table->index('last_calculated_at', Schema::getConnection()->getTablePrefix() . 'metric_statistics_last_calc_idx');
+            $table->index('last_calculated_at', Schema::getConnection()->getTablePrefix().'metric_statistics_last_calc_idx');
         });
     }
 

@@ -100,7 +100,7 @@ class FetchHttpClient
         }
 
         // Try with www. prefix
-        $wwwDomain = 'www.' . $domain;
+        $wwwDomain = 'www.'.$domain;
         if (isset($domains[$wwwDomain])) {
             return $domains[$wwwDomain];
         }
@@ -125,7 +125,7 @@ class FetchHttpClient
 
         foreach ($cookies as $name => $value) {
             $cookieJar->setCookie(new SetCookie([
-                'Domain' => '.' . $domain, // Leading dot makes it work for subdomains
+                'Domain' => '.'.$domain, // Leading dot makes it work for subdomains
                 'Name' => $name,
                 'Value' => $value,
                 'Discard' => false,
@@ -180,7 +180,7 @@ class FetchHttpClient
             return [
                 'success' => false,
                 'status_code' => 0,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
             ];
         }
     }

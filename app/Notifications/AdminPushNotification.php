@@ -30,7 +30,7 @@ class AdminPushNotification extends Notification
             ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
             ->body($this->message)
             ->badge('/favicon.ico')
-            ->tag('admin-notification-' . time())
+            ->tag('admin-notification-'.time())
             ->data([
                 'url' => $this->url ?? url('/'),
                 'type' => 'admin_broadcast',

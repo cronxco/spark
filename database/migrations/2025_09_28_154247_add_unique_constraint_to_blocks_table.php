@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         // Get the table name with prefix
-        $tableName = DB::getTablePrefix() . 'blocks';
+        $tableName = DB::getTablePrefix().'blocks';
 
         // First, remove any existing duplicate blocks before adding the constraint
         DB::statement("

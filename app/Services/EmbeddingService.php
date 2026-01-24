@@ -35,7 +35,7 @@ class EmbeddingService
      */
     public static function formatForPostgres(array $embedding): string
     {
-        return '[' . implode(',', $embedding) . ']';
+        return '['.implode(',', $embedding).']';
     }
 
     /**
@@ -116,7 +116,7 @@ class EmbeddingService
 
         // Use cache to avoid redundant API calls for the same text
         if ($useCache) {
-            $cacheKey = 'embedding:' . md5($text);
+            $cacheKey = 'embedding:'.md5($text);
             $cached = Cache::get($cacheKey);
 
             if ($cached !== null) {
@@ -127,7 +127,7 @@ class EmbeddingService
         $embeddings = $this->embedBatch([$text]);
 
         if ($useCache && ! empty($embeddings)) {
-            Cache::put('embedding:' . md5($text), $embeddings[0], now()->addDays(30));
+            Cache::put('embedding:'.md5($text), $embeddings[0], now()->addDays(30));
         }
 
         return $embeddings[0] ?? array_fill(0, $this->dimensions, 0.0);
@@ -160,7 +160,7 @@ class EmbeddingService
 
         try {
             $headers = [
-                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Authorization' => 'Bearer '.$this->apiKey,
                 'Content-Type' => 'application/json',
             ];
 
@@ -182,7 +182,7 @@ class EmbeddingService
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
-                throw new Exception('OpenAI API returned error: ' . $response->body());
+                throw new Exception('OpenAI API returned error: '.$response->body());
             }
 
             $data = $response->json();

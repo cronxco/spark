@@ -80,7 +80,7 @@ class GoodreadsProgressData extends BaseProcessingJob
             ];
 
             // Build source ID
-            $sourceId = 'goodreads_' . $progressPercentage . '_' . md5($guid);
+            $sourceId = 'goodreads_'.$progressPercentage.'_'.md5($guid);
 
             // Build event
             $events[] = [
@@ -158,7 +158,7 @@ class GoodreadsProgressData extends BaseProcessingJob
         // Try partial match (book title might be truncated in updates feed)
         $book = EventObject::where('user_id', $this->integration->user_id)
             ->where('type', 'goodreads_book')
-            ->where('title', 'like', $bookTitle . '%')
+            ->where('title', 'like', $bookTitle.'%')
             ->first();
 
         return $book;

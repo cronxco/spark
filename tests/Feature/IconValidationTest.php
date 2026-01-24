@@ -43,14 +43,14 @@ class IconValidationTest extends TestCase
         // If we found invalid icons, fail the test with details
         if (! empty($this->invalidIcons)) {
             $this->fail(
-                "Found invalid icon references:\n" .
-                    implode("\n", $this->invalidIcons) .
-                    "\n\nValid HeroIcons are:\n" .
-                    implode("\n", array_slice($this->validHeroIcons, 0, 50)) . // Show first 50 valid icons
-                    "\n\nValid FontAwesome icons are:\n" .
-                    implode("\n", array_slice($this->validFontAwesomeIcons, 0, 50)) . // Show first 50 valid icons
-                    "\n\nTotal valid HeroIcons available: " . count($this->validHeroIcons) .
-                    "\nTotal valid FontAwesome icons available: " . count($this->validFontAwesomeIcons)
+                "Found invalid icon references:\n".
+                    implode("\n", $this->invalidIcons).
+                    "\n\nValid HeroIcons are:\n".
+                    implode("\n", array_slice($this->validHeroIcons, 0, 50)). // Show first 50 valid icons
+                    "\n\nValid FontAwesome icons are:\n".
+                    implode("\n", array_slice($this->validFontAwesomeIcons, 0, 50)). // Show first 50 valid icons
+                    "\n\nTotal valid HeroIcons available: ".count($this->validHeroIcons).
+                    "\nTotal valid FontAwesome icons available: ".count($this->validFontAwesomeIcons)
             );
         }
 
@@ -171,7 +171,7 @@ class IconValidationTest extends TestCase
         }
 
         // Scan all SVG files directly in the svg directory
-        $svgFiles = File::glob($heroiconsPath . '/*.svg');
+        $svgFiles = File::glob($heroiconsPath.'/*.svg');
 
         foreach ($svgFiles as $svgFile) {
             $filename = basename($svgFile, '.svg');
@@ -197,13 +197,13 @@ class IconValidationTest extends TestCase
         $categories = ['brands', 'regular', 'solid'];
 
         foreach ($categories as $category) {
-            $categoryPath = $fontawesomePath . '/' . $category;
+            $categoryPath = $fontawesomePath.'/'.$category;
 
             if (! File::exists($categoryPath)) {
                 continue;
             }
 
-            $svgFiles = File::glob($categoryPath . '/*.svg');
+            $svgFiles = File::glob($categoryPath.'/*.svg');
 
             foreach ($svgFiles as $svgFile) {
                 $filename = basename($svgFile, '.svg');
@@ -216,7 +216,7 @@ class IconValidationTest extends TestCase
                     default => 'fas'
                 };
 
-                $this->validFontAwesomeIcons[] = $prefix . '.' . $filename;
+                $this->validFontAwesomeIcons[] = $prefix.'.'.$filename;
             }
         }
     }

@@ -61,7 +61,7 @@ class MigrationCompleted extends SparkNotification
 
         if ($this->details) {
             if (isset($this->details['events_imported'])) {
-                $message->line('**Events imported:** ' . number_format($this->details['events_imported']));
+                $message->line('**Events imported:** '.number_format($this->details['events_imported']));
             }
 
             if (isset($this->details['date_range'])) {
@@ -87,7 +87,7 @@ class MigrationCompleted extends SparkNotification
         $parts = [];
 
         if (isset($this->details['events_imported'])) {
-            $parts[] = number_format($this->details['events_imported']) . ' events imported';
+            $parts[] = number_format($this->details['events_imported']).' events imported';
         }
 
         if (isset($this->details['date_range'])) {
@@ -98,6 +98,6 @@ class MigrationCompleted extends SparkNotification
             return '';
         }
 
-        return ': ' . implode(', ', $parts);
+        return ': '.implode(', ', $parts);
     }
 }

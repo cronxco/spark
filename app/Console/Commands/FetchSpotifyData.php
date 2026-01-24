@@ -108,7 +108,7 @@ class FetchSpotifyData extends Command
                 $successCount++;
 
             } catch (Exception $e) {
-                $this->error("Failed to fetch Spotify data for integration {$integration->id}: " . $e->getMessage());
+                $this->error("Failed to fetch Spotify data for integration {$integration->id}: ".$e->getMessage());
                 $errorCount++;
             }
         }

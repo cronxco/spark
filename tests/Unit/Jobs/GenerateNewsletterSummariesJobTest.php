@@ -150,7 +150,7 @@ class GenerateNewsletterSummariesJobTest extends TestCase
             'Test content'
         );
 
-        $expectedId = 'generate_newsletter_summaries_' . $integration->id . '_' . $event->id;
+        $expectedId = 'generate_newsletter_summaries_'.$integration->id.'_'.$event->id;
         $this->assertEquals($expectedId, $job->uniqueId());
     }
 }

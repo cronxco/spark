@@ -40,8 +40,8 @@ class LinkTransactions extends Command
         $dryRun = $this->option('dry-run');
 
         $this->info('Starting transaction linking...');
-        $this->info('Threshold: ' . $threshold . '%');
-        $this->info('Batch size: ' . $batchSize);
+        $this->info('Threshold: '.$threshold.'%');
+        $this->info('Batch size: '.$batchSize);
 
         if ($dryRun) {
             $this->warn('DRY RUN - No relationships will be created');
@@ -58,7 +58,7 @@ class LinkTransactions extends Command
             return Command::FAILURE;
         }
 
-        $this->info('Processing ' . $users->count() . ' user(s)');
+        $this->info('Processing '.$users->count().' user(s)');
 
         $totalStats = ['created' => 0, 'pending' => 0, 'skipped' => 0, 'processed' => 0];
 

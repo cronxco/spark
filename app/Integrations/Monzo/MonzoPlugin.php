@@ -464,7 +464,7 @@ class MonzoPlugin extends OAuthPlugin
     public function getOAuthUrl(IntegrationGroup $group): string
     {
         $csrfToken = Str::random(32);
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -480,14 +480,14 @@ class MonzoPlugin extends OAuthPlugin
             'state' => $state,
         ];
 
-        return $this->authBase . '?' . http_build_query($params);
+        return $this->authBase.'?'.http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         $error = $request->get('error');
         if ($error) {
-            throw new Exception('Monzo authorization failed: ' . $error);
+            throw new Exception('Monzo authorization failed: '.$error);
         }
 
         $code = (string) $request->get('code');
@@ -500,7 +500,7 @@ class MonzoPlugin extends OAuthPlugin
         if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
             throw new Exception('Invalid state parameter');
         }
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
         $expectedCsrf = Session::get($sessionKey);
         if (($stateData['csrf_token'] ?? null) !== $expectedCsrf) {
             throw new Exception('Invalid CSRF token');
@@ -515,7 +515,7 @@ class MonzoPlugin extends OAuthPlugin
             'redirect_uri' => $this->redirectUri,
         ]);
 
-        $response = Http::asForm()->post($this->apiBase . '/oauth2/token', [
+        $response = Http::asForm()->post($this->apiBase.'/oauth2/token', [
             'grant_type' => 'authorization_code',
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -599,7 +599,7 @@ class MonzoPlugin extends OAuthPlugin
             ->where('service', 'monzo')
             ->where('action', 'had_balance')
             ->where('actor_id', $actorId)
-            ->where('time', '<', $date . ' 00:00:00')
+            ->where('time', '<', $date.' 00:00:00')
             ->orderBy('time', 'desc')
             ->first();
         if ($prev) {
@@ -999,7 +999,7 @@ class MonzoPlugin extends OAuthPlugin
             ], $integration->id);
 
             $response = Http::withHeaders($this->authHeaders($integration))
-                ->get($this->getBaseUrl() . '/balance', [
+                ->get($this->getBaseUrl().'/balance', [
                     'account_id' => $account['id'],
                 ]);
 
@@ -1007,7 +1007,7 @@ class MonzoPlugin extends OAuthPlugin
             $this->logApiResponse('GET', '/balance', $response->status(), $response->body(), $response->headers(), $integration->id);
 
             if (! $response->successful()) {
-                throw new Exception('Failed to fetch balance from Monzo API: ' . $response->body());
+                throw new Exception('Failed to fetch balance from Monzo API: '.$response->body());
             }
 
             $balanceData = $response->json();
@@ -1040,7 +1040,7 @@ class MonzoPlugin extends OAuthPlugin
             ], $integration->id);
 
             $response = Http::withHeaders($this->authHeaders($integration))
-                ->get($this->getBaseUrl() . '/pots', [
+                ->get($this->getBaseUrl().'/pots', [
                     'current_account_id' => $account['id'],
                 ]);
 
@@ -1048,7 +1048,7 @@ class MonzoPlugin extends OAuthPlugin
             $this->logApiResponse('GET', '/pots', $response->status(), $response->body(), $response->headers(), $integration->id);
 
             if (! $response->successful()) {
-                throw new Exception('Failed to fetch pots from Monzo API: ' . $response->body());
+                throw new Exception('Failed to fetch pots from Monzo API: '.$response->body());
             }
 
             $pots = $response->json('pots') ?? [];
@@ -1094,7 +1094,7 @@ class MonzoPlugin extends OAuthPlugin
             ], $integration->id);
 
             $response = Http::withHeaders($this->authHeaders($integration))
-                ->get($this->getBaseUrl() . '/transactions', [
+                ->get($this->getBaseUrl().'/transactions', [
                     'account_id' => $account['id'],
                     'expand[]' => 'merchant',
                     'since' => $sinceIso,
@@ -1105,7 +1105,7 @@ class MonzoPlugin extends OAuthPlugin
             $this->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $integration->id);
 
             if (! $response->successful()) {
-                throw new Exception('Failed to fetch transactions from Monzo API: ' . $response->body());
+                throw new Exception('Failed to fetch transactions from Monzo API: '.$response->body());
             }
 
             $transactions = $response->json('transactions') ?? [];
@@ -1117,7 +1117,7 @@ class MonzoPlugin extends OAuthPlugin
                     break;
                 }
                 $nextResp = Http::withHeaders($this->authHeaders($integration))
-                    ->get($this->getBaseUrl() . '/transactions', [
+                    ->get($this->getBaseUrl().'/transactions', [
                         'account_id' => $account['id'],
                         'expand[]' => 'merchant',
                         'since' => $sinceIso,
@@ -1175,7 +1175,7 @@ class MonzoPlugin extends OAuthPlugin
         }
 
         return [
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization' => 'Bearer '.$token,
         ];
     }
 
@@ -1258,7 +1258,7 @@ class MonzoPlugin extends OAuthPlugin
                 ], $integration->id);
 
                 $response = Http::withHeaders($this->authHeaders($integration))
-                    ->get($this->getBaseUrl() . '/transactions', [
+                    ->get($this->getBaseUrl().'/transactions', [
                         'account_id' => $account['id'],
                         'expand[]' => 'merchant',
                         'since' => $sinceIso,
@@ -1269,7 +1269,7 @@ class MonzoPlugin extends OAuthPlugin
                 $this->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $integration->id);
 
                 if (! $response->successful()) {
-                    throw new Exception('Failed to fetch transactions from Monzo API: ' . $response->body());
+                    throw new Exception('Failed to fetch transactions from Monzo API: '.$response->body());
                 }
 
                 $transactions = $response->json();
@@ -1341,7 +1341,7 @@ class MonzoPlugin extends OAuthPlugin
             'client_id' => $clientId,
         ]);
 
-        $response = Http::asForm()->post($this->apiBase . '/oauth2/token', [
+        $response = Http::asForm()->post($this->apiBase.'/oauth2/token', [
             'grant_type' => 'refresh_token',
             'client_id' => $clientId,
             'client_secret' => $clientSecret,
@@ -1378,7 +1378,7 @@ class MonzoPlugin extends OAuthPlugin
      */
     protected function makeAuthenticatedMonzoRequest(string $method, string $endpoint, array $params = [], ?Integration $integration = null): \Illuminate\Http\Client\Response
     {
-        $url = $this->apiBase . $endpoint;
+        $url = $this->apiBase.$endpoint;
 
         // Log the API request
         $this->logApiRequest($method, $endpoint, [
@@ -1456,7 +1456,7 @@ class MonzoPlugin extends OAuthPlugin
         ], [], $group->id);
 
         $resp = Http::withToken((string) $group->access_token)
-            ->get($this->apiBase . '/accounts');
+            ->get($this->apiBase.'/accounts');
 
         // Log the API response
         $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
@@ -1472,7 +1472,7 @@ class MonzoPlugin extends OAuthPlugin
 
                 // Retry the request with new token
                 $resp = Http::withToken((string) $group->access_token)
-                    ->get($this->apiBase . '/accounts');
+                    ->get($this->apiBase.'/accounts');
 
                 $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
             } catch (Exception $e) {
@@ -1508,7 +1508,7 @@ class MonzoPlugin extends OAuthPlugin
         ], $integration->id);
 
         $resp = Http::withHeaders($this->authHeaders($integration))
-            ->get($this->apiBase . '/pots', [
+            ->get($this->apiBase.'/pots', [
                 'current_account_id' => $account['id'],
             ]);
 
@@ -1531,7 +1531,7 @@ class MonzoPlugin extends OAuthPlugin
             ],
             [
                 'integration_id' => $integration->id,
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -1543,7 +1543,7 @@ class MonzoPlugin extends OAuthPlugin
 
             // Create balance event for the pot
             $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
-            $sourceId = 'monzo_pot_balance_' . $pot['id'] . '_' . $date;
+            $sourceId = 'monzo_pot_balance_'.$pot['id'].'_'.$date;
 
             Event::updateOrCreate(
                 [
@@ -1551,7 +1551,7 @@ class MonzoPlugin extends OAuthPlugin
                     'source_id' => $sourceId,
                 ],
                 [
-                    'time' => $date . ' 23:59:59',
+                    'time' => $date.' 23:59:59',
                     'actor_id' => $potObject->id,
                     'service' => 'monzo',
                     'domain' => self::getDomain(),
@@ -1580,7 +1580,7 @@ class MonzoPlugin extends OAuthPlugin
         ], $integration->id);
 
         $resp = Http::withHeaders($this->authHeaders($integration))
-            ->get($this->apiBase . '/balance', [
+            ->get($this->apiBase.'/balance', [
                 'account_id' => $account['id'],
             ]);
 
@@ -1605,7 +1605,7 @@ class MonzoPlugin extends OAuthPlugin
             ],
             [
                 'integration_id' => $integration->id,
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -1614,10 +1614,10 @@ class MonzoPlugin extends OAuthPlugin
         $event = Event::updateOrCreate(
             [
                 'integration_id' => $integration->id,
-                'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
+                'source_id' => 'monzo_balance_'.$account['id'].'_'.$date,
             ],
             [
-                'time' => $date . ' 23:59:59',
+                'time' => $date.' 23:59:59',
                 'actor_id' => $this->upsertAccountObject($integration, $account)->id,
                 'service' => 'monzo',
                 'domain' => self::getDomain(),
@@ -1654,7 +1654,7 @@ class MonzoPlugin extends OAuthPlugin
         ], $integration->id);
 
         $resp = Http::withHeaders($this->authHeaders($integration))
-            ->get($this->apiBase . '/transactions', [
+            ->get($this->apiBase.'/transactions', [
                 'account_id' => $account['id'],
                 'expand[]' => 'merchant',
                 'since' => $sinceIso,

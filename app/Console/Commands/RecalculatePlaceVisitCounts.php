@@ -88,7 +88,7 @@ class RecalculatePlaceVisitCounts extends Command
         $updateCount = $placesToUpdate->count();
 
         $this->info("Places needing updates: {$updateCount}");
-        $this->info('Places already correct: ' . ($totalPlaces - $updateCount));
+        $this->info('Places already correct: '.($totalPlaces - $updateCount));
         $this->newLine();
 
         if ($updateCount === 0) {
@@ -206,17 +206,17 @@ class RecalculatePlaceVisitCounts extends Command
                 ['Place ID', 'Title', 'Old Count', 'New Count', 'Difference'],
                 array_map(function ($change) {
                     return [
-                        substr($change['id'], 0, 8) . '...',
+                        substr($change['id'], 0, 8).'...',
                         substr($change['title'], 0, 40),
                         $change['old_count'],
                         $change['new_count'],
-                        ($change['new_count'] - $change['old_count']) > 0 ? '+' . ($change['new_count'] - $change['old_count']) : ($change['new_count'] - $change['old_count']),
+                        ($change['new_count'] - $change['old_count']) > 0 ? '+'.($change['new_count'] - $change['old_count']) : ($change['new_count'] - $change['old_count']),
                     ];
                 }, $sampleChanges)
             );
 
             if (count($changes) > 20) {
-                $this->info('... and ' . (count($changes) - 20) . ' more changes.');
+                $this->info('... and '.(count($changes) - 20).' more changes.');
             }
         }
 

@@ -107,7 +107,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
             ? md5($this->s3ObjectKey)
             : md5($this->rawEmailContent ?? '');
 
-        return 'process_receipt_email_' . $this->integration->id . '_' . $contentHash;
+        return 'process_receipt_email_'.$this->integration->id.'_'.$contentHash;
     }
 
     /**
@@ -168,7 +168,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
             }
 
             // Combine all text sources
-            $combinedText = trim($textPlain . "\n\n" . $pdfText);
+            $combinedText = trim($textPlain."\n\n".$pdfText);
 
             Log::info('Receipt: Parsed email', [
                 'subject' => $subject,
@@ -191,7 +191,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
-            throw new Exception('Failed to parse email: ' . $e->getMessage());
+            throw new Exception('Failed to parse email: '.$e->getMessage());
         }
     }
 
@@ -290,7 +290,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
 
         // Create receipt event
         $event = Event::create([
-            'source_id' => 'receipt_' . Str::uuid(),
+            'source_id' => 'receipt_'.Str::uuid(),
             'time' => $transactionTime,
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,

@@ -95,7 +95,7 @@ class ExtractNewsletterContentJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'extract_newsletter_content_' . $this->integration->id . '_' . $this->event->id;
+        return 'extract_newsletter_content_'.$this->integration->id.'_'.$this->event->id;
     }
 
     private function extractArticleText(string $subject, string $content): string
@@ -118,7 +118,7 @@ class ExtractNewsletterContentJob implements ShouldQueue
                 'original_length' => $contentLength,
                 'truncated_to' => strlen($contentToSend),
                 'characters_lost' => $contentLength - strlen($contentToSend),
-                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1) . '%',
+                'percentage_sent' => round((strlen($contentToSend) / $contentLength) * 100, 1).'%',
             ]);
         }
 

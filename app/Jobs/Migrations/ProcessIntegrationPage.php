@@ -227,17 +227,17 @@ class ProcessIntegrationPage implements ShouldQueue
                                     'title' => $date,
                                 ], [
                                     'integration_id' => $this->integration->id,
-                                    'time' => $date . ' 00:00:00',
+                                    'time' => $date.' 00:00:00',
                                     'content' => null,
                                     'metadata' => ['date' => $date],
                                 ]);
                                 $event = Event::updateOrCreate(
                                     [
                                         'integration_id' => $this->integration->id,
-                                        'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
+                                        'source_id' => 'monzo_balance_'.$account['id'].'_'.$date,
                                     ],
                                     [
-                                        'time' => $date . ' 23:59:59',
+                                        'time' => $date.' 23:59:59',
                                         'actor_id' => $plugin->upsertAccountObject($this->integration, $account)->id,
                                         'service' => 'monzo',
                                         'domain' => 'money',
@@ -287,17 +287,17 @@ class ProcessIntegrationPage implements ShouldQueue
                                     'title' => $date,
                                 ], [
                                     'integration_id' => $this->integration->id,
-                                    'time' => $date . ' 00:00:00',
+                                    'time' => $date.' 00:00:00',
                                     'content' => null,
                                     'metadata' => ['date' => $date],
                                 ]);
                                 $event = Event::updateOrCreate(
                                     [
                                         'integration_id' => $this->integration->id,
-                                        'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
+                                        'source_id' => 'monzo_balance_'.$account['id'].'_'.$date,
                                     ],
                                     [
-                                        'time' => $date . ' 23:59:59',
+                                        'time' => $date.' 23:59:59',
                                         'actor_id' => $plugin->upsertAccountObject($this->integration, $account)->id,
                                         'service' => 'monzo',
                                         'domain' => 'money',
@@ -609,7 +609,7 @@ class ProcessIntegrationPage implements ShouldQueue
         $token = $group?->access_token ?? $this->integration->access_token;
 
         return [
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization' => 'Bearer '.$token,
         ];
     }
 
@@ -626,12 +626,12 @@ class ProcessIntegrationPage implements ShouldQueue
 
     private function cacheKey(string $suffix): string
     {
-        return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
+        return 'monzo:migration:'.$this->integration->id.':'.$suffix;
     }
 
     private function gcCacheKey(string $suffix): string
     {
-        return 'gocardless:migration:' . $this->integration->id . ':' . $suffix;
+        return 'gocardless:migration:'.$this->integration->id.':'.$suffix;
     }
 
     /**
@@ -659,14 +659,14 @@ class ProcessIntegrationPage implements ShouldQueue
                 $since = $item['since'] ?? 'unknown';
                 $before = $item['before'] ?? 'unknown';
                 // Create a hash of the time window to ensure uniqueness
-                $windowHash = substr(md5($since . $before), 0, 8);
+                $windowHash = substr(md5($since.$before), 0, 8);
 
                 return "{$baseId}_transactions_{$windowHash}";
             }
         }
 
         // Fallback for other job types
-        return "{$baseId}_{$instanceType}_" . substr(uniqid(), -8);
+        return "{$baseId}_{$instanceType}_".substr(uniqid(), -8);
     }
 
     /**
@@ -705,19 +705,19 @@ class ProcessIntegrationPage implements ShouldQueue
 
         // Fetch user info
         $userResponse = Http::withToken($accessToken)
-            ->get($baseUrl . '/api/v1/users/me');
+            ->get($baseUrl.'/api/v1/users/me');
 
         $userData = $userResponse->successful() ? $userResponse->json() : null;
 
         // Fetch tags
         $tagsResponse = Http::withToken($accessToken)
-            ->get($baseUrl . '/api/v1/tags');
+            ->get($baseUrl.'/api/v1/tags');
 
         $tagsData = $tagsResponse->successful() ? ($tagsResponse->json()['tags'] ?? []) : [];
 
         // Fetch lists
         $listsResponse = Http::withToken($accessToken)
-            ->get($baseUrl . '/api/v1/lists');
+            ->get($baseUrl.'/api/v1/lists');
 
         $listsData = $listsResponse->successful() ? ($listsResponse->json()['lists'] ?? []) : [];
 
@@ -725,7 +725,7 @@ class ProcessIntegrationPage implements ShouldQueue
         $highlightsData = [];
         if ($syncHighlights) {
             $highlightsResponse = Http::withToken($accessToken)
-                ->get($baseUrl . '/api/v1/highlights');
+                ->get($baseUrl.'/api/v1/highlights');
 
             if ($highlightsResponse->successful()) {
                 $highlightsData = $highlightsResponse->json()['highlights'] ?? [];

@@ -377,7 +377,7 @@ class PhotosData extends BaseProcessingJob
             'metadata' => [
                 'photo_count' => $clusterData['photo_count'],
                 'video_count' => $clusterData['video_count'],
-                'time_range' => $clusterData['start_time']->format('g:ia') . ' - ' . $clusterData['end_time']->format('g:ia'),
+                'time_range' => $clusterData['start_time']->format('g:ia').' - '.$clusterData['end_time']->format('g:ia'),
                 'location_name' => $clusterData['location_name'] ?? null,
                 'thumbnail_urls' => $thumbnailUrls,
             ],

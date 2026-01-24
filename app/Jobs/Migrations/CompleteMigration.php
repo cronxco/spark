@@ -122,7 +122,7 @@ class CompleteMigration implements ShouldQueue
             if ($oldestTime->format('Y-m') === $newestTime->format('Y-m')) {
                 $statistics['date_range'] = $newestTime->format('M Y');
             } else {
-                $statistics['date_range'] = $oldestTime->format('M Y') . ' - ' . $newestTime->format('M Y');
+                $statistics['date_range'] = $oldestTime->format('M Y').' - '.$newestTime->format('M Y');
             }
         }
 

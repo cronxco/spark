@@ -92,7 +92,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             ? md5($this->s3ObjectKey)
             : md5($this->rawEmailContent ?? '');
 
-        return 'process_newsletter_email_' . $this->integration->id . '_' . $contentHash;
+        return 'process_newsletter_email_'.$this->integration->id.'_'.$contentHash;
     }
 
     /**
@@ -182,7 +182,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
-            throw new Exception('Failed to parse email: ' . $e->getMessage());
+            throw new Exception('Failed to parse email: '.$e->getMessage());
         }
     }
 
@@ -280,7 +280,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
         }
         // Create newsletter event
         $event = Event::create([
-            'source_id' => $parsedEmail['message_id'] ?: 'newsletter_' . Str::uuid(),
+            'source_id' => $parsedEmail['message_id'] ?: 'newsletter_'.Str::uuid(),
             'time' => $receivedTime,
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,

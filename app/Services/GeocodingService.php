@@ -353,6 +353,6 @@ class GeocodingService
      */
     private function getRateLimitKey(): string
     {
-        return 'geoapify_requests_' . now()->format('Y-m-d');
+        return 'geoapify_requests_'.now()->format('Y-m-d');
     }
 }

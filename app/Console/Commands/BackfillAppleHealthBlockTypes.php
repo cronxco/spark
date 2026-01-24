@@ -135,7 +135,7 @@ class BackfillAppleHealthBlockTypes extends Command
                         }
                     } catch (Exception $e) {
                         $errorCount++;
-                        $this->error("\nError processing block {$block->id}: " . $e->getMessage());
+                        $this->error("\nError processing block {$block->id}: ".$e->getMessage());
                     }
 
                     $bar->advance();
@@ -160,7 +160,7 @@ class BackfillAppleHealthBlockTypes extends Command
 
             return self::SUCCESS;
         } catch (Exception $e) {
-            $this->error('Backfill failed: ' . $e->getMessage());
+            $this->error('Backfill failed: '.$e->getMessage());
             $this->newLine();
             $this->error($e->getTraceAsString());
 

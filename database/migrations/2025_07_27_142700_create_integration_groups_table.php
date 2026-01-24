@@ -28,14 +28,14 @@ class CreateIntegrationGroupsTable extends Migration
             $table->index('service');
             $table->index('account_id');
             // If a user is deleted, remove their integration groups
-            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'integration_groups_user_id_foreign')
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix().'integration_groups_user_id_foreign')
                 ->references('id')
                 ->on('users')
                 ->onDelete('cascade');
         });
         // Partial unique index (user_id, service, account_id) where account_id IS NOT NULL
         // Note: We need to manually handle the prefix for raw SQL statements
-        $tableName = Schema::getConnection()->getTablePrefix() . 'integration_groups';
+        $tableName = Schema::getConnection()->getTablePrefix().'integration_groups';
         DB::statement("CREATE UNIQUE INDEX IF NOT EXISTS integration_groups_user_service_account_unique ON {$tableName} (user_id, service, account_id) WHERE account_id IS NOT NULL");
     }
 

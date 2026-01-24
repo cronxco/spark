@@ -53,7 +53,7 @@ class GlobalActionsQuery
                     $result = SpotlightResult::make()
                         ->setTitle($actionConfig['title'])
                         ->setSubtitle($actionConfig['subtitle'])
-                        ->setTypeahead('Action: ' . $actionConfig['title'])
+                        ->setTypeahead('Action: '.$actionConfig['title'])
                         ->setIcon($actionConfig['icon'])
                         ->setGroup('commands')
                         ->setPriority(1);

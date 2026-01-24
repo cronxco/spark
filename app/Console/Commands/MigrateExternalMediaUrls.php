@@ -156,7 +156,7 @@ class MigrateExternalMediaUrls extends Command
 
         $this->newLine();
         $totalRecords = collect($stats)->sum('count');
-        $this->info('📊 Total records to migrate: ' . number_format($totalRecords));
+        $this->info('📊 Total records to migrate: '.number_format($totalRecords));
         $this->newLine();
     }
 
@@ -169,7 +169,7 @@ class MigrateExternalMediaUrls extends Command
         $progress = ActionProgress::create([
             'user_id' => $this->userId,
             'action_type' => 'media_migration',
-            'action_id' => "migrate_media_urls_{$modelName}_" . now()->format('Y-m-d_H-i-s'),
+            'action_id' => "migrate_media_urls_{$modelName}_".now()->format('Y-m-d_H-i-s'),
             'step' => 'dispatching',
             'total' => 0, // Will be updated as we dispatch jobs
             'processed' => 0,

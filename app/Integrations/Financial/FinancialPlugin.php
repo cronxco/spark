@@ -244,7 +244,7 @@ class FinancialPlugin extends ManualPlugin
                 'title' => $date,
             ],
             [
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -256,8 +256,8 @@ class FinancialPlugin extends ManualPlugin
 
         return Event::create([
             'integration_id' => $integration->id,
-            'source_id' => 'manual_balance_' . $accountObject->id . '_' . $date,
-            'time' => $date . ' 23:59:59',
+            'source_id' => 'manual_balance_'.$accountObject->id.'_'.$date,
+            'time' => $date.' 23:59:59',
             'actor_id' => $accountObject->id,
             'service' => 'manual_account',
             'domain' => self::getDomain(),
@@ -389,7 +389,7 @@ class FinancialPlugin extends ManualPlugin
         // Get the actual table name with prefix (respects test prefixes)
         $model = new Event;
         $prefix = $model->getConnection()->getTablePrefix();
-        $table = $prefix . $model->getTable();
+        $table = $prefix.$model->getTable();
 
         // Use PostgreSQL DISTINCT ON for efficient "latest per group" query
         $placeholders = implode(',', array_fill(0, count($accountIds), '?'));

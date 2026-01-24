@@ -38,7 +38,7 @@ class GoodreadsProgressPull extends BaseFetchJob
         $result = $fetchManager->fetch($rssUrl, $group);
 
         if ($result['error']) {
-            throw new Exception('RSS fetch failed: ' . $result['error']);
+            throw new Exception('RSS fetch failed: '.$result['error']);
         }
 
         // Parse XML

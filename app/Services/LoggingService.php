@@ -17,9 +17,9 @@ class LoggingService
         $uuidBlock = $user->getUuidBlock();
         $channelName = "user_{$uuidBlock}";
 
-        if (! config('logging.channels.' . $channelName)) {
+        if (! config('logging.channels.'.$channelName)) {
             config([
-                'logging.channels.' . $channelName => [
+                'logging.channels.'.$channelName => [
                     'driver' => 'daily',
                     'path' => storage_path("logs/user_{$uuidBlock}.log"),
                     'level' => 'debug',
@@ -47,9 +47,9 @@ class LoggingService
         $uuidBlock = $group->getUuidBlock();
         $channelName = "group_{$service}_{$uuidBlock}";
 
-        if (! config('logging.channels.' . $channelName)) {
+        if (! config('logging.channels.'.$channelName)) {
             config([
-                'logging.channels.' . $channelName => [
+                'logging.channels.'.$channelName => [
                     'driver' => 'daily',
                     'path' => storage_path("logs/group_{$service}_{$uuidBlock}.log"),
                     'level' => 'debug',
@@ -78,9 +78,9 @@ class LoggingService
         $uuidBlock = $integration->getUuidBlock();
         $channelName = "integration_{$service}_{$instanceType}_{$uuidBlock}";
 
-        if (! config('logging.channels.' . $channelName)) {
+        if (! config('logging.channels.'.$channelName)) {
             config([
-                'logging.channels.' . $channelName => [
+                'logging.channels.'.$channelName => [
                     'driver' => 'daily',
                     'path' => storage_path("logs/integration_{$service}_{$instanceType}_{$uuidBlock}.log"),
                     'level' => 'debug',

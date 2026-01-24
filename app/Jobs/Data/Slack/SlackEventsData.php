@@ -115,7 +115,7 @@ class SlackEventsData extends BaseProcessingJob
 
         // Add channel-specific tags
         if (! empty($eventData['event_metadata']['channel'])) {
-            $event->attachTag('channel_' . $eventData['event_metadata']['channel'], 'slack_channel');
+            $event->attachTag('channel_'.$eventData['event_metadata']['channel'], 'slack_channel');
             $event->attachTag($eventData['action'], 'slack_action');
         } else {
             $event->attachTag($eventData['action'], 'slack_action');
@@ -128,27 +128,27 @@ class SlackEventsData extends BaseProcessingJob
 
         // Add team tag if available
         if (! empty($eventData['event_metadata']['team'])) {
-            $event->attachTag('team_' . $eventData['event_metadata']['team'], 'slack_team');
+            $event->attachTag('team_'.$eventData['event_metadata']['team'], 'slack_team');
         }
 
         // Add channel tag if available
         if (! empty($eventData['event_metadata']['channel'])) {
-            $event->attachTag('channel_' . $eventData['event_metadata']['channel'], 'slack_channel');
+            $event->attachTag('channel_'.$eventData['event_metadata']['channel'], 'slack_channel');
         }
 
         // Add subtype tag for messages
         if (! empty($eventData['event_metadata']['subtype'])) {
-            $event->attachTag('subtype_' . $eventData['event_metadata']['subtype'], 'slack_subtype');
+            $event->attachTag('subtype_'.$eventData['event_metadata']['subtype'], 'slack_subtype');
         }
 
         // Add reaction tag if available
         if (! empty($eventData['event_metadata']['reaction'])) {
-            $event->attachTag('reaction_' . str_replace([':', '-'], '_', $eventData['event_metadata']['reaction']), 'slack_reaction');
+            $event->attachTag('reaction_'.str_replace([':', '-'], '_', $eventData['event_metadata']['reaction']), 'slack_reaction');
         }
 
         // Add file type tag if available
         if (! empty($eventData['event_metadata']['file_type'])) {
-            $event->attachTag('file_' . $eventData['event_metadata']['file_type'], 'slack_file_type');
+            $event->attachTag('file_'.$eventData['event_metadata']['file_type'], 'slack_file_type');
         }
     }
 }

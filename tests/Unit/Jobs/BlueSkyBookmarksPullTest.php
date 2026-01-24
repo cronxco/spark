@@ -64,7 +64,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $job = new BlueSkyBookmarksPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('bluesky_bookmarks_' . $this->integration->id, $uniqueId);
+        $this->assertStringContainsString('bluesky_bookmarks_'.$this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

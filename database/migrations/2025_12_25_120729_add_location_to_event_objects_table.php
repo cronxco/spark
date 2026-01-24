@@ -16,7 +16,7 @@ return new class extends Migration
         });
 
         // Get table name with prefix
-        $tableName = Schema::getConnection()->getTablePrefix() . 'objects';
+        $tableName = Schema::getConnection()->getTablePrefix().'objects';
 
         // Add geography column using raw SQL (PostGIS type)
         DB::statement("ALTER TABLE {$tableName} ADD COLUMN location GEOGRAPHY(POINT, 4326)");
@@ -28,7 +28,7 @@ return new class extends Migration
     public function down(): void
     {
         // Get table name with prefix
-        $tableName = Schema::getConnection()->getTablePrefix() . 'objects';
+        $tableName = Schema::getConnection()->getTablePrefix().'objects';
 
         // Drop spatial index
         DB::statement("DROP INDEX IF EXISTS {$tableName}_location_idx");

@@ -324,7 +324,7 @@ class ReceiptTransactionMatcher
                 return [$diffFallback, 'fallback_gbp'];
             }
 
-            return [$diffPrimary, 'converted_' . strtolower($receiptCurrency) . '_to_' . strtolower($txnCurrency)];
+            return [$diffPrimary, 'converted_'.strtolower($receiptCurrency).'_to_'.strtolower($txnCurrency)];
         } catch (Exception $e) {
             // Conversion failed - fall back to direct comparison
             Log::warning('Receipt: Currency conversion failed in matching', [

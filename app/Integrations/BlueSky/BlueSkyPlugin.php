@@ -268,7 +268,7 @@ class BlueSkyPlugin extends OAuthPlugin
                 'error' => $e->getMessage(),
                 'group_id' => $group->id,
             ]);
-            throw new Exception('BlueSky OAuth failed: ' . $e->getMessage());
+            throw new Exception('BlueSky OAuth failed: '.$e->getMessage());
         }
     }
 

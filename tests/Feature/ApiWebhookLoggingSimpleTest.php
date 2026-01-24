@@ -24,8 +24,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - File should be created automatically
-        $expectedFileName = 'api_test_auto_instance_auto_integration_123-' . now()->format('Y-m-d') . '.log';
-        $logPath = storage_path('logs/' . $expectedFileName);
+        $expectedFileName = 'api_test_auto_instance_auto_integration_123-'.now()->format('Y-m-d').'.log';
+        $logPath = storage_path('logs/'.$expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         // Verify log content structure
@@ -51,8 +51,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - File should be created automatically
-        $expectedFileName = 'api_test_auto_service-' . now()->format('Y-m-d') . '.log';
-        $logPath = storage_path('logs/' . $expectedFileName);
+        $expectedFileName = 'api_test_auto_service-'.now()->format('Y-m-d').'.log';
+        $logPath = storage_path('logs/'.$expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         // Verify log content structure
@@ -76,8 +76,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - Should create per-service file
-        $expectedFileName = 'api_test_fallback-' . now()->format('Y-m-d') . '.log';
-        $logPath = storage_path('logs/' . $expectedFileName);
+        $expectedFileName = 'api_test_fallback-'.now()->format('Y-m-d').'.log';
+        $logPath = storage_path('logs/'.$expectedFileName);
         $this->assertTrue(file_exists($logPath));
     }
 
@@ -101,8 +101,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         );
 
         // Assert - File created and content sanitized
-        $expectedFileName = 'api_test_sanitize_sanitize_integration_999-' . now()->format('Y-m-d') . '.log';
-        $logPath = storage_path('logs/' . $expectedFileName);
+        $expectedFileName = 'api_test_sanitize_sanitize_integration_999-'.now()->format('Y-m-d').'.log';
+        $logPath = storage_path('logs/'.$expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         $logContent = file_get_contents($logPath);
@@ -132,8 +132,8 @@ class ApiWebhookLoggingSimpleTest extends TestCase
 
         // Assert - All log entries in the same file
         $uuidBlock = explode('-', $integrationId)[0] ?? $integrationId;
-        $expectedFileName = 'api_multi_test_' . $uuidBlock . '-' . now()->format('Y-m-d') . '.log';
-        $logPath = storage_path('logs/' . $expectedFileName);
+        $expectedFileName = 'api_multi_test_'.$uuidBlock.'-'.now()->format('Y-m-d').'.log';
+        $logPath = storage_path('logs/'.$expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         $logContent = file_get_contents($logPath);

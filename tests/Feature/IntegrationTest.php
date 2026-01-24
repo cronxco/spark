@@ -79,7 +79,7 @@ class IntegrationTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->get('/integrations/github/callback?code=test_code&state=' . $state);
+            ->get('/integrations/github/callback?code=test_code&state='.$state);
 
         // This will fail because we're not mocking the GitHub API
         // but it should redirect back to integrations index

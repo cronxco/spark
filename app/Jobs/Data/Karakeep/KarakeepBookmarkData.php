@@ -411,7 +411,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         // Truncate and ensure ellipsis
         $truncated = $this->truncateToWords($content);
 
-        return rtrim($truncated, ' .') . '...'; // Ensure it ends with ... even if not truncated
+        return rtrim($truncated, ' .').'...'; // Ensure it ends with ... even if not truncated
 
         // Truncate to 150 words if needed
         return $this->truncateToWords($content);
@@ -430,7 +430,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
 
         $words = array_slice($words, 0, $wordLimit);
 
-        return implode(' ', $words) . '...';
+        return implode(' ', $words).'...';
     }
 
     protected function attachTagsToEvent(Event $event, array $bookmark, array $tagsMap): void
@@ -507,7 +507,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         foreach ($highlightsMap as $highlight) {
             if (($highlight['bookmarkId'] ?? null) === $bookmarkId) {
                 $highlightText = $highlight['text'] ?? '';
-                $truncatedText = strlen($highlightText) > 50 ? substr($highlightText, 0, 50) . '...' : $highlightText;
+                $truncatedText = strlen($highlightText) > 50 ? substr($highlightText, 0, 50).'...' : $highlightText;
 
                 // Use highlight's creation time if available, otherwise fall back to bookmark's creation time
                 $highlightTime = isset($highlight['createdAt']) ? Carbon::parse($highlight['createdAt']) : $createdAt;
@@ -515,7 +515,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
                 Block::create([
                     'event_id' => $event->id,
                     'time' => $highlightTime,
-                    'title' => 'Highlight: ' . $truncatedText,
+                    'title' => 'Highlight: '.$truncatedText,
                     'block_type' => 'bookmark_highlight',
                     'metadata' => [
                         'text' => $highlight['text'] ?? null,

@@ -37,8 +37,8 @@ class StartProcessingIntegrationMigrationTest extends TestCase
             ['since' => '2024-01-01T00:00:00Z', 'before' => '2024-01-02T00:00:00Z'],
             ['since' => '2024-01-02T00:00:00Z', 'before' => '2024-01-03T00:00:00Z'],
         ];
-        Cache::put('monzo:migration:' . $integration->id . ':tx_windows', $windows, now()->addHours(6));
-        Cache::put('monzo:migration:' . $integration->id . ':balances_last_date', '2024-01-03', now()->addHours(6));
+        Cache::put('monzo:migration:'.$integration->id.':tx_windows', $windows, now()->addHours(6));
+        Cache::put('monzo:migration:'.$integration->id.':balances_last_date', '2024-01-03', now()->addHours(6));
 
         // Use queue fake to capture dispatched jobs
         Queue::fake();

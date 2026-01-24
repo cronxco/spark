@@ -162,7 +162,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'title' => $date,
             ],
             [
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -186,13 +186,13 @@ class DailyCheckinPlugin extends ManualPlugin
 
         // Determine action and default time based on period
         $action = $period === 'morning' ? 'had_morning_checkin' : 'had_afternoon_checkin';
-        $defaultTime = $period === 'morning' ? $date . ' 08:00:00' : $date . ' 17:00:00';
+        $defaultTime = $period === 'morning' ? $date.' 08:00:00' : $date.' 17:00:00';
 
         // Calculate combined value (out of 10)
         $combinedValue = $physical + $mental;
 
         // Create or update the event
-        $sourceId = 'daily_checkin_' . $period . '_' . $date;
+        $sourceId = 'daily_checkin_'.$period.'_'.$date;
 
         $event = Event::updateOrCreate(
             [

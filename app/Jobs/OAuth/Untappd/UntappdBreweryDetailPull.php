@@ -46,7 +46,7 @@ class UntappdBreweryDetailPull extends BaseFetchJob
         $result = $client->fetch($this->breweryUrl, $this->integration->group);
 
         if (! $result['success']) {
-            throw new Exception('Playwright fetch failed: ' . ($result['error'] ?? 'Unknown error'));
+            throw new Exception('Playwright fetch failed: '.($result['error'] ?? 'Unknown error'));
         }
 
         return [

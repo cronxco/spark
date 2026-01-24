@@ -77,7 +77,7 @@ class OuraVO2MaxData extends BaseProcessingJob
 
         Event::create([
             'source_id' => $sourceId,
-            'time' => $timestamp ? Str::substr($timestamp, 0, 19) : ($day . ' 00:00:00'),
+            'time' => $timestamp ? Str::substr($timestamp, 0, 19) : ($day.' 00:00:00'),
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',

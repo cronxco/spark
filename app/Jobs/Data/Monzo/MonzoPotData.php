@@ -48,7 +48,7 @@ class MonzoPotData extends BaseProcessingJob
                 'title' => $date,
             ],
             [
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -60,7 +60,7 @@ class MonzoPotData extends BaseProcessingJob
 
             // Create balance event for the pot
             $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
-            $sourceId = 'monzo_pot_balance_' . $pot['id'] . '_' . $date;
+            $sourceId = 'monzo_pot_balance_'.$pot['id'].'_'.$date;
 
             Event::updateOrCreate(
                 [
@@ -68,7 +68,7 @@ class MonzoPotData extends BaseProcessingJob
                     'source_id' => $sourceId,
                 ],
                 [
-                    'time' => $date . ' 23:59:59',
+                    'time' => $date.' 23:59:59',
                     'actor_id' => $potObject->id,
                     'service' => 'monzo',
                     'domain' => 'money',

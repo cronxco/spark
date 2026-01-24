@@ -79,7 +79,7 @@ class TaskRegistry
             if ($resolved->isEmpty() && $remaining->isNotEmpty()) {
                 // Circular dependency detected
                 throw new CircularDependencyException(
-                    'Circular dependency detected in tasks: ' . $remaining->pluck('key')->join(', ')
+                    'Circular dependency detected in tasks: '.$remaining->pluck('key')->join(', ')
                 );
             }
 

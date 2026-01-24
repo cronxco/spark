@@ -11,7 +11,7 @@ class HevyAnalyzeProgressionEffect extends BaseEffectJob
 {
     public function uniqueId(): string
     {
-        return 'hevy_analyze_progression_' . $this->integration->id . '_' . now()->toDateString();
+        return 'hevy_analyze_progression_'.$this->integration->id.'_'.now()->toDateString();
     }
 
     protected function execute(): array
@@ -26,7 +26,7 @@ class HevyAnalyzeProgressionEffect extends BaseEffectJob
 
         return [
             'success' => true,
-            'message' => 'Analyzed ' . count($result['recommendations']) . ' exercise(s)',
+            'message' => 'Analyzed '.count($result['recommendations']).' exercise(s)',
             'data' => $result,
         ];
     }
@@ -61,7 +61,7 @@ class HevyAnalyzeProgressionEffect extends BaseEffectJob
             // Create recommendation event with deterministic source_id
             $date = now()->format('Ymd');
             $exerciseName = $rec['exercise'];
-            $sourceId = 'hevy_coach_' . $this->integration->id . '_' . $routineObject->id . '_' . md5($exerciseName) . '_' . $date;
+            $sourceId = 'hevy_coach_'.$this->integration->id.'_'.$routineObject->id.'_'.md5($exerciseName).'_'.$date;
 
             $event = Event::create([
                 'source_id' => $sourceId,
@@ -79,7 +79,7 @@ class HevyAnalyzeProgressionEffect extends BaseEffectJob
             $event->createBlock([
                 'block_type' => 'coach_recommendation',
                 'time' => now(),
-                'title' => $rec['routine'] . ' - ' . $rec['exercise'] . ' - ' . ucfirst($rec['action']),
+                'title' => $rec['routine'].' - '.$rec['exercise'].' - '.ucfirst($rec['action']),
                 'content' => $rec['reason'],
                 'metadata' => $rec,
             ]);

@@ -65,14 +65,14 @@ class OuraRestModePeriodData extends BaseProcessingJob
         $duration = null;
         if ($endDay && $endTime) {
             try {
-                $startDateTime = Carbon::parse($startDay . ' ' . ($startTime ?? '00:00:00'));
-                $endDateTime = Carbon::parse($endDay . ' ' . $endTime);
+                $startDateTime = Carbon::parse($startDay.' '.($startTime ?? '00:00:00'));
+                $endDateTime = Carbon::parse($endDay.' '.$endTime);
                 $duration = $endDateTime->diffInSeconds($startDateTime);
             } catch (Exception $e) {
                 Log::warning('Failed to calculate rest mode period duration', [
                     'item_id' => $id,
-                    'start' => $startDay . ' ' . ($startTime ?? '00:00:00'),
-                    'end' => $endDay . ' ' . $endTime,
+                    'start' => $startDay.' '.($startTime ?? '00:00:00'),
+                    'end' => $endDay.' '.$endTime,
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -94,9 +94,9 @@ class OuraRestModePeriodData extends BaseProcessingJob
             'user_id' => $this->integration->user_id,
             'concept' => 'rest_period',
             'type' => 'rest_period',
-            'title' => 'Rest Mode Period (' . substr($id, 0, 8) . ')',
+            'title' => 'Rest Mode Period ('.substr($id, 0, 8).')',
         ], [
-            'time' => $startDay . ' ' . ($startTime ?? '00:00:00'),
+            'time' => $startDay.' '.($startTime ?? '00:00:00'),
             'content' => 'Rest mode period with episodes',
             'metadata' => [],
         ]);
@@ -105,7 +105,7 @@ class OuraRestModePeriodData extends BaseProcessingJob
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $startDay . ' ' . ($startTime ?? '00:00:00'),
+            'time' => $startDay.' '.($startTime ?? '00:00:00'),
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -141,7 +141,7 @@ class OuraRestModePeriodData extends BaseProcessingJob
         // Add end time as timing block
         if ($endDay && $endTime) {
             $timingFields = ['end_time' => 'End Time'];
-            $item['end_time'] = $endDay . ' ' . $endTime;
+            $item['end_time'] = $endDay.' '.$endTime;
             $this->createSleepTimingBlocks($event, $item, $timingFields, $plugin);
         }
     }

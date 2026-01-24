@@ -33,7 +33,7 @@ class UntappdRssPull extends BaseFetchJob
         $result = $fetchManager->fetch($rssUrl, $group);
 
         if ($result['error']) {
-            throw new Exception('RSS fetch failed: ' . $result['error']);
+            throw new Exception('RSS fetch failed: '.$result['error']);
         }
 
         $xmlContent = $result['html'];
@@ -44,7 +44,7 @@ class UntappdRssPull extends BaseFetchJob
             if (preg_match('/<pre[^>]*>(.*?)<\/pre>/is', $xmlContent, $matches)) {
                 $xmlContent = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5);
             } else {
-                throw new Exception('Received HTML instead of XML and could not extract from <pre> tags. Response starts with: ' . substr($xmlContent, 0, 200));
+                throw new Exception('Received HTML instead of XML and could not extract from <pre> tags. Response starts with: '.substr($xmlContent, 0, 200));
             }
         }
 
@@ -57,7 +57,7 @@ class UntappdRssPull extends BaseFetchJob
             $errorMessages = array_map(fn ($error) => trim($error->message), $errors);
             libxml_clear_errors();
 
-            throw new Exception('Failed to parse RSS XML: ' . implode(', ', $errorMessages) . '. Content preview: ' . substr($xmlContent, 0, 500));
+            throw new Exception('Failed to parse RSS XML: '.implode(', ', $errorMessages).'. Content preview: '.substr($xmlContent, 0, 500));
         }
 
         $items = [];

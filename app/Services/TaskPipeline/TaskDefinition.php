@@ -87,7 +87,7 @@ class TaskDefinition
             return 'integration';
         }
 
-        throw new InvalidArgumentException('Unsupported model type: ' . get_class($model));
+        throw new InvalidArgumentException('Unsupported model type: '.get_class($model));
     }
 
     /**

@@ -184,8 +184,8 @@ class Receipts extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->whereHas('target', function ($subQuery) {
-                    $subQuery->where('title', 'ilike', '%' . $this->search . '%');
-                })->orWhereRaw('CAST(value AS TEXT) LIKE ?', ['%' . $this->search . '%']);
+                    $subQuery->where('title', 'ilike', '%'.$this->search.'%');
+                })->orWhereRaw('CAST(value AS TEXT) LIKE ?', ['%'.$this->search.'%']);
             });
         }
 

@@ -27,7 +27,7 @@ return new class extends Migration
         // Add PostgreSQL-specific optimizations if using PostgreSQL
         if (DB::getDriverName() === 'pgsql') {
             $connection = Schema::connection(config('activitylog.database_connection'));
-            $tableName = $connection->getConnection()->getTablePrefix() . config('activitylog.table_name');
+            $tableName = $connection->getConnection()->getTablePrefix().config('activitylog.table_name');
 
             // Create expression indexes for case-insensitive searches
             DB::connection(config('activitylog.database_connection'))->statement("CREATE INDEX activity_log_description_lower_idx ON {$tableName} (LOWER(description))");

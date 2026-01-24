@@ -166,7 +166,7 @@ class MediaDeduplicationServiceTest extends TestCase
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'test_img');
         $extension = '.jpg';
-        $newPath = $tempFile . $extension;
+        $newPath = $tempFile.$extension;
         rename($tempFile, $newPath);
 
         // Create a tiny 1x1 pixel image

@@ -74,14 +74,14 @@ class Session extends Model
         $device = $this->device;
 
         if ($device['is_mobile']) {
-            return $device['platform'] . ' Mobile - ' . $device['browser'];
+            return $device['platform'].' Mobile - '.$device['browser'];
         }
 
         if ($device['is_tablet']) {
-            return $device['platform'] . ' Tablet - ' . $device['browser'];
+            return $device['platform'].' Tablet - '.$device['browser'];
         }
 
-        return $device['platform'] . ' Desktop - ' . $device['browser'];
+        return $device['platform'].' Desktop - '.$device['browser'];
     }
 
     /**

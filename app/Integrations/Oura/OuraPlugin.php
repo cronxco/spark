@@ -866,7 +866,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
         $csrfToken = Str::random(32);
-        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -886,7 +886,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'code_challenge_method' => 'S256',
         ];
 
-        return $this->authUrl . '/oauth/authorize?' . http_build_query($params);
+        return $this->authUrl.'/oauth/authorize?'.http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -898,7 +898,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'error' => $error,
                 'error_description' => $request->get('error_description'),
             ]);
-            throw new Exception('Oura authorization failed: ' . $error);
+            throw new Exception('Oura authorization failed: '.$error);
         }
 
         $code = $request->get('code');
@@ -972,7 +972,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new Exception('Failed to exchange code for tokens: ' . $response->body());
+            throw new Exception('Failed to exchange code for tokens: '.$response->body());
         }
 
         $tokenData = $response->json();
@@ -1262,9 +1262,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+        $desc = 'GET '.$this->baseUrl.$endpoint.(! empty($query) ? '?'.http_build_query($query) : '');
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
+        $response = Http::withToken($token)->get($this->baseUrl.$endpoint, $query);
         $span?->finish();
 
         // Log the API response
@@ -1345,7 +1345,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         return [
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization' => 'Bearer '.$token,
         ];
     }
 
@@ -1371,7 +1371,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             $integration,
             "oura_daily_{$kind}",
             $options['title'] ?? Str::title($kind),
-            ($options['title'] ?? Str::title($kind)) . ' daily summary'
+            ($options['title'] ?? Str::title($kind)).' daily summary'
         );
 
         $scoreField = $options['score_field'] ?? 'score';
@@ -1397,7 +1397,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $day . ' 00:00:00',
+            'time' => $day.' 00:00:00',
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -1462,7 +1462,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $start = Arr::get($item, 'start_datetime');
         $end = Arr::get($item, 'end_datetime');
         $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
-        $sourceId = "oura_workout_{$integration->id}_" . (Arr::get($item, 'id') ?? ($day . '_' . md5(json_encode($item))));
+        $sourceId = "oura_workout_{$integration->id}_".(Arr::get($item, 'id') ?? ($day.'_'.md5(json_encode($item))));
         $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
         if ($exists) {
             return;
@@ -1477,9 +1477,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'user_id' => $integration->user_id,
             'concept' => 'workout',
             'type' => $activityType,
-            'title' => Str::title((string) $activityType) . ' (' . substr($workoutId, 0, 8) . ')',
+            'title' => Str::title((string) $activityType).' ('.substr($workoutId, 0, 8).')',
         ], [
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'content' => 'Oura workout session',
             'metadata' => [],
         ]);
@@ -1488,7 +1488,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $calories = (float) Arr::get($item, 'calories', Arr::get($item, 'total_calories', 0));
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -1649,9 +1649,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+        $desc = 'GET '.$this->baseUrl.$endpoint.(! empty($query) ? '?'.http_build_query($query) : '');
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
+        $response = Http::withToken($token)->get($this->baseUrl.$endpoint, $query);
         $span?->finish();
 
         // Log the API response
@@ -1742,7 +1742,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 // Merge unique by timestamp and source
                 $byKey = [];
                 foreach (array_merge($items, $sweepItems) as $row) {
-                    $key = ($row['timestamp'] ?? '') . '|' . ($row['source'] ?? '');
+                    $key = ($row['timestamp'] ?? '').'|'.($row['source'] ?? '');
                     if ($key !== '|') {
                         $byKey[$key] = $row;
                     }
@@ -2318,7 +2318,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             $efficiency = Arr::get($item, 'efficiency');
             $event = Event::create([
                 'source_id' => $sourceId,
-                'time' => $start ?? ($day . ' 00:00:00'),
+                'time' => $start ?? ($day.' 00:00:00'),
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'service' => 'oura',
@@ -2572,7 +2572,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             [$encodedAvg, $avgMultiplier] = $this->encodeNumericValue($avg);
             $event = Event::create([
                 'source_id' => $sourceId,
-                'time' => $day . ' 00:00:00',
+                'time' => $day.' 00:00:00',
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'service' => 'oura',
@@ -2629,7 +2629,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     {
         $start = Arr::get($item, 'start_datetime') ?? Arr::get($item, 'timestamp');
         $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
-        $sourceId = "oura_session_{$integration->id}_" . (Arr::get($item, 'id') ?? ($day . '_' . md5(json_encode($item))));
+        $sourceId = "oura_session_{$integration->id}_".(Arr::get($item, 'id') ?? ($day.'_'.md5(json_encode($item))));
         $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
         if ($exists) {
             return;
@@ -2644,9 +2644,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'user_id' => $integration->user_id,
             'concept' => 'mindfulness_session',
             'type' => $sessionType,
-            'title' => Str::title((string) $sessionType) . ' (' . substr($sessionId, 0, 8) . ')',
+            'title' => Str::title((string) $sessionType).' ('.substr($sessionId, 0, 8).')',
         ], [
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'content' => 'Oura guided or unguided session',
             'metadata' => [],
         ]);
@@ -2654,7 +2654,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $durationSec = (int) Arr::get($item, 'duration', 0);
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -2685,7 +2685,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
     {
         $timestamp = Arr::get($item, 'timestamp') ?? Arr::get($item, 'time') ?? now()->toIso8601String();
         $day = Str::substr($timestamp, 0, 10);
-        $sourceId = "oura_tag_{$integration->id}_" . md5(json_encode($item));
+        $sourceId = "oura_tag_{$integration->id}_".md5(json_encode($item));
         $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
         if ($exists) {
             return;
@@ -2733,9 +2733,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
      */
     protected function getLogChannel(): string
     {
-        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
+        $pluginChannel = 'api_debug_'.str_replace([' ', '-', '_'], '_', static::getIdentifier());
 
-        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
+        return config('logging.channels.'.$pluginChannel) ? $pluginChannel : 'api_debug';
     }
 
     /**
@@ -2802,7 +2802,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         // Limit response body size to prevent huge logs
         $maxLength = 10000;
         if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
+            return substr($body, 0, $maxLength).'... [TRUNCATED]';
         }
 
         // Try to parse as JSON and sanitize sensitive fields
@@ -2851,7 +2851,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
             Event::create([
                 'source_id' => $sourceId,
-                'time' => $day . ' 00:00:00',
+                'time' => $day.' 00:00:00',
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'service' => 'oura',
@@ -2902,7 +2902,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
             Event::create([
                 'source_id' => $sourceId,
-                'time' => $item['timestamp'] ?? ($day . ' 00:00:00'),
+                'time' => $item['timestamp'] ?? ($day.' 00:00:00'),
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'service' => 'oura',
@@ -2990,14 +2990,14 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'type' => 'enhanced_tag',
             'title' => $customName ?: "Enhanced Tag ({$tagType})",
         ], [
-            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'time' => $startDay.' '.($item['start_time'] ?? '00:00:00'),
             'content' => $item['comment'] ?: 'Enhanced tag with detailed metadata',
             'metadata' => [],
         ]);
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'time' => $startDay.' '.($item['start_time'] ?? '00:00:00'),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -3065,7 +3065,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $day . ' 00:00:00',
+            'time' => $day.' 00:00:00',
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -3122,16 +3122,16 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'user_id' => $integration->user_id,
             'concept' => 'rest_period',
             'type' => 'rest_period',
-            'title' => 'Rest Mode Period (' . substr($periodId, 0, 8) . ')',
+            'title' => 'Rest Mode Period ('.substr($periodId, 0, 8).')',
         ], [
-            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'time' => $startDay.' '.($item['start_time'] ?? '00:00:00'),
             'content' => 'Rest mode period with episodes',
             'metadata' => [],
         ]);
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $startDay . ' ' . ($item['start_time'] ?? '00:00:00'),
+            'time' => $startDay.' '.($item['start_time'] ?? '00:00:00'),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -3202,7 +3202,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
             'action' => $action,
             'actor_id' => $actor->id,
             'target_id' => $target->id,
-            'time' => $day . ' 12:00:00',
+            'time' => $day.' 12:00:00',
             'value' => $encodedValue,
             'value_multiplier' => $multiplier,
             'service' => 'oura',
@@ -3243,7 +3243,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         $efficiency = Arr::get($item, 'efficiency');
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $start ?? ($day . ' 00:00:00'),
+            'time' => $start ?? ($day.' 00:00:00'),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -3311,8 +3311,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         try {
-            $start = Carbon::parse($startDay . ' ' . ($startTime ?? '00:00:00'));
-            $end = Carbon::parse($endDay . ' ' . $endTime);
+            $start = Carbon::parse($startDay.' '.($startTime ?? '00:00:00'));
+            $end = Carbon::parse($endDay.' '.$endTime);
 
             return $end->diffInSeconds($start);
         } catch (Exception $e) {

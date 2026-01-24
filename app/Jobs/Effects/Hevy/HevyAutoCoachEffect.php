@@ -8,7 +8,7 @@ class HevyAutoCoachEffect extends BaseEffectJob
 {
     public function uniqueId(): string
     {
-        return 'hevy_auto_coach_' . $this->integration->id . '_' . now()->toDateString();
+        return 'hevy_auto_coach_'.$this->integration->id.'_'.now()->toDateString();
     }
 
     protected function execute(): array
@@ -27,7 +27,7 @@ class HevyAutoCoachEffect extends BaseEffectJob
 
         return [
             'success' => $updateResult['success'],
-            'message' => 'Auto-coach completed: ' . $updateResult['message'],
+            'message' => 'Auto-coach completed: '.$updateResult['message'],
             'data' => [
                 'analysis' => $analyzeResult['data'],
                 'update' => $updateResult['data'],

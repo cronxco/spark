@@ -406,7 +406,7 @@ class ArticleImageExtractor
         if (str_starts_with($url, '//')) {
             $scheme = parse_url($baseUrl, PHP_URL_SCHEME) ?? 'https';
 
-            return $scheme . ':' . $url;
+            return $scheme.':'.$url;
         }
 
         // Parse the base URL

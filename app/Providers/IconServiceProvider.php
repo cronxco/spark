@@ -25,7 +25,7 @@ class IconServiceProvider extends ServiceProvider
         // This ensures we override blade-icons' directive registration
         $this->app->booted(function () {
             Blade::directive('svg', function ($expression) {
-                return "<?php echo app('" . static::class . "')->renderSvg({$expression}); ?>";
+                return "<?php echo app('".static::class."')->renderSvg({$expression}); ?>";
             });
         });
     }
@@ -48,13 +48,13 @@ class IconServiceProvider extends ServiceProvider
         // e.g., fas.bars -> fas-bars (required by blade-fontawesome)
         if (str_contains($name, '.') && preg_match('/^fa[srbldt]\./', $name)) {
             $parts = explode('.', $name, 2);
-            $name = $parts[0] . '-' . $parts[1];
+            $name = $parts[0].'-'.$parts[1];
         }
 
         // Handle bare names (no prefix) - add default prefix based on library
         if (! preg_match('/^(fa[srbldt][\.-]|[os]-)/', $name)) {
             $defaultLibrary = config('icons.default_library', 'fontawesome');
-            $name = $defaultLibrary === 'fontawesome' ? 'fas-' . $name : 'o-' . $name;
+            $name = $defaultLibrary === 'fontawesome' ? 'fas-'.$name : 'o-'.$name;
         }
 
         // Check if this is a FontAwesome icon
@@ -62,9 +62,9 @@ class IconServiceProvider extends ServiceProvider
             // Render FontAwesome icons using Blade component syntax
             // This bypasses blade-icons factory and uses blade-fontawesome components directly
             // e.g., fas-bars becomes <x-fas-bars class="..." />
-            $classAttr = $class ? ' class="' . e($class) . '"' : '';
+            $classAttr = $class ? ' class="'.e($class).'"' : '';
 
-            return Blade::render('<x-' . $name . $classAttr . ' />');
+            return Blade::render('<x-'.$name.$classAttr.' />');
         }
 
         // For heroicons and other icons, use the default blade-icons factory

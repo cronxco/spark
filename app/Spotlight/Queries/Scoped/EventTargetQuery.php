@@ -27,7 +27,7 @@ class EventTargetQuery
             return collect([
                 SpotlightResult::make()
                     ->setTitle($event->target->title ?? 'Untitled Target')
-                    ->setSubtitle('Target Object' . ($event->target->concept ? ' • ' . ucfirst($event->target->concept) : ''))
+                    ->setSubtitle('Target Object'.($event->target->concept ? ' • '.ucfirst($event->target->concept) : ''))
                     ->setIcon('flag')
                     ->setGroup('objects')
                     ->setPriority(1)

@@ -69,7 +69,7 @@ class IntegrationFailed extends SparkNotification
         if ($this->details) {
             $mail->line('Additional Details:');
             foreach ($this->details as $key => $value) {
-                $mail->line(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value);
+                $mail->line(ucfirst(str_replace('_', ' ', $key)).': '.$value);
             }
         }
 

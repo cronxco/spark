@@ -9,7 +9,7 @@ class ImmichUrlBuilder
      */
     public function getAssetUrl(string $serverUrl, string $assetId): string
     {
-        return rtrim($serverUrl, '/') . "/photos/{$assetId}";
+        return rtrim($serverUrl, '/')."/photos/{$assetId}";
     }
 
     /**
@@ -18,7 +18,7 @@ class ImmichUrlBuilder
      */
     public function getThumbnailUrl(string $serverUrl, string $assetId, string $size = 'preview'): string
     {
-        return rtrim($serverUrl, '/') . "/api/asset/thumbnail/{$assetId}?size={$size}";
+        return rtrim($serverUrl, '/')."/api/asset/thumbnail/{$assetId}?size={$size}";
     }
 
     /**
@@ -26,7 +26,7 @@ class ImmichUrlBuilder
      */
     public function getPersonUrl(string $serverUrl, string $personId): string
     {
-        return rtrim($serverUrl, '/') . "/people/{$personId}";
+        return rtrim($serverUrl, '/')."/people/{$personId}";
     }
 
     /**
@@ -34,7 +34,7 @@ class ImmichUrlBuilder
      */
     public function getPersonThumbnailUrl(string $serverUrl, string $personId): string
     {
-        return rtrim($serverUrl, '/') . "/api/people/{$personId}/thumbnail";
+        return rtrim($serverUrl, '/')."/api/people/{$personId}/thumbnail";
     }
 
     /**
@@ -42,6 +42,6 @@ class ImmichUrlBuilder
      */
     public function getAlbumUrl(string $serverUrl, string $albumId): string
     {
-        return rtrim($serverUrl, '/') . "/albums/{$albumId}";
+        return rtrim($serverUrl, '/')."/albums/{$albumId}";
     }
 }

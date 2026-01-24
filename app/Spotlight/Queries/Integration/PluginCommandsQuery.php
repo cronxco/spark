@@ -33,7 +33,7 @@ class PluginCommandsQuery
                     return SpotlightResult::make()
                         ->setTitle($command['title'])
                         ->setSubtitle($command['subtitle'] ?? '')
-                        ->setTypeahead('Command: ' . $command['title'])
+                        ->setTypeahead('Command: '.$command['title'])
                         ->setIcon(normalize_icon_for_spotlight($command['icon'] ?? 'puzzle-piece'))
                         ->setGroup('integrations')
                         ->setPriority($command['priority'] ?? 1)

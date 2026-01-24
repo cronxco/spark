@@ -215,7 +215,7 @@ PROMPT;
     {
         $title = strtolower($insight['title'] ?? '');
         $description = strtolower($insight['description'] ?? '');
-        $combined = $title . ' ' . $description;
+        $combined = $title.' '.$description;
 
         // Patterns that indicate behavioral counting rather than content analysis
         $metaAnalysisPatterns = [
@@ -515,7 +515,7 @@ SYSTEM;
             return 'No recent activity in this domain.';
         }
 
-        $lines = ['Found ' . count($events) . " events in the last analysis window:\n"];
+        $lines = ['Found '.count($events)." events in the last analysis window:\n"];
 
         // Group events by service and action
         $grouped = [];
@@ -562,7 +562,7 @@ SYSTEM;
                     $parts[] = "Value: {$example['value']} {$example['value_unit']}";
                 }
                 if (! empty($parts)) {
-                    $lines[] = '  - ' . implode(', ', $parts);
+                    $lines[] = '  - '.implode(', ', $parts);
                 }
             }
 
@@ -584,7 +584,7 @@ SYSTEM;
         $lines = ["## Learning from Past Insights\n"];
 
         if (! empty($learning['successful_insights'])) {
-            $lines[] = '**Successful insight patterns:** ' . count($learning['successful_insights']) . ' recorded';
+            $lines[] = '**Successful insight patterns:** '.count($learning['successful_insights']).' recorded';
             $lines[] = "Focus on similar types of insights that worked well before.\n";
         }
 

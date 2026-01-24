@@ -102,9 +102,9 @@ class RecentlyViewed extends Component
         $model = $item->model;
 
         return match ($item->type) {
-            Event::class => format_action_title($model->action) .
+            Event::class => format_action_title($model->action).
                 (should_display_action_with_object($model->action, $model->service)
-                    ? ' ' . ($model->target?->title ?? $model->actor?->title ?? '')
+                    ? ' '.($model->target?->title ?? $model->actor?->title ?? '')
                     : ''),
             EventObject::class => $model->title ?? 'Untitled Object',
             Block::class => $model->title ?? $model->block_type ?? 'Untitled Block',
@@ -120,10 +120,10 @@ class RecentlyViewed extends Component
         $model = $item->model;
 
         return match ($item->type) {
-            Event::class => ($model->service ? ucfirst($model->service) : '') .
-                ($model->domain ? ' / ' . ucfirst($model->domain) : ''),
-            EventObject::class => ucfirst($model->concept ?? '') .
-                ($model->type ? ' / ' . ucfirst($model->type) : ''),
+            Event::class => ($model->service ? ucfirst($model->service) : '').
+                ($model->domain ? ' / '.ucfirst($model->domain) : ''),
+            EventObject::class => ucfirst($model->concept ?? '').
+                ($model->type ? ' / '.ucfirst($model->type) : ''),
             Block::class => $model->block_type ?? '',
             default => '',
         };

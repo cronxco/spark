@@ -109,7 +109,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
         // Conditionally dispatch beer detail job OR create beer block immediately
         if ($details['beer_url'] && $event->target) {
             if ($this->shouldFetchBeerDetails($event->target)) {
-                $fullBeerUrl = 'https://untappd.com' . $details['beer_url'];
+                $fullBeerUrl = 'https://untappd.com'.$details['beer_url'];
 
                 logger()->info('Dispatching beer detail job', [
                     'beer_id' => $event->target->id,
@@ -146,7 +146,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
             $breweryId = $this->getOrCreateBreweryObject($details['brewery_name'], $details['brewery_url']);
 
             if ($breweryId && $this->shouldFetchBreweryDetails($breweryId)) {
-                $fullBreweryUrl = 'https://untappd.com' . $details['brewery_url'];
+                $fullBreweryUrl = 'https://untappd.com'.$details['brewery_url'];
 
                 logger()->info('Dispatching brewery detail job', [
                     'brewery_id' => $breweryId,
@@ -400,7 +400,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
             ],
             [
                 'time' => now(),
-                'url' => 'https://untappd.com' . $breweryUrl,
+                'url' => 'https://untappd.com'.$breweryUrl,
                 'metadata' => [
                     'created_from_checkin' => true,
                 ],

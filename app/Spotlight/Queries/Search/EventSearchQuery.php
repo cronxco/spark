@@ -92,7 +92,7 @@ class EventSearchQuery
                     return SpotlightResult::make()
                         ->setTitle(format_action_title($event->action))
                         ->setSubtitle($subtitle)
-                        ->setTypeahead('Event: ' . $event->action . ' at ' . $event->time->format('M j, g:ia'))
+                        ->setTypeahead('Event: '.$event->action.' at '.$event->time->format('M j, g:ia'))
                         ->setIcon($actionIcon)
                         ->setGroup('events')
                         ->setPriority($priority)

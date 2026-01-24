@@ -38,7 +38,7 @@ class OutlineData extends BaseProcessingJob
                 'time' => $collection['createdAt'] ?? now()->toISOString(),
                 'content' => $collection['description'] ?? null,
                 'metadata' => $collection,
-                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/') . ($collection['url'] ?? ''),
+                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/').($collection['url'] ?? ''),
                 'image_url' => null,
             ];
 
@@ -60,7 +60,7 @@ class OutlineData extends BaseProcessingJob
                 'time' => $doc['createdAt'] ?? now()->toISOString(),
                 'content' => $doc['text'] ?? null,
                 'metadata' => $doc,
-                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/') . ($doc['url'] ?? ''),
+                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/').($doc['url'] ?? ''),
                 'image_url' => null,
             ]);
 
@@ -81,7 +81,7 @@ class OutlineData extends BaseProcessingJob
             ]);
 
             // Event
-            $sourceId = 'outline_doc_' . ($doc['id'] ?? 'unknown');
+            $sourceId = 'outline_doc_'.($doc['id'] ?? 'unknown');
             $time = $isDayNote
                 ? CarbonImmutable::createFromFormat('Y-m-d: l', (string) $doc['title'], 'UTC')->startOfDay()->toIso8601String()
                 : ($doc['createdAt'] ?? now()->toISOString());
@@ -166,7 +166,7 @@ class OutlineData extends BaseProcessingJob
             if (preg_match('/^\s*- \[( |x|X)\] (.*)$/', $line, $m)) {
                 $checked = strtolower(trim($m[1])) === 'x';
                 $taskText = trim($m[2]);
-                $hash = hash('sha256', ($doc['id'] ?? '') . '|' . ($index + 1) . '|' . strtolower($taskText));
+                $hash = hash('sha256', ($doc['id'] ?? '').'|'.($index + 1).'|'.strtolower($taskText));
 
                 $blocks[] = [
                     'block_type' => $isDayNote ? 'day_task' : 'doc_task',

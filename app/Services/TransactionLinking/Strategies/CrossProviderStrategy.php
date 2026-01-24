@@ -160,8 +160,8 @@ class CrossProviderStrategy implements LinkingStrategy
             })
             ->where(function ($q) use ($cardId) {
                 // Match on masked PAN in metadata
-                $q->whereRaw("metadata->>'account_number' LIKE ?", ['%' . $cardId])
-                    ->orWhereRaw("metadata->'raw'->>'maskedPan' LIKE ?", ['%' . $cardId]);
+                $q->whereRaw("metadata->>'account_number' LIKE ?", ['%'.$cardId])
+                    ->orWhereRaw("metadata->'raw'->>'maskedPan' LIKE ?", ['%'.$cardId]);
             })
             ->get();
     }

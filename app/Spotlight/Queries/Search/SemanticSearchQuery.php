@@ -109,9 +109,9 @@ class SemanticSearchQuery
 
                     $results->push(
                         SpotlightResult::make()
-                            ->setTitle('🔍 ' . format_action_title($event->action))
+                            ->setTitle('🔍 '.format_action_title($event->action))
                             ->setSubtitle($subtitle)
-                            ->setTypeahead('Semantic: ' . $event->action . ' at ' . $event->time->format('M j, g:ia'))
+                            ->setTypeahead('Semantic: '.$event->action.' at '.$event->time->format('M j, g:ia'))
                             ->setIcon('magnifying-glass')
                             ->setGroup('events')
                             ->setPriority(10) // Lower priority than exact matches
@@ -156,9 +156,9 @@ class SemanticSearchQuery
 
                     $results->push(
                         SpotlightResult::make()
-                            ->setTitle('🔍 ' . $title)
+                            ->setTitle('🔍 '.$title)
                             ->setSubtitle($subtitle)
-                            ->setTypeahead('Semantic: ' . $title)
+                            ->setTypeahead('Semantic: '.$title)
                             ->setIcon('document-text')
                             ->setGroup('blocks')
                             ->setPriority(11) // Slightly lower priority than events
@@ -194,9 +194,9 @@ class SemanticSearchQuery
 
                     $results->push(
                         SpotlightResult::make()
-                            ->setTitle('🔍 ' . ($object->title ?? 'Untitled'))
+                            ->setTitle('🔍 '.($object->title ?? 'Untitled'))
                             ->setSubtitle($subtitle)
-                            ->setTypeahead('Semantic: ' . ($object->title ?? 'Object'))
+                            ->setTypeahead('Semantic: '.($object->title ?? 'Object'))
                             ->setIcon('cube')
                             ->setGroup('objects')
                             ->setPriority(12) // Slightly lower priority than blocks

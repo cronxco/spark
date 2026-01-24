@@ -104,7 +104,7 @@ class OuraHeartrateData extends BaseProcessingJob
 
         [$encMin, $minMult] = $plugin->encodeNumericValue($min);
         $blocksData[] = [
-            'time' => $day . ' 00:00:00',
+            'time' => $day.' 00:00:00',
             'title' => 'Min Heart Rate',
             'block_type' => 'heart_rate',
             'metadata' => ['type' => 'minimum', 'context' => 'daily_series'],
@@ -115,7 +115,7 @@ class OuraHeartrateData extends BaseProcessingJob
 
         [$encMax, $maxMult] = $plugin->encodeNumericValue($max);
         $blocksData[] = [
-            'time' => $day . ' 00:00:00',
+            'time' => $day.' 00:00:00',
             'title' => 'Max Heart Rate',
             'block_type' => 'heart_rate',
             'metadata' => ['type' => 'maximum', 'context' => 'daily_series'],
@@ -125,7 +125,7 @@ class OuraHeartrateData extends BaseProcessingJob
         ];
 
         $blocksData[] = [
-            'time' => $day . ' 00:00:00',
+            'time' => $day.' 00:00:00',
             'title' => 'Data Points',
             'block_type' => 'heart_rate',
             'metadata' => ['type' => 'count', 'context' => 'daily_series'],
@@ -136,7 +136,7 @@ class OuraHeartrateData extends BaseProcessingJob
 
         return [
             'source_id' => $sourceId,
-            'time' => $day . ' 00:00:00',
+            'time' => $day.' 00:00:00',
             'actor' => $actor,
             'target' => $target,
             'domain' => 'health',

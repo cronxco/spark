@@ -27,7 +27,7 @@ class EventIntegrationQuery
             return collect([
                 SpotlightResult::make()
                     ->setTitle($event->integration->name)
-                    ->setSubtitle('Source Integration • ' . ($event->service ? ucfirst($event->service) : 'Unknown Service'))
+                    ->setSubtitle('Source Integration • '.($event->service ? ucfirst($event->service) : 'Unknown Service'))
                     ->setIcon('link')
                     ->setGroup('integrations')
                     ->setPriority(1)

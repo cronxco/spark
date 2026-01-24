@@ -40,7 +40,7 @@ abstract class BaseEffectJob implements ShouldQueue
     {
         $hub = SentrySdk::getCurrentHub();
         $txContext = new TransactionContext;
-        $txContext->setName('job.effect:' . $this->integration->service . ':' . $this->getEffectType());
+        $txContext->setName('job.effect:'.$this->integration->service.':'.$this->getEffectType());
         $txContext->setOp('job');
         $transaction = $hub->startTransaction($txContext);
         $hub->setSpan($transaction);
