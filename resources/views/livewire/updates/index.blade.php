@@ -3,13 +3,14 @@ use App\Jobs\ProcessIntegrationData;
 use App\Jobs\RunIntegrationTask;
 use App\Models\ActionProgress;
 use App\Models\Integration;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
-use Carbon\Carbon;
 
 new class extends Component {
     use Toast;
@@ -48,7 +49,7 @@ new class extends Component {
         /** @var User $user */
         $user = Auth::user();
         $query = $user->integrations()
-            ->with('user')
+            ->with('user', 'group')
             ->orderBy('last_successful_update_at', 'asc')
             ->orderBy('created_at', 'asc')
             ;
@@ -73,7 +74,23 @@ new class extends Component {
 
         $userIntegrations = $query->get();
 
-        $integrationsData = $userIntegrations->map(function ($integration) {
+        // Batch load last event times for webhook/manual integrations to avoid N+1
+        $webhookManualIntegrationIds = $userIntegrations->filter(function ($integration) {
+            $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration->service);
+            return $pluginClass && in_array($pluginClass::getServiceType(), ['webhook', 'manual']);
+        })->pluck('id');
+
+        $lastEventTimes = [];
+        if ($webhookManualIntegrationIds->isNotEmpty()) {
+            $lastEventTimes = DB::table('dev_events')
+                ->select('integration_id', DB::raw('MAX(time) as last_time'))
+                ->whereIn('integration_id', $webhookManualIntegrationIds)
+                ->groupBy('integration_id')
+                ->pluck('last_time', 'integration_id')
+                ->toArray();
+        }
+
+        $integrationsData = $userIntegrations->map(function ($integration) use ($lastEventTimes) {
             $batchName = null;
             $batchProgress = null;
             $migrationPhase = null;
@@ -189,11 +206,11 @@ new class extends Component {
                 // leave sweep values null on error
             }
 
-            // Get last event time for webhook/manual integrations
+            // Get last event time for webhook/manual integrations from batched data
             $lastEventTime = null;
             $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration->service);
             if ($pluginClass && in_array($pluginClass::getServiceType(), ['webhook', 'manual'])) {
-                $lastEventTime = $integration->getLastEventTime();
+                $lastEventTime = isset($lastEventTimes[$integration->id]) ? Carbon::parse($lastEventTimes[$integration->id]) : null;
             }
 
             return [

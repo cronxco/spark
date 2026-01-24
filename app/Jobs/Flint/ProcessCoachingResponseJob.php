@@ -214,32 +214,40 @@ PROMPT;
 
         // If patterns span multiple domains, look for cross-domain connections
         if (count($patternDomains) > 1) {
-            foreach ($patternDomains as $domain) {
-                $crossDomainPatterns = $patternLearning->findCrossDomainPatterns(
-                    $this->user,
-                    $domain
-                );
+            // Query all cross-domain patterns at once instead of per domain
+            $crossDomainPatterns = EventObject::where('user_id', $this->user->id)
+                ->where('concept', 'flint')
+                ->where('type', 'learned_pattern')
+                ->whereNull('deleted_at')
+                ->whereRaw("jsonb_array_length((metadata::jsonb)->'domains') > 1")
+                ->where(function ($query) use ($patternDomains) {
+                    foreach ($patternDomains as $domain) {
+                        $query->orWhereRaw("(metadata::jsonb)->'domains' @> ?", [json_encode([$domain])]);
+                    }
+                })
+                ->where('time', '>=', now()->subDays(90))
+                ->orderByRaw("(metadata->>'confidence_score')::numeric DESC")
+                ->get();
 
-                if ($crossDomainPatterns->isNotEmpty()) {
-                    // Store cross-domain connections in the coaching session metadata
-                    $metadata = $this->coachingSession->metadata;
-                    $metadata['cross_domain_insights'] = $crossDomainPatterns
-                        ->map(fn ($pattern) => [
-                            'pattern_id' => $pattern->id,
-                            'title' => $pattern->title,
-                            'domains' => $pattern->metadata['domains'] ?? [],
-                            'confidence' => $pattern->metadata['confidence_score'] ?? 0.3,
-                        ])
-                        ->toArray();
+            if ($crossDomainPatterns->isNotEmpty()) {
+                // Store cross-domain connections in the coaching session metadata
+                $metadata = $this->coachingSession->metadata;
+                $metadata['cross_domain_insights'] = $crossDomainPatterns
+                    ->map(fn ($pattern) => [
+                        'pattern_id' => $pattern->id,
+                        'title' => $pattern->title,
+                        'domains' => $pattern->metadata['domains'] ?? [],
+                        'confidence' => $pattern->metadata['confidence_score'] ?? 0.3,
+                    ])
+                    ->toArray();
 
-                    $this->coachingSession->metadata = $metadata;
-                    $this->coachingSession->save();
+                $this->coachingSession->metadata = $metadata;
+                $this->coachingSession->save();
 
-                    Log::info('[Flint] [COACHING] Detected cross-domain connections', [
-                        'session_id' => $this->coachingSession->id,
-                        'connections' => count($crossDomainPatterns),
-                    ]);
-                }
+                Log::info('[Flint] [COACHING] Detected cross-domain connections', [
+                    'session_id' => $this->coachingSession->id,
+                    'connections' => count($crossDomainPatterns),
+                ]);
             }
         }
 
@@ -267,7 +275,7 @@ PROMPT;
 
         if ($anomalyId) {
             try {
-                $anomaly = MetricTrend::find($anomalyId);
+                $anomaly = MetricTrend::with('metricStatistic')->find($anomalyId);
                 if ($anomaly) {
                     $anomaly->acknowledge();
 
@@ -316,10 +324,35 @@ PROMPT;
         PatternLearningService $patternLearning,
         array $extractedPatterns
     ): void {
+        if (empty($extractedPatterns)) {
+            return;
+        }
+
         // Get the learned patterns that were just stored
         $learnedPatterns = $patternLearning->getLearnedPatterns($this->user, 0.3);
 
-        // For each new pattern, find and tag related events
+        // Get anomaly context once
+        $anomalyContext = $this->coachingSession->metadata['anomaly_context'] ?? [];
+        $service = $anomalyContext['service'] ?? null;
+        $action = $anomalyContext['action'] ?? null;
+
+        if (! $service || ! $action) {
+            return;
+        }
+
+        // Query events ONCE for all patterns (prevents N+1 queries)
+        $relatedEvents = Event::forUser($this->user->id)
+            ->where('service', $service)
+            ->where('action', $action)
+            ->where('time', '>=', now()->subDays(7))
+            ->limit(50)
+            ->get();
+
+        if ($relatedEvents->isEmpty()) {
+            return;
+        }
+
+        // For each new pattern, tag related events using the same event collection
         foreach ($extractedPatterns as $pattern) {
             $learnedPattern = $learnedPatterns->first(fn ($p) => $p->title === $pattern['title']);
 
@@ -327,26 +360,12 @@ PROMPT;
                 continue;
             }
 
-            // Find related events from the anomaly period
-            $anomalyContext = $this->coachingSession->metadata['anomaly_context'] ?? [];
-            $service = $anomalyContext['service'] ?? null;
-            $action = $anomalyContext['action'] ?? null;
-
-            if ($service && $action) {
-                $relatedEvents = Event::forUser($this->user->id)
-                    ->where('service', $service)
-                    ->where('action', $action)
-                    ->where('time', '>=', now()->subDays(7))
-                    ->limit(5)
-                    ->get();
-
-                foreach ($relatedEvents as $event) {
-                    $patternLearning->tagEventWithInsight(
-                        $event,
-                        $learnedPattern,
-                        $pattern['user_explanation']
-                    );
-                }
+            foreach ($relatedEvents->take(5) as $event) {
+                $patternLearning->tagEventWithInsight(
+                    $event,
+                    $learnedPattern,
+                    $pattern['user_explanation']
+                );
             }
         }
     }

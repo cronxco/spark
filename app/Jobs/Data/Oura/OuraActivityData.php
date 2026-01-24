@@ -46,8 +46,19 @@ class OuraActivityData extends BaseProcessingJob
             'activity_count' => count($activityItems),
         ]);
 
+        // Batch check existence to prevent N+1 queries
+        $sourceIds = collect($activityItems)
+            ->map(fn ($item) => $item['day'] ? "oura_activity_{$this->integration->id}_{$item['day']}" : null)
+            ->filter()
+            ->toArray();
+
+        $existingSourceIds = Event::where('integration_id', $this->integration->id)
+            ->whereIn('source_id', $sourceIds)
+            ->pluck('source_id')
+            ->flip(); // For O(1) lookup
+
         foreach ($activityItems as $item) {
-            $this->createEnhancedActivityEvent($plugin, $item);
+            $this->createEnhancedActivityEvent($plugin, $item, $existingSourceIds);
         }
 
         Log::info('OuraActivityData: Completed processing activity data', [
@@ -58,7 +69,7 @@ class OuraActivityData extends BaseProcessingJob
     /**
      * Create activity event with full API v2 field support
      */
-    private function createEnhancedActivityEvent(OuraPlugin $plugin, array $item): void
+    private function createEnhancedActivityEvent(OuraPlugin $plugin, array $item, \Illuminate\Support\Collection $existingSourceIds): void
     {
         $day = $item['day'] ?? null;
         if (! $day) {
@@ -66,10 +77,9 @@ class OuraActivityData extends BaseProcessingJob
         }
 
         $sourceId = "oura_activity_{$this->integration->id}_{$day}";
-        $exists = Event::where('source_id', $sourceId)
-            ->where('integration_id', $this->integration->id)
-            ->first();
-        if ($exists) {
+
+        // Check existence in memory (no query)
+        if ($existingSourceIds->has($sourceId)) {
             return;
         }
 

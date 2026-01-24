@@ -9,6 +9,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
@@ -670,6 +671,57 @@ class Event extends Model
             'location && ST_MakeEnvelope(?, ?, ?, ?, 4326)',
             [$west, $south, $east, $north]
         );
+    }
+
+    /**
+     * Create or update multiple blocks efficiently using batch operations.
+     * Prevents N+1 queries by pre-loading existing blocks.
+     */
+    public function createBlocksInBatch(array $blocksData): Collection
+    {
+        if (empty($blocksData)) {
+            return collect();
+        }
+
+        // Step 1: Pre-load ALL existing blocks for this event (1 query)
+        $existingBlocks = $this->blocks()
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy(fn ($block) => $block->title . '::' . ($block->block_type ?? 'null'));
+
+        $blocksToUpdate = [];
+        $blocksToCreate = [];
+        $resultBlocks = collect();
+
+        foreach ($blocksData as $blockData) {
+            $key = $blockData['title'] . '::' . ($blockData['block_type'] ?? 'null');
+
+            if ($existingBlocks->has($key)) {
+                // Update existing block
+                $existingBlock = $existingBlocks->get($key);
+                $existingBlock->fill($blockData);
+                $blocksToUpdate[] = $existingBlock;
+                $resultBlocks->push($existingBlock);
+            } else {
+                // Prepare for creation
+                $blockData['event_id'] = $this->id;
+                $blockData['time'] = $blockData['time'] ?? $this->time;
+                $blocksToCreate[] = $blockData;
+            }
+        }
+
+        // Batch update
+        foreach ($blocksToUpdate as $block) {
+            $block->save();
+        }
+
+        // Batch create
+        foreach ($blocksToCreate as $blockData) {
+            $block = Block::create($blockData);
+            $resultBlocks->push($block);
+        }
+
+        return $resultBlocks;
     }
 
     /**
