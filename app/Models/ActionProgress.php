@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property string $action_type
  * @property string $action_id
- * @property string|null $step
+ * @property string $step
  * @property string $message
  * @property int $progress
  * @property int $total
@@ -54,6 +54,10 @@ class ActionProgress extends Model
         'completed_at',
         'failed_at',
         'error_message',
+    ];
+
+    protected $attributes = [
+        'step' => 'in_progress',
     ];
 
     protected $casts = [

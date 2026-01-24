@@ -301,7 +301,7 @@ new class extends Component {
 };
 ?>
 
-<div @if($this->hasActiveProgress()) wire:poll.5s @elseif($this->hasUnreadNotifications()) wire:poll.30s @endif>
+<div @if ($this->hasActiveProgress()) wire:poll.5s @elseif ($this->hasUnreadNotifications()) wire:poll.30s @endif>
     <x-header title="Notifications" subtitle="View and manage all your notifications and activities" separator>
         <x-slot:actions>
             <button wire:click="markAllAsRead" class="btn btn-ghost btn-sm">
@@ -499,7 +499,7 @@ new class extends Component {
                 $actionUrl = $data['action_url'] ?? null;
                 @endphp
 
-                <div class="card bg-base-100 border border-{{ $color }}/20 @if($notification->read_at) opacity-60 @endif">
+                <div class="card bg-base-100 border border-{{ $color }}/20 @if ($notification->read_at) opacity-60 @endif">
                     <div class="card-body p-4">
                         <div class="flex items-start gap-3">
                             <x-icon :name="$iconName" class="w-5 h-5 mt-0.5 text-{{ $color }}" />
@@ -662,17 +662,17 @@ new class extends Component {
         <div class="flex gap-2">
             <button
                 wire:click="previousPage"
-                @if($page <= 1) disabled @endif
+                @if ($page <= 1) disabled @endif
                 class="btn btn-sm"
-                @if($page <= 1) disabled @endif>
+                @if ($page <= 1) disabled @endif>
                 <x-icon name="fas.chevron-left" class="w-3 h-3" />
                 Previous
             </button>
             <button
                 wire:click="nextPage"
-                @if(!$feed['hasMore']) disabled @endif
+                @if (!$feed['hasMore']) disabled @endif
                 class="btn btn-sm"
-                @if(!$feed['hasMore']) disabled @endif>
+                @if (!$feed['hasMore']) disabled @endif>
                 Next
                 <x-icon name="fas.chevron-right" class="w-3 h-3" />
             </button>
