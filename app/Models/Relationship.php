@@ -48,6 +48,7 @@ class Relationship extends Model
     /**
      * Create a relationship, handling bi-directional types intelligently.
      * For bi-directional types, prevents creating duplicate reverse relationships.
+     * For directional types, prevents creating exact duplicates.
      */
     public static function createRelationship(array $attributes): self
     {
@@ -79,7 +80,18 @@ class Relationship extends Model
             }
         }
 
-        return self::create($attributes);
+        // For directional relationships, use firstOrCreate to prevent exact duplicates
+        return self::firstOrCreate(
+            [
+                'user_id' => $attributes['user_id'],
+                'from_type' => $attributes['from_type'],
+                'from_id' => $attributes['from_id'],
+                'to_type' => $attributes['to_type'],
+                'to_id' => $attributes['to_id'],
+                'type' => $type,
+            ],
+            $attributes
+        );
     }
 
     /**
