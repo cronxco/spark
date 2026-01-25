@@ -425,7 +425,7 @@ class SparkServerTest extends TestCase
         $response->assertOk();
         // Embeddings should not appear in the response
         $response->assertSee($object->id);
-        // The word "embeddings" should not appear as a JSON key in the response
+        $response->assertDontSee('"embeddings"');
     }
 
     #[Test]

@@ -61,12 +61,14 @@ class DayContextResource extends Resource implements HasUriTemplate
         $assistantIntegration = Integration::query()
             ->where('user_id', $user->id)
             ->where('service', 'flint')
+            ->where('instance_type', 'assistant')
             ->first();
 
         if (! $assistantIntegration) {
             $assistantIntegration = new Integration([
                 'user_id' => $user->id,
                 'service' => 'flint',
+                'instance_type' => 'assistant',
                 'name' => 'MCP Context',
                 'configuration' => [
                     'today_enabled' => true,

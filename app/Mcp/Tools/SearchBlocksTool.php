@@ -47,8 +47,8 @@ class SearchBlocksTool extends Tool
             return Response::error('Query parameter is required.');
         }
 
-        $semantic = $request->get('semantic', true);
-        $limit = min((int) $request->get('limit', 20), 50);
+        $semantic = $request->boolean('semantic', true);
+        $limit = max(1, min((int) $request->get('limit', 20), 50));
         $blockType = $request->get('block_type');
         $fromDate = $request->get('from_date');
         $toDate = $request->get('to_date');
@@ -126,7 +126,9 @@ class SearchBlocksTool extends Tool
 
             return Response::text(json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         } catch (Exception $e) {
-            return Response::error('Search failed: ' . $e->getMessage());
+            report($e);
+
+            return Response::error('Search failed. Please try again later.');
         }
     }
 

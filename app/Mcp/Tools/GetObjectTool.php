@@ -61,7 +61,8 @@ class GetObjectTool extends Tool
 
         // Include recent events if requested
         $includeEvents = $request->get('include_events', true);
-        $eventLimit = min((int) $request->get('event_limit', 10), 25);
+        $eventLimit = (int) $request->get('event_limit', 10);
+        $eventLimit = max(1, min($eventLimit, 25));
 
         if ($includeEvents) {
             // Get user's integration IDs
@@ -103,6 +104,8 @@ class GetObjectTool extends Tool
 
             'event_limit' => $schema->integer()
                 ->description('Maximum number of recent events to include (default: 10, max: 25).')
+                ->minimum(1)
+                ->maximum(25)
                 ->default(10),
         ];
     }

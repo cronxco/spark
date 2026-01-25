@@ -47,8 +47,8 @@ class SearchObjectsTool extends Tool
             return Response::error('Query parameter is required.');
         }
 
-        $semantic = $request->get('semantic', true);
-        $limit = min((int) $request->get('limit', 20), 50);
+        $semantic = $request->boolean('semantic', true);
+        $limit = max(1, min((int) $request->get('limit', 20), 50));
         $concept = $request->get('concept');
         $type = $request->get('type');
 
@@ -61,11 +61,11 @@ class SearchObjectsTool extends Tool
                 $filters = array_filter([
                     'concept' => $concept,
                     'type' => $type,
+                    'user_id' => $user->id,
                 ]);
 
                 // Perform hybrid search with semantic + filters
                 $objects = EventObject::hybridSearch($embedding, $filters, threshold: 1.2, limit: $limit)
-                    ->where('user_id', $user->id)
                     ->get();
             } else {
                 // Keyword search (basic LIKE search)
@@ -108,7 +108,9 @@ class SearchObjectsTool extends Tool
 
             return Response::text(json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         } catch (Exception $e) {
-            return Response::error('Search failed: ' . $e->getMessage());
+            report($e);
+
+            return Response::error('Search failed. Please try again later.');
         }
     }
 
