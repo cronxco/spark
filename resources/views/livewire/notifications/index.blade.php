@@ -241,7 +241,7 @@ new class extends Component {
                     <option value="month">Time: This Month</option>
                 </select>
 
-                @if($search || $typeFilter !== 'all' || $statusFilter !== 'all' || $timeRange !== 'all')
+                @if ($search || $typeFilter !== 'all' || $statusFilter !== 'all' || $timeRange !== 'all')
                     <button
                         wire:click="clearFilters"
                         class="px-4 py-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
@@ -268,9 +268,9 @@ new class extends Component {
         </div>
 
         {{-- Items List --}}
-        @if($this->items->count() > 0)
+        @if ($this->items->count() > 0)
             <div class="space-y-4">
-                @foreach($this->items as $item)
+                @foreach ($this->items as $item)
                     <div class="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
                         <div class="flex justify-between items-start">
                             <div class="flex-1">
@@ -278,12 +278,12 @@ new class extends Component {
                                     <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">
                                         {{ $item->title }}
                                     </h3>
-                                    @if($item->type === 'notification' && !$item->read_at)
+                                    @if ($item->type === 'notification' && !$item->read_at)
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                             Unread
                                         </span>
                                     @endif
-                                    @if($item->type === 'progress' && !$item->completed_at && !$item->failed_at)
+                                    @if ($item->type === 'progress' && !$item->completed_at && !$item->failed_at)
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                             Active
                                         </span>
@@ -292,7 +292,7 @@ new class extends Component {
                                 <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
                                     {{ $item->message }}
                                 </p>
-                                @if($item->type === 'progress' && isset($item->progress) && isset($item->total))
+                                @if ($item->type === 'progress' && isset($item->progress) && isset($item->total))
                                     <div class="mt-2">
                                         <div class="flex justify-between text-xs text-neutral-600 dark:text-neutral-400 mb-1">
                                             <span>Progress</span>
@@ -311,7 +311,7 @@ new class extends Component {
                                 </p>
                             </div>
                             <div class="flex gap-2 ml-4">
-                                @if($item->type === 'notification' && !$item->read_at)
+                                @if ($item->type === 'notification' && !$item->read_at)
                                     <button
                                         wire:click="markAsRead('{{ $item->id }}')"
                                         class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
@@ -319,7 +319,7 @@ new class extends Component {
                                         Mark Read
                                     </button>
                                 @endif
-                                @if($item->type === 'notification')
+                                @if ($item->type === 'notification')
                                     <button
                                         wire:click="deleteNotification('{{ $item->id }}')"
                                         class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
