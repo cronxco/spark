@@ -25,7 +25,7 @@ return new class extends Migration
         });
 
         // Get table name with prefix
-        $tableName = Schema::getConnection()->getTablePrefix().'geocoding_cache';
+        $tableName = Schema::getConnection()->getTablePrefix() . 'geocoding_cache';
 
         // Add geography column using raw SQL (PostGIS type)
         DB::statement("ALTER TABLE {$tableName} ADD COLUMN location GEOGRAPHY(POINT, 4326)");
@@ -37,7 +37,7 @@ return new class extends Migration
     public function down(): void
     {
         // Get table name with prefix
-        $tableName = Schema::getConnection()->getTablePrefix().'geocoding_cache';
+        $tableName = Schema::getConnection()->getTablePrefix() . 'geocoding_cache';
 
         // Drop spatial index
         DB::statement("DROP INDEX IF EXISTS {$tableName}_location_idx");

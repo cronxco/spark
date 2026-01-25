@@ -60,19 +60,19 @@ class RedditSavedData extends BaseProcessingJob
             if ($kind === 't3') {
                 $title = $data['title'] ?? 'Reddit Post';
             } else {
-                $title = $data['title'] ?? ('Comment on '.($data['link_title'] ?? 'Reddit'));
+                $title = $data['title'] ?? ('Comment on ' . ($data['link_title'] ?? 'Reddit'));
             }
 
             // Actor (reddit account)
             $actor = [
                 'concept' => 'user',
                 'type' => 'reddit_account',
-                'title' => ($me['subreddit']['display_name_prefixed'] ?? 'u/'.($me['name'] ?? 'me')),
+                'title' => ($me['subreddit']['display_name_prefixed'] ?? 'u/' . ($me['name'] ?? 'me')),
                 'content' => null,
                 'metadata' => [
                     'reddit_user_id' => $me['id'] ?? null,
                 ],
-                'url' => isset($me['name']) ? 'https://www.reddit.com/user/'.$me['name'] : null,
+                'url' => isset($me['name']) ? 'https://www.reddit.com/user/' . $me['name'] : null,
                 'image_url' => null,
                 'time' => now(),
             ];
@@ -90,7 +90,7 @@ class RedditSavedData extends BaseProcessingJob
                     'author' => $data['author'] ?? null,
                     'score' => $data['score'] ?? null,
                 ],
-                'url' => 'https://old.reddit.com'.($data['permalink'] ?? ''),
+                'url' => 'https://old.reddit.com' . ($data['permalink'] ?? ''),
                 'image_url' => $images[0] ?? null,
                 'time' => Carbon::createFromTimestamp($createdUtc),
             ];
@@ -146,7 +146,7 @@ class RedditSavedData extends BaseProcessingJob
                 'target' => $target,
                 'blocks' => $blocks,
                 'tags' => [
-                    'r/'.($data['subreddit'] ?? 'unknown'),
+                    'r/' . ($data['subreddit'] ?? 'unknown'),
                 ],
             ];
         }

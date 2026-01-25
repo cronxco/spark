@@ -27,7 +27,7 @@ class EventActorQuery
             return collect([
                 SpotlightResult::make()
                     ->setTitle($event->actor->title ?? 'Untitled Actor')
-                    ->setSubtitle('Actor Object'.($event->actor->concept ? ' • '.ucfirst($event->actor->concept) : ''))
+                    ->setSubtitle('Actor Object' . ($event->actor->concept ? ' • ' . ucfirst($event->actor->concept) : ''))
                     ->setIcon('user-circle')
                     ->setGroup('objects')
                     ->setPriority(1)

@@ -150,7 +150,7 @@ trait HasOuraBlocks
                     'block_type' => 'heart_rate',
                     'time' => $event->time,
                     'integration_id' => $event->integration_id,
-                    'title' => ucfirst($heartRateTypes[$type]).' Heart Rate',
+                    'title' => ucfirst($heartRateTypes[$type]) . ' Heart Rate',
                     'metadata' => [
                         'type' => $heartRateTypes[$type],
                         'context' => 'daily_summary',

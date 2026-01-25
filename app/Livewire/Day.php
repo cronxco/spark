@@ -373,7 +373,7 @@ class Day extends Component
         $currentHour = null;
 
         foreach ($this->events as $event) {
-            $key = $event->service.'::'.$event->action;
+            $key = $event->service . '::' . $event->action;
             $hour = to_user_timezone($event->time, auth()->user())->format('H');
 
             if ($currentKey !== $key || $currentHour !== $hour) {
@@ -383,7 +383,7 @@ class Day extends Component
                 $currentKey = $key;
                 $currentHour = $hour;
                 $current = [
-                    'key' => $key.'::h:'.($hour ?? '00').'::'.($event->id),
+                    'key' => $key . '::h:' . ($hour ?? '00') . '::' . ($event->id),
                     'service' => $event->service,
                     'action' => $event->action,
                     'hour' => $hour,
@@ -419,7 +419,7 @@ class Day extends Component
             $group['formatted_action'] = format_action_title($group['action']);
             $group['count'] = $count;
             $group['object_type_plural'] = $objectTypePlural;
-            $group['summary'] = $group['formatted_action'].' '.$count.' '.$objectTypePlural;
+            $group['summary'] = $group['formatted_action'] . ' ' . $count . ' ' . $objectTypePlural;
         }
 
         return $groups;
@@ -785,7 +785,7 @@ class Day extends Component
     {
         $pluginClass = PluginRegistry::getPlugin($service);
         if ($pluginClass) {
-            return 'text-'.($pluginClass::getAccentColor() ?: 'primary');
+            return 'text-' . ($pluginClass::getAccentColor() ?: 'primary');
         }
 
         return 'text-primary';
@@ -795,7 +795,7 @@ class Day extends Component
     {
         $pluginClass = PluginRegistry::getPlugin($service);
         if ($pluginClass) {
-            return 'badge-'.($pluginClass::getAccentColor() ?: 'primary');
+            return 'badge-' . ($pluginClass::getAccentColor() ?: 'primary');
         }
 
         return 'badge-primary';
@@ -879,7 +879,7 @@ class Day extends Component
             // Show milliseconds if under a second
             $ms = (int) round($seconds * 1000);
 
-            return $ms.'ms';
+            return $ms . 'ms';
         }
 
         $total = (int) round($seconds);
@@ -889,13 +889,13 @@ class Day extends Component
 
         $parts = [];
         if ($h > 0) {
-            $parts[] = $h.'h';
+            $parts[] = $h . 'h';
         }
         if ($m > 0 || $h > 0) {
-            $parts[] = $m.'m';
+            $parts[] = $m . 'm';
         }
         if ($h === 0) {
-            $parts[] = $s.'s';
+            $parts[] = $s . 's';
         }
 
         return implode('', $parts);

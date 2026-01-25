@@ -57,7 +57,7 @@ class DataExportReady extends SparkNotification
         if ($this->details) {
             $mail->line('Export Details:');
             foreach ($this->details as $key => $value) {
-                $mail->line(ucfirst(str_replace('_', ' ', $key)).': '.$value);
+                $mail->line(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value);
             }
         }
 

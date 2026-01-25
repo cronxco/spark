@@ -137,7 +137,7 @@ class GoodreadsShelfData extends BaseProcessingJob
             }
 
             // Build source ID
-            $sourceId = 'goodreads_'.$action.'_'.md5($guid);
+            $sourceId = 'goodreads_' . $action . '_' . md5($guid);
 
             // Build event - use stored start date if available
             $events[] = [

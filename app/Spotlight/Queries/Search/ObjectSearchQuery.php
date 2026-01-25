@@ -68,7 +68,7 @@ class ObjectSearchQuery
                     return SpotlightResult::make()
                         ->setTitle($object->title ?? 'Untitled')
                         ->setSubtitle($subtitle)
-                        ->setTypeahead('Object: '.($object->title ?? 'Untitled'))
+                        ->setTypeahead('Object: ' . ($object->title ?? 'Untitled'))
                         ->setIcon($objectIcon)
                         ->setGroup('objects')
                         ->setPriority($priority)

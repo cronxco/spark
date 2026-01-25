@@ -149,7 +149,7 @@ class GenerateArticlesWaitingJob implements ShouldQueue
         }
 
         $takeawaysText = ! empty($keyTakeaways)
-            ? "Key takeaways:\n".implode("\n", array_map(fn ($t) => "- {$t}", array_slice($keyTakeaways, 0, 3)))
+            ? "Key takeaways:\n" . implode("\n", array_map(fn ($t) => "- {$t}", array_slice($keyTakeaways, 0, 3)))
             : '';
 
         $prompt = <<<PROMPT
@@ -202,7 +202,7 @@ PROMPT;
 
             // Fallback to basic pitch
             return [
-                'pitch' => $summary ? mb_substr($summary, 0, 150).'...' : 'Read this saved article.',
+                'pitch' => $summary ? mb_substr($summary, 0, 150) . '...' : 'Read this saved article.',
                 'reading_time' => $this->estimateReadingTime($content),
                 'key_points' => array_slice($keyTakeaways, 0, 2),
             ];
@@ -251,6 +251,6 @@ PROMPT;
         $wordCount = str_word_count(strip_tags($content));
         $minutes = max(1, (int) ceil($wordCount / 200)); // 200 words per minute
 
-        return $minutes.' min';
+        return $minutes . ' min';
     }
 }

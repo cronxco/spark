@@ -85,6 +85,6 @@ class LinkTransactionsJob implements ShouldQueue
      */
     public function uniqueId(): string
     {
-        return 'link-transactions-'.$this->event->id;
+        return 'link-transactions-' . $this->event->id;
     }
 }

@@ -64,7 +64,7 @@ class SpotifyListeningPullTest extends TestCase
         $job = new SpotifyListeningPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('spotify_listening_'.$this->integration->id, $uniqueId);
+        $this->assertStringContainsString('spotify_listening_' . $this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

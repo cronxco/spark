@@ -44,7 +44,7 @@ class UntappdCheckinDetailPull extends BaseFetchJob
         $result = $client->fetch($this->checkinUrl, $this->integration->group);
 
         if (! $result['success']) {
-            throw new Exception('Playwright fetch failed: '.($result['error'] ?? 'Unknown error'));
+            throw new Exception('Playwright fetch failed: ' . ($result['error'] ?? 'Unknown error'));
         }
 
         return [

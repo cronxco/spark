@@ -119,7 +119,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
         $csrfToken = Str::random(32);
 
         // Store CSRF token in session for validation
-        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -139,7 +139,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
             'code_challenge_method' => 'S256',
         ];
 
-        return $this->baseUrl.'/oauth/authorize?'.http_build_query($params);
+        return $this->baseUrl . '/oauth/authorize?' . http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -177,8 +177,8 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
         // Exchange code for tokens with PKCE
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$this->baseUrl.'/oauth/token'));
-        $response = Http::post($this->baseUrl.'/oauth/token', [
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $this->baseUrl . '/oauth/token'));
+        $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'code' => $code,
@@ -261,8 +261,8 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$this->baseUrl.'/oauth/token'));
-        $response = Http::post($this->baseUrl.'/oauth/token', [
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $this->baseUrl . '/oauth/token'));
+        $response = Http::post($this->baseUrl . '/oauth/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'refresh_token' => $group->refresh_token,
@@ -341,16 +341,16 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.$endpoint));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . $endpoint));
         $response = Http::withToken($token)
-            ->get($this->baseUrl.$endpoint);
+            ->get($this->baseUrl . $endpoint);
         $span?->finish();
 
         // Log the API response
         $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful()) {
-            throw new Exception('API request failed: '.$response->body());
+            throw new Exception('API request failed: ' . $response->body());
         }
 
         return $response->json() ?? [];
@@ -382,7 +382,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
     protected function validateCsrfToken(string $token, IntegrationGroup $group): bool
     {
         // Get the session key for this group
-        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
 
         // Retrieve stored token from session
         $storedToken = Session::get($sessionKey);
@@ -407,9 +407,9 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
      */
     protected function getLogChannel(): string
     {
-        $pluginChannel = 'api_debug_'.str_replace([' ', '-', '_'], '_', static::getIdentifier());
+        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
 
-        return config('logging.channels.'.$pluginChannel) ? $pluginChannel : 'api_debug';
+        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
     }
 
     /**
@@ -476,7 +476,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
         // Limit response body size to prevent huge logs
         $maxLength = 10000;
         if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength).'... [TRUNCATED]';
+            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
         }
 
         // Try to parse as JSON and sanitize sensitive fields

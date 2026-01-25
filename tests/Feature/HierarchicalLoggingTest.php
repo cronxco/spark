@@ -44,7 +44,7 @@ class HierarchicalLoggingTest extends TestCase
         // Clean up any log files created during tests
         $logsPath = storage_path('logs');
         if (File::exists($logsPath)) {
-            $files = File::glob($logsPath.'/*_{'.now()->format('Y-m-d').'}.log');
+            $files = File::glob($logsPath . '/*_{' . now()->format('Y-m-d') . '}.log');
             foreach ($files as $file) {
                 File::delete($file);
             }

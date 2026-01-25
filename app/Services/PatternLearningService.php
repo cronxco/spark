@@ -28,7 +28,7 @@ class PatternLearningService
             'user_id' => $user->id,
             'concept' => 'flint',
             'type' => 'coaching_session',
-            'title' => 'Health Check-In: '.$metricStatistic->getDisplayName(),
+            'title' => 'Health Check-In: ' . $metricStatistic->getDisplayName(),
             'time' => now(),
             'metadata' => [
                 'status' => 'active',

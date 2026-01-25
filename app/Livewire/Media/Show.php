@@ -90,7 +90,7 @@ class Show extends Component
             $this->showEditModal = false;
             $this->dispatch('media-updated');
         } catch (Exception $e) {
-            $this->error('Failed to update media: '.$e->getMessage());
+            $this->error('Failed to update media: ' . $e->getMessage());
         }
     }
 
@@ -114,7 +114,7 @@ class Show extends Component
             $this->dispatch('media-deleted', mediaId: $mediaId);
             $this->redirect(route('media.index'), navigate: true);
         } catch (Exception $e) {
-            $this->error('Failed to delete media: '.$e->getMessage());
+            $this->error('Failed to delete media: ' . $e->getMessage());
         }
     }
 
@@ -126,7 +126,7 @@ class Show extends Component
 
             $this->success('Conversion regeneration queued. This may take a few moments.');
         } catch (Exception $e) {
-            $this->error('Failed to regenerate conversions: '.$e->getMessage());
+            $this->error('Failed to regenerate conversions: ' . $e->getMessage());
         }
     }
 

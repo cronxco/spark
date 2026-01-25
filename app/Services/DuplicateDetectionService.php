@@ -69,8 +69,8 @@ class DuplicateDetectionService
 
         // Build query to find pairs with high similarity
         // We use a self-join to find pairs and calculate similarity
-        $query = DB::table($table.' as t1')
-            ->join($table.' as t2', function ($join) {
+        $query = DB::table($table . ' as t1')
+            ->join($table . ' as t2', function ($join) {
                 $join->on('t1.id', '<', 't2.id') // Avoid duplicate pairs (a,b) and (b,a)
                     ->whereNotNull('t1.embeddings')
                     ->whereNotNull('t2.embeddings');

@@ -112,7 +112,7 @@ class LinkOysterJourneyEventsJob implements ShouldQueue
                 $touchedOutRawLower = strtolower($touchedOutRaw);
 
                 // Check if destination appears after "to" in the raw action
-                $hasDestinationInTouchIn = preg_match('/\bto\b.*'.preg_quote($destinationName, '/').'/i', $touchedInRawLower);
+                $hasDestinationInTouchIn = preg_match('/\bto\b.*' . preg_quote($destinationName, '/') . '/i', $touchedInRawLower);
                 $hasDestinationInTouchOut = str_contains($touchedOutRawLower, $destinationName);
 
                 if (! $hasDestinationInTouchIn && ! $hasDestinationInTouchOut) {
@@ -166,6 +166,6 @@ class LinkOysterJourneyEventsJob implements ShouldQueue
             ? md5(json_encode($this->statementPeriod))
             : 'all';
 
-        return 'link_oyster_journeys_'.$this->integration->id.'_'.$periodHash;
+        return 'link_oyster_journeys_' . $this->integration->id . '_' . $periodHash;
     }
 }

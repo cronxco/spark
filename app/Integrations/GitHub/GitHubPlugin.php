@@ -179,7 +179,7 @@ class GitHubPlugin extends OAuthPlugin
         $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
         $csrfToken = Str::random(32);
-        $sessionKey = 'oauth_csrf_'.session_id().'_'.$group->id;
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -200,7 +200,7 @@ class GitHubPlugin extends OAuthPlugin
         ];
 
         // GitHub authorization occurs on github.com, not api.github.com
-        return $this->authUrl.'/authorize?'.http_build_query($params);
+        return $this->authUrl . '/authorize?' . http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -213,7 +213,7 @@ class GitHubPlugin extends OAuthPlugin
                 'error' => $error,
                 'error_description' => $request->get('error_description'),
             ]);
-            throw new Exception('GitHub authorization failed: '.$error);
+            throw new Exception('GitHub authorization failed: ' . $error);
         }
 
         $code = $request->get('code');
@@ -269,10 +269,10 @@ class GitHubPlugin extends OAuthPlugin
         // Exchange code for token on github.com/login/oauth/access_token
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$this->authUrl.'/access_token'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $this->authUrl . '/access_token'));
         $response = Http::asForm()
             ->withHeaders(['Accept' => 'application/json'])
-            ->post($this->authUrl.'/access_token', [
+            ->post($this->authUrl . '/access_token', [
                 'client_id' => $this->clientId,
                 'client_secret' => $this->clientSecret,
                 'code' => $code,
@@ -290,7 +290,7 @@ class GitHubPlugin extends OAuthPlugin
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new Exception('Failed to exchange code for tokens: '.$response->body());
+            throw new Exception('Failed to exchange code for tokens: ' . $response->body());
         }
 
         $tokenData = $response->json();
@@ -640,21 +640,21 @@ class GitHubPlugin extends OAuthPlugin
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.$endpoint));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . $endpoint));
         $response = Http::withToken($token)
             ->withHeaders([
                 'Accept' => 'application/vnd.github+json',
                 'X-GitHub-Api-Version' => $this->apiVersion,
                 'User-Agent' => config('app.name', 'SparkApp'),
             ])
-            ->get($this->baseUrl.$endpoint);
+            ->get($this->baseUrl . $endpoint);
         $span?->finish();
 
         // Log the API response
         $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
 
         if (! $response->successful()) {
-            throw new Exception('API request failed: '.$response->body());
+            throw new Exception('API request failed: ' . $response->body());
         }
 
         return $response->json();
@@ -674,7 +674,7 @@ class GitHubPlugin extends OAuthPlugin
         if (empty($secret)) {
             return true;
         }
-        $expectedSignature = 'sha256='.hash_hmac('sha256', $payload, $secret);
+        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
 
         return hash_equals($expectedSignature, $signature);
     }
@@ -800,7 +800,7 @@ class GitHubPlugin extends OAuthPlugin
             ],
             'url' => $data['actor']['html_url']
                 ?? $data['actor']['url']
-                ?? (isset($data['actor']['login']) ? 'https://github.com/'.$data['actor']['login'] : null),
+                ?? (isset($data['actor']['login']) ? 'https://github.com/' . $data['actor']['login'] : null),
             'image_url' => $data['actor']['avatar_url'],
         ];
 
@@ -814,7 +814,7 @@ class GitHubPlugin extends OAuthPlugin
                 'full_name' => $data['repo']['full_name'] ?? $data['repo']['name'] ?? null,
             ],
             'url' => $data['repo']['html_url']
-                ?? (isset($data['repo']['name']) ? 'https://github.com/'.$data['repo']['name'] : null),
+                ?? (isset($data['repo']['name']) ? 'https://github.com/' . $data['repo']['name'] : null),
         ];
 
         $commits = $data['payload']['commits'] ?? [];
@@ -822,7 +822,7 @@ class GitHubPlugin extends OAuthPlugin
 
         foreach ($commits as $commit) {
             $blocks[] = [
-                'title' => 'Commit: '.substr($commit['sha'], 0, 7),
+                'title' => 'Commit: ' . substr($commit['sha'], 0, 7),
                 'metadata' => [
                     'message' => $commit['message'],
                 ],
@@ -1054,9 +1054,9 @@ class GitHubPlugin extends OAuthPlugin
      */
     protected function getLogChannel(): string
     {
-        $pluginChannel = 'api_debug_'.str_replace([' ', '-', '_'], '_', static::getIdentifier());
+        $pluginChannel = 'api_debug_' . str_replace([' ', '-', '_'], '_', static::getIdentifier());
 
-        return config('logging.channels.'.$pluginChannel) ? $pluginChannel : 'api_debug';
+        return config('logging.channels.' . $pluginChannel) ? $pluginChannel : 'api_debug';
     }
 
     /**
@@ -1123,7 +1123,7 @@ class GitHubPlugin extends OAuthPlugin
         // Limit response body size to prevent huge logs
         $maxLength = 10000;
         if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength).'... [TRUNCATED]';
+            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
         }
 
         // Try to parse as JSON and sanitize sensitive fields

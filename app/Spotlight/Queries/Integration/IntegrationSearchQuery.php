@@ -38,7 +38,7 @@ class IntegrationSearchQuery
                     $subtitle = $plugin::getDisplayName();
 
                     if ($integration->last_successful_update_at) {
-                        $subtitle .= ' • Updated '.$integration->last_successful_update_at->diffForHumans();
+                        $subtitle .= ' • Updated ' . $integration->last_successful_update_at->diffForHumans();
                     } elseif ($integration->last_triggered_at) {
                         $subtitle .= ' • Processing...';
                     } else {
@@ -54,7 +54,7 @@ class IntegrationSearchQuery
                     return SpotlightResult::make()
                         ->setTitle($integration->name)
                         ->setSubtitle($subtitle)
-                        ->setTypeahead('Integration: '.$integration->name)
+                        ->setTypeahead('Integration: ' . $integration->name)
                         ->setIcon(normalize_icon_for_spotlight($plugin::getIcon()))
                         ->setGroup('integrations')
                         ->setPriority(1)

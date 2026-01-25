@@ -49,7 +49,7 @@ class ManageEventTags extends Component
             }
         } else {
             // Strip matching prefix from the visible value if present
-            if (preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $m) === 1) {
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
                 $name = trim($m[1]);
             }
         }
@@ -95,7 +95,7 @@ class ManageEventTags extends Component
             }
         } else {
             // Strip matching prefix from the visible value if present
-            if (preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $m) === 1) {
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
                 $name = trim($m[1]);
             }
         }

@@ -124,7 +124,7 @@ class ReceiptDetail extends Component
         } catch (Exception $e) {
             $this->dispatch('notify', [
                 'type' => 'error',
-                'message' => 'Failed to download email: '.$e->getMessage(),
+                'message' => 'Failed to download email: ' . $e->getMessage(),
             ]);
 
             return null;
@@ -171,7 +171,7 @@ class ReceiptDetail extends Component
         return view('livewire.receipt-detail', [
             'matchedTransaction' => $this->matchedTransaction,
             'candidateMatches' => $this->candidateMatches,
-        ])->title('Receipt Details - '.$this->receipt->target?->title ?? 'Receipt');
+        ])->title('Receipt Details - ' . $this->receipt->target?->title ?? 'Receipt');
     }
 
     private function calculateMatchConfidence(Event $receipt, Event $transaction): float

@@ -110,7 +110,7 @@ class CheckIntegrations extends Command
         foreach ($errorIntegrations as $integration) {
             $this->line("  ❌ {$integration->id} ({$integration->service}) - {$integration->error_count} errors");
             if ($integration->last_error_message) {
-                $this->line('    Last error: '.substr($integration->last_error_message, 0, 100).'...');
+                $this->line('    Last error: ' . substr($integration->last_error_message, 0, 100) . '...');
             }
         }
 

@@ -66,7 +66,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $job = new GoCardlessTransactionPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('gocardless_transactions_'.$this->integration->id, $uniqueId);
+        $this->assertStringContainsString('gocardless_transactions_' . $this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

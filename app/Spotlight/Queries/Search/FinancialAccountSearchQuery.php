@@ -70,8 +70,8 @@ class FinancialAccountSearchQuery
                     $balanceValue = $latestBalance->value / ($latestBalance->value_multiplier ?: 1);
                     $currency = $latestBalance->value_unit ?? 'GBP';
                     $currencySymbol = $currency === 'GBP' ? '£' : $currency;
-                    $subtitle .= ' • '.$currencySymbol.number_format($balanceValue, 2);
-                    $subtitle .= ' • Updated '.$latestBalance->time->diffForHumans();
+                    $subtitle .= ' • ' . $currencySymbol . number_format($balanceValue, 2);
+                    $subtitle .= ' • Updated ' . $latestBalance->time->diffForHumans();
 
                     // Boost priority for recently updated accounts
                     $priority = $latestBalance->time->isAfter(now()->subWeek()) ? 1 : 2;
@@ -82,7 +82,7 @@ class FinancialAccountSearchQuery
                 return SpotlightResult::make()
                     ->setTitle($account->title)
                     ->setSubtitle($subtitle)
-                    ->setTypeahead('Account: '.$account->title)
+                    ->setTypeahead('Account: ' . $account->title)
                     ->setIcon('currency-pound')
                     ->setGroup('accounts')
                     ->setPriority($priority)

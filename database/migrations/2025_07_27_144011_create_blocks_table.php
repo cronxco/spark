@@ -24,7 +24,7 @@ return new class extends Migration
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('deleted_at')->nullable();
-            $table->foreign('event_id', Schema::getConnection()->getTablePrefix().'blocks_event_id_foreign')->references('id')->on('events');
+            $table->foreign('event_id', Schema::getConnection()->getTablePrefix() . 'blocks_event_id_foreign')->references('id')->on('events');
         });
     }
 

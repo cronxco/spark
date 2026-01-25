@@ -61,7 +61,7 @@ class MonzoAccountData extends BaseProcessingJob
                 'title' => $date,
             ],
             [
-                'time' => $date.' 00:00:00',
+                'time' => $date . ' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]

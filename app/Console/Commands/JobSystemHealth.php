@@ -230,7 +230,7 @@ class JobSystemHealth extends Command
     {
         $this->info('🚀 Job System Health Dashboard');
         $this->line('══════════════════════════════════════');
-        $this->line('📅 Generated: '.now()->format('Y-m-d H:i:s T'));
+        $this->line('📅 Generated: ' . now()->format('Y-m-d H:i:s T'));
         $this->newLine();
     }
 
@@ -299,7 +299,7 @@ class JobSystemHealth extends Command
 
         $this->line("  📈 Success rate (24h): <{$successColor}>{$successRate}%</{$successColor}>");
         $this->line("  🔄 Jobs processed (24h): <comment>{$performance['jobs_processed_24h']}</comment>");
-        $this->line('  💾 Cache hit rate: <comment>'.round($performance['cache_hit_rate'], 1).'%</comment>');
+        $this->line('  💾 Cache hit rate: <comment>' . round($performance['cache_hit_rate'], 1) . '%</comment>');
 
         $this->newLine();
     }
@@ -332,7 +332,7 @@ class JobSystemHealth extends Command
 
         $this->line('══════════════════════════════════════');
         $this->line("{$statusIcon} Overall Status: <{$statusColor}>{$status}</{$statusColor}>");
-        $this->line('📊 Total alerts: '.count($alerts));
+        $this->line('📊 Total alerts: ' . count($alerts));
 
         if (! empty($alerts)) {
             $criticalCount = count(array_filter($alerts, fn ($a) => $a['level'] === 'critical'));

@@ -154,7 +154,7 @@ class PushNotificationTest extends TestCase
         );
 
         $response = $this->actingAs($this->user)
-            ->getJson('/push/status?endpoint='.urlencode('https://fcm.googleapis.com/fcm/send/test-token'));
+            ->getJson('/push/status?endpoint=' . urlencode('https://fcm.googleapis.com/fcm/send/test-token'));
 
         $response->assertOk()
             ->assertJson([

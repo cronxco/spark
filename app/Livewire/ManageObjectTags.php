@@ -47,7 +47,7 @@ class ManageObjectTags extends Component
                 $name = trim($m[2]);
             }
         } else {
-            if (preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $m) === 1) {
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
                 $name = trim($m[1]);
             }
         }
@@ -90,7 +90,7 @@ class ManageObjectTags extends Component
                 $name = trim($m[2]);
             }
         } else {
-            if (preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $m) === 1) {
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
                 $name = trim($m[1]);
             }
         }

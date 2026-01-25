@@ -102,7 +102,7 @@ class HevySweepTest extends TestCase
         // Verify API calls were made for sweep
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'workouts') &&
-                   str_contains($request->url(), 'start_date='.now()->subDays(30)->toDateString());
+                   str_contains($request->url(), 'start_date=' . now()->subDays(30)->toDateString());
         });
     }
 
@@ -131,7 +131,7 @@ class HevySweepTest extends TestCase
 
         // Verify no sweep API calls were made
         Http::assertNotSent(function ($request) {
-            return str_contains($request->url(), 'start_date='.now()->subDays(30)->toDateString());
+            return str_contains($request->url(), 'start_date=' . now()->subDays(30)->toDateString());
         });
     }
 
@@ -160,7 +160,7 @@ class HevySweepTest extends TestCase
 
         // Verify sweep API calls were made
         Http::assertSent(function ($request) {
-            return str_contains($request->url(), 'start_date='.now()->subDays(30)->toDateString());
+            return str_contains($request->url(), 'start_date=' . now()->subDays(30)->toDateString());
         });
     }
 

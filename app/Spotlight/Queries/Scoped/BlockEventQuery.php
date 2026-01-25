@@ -70,7 +70,7 @@ class BlockEventQuery
 
             return collect([
                 SpotlightResult::make()
-                    ->setTitle('Parent Event: '.format_action_title($event->action))
+                    ->setTitle('Parent Event: ' . format_action_title($event->action))
                     ->setSubtitle($subtitle)
                     ->setIcon($actionIcon)
                     ->setGroup('events')

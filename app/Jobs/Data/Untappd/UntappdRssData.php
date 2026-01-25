@@ -120,7 +120,7 @@ class UntappdRssData extends BaseProcessingJob
             }
 
             // Build source ID
-            $sourceId = 'untappd_'.md5($guid);
+            $sourceId = 'untappd_' . md5($guid);
 
             // Build event
             $events[] = [

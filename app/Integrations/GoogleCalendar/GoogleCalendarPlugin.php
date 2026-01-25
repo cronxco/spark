@@ -234,7 +234,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
         // Store CSRF token in session for validation
         // Use only group_id in the key to avoid session_id mismatch issues
-        $sessionKey = 'oauth_csrf_google_calendar_'.$group->id;
+        $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
         Session::put($sessionKey, $csrfToken);
 
         $state = encrypt([
@@ -256,7 +256,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
             'prompt' => 'consent',
         ];
 
-        return $this->authUrl.'/auth?'.http_build_query($params);
+        return $this->authUrl . '/auth?' . http_build_query($params);
     }
 
     public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
@@ -268,7 +268,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'error' => $error,
                 'error_description' => $request->get('error_description'),
             ]);
-            throw new Exception('Google Calendar authorization failed: '.$error);
+            throw new Exception('Google Calendar authorization failed: ' . $error);
         }
 
         $code = $request->get('code');
@@ -327,7 +327,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $tokenEndpoint = 'https://oauth2.googleapis.com/token';
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$tokenEndpoint));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $tokenEndpoint));
         $response = Http::asForm()->post($tokenEndpoint, [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -346,7 +346,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'response' => $response->body(),
                 'status' => $response->status(),
             ]);
-            throw new Exception('Failed to exchange code for tokens: '.$response->body());
+            throw new Exception('Failed to exchange code for tokens: ' . $response->body());
         }
 
         $tokenData = $response->json();
@@ -399,10 +399,10 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
             $hub = SentrySdk::getCurrentHub();
             $parentSpan = $hub->getSpan();
-            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/users/me/calendarList'));
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/users/me/calendarList'));
 
             $response = Http::withToken($group->access_token)
-                ->get($this->baseUrl.'/users/me/calendarList');
+                ->get($this->baseUrl . '/users/me/calendarList');
             $span?->finish();
 
             if (! $response->successful()) {
@@ -506,10 +506,10 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl."/calendars/{$calendarId}/events"));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . "/calendars/{$calendarId}/events"));
 
         $response = Http::withToken($group->access_token)
-            ->get($this->baseUrl."/calendars/{$calendarId}/events", $params);
+            ->get($this->baseUrl . "/calendars/{$calendarId}/events", $params);
         $span?->finish();
 
         $this->logApiResponse('GET', "/calendars/{$calendarId}/events", $response->status(), $response->body(), $response->headers(), $integration->id);
@@ -744,10 +744,10 @@ class GoogleCalendarPlugin extends OAuthPlugin
         // Get primary calendar to extract user email
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET '.$this->baseUrl.'/calendars/primary'));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET ' . $this->baseUrl . '/calendars/primary'));
 
         $response = Http::withToken($group->access_token)
-            ->get($this->baseUrl.'/calendars/primary');
+            ->get($this->baseUrl . '/calendars/primary');
         $span?->finish();
 
         if ($response->successful()) {
@@ -795,7 +795,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
         $hub = SentrySdk::getCurrentHub();
         $parentSpan = $hub->getSpan();
         $tokenEndpoint = 'https://oauth2.googleapis.com/token';
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST '.$tokenEndpoint));
+        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('POST ' . $tokenEndpoint));
 
         $response = Http::asForm()->post($tokenEndpoint, [
             'client_id' => $this->clientId,
@@ -857,7 +857,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
     protected function validateCsrfToken(string $token, IntegrationGroup $group): bool
     {
         // Get the session key for this group (without session_id to avoid session regeneration issues)
-        $sessionKey = 'oauth_csrf_google_calendar_'.$group->id;
+        $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
 
         // Retrieve stored token from session
         $storedToken = Session::get($sessionKey);

@@ -64,7 +64,7 @@ class GitHubActivityPullTest extends TestCase
         $job = new GitHubActivityPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('github_activity_'.$this->integration->id, $uniqueId);
+        $this->assertStringContainsString('github_activity_' . $this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

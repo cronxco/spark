@@ -45,9 +45,9 @@ class GoCardlessAdminController extends Controller
     {
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$this->getAccessToken(),
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
                 'Accept' => 'application/json',
-            ])->delete(config('services.gocardless.api_base').'/agreements/enduser/'.$agreementId.'/');
+            ])->delete(config('services.gocardless.api_base') . '/agreements/enduser/' . $agreementId . '/');
 
             if ($response->successful()) {
                 Log::info('GoCardless agreement deleted successfully', [
@@ -66,7 +66,7 @@ class GoCardlessAdminController extends Controller
             ]);
 
             return redirect()->route('admin.gocardless.index')
-                ->with('error', 'Failed to delete agreement: '.$response->body());
+                ->with('error', 'Failed to delete agreement: ' . $response->body());
 
         } catch (Throwable $e) {
             Log::error('Exception deleting GoCardless agreement', [
@@ -76,7 +76,7 @@ class GoCardlessAdminController extends Controller
             ]);
 
             return redirect()->route('admin.gocardless.index')
-                ->with('error', 'Exception deleting agreement: '.$e->getMessage());
+                ->with('error', 'Exception deleting agreement: ' . $e->getMessage());
         }
     }
 
@@ -87,9 +87,9 @@ class GoCardlessAdminController extends Controller
     {
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$this->getAccessToken(),
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
                 'Accept' => 'application/json',
-            ])->delete(config('services.gocardless.api_base').'/requisitions/'.$requisitionId.'/');
+            ])->delete(config('services.gocardless.api_base') . '/requisitions/' . $requisitionId . '/');
 
             if ($response->successful()) {
                 Log::info('GoCardless requisition deleted successfully', [
@@ -108,7 +108,7 @@ class GoCardlessAdminController extends Controller
             ]);
 
             return redirect()->route('admin.gocardless.index')
-                ->with('error', 'Failed to delete requisition: '.$response->body());
+                ->with('error', 'Failed to delete requisition: ' . $response->body());
 
         } catch (Throwable $e) {
             Log::error('Exception deleting GoCardless requisition', [
@@ -118,7 +118,7 @@ class GoCardlessAdminController extends Controller
             ]);
 
             return redirect()->route('admin.gocardless.index')
-                ->with('error', 'Exception deleting requisition: '.$e->getMessage());
+                ->with('error', 'Exception deleting requisition: ' . $e->getMessage());
         }
     }
 
@@ -128,12 +128,12 @@ class GoCardlessAdminController extends Controller
     protected function getAgreements(): array
     {
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$this->getAccessToken(),
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Accept' => 'application/json',
-        ])->get(config('services.gocardless.api_base').'/agreements/enduser/');
+        ])->get(config('services.gocardless.api_base') . '/agreements/enduser/');
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to fetch agreements: '.$response->body());
+            throw new RuntimeException('Failed to fetch agreements: ' . $response->body());
         }
 
         $data = $response->json();
@@ -147,12 +147,12 @@ class GoCardlessAdminController extends Controller
     protected function getRequisitions(): array
     {
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$this->getAccessToken(),
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
             'Accept' => 'application/json',
-        ])->get(config('services.gocardless.api_base').'/requisitions/');
+        ])->get(config('services.gocardless.api_base') . '/requisitions/');
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to fetch requisitions: '.$response->body());
+            throw new RuntimeException('Failed to fetch requisitions: ' . $response->body());
         }
 
         $data = $response->json();
@@ -167,13 +167,13 @@ class GoCardlessAdminController extends Controller
     {
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
-        ])->post(config('services.gocardless.api_base').'/token/new/', [
+        ])->post(config('services.gocardless.api_base') . '/token/new/', [
             'secret_id' => config('services.gocardless.secret_id'),
             'secret_key' => config('services.gocardless.secret_key'),
         ]);
 
         if (! $response->successful()) {
-            throw new RuntimeException('Failed to get access token: '.$response->body());
+            throw new RuntimeException('Failed to get access token: ' . $response->body());
         }
 
         $data = $response->json();

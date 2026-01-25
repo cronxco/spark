@@ -59,8 +59,8 @@ class InsightDeduplicationService
         // Check for similar insights using text similarity
         foreach ($seenInsights as $signature => $seenInsight) {
             $similarity = $this->calculateSimilarity(
-                $insight['title'].' '.$insight['description'],
-                $seenInsight['title'].' '.$seenInsight['description']
+                $insight['title'] . ' ' . $insight['description'],
+                $seenInsight['title'] . ' ' . $seenInsight['description']
             );
 
             if ($similarity >= $this->similarityThreshold) {
@@ -181,7 +181,7 @@ class InsightDeduplicationService
     protected function generateSignature(array $insight): string
     {
         // Normalize text: lowercase, remove punctuation, trim whitespace
-        $text = $this->normalizeText(($insight['title'] ?? '').' '.($insight['description'] ?? ''));
+        $text = $this->normalizeText(($insight['title'] ?? '') . ' ' . ($insight['description'] ?? ''));
 
         return md5($text);
     }

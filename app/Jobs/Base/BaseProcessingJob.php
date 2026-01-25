@@ -55,7 +55,7 @@ abstract class BaseProcessingJob implements ShouldQueue
     {
         $hub = SentrySdk::getCurrentHub();
         $txContext = new TransactionContext;
-        $txContext->setName('job.process:'.$this->serviceName.':'.$this->getJobType());
+        $txContext->setName('job.process:' . $this->serviceName . ':' . $this->getJobType());
         $txContext->setOp('job');
         $transaction = $hub->startTransaction($txContext);
         $hub->setSpan($transaction);
@@ -125,7 +125,7 @@ abstract class BaseProcessingJob implements ShouldQueue
      */
     public function uniqueId(): string
     {
-        return $this->serviceName.'_'.$this->getJobType().'_'.$this->integration->id.'_'.md5(serialize($this->rawData));
+        return $this->serviceName . '_' . $this->getJobType() . '_' . $this->integration->id . '_' . md5(serialize($this->rawData));
     }
 
     /**

@@ -76,7 +76,7 @@ class ContentExtractor
 
             return [
                 'success' => false,
-                'reason' => 'Parse error: '.$e->getMessage(),
+                'reason' => 'Parse error: ' . $e->getMessage(),
                 'data' => null,
             ];
         } catch (Exception $e) {
@@ -87,7 +87,7 @@ class ContentExtractor
 
             return [
                 'success' => false,
-                'reason' => 'Extraction error: '.$e->getMessage(),
+                'reason' => 'Extraction error: ' . $e->getMessage(),
                 'data' => null,
             ];
         }

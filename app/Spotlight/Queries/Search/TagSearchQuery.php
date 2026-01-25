@@ -34,13 +34,13 @@ class TagSearchQuery
 
                     $subtitle = ucfirst($tag->type ?? 'general');
                     if ($taggablesCount > 0) {
-                        $subtitle .= ' • Used '.$taggablesCount.' '.str('time')->plural($taggablesCount);
+                        $subtitle .= ' • Used ' . $taggablesCount . ' ' . str('time')->plural($taggablesCount);
                     }
 
                     return SpotlightResult::make()
                         ->setTitle($tag->name)
                         ->setSubtitle($subtitle)
-                        ->setTypeahead('Tag: '.$tag->name)
+                        ->setTypeahead('Tag: ' . $tag->name)
                         ->setIcon('tag')
                         ->setGroup('tags')
                         ->setPriority(1)

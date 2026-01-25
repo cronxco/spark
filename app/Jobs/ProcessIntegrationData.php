@@ -44,7 +44,7 @@ class ProcessIntegrationData implements ShouldQueue
     {
         $hub = SentrySdk::getCurrentHub();
         $txContext = new TransactionContext;
-        $txContext->setName('job.process_integration: '.$this->integration->service);
+        $txContext->setName('job.process_integration: ' . $this->integration->service);
         $txContext->setOp('job');
         $transaction = $hub->startTransaction($txContext);
         $hub->setSpan($transaction);

@@ -63,7 +63,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->getBaseUrl().'/transactions', [
+            ->get($plugin->getBaseUrl() . '/transactions', [
                 'account_id' => $account['id'],
                 'expand[]' => 'merchant',
                 'since' => $sinceIso,
@@ -74,7 +74,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         $plugin->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $this->integration->id);
 
         if (! $response->successful()) {
-            throw new Exception('Failed to fetch historical transactions: '.$response->body());
+            throw new Exception('Failed to fetch historical transactions: ' . $response->body());
         }
 
         $transactions = $response->json('transactions') ?? [];
@@ -93,7 +93,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->getBaseUrl().'/balance', [
+            ->get($plugin->getBaseUrl() . '/balance', [
                 'account_id' => $account['id'],
             ]);
 
@@ -101,7 +101,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         $plugin->logApiResponse('GET', '/balance', $response->status(), $response->body(), $response->headers(), $this->integration->id);
 
         if (! $response->successful()) {
-            throw new Exception('Failed to fetch historical balance: '.$response->body());
+            throw new Exception('Failed to fetch historical balance: ' . $response->body());
         }
 
         $balanceData = $response->json();
@@ -120,7 +120,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         ], $this->integration->id);
 
         $response = Http::withHeaders($plugin->authHeaders($this->integration))
-            ->get($plugin->getBaseUrl().'/pots', [
+            ->get($plugin->getBaseUrl() . '/pots', [
                 'current_account_id' => $account['id'],
             ]);
 
@@ -128,7 +128,7 @@ class MonzoHistoricalData extends BaseInitializationJob
         $plugin->logApiResponse('GET', '/pots', $response->status(), $response->body(), $response->headers(), $this->integration->id);
 
         if (! $response->successful()) {
-            throw new Exception('Failed to fetch historical pots: '.$response->body());
+            throw new Exception('Failed to fetch historical pots: ' . $response->body());
         }
 
         $pots = $response->json('pots') ?? [];

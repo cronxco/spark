@@ -145,7 +145,7 @@ class ProcessIntegrationPageUndefinedVariableTest extends TestCase
         $progress = ActionProgress::getLatestProgress(
             $integration->user_id,
             'migration',
-            "integration_{$integration->id}_transactions_".substr(md5($since.$before), 0, 8)
+            "integration_{$integration->id}_transactions_" . substr(md5($since . $before), 0, 8)
         );
 
         $this->assertNotNull($progress);
@@ -170,7 +170,7 @@ class ProcessIntegrationPageUndefinedVariableTest extends TestCase
             'user_id' => $user->id,
             'integration_group_id' => $group->id,
             'service' => 'monzo',
-            'name' => 'Monzo '.ucfirst($instanceType),
+            'name' => 'Monzo ' . ucfirst($instanceType),
             'instance_type' => $instanceType,
             'configuration' => [],
         ]);

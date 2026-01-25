@@ -69,7 +69,7 @@ class ListTasksCommand extends Command
                 $task->key,
                 $task->name,
                 implode(', ', $task->appliesTo),
-                count($task->dependencies).' deps',
+                count($task->dependencies) . ' deps',
                 $task->priority,
                 $task->queue,
                 $task->registeredBy ? 'Plugin' : 'Core',
@@ -77,9 +77,9 @@ class ListTasksCommand extends Command
         );
 
         $this->newLine();
-        $this->info('Total: '.$tasks->count().' tasks');
-        $this->comment('Core: '.$tasks->filter(fn ($t) => ! $t->registeredBy)->count());
-        $this->comment('Plugin: '.$tasks->filter(fn ($t) => $t->registeredBy)->count());
+        $this->info('Total: ' . $tasks->count() . ' tasks');
+        $this->comment('Core: ' . $tasks->filter(fn ($t) => ! $t->registeredBy)->count());
+        $this->comment('Plugin: ' . $tasks->filter(fn ($t) => $t->registeredBy)->count());
     }
 
     /**

@@ -104,7 +104,7 @@ class MigrateHadLinkToRelationships extends Command
 
             return self::SUCCESS;
         } catch (Exception $e) {
-            $this->error('Migration failed: '.$e->getMessage());
+            $this->error('Migration failed: ' . $e->getMessage());
             $this->newLine();
             $this->error($e->getTraceAsString());
 

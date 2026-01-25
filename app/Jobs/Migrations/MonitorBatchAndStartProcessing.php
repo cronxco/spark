@@ -35,7 +35,7 @@ class MonitorBatchAndStartProcessing implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping('monitor_batch_'.$this->targetBatchId))
+            (new WithoutOverlapping('monitor_batch_' . $this->targetBatchId))
                 ->releaseAfter(10),
         ];
     }

@@ -30,7 +30,7 @@ class CookieParser
                 'success' => false,
                 'cookies' => [],
                 'expires_at' => null,
-                'error' => 'Invalid JSON: '.$e->getMessage(),
+                'error' => 'Invalid JSON: ' . $e->getMessage(),
             ];
         }
 
@@ -189,7 +189,7 @@ class CookieParser
             if ($expiry->isPast()) {
                 return [
                     'status' => 'red',
-                    'message' => 'Expired '.$expiry->diffForHumans(),
+                    'message' => 'Expired ' . $expiry->diffForHumans(),
                     'days_until_expiry' => 0,
                 ];
             }
@@ -217,7 +217,7 @@ class CookieParser
             } else {
                 return [
                     'status' => 'green',
-                    'message' => 'Expires '.$expiry->format('M j, Y'),
+                    'message' => 'Expires ' . $expiry->format('M j, Y'),
                     'days_until_expiry' => $daysUntilExpiry,
                 ];
             }

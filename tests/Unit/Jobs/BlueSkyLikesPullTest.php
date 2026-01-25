@@ -62,7 +62,7 @@ class BlueSkyLikesPullTest extends TestCase
         $job = new BlueSkyLikesPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('bluesky_likes_'.$this->integration->id, $uniqueId);
+        $this->assertStringContainsString('bluesky_likes_' . $this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

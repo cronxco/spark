@@ -56,8 +56,8 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_test_service_test_integration_123-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_test_service_test_integration_123-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         // Verify log content
@@ -73,8 +73,8 @@ class ApiWebhookLoggingHelpersTest extends TestCase
     {
         // Arrange
         $jsonResponse = '{"accounts": [{"id": "123", "balance": 100}], "token": "secret_token"}';
-        $expectedFileName = 'api_test_service_test_integration_456-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_test_service_test_integration_456-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
 
         // Clear any existing log file to ensure clean test
         if (file_exists($logPath)) {
@@ -123,8 +123,8 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_test_webhook_service_webhook_integration_789-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_test_webhook_service_webhook_integration_789-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         $logContent = file_get_contents($logPath);
@@ -142,8 +142,8 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         log_integration_webhook('service', '', [], [], false);
 
         // Should create per-service log files
-        $expectedFileName = 'api_service-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_service-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
     }
 
@@ -175,15 +175,15 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_test_sensitive_sensitive_test-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_test_sensitive_sensitive_test-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         $logContent = file_get_contents($logPath);
 
         // All sensitive keys should be redacted
         foreach ($sensitiveKeys as $key) {
-            $this->assertStringContainsString('"'.$key.'":"[REDACTED]"', $logContent);
+            $this->assertStringContainsString('"' . $key . '":"[REDACTED]"', $logContent);
         }
 
         // Safe field should remain
@@ -205,8 +205,8 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Should create log file despite invalid parameters
-        $expectedFileName = 'api_test_edge_edge_case-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_test_edge_edge_case-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
     }
 
@@ -225,8 +225,8 @@ class ApiWebhookLoggingHelpersTest extends TestCase
         );
 
         // Assert
-        $expectedFileName = 'api_test_timestamp_timestamp_test-'.now()->format('Y-m-d').'.log';
-        $logPath = storage_path('logs/'.$expectedFileName);
+        $expectedFileName = 'api_test_timestamp_timestamp_test-' . now()->format('Y-m-d') . '.log';
+        $logPath = storage_path('logs/' . $expectedFileName);
         $this->assertTrue(file_exists($logPath));
 
         $logContent = file_get_contents($logPath);

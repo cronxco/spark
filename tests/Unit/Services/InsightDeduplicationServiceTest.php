@@ -229,7 +229,7 @@ class InsightDeduplicationServiceTest extends TestCase
 
         $insight2 = [
             'title' => 'Long insight',
-            'description' => $longDescription.' Extra text.',
+            'description' => $longDescription . ' Extra text.',
             'confidence' => 0.9,
         ];
 

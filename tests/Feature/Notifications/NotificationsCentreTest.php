@@ -70,7 +70,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-sync-'.uniqid(),
+            'action_id' => 'test-sync-' . uniqid(),
             'message' => 'Syncing data...',
             'progress' => 50,
             'total' => 100,
@@ -129,7 +129,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-sync-'.uniqid(),
+            'action_id' => 'test-sync-' . uniqid(),
             'message' => 'Syncing data...',
             'progress' => 50,
             'total' => 100,
@@ -152,7 +152,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-sync-'.uniqid(),
+            'action_id' => 'test-sync-' . uniqid(),
             'message' => 'Syncing data...',
             'progress' => 50,
             'total' => 100,
@@ -172,7 +172,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-sync-'.uniqid(),
+            'action_id' => 'test-sync-' . uniqid(),
             'message' => 'Syncing data...',
             'progress' => 50,
             'total' => 100,
@@ -181,7 +181,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'export',
-            'action_id' => 'test-export-'.uniqid(),
+            'action_id' => 'test-export-' . uniqid(),
             'message' => 'Export completed',
             'progress' => 100,
             'total' => 100,
@@ -219,7 +219,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-recent-sync-'.uniqid(),
+            'action_id' => 'test-recent-sync-' . uniqid(),
             'message' => 'Recent sync',
             'progress' => 50,
             'total' => 100,
@@ -230,7 +230,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'export',
-            'action_id' => 'test-old-export-'.uniqid(),
+            'action_id' => 'test-old-export-' . uniqid(),
             'message' => 'Old export',
             'progress' => 100,
             'total' => 100,
@@ -303,7 +303,7 @@ class NotificationsCentreTest extends TestCase
         $oldAction = ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'export',
-            'action_id' => 'test-old-completed-'.uniqid(),
+            'action_id' => 'test-old-completed-' . uniqid(),
             'message' => 'Old export',
             'progress' => 100,
             'total' => 100,
@@ -314,7 +314,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-recent-completed-'.uniqid(),
+            'action_id' => 'test-recent-completed-' . uniqid(),
             'message' => 'Recent sync',
             'progress' => 100,
             'total' => 100,
@@ -372,7 +372,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $this->user->id,
             'action_type' => 'sync',
-            'action_id' => 'test-user-sync-'.uniqid(),
+            'action_id' => 'test-user-sync-' . uniqid(),
             'message' => 'User sync',
             'progress' => 50,
             'total' => 100,
@@ -381,7 +381,7 @@ class NotificationsCentreTest extends TestCase
         ActionProgress::create([
             'user_id' => $otherUser->id,
             'action_type' => 'export',
-            'action_id' => 'test-other-export-'.uniqid(),
+            'action_id' => 'test-other-export-' . uniqid(),
             'message' => 'Other user export',
             'progress' => 50,
             'total' => 100,

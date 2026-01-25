@@ -65,14 +65,14 @@ class OuraEnhancedTagData extends BaseProcessingJob
         $duration = null;
         if ($endDay && $endTime) {
             try {
-                $startDateTime = Carbon::parse($startDay.' '.($startTime ?? '00:00:00'));
-                $endDateTime = Carbon::parse($endDay.' '.$endTime);
+                $startDateTime = Carbon::parse($startDay . ' ' . ($startTime ?? '00:00:00'));
+                $endDateTime = Carbon::parse($endDay . ' ' . $endTime);
                 $duration = $endDateTime->diffInSeconds($startDateTime);
             } catch (Exception $e) {
                 Log::warning('Failed to calculate enhanced tag duration', [
                     'item_id' => $id,
-                    'start' => $startDay.' '.($startTime ?? '00:00:00'),
-                    'end' => $endDay.' '.$endTime,
+                    'start' => $startDay . ' ' . ($startTime ?? '00:00:00'),
+                    'end' => $endDay . ' ' . $endTime,
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -97,7 +97,7 @@ class OuraEnhancedTagData extends BaseProcessingJob
             'type' => 'enhanced_tag',
             'title' => $customName ?: "Enhanced Tag ({$tagType})",
         ], [
-            'time' => $startDay.' '.($startTime ?? '00:00:00'),
+            'time' => $startDay . ' ' . ($startTime ?? '00:00:00'),
             'content' => $comment ?: 'Enhanced tag with detailed metadata',
             'metadata' => [],
         ]);
@@ -106,7 +106,7 @@ class OuraEnhancedTagData extends BaseProcessingJob
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $startDay.' '.($startTime ?? '00:00:00'),
+            'time' => $startDay . ' ' . ($startTime ?? '00:00:00'),
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -135,7 +135,7 @@ class OuraEnhancedTagData extends BaseProcessingJob
         if ($endDay && $endTime) {
             $tagFields['end_time'] = 'End Time';
             // Prepare combined end time value
-            $item['end_time'] = $endDay.' '.$endTime;
+            $item['end_time'] = $endDay . ' ' . $endTime;
         }
 
         // Prepare tag type value for the trait method

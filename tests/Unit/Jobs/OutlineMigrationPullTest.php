@@ -28,7 +28,7 @@ class OutlineMigrationPullTest extends TestCase
         $integration = $this->makeIntegration();
         $job = new OutlineMigrationPull($integration, 100, 50);
 
-        $expectedId = 'outline_migration_'.$integration->id.'_100';
+        $expectedId = 'outline_migration_' . $integration->id . '_100';
         $this->assertSame($expectedId, $job->uniqueId());
     }
 

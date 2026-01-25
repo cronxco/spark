@@ -129,7 +129,7 @@ Route::middleware(['auth'])->group(function () {
         }
 
         // Load institutions if not already in session
-        if (empty(session('gocardless_institutions_'.$group->id, []))) {
+        if (empty(session('gocardless_institutions_' . $group->id, []))) {
             try {
                 $plugin = new GoCardlessBankPlugin;
                 $institutions = $plugin->getInstitutions();
@@ -147,14 +147,14 @@ Route::middleware(['auth'])->group(function () {
                 Log::info('GoCardless institutions loaded', $logData);
 
                 if (! empty($institutions)) {
-                    session(['gocardless_institutions_'.$group->id => $institutions]);
+                    session(['gocardless_institutions_' . $group->id => $institutions]);
                     Log::info('Institutions saved to session', [
-                        'session_key' => 'gocardless_institutions_'.$group->id,
+                        'session_key' => 'gocardless_institutions_' . $group->id,
                         'count' => count($institutions),
                     ]);
                 } else {
                     Log::warning('GoCardless API returned empty institutions');
-                    session(['gocardless_institutions_'.$group->id => []]);
+                    session(['gocardless_institutions_' . $group->id => []]);
                 }
             } catch (\Throwable $e) {
                 $logData = [
@@ -168,7 +168,7 @@ Route::middleware(['auth'])->group(function () {
                 }
 
                 Log::error('GoCardless API call failed', $logData);
-                session(['gocardless_institutions_'.$group->id => []]);
+                session(['gocardless_institutions_' . $group->id => []]);
             }
         }
 
@@ -194,7 +194,7 @@ Route::middleware(['auth'])->group(function () {
         }
 
         // Get the whitelisted institutions from session
-        $institutions = session('gocardless_institutions_'.$group->id, []);
+        $institutions = session('gocardless_institutions_' . $group->id, []);
 
         // Validate institution_id exists in the whitelisted institutions
         $validInstitution = collect($institutions)->firstWhere('id', $institutionId);
@@ -217,7 +217,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Store the validated institution ID and OAuth group ID to avoid ambiguity
         session([
-            'gocardless_institution_id_'.$group->id => (string) $institutionId,
+            'gocardless_institution_id_' . $group->id => (string) $institutionId,
             'gocardless_oauth_group_id' => $group->id,
         ]);
 
@@ -236,7 +236,7 @@ Route::middleware(['auth'])->group(function () {
             'user_id' => Auth::id(),
             'institution_id' => $institutionId,
             'session_keys' => [
-                'institution_key' => 'gocardless_institution_id_'.$group->id,
+                'institution_key' => 'gocardless_institution_id_' . $group->id,
                 'oauth_group_key' => 'gocardless_oauth_group_id',
             ],
         ];
@@ -257,7 +257,7 @@ Route::middleware(['auth'])->group(function () {
 // Webhook routes (no auth required)
 Route::post('webhook/{service}/{secret}', [WebhookController::class, 'handle'])->name('webhook.handle');
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
 
 // Authelia Socialite authentication routes
 Route::get('auth/authelia/redirect', function () {

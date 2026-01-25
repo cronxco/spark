@@ -72,7 +72,7 @@ class BlueSkyBookmarksData extends BaseProcessingJob
         $replyCount = $post['replyCount'] ?? 0;
 
         // Build source ID
-        $sourceId = "bluesky_{$action}_".str_replace(['at://', '/'], ['', '_'], $uri);
+        $sourceId = "bluesky_{$action}_" . str_replace(['at://', '/'], ['', '_'], $uri);
 
         // Actor (current user)
         $group = $this->integration->group;
@@ -97,7 +97,7 @@ class BlueSkyBookmarksData extends BaseProcessingJob
         $target = [
             'concept' => 'social',
             'type' => 'bluesky_post',
-            'title' => substr($text, 0, 100).(strlen($text) > 100 ? '...' : ''),
+            'title' => substr($text, 0, 100) . (strlen($text) > 100 ? '...' : ''),
             'content' => $text,
             'metadata' => [
                 'uri' => $uri,
@@ -109,7 +109,7 @@ class BlueSkyBookmarksData extends BaseProcessingJob
                 'repost_count' => $repostCount,
                 'reply_count' => $replyCount,
             ],
-            'url' => "https://bsky.app/profile/{$authorHandle}/post/".basename($uri),
+            'url' => "https://bsky.app/profile/{$authorHandle}/post/" . basename($uri),
             'image_url' => null,
             'time' => $time,
         ];

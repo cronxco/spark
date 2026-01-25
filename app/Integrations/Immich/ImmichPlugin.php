@@ -476,7 +476,7 @@ class ImmichPlugin extends ManualPlugin
     {
         $maxLength = 10000;
         if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength).' ... [TRUNCATED]';
+            return substr($body, 0, $maxLength) . ' ... [TRUNCATED]';
         }
 
         // Try to parse as JSON and sanitize sensitive fields

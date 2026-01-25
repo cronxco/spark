@@ -72,7 +72,7 @@ class OuraWorkoutsData extends BaseProcessingJob
             'user_id' => $this->integration->user_id,
             'concept' => 'workout',
             'type' => $activityType,
-            'title' => ucwords(str_replace('_', ' ', $activityType)).' ('.substr($id, 0, 8).')',
+            'title' => ucwords(str_replace('_', ' ', $activityType)) . ' (' . substr($id, 0, 8) . ')',
         ], [
             'time' => $start,
             'content' => 'Enhanced workout session with comprehensive metrics',
@@ -196,7 +196,7 @@ class OuraWorkoutsData extends BaseProcessingJob
                     $event->createBlock([
                         'block_type' => 'heart_rate',
                         'time' => $event->time,
-                        'title' => 'HR Zone: '.ucwords(str_replace('_', ' ', $zoneName)),
+                        'title' => 'HR Zone: ' . ucwords(str_replace('_', ' ', $zoneName)),
                         'metadata' => [
                             'type' => 'heart_rate_zone',
                             'zone' => $zoneName,

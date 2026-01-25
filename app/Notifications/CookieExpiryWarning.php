@@ -63,7 +63,7 @@ class CookieExpiryWarning extends SparkNotification
 
     public function getActionUrl(): ?string
     {
-        return route('bookmarks').'?tab=cookies';
+        return route('bookmarks') . '?tab=cookies';
     }
 
     /**

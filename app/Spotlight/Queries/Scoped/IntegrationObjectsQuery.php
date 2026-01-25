@@ -77,7 +77,7 @@ class IntegrationObjectsQuery
                 $latestEvent = $latestEvents->get($object->id);
 
                 if ($latestEvent) {
-                    $subtitleParts[] = 'Updated '.$latestEvent->time->diffForHumans();
+                    $subtitleParts[] = 'Updated ' . $latestEvent->time->diffForHumans();
                 }
 
                 $subtitle = implode(' • ', $subtitleParts);

@@ -243,7 +243,7 @@ class SlackPlugin extends WebhookPlugin
         $body = $request->getContent();
 
         $baseString = "v0:{$timestamp}:{$body}";
-        $expectedSignature = 'v0='.hash_hmac('sha256', $baseString, $integration->account_id);
+        $expectedSignature = 'v0=' . hash_hmac('sha256', $baseString, $integration->account_id);
 
         return hash_equals($expectedSignature, $signature);
     }
@@ -267,7 +267,7 @@ class SlackPlugin extends WebhookPlugin
         $target = [
             'concept' => 'message',
             'type' => 'slack_message',
-            'title' => 'Message in '.($event['channel'] ?? 'unknown channel'),
+            'title' => 'Message in ' . ($event['channel'] ?? 'unknown channel'),
             'content' => $event['text'] ?? '',
             'metadata' => [
                 'slack_message_id' => $event['ts'] ?? null,
@@ -313,7 +313,7 @@ class SlackPlugin extends WebhookPlugin
         $target = [
             'concept' => 'reaction',
             'type' => 'slack_reaction',
-            'title' => 'Reaction: '.$event['reaction'],
+            'title' => 'Reaction: ' . $event['reaction'],
             'content' => $event['reaction'],
             'metadata' => [
                 'reaction' => $event['reaction'],
@@ -404,7 +404,7 @@ class SlackPlugin extends WebhookPlugin
         }
 
         $baseString = "v0:{$timestamp}:{$body}";
-        $expectedSignature = 'v0='.hash_hmac('sha256', $baseString, $integration->account_id);
+        $expectedSignature = 'v0=' . hash_hmac('sha256', $baseString, $integration->account_id);
 
         return hash_equals($expectedSignature, $signature);
     }
@@ -441,7 +441,7 @@ class SlackPlugin extends WebhookPlugin
         $target = [
             'concept' => 'message',
             'type' => 'slack_message',
-            'title' => 'Message in '.($event['channel'] ?? 'unknown channel'),
+            'title' => 'Message in ' . ($event['channel'] ?? 'unknown channel'),
             'content' => $event['text'] ?? '',
             'metadata' => [
                 'slack_message_id' => $event['ts'] ?? null,
@@ -453,7 +453,7 @@ class SlackPlugin extends WebhookPlugin
 
         return [
             'events' => [[
-                'source_id' => $webhookPayload['event_id'] ?? 'slack_'.($event['ts'] ?? time()),
+                'source_id' => $webhookPayload['event_id'] ?? 'slack_' . ($event['ts'] ?? time()),
                 'time' => isset($event['ts']) ? date('Y-m-d H:i:s', $event['ts']) : now(),
                 'actor' => $actor,
                 'target' => $target,
@@ -503,7 +503,7 @@ class SlackPlugin extends WebhookPlugin
 
         return [
             'events' => [[
-                'source_id' => 'slack_reaction_'.($event['event_ts'] ?? time()),
+                'source_id' => 'slack_reaction_' . ($event['event_ts'] ?? time()),
                 'time' => isset($event['event_ts']) ? date('Y-m-d H:i:s', $event['event_ts']) : now(),
                 'actor' => $actor,
                 'target' => $target,
@@ -555,7 +555,7 @@ class SlackPlugin extends WebhookPlugin
 
         return [
             'events' => [[
-                'source_id' => 'slack_file_'.($event['event_ts'] ?? time()),
+                'source_id' => 'slack_file_' . ($event['event_ts'] ?? time()),
                 'time' => isset($event['event_ts']) ? date('Y-m-d H:i:s', $event['event_ts']) : now(),
                 'actor' => $actor,
                 'target' => $target,

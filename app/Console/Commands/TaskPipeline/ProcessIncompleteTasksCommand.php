@@ -63,7 +63,7 @@ class ProcessIncompleteTasksCommand extends Command
             foreach ($filters as $key => $value) {
                 $filterStrings[] = "{$key}={$value}";
             }
-            $this->comment('Filters: '.implode(', ', $filterStrings));
+            $this->comment('Filters: ' . implode(', ', $filterStrings));
         }
 
         $this->newLine();
@@ -119,7 +119,7 @@ class ProcessIncompleteTasksCommand extends Command
         $batchSize = (int) $this->option('batch-size');
         $filters = $this->getFilters();
 
-        $this->info('Starting batch processing for '.count($modelTypes).' model type(s)...');
+        $this->info('Starting batch processing for ' . count($modelTypes) . ' model type(s)...');
         $this->newLine();
 
         // Create progress record (use first user as owner for system commands)
@@ -133,7 +133,7 @@ class ProcessIncompleteTasksCommand extends Command
         $progressRecord = ActionProgress::createProgress(
             $userId,
             'task_pipeline_batch',
-            'batch_'.now()->timestamp,
+            'batch_' . now()->timestamp,
             'starting',
             'Starting batch task pipeline processing...',
             0

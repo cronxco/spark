@@ -58,7 +58,7 @@ class ArchiveBypassHandler
         $domain = FetchHttpClient::getDomainFromUrl($url);
 
         foreach ($excludedDomains as $excluded) {
-            if ($domain === $excluded || str_ends_with($domain, '.'.$excluded)) {
+            if ($domain === $excluded || str_ends_with($domain, '.' . $excluded)) {
                 Log::debug('Fetch: Domain excluded from archive bypass', [
                     'url' => $url,
                     'domain' => $domain,
@@ -146,7 +146,7 @@ class ArchiveBypassHandler
     protected function findArchivedVersion(string $url): ?string
     {
         // Build the archive.is search URL
-        $searchUrl = self::ARCHIVE_BASE_URL.'/'.$url;
+        $searchUrl = self::ARCHIVE_BASE_URL . '/' . $url;
 
         try {
             $response = $this->httpClient->get($searchUrl, [
@@ -213,7 +213,7 @@ class ArchiveBypassHandler
 
             // If it's a relative URL, make it absolute
             if (str_starts_with($archiveUrl, '/')) {
-                return self::ARCHIVE_BASE_URL.$archiveUrl;
+                return self::ARCHIVE_BASE_URL . $archiveUrl;
             }
         }
 
@@ -251,7 +251,7 @@ class ArchiveBypassHandler
                     continue;
                 }
 
-                return self::ARCHIVE_BASE_URL.'/'.ltrim($path, '/');
+                return self::ARCHIVE_BASE_URL . '/' . ltrim($path, '/');
             }
         }
 

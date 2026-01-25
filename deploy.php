@@ -60,7 +60,7 @@ task('deploy', [
 after('deploy:update_code', 'deploy:upload_version');
 task('deploy:upload_version', function () {
     // Make path absolute based on deploy.php location
-    $localPath = __DIR__.'/config/version.yml';
+    $localPath = __DIR__ . '/config/version.yml';
     $remotePath = '{{release_path}}/config/version.yml';
     if (! file_exists($localPath)) {
         writeln("<comment>⚠️ version.yml not found locally at {$localPath}, skipping upload.</comment>");
@@ -89,12 +89,12 @@ task('version:prepare', function () {
         'projects' => getenv('SENTRY_PROJECT_ARRAY'),
         'token' => getenv('SENTRY_TOKEN'),
         'environment' => 'production',
-        'version' => $ver.'+'.$commit,
+        'version' => $ver . '+' . $commit,
         'version_prefix' => getenv('SENTRY_PREFIX'),
         'sentry_server' => getenv('SENTRY_SERVER'),
     ]);
-    set('version', getenv('SENTRY_PREFIX').$ver.'+'.$commit);
-    writeln('<info>'.get('version').'</info>');
+    set('version', getenv('SENTRY_PREFIX') . $ver . '+' . $commit);
+    writeln('<info>' . get('version') . '</info>');
 });
 
 task('version:set', function () {

@@ -377,7 +377,7 @@ class Integration extends Model
         $count = count($times);
         $timesList = implode(', ', $times);
 
-        return $count.'× daily at '.$timesList.' ('.$tz.')';
+        return $count . '× daily at ' . $timesList . ' (' . $tz . ')';
     }
 
     /**

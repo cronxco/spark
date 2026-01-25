@@ -52,14 +52,14 @@ class GoCardlessIntegrationTest extends TestCase
             ['id' => 'test_bank_1', 'name' => 'Test Bank 1'],
             ['id' => 'test_bank_2', 'name' => 'Test Bank 2'],
         ];
-        session(['gocardless_institutions_'.$group->id => $institutions]);
+        session(['gocardless_institutions_' . $group->id => $institutions]);
 
         $resp = $this->post(route('integrations.gocardless.setInstitution', ['group' => $group->id]), [
             'institution_id' => 'test_bank_1',
         ]);
 
         $resp->assertRedirect(route('integrations.oauth', ['service' => 'gocardless']));
-        $this->assertEquals('test_bank_1', session('gocardless_institution_id_'.$group->id));
+        $this->assertEquals('test_bank_1', session('gocardless_institution_id_' . $group->id));
     }
 
     #[Test]
@@ -80,7 +80,7 @@ class GoCardlessIntegrationTest extends TestCase
             ['id' => 'test_bank_1', 'name' => 'Test Bank 1'],
             ['id' => 'test_bank_2', 'name' => 'Test Bank 2'],
         ];
-        session(['gocardless_institutions_'.$group->id => $institutions]);
+        session(['gocardless_institutions_' . $group->id => $institutions]);
 
         $resp = $this->get(route('integrations.gocardless.bankSelection', ['group' => $group->id]));
 
@@ -104,7 +104,7 @@ class GoCardlessIntegrationTest extends TestCase
         ]);
 
         // Ensure no institutions are in session to simulate API failure
-        session(['gocardless_institutions_'.$group->id => []]);
+        session(['gocardless_institutions_' . $group->id => []]);
 
         $resp = $this->get(route('integrations.gocardless.bankSelection', ['group' => $group->id]));
 
@@ -113,7 +113,7 @@ class GoCardlessIntegrationTest extends TestCase
         $resp->assertSee('API credentials not configured correctly');
 
         // Verify no banks are in session
-        $this->assertEmpty(session('gocardless_institutions_'.$group->id));
+        $this->assertEmpty(session('gocardless_institutions_' . $group->id));
     }
 
     #[Test]
@@ -130,7 +130,7 @@ class GoCardlessIntegrationTest extends TestCase
         ]);
 
         // Set institution in session
-        Session::put('gocardless_institution_id_'.$group->id, 'test_bank_1');
+        Session::put('gocardless_institution_id_' . $group->id, 'test_bank_1');
 
         $plugin = new GoCardlessBankPlugin;
 

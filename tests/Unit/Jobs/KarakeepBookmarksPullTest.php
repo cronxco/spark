@@ -67,7 +67,7 @@ class KarakeepBookmarksPullTest extends TestCase
         $job = new KarakeepBookmarksPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('karakeep_bookmarks_'.$this->integration->id, $uniqueId);
+        $this->assertStringContainsString('karakeep_bookmarks_' . $this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

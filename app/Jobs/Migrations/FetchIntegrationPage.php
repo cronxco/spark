@@ -55,7 +55,7 @@ class FetchIntegrationPage implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping('monzo:migration:'.$this->integration->id))
+            (new WithoutOverlapping('monzo:migration:' . $this->integration->id))
                 ->expireAfter(120),
         ];
     }
@@ -134,7 +134,7 @@ class FetchIntegrationPage implements ShouldQueue
                 return;
             }
             // Backoff and retry via job retries
-            throw new RuntimeException('Oura fetch failed with status '.$status);
+            throw new RuntimeException('Oura fetch failed with status ' . $status);
         }
 
         $items = $resp['items'] ?? [];
@@ -198,7 +198,7 @@ class FetchIntegrationPage implements ShouldQueue
             return;
         }
         if (! $resp->successful()) {
-            throw new RuntimeException('Spotify fetch failed: '.$resp->status());
+            throw new RuntimeException('Spotify fetch failed: ' . $resp->status());
         }
         $json = $resp->json();
         $items = $json['items'] ?? [];
@@ -348,7 +348,7 @@ class FetchIntegrationPage implements ShouldQueue
             return;
         }
         if (! $resp->successful()) {
-            throw new RuntimeException('GitHub fetch failed: '.$resp->status());
+            throw new RuntimeException('GitHub fetch failed: ' . $resp->status());
         }
         $items = $resp->json() ?? [];
         if (empty($items)) {
@@ -430,7 +430,7 @@ class FetchIntegrationPage implements ShouldQueue
             }
 
             if (! $accountsResp->successful()) {
-                throw new RuntimeException('Monzo accounts fetch failed: '.$accountsResp->status());
+                throw new RuntimeException('Monzo accounts fetch failed: ' . $accountsResp->status());
             }
 
             $accounts = $accountsResp->json('accounts') ?? [];
@@ -585,7 +585,7 @@ class FetchIntegrationPage implements ShouldQueue
 
         // Fetch bookmarks for this page
         $resp = Http::withToken($accessToken)
-            ->get($baseUrl.'/api/v1/bookmarks', [
+            ->get($baseUrl . '/api/v1/bookmarks', [
                 'limit' => $perPage,
                 'offset' => ($page - 1) * $perPage,
                 'sort' => 'createdAt',
@@ -602,7 +602,7 @@ class FetchIntegrationPage implements ShouldQueue
         }
 
         if (! $resp->successful()) {
-            throw new RuntimeException('Karakeep fetch failed: '.$resp->status().' - '.$resp->body());
+            throw new RuntimeException('Karakeep fetch failed: ' . $resp->status() . ' - ' . $resp->body());
         }
 
         $json = $resp->json();
@@ -672,12 +672,12 @@ class FetchIntegrationPage implements ShouldQueue
 
     private function gcCacheKey(string $suffix): string
     {
-        return 'gocardless:migration:'.$this->integration->id.':'.$suffix;
+        return 'gocardless:migration:' . $this->integration->id . ':' . $suffix;
     }
 
     private function cacheKey(string $suffix): string
     {
-        return 'monzo:migration:'.$this->integration->id.':'.$suffix;
+        return 'monzo:migration:' . $this->integration->id . ':' . $suffix;
     }
 
     private function getValidMonzoToken(?IntegrationGroup $group, bool $forceRefresh = false): ?string
@@ -833,7 +833,7 @@ class FetchIntegrationPage implements ShouldQueue
             if ($oldestTime->format('Y-m') === $newestTime->format('Y-m')) {
                 $statistics['date_range'] = $newestTime->format('M Y');
             } else {
-                $statistics['date_range'] = $oldestTime->format('M Y').' - '.$newestTime->format('M Y');
+                $statistics['date_range'] = $oldestTime->format('M Y') . ' - ' . $newestTime->format('M Y');
             }
         }
 

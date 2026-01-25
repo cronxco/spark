@@ -204,7 +204,7 @@ class PhotoClusteringServiceTest extends TestCase
         string $type = 'IMAGE'
     ): array {
         return [
-            'id' => 'photo-'.md5($timestamp.$latitude.$longitude),
+            'id' => 'photo-' . md5($timestamp . $latitude . $longitude),
             'type' => $type,
             'fileCreatedAt' => $timestamp,
             'createdAt' => $timestamp,

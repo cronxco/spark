@@ -42,10 +42,10 @@ class MetricSearchQuery
                         $metric->action
                     );
 
-                    $subtitle = ucfirst($metric->service).' • '.$formattedValue;
+                    $subtitle = ucfirst($metric->service) . ' • ' . $formattedValue;
 
                     if ($metric->recent_anomalies_count > 0) {
-                        $subtitle .= ' • '.$metric->recent_anomalies_count.' recent '.str('anomaly')->plural($metric->recent_anomalies_count);
+                        $subtitle .= ' • ' . $metric->recent_anomalies_count . ' recent ' . str('anomaly')->plural($metric->recent_anomalies_count);
                     }
 
                     // Boost priority for metrics with unacknowledged trends
@@ -54,7 +54,7 @@ class MetricSearchQuery
                     return SpotlightResult::make()
                         ->setTitle($metric->getDisplayName())
                         ->setSubtitle($subtitle)
-                        ->setTypeahead('Metric: '.$metric->getDisplayName())
+                        ->setTypeahead('Metric: ' . $metric->getDisplayName())
                         ->setIcon('chart-bar')
                         ->setGroup('metrics')
                         ->setPriority($priority)

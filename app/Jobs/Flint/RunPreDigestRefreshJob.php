@@ -110,7 +110,7 @@ class RunPreDigestRefreshJob implements ShouldQueue
                         return 'null';
                     }
                     if (is_array($r)) {
-                        return 'array('.count($r).' items)';
+                        return 'array(' . count($r) . ' items)';
                     }
 
                     return gettype($r);

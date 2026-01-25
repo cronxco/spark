@@ -161,7 +161,7 @@ class ListIcons extends Command
             ];
         }
 
-        $relativePath = str_replace(base_path().'/', '', $filePath);
+        $relativePath = str_replace(base_path() . '/', '', $filePath);
         if (! in_array($relativePath, $iconUsage[$icon]['files'])) {
             $iconUsage[$icon]['files'][] = $relativePath;
         }
@@ -325,19 +325,19 @@ class ListIcons extends Command
 
         // Add prefix info
         if (str_starts_with($icon, 'o-')) {
-            return $formatted.' (HeroIcon Outline)';
+            return $formatted . ' (HeroIcon Outline)';
         }
 
         if (str_starts_with($icon, 'fas.')) {
-            return $formatted.' (FontAwesome Solid)';
+            return $formatted . ' (FontAwesome Solid)';
         }
 
         if (str_starts_with($icon, 'fab.')) {
-            return $formatted.' (FontAwesome Brand)';
+            return $formatted . ' (FontAwesome Brand)';
         }
 
         if (str_starts_with($icon, 'far.')) {
-            return $formatted.' (FontAwesome Regular)';
+            return $formatted . ' (FontAwesome Regular)';
         }
 
         return $formatted;

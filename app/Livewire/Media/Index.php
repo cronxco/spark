@@ -109,8 +109,8 @@ class Index extends Component
         // Search filter
         if ($this->search) {
             $deduplicatedQuery->where(function ($q) {
-                $q->where('name', 'ilike', '%'.$this->search.'%')
-                    ->orWhere('file_name', 'ilike', '%'.$this->search.'%');
+                $q->where('name', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('file_name', 'ilike', '%' . $this->search . '%');
             });
         }
 
@@ -232,7 +232,7 @@ class Index extends Component
             $this->selectedItems = [];
             $this->resetPage();
         } catch (Exception $e) {
-            $this->error('Failed to delete: '.$e->getMessage());
+            $this->error('Failed to delete: ' . $e->getMessage());
         }
     }
 

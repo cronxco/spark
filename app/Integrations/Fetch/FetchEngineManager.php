@@ -335,7 +335,7 @@ class FetchEngineManager
     protected function domainRequiresJavaScript(string $domain): bool
     {
         foreach ($this->jsRequiredDomains as $requiredDomain) {
-            if ($domain === $requiredDomain || str_ends_with($domain, '.'.$requiredDomain)) {
+            if ($domain === $requiredDomain || str_ends_with($domain, '.' . $requiredDomain)) {
                 return true;
             }
         }

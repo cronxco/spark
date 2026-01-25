@@ -366,7 +366,7 @@ class AgentWorkingMemoryService
      */
     protected function getCacheKey(string $userId): string
     {
-        return self::CACHE_PREFIX.$userId;
+        return self::CACHE_PREFIX . $userId;
     }
 
     /**

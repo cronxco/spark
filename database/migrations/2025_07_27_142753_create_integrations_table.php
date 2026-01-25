@@ -27,10 +27,10 @@ return new class extends Migration
             // Indexes for performance
             $table->index('user_id');
             $table->index('integration_group_id');
-            $table->index('migration_batch_id', Schema::getConnection()->getTablePrefix().'integrations_migration_batch_id_index');
+            $table->index('migration_batch_id', Schema::getConnection()->getTablePrefix() . 'integrations_migration_batch_id_index');
             // Foreign keys
-            $table->foreign('user_id', Schema::getConnection()->getTablePrefix().'integrations_user_id_foreign')->references('id')->on('users');
-            $table->foreign('integration_group_id', Schema::getConnection()->getTablePrefix().'integrations_integration_group_id_foreign')
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'integrations_user_id_foreign')->references('id')->on('users');
+            $table->foreign('integration_group_id', Schema::getConnection()->getTablePrefix() . 'integrations_integration_group_id_foreign')
                 ->references('id')
                 ->on('integration_groups')
                 ->onDelete('cascade');

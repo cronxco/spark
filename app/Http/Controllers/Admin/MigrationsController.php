@@ -67,7 +67,7 @@ class MigrationsController extends Controller
             ]);
 
             return redirect()->route('admin.migrations.index')
-                ->with('error', 'Failed to dispatch migration: '.$e->getMessage());
+                ->with('error', 'Failed to dispatch migration: ' . $e->getMessage());
         }
     }
 }

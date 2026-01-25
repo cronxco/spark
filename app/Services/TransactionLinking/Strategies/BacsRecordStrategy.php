@@ -80,7 +80,7 @@ class BacsRecordStrategy implements LinkingStrategy
             ->where('id', '!=', $event->id)
             ->where('service', 'monzo')
             ->whereIn('action', ['pot_withdrawal_to', 'pot_transfer_from'])
-            ->whereRaw("event_metadata->'raw'->'metadata'->>'external_id' LIKE ?", ['%'.$bacsRecordId.'%'])
+            ->whereRaw("event_metadata->'raw'->'metadata'->>'external_id' LIKE ?", ['%' . $bacsRecordId . '%'])
             ->get();
 
         foreach ($potWithdrawals as $potWithdrawal) {

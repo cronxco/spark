@@ -132,14 +132,14 @@ class GenerateDailyDigestJob implements ShouldQueue
 
     private function createDigestEventObject(): EventObject
     {
-        $title = Carbon::now()->format('Y-m-d').' '.
+        $title = Carbon::now()->format('Y-m-d') . ' ' .
                  ($this->period === 'morning' ? 'AM' : 'PM');
 
         return EventObject::firstOrCreate(
             [
                 'user_id' => $this->user->id,
                 'concept' => 'digest',
-                'type' => $this->period.'_digest',
+                'type' => $this->period . '_digest',
                 'title' => $title,
             ],
             [
@@ -232,7 +232,7 @@ class GenerateDailyDigestJob implements ShouldQueue
                 'value' => count($digestData['key_points']),
                 'time' => now(),
                 'metadata' => [
-                    'content' => implode("\n", array_map(fn ($p, $i) => ($i + 1).'. '.$p, $digestData['key_points'], array_keys($digestData['key_points']))),
+                    'content' => implode("\n", array_map(fn ($p, $i) => ($i + 1) . '. ' . $p, $digestData['key_points'], array_keys($digestData['key_points']))),
                     'points' => $digestData['key_points'],
                     'period' => $this->period,
                 ],
@@ -337,7 +337,7 @@ class GenerateDailyDigestJob implements ShouldQueue
                 ? " (Due: {$action['suggested_due_date']})"
                 : '';
 
-            return ($index + 1).". [{$priority}] {$action['title']}{$dueDate}\n   {$action['description']}";
+            return ($index + 1) . ". [{$priority}] {$action['title']}{$dueDate}\n   {$action['description']}";
         }, $actions, array_keys($actions)));
     }
 
@@ -349,7 +349,7 @@ class GenerateDailyDigestJob implements ShouldQueue
                 ? " ({$alert['related_service']})"
                 : '';
 
-            return ($index + 1).". [{$severity}] {$alert['title']}{$service}\n   {$alert['description']}";
+            return ($index + 1) . ". [{$severity}] {$alert['title']}{$service}\n   {$alert['description']}";
         }, $alerts, array_keys($alerts)));
     }
 

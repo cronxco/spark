@@ -260,7 +260,7 @@ class AssistantContextService
         $currentGroup = null;
 
         foreach ($events as $event) {
-            $key = $event->service.'::'.$event->action;
+            $key = $event->service . '::' . $event->action;
             $hour = to_user_timezone($event->time, $user)->format('H');
 
             if ($currentKey !== $key || $currentHour !== $hour) {
@@ -308,7 +308,7 @@ class AssistantContextService
 
         // Get timezone hour range
         $sampleTime = $sample ? to_user_timezone($sample->time, $user) : null;
-        $timezoneHour = $sampleTime ? $sampleTime->format('H:00').' - '.$sampleTime->copy()->addHour()->format('H:00').' '.$sampleTime->format('T') : '';
+        $timezoneHour = $sampleTime ? $sampleTime->format('H:00') . ' - ' . $sampleTime->copy()->addHour()->format('H:00') . ' ' . $sampleTime->format('T') : '';
 
         return [
             'service' => $group['service'],
@@ -317,7 +317,7 @@ class AssistantContextService
             'timezone_hour' => $timezoneHour,
             'count' => $count,
             'object_type_plural' => $objectTypePlural,
-            'summary' => $formattedAction.' '.$count.' '.$objectTypePlural,
+            'summary' => $formattedAction . ' ' . $count . ' ' . $objectTypePlural,
             'is_condensed' => $count >= 4,
             'formatted_action' => $formattedAction,
             'first_event' => $this->transformEvent($group['events'][0], $config, $metricsCache),
@@ -462,7 +462,7 @@ class AssistantContextService
 
         // Limit content to 500 chars to save tokens
         if (mb_strlen($content, 'UTF-8') > 500) {
-            $content = mb_substr($content, 0, 500, 'UTF-8').'...';
+            $content = mb_substr($content, 0, 500, 'UTF-8') . '...';
         }
 
         $data = [

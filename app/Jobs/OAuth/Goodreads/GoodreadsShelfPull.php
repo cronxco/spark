@@ -33,7 +33,7 @@ class GoodreadsShelfPull extends BaseFetchJob
         $shelf = GoodreadsPlugin::getShelfFromInstanceType($this->integration->instance_type);
 
         if (! $shelf) {
-            throw new Exception('Invalid instance type for shelf feed: '.$this->integration->instance_type);
+            throw new Exception('Invalid instance type for shelf feed: ' . $this->integration->instance_type);
         }
 
         $rssUrl = GoodreadsPlugin::buildShelfUrl($userId, $apiKey, $shelf);
@@ -43,7 +43,7 @@ class GoodreadsShelfPull extends BaseFetchJob
         $result = $fetchManager->fetch($rssUrl, $group);
 
         if ($result['error']) {
-            throw new Exception('RSS fetch failed: '.$result['error']);
+            throw new Exception('RSS fetch failed: ' . $result['error']);
         }
 
         // Parse XML

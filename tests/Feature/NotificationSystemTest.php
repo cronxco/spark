@@ -324,7 +324,7 @@ class NotificationSystemTest extends TestCase
 
         $mailMessage = $notification->toMail($this->user);
 
-        $this->assertStringContainsString('Hello '.$this->user->name, $mailMessage->greeting);
+        $this->assertStringContainsString('Hello ' . $this->user->name, $mailMessage->greeting);
         $this->assertStringContainsString('completed successfully', collect($mailMessage->introLines)->first());
         $this->assertEquals('View Integration', $mailMessage->actionText);
     }
@@ -518,7 +518,7 @@ class NotificationSystemTest extends TestCase
 
         $mailMessage = $notification->toMail($this->user);
 
-        $this->assertStringContainsString('Hello '.$this->user->name, $mailMessage->greeting);
+        $this->assertStringContainsString('Hello ' . $this->user->name, $mailMessage->greeting);
         $this->assertStringContainsString('1,500', collect($mailMessage->introLines)->implode(' '));
         $this->assertStringContainsString('Jan 2023 - Dec 2024', collect($mailMessage->introLines)->implode(' '));
         $this->assertEquals('Explore Your Data', $mailMessage->actionText);
@@ -536,7 +536,7 @@ class NotificationSystemTest extends TestCase
 
         $mailMessage = $notification->toMail($this->user);
 
-        $this->assertStringContainsString('Hello '.$this->user->name, $mailMessage->greeting);
+        $this->assertStringContainsString('Hello ' . $this->user->name, $mailMessage->greeting);
         $this->assertStringContainsString('re-authorize', collect($mailMessage->introLines)->implode(' '));
         $this->assertEquals('Re-authorize Connection', $mailMessage->actionText);
     }

@@ -119,7 +119,7 @@ class FetchIntegrationData extends Command
                 $successCount++;
 
             } catch (Exception $e) {
-                $this->error("Failed to schedule job for integration {$integration->id} ({$integration->service}): ".$e->getMessage());
+                $this->error("Failed to schedule job for integration {$integration->id} ({$integration->service}): " . $e->getMessage());
                 $errorCount++;
             }
         }

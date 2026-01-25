@@ -158,7 +158,7 @@ class TflStationLookup
             $modes = $mode ?? 'tube,dlr,overground,elizabeth-line,tram,national-rail,bus';
 
             $response = Http::timeout(10)
-                ->get(self::TFL_API_BASE.'/StopPoint/Search', [
+                ->get(self::TFL_API_BASE . '/StopPoint/Search', [
                     'query' => $stationName,
                     'modes' => $modes,
                     'maxResults' => 5,

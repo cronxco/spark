@@ -181,7 +181,7 @@ class FetchSingleUrl implements ShouldQueue
                 if ($screenshot && $shouldTryArchive) {
                     try {
                         $mediaHelper = app(MediaDownloadHelper::class);
-                        $fileName = 'error-screenshot-'.now()->format('Y-m-d-His').'.png';
+                        $fileName = 'error-screenshot-' . now()->format('Y-m-d-His') . '.png';
 
                         $mediaHelper->attachMediaFromBase64(
                             $screenshot,
@@ -272,7 +272,7 @@ class FetchSingleUrl implements ShouldQueue
                 'url' => $this->url,
                 'error' => $e->getMessage(),
             ]);
-            $this->updateWebpageError($webpage, 'HTTP error: '.$e->getMessage());
+            $this->updateWebpageError($webpage, 'HTTP error: ' . $e->getMessage());
 
             // Update history with failure
             $engine->updateLastHistoryEntry($webpage, [
@@ -299,7 +299,7 @@ class FetchSingleUrl implements ShouldQueue
                 'url' => $this->url,
                 'error' => $e->getMessage(),
             ]);
-            $this->updateWebpageError($webpage, 'Error: '.$e->getMessage());
+            $this->updateWebpageError($webpage, 'Error: ' . $e->getMessage());
 
             // Update history with failure
             $engine->updateLastHistoryEntry($webpage, [
@@ -327,7 +327,7 @@ class FetchSingleUrl implements ShouldQueue
 
         $webpage = EventObject::find($this->webpageObjectId);
         if ($webpage) {
-            $this->updateWebpageError($webpage, 'Failed after 3 attempts: '.$exception->getMessage());
+            $this->updateWebpageError($webpage, 'Failed after 3 attempts: ' . $exception->getMessage());
         }
     }
 
@@ -416,7 +416,7 @@ class FetchSingleUrl implements ShouldQueue
                 'url' => $this->url,
                 'error' => $e->getMessage(),
             ]);
-            $this->updateWebpageError($webpage, 'PDF download failed: '.$e->getMessage());
+            $this->updateWebpageError($webpage, 'PDF download failed: ' . $e->getMessage());
         }
     }
 
@@ -509,7 +509,7 @@ class FetchSingleUrl implements ShouldQueue
         // Store screenshot only for 'once' fetch mode (fetch-once bookmarks)
         if ($fetchMode === 'once' && $screenshot) {
             try {
-                $fileName = 'screenshot-'.now()->format('Y-m-d-His').'.png';
+                $fileName = 'screenshot-' . now()->format('Y-m-d-His') . '.png';
 
                 $mediaHelper->attachMediaFromBase64(
                     $screenshot,

@@ -238,7 +238,7 @@ class FinancialAccountShow extends Component
             }
         } else {
             // Strip matching prefix from the visible value if present
-            if (preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $m) === 1) {
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
                 $name = trim($m[1]);
             }
         }
@@ -281,7 +281,7 @@ class FinancialAccountShow extends Component
             }
         } else {
             // Strip matching prefix from the visible value if present
-            if (preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $m) === 1) {
+            if (preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $m) === 1) {
                 $name = trim($m[1]);
             }
         }
@@ -299,7 +299,7 @@ class FinancialAccountShow extends Component
 
     public function notifyCopied(string $what): void
     {
-        $this->success($what.' copied to clipboard!');
+        $this->success($what . ' copied to clipboard!');
     }
 
     public function openCreateTagModal(): void

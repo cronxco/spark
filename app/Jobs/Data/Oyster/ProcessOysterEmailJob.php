@@ -87,7 +87,7 @@ class ProcessOysterEmailJob implements ShouldQueue
                 $statementPeriod = $pdfParser->extractStatementPeriod($pdfContent);
 
                 Log::info('Oyster: Extracted PDF data', [
-                    'card_number' => $cardNumber ? substr($cardNumber, 0, 4).'****'.substr($cardNumber, -4) : null,
+                    'card_number' => $cardNumber ? substr($cardNumber, 0, 4) . '****' . substr($cardNumber, -4) : null,
                     'statement_period' => $statementPeriod,
                 ]);
             }
@@ -136,7 +136,7 @@ class ProcessOysterEmailJob implements ShouldQueue
             ? md5($this->s3ObjectKey)
             : md5($this->rawEmailContent ?? '');
 
-        return 'process_oyster_email_'.$this->integration->id.'_'.$contentHash;
+        return 'process_oyster_email_' . $this->integration->id . '_' . $contentHash;
     }
 
     /**
@@ -183,7 +183,7 @@ class ProcessOysterEmailJob implements ShouldQueue
     {
         // Create a display name for the card
         $displayName = $cardNumber
-            ? 'Oyster Card ****'.substr($cardNumber, -4)
+            ? 'Oyster Card ****' . substr($cardNumber, -4)
             : 'Oyster Card';
 
         return EventObject::firstOrCreate(
@@ -223,8 +223,8 @@ class ProcessOysterEmailJob implements ShouldQueue
             );
 
             // Create source_id for idempotency
-            $touchedInSourceId = 'oyster_in_'.md5(
-                $journey['date'].'|'.$journey['start_time'].'|'.$journey['origin']
+            $touchedInSourceId = 'oyster_in_' . md5(
+                $journey['date'] . '|' . $journey['start_time'] . '|' . $journey['origin']
             );
 
             // Convert fare from pounds to pence (value must be integer)
@@ -270,8 +270,8 @@ class ProcessOysterEmailJob implements ShouldQueue
                     $this->integration->user_id
                 );
 
-                $touchedOutSourceId = 'oyster_out_'.md5(
-                    $journey['date'].'|'.($journey['end_time'] ?? $journey['start_time']).'|'.$journey['destination']
+                $touchedOutSourceId = 'oyster_out_' . md5(
+                    $journey['date'] . '|' . ($journey['end_time'] ?? $journey['start_time']) . '|' . $journey['destination']
                 );
 
                 $touchedOutEvent = Event::updateOrCreate(
@@ -324,8 +324,8 @@ class ProcessOysterEmailJob implements ShouldQueue
                 continue;
             }
 
-            $sourceId = 'oyster_'.$actionType.'_'.md5(
-                $entry['date'].'|'.$entry['time'].'|'.$entry['raw_action']
+            $sourceId = 'oyster_' . $actionType . '_' . md5(
+                $entry['date'] . '|' . $entry['time'] . '|' . $entry['raw_action']
             );
 
             // Determine value based on action type (convert from pounds to pence)

@@ -71,7 +71,7 @@ class GoogleCalendarEventsPullTest extends TestCase
         $job = new GoogleCalendarEventsPull($this->integration);
         $uniqueId = $job->uniqueId();
 
-        $this->assertStringContainsString('google-calendar_events_'.$this->integration->id, $uniqueId);
+        $this->assertStringContainsString('google-calendar_events_' . $this->integration->id, $uniqueId);
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 

@@ -32,7 +32,7 @@ class PluginTypeValidationTest extends TestCase
             foreach ($errors as $plugin => $pluginErrors) {
                 $errorMessage .= "\nPlugin: {$plugin}\n";
                 foreach ($pluginErrors as $type => $undefinedTypes) {
-                    $errorMessage .= "  {$type}: ".implode(', ', $undefinedTypes)."\n";
+                    $errorMessage .= "  {$type}: " . implode(', ', $undefinedTypes) . "\n";
                 }
             }
             $this->fail($errorMessage);
@@ -59,7 +59,7 @@ class PluginTypeValidationTest extends TestCase
             foreach ($errors as $plugin => $pluginErrors) {
                 $errorMessage .= "\nPlugin: {$plugin}\n";
                 foreach ($pluginErrors as $type => $unusedTypes) {
-                    $errorMessage .= "  {$type}: ".implode(', ', $unusedTypes)."\n";
+                    $errorMessage .= "  {$type}: " . implode(', ', $unusedTypes) . "\n";
                 }
             }
             $this->fail($errorMessage);

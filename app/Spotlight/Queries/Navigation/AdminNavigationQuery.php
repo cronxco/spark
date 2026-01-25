@@ -86,7 +86,7 @@ class AdminNavigationQuery
                         SpotlightResult::make()
                             ->setTitle($routeConfig['title'])
                             ->setSubtitle($routeConfig['subtitle'])
-                            ->setTypeahead('Go to '.$routeConfig['title'])
+                            ->setTypeahead('Go to ' . $routeConfig['title'])
                             ->setIcon($routeConfig['icon'])
                             ->setGroup('admin')
                             ->setPriority(1)

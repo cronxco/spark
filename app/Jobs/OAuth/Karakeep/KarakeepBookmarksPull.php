@@ -61,12 +61,12 @@ class KarakeepBookmarksPull extends BaseFetchJob
         $plugin->logApiRequest('GET', '/api/v1/users/me', ['Authorization' => '[REDACTED]'], [], (string) $this->integration->id);
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/users/me'));
         $userResponse = Http::withToken($accessToken)
-            ->get($baseUrl.'/api/v1/users/me');
+            ->get($baseUrl . '/api/v1/users/me');
         $span?->finish();
         $plugin->logApiResponse('GET', '/api/v1/users/me', $userResponse->status(), $userResponse->body(), $userResponse->headers(), (string) $this->integration->id);
 
         if (! $userResponse->successful()) {
-            throw new Exception('Failed to fetch Karakeep user info: '.$userResponse->body());
+            throw new Exception('Failed to fetch Karakeep user info: ' . $userResponse->body());
         }
 
         $userData = $userResponse->json();
@@ -80,12 +80,12 @@ class KarakeepBookmarksPull extends BaseFetchJob
         $plugin->logApiRequest('GET', '/api/v1/bookmarks', ['Authorization' => '[REDACTED]'], $bookmarksQuery, (string) $this->integration->id);
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/bookmarks'));
         $bookmarksResponse = Http::withToken($accessToken)
-            ->get($baseUrl.'/api/v1/bookmarks', $bookmarksQuery);
+            ->get($baseUrl . '/api/v1/bookmarks', $bookmarksQuery);
         $span?->finish();
         $plugin->logApiResponse('GET', '/api/v1/bookmarks', $bookmarksResponse->status(), $bookmarksResponse->body(), $bookmarksResponse->headers(), (string) $this->integration->id);
 
         if (! $bookmarksResponse->successful()) {
-            throw new Exception('Failed to fetch Karakeep bookmarks: '.$bookmarksResponse->body());
+            throw new Exception('Failed to fetch Karakeep bookmarks: ' . $bookmarksResponse->body());
         }
 
         $bookmarksData = $bookmarksResponse->json();
@@ -94,7 +94,7 @@ class KarakeepBookmarksPull extends BaseFetchJob
         $plugin->logApiRequest('GET', '/api/v1/tags', ['Authorization' => '[REDACTED]'], [], (string) $this->integration->id);
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/tags'));
         $tagsResponse = Http::withToken($accessToken)
-            ->get($baseUrl.'/api/v1/tags');
+            ->get($baseUrl . '/api/v1/tags');
         $span?->finish();
         $plugin->logApiResponse('GET', '/api/v1/tags', $tagsResponse->status(), $tagsResponse->body(), $tagsResponse->headers(), (string) $this->integration->id);
 
@@ -112,7 +112,7 @@ class KarakeepBookmarksPull extends BaseFetchJob
         $plugin->logApiRequest('GET', '/api/v1/lists', ['Authorization' => '[REDACTED]'], [], (string) $this->integration->id);
         $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/lists'));
         $listsResponse = Http::withToken($accessToken)
-            ->get($baseUrl.'/api/v1/lists');
+            ->get($baseUrl . '/api/v1/lists');
         $span?->finish();
         $plugin->logApiResponse('GET', '/api/v1/lists', $listsResponse->status(), $listsResponse->body(), $listsResponse->headers(), (string) $this->integration->id);
 
@@ -132,7 +132,7 @@ class KarakeepBookmarksPull extends BaseFetchJob
             $plugin->logApiRequest('GET', '/api/v1/highlights', ['Authorization' => '[REDACTED]'], [], (string) $this->integration->id);
             $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/highlights'));
             $highlightsResponse = Http::withToken($accessToken)
-                ->get($baseUrl.'/api/v1/highlights');
+                ->get($baseUrl . '/api/v1/highlights');
             $span?->finish();
             $plugin->logApiResponse('GET', '/api/v1/highlights', $highlightsResponse->status(), $highlightsResponse->body(), $highlightsResponse->headers(), (string) $this->integration->id);
 

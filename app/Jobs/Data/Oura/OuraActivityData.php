@@ -86,7 +86,7 @@ class OuraActivityData extends BaseProcessingJob
 
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $day.' 00:00:00',
+            'time' => $day . ' 00:00:00',
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
@@ -163,7 +163,7 @@ class OuraActivityData extends BaseProcessingJob
                     'data_points' => count($class5Min),
                     'class_5_min' => $class5Min,
                 ],
-                'content' => count($class5Min).' data points',
+                'content' => count($class5Min) . ' data points',
                 'value' => count($class5Min),
                 'value_multiplier' => 1,
                 'value_unit' => 'data_points',
@@ -183,7 +183,7 @@ class OuraActivityData extends BaseProcessingJob
                     'data_points' => count($met),
                     'met_data' => $met,
                 ],
-                'content' => count($met).' MET measurements',
+                'content' => count($met) . ' MET measurements',
                 'value' => count($met),
                 'value_multiplier' => 1,
                 'value_unit' => 'data_points',

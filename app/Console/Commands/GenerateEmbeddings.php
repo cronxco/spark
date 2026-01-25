@@ -41,9 +41,9 @@ class GenerateEmbeddings extends Command
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
 
         $this->info('Starting embedding generation...');
-        $this->info('Type: '.$type);
-        $this->info('Force: '.($force ? 'Yes' : 'No'));
-        $this->info('Batch size: '.$batchSize);
+        $this->info('Type: ' . $type);
+        $this->info('Force: ' . ($force ? 'Yes' : 'No'));
+        $this->info('Batch size: ' . $batchSize);
 
         if ($type === 'all' || $type === 'events') {
             $this->generateEventEmbeddings($force, $batchSize, $limit);

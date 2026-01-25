@@ -154,7 +154,7 @@ class SlackEventsHookTest extends TestCase
         $timestamp = time();
         $body = json_encode($payload);
         $baseString = "v0:{$timestamp}:{$body}";
-        $signature = 'v0='.hash_hmac('sha256', $baseString, $this->group->account_id);
+        $signature = 'v0=' . hash_hmac('sha256', $baseString, $this->group->account_id);
 
         $headers = [
             'x-slack-signature' => [$signature],

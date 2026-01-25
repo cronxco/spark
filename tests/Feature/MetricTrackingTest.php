@@ -88,7 +88,7 @@ class MetricTrackingTest extends TestCase
         // Create 40 events over 40 days with varying values
         for ($i = 0; $i < 40; $i++) {
             Event::create([
-                'source_id' => 'test-'.$i,
+                'source_id' => 'test-' . $i,
                 'time' => now()->subDays(40 - $i),
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,

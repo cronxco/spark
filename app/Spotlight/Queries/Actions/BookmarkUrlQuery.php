@@ -27,7 +27,7 @@ class BookmarkUrlQuery
                 SpotlightResult::make()
                     ->setTitle('Bookmark This URL')
                     ->setSubtitle($query)
-                    ->setTypeahead('Bookmark: '.$query)
+                    ->setTypeahead('Bookmark: ' . $query)
                     ->setIcon('bookmark')
                     ->setGroup('actions')
                     ->setPriority(1)
@@ -51,7 +51,7 @@ class BookmarkUrlQuery
         }
 
         // Try adding http:// and validate
-        $withProtocol = 'http://'.$input;
+        $withProtocol = 'http://' . $input;
         if (filter_var($withProtocol, FILTER_VALIDATE_URL) !== false) {
             // Make sure it has at least a domain-like structure
             return preg_match('/^[a-z0-9.-]+\.[a-z]{2,}/', $input);

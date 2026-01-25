@@ -147,7 +147,7 @@ class AssistantPromptingService
         }
 
         throw new RuntimeException(
-            'Failed to generate agent response after '.self::MAX_RETRIES.' attempts: '.
+            'Failed to generate agent response after ' . self::MAX_RETRIES . ' attempts: ' .
             $lastException->getMessage()
         );
     }
@@ -428,7 +428,7 @@ USER;
                 $decoded = json_decode($content, true);
 
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new RuntimeException('Invalid JSON response from OpenAI: '.json_last_error_msg());
+                    throw new RuntimeException('Invalid JSON response from OpenAI: ' . json_last_error_msg());
                 }
 
                 return $decoded;
@@ -451,7 +451,7 @@ USER;
         }
 
         throw new RuntimeException(
-            'Failed to generate digest after '.self::MAX_RETRIES.' attempts: '.
+            'Failed to generate digest after ' . self::MAX_RETRIES . ' attempts: ' .
             $lastException->getMessage()
         );
     }

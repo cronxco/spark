@@ -26,15 +26,15 @@ return new class extends Migration
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
 
             // Foreign key
-            $table->foreign('metric_statistic_id', Schema::getConnection()->getTablePrefix().'metric_trends_stat_id_foreign')
+            $table->foreign('metric_statistic_id', Schema::getConnection()->getTablePrefix() . 'metric_trends_stat_id_foreign')
                 ->references('id')->on('metric_statistics')->onDelete('cascade');
 
             // Index for querying unacknowledged trends by metric and type
             $table->index(['metric_statistic_id', 'type', 'acknowledged_at'],
-                Schema::getConnection()->getTablePrefix().'metric_trends_query_idx');
+                Schema::getConnection()->getTablePrefix() . 'metric_trends_query_idx');
 
             // Index for recent trends
-            $table->index('detected_at', Schema::getConnection()->getTablePrefix().'metric_trends_detected_idx');
+            $table->index('detected_at', Schema::getConnection()->getTablePrefix() . 'metric_trends_detected_idx');
         });
     }
 

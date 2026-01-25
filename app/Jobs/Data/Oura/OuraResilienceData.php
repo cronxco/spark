@@ -100,7 +100,7 @@ class OuraResilienceData extends BaseProcessingJob
         // Create the main resilience event with mapped level value
         $event = Event::create([
             'source_id' => $sourceId,
-            'time' => $day.' 00:00:00',
+            'time' => $day . ' 00:00:00',
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',

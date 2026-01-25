@@ -158,7 +158,7 @@ class RegenerateEmbeddings extends Command
         $this->line("Found {$total} {$modelName} records to process");
 
         // Create progress tracker
-        $progressId = 'regenerate-embeddings-'.strtolower($modelName).'-'.now()->timestamp;
+        $progressId = 'regenerate-embeddings-' . strtolower($modelName) . '-' . now()->timestamp;
         $progress = ActionProgress::create([
             'user_id' => 1, // System user
             'action_id' => $progressId,

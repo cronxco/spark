@@ -88,7 +88,7 @@ class BlockSearchQuery
                     return SpotlightResult::make()
                         ->setTitle($blockTitle)
                         ->setSubtitle($subtitle)
-                        ->setTypeahead('Block: '.$blockTitle)
+                        ->setTypeahead('Block: ' . $blockTitle)
                         ->setIcon($blockIcon)
                         ->setGroup('blocks')
                         ->setPriority($priority)
