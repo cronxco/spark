@@ -110,7 +110,7 @@ class BlockResource extends JsonResource
         if ($content) {
             // Limit content length in condensed mode
             $data['content'] = mb_strlen($content, 'UTF-8') > 500
-                ? mb_substr($content, 0, 500, 'UTF-8').'...'
+                ? mb_substr($content, 0, 500, 'UTF-8') . '...'
                 : $content;
         }
 
