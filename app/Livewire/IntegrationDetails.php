@@ -243,23 +243,37 @@ class IntegrationDetails extends Component
             return [];
         }
 
-        return collect($pluginClass::getActionTypes())->map(function ($action, $key) {
+        $actionTypes = $pluginClass::getActionTypes();
+        $actionKeys = array_keys($actionTypes);
+
+        // Get all counts in one query using groupBy
+        $actionCounts = Event::where('integration_id', $this->integration->id)
+            ->selectRaw('action, count(*) as count')
+            ->whereIn('action', $actionKeys)
+            ->groupBy('action')
+            ->pluck('count', 'action');
+
+        // Get all recent events in one query, then group by action
+        $allRecentEvents = Event::where('integration_id', $this->integration->id)
+            ->whereIn('action', $actionKeys)
+            ->with('target')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $recentByAction = $allRecentEvents->groupBy('action')
+            ->map(fn ($group) => $group->take(5));
+
+        // Get newest events (top 1 per action) from the recent events
+        $newestByAction = $allRecentEvents->groupBy('action')
+            ->map(fn ($group) => $group->first());
+
+        return collect($actionTypes)->map(function ($action, $key) use ($actionCounts, $recentByAction, $newestByAction) {
             return [
                 'key' => $key,
                 'action' => $action,
-                'count' => Event::where('integration_id', $this->integration->id)
-                    ->where('action', $key)
-                    ->count(),
-                'recent' => Event::where('integration_id', $this->integration->id)
-                    ->where('action', $key)
-                    ->with('target')
-                    ->orderBy('created_at', 'desc')
-                    ->limit(5)
-                    ->get(),
-                'newest' => Event::where('integration_id', $this->integration->id)
-                    ->where('action', $key)
-                    ->orderBy('created_at', 'desc')
-                    ->first(),
+                'count' => $actionCounts[$key] ?? 0,
+                'recent' => $recentByAction[$key] ?? collect(),
+                'newest' => $newestByAction[$key] ?? null,
             ];
         })->toArray();
     }
@@ -271,41 +285,57 @@ class IntegrationDetails extends Component
             return [];
         }
 
-        return collect($pluginClass::getObjectTypes())->map(function ($object, $key) {
+        $objectTypes = $pluginClass::getObjectTypes();
+        $objectTypeKeys = array_keys($objectTypes);
+
+        // Get all object IDs associated with this integration's events
+        $objectIds = Event::where('integration_id', $this->integration->id)
+            ->select('actor_id', 'target_id')
+            ->get()
+            ->flatMap(fn ($event) => [$event->actor_id, $event->target_id])
+            ->filter()
+            ->unique()
+            ->values();
+
+        // If no objects found, return early
+        if ($objectIds->isEmpty()) {
+            return collect($objectTypes)->map(function ($object, $key) {
+                return [
+                    'key' => $key,
+                    'object' => $object,
+                    'count' => 0,
+                    'recent' => collect(),
+                    'newest' => null,
+                ];
+            })->toArray();
+        }
+
+        // Get counts grouped by type
+        $objectCounts = EventObject::whereIn('id', $objectIds)
+            ->whereIn('type', $objectTypeKeys)
+            ->selectRaw('type, count(*) as count')
+            ->groupBy('type')
+            ->pluck('count', 'type');
+
+        // Get all objects of these types, ordered by created_at
+        $allObjects = EventObject::whereIn('id', $objectIds)
+            ->whereIn('type', $objectTypeKeys)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $recentByType = $allObjects->groupBy('type')
+            ->map(fn ($group) => $group->take(5));
+
+        $newestByType = $allObjects->groupBy('type')
+            ->map(fn ($group) => $group->first());
+
+        return collect($objectTypes)->map(function ($object, $key) use ($objectCounts, $recentByType, $newestByType) {
             return [
                 'key' => $key,
                 'object' => $object,
-                'count' => EventObject::where('type', $key)
-                    ->where(function ($query) {
-                        $query->whereHas('actorEvents', function ($q) {
-                            $q->where('integration_id', $this->integration->id);
-                        })->orWhereHas('targetEvents', function ($q) {
-                            $q->where('integration_id', $this->integration->id);
-                        });
-                    })
-                    ->count(),
-                'recent' => EventObject::where('type', $key)
-                    ->where(function ($query) {
-                        $query->whereHas('actorEvents', function ($q) {
-                            $q->where('integration_id', $this->integration->id);
-                        })->orWhereHas('targetEvents', function ($q) {
-                            $q->where('integration_id', $this->integration->id);
-                        });
-                    })
-                    ->with(['actorEvents', 'targetEvents'])
-                    ->orderBy('created_at', 'desc')
-                    ->limit(5)
-                    ->get(),
-                'newest' => EventObject::where('type', $key)
-                    ->where(function ($query) {
-                        $query->whereHas('actorEvents', function ($q) {
-                            $q->where('integration_id', $this->integration->id);
-                        })->orWhereHas('targetEvents', function ($q) {
-                            $q->where('integration_id', $this->integration->id);
-                        });
-                    })
-                    ->orderBy('created_at', 'desc')
-                    ->first(),
+                'count' => $objectCounts[$key] ?? 0,
+                'recent' => $recentByType[$key] ?? collect(),
+                'newest' => $newestByType[$key] ?? null,
             ];
         })->toArray();
     }
@@ -317,29 +347,53 @@ class IntegrationDetails extends Component
             return [];
         }
 
-        return collect($pluginClass::getBlockTypes())->map(function ($block, $key) {
+        $blockTypes = $pluginClass::getBlockTypes();
+        $blockTypeKeys = array_keys($blockTypes);
+
+        // Get all event IDs for this integration
+        $eventIds = Event::where('integration_id', $this->integration->id)
+            ->pluck('id');
+
+        // If no events found, return early
+        if ($eventIds->isEmpty()) {
+            return collect($blockTypes)->map(function ($block, $key) {
+                return [
+                    'key' => $key,
+                    'block' => $block,
+                    'count' => 0,
+                    'recent' => collect(),
+                    'newest' => null,
+                ];
+            })->toArray();
+        }
+
+        // Get counts grouped by block_type
+        $blockCounts = Block::whereIn('event_id', $eventIds)
+            ->whereIn('block_type', $blockTypeKeys)
+            ->selectRaw('block_type, count(*) as count')
+            ->groupBy('block_type')
+            ->pluck('count', 'block_type');
+
+        // Get all blocks of these types, ordered by created_at
+        $allBlocks = Block::whereIn('event_id', $eventIds)
+            ->whereIn('block_type', $blockTypeKeys)
+            ->with('event')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $recentByType = $allBlocks->groupBy('block_type')
+            ->map(fn ($group) => $group->take(5));
+
+        $newestByType = $allBlocks->groupBy('block_type')
+            ->map(fn ($group) => $group->first());
+
+        return collect($blockTypes)->map(function ($block, $key) use ($blockCounts, $recentByType, $newestByType) {
             return [
                 'key' => $key,
                 'block' => $block,
-                'count' => Block::where('block_type', $key)
-                    ->whereHas('event', function ($query) {
-                        $query->where('integration_id', $this->integration->id);
-                    })
-                    ->count(),
-                'recent' => Block::where('block_type', $key)
-                    ->whereHas('event', function ($query) {
-                        $query->where('integration_id', $this->integration->id);
-                    })
-                    ->with('event')
-                    ->orderBy('created_at', 'desc')
-                    ->limit(5)
-                    ->get(),
-                'newest' => Block::where('block_type', $key)
-                    ->whereHas('event', function ($query) {
-                        $query->where('integration_id', $this->integration->id);
-                    })
-                    ->orderBy('created_at', 'desc')
-                    ->first(),
+                'count' => $blockCounts[$key] ?? 0,
+                'recent' => $recentByType[$key] ?? collect(),
+                'newest' => $newestByType[$key] ?? null,
             ];
         })->toArray();
     }

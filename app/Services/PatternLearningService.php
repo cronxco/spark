@@ -314,30 +314,33 @@ class PatternLearningService
             return $pattern;
         }
 
-        $crossDomainConnections = [];
-
-        foreach ($domains as $domain) {
-            // Find other patterns in this domain
-            $relatedPatterns = $this->findCrossDomainPatterns($user, $domain, 90);
-
-            foreach ($relatedPatterns as $relatedPattern) {
-                if ($relatedPattern->id === $pattern->id) {
-                    continue;
+        // Query all related cross-domain patterns in one go instead of per domain
+        $relatedPatterns = EventObject::where('user_id', $user->id)
+            ->where('concept', 'flint')
+            ->where('type', 'learned_pattern')
+            ->where('id', '!=', $pattern->id)
+            ->whereNull('deleted_at')
+            ->whereRaw("jsonb_array_length((metadata::jsonb)->'domains') > 1")
+            ->where(function ($query) use ($domains) {
+                foreach ($domains as $domain) {
+                    $query->orWhereRaw("(metadata::jsonb)->'domains' @> ?", [json_encode([$domain])]);
                 }
+            })
+            ->where('time', '>=', now()->subDays(90))
+            ->orderByRaw("(metadata->>'confidence_score')::numeric DESC")
+            ->get();
 
-                $crossDomainConnections[] = [
-                    'pattern_id' => $relatedPattern->id,
-                    'title' => $relatedPattern->title,
-                    'domains' => $relatedPattern->metadata['domains'] ?? [],
-                    'confidence' => $relatedPattern->metadata['confidence_score'] ?? 0.3,
-                    'explanation' => $relatedPattern->metadata['user_explanation'] ?? '',
-                ];
-            }
-        }
+        if ($relatedPatterns->isNotEmpty()) {
+            $crossDomainConnections = $relatedPatterns->map(fn ($relatedPattern) => [
+                'pattern_id' => $relatedPattern->id,
+                'title' => $relatedPattern->title,
+                'domains' => $relatedPattern->metadata['domains'] ?? [],
+                'confidence' => $relatedPattern->metadata['confidence_score'] ?? 0.3,
+                'explanation' => $relatedPattern->metadata['user_explanation'] ?? '',
+            ])->take(5)->toArray();
 
-        if (! empty($crossDomainConnections)) {
             $metadata = $pattern->metadata;
-            $metadata['cross_domain_connections'] = array_slice($crossDomainConnections, 0, 5);
+            $metadata['cross_domain_connections'] = $crossDomainConnections;
             $pattern->metadata = $metadata;
             $pattern->save();
 

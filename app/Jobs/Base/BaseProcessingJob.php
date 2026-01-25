@@ -20,6 +20,7 @@ use Sentry\Severity;
 use Sentry\Tracing\SpanContext;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
+use Spatie\Tags\Tag;
 use Throwable;
 
 abstract class BaseProcessingJob implements ShouldQueue
@@ -149,6 +150,7 @@ abstract class BaseProcessingJob implements ShouldQueue
     protected function createEvents(array $eventData): Collection
     {
         $events = collect();
+        $eventTagsMap = [];
 
         foreach ($eventData as $data) {
             // Skip if event already exists to prevent duplicate key violations
@@ -208,23 +210,9 @@ abstract class BaseProcessingJob implements ShouldQueue
                     }
                 }
 
-                // Attach tags if provided in payload (supports optional typed tags)
-                if (isset($data['tags']) && is_array($data['tags'])) {
-                    foreach ($data['tags'] as $tag) {
-                        if (is_array($tag)) {
-                            $name = (string) ($tag['name'] ?? '');
-                            $type = $tag['type'] ?? null;
-                            if ($name !== '') {
-                                if ($type) {
-                                    $event->attachTag($name, (string) $type);
-                                } else {
-                                    $event->attachTag($name, 'spark_tag');
-                                }
-                            }
-                        } elseif (is_string($tag) && $tag !== '') {
-                            $event->attachTag($tag, 'spark_tag');
-                        }
-                    }
+                // Store tags for batch processing (prevents N+1 queries)
+                if (isset($data['tags']) && is_array($data['tags']) && ! empty($data['tags'])) {
+                    $eventTagsMap[$data['source_id']] = $data['tags'];
                 }
 
                 // Set location and link to place if route data is present (Apple Health workouts)
@@ -286,6 +274,11 @@ abstract class BaseProcessingJob implements ShouldQueue
             }
         }
 
+        // Batch attach all tags at once to prevent N+1 queries
+        if (! empty($eventTagsMap)) {
+            $this->attachTagsInBatch($events, $eventTagsMap);
+        }
+
         return $events;
     }
 
@@ -330,6 +323,9 @@ abstract class BaseProcessingJob implements ShouldQueue
     protected function downloadImagesToMediaLibrary(Collection $events): void
     {
         $mediaHelper = app(\App\Services\Media\MediaDownloadHelper::class);
+
+        // Eager load relationships to prevent N+1 queries
+        $events->load(['blocks', 'target', 'actor']);
 
         foreach ($events as $event) {
             // Download images from blocks with media_url
@@ -439,6 +435,64 @@ abstract class BaseProcessingJob implements ShouldQueue
                         'error' => $e->getMessage(),
                     ]);
                 }
+            }
+        }
+    }
+
+    /**
+     * Batch attach tags to multiple events to prevent N+1 queries.
+     * Fetches all needed tags upfront and attaches them using IDs.
+     */
+    protected function attachTagsInBatch(Collection $events, array $eventTagsMap): void
+    {
+        if (empty($eventTagsMap)) {
+            return;
+        }
+
+        // Step 1: Collect all unique tags across all events
+        $allTags = collect($eventTagsMap)
+            ->flatten(1)
+            ->unique(function ($tag) {
+                $name = is_array($tag) ? ($tag['name'] ?? '') : $tag;
+                $type = is_array($tag) ? ($tag['type'] ?? 'spark_tag') : 'spark_tag';
+
+                return "{$type}:{$name}";
+            })
+            ->filter(fn ($tag) => ! empty(is_array($tag) ? ($tag['name'] ?? '') : $tag));
+
+        // Step 2: Batch fetch/create all tags upfront (one query per unique tag)
+        $tagsByKey = collect();
+        foreach ($allTags as $tag) {
+            $name = is_array($tag) ? ($tag['name'] ?? '') : $tag;
+            $type = is_array($tag) ? ($tag['type'] ?? 'spark_tag') : 'spark_tag';
+            $key = "{$type}:{$name}";
+
+            if (! $tagsByKey->has($key)) {
+                $tagObject = Tag::findOrCreate($name, $type);
+                $tagsByKey->put($key, $tagObject);
+            }
+        }
+
+        // Step 3: Attach tags to events using IDs (no additional queries)
+        foreach ($events as $event) {
+            $eventTags = $eventTagsMap[$event->source_id] ?? [];
+            if (empty($eventTags)) {
+                continue;
+            }
+
+            $tagIds = collect($eventTags)
+                ->map(function ($tag) use ($tagsByKey) {
+                    $name = is_array($tag) ? ($tag['name'] ?? '') : $tag;
+                    $type = is_array($tag) ? ($tag['type'] ?? 'spark_tag') : 'spark_tag';
+
+                    return $tagsByKey->get("{$type}:{$name}")?->id;
+                })
+                ->filter()
+                ->unique()
+                ->toArray();
+
+            if (! empty($tagIds)) {
+                $event->tags()->syncWithoutDetaching($tagIds);
             }
         }
     }
