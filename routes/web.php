@@ -61,6 +61,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
+    Volt::route('notifications', 'notifications.index')->name('notifications.index');
 
     // Media routes
     Route::get('media', \App\Livewire\Media\Index::class)->name('media.index');

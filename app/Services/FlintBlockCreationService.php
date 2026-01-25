@@ -124,24 +124,29 @@ class FlintBlockCreationService
                 default => 2,
             };
 
-            $block = Block::create([
-                'id' => Str::uuid(),
-                'event_id' => $flintEvent->id,
-                'block_type' => 'flint_prioritized_action',
-                'time' => now(),
-                'title' => $action['title'] ?? 'Action Required',
-                'value' => $priority,
-                'value_unit' => 'priority',
-                'metadata' => [
-                    'description' => $action['description'] ?? '',
-                    'priority' => $action['priority'] ?? 'medium',
-                    'actionable' => $action['actionable'] ?? false,
-                    'suggested_due_date' => $action['suggested_due_date'] ?? null,
-                    'source_domains' => $action['source_domains'] ?? [],
-                    'generated_at' => now()->toIso8601String(),
-                    'completed' => false,
+            $title = $action['title'] ?? 'Action Required';
+
+            $block = Block::updateOrCreate(
+                [
+                    'event_id' => $flintEvent->id,
+                    'block_type' => 'flint_prioritized_action',
+                    'title' => $title,
                 ],
-            ]);
+                [
+                    'time' => now(),
+                    'value' => $priority,
+                    'value_unit' => 'priority',
+                    'metadata' => [
+                        'description' => $action['description'] ?? '',
+                        'priority' => $action['priority'] ?? 'medium',
+                        'actionable' => $action['actionable'] ?? false,
+                        'suggested_due_date' => $action['suggested_due_date'] ?? null,
+                        'source_domains' => $action['source_domains'] ?? [],
+                        'generated_at' => now()->toIso8601String(),
+                        'completed' => false,
+                    ],
+                ]
+            );
 
             $blocks[] = $block;
         }

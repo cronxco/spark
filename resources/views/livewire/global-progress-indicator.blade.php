@@ -54,6 +54,7 @@ new class extends Component {
                     ->orWhere('failed_at', '>', $now->copy()->subMinute());
             })
             ->latest('updated_at')
+            ->limit(3)
             ->get();
 
         // Recent history (1-5 minutes ago)
@@ -81,7 +82,7 @@ new class extends Component {
     {
         $this->unreadNotifications = Auth::user()->unreadNotifications()
             ->latest()
-            ->limit(10)
+            ->limit(3)
             ->get();
     }
 
@@ -270,7 +271,13 @@ new class extends Component {
              style="display: none;">
             @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
             <div class="card-body">
-                <h3 class="font-semibold text-sm mb-3">Updates</h3>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-sm">Updates</h3>
+                    <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-xs gap-1">
+                        View All
+                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                    </a>
+                </div>
 
                 {{-- Active Operations --}}
                 @if ($activeProgresses->isNotEmpty())
@@ -528,6 +535,13 @@ new class extends Component {
                     </div>
                 </div>
                 @endif
+
+                {{-- Footer with View All Link --}}
+                <div class="px-4 py-3 border-t border-base-300">
+                    <a href="{{ route('notifications.index') }}" class="btn btn-sm btn-block btn-ghost">
+                        View All Notifications
+                    </a>
+                </div>
             </div>
             @else
             {{-- Empty state --}}

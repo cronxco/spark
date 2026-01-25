@@ -56,6 +56,10 @@ class ActionProgress extends Model
         'error_message',
     ];
 
+    protected $attributes = [
+        'step' => 'in_progress',
+    ];
+
     protected $casts = [
         'details' => 'array',
         'updates' => 'array',
