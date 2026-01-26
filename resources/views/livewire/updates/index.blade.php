@@ -2,23 +2,29 @@
 use App\Jobs\ProcessIntegrationData;
 use App\Jobs\RunIntegrationTask;
 use App\Models\ActionProgress;
+use App\Models\Event;
 use App\Models\Integration;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
-new class extends Component {
+new class extends Component
+{
     use Toast;
 
     public array $integrations = [];
+
     public bool $isRefreshing = false;
+
     public string $filter = 'all'; // all|integrations|tasks
+
     public string $search = '';
+
     /** @var array<string, bool> */
     public array $collapse = [];
 
@@ -36,7 +42,7 @@ new class extends Component {
 
     public function toggle(string $key): void
     {
-        $this->collapse[$key] = !($this->collapse[$key] ?? false);
+        $this->collapse[$key] = ! ($this->collapse[$key] ?? false);
     }
 
     public function mount(): void
@@ -51,8 +57,7 @@ new class extends Component {
         $query = $user->integrations()
             ->with('user', 'group')
             ->orderBy('last_successful_update_at', 'asc')
-            ->orderBy('created_at', 'asc')
-            ;
+            ->orderBy('created_at', 'asc');
 
         if ($this->filter === 'integrations') {
             $query->where(function ($q) {
@@ -65,10 +70,10 @@ new class extends Component {
         }
 
         // Apply search filter
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $query->where(function ($q) {
-                $q->where('name', 'ILIKE', '%' . $this->search . '%')
-                  ->orWhere('service', 'ILIKE', '%' . $this->search . '%');
+                $q->where('name', 'ILIKE', '%'.$this->search.'%')
+                    ->orWhere('service', 'ILIKE', '%'.$this->search.'%');
             });
         }
 
@@ -77,12 +82,13 @@ new class extends Component {
         // Batch load last event times for webhook/manual integrations to avoid N+1
         $webhookManualIntegrationIds = $userIntegrations->filter(function ($integration) {
             $pluginClass = App\Integrations\PluginRegistry::getPlugin($integration->service);
+
             return $pluginClass && in_array($pluginClass::getServiceType(), ['webhook', 'manual']);
         })->pluck('id');
 
         $lastEventTimes = [];
         if ($webhookManualIntegrationIds->isNotEmpty()) {
-            $lastEventTimes = DB::table('dev_events')
+            $lastEventTimes = DB::table((new Event)->getTable())
                 ->select('integration_id', DB::raw('MAX(time) as last_time'))
                 ->whereIn('integration_id', $webhookManualIntegrationIds)
                 ->groupBy('integration_id')
@@ -94,7 +100,7 @@ new class extends Component {
             $batchName = null;
             $batchProgress = null;
             $migrationPhase = null;
-            if (!empty($integration->migration_batch_id)) {
+            if (! empty($integration->migration_batch_id)) {
                 try {
                     $batch = Bus::findBatch($integration->migration_batch_id);
                     if ($batch) {
@@ -137,9 +143,9 @@ new class extends Component {
             $txWindowCount = null;
             if ($integration->service === 'monzo') {
                 // Prefer the generic fetched_back_to (from transactions windows); fallback to balances marker
-                $fetchedBackTo = Cache::get('monzo:migration:' . $integration->id . ':fetched_back_to')
-                    ?: Cache::get('monzo:migration:' . $integration->id . ':balances_last_date');
-                $windows = Cache::get('monzo:migration:' . $integration->id . ':tx_windows');
+                $fetchedBackTo = Cache::get('monzo:migration:'.$integration->id.':fetched_back_to')
+                    ?: Cache::get('monzo:migration:'.$integration->id.':balances_last_date');
+                $windows = Cache::get('monzo:migration:'.$integration->id.':tx_windows');
                 if (is_array($windows)) {
                     $txWindowCount = count($windows);
                 }
@@ -262,19 +268,19 @@ new class extends Component {
                 ($integrationModel->group->account_id ?: 'Default Group') :
                 'Default Group';
 
-            if (!isset($groupedIntegrations[$pluginName])) {
+            if (! isset($groupedIntegrations[$pluginName])) {
                 $groupedIntegrations[$pluginName] = [
                     'plugin_name' => $pluginName,
                     'plugin_icon' => $pluginIcon,
                     'plugin_service' => $integration['service'],
-                    'groups' => []
+                    'groups' => [],
                 ];
             }
 
-            if (!isset($groupedIntegrations[$pluginName]['groups'][$groupName])) {
+            if (! isset($groupedIntegrations[$pluginName]['groups'][$groupName])) {
                 $groupedIntegrations[$pluginName]['groups'][$groupName] = [
                     'group_name' => $groupName,
-                    'integrations' => []
+                    'integrations' => [],
                 ];
             }
 
@@ -283,7 +289,7 @@ new class extends Component {
 
         // Initialize collapse state for new plugins (default to collapsed)
         foreach (array_keys($groupedIntegrations) as $pluginName) {
-            if (!isset($this->collapse[$pluginName])) {
+            if (! isset($this->collapse[$pluginName])) {
                 $this->collapse[$pluginName] = false; // false = collapsed
             }
         }
@@ -321,16 +327,17 @@ new class extends Component {
         // Sort: sections with issues first, then clean sections
         uasort($sortedIntegrations, function ($a, $b) {
             // First, sort by whether they have issues (issues first)
-            if ($a['has_issues'] && !$b['has_issues']) {
+            if ($a['has_issues'] && ! $b['has_issues']) {
                 return -1;
             }
-            if (!$a['has_issues'] && $b['has_issues']) {
+            if (! $a['has_issues'] && $b['has_issues']) {
                 return 1;
             }
             // Within same issue status, sort by issue count (desc) or alphabetically
             if ($a['has_issues'] && $b['has_issues']) {
                 return $b['issue_count'] <=> $a['issue_count'];
             }
+
             return strcmp($a['plugin_name'], $b['plugin_name']);
         });
 
@@ -354,6 +361,7 @@ new class extends Component {
                     return 'pending_update'; // Yellow/warning - recently overdue
                 }
             }
+
             return 'needs_update';
         }
 
@@ -364,13 +372,15 @@ new class extends Component {
     {
         $integration = Integration::find($integrationId);
 
-        if (!$integration) {
+        if (! $integration) {
             $this->error('Integration not found.');
+
             return;
         }
 
         if ((string) $integration->user_id !== (string) Auth::id()) {
             $this->error('Integration not found.');
+
             return;
         }
 
@@ -394,13 +404,14 @@ new class extends Component {
     public function togglePause(string $integrationId): void
     {
         $integration = Integration::find($integrationId);
-        if (!$integration || (string) $integration->user_id !== (string) Auth::id()) {
+        if (! $integration || (string) $integration->user_id !== (string) Auth::id()) {
             $this->error('Integration not found.');
+
             return;
         }
 
         $config = $integration->configuration ?? [];
-        $config['paused'] = !((bool) ($config['paused'] ?? false));
+        $config['paused'] = ! ((bool) ($config['paused'] ?? false));
         $integration->update(['configuration' => $config]);
         $this->success($config['paused'] ? 'Paused.' : 'Resumed.');
         $this->loadData();
