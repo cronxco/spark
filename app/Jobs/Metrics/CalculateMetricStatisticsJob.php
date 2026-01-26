@@ -82,13 +82,13 @@ class CalculateMetricStatisticsJob implements ShouldQueue
         $eventsTable = (new Event)->getTable();
 
         return DB::table($eventsTable)
-            ->join('integrations', $eventsTable.'.integration_id', '=', 'integrations.id')
-            ->select('integrations.user_id as user_id', $eventsTable.'.service', $eventsTable.'.action', $eventsTable.'.value_unit')
-            ->whereNull($eventsTable.'.deleted_at')
+            ->join('integrations', $eventsTable . '.integration_id', '=', 'integrations.id')
+            ->select('integrations.user_id as user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit')
+            ->whereNull($eventsTable . '.deleted_at')
             ->whereNull('integrations.deleted_at')
-            ->whereNotNull($eventsTable.'.value')
-            ->whereNotNull($eventsTable.'.value_unit')
-            ->groupBy('integrations.user_id', $eventsTable.'.service', $eventsTable.'.action', $eventsTable.'.value_unit')
+            ->whereNotNull($eventsTable . '.value')
+            ->whereNotNull($eventsTable . '.value_unit')
+            ->groupBy('integrations.user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit')
             ->having(DB::raw('COUNT(*)'), '>=', 10) // At least 10 events
             ->get()
             ->filter(function ($metricData) {
