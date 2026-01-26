@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\EventObject;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -44,8 +45,9 @@ class RecalculatePlaceVisitCounts extends Command
 
         // Get table prefix to handle prefixed environments
         $prefix = DB::getTablePrefix();
+        $objectsTable = (new EventObject)->getTable();
 
-        $calculatedData = DB::table('objects as o')
+        $calculatedData = DB::table($objectsTable.' as o')
             ->select([
                 'o.id',
                 'o.title',
@@ -88,7 +90,7 @@ class RecalculatePlaceVisitCounts extends Command
         $updateCount = $placesToUpdate->count();
 
         $this->info("Places needing updates: {$updateCount}");
-        $this->info('Places already correct: ' . ($totalPlaces - $updateCount));
+        $this->info('Places already correct: '.($totalPlaces - $updateCount));
         $this->newLine();
 
         if ($updateCount === 0) {
@@ -123,12 +125,12 @@ class RecalculatePlaceVisitCounts extends Command
             $progressBar->start();
 
             // Process in chunks of 500 for efficient bulk updates
-            $placesToUpdate->chunk(500)->each(function ($chunk) use (&$stats, &$progressBar) {
-                DB::transaction(function () use ($chunk, &$stats, &$progressBar) {
+            $placesToUpdate->chunk(500)->each(function ($chunk) use (&$stats, &$progressBar, $objectsTable) {
+                DB::transaction(function () use ($chunk, &$stats, &$progressBar, $objectsTable) {
                     foreach ($chunk as $place) {
                         try {
                             // Build updated metadata
-                            $currentMetadata = DB::table('objects')
+                            $currentMetadata = DB::table($objectsTable)
                                 ->where('id', $place->id)
                                 ->value('metadata');
 
@@ -144,7 +146,7 @@ class RecalculatePlaceVisitCounts extends Command
                             }
 
                             // Update using raw query for efficiency
-                            DB::table('objects')
+                            DB::table($objectsTable)
                                 ->where('id', $place->id)
                                 ->update([
                                     'metadata' => json_encode($metadata),
@@ -206,17 +208,17 @@ class RecalculatePlaceVisitCounts extends Command
                 ['Place ID', 'Title', 'Old Count', 'New Count', 'Difference'],
                 array_map(function ($change) {
                     return [
-                        substr($change['id'], 0, 8) . '...',
+                        substr($change['id'], 0, 8).'...',
                         substr($change['title'], 0, 40),
                         $change['old_count'],
                         $change['new_count'],
-                        ($change['new_count'] - $change['old_count']) > 0 ? '+' . ($change['new_count'] - $change['old_count']) : ($change['new_count'] - $change['old_count']),
+                        ($change['new_count'] - $change['old_count']) > 0 ? '+'.($change['new_count'] - $change['old_count']) : ($change['new_count'] - $change['old_count']),
                     ];
                 }, $sampleChanges)
             );
 
             if (count($changes) > 20) {
-                $this->info('... and ' . (count($changes) - 20) . ' more changes.');
+                $this->info('... and '.(count($changes) - 20).' more changes.');
             }
         }
 

@@ -79,14 +79,16 @@ class CalculateMetricStatisticsJob implements ShouldQueue
     {
         // Get all unique user/service/action/unit combinations by joining integrations
         // Events do not have a user_id column — user is owned by the integration
-        return DB::table('events')
-            ->join('integrations', 'events.integration_id', '=', 'integrations.id')
-            ->select('integrations.user_id as user_id', 'events.service', 'events.action', 'events.value_unit')
-            ->whereNull('events.deleted_at')
+        $eventsTable = (new Event)->getTable();
+
+        return DB::table($eventsTable)
+            ->join('integrations', $eventsTable.'.integration_id', '=', 'integrations.id')
+            ->select('integrations.user_id as user_id', $eventsTable.'.service', $eventsTable.'.action', $eventsTable.'.value_unit')
+            ->whereNull($eventsTable.'.deleted_at')
             ->whereNull('integrations.deleted_at')
-            ->whereNotNull('events.value')
-            ->whereNotNull('events.value_unit')
-            ->groupBy('integrations.user_id', 'events.service', 'events.action', 'events.value_unit')
+            ->whereNotNull($eventsTable.'.value')
+            ->whereNotNull($eventsTable.'.value_unit')
+            ->groupBy('integrations.user_id', $eventsTable.'.service', $eventsTable.'.action', $eventsTable.'.value_unit')
             ->having(DB::raw('COUNT(*)'), '>=', 10) // At least 10 events
             ->get()
             ->filter(function ($metricData) {
