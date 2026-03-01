@@ -104,8 +104,8 @@ class GetObjectTool extends Tool
 
             'event_limit' => $schema->integer()
                 ->description('Maximum number of recent events to include (default: 10, max: 25).')
-                ->minimum(1)
-                ->maximum(25)
+                ->min(1)
+                ->max(25)
                 ->default(10),
         ];
     }
