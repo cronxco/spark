@@ -152,7 +152,7 @@ class GetDayContextTool extends Tool
 
         // For specific dates, determine relative position to today
         $today = Carbon::today();
-        $diffDays = $today->diffInDays($targetDate, signed: false);
+        $diffDays = $today->diffInDays($targetDate, absolute: false);
 
         if ($targetDate->isSameDay($today)) {
             return 'today';
