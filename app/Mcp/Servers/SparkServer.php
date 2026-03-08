@@ -10,7 +10,10 @@ use App\Mcp\Tools\GetObjectTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
 use App\Mcp\Tools\SearchObjectsTool;
+use App\Mcp\Tracing\McpSpan;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\ServerContext;
+use Laravel\Mcp\Server\Transport\JsonRpcRequest;
 
 class SparkServer extends Server
 {
@@ -86,4 +89,68 @@ class SparkServer extends Server
     protected array $prompts = [
         //
     ];
+
+    /**
+     * Handle incoming JSON-RPC messages with Sentry tracing.
+     */
+    protected function handleMessage(JsonRpcRequest $request, ServerContext $context): void
+    {
+        // Handle tool calls with tracing
+        if ($request->method === 'tools/call') {
+            $toolName = $request->params['name'] ?? 'unknown';
+            $arguments = $request->params['arguments'] ?? [];
+
+            McpSpan::toolCall(
+                $toolName,
+                $this->transport,
+                $request->id,
+                $arguments,
+                fn () => parent::handleMessage($request, $context)
+            );
+
+            return;
+        }
+
+        // Handle resource reads with tracing
+        if ($request->method === 'resources/read') {
+            $resourceUri = $request->params['uri'] ?? 'unknown';
+
+            McpSpan::resourceRead(
+                $resourceUri,
+                $this->transport,
+                $request->id,
+                fn () => parent::handleMessage($request, $context)
+            );
+
+            return;
+        }
+
+        // Handle all other methods without tracing
+        parent::handleMessage($request, $context);
+    }
+
+    /**
+     * Handle initialization messages with Sentry tracing.
+     */
+    protected function handleInitializeMessage(JsonRpcRequest $request, ServerContext $context): void
+    {
+        $clientInfo = $request->params['clientInfo'] ?? [];
+
+        McpSpan::initialize(
+            $this->transport,
+            $request->id,
+            $clientInfo,
+            function () use ($request, $context, $clientInfo): void {
+                parent::handleInitializeMessage($request, $context);
+
+                // Set session-level metadata after successful initialization
+                McpSpan::setSessionMetadata(
+                    $clientInfo,
+                    $this->name,
+                    $this->version,
+                    '2025-11-25'
+                );
+            }
+        );
+    }
 }
