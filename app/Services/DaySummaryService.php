@@ -35,7 +35,7 @@ class DaySummaryService
             $sections['health'] = $this->buildHealthSection($events, $metricsCache);
         }
 
-        if (! $domains || in_array('health', $domains)) {
+        if (! $domains || in_array('activity', $domains)) {
             $sections['activity'] = $this->buildActivitySection($events, $metricsCache);
         }
 
@@ -641,15 +641,26 @@ class DaySummaryService
             $stat = $trend->metricStatistic;
 
             // Count consecutive anomaly days for streak
-            $streakCount = MetricTrend::where('metric_statistic_id', $stat->id)
+            $recentAnomalies = MetricTrend::where('metric_statistic_id', $stat->id)
                 ->anomalies()
                 ->where('detected_at', '<=', $trend->detected_at)
                 ->where('detected_at', '>=', $trend->detected_at->copy()->subDays(30))
                 ->orderByDesc('detected_at')
-                ->get()
-                ->takeWhile(fn ($t) => $t->detected_at->diffInDays($trend->detected_at) === 0
-                    || $t->detected_at->diffInDays($trend->detected_at) <= 1)
-                ->count();
+                ->get();
+
+            $streakCount = 0;
+            $lastDate = $trend->detected_at;
+
+            foreach ($recentAnomalies as $t) {
+                $gap = $t->detected_at->diffInDays($lastDate);
+
+                if ($gap > 1) {
+                    break;
+                }
+
+                $streakCount++;
+                $lastDate = $t->detected_at;
+            }
 
             return [
                 'metric' => $stat->getIdentifier(),

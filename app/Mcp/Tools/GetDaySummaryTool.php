@@ -86,7 +86,7 @@ class GetDaySummaryTool extends Tool
                 ->default(['today']),
 
             'domains' => $schema->array()
-                ->items($schema->string()->enum(['health', 'money', 'media', 'knowledge', 'online']))
+                ->items($schema->string()->enum(['health', 'activity', 'money', 'media', 'knowledge']))
                 ->description('Filter by domains. Omit to include all domains.'),
         ];
     }
