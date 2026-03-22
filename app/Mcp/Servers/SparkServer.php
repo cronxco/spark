@@ -3,10 +3,16 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Resources\DayContextResource;
+use App\Mcp\Tools\AcknowledgeAnomalyTool;
+use App\Mcp\Tools\GetBaselinesTool;
 use App\Mcp\Tools\GetBlockTool;
 use App\Mcp\Tools\GetDayContextTool;
+use App\Mcp\Tools\GetDaySummaryTool;
+use App\Mcp\Tools\GetEventsByFilterTool;
 use App\Mcp\Tools\GetEventTool;
+use App\Mcp\Tools\GetMetricTrendTool;
 use App\Mcp\Tools\GetObjectTool;
+use App\Mcp\Tools\GetServiceStatusTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
 use App\Mcp\Tools\SearchObjectsTool;
@@ -39,19 +45,34 @@ class SparkServer extends Server
         - **Blocks**: Data units attached to events (summaries, metrics, content)
 
         ## Available Tools
-        - `get-day-context`: Get structured context for a specific date
-        - `search-events`: Search events by semantic or keyword
-        - `search-blocks`: Search blocks by semantic or keyword
-        - `search-objects`: Search objects/entities by semantic or keyword
-        - `get-event`: Get full details for a specific event
-        - `get-object`: Get full details for a specific object
-        - `get-block`: Get full details for a specific block
 
-        ## Search Tips
-        - Use semantic search (default) for natural language queries
-        - Use keyword search for exact matches
-        - Filter by service, domain, date range for more specific results
-        - Domains: health, money, media, knowledge, online
+        ### Briefing & Summary (start here)
+        - `get-day-summary`: **Preferred for daily briefings.** Compact, pre-aggregated summary by domain (health, activity, money, media, knowledge) with baseline comparisons and anomaly detection. Supports multiple dates.
+        - `get-service-status`: Check sync coverage and data freshness for all services on a date.
+
+        ### Metrics & Trends
+        - `get-metric-trend`: Daily metric values over a date range with baseline comparison, trend direction, and anomaly streaks. Use dot-notation identifiers (e.g. "oura.sleep_score").
+        - `get-baselines`: Retrieve baseline statistics (mean, stddev, bounds) for metrics. Omit metrics param to discover all available.
+        - `acknowledge-anomaly`: Mark an anomaly as acknowledged with an optional note and suppression period.
+
+        ### Precise Filtering
+        - `get-events-by-filter`: Filter events by service, action, and date range. Use for exact queries like "all Monzo transactions this week".
+
+        ### Search & Detail
+        - `get-day-context`: Full raw event context for a date (large response — prefer get-day-summary).
+        - `search-events`: Search events by semantic or keyword query.
+        - `search-blocks`: Search blocks by semantic or keyword query.
+        - `search-objects`: Search objects/entities by semantic or keyword query.
+        - `get-event`: Get full details for a specific event by ID.
+        - `get-object`: Get full details for a specific object by ID.
+        - `get-block`: Get full details for a specific block by ID.
+
+        ## Workflow Tips
+        - Start with `get-day-summary` for daily briefings — it replaces multiple get-day-context + parsing calls.
+        - Use `get-baselines` to discover available metrics, then `get-metric-trend` for analysis.
+        - Use `get-events-by-filter` for precise queries that semantic search can't handle well.
+        - Check `get-service-status` when data seems incomplete.
+        - Domains: health, money, media, knowledge, online.
 
         ## Authentication
         All requests require authentication via Sanctum bearer token.
@@ -63,7 +84,13 @@ class SparkServer extends Server
      * @var array<int, class-string<\Laravel\Mcp\Server\Tool>>
      */
     protected array $tools = [
+        GetDaySummaryTool::class,
         GetDayContextTool::class,
+        GetMetricTrendTool::class,
+        GetEventsByFilterTool::class,
+        GetServiceStatusTool::class,
+        GetBaselinesTool::class,
+        AcknowledgeAnomalyTool::class,
         SearchEventsTool::class,
         SearchBlocksTool::class,
         SearchObjectsTool::class,
