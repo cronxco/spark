@@ -3,6 +3,10 @@
         "laravel-boost": {
             "command": "vendor/bin/sail",
             "args": ["artisan", "boost:mcp"]
+        },
+        "supabase": {
+            "type": "http",
+            "url": "https://mcp.supabase.com/mcp?readonly=true"
         }
     }
 }

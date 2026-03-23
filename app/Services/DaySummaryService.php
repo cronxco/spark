@@ -550,6 +550,38 @@ class DaySummaryService
             })->values()->all();
         }
 
+        // Fetched content (recurring fetches like Economist daily briefing)
+        $fetched = $events->filter(fn ($e) => $e->service === 'fetch' && $e->action === 'fetched');
+        if ($fetched->isNotEmpty()) {
+            $section['fetched_content'] = $fetched->map(function ($event) {
+                $item = [
+                    'title' => $event->target?->title ?? 'Untitled',
+                    'url' => $event->url ?? $event->target?->url,
+                ];
+
+                // Include summary blocks (prefer short summary, fall back to any summary)
+                $summary = $event->blocks->first(fn ($b) => $b->block_type === 'fetch_summary_paragraph')
+                    ?? $event->blocks->first(fn ($b) => str_contains($b->block_type, 'summary'));
+                if ($summary) {
+                    $item['summary'] = $summary->getContent();
+                }
+
+                // Include key takeaways if available
+                $takeaways = $event->blocks->firstWhere('block_type', 'fetch_key_takeaways');
+                if ($takeaways) {
+                    $item['key_takeaways'] = $takeaways->getContent();
+                }
+
+                // Include TLDR if available
+                $tldr = $event->blocks->firstWhere('block_type', 'fetch_tldr');
+                if ($tldr) {
+                    $item['tldr'] = $tldr->getContent();
+                }
+
+                return $item;
+            })->values()->all();
+        }
+
         // Newsletters
         $newsletters = $events->filter(fn ($e) => $e->service === 'newsletter' && $e->action === 'received_post');
         if ($newsletters->isNotEmpty()) {
@@ -562,6 +594,19 @@ class DaySummaryService
                 $tldr = $event->blocks->firstWhere('block_type', 'newsletter_tldr');
                 if ($tldr) {
                     $newsletter['tldr'] = $tldr->getContent();
+                }
+
+                // Include summary block
+                $summary = $event->blocks->first(fn ($b) => $b->block_type === 'newsletter_summary_paragraph')
+                    ?? $event->blocks->first(fn ($b) => str_contains($b->block_type, 'newsletter_summary'));
+                if ($summary) {
+                    $newsletter['summary'] = $summary->getContent();
+                }
+
+                // Include key takeaways if available
+                $takeaways = $event->blocks->firstWhere('block_type', 'newsletter_key_takeaways');
+                if ($takeaways) {
+                    $newsletter['key_takeaways'] = $takeaways->getContent();
                 }
 
                 return $newsletter;
