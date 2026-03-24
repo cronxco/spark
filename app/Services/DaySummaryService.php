@@ -151,7 +151,7 @@ class DaySummaryService
         // Sleep score
         $sleepScore = $healthEvents->firstWhere('action', 'had_sleep_score');
         if ($sleepScore) {
-            $entry = ['score' => $sleepScore->formatted_value];
+            $entry = ['event_id' => $sleepScore->id, 'score' => $sleepScore->formatted_value];
             $this->attachBaseline($entry, $sleepScore, $metricsCache);
 
             // Get contributors from blocks
@@ -168,7 +168,7 @@ class DaySummaryService
         // Sleep duration
         $sleepDuration = $healthEvents->firstWhere('action', 'slept_for');
         if ($sleepDuration) {
-            $entry = ['duration_seconds' => $sleepDuration->formatted_value];
+            $entry = ['event_id' => $sleepDuration->id, 'duration_seconds' => $sleepDuration->formatted_value];
             $this->attachBaseline($entry, $sleepDuration, $metricsCache);
 
             // Sleep stages from blocks
@@ -185,7 +185,7 @@ class DaySummaryService
         // Readiness score
         $readiness = $healthEvents->firstWhere('action', 'had_readiness_score');
         if ($readiness) {
-            $entry = ['score' => $readiness->formatted_value];
+            $entry = ['event_id' => $readiness->id, 'score' => $readiness->formatted_value];
             $this->attachBaseline($entry, $readiness, $metricsCache);
 
             $contributors = $readiness->blocks->where('block_type', 'contributor');
@@ -201,7 +201,7 @@ class DaySummaryService
         // Activity score
         $activity = $healthEvents->firstWhere('action', 'had_activity_score');
         if ($activity) {
-            $entry = ['score' => $activity->formatted_value];
+            $entry = ['event_id' => $activity->id, 'score' => $activity->formatted_value];
             $this->attachBaseline($entry, $activity, $metricsCache);
             $section['activity_score'] = $entry;
         }
@@ -209,7 +209,7 @@ class DaySummaryService
         // Heart rate
         $heartRate = $healthEvents->firstWhere('action', 'had_heart_rate');
         if ($heartRate) {
-            $entry = ['value' => $heartRate->formatted_value, 'unit' => 'bpm'];
+            $entry = ['event_id' => $heartRate->id, 'value' => $heartRate->formatted_value, 'unit' => 'bpm'];
             $this->attachBaseline($entry, $heartRate, $metricsCache);
             $section['heart_rate'] = $entry;
         }
@@ -217,7 +217,7 @@ class DaySummaryService
         // SpO2
         $spo2 = $healthEvents->firstWhere('action', 'had_spo2');
         if ($spo2) {
-            $entry = ['value' => $spo2->formatted_value, 'unit' => '%'];
+            $entry = ['event_id' => $spo2->id, 'value' => $spo2->formatted_value, 'unit' => '%'];
             $this->attachBaseline($entry, $spo2, $metricsCache);
             $section['spo2'] = $entry;
         }
@@ -225,7 +225,7 @@ class DaySummaryService
         // Stress
         $stress = $healthEvents->firstWhere('action', 'had_stress_score');
         if ($stress) {
-            $entry = ['value' => $stress->formatted_value, 'unit' => 'stress_level'];
+            $entry = ['event_id' => $stress->id, 'value' => $stress->formatted_value, 'unit' => 'stress_level'];
             $this->attachBaseline($entry, $stress, $metricsCache);
             $section['stress'] = $entry;
         }
@@ -233,7 +233,7 @@ class DaySummaryService
         // Resilience
         $resilience = $healthEvents->firstWhere('action', 'had_resilience_score');
         if ($resilience) {
-            $entry = ['value' => $resilience->formatted_value, 'unit' => 'resilience_level'];
+            $entry = ['event_id' => $resilience->id, 'value' => $resilience->formatted_value, 'unit' => 'resilience_level'];
             $this->attachBaseline($entry, $resilience, $metricsCache);
             $section['resilience'] = $entry;
         }
@@ -241,7 +241,7 @@ class DaySummaryService
         // HRV (Apple Health)
         $hrv = $events->first(fn ($e) => $e->service === 'apple_health' && $e->action === 'had_heart_rate_variability');
         if ($hrv) {
-            $entry = ['value' => $hrv->formatted_value, 'unit' => 'ms'];
+            $entry = ['event_id' => $hrv->id, 'value' => $hrv->formatted_value, 'unit' => 'ms'];
             $this->attachBaseline($entry, $hrv, $metricsCache);
             $section['hrv'] = $entry;
         }
@@ -249,14 +249,14 @@ class DaySummaryService
         // Cardiovascular age
         $cvAge = $healthEvents->firstWhere('action', 'had_cardiovascular_age');
         if ($cvAge) {
-            $section['cardiovascular_age'] = ['value' => $cvAge->formatted_value, 'unit' => 'years'];
+            $section['cardiovascular_age'] = ['event_id' => $cvAge->id, 'value' => $cvAge->formatted_value, 'unit' => 'years'];
         }
 
         // VO2 Max (check Oura first, then Apple Health)
         $vo2 = $healthEvents->firstWhere('action', 'had_vo2_max')
             ?? $events->first(fn ($e) => $e->service === 'apple_health' && $e->action === 'had_vo2_max');
         if ($vo2) {
-            $entry = ['value' => $vo2->formatted_value, 'unit' => $vo2->value_unit];
+            $entry = ['event_id' => $vo2->id, 'value' => $vo2->formatted_value, 'unit' => $vo2->value_unit];
             $this->attachBaseline($entry, $vo2, $metricsCache);
             $section['vo2_max'] = $entry;
         }
@@ -286,7 +286,7 @@ class DaySummaryService
         foreach ($simpleMetrics as $key => $config) {
             $event = $ahEvents->firstWhere('action', $config['action']);
             if ($event) {
-                $entry = ['value' => $event->formatted_value, 'unit' => $config['unit']];
+                $entry = ['event_id' => $event->id, 'value' => $event->formatted_value, 'unit' => $config['unit']];
                 $this->attachBaseline($entry, $event, $metricsCache);
                 $section[$key] = $entry;
             }
@@ -297,6 +297,7 @@ class DaySummaryService
         if ($workouts->isNotEmpty()) {
             $section['workouts'] = $workouts->map(function ($event) {
                 $workout = [
+                    'event_id' => $event->id,
                     'source' => $event->service,
                     'type' => $event->target?->title ?? 'Unknown',
                     'calories' => $event->formatted_value,
@@ -325,6 +326,7 @@ class DaySummaryService
         if ($hevyWorkouts->isNotEmpty()) {
             $section['strength_workouts'] = $hevyWorkouts->map(function ($event) {
                 $workout = [
+                    'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Workout',
                     'total_volume_kg' => $event->formatted_value,
                     'time' => $event->time->toISOString(),
@@ -360,6 +362,7 @@ class DaySummaryService
         if ($transactions->isNotEmpty()) {
             $section['transactions'] = $transactions->map(function ($event) {
                 $tx = [
+                    'event_id' => $event->id,
                     'merchant' => $event->target?->title ?? 'Unknown',
                     'amount' => $event->formatted_value,
                     'currency' => $event->value_unit ?? 'GBP',
@@ -394,6 +397,7 @@ class DaySummaryService
         if ($receipts->isNotEmpty()) {
             $section['receipts'] = $receipts->map(function ($event) {
                 $receipt = [
+                    'event_id' => $event->id,
                     'merchant' => $event->target?->title ?? 'Unknown',
                     'amount' => $event->formatted_value,
                     'currency' => $event->value_unit ?? 'GBP',
@@ -464,6 +468,8 @@ class DaySummaryService
                 $isAlbumSession = $topAlbum && ($topAlbum / $sessionEvents->count()) > 0.5;
 
                 return [
+                    'first_event_id' => $first->id,
+                    'last_event_id' => $last->id,
                     'start' => $first->time->toISOString(),
                     'end' => $last->time->toISOString(),
                     'track_count' => $sessionEvents->count(),
@@ -480,6 +486,7 @@ class DaySummaryService
         if ($untappdEvents->isNotEmpty()) {
             $section['beer_checkins'] = $untappdEvents->map(function ($event) {
                 $checkin = [
+                    'event_id' => $event->id,
                     'beer' => $event->target?->title ?? 'Unknown',
                     'rating' => $event->formatted_value,
                     'time' => $event->time->toISOString(),
@@ -500,6 +507,7 @@ class DaySummaryService
         if ($readingEvents->isNotEmpty()) {
             $section['reading'] = $readingEvents->map(function ($event) {
                 return [
+                    'event_id' => $event->id,
                     'action' => $event->action,
                     'book' => $event->target?->title ?? 'Unknown',
                     'rating' => $event->action === 'finished_reading' ? $event->formatted_value : null,
@@ -522,6 +530,7 @@ class DaySummaryService
         if ($outlineEvents->isNotEmpty()) {
             $section['outline_note_exists'] = true;
             $section['outline_notes'] = $outlineEvents->map(fn ($e) => [
+                'event_id' => $e->id,
                 'action' => $e->action,
                 'title' => $e->target?->title ?? $e->actor?->title ?? 'Note',
             ])->values()->all();
@@ -532,6 +541,7 @@ class DaySummaryService
         if ($bookmarks->isNotEmpty()) {
             $section['bookmarks'] = $bookmarks->map(function ($event) {
                 $bookmark = [
+                    'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Untitled',
                     'source' => $event->service,
                     'url' => $event->url ?? $event->target?->url,
@@ -542,7 +552,7 @@ class DaySummaryService
                 if ($summary) {
                     $content = $summary->getContent();
                     $bookmark['summary'] = mb_strlen($content, 'UTF-8') > 300
-                        ? mb_substr($content, 0, 300, 'UTF-8') . '...'
+                        ? mb_substr($content, 0, 300, 'UTF-8').'...'
                         : $content;
                 }
 
@@ -555,6 +565,7 @@ class DaySummaryService
         if ($fetched->isNotEmpty()) {
             $section['fetched_content'] = $fetched->map(function ($event) {
                 $item = [
+                    'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Untitled',
                     'url' => $event->url ?? $event->target?->url,
                 ];
@@ -587,6 +598,7 @@ class DaySummaryService
         if ($newsletters->isNotEmpty()) {
             $section['newsletters'] = $newsletters->map(function ($event) {
                 $newsletter = [
+                    'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Newsletter',
                     'from' => $event->actor?->title ?? 'Unknown',
                 ];
@@ -618,6 +630,7 @@ class DaySummaryService
         if ($calendarEvents->isNotEmpty()) {
             $section['calendar_events'] = $calendarEvents->map(function ($event) {
                 $calEvent = [
+                    'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Event',
                     'duration_minutes' => $event->formatted_value,
                     'time' => $event->time->toISOString(),

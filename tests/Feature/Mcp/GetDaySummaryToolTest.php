@@ -77,6 +77,7 @@ class GetDaySummaryToolTest extends TestCase
         $this->assertArrayHasKey('sections', $summary);
         $this->assertArrayHasKey('health', $summary['sections']);
         $this->assertArrayHasKey('sleep_score', $summary['sections']['health']);
+        $this->assertEquals($sleepEvent->id, $summary['sections']['health']['sleep_score']['event_id']);
         $this->assertEquals(85, $summary['sections']['health']['sleep_score']['score']);
         $this->assertArrayHasKey('contributors', $summary['sections']['health']['sleep_score']);
     }
@@ -98,7 +99,7 @@ class GetDaySummaryToolTest extends TestCase
         $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
 
-        Event::factory()->create([
+        $stepsEvent = Event::factory()->create([
             'integration_id' => $ahIntegration->id,
             'service' => 'apple_health',
             'domain' => 'health',
@@ -116,6 +117,7 @@ class GetDaySummaryToolTest extends TestCase
 
         $this->assertArrayHasKey('activity', $summary['sections']);
         $this->assertArrayHasKey('steps', $summary['sections']['activity']);
+        $this->assertEquals($stepsEvent->id, $summary['sections']['activity']['steps']['event_id']);
         $this->assertEquals(10500, $summary['sections']['activity']['steps']['value']);
     }
 
@@ -248,6 +250,7 @@ class GetDaySummaryToolTest extends TestCase
 
         $this->assertArrayHasKey('money', $summary['sections']);
         $this->assertCount(2, $summary['sections']['money']['transactions']);
+        $this->assertArrayHasKey('event_id', $summary['sections']['money']['transactions'][0]);
         $this->assertEquals(30.0, $summary['sections']['money']['total_spend']);
     }
 
@@ -300,6 +303,8 @@ class GetDaySummaryToolTest extends TestCase
         $this->assertArrayHasKey('media', $summary['sections']);
         $this->assertArrayHasKey('listening_sessions', $summary['sections']['media']);
         $this->assertCount(1, $summary['sections']['media']['listening_sessions']);
+        $this->assertArrayHasKey('first_event_id', $summary['sections']['media']['listening_sessions'][0]);
+        $this->assertArrayHasKey('last_event_id', $summary['sections']['media']['listening_sessions'][0]);
         $this->assertEquals(5, $summary['sections']['media']['listening_sessions'][0]['track_count']);
     }
 
