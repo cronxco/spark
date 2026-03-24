@@ -552,7 +552,7 @@ class DaySummaryService
                 if ($summary) {
                     $content = $summary->getContent();
                     $bookmark['summary'] = mb_strlen($content, 'UTF-8') > 300
-                        ? mb_substr($content, 0, 300, 'UTF-8').'...'
+                        ? mb_substr($content, 0, 300, 'UTF-8') . '...'
                         : $content;
                 }
 
