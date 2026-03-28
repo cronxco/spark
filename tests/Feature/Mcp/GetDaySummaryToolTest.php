@@ -213,7 +213,10 @@ class GetDaySummaryToolTest extends TestCase
             'service' => 'monzo',
         ]);
 
-        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $actor = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Personal',
+        ]);
         $merchant = EventObject::factory()->create([
             'user_id' => $this->user->id,
             'title' => 'Tesco',
@@ -230,6 +233,7 @@ class GetDaySummaryToolTest extends TestCase
             'time' => Carbon::today()->setHour(12),
             'actor_id' => $actor->id,
             'target_id' => $merchant->id,
+            'event_metadata' => ['notes' => 'Weekly shop'],
         ]);
 
         Event::factory()->create([
@@ -252,6 +256,15 @@ class GetDaySummaryToolTest extends TestCase
         $this->assertCount(2, $summary['sections']['money']['transactions']);
         $this->assertArrayHasKey('event_id', $summary['sections']['money']['transactions'][0]);
         $this->assertEquals(30.0, $summary['sections']['money']['total_spend']);
+
+        // Service orders by time DESC, so 14:00 event comes first
+        $firstTx = $summary['sections']['money']['transactions'][0];
+        $this->assertEquals('Personal', $firstTx['account']);
+        $this->assertArrayNotHasKey('reference', $firstTx);
+
+        $secondTx = $summary['sections']['money']['transactions'][1];
+        $this->assertEquals('Personal', $secondTx['account']);
+        $this->assertEquals('Weekly shop', $secondTx['reference']);
     }
 
     #[Test]

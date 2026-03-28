@@ -371,7 +371,14 @@ class DaySummaryService
                     'time' => $event->time->toISOString(),
                 ];
 
+                if ($event->actor?->title) {
+                    $tx['account'] = $event->actor->title;
+                }
+
                 if ($event->event_metadata) {
+                    if (! empty($event->event_metadata['notes'])) {
+                        $tx['reference'] = $event->event_metadata['notes'];
+                    }
                     if (isset($event->event_metadata['card_last4'])) {
                         $tx['card_last4'] = $event->event_metadata['card_last4'];
                     }
