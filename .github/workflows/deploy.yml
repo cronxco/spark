@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # v2
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
           php-version: 8.2
           tools: composer:v2
@@ -209,7 +209,7 @@ jobs:
     steps:
       - name: App Token
         id: app_token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
@@ -218,7 +218,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # v2
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
           php-version: "8.2"
 
@@ -294,7 +294,7 @@ jobs:
     steps:
       - name: App Token
         id: app_token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
@@ -303,7 +303,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # v2
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
           php-version: "8.2"
 
@@ -463,7 +463,7 @@ jobs:
     steps:
       - name: App Token
         id: app_token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}

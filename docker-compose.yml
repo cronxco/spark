@@ -1,6 +1,6 @@
 services:
     nginx:
-        image: "nginx:latest@sha256:341bf0f3ce6c5277d6002cf6e1fb0319fa4252add24ab6a0e262e0056d313208"
+        image: "nginx:latest@sha256:7150b3a39203cb5bee612ff4a9d18774f8c7caf6399d6e8985e97e28eb751c18"
         ports:
             - "${HTTP_PORT:-8000}:80"
             - "${SSL_PORT:-443}:443"
@@ -69,7 +69,7 @@ services:
             retries: 3
             timeout: 5s
     redis:
-        image: "redis:alpine@sha256:4eec4565e45aa0b3966554c866bc73211e281b0b3d89fe9a33c982e6faca809d"
+        image: "redis:alpine@sha256:81b6f81d6a6c5b9019231a2e8eb10085e3a139a34f833dcc965a8a959b040b72"
         ports:
             - "${FORWARD_REDIS_PORT:-6379}:6379"
         volumes:
