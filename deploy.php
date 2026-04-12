@@ -14,8 +14,6 @@ set('keep_releases', 3);
 set('writable_mode', 'chmod');
 // The host deploy_path (/srv/spark) is volume-mounted into the container as this path
 set('container_deploy_path', '/var/www/spark');
-// Override Laravel recipe default — artisan path must be the container path, not the host path
-set('bin/artisan', '{{container_deploy_path}}/releases/{{release_name}}/artisan');
 
 add('shared_files', ['.env']);
 add('shared_dirs', ['storage']);
@@ -117,6 +115,21 @@ task('deploy:upload_version', function () {
     writeln('<info>Uploading version.yml to {{release_path}}</info>');
     upload($localPath, $remotePath);
 });
+
+// Override built-in artisan tasks — the recipe hardcodes {{release_or_current_path}}/artisan (host path)
+// as the script argument to {{bin/php}}, but it must be the container path for docker exec.
+// Overriding release_or_current_path globally is unsafe (deploy:vendors cd's to it on the host).
+function containerArtisan(string $command): Closure
+{
+    return function () use ($command) {
+        run('sudo docker exec -t spark php {{container_deploy_path}}/releases/{{release_name}}/artisan ' . $command);
+    };
+}
+
+task('artisan:storage:link', containerArtisan('storage:link'));
+task('artisan:view:cache', containerArtisan('view:cache'));
+task('artisan:config:cache', containerArtisan('config:cache'));
+task('artisan:migrate', containerArtisan('migrate --force'));
 
 // Fix git safe.directory for the repo inside the container
 after('deploy:vendors', 'deploy:version:prepare');
