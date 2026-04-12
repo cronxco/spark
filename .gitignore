@@ -38,3 +38,9 @@ auth.json
 .agents/
 .claude/
 skills-lock.json
+**/caddy
+frankenphp
+frankenphp-worker.php
+docker/compose.yml
+docker/nginx-jupiter.conf
+docker/Dockerfile

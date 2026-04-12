@@ -131,4 +131,7 @@ return [
     // Enable/disable TaskPipeline job dispatch (disabled in testing by default to improve performance)
     'enable_task_pipeline' => env('ENABLE_TASK_PIPELINE', true),
 
+    // Trusted reverse proxies (Jupiter's Tailscale IP, or '*' since port 8080 is loopback-only on Titan)
+    'trusted_proxies' => env('TRUSTED_PROXIES', '*'),
+
 ];
