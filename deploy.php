@@ -12,6 +12,8 @@ set('repository', getenv('DEPLPOYER_REPO'));
 set('cleanup_use_sudo', true);
 set('keep_releases', 3);
 set('writable_mode', 'chmod');
+// The host deploy_path (/srv/spark) is volume-mounted into the container as this path
+set('container_deploy_path', '/var/www/spark');
 
 add('shared_files', ['.env']);
 add('shared_dirs', ['storage']);
@@ -22,16 +24,16 @@ host('prod')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
-    ->set('bin/php', 'sudo docker exec -t -w {{release_path}} spark php')
-    ->set('bin/composer', 'sudo docker exec -t -w {{release_path}} spark composer');
+    ->set('bin/php', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark php')
+    ->set('bin/composer', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer');
 
 host('dev')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('branch', 'dev')
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
-    ->set('bin/php', 'sudo docker exec -t -w {{release_path}} spark php')
-    ->set('bin/composer', 'sudo docker exec -t -w {{release_path}} spark composer');
+    ->set('bin/php', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark php')
+    ->set('bin/composer', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer');
 
 // Deploy task sequence
 task('deploy', [
@@ -65,14 +67,14 @@ task('horizon:restart', function () {
 // Inject Wire credentials before composer install
 task('composer:prepare', function () {
     run(
-        'sudo docker exec -t -w {{release_path}} spark composer config http-basic.wire-elements-pro.composer.sh %secret%',
+        'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer config http-basic.wire-elements-pro.composer.sh %secret%',
         secret: getenv('WIRE_SECRET')
     );
 });
 
 // Build frontend assets inside the container
 task('npm:run:prod', function () {
-    run('sudo docker exec -t -w {{release_path}} spark npm run build');
+    run('sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark npm run build');
 });
 
 // Version tasks
@@ -117,8 +119,8 @@ task('deploy:upload_version', function () {
 // Fix git safe.directory for the repo inside the container
 after('deploy:vendors', 'deploy:version:prepare');
 task('deploy:version:prepare', function () {
-    $repoPath = getenv('DEPLOYER_PATH') . '/.dep/repo';
-    run("sudo docker exec -t spark git config --global --add safe.directory {$repoPath}");
+    $containerRepoPath = get('container_deploy_path') . '/.dep/repo';
+    run("sudo docker exec -t spark git config --global --add safe.directory {$containerRepoPath}");
 });
 
 after('deploy:failed', 'deploy:unlock');
