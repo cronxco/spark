@@ -11,6 +11,7 @@ set('application', getenv('DEPLOYER_APP'));
 set('repository', getenv('DEPLPOYER_REPO'));
 set('cleanup_use_sudo', true);
 set('keep_releases', 3);
+set('writable_mode', 'chmod');
 
 add('shared_files', ['.env']);
 add('shared_dirs', ['storage']);
