@@ -3,83 +3,78 @@
 namespace Deployer;
 
 require 'recipe/laravel.php';
-require 'contrib/php-fpm.php';
 require 'contrib/npm.php';
-require 'contrib/crontab.php';
 require 'contrib/sentry.php';
 
 // Config
 set('application', getenv('DEPLOYER_APP'));
 set('repository', getenv('DEPLPOYER_REPO'));
-set('php_fpm_version', '8.2');
 set('cleanup_use_sudo', true);
 set('keep_releases', 3);
 
-add('shared_files', []);
-add('shared_dirs', []);
+add('shared_files', ['.env']);
+add('shared_dirs', ['storage']);
 add('writable_dirs', []);
-add('crontab:jobs', [
-    '* * * * * cd {{release_path}} && {{bin/php}} artisan schedule:run >> /dev/null 2>&1',
-]);
 
 // Hosts
 host('prod')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
-    ->set('bin/crontab', 'sudo /usr/bin/crontab')
-    ->set('bin/php', 'sudo docker exec -d -t -w {{release_path}} swag php')
-    ->set('bin/composer', 'sudo docker exec -t -w {{release_path}} swag /config/php/composer.phar');
+    ->set('bin/php', 'sudo docker exec -t -w {{release_path}} spark php')
+    ->set('bin/composer', 'sudo docker exec -t -w {{release_path}} spark composer');
 
 host('dev')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('branch', 'dev')
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
-    ->set('bin/crontab', 'sudo /usr/bin/crontab')
-    ->set('bin/php', 'sudo docker exec -d -t -w {{release_path}} swag php')
-    ->set('bin/composer', 'sudo docker exec -t -w {{release_path}} swag /config/php/composer.phar');
+    ->set('bin/php', 'sudo docker exec -t -w {{release_path}} spark php')
+    ->set('bin/composer', 'sudo docker exec -t -w {{release_path}} spark composer');
 
+// Deploy task sequence
 task('deploy', [
     'version:prepare',
     'deploy:prepare',
     'composer:prepare',
     'deploy:vendors',
     'version:set',
-    'artisan:horizon:terminate',
     'artisan:storage:link',
     'artisan:view:cache',
     'artisan:config:cache',
     'artisan:migrate',
     'npm:install',
     'npm:run:prod',
-    'artisan:horizon',
-    'deploy:publish',
+    'deploy:publish',      // ← symlink swap happens here
+    'octane:reload',       // ← reload Octane workers to pick up new release
+    'horizon:restart',     // ← graceful Horizon restart
 ]);
 
-after('deploy:update_code', 'deploy:upload_version');
-task('deploy:upload_version', function () {
-    // Make path absolute based on deploy.php location
-    $localPath = __DIR__ . '/config/version.yml';
-    $remotePath = '{{release_path}}/config/version.yml';
-    if (! file_exists($localPath)) {
-        writeln("<comment>⚠️ version.yml not found locally at {$localPath}, skipping upload.</comment>");
-
-        return;
-    }
-    writeln('<info>Uploading version.yml to {{release_path}}</info>');
-    upload($localPath, $remotePath);
+// Reload Octane gracefully after symlink swap
+// octane:reload sends SIGUSR1 to workers — zero-downtime reload
+task('octane:reload', function () {
+    run('sudo docker exec spark php /var/www/spark/current/artisan octane:reload || sudo docker restart spark');
 });
 
-after('deploy:vendors', 'deploy:version:prepare');
-task('deploy:version:prepare', function () {
-    run('sudo docker exec -t -w /srv/web/sites/spark/.dep/repo/ swag git config --global --add safe.directory /srv/web/sites/spark/.dep/repo');
+// Terminate Horizon — Docker restart policy brings it back automatically with new code
+task('horizon:restart', function () {
+    run('sudo docker exec spark-horizon php /var/www/spark/current/artisan horizon:terminate');
 });
 
+// Inject Wire credentials before composer install
 task('composer:prepare', function () {
-    run('sudo docker exec -t -w {{release_path}} swag /config/php/composer.phar config http-basic.wire-elements-pro.composer.sh %secret%', secret: getenv('WIRE_SECRET'));
+    run(
+        'sudo docker exec -t -w {{release_path}} spark composer config http-basic.wire-elements-pro.composer.sh %secret%',
+        secret: getenv('WIRE_SECRET')
+    );
 });
 
+// Build frontend assets inside the container
+task('npm:run:prod', function () {
+    run('sudo docker exec -t -w {{release_path}} spark npm run build');
+});
+
+// Version tasks
 task('version:prepare', function () {
     $absorb = runLocally('php artisan version:absorb');
     $ver = runLocally('php artisan version:show --format=version-only --suppress-app-name');
@@ -104,9 +99,25 @@ task('version:set', function () {
     run("echo {$ver} > {{release_path}}/public/VERSION.txt");
 });
 
-task('npm:run:prod', function () {
-    run('sudo docker exec -t -w {{release_path}} swag npm run build');
+// Upload version.yml after code checkout
+after('deploy:update_code', 'deploy:upload_version');
+task('deploy:upload_version', function () {
+    $localPath = __DIR__ . '/config/version.yml';
+    $remotePath = '{{release_path}}/config/version.yml';
+    if (! file_exists($localPath)) {
+        writeln("<comment>⚠️ version.yml not found locally at {$localPath}, skipping upload.</comment>");
+
+        return;
+    }
+    writeln('<info>Uploading version.yml to {{release_path}}</info>');
+    upload($localPath, $remotePath);
+});
+
+// Fix git safe.directory for the repo inside the container
+after('deploy:vendors', 'deploy:version:prepare');
+task('deploy:version:prepare', function () {
+    $repoPath = getenv('DEPLOYER_PATH') . '/.dep/repo';
+    run("sudo docker exec -t spark git config --global --add safe.directory {$repoPath}");
 });
 
 after('deploy:failed', 'deploy:unlock');
-after('deploy:success', 'crontab:sync');
