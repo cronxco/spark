@@ -14,6 +14,8 @@ set('keep_releases', 3);
 set('writable_mode', 'chmod');
 // The host deploy_path (/srv/spark) is volume-mounted into the container as this path
 set('container_deploy_path', '/var/www/spark');
+// Override Laravel recipe default — artisan path must be the container path, not the host path
+set('bin/artisan', '{{container_deploy_path}}/releases/{{release_name}}/artisan');
 
 add('shared_files', ['.env']);
 add('shared_dirs', ['storage']);
