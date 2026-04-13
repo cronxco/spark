@@ -74,7 +74,12 @@ task('composer:prepare', function () {
     );
 });
 
-// Build frontend assets inside the container
+// Install npm dependencies and build frontend assets inside the container
+task('npm:install', function () {
+    run('sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark npm install');
+    run('sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark npm install --no-save lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl @rollup/rollup-linux-x64-musl');
+});
+
 task('npm:run:prod', function () {
     run('sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark npm run build');
 });
