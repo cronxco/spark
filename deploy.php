@@ -2,6 +2,8 @@
 
 namespace Deployer;
 
+use Closure;
+
 require 'recipe/laravel.php';
 require 'contrib/npm.php';
 require 'contrib/sentry.php';
