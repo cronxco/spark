@@ -14,7 +14,7 @@ return [
     /*
      * The model to use for push subscriptions.
      */
-    'model' => \NotificationChannels\WebPush\PushSubscription::class,
+    'model' => \App\Models\PushSubscription::class,
 
     /*
      * GCM Sender ID (optional, for legacy Chrome support)

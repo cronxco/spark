@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\Apn\ApnMessage;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
@@ -84,6 +85,17 @@ abstract class SparkNotification extends Notification implements ShouldQueue
                 'TTL' => 86400, // 24 hours
                 'urgency' => $this->isPriority() ? 'high' : 'normal',
             ]);
+    }
+
+    /**
+     * Get the APNs representation of the notification
+     */
+    public function toApn(User $notifiable): ApnMessage
+    {
+        return ApnMessage::create()
+            ->title($this->getTitle())
+            ->body($this->getMessage())
+            ->sound('default');
     }
 
     /**
