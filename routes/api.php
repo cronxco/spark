@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\FetchApiController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
 use App\Http\Controllers\Api\SemanticSearchController;
+use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\EventApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -113,3 +114,7 @@ Route::middleware('sentry.api.logging')->group(function () {
 Route::get('user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum')->name('api.user');
+
+// OAuth PKCE token exchange + refresh (iOS companion app) — unauthenticated
+Route::post('oauth/token', [OAuthController::class, 'token'])->name('oauth.token');
+Route::post('oauth/refresh', [OAuthController::class, 'refresh'])->name('oauth.refresh');

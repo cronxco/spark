@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
@@ -36,6 +37,12 @@ Route::middleware(['auth'])->prefix('push')->group(function () {
     Route::get('subscriptions', [PushSubscriptionController::class, 'list'])->name('push.subscriptions');
     Route::delete('subscriptions/{id}', [PushSubscriptionController::class, 'destroy'])->name('push.subscriptions.destroy');
     Route::post('test', [PushSubscriptionController::class, 'test'])->name('push.test');
+});
+
+// OAuth PKCE authorization (iOS companion app)
+Route::middleware(['auth'])->group(function () {
+    Route::get('oauth/authorize', [OAuthController::class, 'authorize'])->name('oauth.authorize');
+    Route::post('oauth/authorize', [OAuthController::class, 'approve'])->name('oauth.approve');
 });
 
 Route::middleware(['auth'])->group(function () {
