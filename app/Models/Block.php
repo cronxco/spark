@@ -49,6 +49,13 @@ class Block extends Model implements HasMedia
         'embeddings',
     ];
 
+    /**
+     * A 1536-dim pgvector column; keep it out of JSON/array serialisation.
+     */
+    protected $hidden = [
+        'embeddings',
+    ];
+
     protected $casts = [
         'time' => 'datetime',
         'metadata' => 'array',
