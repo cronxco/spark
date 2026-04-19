@@ -57,6 +57,103 @@ class GetMetricTrendTool extends Tool
             return Response::error('Invalid date range.');
         }
 
+        [$startDate, $endDate] = $dateRange;
+
+        // Query events for the metric within date range. Select only the
+        // columns we actually use — `events` rows carry a 1536-dim embeddings
+        // vector and JSON metadata, and pulling them is pure egress waste.
+        $events = Event::query()
+            ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
+            ->where('service', $statistic->service)
+            ->where('action', $statistic->action)
+            ->whereBetween('time', [$startDate, $endDate])
+            ->orderBy('time', 'asc')
+            ->get(['id', 'time', 'value', 'value_multiplier']);
+
+        // Group by date, take latest event per day
+        $hasValidStats = $statistic->hasValidStatistics();
+        $dailyValues = $events->groupBy(fn ($e) => $e->time->toDateString())
+            ->map(function ($dayEvents) use ($statistic, $hasValidStats) {
+                $latest = $dayEvents->sortByDesc('time')->first();
+                $value = $latest->formatted_value;
+
+                $entry = [
+                    'date' => $latest->time->toDateString(),
+                    'value' => $value,
+                ];
+
+                if ($hasValidStats) {
+                    $baseline = $statistic->mean_value;
+                    $entry['vs_baseline_pct'] = $baseline != 0
+                        ? round((($value - $baseline) / abs($baseline)) * 100, 1)
+                        : 0;
+                    $entry['is_anomaly'] = $value < $statistic->normal_lower_bound
+                        || $value > $statistic->normal_upper_bound;
+                }
+
+                return $entry;
+            })->values()->all();
+
+        // Calculate summary stats
+        $values = collect($dailyValues)->pluck('value')->filter(fn ($v) => $v !== null);
+        $summary = [];
+
+        if ($values->isNotEmpty()) {
+            $halfPoint = (int) floor($values->count() / 2);
+            $firstHalf = $values->take($halfPoint);
+            $secondHalf = $values->skip($halfPoint);
+
+            $firstMean = $firstHalf->isNotEmpty() ? $firstHalf->avg() : 0;
+            $secondMean = $secondHalf->isNotEmpty() ? $secondHalf->avg() : 0;
+
+            $summary = [
+                'min' => round($values->min(), 2),
+                'max' => round($values->max(), 2),
+                'mean' => round($values->avg(), 2),
+                'data_points' => $values->count(),
+                'trend_direction' => $secondMean > $firstMean ? 'up' : ($secondMean < $firstMean ? 'down' : 'stable'),
+            ];
+
+            if ($hasValidStats) {
+                $anomalyStreak = 0;
+                $currentStreak = 0;
+
+                foreach ($dailyValues as $day) {
+                    if ($day['is_anomaly'] ?? false) {
+                        $currentStreak++;
+                        $anomalyStreak = max($anomalyStreak, $currentStreak);
+                    } else {
+                        $currentStreak = 0;
+                    }
+                }
+
+                $summary['max_anomaly_streak'] = $anomalyStreak;
+            }
+        }
+
+        $result = [
+            'metric' => $statistic->getIdentifier(),
+            'service' => $statistic->service,
+            'action' => $statistic->action,
+            'unit' => $statistic->value_unit,
+            'range' => [
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ],
+            'daily_values' => $dailyValues,
+            'summary' => $summary,
+        ];
+
+        if ($hasValidStats) {
+            $result['baseline'] = [
+                'mean' => round($statistic->mean_value, 2),
+                'stddev' => round($statistic->stddev_value, 2),
+                'normal_lower' => round($statistic->normal_lower_bound, 2),
+                'normal_upper' => round($statistic->normal_upper_bound, 2),
+                'sample_days' => $statistic->event_count,
+            ];
+        }
+
         return Response::text(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 

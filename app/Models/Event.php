@@ -55,6 +55,14 @@ class Event extends Model
         'location_source',
     ];
 
+    /**
+     * A 1536-dim pgvector column; keep it out of JSON/array serialisation
+     * so it can't be accidentally shipped over API or Livewire payloads.
+     */
+    protected $hidden = [
+        'embeddings',
+    ];
+
     protected $casts = [
         'time' => 'datetime',
         'actor_metadata' => 'array',

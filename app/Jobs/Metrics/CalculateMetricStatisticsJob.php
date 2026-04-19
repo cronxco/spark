@@ -5,6 +5,7 @@ namespace App\Jobs\Metrics;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -129,37 +130,69 @@ class CalculateMetricStatisticsJob implements ShouldQueue
 
     /**
      * Calculate statistics for a specific metric
+     *
+     * Aggregates in SQL rather than pulling every historical event into PHP —
+     * `events` rows are large (they include a 1536-dim `embeddings` vector and
+     * JSON metadata columns), so `SELECT *` on a multi-million-row history
+     * dominated database egress and wall-time.
      */
     protected function calculateMetricStatistics(string $userId, string $service, string $action, string $valueUnit): void
     {
-        // Get all events for this metric via integration relationship
-        $events = Event::whereHas('integration', function ($query) use ($userId) {
-            $query->where('user_id', $userId);
-        })
-            ->where('service', $service)
-            ->where('action', $action)
-            ->where('value_unit', $valueUnit)
-            ->whereNotNull('value')
-            ->whereNull('deleted_at')
-            ->orderBy('time')
-            ->get();
+        $eventsTable = (new Event)->getTable();
 
-        if ($events->count() < 10) {
+        // Mirrors Event::getFormattedValueAttribute() in SQL: null/0/1 multipliers
+        // pass the raw value through, everything else divides.
+        $formattedExpr = <<<'SQL'
+            CASE
+                WHEN e.value_multiplier IS NULL OR e.value_multiplier IN (0, 1)
+                    THEN e.value::double precision
+                ELSE e.value::double precision / e.value_multiplier
+            END
+        SQL;
+
+        $row = DB::table($eventsTable . ' as e')
+            ->join('integrations as i', 'e.integration_id', '=', 'i.id')
+            ->where('i.user_id', $userId)
+            ->whereNull('i.deleted_at')
+            ->where('e.service', $service)
+            ->where('e.action', $action)
+            ->where('e.value_unit', $valueUnit)
+            ->whereNotNull('e.value')
+            ->whereNull('e.deleted_at')
+            ->selectRaw(<<<SQL
+                COUNT(*) AS total_count,
+                MIN(e.time) AS first_event_at,
+                MAX(e.time) AS last_event_at,
+                COUNT(*) FILTER (WHERE e.value <> 0) AS formatted_count,
+                MIN({$formattedExpr}) FILTER (WHERE e.value <> 0) AS min_value,
+                MAX({$formattedExpr}) FILTER (WHERE e.value <> 0) AS max_value,
+                AVG({$formattedExpr}) FILTER (WHERE e.value <> 0) AS mean_value,
+                STDDEV_POP({$formattedExpr}) FILTER (WHERE e.value <> 0) AS stddev_value
+            SQL)
+            ->first();
+
+        $totalCount = (int) ($row->total_count ?? 0);
+
+        if ($totalCount < 10) {
             Log::info('Insufficient events for metric', [
                 'user_id' => $userId,
                 'service' => $service,
                 'action' => $action,
                 'value_unit' => $valueUnit,
-                'count' => $events->count(),
+                'count' => $totalCount,
             ]);
 
             return;
         }
 
-        // Check if we have at least 30 days of data
-        $firstEvent = $events->first();
-        $lastEvent = $events->last();
-        $daysBetween = $firstEvent->time->diffInDays($lastEvent->time);
+        $firstEventAt = $row->first_event_at ? Carbon::parse($row->first_event_at) : null;
+        $lastEventAt = $row->last_event_at ? Carbon::parse($row->last_event_at) : null;
+
+        if (! $firstEventAt || ! $lastEventAt) {
+            return;
+        }
+
+        $daysBetween = $firstEventAt->diffInDays($lastEventAt);
 
         if ($daysBetween < 30) {
             Log::info('Insufficient time range for metric', [
@@ -173,18 +206,15 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             return;
         }
 
-        // Calculate statistics using formatted values
-        $values = $events->map(fn ($event) => $event->getFormattedValueAttribute())->filter()->values();
+        $formattedCount = (int) ($row->formatted_count ?? 0);
 
-        if ($values->isEmpty()) {
+        if ($formattedCount === 0 || $row->mean_value === null) {
             return;
         }
 
-        $mean = $values->average();
-        $variance = $values->map(fn ($value) => pow($value - $mean, 2))->average();
-        $stddev = sqrt($variance);
+        $mean = (float) $row->mean_value;
+        $stddev = (float) ($row->stddev_value ?? 0.0);
 
-        // Create or update metric statistic
         MetricStatistic::updateOrCreate(
             [
                 'user_id' => $userId,
@@ -193,11 +223,11 @@ class CalculateMetricStatisticsJob implements ShouldQueue
                 'value_unit' => $valueUnit,
             ],
             [
-                'event_count' => $values->count(),
-                'first_event_at' => $firstEvent->time,
-                'last_event_at' => $lastEvent->time,
-                'min_value' => $values->min(),
-                'max_value' => $values->max(),
+                'event_count' => $formattedCount,
+                'first_event_at' => $firstEventAt,
+                'last_event_at' => $lastEventAt,
+                'min_value' => (float) $row->min_value,
+                'max_value' => (float) $row->max_value,
                 'mean_value' => $mean,
                 'stddev_value' => $stddev,
                 'normal_lower_bound' => $mean - (2 * $stddev),
@@ -211,7 +241,7 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             'service' => $service,
             'action' => $action,
             'value_unit' => $valueUnit,
-            'count' => $values->count(),
+            'count' => $formattedCount,
             'mean' => $mean,
             'stddev' => $stddev,
         ]);
