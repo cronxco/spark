@@ -56,5 +56,4 @@ return new class extends Migration
             throw $e;
         }
     }
-    }
 };
