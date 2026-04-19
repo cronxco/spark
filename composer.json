@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "clickbar/laravel-magellan": "^2.0",
         "fivefilters/readability.php": "^3.3",
         "guzzlehttp/guzzle": "^7.10",
@@ -46,7 +46,7 @@
         "zbateson/mail-mime-parser": "^3.0"
     },
     "require-dev": {
-        "brianium/paratest": "^7.0",
+        "brianium/paratest": "^7.20.0",
         "deployer/deployer": "^7.5",
         "fakerphp/faker": "^1.23",
         "laravel/boost": "^1.8",
@@ -55,8 +55,27 @@
         "laravel/sail": "^1.44",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^11.5.3",
+        "phpunit/php-code-coverage": "^14",
+        "phpunit/php-file-iterator": "^7",
+        "phpunit/php-invoker": "^7.0.0",
+        "phpunit/php-text-template": "^6.0",
+        "phpunit/php-timer": "^9",
+        "phpunit/phpunit": "^13.0.0",
         "ryoluo/sail-ssl": "^1.4",
+        "sebastian/cli-parser": "^5.0.0",
+        "sebastian/comparator": "^8.1.2",
+        "sebastian/complexity": "^6.0",
+        "sebastian/diff": "^8.1",
+        "sebastian/environment": "^9.1",
+        "sebastian/exporter": "^8.0",
+        "sebastian/global-state": "^9.0.0",
+        "sebastian/lines-of-code": "^5.0",
+        "sebastian/object-enumerator": "^8.0.0",
+        "sebastian/object-reflector": "^6.0",
+        "sebastian/recursion-context": "^8.0",
+        "sebastian/type": "^7.0.0",
+        "sebastian/version": "^7.0",
+        "theseer/tokenizer": "^2.0.1",
         "tightenco/duster": "^3.2"
     },
     "autoload": {
@@ -115,7 +134,7 @@
             "php-http/discovery": true
         },
         "platform": {
-            "php": "8.2"
+            "php": "8.4.1"
         }
     },
     "minimum-stability": "dev",
