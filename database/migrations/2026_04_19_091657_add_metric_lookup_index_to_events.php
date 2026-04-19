@@ -41,7 +41,8 @@ return new class extends Migration
         try {
             DB::statement($sql);
         } catch (\Throwable $e) {
-            // Swallow errors to avoid aborting entire migration.
+            report($e);
+            throw $e;
         }
     }
 };
