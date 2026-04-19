@@ -52,6 +52,13 @@ class EventObject extends Model implements HasMedia
         'location_source',
     ];
 
+    /**
+     * A 1536-dim pgvector column; keep it out of JSON/array serialisation.
+     */
+    protected $hidden = [
+        'embeddings',
+    ];
+
     protected $casts = [
         'time' => 'datetime',
         'metadata' => 'array',

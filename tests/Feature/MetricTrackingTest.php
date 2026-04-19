@@ -114,10 +114,111 @@ class MetricTrackingTest extends TestCase
 
         $metric = MetricStatistic::where('user_id', $user->id)->first();
         $this->assertEquals(40, $metric->event_count);
-        $this->assertNotNull($metric->mean_value);
-        $this->assertNotNull($metric->stddev_value);
-        $this->assertNotNull($metric->normal_lower_bound);
-        $this->assertNotNull($metric->normal_upper_bound);
+
+        // Values are 70..89 repeated twice → mean = 79.5, min = 70, max = 89.
+        $this->assertEqualsWithDelta(79.5, (float) $metric->mean_value, 0.0001);
+        $this->assertEqualsWithDelta(70.0, (float) $metric->min_value, 0.0001);
+        $this->assertEqualsWithDelta(89.0, (float) $metric->max_value, 0.0001);
+
+        // Population stddev of 70..89 twice is sqrt(variance). Compute it here
+        // to pin the value independent of SQL implementation choices.
+        $values = [];
+        for ($i = 0; $i < 40; $i++) {
+            $values[] = 70 + ($i % 20);
+        }
+        $mean = array_sum($values) / count($values);
+        $expectedStddev = sqrt(array_sum(array_map(fn ($v) => ($v - $mean) ** 2, $values)) / count($values));
+
+        $this->assertEqualsWithDelta($expectedStddev, (float) $metric->stddev_value, 0.0001);
+        $this->assertEqualsWithDelta($mean - 2 * $expectedStddev, (float) $metric->normal_lower_bound, 0.0001);
+        $this->assertEqualsWithDelta($mean + 2 * $expectedStddev, (float) $metric->normal_upper_bound, 0.0001);
+    }
+
+    /**
+     * @test
+     */
+    public function calculate_metric_statistics_job_applies_value_multiplier(): void
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+        ]);
+
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+
+        // 40 events with raw value = 100..199 (mod 100) + 100 and multiplier = 100.
+        // With the accessor, formatted_value = value / 100, so effective values
+        // are 1.00..1.99, mean = 1.495.
+        for ($i = 0; $i < 40; $i++) {
+            Event::create([
+                'source_id' => 'mul-' . $i,
+                'time' => now()->subDays(40 - $i),
+                'integration_id' => $integration->id,
+                'actor_id' => $actor->id,
+                'service' => 'monzo',
+                'domain' => 'money',
+                'action' => 'transaction',
+                'value' => 100 + ($i % 100),
+                'value_multiplier' => 100,
+                'value_unit' => 'gbp',
+            ]);
+        }
+
+        (new CalculateMetricStatisticsJob)->handle();
+
+        $metric = MetricStatistic::where('user_id', $user->id)->first();
+
+        $this->assertNotNull($metric);
+        $this->assertEquals(40, $metric->event_count);
+
+        // Recompute expected stats using the PHP accessor semantics.
+        $values = [];
+        for ($i = 0; $i < 40; $i++) {
+            $values[] = (100 + ($i % 100)) / 100;
+        }
+        $expectedMean = array_sum($values) / count($values);
+
+        $this->assertEqualsWithDelta($expectedMean, (float) $metric->mean_value, 0.0001);
+        $this->assertEqualsWithDelta(min($values), (float) $metric->min_value, 0.0001);
+        $this->assertEqualsWithDelta(max($values), (float) $metric->max_value, 0.0001);
+    }
+
+    /**
+     * @test
+     */
+    public function calculate_metric_statistics_job_skips_when_fewer_than_ten_events(): void
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+        ]);
+
+        // Only 5 events — below the threshold; no MetricStatistic should be written.
+        for ($i = 0; $i < 5; $i++) {
+            Event::create([
+                'source_id' => 'few-' . $i,
+                'time' => now()->subDays(40 - $i),
+                'integration_id' => $integration->id,
+                'service' => 'oura',
+                'domain' => 'health',
+                'action' => 'had_readiness_score',
+                'value' => 80,
+                'value_multiplier' => 1,
+                'value_unit' => 'percent',
+            ]);
+        }
+
+        (new CalculateMetricStatisticsJob)->handle();
+
+        $this->assertDatabaseMissing('metric_statistics', [
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
     }
 
     /**
