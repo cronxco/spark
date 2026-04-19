@@ -9,32 +9,85 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
-        "deployer/deployer": "^7.5",
+        "php": "^8.4",
+        "clickbar/laravel-magellan": "^2.0",
+        "fivefilters/readability.php": "^3.3",
+        "guzzlehttp/guzzle": "^7.10",
+        "html2text/html2text": "^4.3",
+        "icehouse-ventures/laravel-chartjs": "^4.2",
+        "intervention/image": "^3.11",
+        "jenssegers/agent": "^2.6",
+        "laravel-notification-channels/webpush": "^10.3",
         "laravel/framework": "^12.0",
+        "laravel/horizon": "^5.30.3",
+        "laravel/mcp": "^0.5.9",
+        "laravel/octane": "*",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
-        "livewire/flux": "^2.1.1",
-        "livewire/volt": "^1.7.0",
+        "league/flysystem-aws-s3-v3": "^3.30",
+        "livewire/livewire": "^3.6",
+        "livewire/volt": "^1.7",
+        "openai-php/laravel": "^0.18.0",
+        "owenvoke/blade-fontawesome": "^2.9",
         "pgvector/pgvector": "^0.2.2",
-        "socialiteproviders/authelia": "^4.0"
+        "pragmarx/version": "dev-master",
+        "predis/predis": "^3.2",
+        "revolution/laravel-bluesky": "^1.1",
+        "robsontenorio/mary": "dev-main",
+        "sentry/sentry-laravel": "^4.9",
+        "smalot/pdfparser": "^2.12",
+        "socialiteproviders/authelia": "^4.0",
+        "spatie/laravel-activitylog": "^4",
+        "spatie/laravel-medialibrary": "^11.17",
+        "spatie/laravel-tags": "^4.10",
+        "symfony/emoji": "^7.3",
+        "willscottuk/monzo-php": "dev-master",
+        "wire-elements/pro": "^4.0",
+        "zbateson/mail-mime-parser": "^3.0"
     },
     "require-dev": {
+        "brianium/paratest": "^7.20.0",
+        "deployer/deployer": "^7.5",
         "fakerphp/faker": "^1.23",
+        "laravel/boost": "^1.8",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.18",
         "laravel/sail": "^1.44",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^11.5.3",
-        "ryoluo/sail-ssl": "^1.4"
+        "phpunit/php-code-coverage": "^14",
+        "phpunit/php-file-iterator": "^7",
+        "phpunit/php-invoker": "^7.0.0",
+        "phpunit/php-text-template": "^6.0",
+        "phpunit/php-timer": "^9",
+        "phpunit/phpunit": "^13.0.0",
+        "ryoluo/sail-ssl": "^1.4",
+        "sebastian/cli-parser": "^5.0.0",
+        "sebastian/comparator": "^8.1.2",
+        "sebastian/complexity": "^6.0",
+        "sebastian/diff": "^8.1",
+        "sebastian/environment": "^9.1",
+        "sebastian/exporter": "^8.0",
+        "sebastian/global-state": "^9.0.0",
+        "sebastian/lines-of-code": "^5.0",
+        "sebastian/object-enumerator": "^8.0.0",
+        "sebastian/object-reflector": "^6.0",
+        "sebastian/recursion-context": "^8.0",
+        "sebastian/type": "^7.0.0",
+        "sebastian/version": "^7.0",
+        "theseer/tokenizer": "^2.0.1",
+        "tightenco/duster": "^3.2"
     },
     "autoload": {
         "psr-4": {
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Support/helpers.php",
+            "app/Support/SentryAiHelpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -47,7 +100,8 @@
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "@php artisan sentry:publish --ansi"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
@@ -59,7 +113,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan horizon\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,horizon,logs,vite --kill-others"
         ],
         "test": [
             "@php artisan config:clear --ansi",
@@ -78,6 +132,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.4.1"
         }
     },
     "minimum-stability": "dev",
@@ -86,6 +143,10 @@
         {
             "type": "vcs",
             "url": "git@github.com:cronxco/graby.git"
+        },
+        {
+            "type": "vcs",
+            "url": "git@github.com:cronxco/mary.git"
         },
         {
             "type": "vcs",
@@ -106,10 +167,6 @@
             "only": [
                 "wire-elements/*"
             ]
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:cronxco/mary.git"
         },
         {
             "type": "vcs",
