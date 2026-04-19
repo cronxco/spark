@@ -147,6 +147,7 @@ class MetricTrackingTest extends TestCase
         ]);
 
         $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
 
         // 40 events with raw value = 100..199 (mod 100) + 100 and multiplier = 100.
         // With the accessor, formatted_value = value / 100, so effective values
@@ -157,6 +158,7 @@ class MetricTrackingTest extends TestCase
                 'time' => now()->subDays(40 - $i),
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
+                'target_id' => $target->id,
                 'service' => 'monzo',
                 'domain' => 'money',
                 'action' => 'transaction',
@@ -196,6 +198,8 @@ class MetricTrackingTest extends TestCase
             'user_id' => $user->id,
             'integration_group_id' => $group->id,
         ]);
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
 
         // Only 5 events — below the threshold; no MetricStatistic should be written.
         for ($i = 0; $i < 5; $i++) {
@@ -203,6 +207,8 @@ class MetricTrackingTest extends TestCase
                 'source_id' => 'few-' . $i,
                 'time' => now()->subDays(40 - $i),
                 'integration_id' => $integration->id,
+                'actor_id' => $actor->id,
+                'target_id' => $target->id,
                 'service' => 'oura',
                 'domain' => 'health',
                 'action' => 'had_readiness_score',
