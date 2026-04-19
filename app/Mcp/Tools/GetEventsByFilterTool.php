@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventResource;
-use App\Mcp\Helpers\DateParser;
-use App\Models\Event;
+use App\Services\Mobile\EventFeed;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -16,8 +15,6 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class GetEventsByFilterTool extends Tool
 {
-    use DateParser;
-
     /**
      * The tool's description.
      */
@@ -39,53 +36,33 @@ class GetEventsByFilterTool extends Tool
         }
 
         $service = $request->get('service');
-        $action = $request->get('action');
-        $from = $request->get('from_date');
-        $to = $request->get('to_date');
-        $limit = min((int) ($request->get('limit', 50)), 100);
 
         if (! $service) {
             return Response::error('The "service" parameter is required.');
         }
 
-        // Get user's integration IDs for authorization
-        $integrationIds = $user->integrations()->pluck('id')->all();
-
-        if (empty($integrationIds)) {
+        if ($user->integrations()->count() === 0) {
             return Response::error('No integrations found for this user.');
         }
 
-        $query = Event::query()
-            ->whereIn('integration_id', $integrationIds)
-            ->where('service', $service)
-            ->with(['actor', 'target', 'blocks', 'tags']);
+        $result = app(EventFeed::class)->filter(
+            $user,
+            $service,
+            $request->get('action'),
+            $request->get('from_date'),
+            $request->get('to_date'),
+            (int) $request->get('limit', EventFeed::LIMIT_DEFAULT),
+        );
 
-        if ($action) {
-            $query->where('action', $action);
-        }
-
-        // Apply date range
-        $dateRange = $this->parseDateRange($from, $to);
-        if ($dateRange) {
-            $query->whereBetween('time', $dateRange);
-        }
-
-        // Get total count before limiting
-        $totalCount = $query->count();
-
-        $events = $query->orderBy('time', 'desc')
-            ->limit($limit)
-            ->get();
-
-        $result = [
-            'service' => $service,
-            'action' => $action,
-            'total_count' => $totalCount,
-            'returned_count' => $events->count(),
-            'events' => EventResource::collection($events)->resolve(request()),
+        $payload = [
+            'service' => $result['service'],
+            'action' => $result['action'],
+            'total_count' => $result['total_count'],
+            'returned_count' => $result['returned_count'],
+            'events' => EventResource::collection($result['events'])->resolve(request()),
         ];
 
-        return Response::text(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        return Response::text(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
     /**

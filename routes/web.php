@@ -21,6 +21,25 @@ Route::get('/', function () {
     return redirect()->route('today.main');
 })->name('home');
 
+Route::get('.well-known/apple-app-site-association', function () {
+    $teamId = config('ios.apple_team_id', '');
+    $bundleId = config('ios.app_bundle_id', 'co.cronx.spark');
+    $appId = $teamId === '' ? $bundleId : $teamId . '.' . $bundleId;
+
+    return response()->json([
+        'applinks' => [
+            'apps' => [],
+            'details' => [[
+                'appID' => $appId,
+                'paths' => ['/event/*', '/object/*', '/place/*'],
+            ]],
+        ],
+        'webcredentials' => [
+            'apps' => [$appId],
+        ],
+    ], 200, ['Content-Type' => 'application/json']);
+})->name('aasa');
+
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');

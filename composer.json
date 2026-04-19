@@ -23,6 +23,7 @@
         "laravel/horizon": "^5.30.3",
         "laravel/mcp": "^0.5.9",
         "laravel/octane": "*",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.30",

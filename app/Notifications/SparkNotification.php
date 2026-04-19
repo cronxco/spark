@@ -2,7 +2,9 @@
 
 namespace App\Notifications;
 
+use App\Models\PushSubscription;
 use App\Models\User;
+use App\Notifications\Channels\ApnsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -35,31 +37,20 @@ abstract class SparkNotification extends Notification implements ShouldQueue
     {
         $channels = ['database'];
 
-        // Priority notifications always send via all channels
         if ($this->isPriority()) {
             $channels[] = 'mail';
 
-            // Add push if user has any subscriptions
-            if ($notifiable->pushSubscriptions()->exists()) {
-                $channels[] = WebPushChannel::class;
-            }
-
-            return $channels;
+            return array_merge($channels, $this->pushChannelsFor($notifiable));
         }
 
-        // Check user preferences for email
         if ($notifiable->hasEmailNotificationsEnabled($this->getNotificationType())) {
-            // Handle delayed sending based on work hours
             if (! $this->shouldDelayEmail($notifiable)) {
                 $channels[] = 'mail';
             }
         }
 
-        // Check user preferences for push notifications
         if ($notifiable->hasPushNotificationsEnabledForType($this->getNotificationType())) {
-            if ($notifiable->pushSubscriptions()->exists()) {
-                $channels[] = WebPushChannel::class;
-            }
+            $channels = array_merge($channels, $this->pushChannelsFor($notifiable));
         }
 
         return $channels;
@@ -146,6 +137,32 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             'action_url' => $this->getActionUrl(),
             'priority' => $this->isPriority(),
         ];
+    }
+
+    /**
+     * Inspect the user's push subscriptions and return the set of push
+     * channels they have a device registered for. De-duplicated so each
+     * channel is only listed once, regardless of subscription count.
+     *
+     * @return array<int, class-string>
+     */
+    protected function pushChannelsFor(User $notifiable): array
+    {
+        $deviceTypes = $notifiable->pushSubscriptions()
+            ->pluck('device_type')
+            ->map(fn ($type) => $type ?: PushSubscription::DEVICE_TYPE_WEB)
+            ->unique();
+
+        $channels = [];
+        foreach ($deviceTypes as $type) {
+            if ($type === PushSubscription::DEVICE_TYPE_IOS) {
+                $channels[] = ApnsChannel::class;
+            } else {
+                $channels[] = WebPushChannel::class;
+            }
+        }
+
+        return array_values(array_unique($channels));
     }
 
     /**

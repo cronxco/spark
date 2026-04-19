@@ -53,6 +53,7 @@ task('deploy', [
     'deploy:publish',      // ← symlink swap happens here
     'octane:reload',       // ← reload Octane workers to pick up new release
     'horizon:restart',     // ← graceful Horizon restart
+    'reverb:restart',      // ← restart Reverb WebSocket server
 ]);
 
 // Reload Octane gracefully after symlink swap
@@ -64,6 +65,13 @@ task('octane:reload', function () {
 // Terminate Horizon — Docker restart policy brings it back automatically with new code
 task('horizon:restart', function () {
     run('sudo docker exec spark-horizon php /var/www/spark/current/artisan horizon:terminate');
+});
+
+// Restart Reverb — Docker restart policy brings it back automatically with new code.
+// Use restart (not stop) so the container is guaranteed to come back even if the
+// long-lived process exits cleanly with a zero exit code.
+task('reverb:restart', function () {
+    run('sudo docker restart spark-reverb');
 });
 
 // Inject Wire credentials before composer install

@@ -242,13 +242,21 @@ class OAuthController extends Controller
     /**
      * Translate an OAuth scope string into Sanctum token abilities.
      *
+     * Sanctum ability checks are exact string matches (not glob patterns),
+     * so `ios:*` in a scope string expands to the explicit pair that the
+     * `ability:ios:read` / `ability:ios:write` middleware actually look for.
+     *
      * @return array<int, string>
      */
     protected function scopeToAbilities(string $scope): array
     {
         $abilities = array_values(array_filter(explode(' ', trim($scope))));
 
-        return $abilities === [] ? ['ios:*'] : $abilities;
+        if ($abilities === [] || in_array('ios:*', $abilities, true)) {
+            return ['ios:read', 'ios:write'];
+        }
+
+        return $abilities;
     }
 
     /**

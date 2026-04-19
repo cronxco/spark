@@ -177,12 +177,14 @@ class OAuthFlowTest extends TestCase
         $this->assertSame(hash('sha256', $body['refresh_token']), $stored->token_hash);
         $this->assertNull($stored->revoked_at);
 
-        // Access token has the ios:* ability and is owned by the user.
+        // Access token holds the concrete read/write abilities (Sanctum does
+        // exact-match ability checks, so `ios:*` scope expands to the pair).
         $tokenId = (int) explode('|', $body['access_token'])[0];
         $personalToken = PersonalAccessToken::query()->find($tokenId);
         $this->assertNotNull($personalToken);
         $this->assertSame((string) $user->getKey(), (string) $personalToken->tokenable_id);
-        $this->assertContains('ios:*', $personalToken->abilities);
+        $this->assertContains('ios:read', $personalToken->abilities);
+        $this->assertContains('ios:write', $personalToken->abilities);
     }
 
     #[Test]

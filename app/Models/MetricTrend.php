@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\Mobile\AnomalyRaised;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -49,6 +50,22 @@ class MetricTrend extends Model
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
+        });
+
+        // Broadcast anomalies to the iOS client the moment they're persisted.
+        // Centralised here so both DetectMetricAnomaliesJob and DetectAnomaliesTask
+        // (Task Pipeline) emit the event without duplicating dispatch code.
+        static::created(function (MetricTrend $model) {
+            if (! in_array($model->type, ['anomaly_high', 'anomaly_low'], true)) {
+                return;
+            }
+
+            $userId = $model->metricStatistic?->user_id;
+            if (! $userId) {
+                return;
+            }
+
+            event(AnomalyRaised::fromTrend($model, (string) $userId));
         });
     }
 

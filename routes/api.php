@@ -118,3 +118,11 @@ Route::get('user', function (Request $request) {
 // OAuth PKCE token exchange + refresh (iOS companion app) — unauthenticated
 Route::post('oauth/token', [OAuthController::class, 'token'])->name('oauth.token');
 Route::post('oauth/refresh', [OAuthController::class, 'refresh'])->name('oauth.refresh');
+
+// Mobile API surface — gated behind config('ios.mobile_api_enabled') so it's
+// invisible in production until the iOS client is ready to ship. Default
+// ability is `ios:read`; write-side endpoints override to `ios:write`.
+Route::prefix('v1/mobile')
+    ->middleware(['auth:sanctum', 'ability:ios:read', 'ios.enabled', 'etag'])
+    ->name('api.v1.mobile.')
+    ->group(base_path('routes/mobile.php'));
