@@ -2,15 +2,19 @@
 
 namespace App\Livewire;
 
+use App\Actions\DispatchIntegrationFetchJobs;
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Livewire\Component;
+use Mary\Traits\Toast;
 
 class IntegrationDetails extends Component
 {
+    use Toast;
+
     public Integration $integration;
 
     public bool $showSidebar = false;
@@ -105,10 +109,15 @@ class IntegrationDetails extends Component
 
     public function triggerIntegrationUpdate(): void
     {
-        // Trigger an immediate update for this integration
-        $this->integration->trigger();
+        if ($this->integration->isPaused()) {
+            $this->error('Integration is paused.');
 
-        $this->dispatch('integration-update-triggered');
+            return;
+        }
+
+        (new DispatchIntegrationFetchJobs)->dispatch($this->integration);
+
+        $this->success('Update triggered successfully!');
     }
 
     public function toggleIntegrationPause(): void
@@ -125,7 +134,7 @@ class IntegrationDetails extends Component
     public function openConfigureModal(): void
     {
         // This would open a configuration modal - for now just redirect to settings
-        $this->redirect(route('integrations.details', $this->integration->id) . '#configuration');
+        $this->redirect(route('integrations.details', $this->integration->id).'#configuration');
     }
 
     public function getCompleteIntegrationData(): array
@@ -150,11 +159,11 @@ class IntegrationDetails extends Component
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         $this->js('
-            const blob = new Blob([' . json_encode($json) . "], { type: 'application/json' });
+            const blob = new Blob(['.json_encode($json)."], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'integration-{$this->integration->id}-" . now()->format('Y-m-d-His') . ".json';
+            a.download = 'integration-{$this->integration->id}-".now()->format('Y-m-d-His').".json';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -213,7 +222,7 @@ class IntegrationDetails extends Component
     public function render()
     {
         return view('livewire.integration-details')
-            ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+            ->layout('components.layouts.app', ['title' => $this->integration->name.' Details']);
     }
 
     /**

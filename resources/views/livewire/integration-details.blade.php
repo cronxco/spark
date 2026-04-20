@@ -14,6 +14,14 @@
                 <x-slot:actions>
                     <!-- Desktop: Full buttons -->
                     <div class="hidden sm:flex gap-2">
+                        @if (!$integration->isPaused())
+                            <x-button
+                                label="Update Now"
+                                icon="fas.rotate"
+                                wire:click="triggerIntegrationUpdate"
+                                class="btn-outline"
+                            />
+                        @endif
                         <x-button
                             label="Configure"
                             link="{{ route('integrations.configure', $integration->id) }}"
@@ -35,6 +43,9 @@
                                     <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                                 </x-button>
                             </x-slot:trigger>
+                            @if (!$integration->isPaused())
+                                <x-menu-item title="Update Now" icon="fas.rotate" wire:click="triggerIntegrationUpdate" />
+                            @endif
                             <x-menu-item title="Configure" icon="fas.gear" link="{{ route('integrations.configure', $integration->id) }}" />
                             <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="fas.sliders" wire:click="toggleSidebar" />
                         </x-dropdown>
