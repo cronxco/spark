@@ -1,5 +1,5 @@
 <?php
-use App\Jobs\ProcessIntegrationData;
+use App\Actions\DispatchIntegrationFetchJobs;
 use App\Jobs\RunIntegrationTask;
 use App\Models\ActionProgress;
 use App\Models\Event;
@@ -385,13 +385,7 @@ new class extends Component
         }
 
         try {
-            // Dispatch the job based on instance type
-            if ($integration->instance_type === 'task' || $integration->service === 'task') {
-                RunIntegrationTask::dispatch($integration)
-                    ->onQueue($integration->configuration['task_queue'] ?? 'pull');
-            } else {
-                ProcessIntegrationData::dispatch($integration);
-            }
+            (new DispatchIntegrationFetchJobs)->dispatch($integration);
 
             $this->success('Update triggered successfully!');
             $this->loadData();
@@ -668,13 +662,12 @@ new class extends Component
                                                 @endif
                                             @endif
 
-                                            @if ($showScheduledUpdates && !$integration['is_processing'] && !$integration['is_paused'] && in_array($integration['status'], ['needs_update', 'pending_update']))
+                                            @if ($showScheduledUpdates && !$integration['is_processing'] && !$integration['is_paused'])
                                                 <x-button
-                                                    label="{{ __('Update') }}"
                                                     icon="fas.rotate"
                                                     wire:click="triggerUpdate('{{ $integration['id'] }}')"
-                                                    :disabled="$integration['is_processing']"
-                                                    class="btn btn-xs sm:btn-sm hover:btn-success"
+                                                    class="btn btn-xs sm:btn-sm btn-ghost"
+                                                    title="{{ __('Trigger update now') }}"
                                                 />
                                             @endif
                                             <x-button

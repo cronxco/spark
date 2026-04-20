@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\DispatchIntegrationFetchJobs;
 use App\Http\Controllers\Controller;
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class IntegrationApiController extends Controller
@@ -75,6 +77,28 @@ class IntegrationApiController extends Controller
         return response()->json([
             'message' => 'Integration configured successfully',
             'integration' => $integration->fresh(),
+        ]);
+    }
+
+    /**
+     * Trigger an immediate update for the specified integration.
+     */
+    public function trigger(Request $request, string $integrationId): JsonResponse
+    {
+        $integration = $request->user()->integrations()->findOrFail($integrationId);
+
+        if ($integration->isPaused()) {
+            return response()->json(['error' => 'Integration is paused.'], 422);
+        }
+
+        $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($integration);
+
+        return response()->json([
+            'message' => 'Integration update triggered.',
+            'integration_id' => $integration->id,
+            'service' => $integration->service,
+            'instance_type' => $integration->instance_type,
+            'jobs_dispatched' => $jobsDispatched,
         ]);
     }
 
