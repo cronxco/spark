@@ -44,3 +44,4 @@ frankenphp-worker.php
 docker/compose.yml
 docker/nginx-jupiter.conf
 docker/Dockerfile
+.DS_Store
