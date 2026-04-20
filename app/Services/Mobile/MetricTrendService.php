@@ -44,13 +44,16 @@ class MetricTrendService
 
         [$startDate, $endDate] = $dateRange;
 
+        // Select only the columns we actually use — `events` rows carry a
+        // 1536-dim embeddings vector and JSON metadata, and pulling them is
+        // pure egress waste.
         $events = Event::query()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->where('service', $statistic->service)
             ->where('action', $statistic->action)
             ->whereBetween('time', [$startDate, $endDate])
             ->orderBy('time', 'asc')
-            ->get();
+            ->get(['id', 'time', 'value', 'value_multiplier']);
 
         $hasValidStats = $statistic->hasValidStatistics();
         $dailyValues = $events->groupBy(fn ($e) => $e->time->toDateString())

@@ -34,6 +34,7 @@
         "pgvector/pgvector": "^0.2.2",
         "pragmarx/version": "dev-master",
         "predis/predis": "^3.2",
+        "pusher/pusher-php-server": "^7.2",
         "revolution/laravel-bluesky": "^1.1",
         "robsontenorio/mary": "dev-main",
         "sentry/sentry-laravel": "^4.9",

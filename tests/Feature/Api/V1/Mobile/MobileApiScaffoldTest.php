@@ -61,14 +61,15 @@ class MobileApiScaffoldTest extends TestCase
     {
         Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
 
+        // The ping payload embeds `server_time`, so the ETag changes whenever
+        // the clock ticks — freeze it so both requests hash the same bytes.
+        $this->freezeTime();
+
         $first = $this->getJson('/api/v1/mobile/ping')->assertOk();
         $etag = $first->headers->get('ETag');
 
         $this->assertNotNull($etag);
 
-        // The ping payload embeds `server_time` so the ETag naturally changes
-        // each second — hit the exact same response by replaying the ETag as
-        // If-None-Match and expecting a 304.
         $this->getJson('/api/v1/mobile/ping', ['If-None-Match' => $etag])
             ->assertStatus(304);
     }
