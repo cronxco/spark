@@ -43,7 +43,7 @@ class GetMetricTrendTool extends Tool
         if (! $service->resolve($metricId, $user)) {
             $scope = explode('.', $metricId)[0] ?? '';
 
-            return Response::error("Unknown metric identifier: {$metricId}. ".MetricIdentifierMap::availableForService($scope, $user));
+            return Response::error("Unknown metric identifier: {$metricId}. " . MetricIdentifierMap::availableForService($scope, $user));
         }
 
         $result = $service->trend(
