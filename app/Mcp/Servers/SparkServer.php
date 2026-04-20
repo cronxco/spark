@@ -16,9 +16,13 @@ use App\Mcp\Tools\GetServiceStatusTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
 use App\Mcp\Tools\SearchObjectsTool;
+use App\Mcp\Tools\TriggerIntegrationUpdateTool;
 use App\Mcp\Tracing\McpSpan;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\Resource;
 use Laravel\Mcp\Server\ServerContext;
+use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Transport\JsonRpcRequest;
 
 class SparkServer extends Server
@@ -67,6 +71,9 @@ class SparkServer extends Server
         - `get-object`: Get full details for a specific object by ID.
         - `get-block`: Get full details for a specific block by ID.
 
+        ## Actions
+        - `trigger-integration-update`: Trigger an immediate on-demand fetch for a specific integration or all instances of a service (e.g. `service: "oura"`). Does not affect the scheduled pull cycle.
+
         ## Workflow Tips
         - Start with `get-day-summary` for daily briefings — it replaces multiple get-day-context + parsing calls.
         - Use `get-baselines` to discover available metrics, then `get-metric-trend` for analysis.
@@ -81,7 +88,7 @@ class SparkServer extends Server
     /**
      * The tools registered with this MCP server.
      *
-     * @var array<int, class-string<\Laravel\Mcp\Server\Tool>>
+     * @var array<int, class-string<Tool>>
      */
     protected array $tools = [
         GetDaySummaryTool::class,
@@ -97,12 +104,13 @@ class SparkServer extends Server
         GetEventTool::class,
         GetObjectTool::class,
         GetBlockTool::class,
+        TriggerIntegrationUpdateTool::class,
     ];
 
     /**
      * The resources registered with this MCP server.
      *
-     * @var array<int, class-string<\Laravel\Mcp\Server\Resource>>
+     * @var array<int, class-string<Server\Resource>>
      */
     protected array $resources = [
         DayContextResource::class,
@@ -111,7 +119,7 @@ class SparkServer extends Server
     /**
      * The prompts registered with this MCP server.
      *
-     * @var array<int, class-string<\Laravel\Mcp\Server\Prompt>>
+     * @var array<int, class-string<Prompt>>
      */
     protected array $prompts = [
         //
