@@ -25,7 +25,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.30",
-        "livewire/livewire": "^3.6",
+        "livewire/livewire": "^3.6.1",
         "livewire/volt": "^1.7",
         "openai-php/laravel": "^0.18.0",
         "owenvoke/blade-fontawesome": "^2.9",
@@ -83,11 +83,7 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        },
-        "files": [
-            "app/Support/helpers.php",
-            "app/Support/SentryAiHelpers.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {

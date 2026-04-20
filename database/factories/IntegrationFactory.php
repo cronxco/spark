@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Integration;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -14,7 +15,7 @@ class IntegrationFactory extends Factory
     {
         return [
             'id' => $this->faker->uuid(),
-            'user_id' => \App\Models\User::factory(),
+            'user_id' => User::factory(),
             'service' => $this->faker->word(),
             'name' => $this->faker->word(),
             'account_id' => $this->faker->uuid(),
