@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Integrations\Contracts\OAuthIntegrationPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\PluginRegistry;
 use App\Jobs\Migrations\StartIntegrationMigration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Exception;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -305,6 +307,12 @@ class IntegrationController extends Controller
                 'group_id' => $group->id,
             ]);
 
+            // If group already has integrations, this is a reconnect — skip onboarding
+            if ($group->integrations()->exists()) {
+                return redirect()->route('integrations.index')
+                    ->with('success', 'Reconnected successfully! Your credentials have been refreshed.');
+            }
+
             // Redirect to onboarding to select instance types
             return redirect()->route('integrations.onboarding', ['group' => $group->id])
                 ->with('success', 'Connected! Now choose what to track.');
@@ -373,6 +381,45 @@ class IntegrationController extends Controller
 
             return redirect()->route('integrations.index')
                 ->with('error', 'Failed to initialize integration. Please try again or contact support if the problem persists.');
+        }
+    }
+
+    public function reconnect(string $service, IntegrationGroup $group): RedirectResponse
+    {
+        if ((string) $group->user_id !== (string) Auth::id()) {
+            abort(403);
+        }
+
+        $pluginClass = PluginRegistry::getPlugin($service);
+        if (! $pluginClass) {
+            abort(404);
+        }
+
+        $plugin = new $pluginClass;
+
+        if (! ($plugin instanceof OAuthIntegrationPlugin)) {
+            return redirect()->route('integrations.index')
+                ->with('error', 'This integration does not support re-authentication.');
+        }
+
+        try {
+            $oauthUrl = $plugin->getOAuthUrl($group);
+
+            if (! filter_var($oauthUrl, FILTER_VALIDATE_URL)) {
+                throw new Exception('Invalid OAuth URL generated');
+            }
+
+            return redirect($oauthUrl);
+        } catch (Exception $e) {
+            Log::error('Reconnect OAuth flow failed', [
+                'service' => $service,
+                'user_id' => Auth::id(),
+                'group_id' => $group->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('integrations.index')
+                ->with('error', 'Failed to initiate reconnection: ' . $e->getMessage());
         }
     }
 

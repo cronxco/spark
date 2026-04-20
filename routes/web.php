@@ -74,6 +74,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Route::get('integrations/{service}/reconnect/{group}', [IntegrationController::class, 'reconnect'])
+        ->whereUuid('group')
+        ->name('integrations.reconnect');
     Route::get('integrations/groups/{group}/onboarding', [IntegrationController::class, 'onboarding'])
         ->whereUuid('group')
         ->name('integrations.onboarding');
