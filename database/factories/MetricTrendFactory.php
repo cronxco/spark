@@ -3,10 +3,11 @@
 namespace Database\Factories;
 
 use App\Models\MetricStatistic;
+use App\Models\MetricTrend;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\MetricTrend>
+ * @extends Factory<MetricTrend>
  */
 class MetricTrendFactory extends Factory
 {

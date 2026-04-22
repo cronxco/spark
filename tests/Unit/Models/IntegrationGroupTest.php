@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -93,7 +94,7 @@ class IntegrationGroupTest extends TestCase
             'expiry' => $expiry,
         ]);
 
-        $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $group->expiry);
+        $this->assertInstanceOf(Carbon::class, $group->expiry);
     }
 
     #[Test]
@@ -107,7 +108,7 @@ class IntegrationGroupTest extends TestCase
             'refresh_expiry' => $refreshExpiry,
         ]);
 
-        $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $group->refresh_expiry);
+        $this->assertInstanceOf(Carbon::class, $group->refresh_expiry);
     }
 
     #[Test]

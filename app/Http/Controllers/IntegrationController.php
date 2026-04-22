@@ -82,7 +82,7 @@ class IntegrationController extends Controller
                 ]);
             } else {
                 // For other services, create a new auth group and start OAuth
-                if ($plugin instanceof \App\Integrations\Contracts\OAuthIntegrationPlugin) {
+                if ($plugin instanceof OAuthIntegrationPlugin) {
                     $group = $plugin->initializeGroup($user);
                 } else {
                     throw new Exception('Plugin does not support OAuth');

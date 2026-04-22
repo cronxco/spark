@@ -3,6 +3,7 @@
 namespace Tests\Unit\Mcp\Tracing;
 
 use App\Mcp\Tracing\TransportDetector;
+use Illuminate\Http\Request;
 use Laravel\Mcp\Server\Transport\HttpTransport;
 use Laravel\Mcp\Server\Transport\StdioTransport;
 use PHPUnit\Framework\Attributes\Test;
@@ -14,7 +15,7 @@ class TransportDetectorTest extends TestCase
     public function detects_http_transport(): void
     {
         $transport = new HttpTransport(
-            request: new \Illuminate\Http\Request,
+            request: new Request,
             sessionId: 'test-session'
         );
 

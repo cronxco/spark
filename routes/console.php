@@ -15,6 +15,8 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
+use Laravel\Horizon\Console\SnapshotCommand;
+use Laravel\Horizon\Horizon;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -49,7 +51,7 @@ Schedule::job(new DetectRetrospectiveMetricAnomaliesJob)
     ->sentryMonitor();
 
 // Schedule Horizon snapshots only if Horizon is installed
-if (class_exists(\Laravel\Horizon\Horizon::class) && class_exists(\Laravel\Horizon\Console\SnapshotCommand::class)) {
+if (class_exists(Horizon::class) && class_exists(SnapshotCommand::class)) {
     Schedule::command('horizon:snapshot')
         ->everyFiveMinutes()
         ->onOneServer()

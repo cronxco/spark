@@ -7,6 +7,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\CurrencyConversionService;
 use Carbon\Carbon;
 use Exception;
 use Html2Text\Html2Text;
@@ -318,7 +319,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
 
         if (strtoupper($currency) !== strtoupper($baseCurrency)) {
             try {
-                $conversionService = app(\App\Services\CurrencyConversionService::class);
+                $conversionService = app(CurrencyConversionService::class);
                 $originalAmount = $receiptData['transaction_summary']['total_amount'];
 
                 // Convert to base currency (GBP)

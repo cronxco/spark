@@ -2,7 +2,9 @@
 
 namespace App\Jobs\TaskPipeline;
 
+use App\Jobs\Base\BaseEffectJob;
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
+use App\Models\Integration;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Batchable;
@@ -86,9 +88,9 @@ class ProcessTaskPipelineJob implements ShouldQueue
         $jobClass = $task->jobClass;
 
         // Check if job extends BaseEffectJob - they expect (Integration, array) instead of (Model, TaskDefinition)
-        if (is_subclass_of($jobClass, \App\Jobs\Base\BaseEffectJob::class)) {
+        if (is_subclass_of($jobClass, BaseEffectJob::class)) {
             // Extract integration from the model
-            $integration = $this->model instanceof \App\Models\Integration
+            $integration = $this->model instanceof Integration
                 ? $this->model
                 : $this->model->integration;
 

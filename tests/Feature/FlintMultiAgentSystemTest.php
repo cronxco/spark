@@ -12,6 +12,9 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use App\Services\AgentOrchestrationService;
+use App\Services\AssistantPromptingService;
+use App\Services\FlintBlockCreationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -65,7 +68,7 @@ class FlintMultiAgentSystemTest extends TestCase
         Queue::fake();
 
         $job = new RunPreDigestRefreshJob($this->user, '06:00');
-        $job->handle(app(\App\Services\AgentOrchestrationService::class));
+        $job->handle(app(AgentOrchestrationService::class));
 
         $this->assertTrue(true);
     }
@@ -81,7 +84,7 @@ class FlintMultiAgentSystemTest extends TestCase
         Notification::fake();
 
         // Mock AssistantPromptingService to avoid real API calls
-        $mockPromptingService = $this->mock(\App\Services\AssistantPromptingService::class);
+        $mockPromptingService = $this->mock(AssistantPromptingService::class);
         $mockPromptingService->shouldReceive('generateResponse')
             ->andReturn(json_encode([
                 'summary' => 'Test summary',
@@ -94,7 +97,7 @@ class FlintMultiAgentSystemTest extends TestCase
             ]));
 
         $job = new RunDigestGenerationJob($this->user, '06:00');
-        $job->handle(app(\App\Services\AgentOrchestrationService::class));
+        $job->handle(app(AgentOrchestrationService::class));
     }
 
     /** @test */
@@ -103,7 +106,7 @@ class FlintMultiAgentSystemTest extends TestCase
         Queue::fake();
 
         // Mock AssistantPromptingService to avoid real API calls
-        $mockPromptingService = $this->mock(\App\Services\AssistantPromptingService::class);
+        $mockPromptingService = $this->mock(AssistantPromptingService::class);
         $mockPromptingService->shouldReceive('generateResponse')
             ->andReturn(json_encode([])); // Empty array - no patterns detected
 
@@ -111,7 +114,7 @@ class FlintMultiAgentSystemTest extends TestCase
         $this->createTestEvents(30);
 
         $job = new RunPatternDetectionJob($this->user);
-        $job->handle(app(\App\Services\AgentOrchestrationService::class));
+        $job->handle(app(AgentOrchestrationService::class));
 
         $this->assertTrue(true);
     }
@@ -187,7 +190,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_flint_event_and_blocks()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
 
         $flintEvent = $blockCreation->getOrCreateFlintEvent($this->user);
 
@@ -199,7 +202,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_one_event_per_period_and_reuses_for_same_period()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
 
         // Create first event (e.g., morning analysis - first agent)
         $firstEvent = $blockCreation->getOrCreateFlintEvent($this->user);
@@ -234,7 +237,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_domain_insight_blocks()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
         $flintEvent = $blockCreation->getOrCreateFlintEvent($this->user);
 
         $insights = [
@@ -265,7 +268,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_cross_domain_insight_blocks()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
         $flintEvent = $blockCreation->getOrCreateFlintEvent($this->user);
 
         $observations = [
@@ -291,7 +294,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_prioritized_action_blocks()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
         $flintEvent = $blockCreation->getOrCreateFlintEvent($this->user);
 
         $actions = [
@@ -318,7 +321,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_pattern_detection_blocks()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
         $flintEvent = $blockCreation->getOrCreateFlintEvent($this->user);
 
         $patternData = [
@@ -345,7 +348,7 @@ class FlintMultiAgentSystemTest extends TestCase
     /** @test */
     public function it_creates_digest_block_with_complete_data()
     {
-        $blockCreation = app(\App\Services\FlintBlockCreationService::class);
+        $blockCreation = app(FlintBlockCreationService::class);
         $flintEvent = $blockCreation->getOrCreateFlintEvent($this->user);
 
         $digestData = [

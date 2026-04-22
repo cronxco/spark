@@ -6,10 +6,13 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\LoggingService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 if (! function_exists('user_now')) {
     /**
@@ -341,7 +344,7 @@ if (! function_exists('format_event_value_display')) {
                         );
 
                         return trim($rendered);
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         // Log error and fall through to default formatting
                         Log::warning('Failed to render value_formatter', [
                             'service' => $service,
@@ -784,7 +787,7 @@ if (! function_exists('karakeep_add_bookmark')) {
             ]);
 
             return null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Exception while adding bookmark to Karakeep', [
                 'url' => $url,
                 'error' => $e->getMessage(),
@@ -993,7 +996,7 @@ if (! function_exists('get_media_url')) {
     /**
      * Get the media URL for a model, falling back to media_url field if no Media Library attachment exists.
      *
-     * @param  \Illuminate\Database\Eloquent\Model&\Spatie\MediaLibrary\HasMedia  $model
+     * @param  Model&HasMedia  $model
      * @param  string  $collection  The media collection to check
      * @param  string  $conversion  The conversion name (thumbnail, medium, webp, or empty for original)
      * @return string|null The media URL or null if no media found
@@ -1041,7 +1044,7 @@ if (! function_exists('get_media_temporary_url')) {
     /**
      * Get a temporary signed URL for media (for private S3 buckets).
      *
-     * @param  \Illuminate\Database\Eloquent\Model&\Spatie\MediaLibrary\HasMedia  $model
+     * @param  Model&HasMedia  $model
      * @param  string  $collection  The media collection to check
      * @param  string  $conversion  The conversion name (thumbnail, medium, webp, or empty for original)
      * @param  int  $expirationMinutes  How long the URL should be valid (default: 60 minutes)
@@ -1096,7 +1099,7 @@ if (! function_exists('render_media_responsive')) {
      * Render a media object as responsive HTML using Spatie's responsive images.
      * Falls back to regular img tag if no media found.
      *
-     * @param  \Illuminate\Database\Eloquent\Model&\Spatie\MediaLibrary\HasMedia  $model
+     * @param  Model&HasMedia  $model
      * @param  string  $collection  The media collection to check
      * @param  array  $attributes  Additional HTML attributes (class, alt, etc.)
      * @param  bool  $useSignedUrls  Whether to use signed URLs for S3 (default: true)
@@ -1159,7 +1162,7 @@ if (! function_exists('get_media_object_url')) {
     /**
      * Get URL from a Media object (signed for S3, direct for local)
      *
-     * @param  \Spatie\MediaLibrary\MediaCollections\Models\Media  $media  The media object
+     * @param  Media  $media  The media object
      * @param  string  $conversion  Optional conversion name (thumbnail, medium, webp, etc.)
      * @param  int  $expirationMinutes  URL expiration in minutes for S3 (default: 60)
      * @return string The media URL
@@ -1204,7 +1207,7 @@ if (! function_exists('render_media_object_responsive')) {
      * Render a Media object as responsive HTML using Spatie's responsive images.
      * Works directly with Media objects (not models).
      *
-     * @param  \Spatie\MediaLibrary\MediaCollections\Models\Media  $media  The media object
+     * @param  Media  $media  The media object
      * @param  array  $attributes  Additional HTML attributes (class, alt, etc.)
      * @param  int  $expirationMinutes  URL expiration in minutes for S3 (default: 60)
      * @return string The HTML output

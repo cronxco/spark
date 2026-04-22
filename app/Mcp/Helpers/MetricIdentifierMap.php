@@ -4,6 +4,7 @@ namespace App\Mcp\Helpers;
 
 use App\Models\MetricStatistic;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 
 class MetricIdentifierMap
 {
@@ -129,14 +130,14 @@ class MetricIdentifierMap
     /**
      * Query MetricStatistic candidates matching the given parts.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, MetricStatistic>
+     * @return Collection<int, MetricStatistic>
      */
     protected static function findCandidates(
         User $user,
         string $service,
         string $action,
         ?string $valueUnit
-    ): \Illuminate\Database\Eloquent\Collection {
+    ): Collection {
         $query = MetricStatistic::where('user_id', $user->id)
             ->where('service', $service)
             ->where('action', $action);

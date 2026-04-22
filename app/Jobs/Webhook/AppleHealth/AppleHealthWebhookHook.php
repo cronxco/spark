@@ -6,11 +6,12 @@ use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Jobs\Base\BaseWebhookHookJob;
 use App\Jobs\Data\AppleHealth\AppleHealthMetricData;
 use App\Jobs\Data\AppleHealth\AppleHealthWorkoutData;
+use App\Models\Integration;
 use Illuminate\Support\Facades\Log;
 
 class AppleHealthWebhookHook extends BaseWebhookHookJob
 {
-    public function __construct(array $webhookPayload, array $headers, \App\Models\Integration $integration)
+    public function __construct(array $webhookPayload, array $headers, Integration $integration)
     {
         parent::__construct($webhookPayload, $headers, $integration);
         $this->onQueue('pull');

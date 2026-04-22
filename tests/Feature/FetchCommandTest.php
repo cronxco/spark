@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Integrations\GitHub\GitHubPlugin;
 use App\Integrations\PluginRegistry;
+use App\Jobs\CheckIntegrationUpdates;
 use App\Models\Integration;
 use App\Models\User;
 use Carbon\Carbon;
@@ -52,7 +53,7 @@ class FetchCommandTest extends TestCase
 
         // Check that CheckIntegrationUpdates job was dispatched (integrations are marked as triggered by the job, not the command)
         // The command now dispatches CheckIntegrationUpdates which handles the processing asynchronously
-        Queue::assertPushed(\App\Jobs\CheckIntegrationUpdates::class, 1);
+        Queue::assertPushed(CheckIntegrationUpdates::class, 1);
     }
 
     #[Test]
@@ -73,7 +74,7 @@ class FetchCommandTest extends TestCase
         $this->assertEquals(0, $result);
 
         // Check that CheckIntegrationUpdates job was dispatched for force updates
-        Queue::assertPushed(\App\Jobs\CheckIntegrationUpdates::class, 1);
+        Queue::assertPushed(CheckIntegrationUpdates::class, 1);
     }
 
     #[Test]

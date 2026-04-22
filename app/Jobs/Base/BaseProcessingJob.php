@@ -6,9 +6,13 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\GeocodingService;
+use App\Services\Media\MediaDownloadHelper;
+use App\Services\PlaceDetectionService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -226,7 +230,7 @@ abstract class BaseProcessingJob implements ShouldQueue
                         $isOutdoor = $locationTag !== 'Indoor';
 
                         // Reverse geocode the starting location
-                        $geocodingService = app(\App\Services\GeocodingService::class);
+                        $geocodingService = app(GeocodingService::class);
                         $geocoded = $geocodingService->reverseGeocode(
                             $firstPoint['lat'],
                             $firstPoint['lng']
@@ -244,14 +248,14 @@ abstract class BaseProcessingJob implements ShouldQueue
 
                         // Link to place only for outdoor workouts
                         if ($isOutdoor) {
-                            $placeService = app(\App\Services\PlaceDetectionService::class);
+                            $placeService = app(PlaceDetectionService::class);
                             $placeService->detectAndLinkPlaceForEvent($event);
                         }
                     }
                 }
 
                 $events->push($event);
-            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            } catch (UniqueConstraintViolationException $e) {
                 // Handle race condition where event was created between our check and create
                 Log::warning('Race condition detected - event already exists', [
                     'integration_id' => $this->integration->id,
@@ -322,7 +326,7 @@ abstract class BaseProcessingJob implements ShouldQueue
      */
     protected function downloadImagesToMediaLibrary(Collection $events): void
     {
-        $mediaHelper = app(\App\Services\Media\MediaDownloadHelper::class);
+        $mediaHelper = app(MediaDownloadHelper::class);
 
         // Eager load relationships to prevent N+1 queries
         $events->load(['blocks', 'target', 'actor']);

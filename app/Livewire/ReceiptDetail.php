@@ -9,6 +9,7 @@ use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceiptDetail extends Component
 {
@@ -91,7 +92,7 @@ class ReceiptDetail extends Component
         $this->mount($this->receipt->id); // Refresh data
     }
 
-    public function downloadOriginalEmail(): ?\Symfony\Component\HttpFoundation\StreamedResponse
+    public function downloadOriginalEmail(): ?StreamedResponse
     {
         $merchant = $this->receipt->target;
         $s3Key = $merchant?->metadata['s3_object_key'] ?? null;

@@ -1,6 +1,7 @@
 <?php
 
 use Sentry\SentrySdk;
+use Sentry\Tracing\Span;
 use Sentry\Tracing\SpanContext;
 
 if (! function_exists('start_ai_request_span')) {
@@ -11,7 +12,7 @@ if (! function_exists('start_ai_request_span')) {
      * @param  array  $messages  Array of message objects with 'role' and 'content' keys
      * @param  array  $config  Additional configuration (temperature, max_tokens, etc.)
      */
-    function start_ai_request_span(string $model, array $messages, array $config = []): ?\Sentry\Tracing\Span
+    function start_ai_request_span(string $model, array $messages, array $config = []): ?Span
     {
         $span = SentrySdk::getCurrentHub()->getSpan();
         if (! $span) {
@@ -59,11 +60,11 @@ if (! function_exists('finish_ai_request_span')) {
     /**
      * Finish an AI request span with token usage tracking
      *
-     * @param  \Sentry\Tracing\Span|null  $span  The span to finish
+     * @param  Span|null  $span  The span to finish
      * @param  array  $usage  Token usage data (input_tokens, output_tokens, total_tokens)
      * @param  string|null  $finishReason  The finish reason (stop, length, content_filter, etc.)
      */
-    function finish_ai_request_span(?\Sentry\Tracing\Span $span, array $usage = [], ?string $finishReason = null): void
+    function finish_ai_request_span(?Span $span, array $usage = [], ?string $finishReason = null): void
     {
         if (! $span) {
             return;
@@ -112,7 +113,7 @@ if (! function_exists('start_ai_agent_span')) {
      * @param  string  $agentName  The name/type of the agent (e.g., 'health_domain_agent', 'cross_domain_synthesizer')
      * @param  array  $input  Input parameters or context for the agent
      */
-    function start_ai_agent_span(string $agentName, array $input = []): ?\Sentry\Tracing\Span
+    function start_ai_agent_span(string $agentName, array $input = []): ?Span
     {
         $span = SentrySdk::getCurrentHub()->getSpan();
         if (! $span) {
@@ -148,10 +149,10 @@ if (! function_exists('finish_ai_agent_span')) {
     /**
      * Finish an AI agent invocation span with output tracking
      *
-     * @param  \Sentry\Tracing\Span|null  $span  The span to finish
+     * @param  Span|null  $span  The span to finish
      * @param  array  $output  Output or results from the agent
      */
-    function finish_ai_agent_span(?\Sentry\Tracing\Span $span, array $output = []): void
+    function finish_ai_agent_span(?Span $span, array $output = []): void
     {
         if (! $span) {
             return;
@@ -198,7 +199,7 @@ if (! function_exists('start_ai_tool_span')) {
      * @param  string  $toolName  The name of the tool being executed (e.g., 'create_block', 'store_memory')
      * @param  array  $parameters  Tool input parameters
      */
-    function start_ai_tool_span(string $toolName, array $parameters = []): ?\Sentry\Tracing\Span
+    function start_ai_tool_span(string $toolName, array $parameters = []): ?Span
     {
         $span = SentrySdk::getCurrentHub()->getSpan();
         if (! $span) {
@@ -234,10 +235,10 @@ if (! function_exists('finish_ai_tool_span')) {
     /**
      * Finish an AI tool execution span with result tracking
      *
-     * @param  \Sentry\Tracing\Span|null  $span  The span to finish
+     * @param  Span|null  $span  The span to finish
      * @param  mixed  $result  The result from the tool execution
      */
-    function finish_ai_tool_span(?\Sentry\Tracing\Span $span, $result = null): void
+    function finish_ai_tool_span(?Span $span, $result = null): void
     {
         if (! $span) {
             return;
@@ -269,7 +270,7 @@ if (! function_exists('start_ai_handoff_span')) {
      * @param  string  $toAgent  The agent receiving control
      * @param  array  $context  Context being passed between agents
      */
-    function start_ai_handoff_span(string $fromAgent, string $toAgent, array $context = []): ?\Sentry\Tracing\Span
+    function start_ai_handoff_span(string $fromAgent, string $toAgent, array $context = []): ?Span
     {
         $span = SentrySdk::getCurrentHub()->getSpan();
         if (! $span) {
@@ -306,9 +307,9 @@ if (! function_exists('finish_ai_handoff_span')) {
     /**
      * Finish an AI handoff span
      *
-     * @param  \Sentry\Tracing\Span|null  $span  The span to finish
+     * @param  Span|null  $span  The span to finish
      */
-    function finish_ai_handoff_span(?\Sentry\Tracing\Span $span): void
+    function finish_ai_handoff_span(?Span $span): void
     {
         if (! $span) {
             return;

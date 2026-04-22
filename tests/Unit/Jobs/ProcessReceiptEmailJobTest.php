@@ -6,6 +6,7 @@ use App\Jobs\Data\Receipt\ProcessReceiptEmailJob;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -174,7 +175,7 @@ class ProcessReceiptEmailJobTest extends TestCase
             'receipts/test-email.eml'
         );
 
-        $this->assertInstanceOf(\Illuminate\Contracts\Queue\ShouldQueue::class, $job);
+        $this->assertInstanceOf(ShouldQueue::class, $job);
     }
 
     /** @test */

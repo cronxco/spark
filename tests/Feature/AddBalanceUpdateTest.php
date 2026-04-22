@@ -9,6 +9,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -136,7 +137,7 @@ class AddBalanceUpdateTest extends TestCase
             'title' => 'Monzo Account',
         ]);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
 
         Livewire::test(AddBalanceUpdate::class)
             ->set('accountId', $monzoAccount->id)
@@ -172,7 +173,7 @@ class AddBalanceUpdateTest extends TestCase
             'provider' => 'Test Bank',
         ]);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
 
         Livewire::test(AddBalanceUpdate::class)
             ->set('accountId', $account->id)

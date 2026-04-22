@@ -4,11 +4,12 @@ namespace App\Jobs\Data\AppleHealth;
 
 use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Jobs\Base\BaseProcessingJob;
+use App\Models\Integration;
 use Illuminate\Support\Facades\Log;
 
 class AppleHealthWorkoutData extends BaseProcessingJob
 {
-    public function __construct(\App\Models\Integration $integration, array $rawData)
+    public function __construct(Integration $integration, array $rawData)
     {
         parent::__construct($integration, $rawData);
         $this->onQueue('pull');

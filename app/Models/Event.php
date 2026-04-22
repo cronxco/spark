@@ -6,6 +6,7 @@ use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Traits\TracksViews;
 use ArrayAccess;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Tags\HasTags;
+use Spatie\Tags\Tag;
 
 class Event extends Model
 {
@@ -348,7 +350,7 @@ class Event extends Model
     /**
      * Override attachTags to log activity
      */
-    public function attachTags(array|ArrayAccess|\Spatie\Tags\Tag $tags, ?string $type = null): static
+    public function attachTags(array|ArrayAccess|Tag $tags, ?string $type = null): static
     {
         $className = static::getTagClassName();
 
@@ -378,7 +380,7 @@ class Event extends Model
 
         collect($tags)
             ->filter()
-            ->each(function (\Spatie\Tags\Tag $tag) {
+            ->each(function (Tag $tag) {
                 $this->tags()->detach($tag);
                 // Log the tag removal
                 $this->logTagActivity($tag, null, 'removed');
@@ -470,12 +472,12 @@ class Event extends Model
     /**
      * Scope for semantic search using vector similarity with temporal weighting
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  array  $embedding  The query embedding vector (1536 dimensions)
      * @param  float  $threshold  Maximum cosine distance (0-2, lower is more similar)
      * @param  int  $limit  Maximum number of results
      * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day, higher = stronger recency bias)
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
@@ -508,13 +510,13 @@ class Event extends Model
     /**
      * Scope for hybrid search (semantic + metadata filters) with temporal weighting
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  array  $embedding  The query embedding vector
      * @param  array  $filters  Additional metadata filters (service, domain, action, integration_id, etc.)
      * @param  float  $threshold  Maximum cosine distance
      * @param  int  $limit  Maximum number of results
      * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
@@ -735,10 +737,10 @@ class Event extends Model
     /**
      * Log tag activity to the activity log
      */
-    private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
+    private function logTagActivity(string|Tag $tag, ?string $type, string $action): void
     {
         // Determine tag name and type
-        if ($tag instanceof \Spatie\Tags\Tag) {
+        if ($tag instanceof Tag) {
             $tagName = $tag->name;
             $tagType = $tag->type;
         } else {
