@@ -236,8 +236,9 @@ class IntegrationDetails extends Component
 
     public function render()
     {
-        return view('livewire.integration-details')
-            ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+        return view('livewire.integration-details', [
+            'pluginClass' => $this->getPluginClass(),
+        ])->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
     }
 
     /**

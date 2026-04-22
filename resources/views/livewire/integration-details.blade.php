@@ -72,7 +72,6 @@
                     <!-- Large integration icon -->
                     <div class="flex-shrink-0 self-center sm:self-start">
                         @php
-                            $pluginClass = $this->getPluginClass();
                             $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.link';
                         @endphp
                         <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
