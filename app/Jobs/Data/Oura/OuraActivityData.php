@@ -6,6 +6,7 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class OuraActivityData extends BaseProcessingJob
@@ -69,7 +70,7 @@ class OuraActivityData extends BaseProcessingJob
     /**
      * Create activity event with full API v2 field support
      */
-    private function createEnhancedActivityEvent(OuraPlugin $plugin, array $item, \Illuminate\Support\Collection $existingSourceIds): void
+    private function createEnhancedActivityEvent(OuraPlugin $plugin, array $item, Collection $existingSourceIds): void
     {
         $day = $item['day'] ?? null;
         if (! $day) {

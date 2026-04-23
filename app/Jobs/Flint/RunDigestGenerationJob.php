@@ -12,6 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Sentry\SentrySdk;
+use Sentry\State\Scope;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 
@@ -38,7 +39,7 @@ class RunDigestGenerationJob implements ShouldQueue
         SentrySdk::getCurrentHub()->setSpan($transaction);
 
         // Set user context for Sentry
-        \Sentry\configureScope(function (\Sentry\State\Scope $scope) {
+        \Sentry\configureScope(function (Scope $scope) {
             $scope->setUser([
                 'id' => $this->user->id,
                 'email' => $this->user->email,

@@ -11,11 +11,12 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 // Carbon already imported above
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 // Http and Log already imported above
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -377,7 +378,7 @@ class GoCardlessBankPlugin extends OAuthPlugin
     /**
      * Handle OAuth callback from GoCardless
      */
-    public function handleOAuthCallback(\Illuminate\Http\Request $request, IntegrationGroup $group): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         // GoCardless redirects back with ?ref={reference}, but we need the actual requisition ID
         $reference = $request->get('ref');

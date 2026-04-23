@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\RelationshipTypeRegistry;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -101,7 +102,7 @@ class RelationshipTest extends TestCase
             'type' => 'linked_to',
         ]);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         Relationship::create([
             'user_id' => $this->user->id,

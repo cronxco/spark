@@ -12,6 +12,8 @@
             <!-- Header -->
             <x-header title="{{ $integration->name ?: $integration->service }}" subtitle="{{ $integration->service }} integration" separator>
                 <x-slot:actions>
+                    @php $isOAuth = $pluginClass && is_a($pluginClass, \App\Integrations\Contracts\OAuthIntegrationPlugin::class, true); @endphp
+
                     <!-- Desktop: Full buttons -->
                     <div class="hidden sm:flex gap-2">
                         @if (!$integration->isPaused())
@@ -19,6 +21,14 @@
                                 label="Update Now"
                                 icon="fas.rotate"
                                 wire:click="triggerIntegrationUpdate"
+                                class="btn-outline"
+                            />
+                        @endif
+                        @if ($isOAuth)
+                            <x-button
+                                label="Reconnect"
+                                icon="fas.rotate-right"
+                                wire:click="reconnectIntegration"
                                 class="btn-outline"
                             />
                         @endif
@@ -46,6 +56,9 @@
                             @if (!$integration->isPaused())
                                 <x-menu-item title="Update Now" icon="fas.rotate" wire:click="triggerIntegrationUpdate" />
                             @endif
+                            @if ($isOAuth)
+                                <x-menu-item title="Reconnect" icon="fas.rotate-right" wire:click="reconnectIntegration" />
+                            @endif
                             <x-menu-item title="Configure" icon="fas.gear" link="{{ route('integrations.configure', $integration->id) }}" />
                             <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="fas.sliders" wire:click="toggleSidebar" />
                         </x-dropdown>
@@ -59,7 +72,6 @@
                     <!-- Large integration icon -->
                     <div class="flex-shrink-0 self-center sm:self-start">
                         @php
-                            $pluginClass = $this->getPluginClass();
                             $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.link';
                         @endphp
                         <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">

@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\GeocodingService;
+use App\Services\PlaceDetectionService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -1143,7 +1144,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
         }
 
         try {
-            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService = app(PlaceDetectionService::class);
             $placeService->detectAndLinkPlaceForEvent($event);
         } catch (Exception $e) {
             // Log error but don't fail the calendar event processing

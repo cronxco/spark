@@ -1,6 +1,299 @@
 <?php
 
+use WireElements\Pro\Components\Modal\Resolvers\EnumPropertyResolver;
 use WireElements\Pro\Components\Spotlight\Enums\OnCloseStateBehavior;
+use WireElements\Pro\Icons\AcademicCap;
+use WireElements\Pro\Icons\AdjustmentsHorizontal;
+use WireElements\Pro\Icons\AdjustmentsVertical;
+use WireElements\Pro\Icons\ArchiveBox;
+use WireElements\Pro\Icons\ArchiveBoxArrowDown;
+use WireElements\Pro\Icons\ArchiveBoxXMark;
+use WireElements\Pro\Icons\ArrowDown;
+use WireElements\Pro\Icons\ArrowDownCircle;
+use WireElements\Pro\Icons\ArrowDownLeft;
+use WireElements\Pro\Icons\ArrowDownOnSquare;
+use WireElements\Pro\Icons\ArrowDownOnSquareStack;
+use WireElements\Pro\Icons\ArrowDownRight;
+use WireElements\Pro\Icons\ArrowDownTray;
+use WireElements\Pro\Icons\ArrowLeft;
+use WireElements\Pro\Icons\ArrowLeftCircle;
+use WireElements\Pro\Icons\ArrowLeftOnRectangle;
+use WireElements\Pro\Icons\ArrowLongDown;
+use WireElements\Pro\Icons\ArrowLongLeft;
+use WireElements\Pro\Icons\ArrowLongRight;
+use WireElements\Pro\Icons\ArrowLongUp;
+use WireElements\Pro\Icons\ArrowPath;
+use WireElements\Pro\Icons\ArrowPathRoundedSquare;
+use WireElements\Pro\Icons\ArrowRight;
+use WireElements\Pro\Icons\ArrowRightCircle;
+use WireElements\Pro\Icons\ArrowRightOnRectangle;
+use WireElements\Pro\Icons\ArrowSmallDown;
+use WireElements\Pro\Icons\ArrowSmallLeft;
+use WireElements\Pro\Icons\ArrowSmallRight;
+use WireElements\Pro\Icons\ArrowSmallUp;
+use WireElements\Pro\Icons\ArrowsPointingIn;
+use WireElements\Pro\Icons\ArrowsPointingOut;
+use WireElements\Pro\Icons\ArrowsRightLeft;
+use WireElements\Pro\Icons\ArrowsUpDown;
+use WireElements\Pro\Icons\ArrowTopRightOnSquare;
+use WireElements\Pro\Icons\ArrowTrendingDown;
+use WireElements\Pro\Icons\ArrowTrendingUp;
+use WireElements\Pro\Icons\ArrowUp;
+use WireElements\Pro\Icons\ArrowUpCircle;
+use WireElements\Pro\Icons\ArrowUpLeft;
+use WireElements\Pro\Icons\ArrowUpOnSquare;
+use WireElements\Pro\Icons\ArrowUpOnSquareStack;
+use WireElements\Pro\Icons\ArrowUpRight;
+use WireElements\Pro\Icons\ArrowUpTray;
+use WireElements\Pro\Icons\ArrowUturnDown;
+use WireElements\Pro\Icons\ArrowUturnLeft;
+use WireElements\Pro\Icons\ArrowUturnRight;
+use WireElements\Pro\Icons\ArrowUturnUp;
+use WireElements\Pro\Icons\AtSymbol;
+use WireElements\Pro\Icons\Backspace;
+use WireElements\Pro\Icons\Backward;
+use WireElements\Pro\Icons\Banknotes;
+use WireElements\Pro\Icons\Bars2;
+use WireElements\Pro\Icons\Bars3;
+use WireElements\Pro\Icons\Bars3BottomLeft;
+use WireElements\Pro\Icons\Bars3BottomRight;
+use WireElements\Pro\Icons\Bars3CenterLeft;
+use WireElements\Pro\Icons\Bars4;
+use WireElements\Pro\Icons\BarsArrowDown;
+use WireElements\Pro\Icons\BarsArrowUp;
+use WireElements\Pro\Icons\Battery0;
+use WireElements\Pro\Icons\Battery100;
+use WireElements\Pro\Icons\Battery50;
+use WireElements\Pro\Icons\Beaker;
+use WireElements\Pro\Icons\Bell;
+use WireElements\Pro\Icons\BellAlert;
+use WireElements\Pro\Icons\BellSlash;
+use WireElements\Pro\Icons\BellSnooze;
+use WireElements\Pro\Icons\Bolt;
+use WireElements\Pro\Icons\BoltSlash;
+use WireElements\Pro\Icons\Bookmark;
+use WireElements\Pro\Icons\BookmarkSlash;
+use WireElements\Pro\Icons\BookmarkSquare;
+use WireElements\Pro\Icons\BookOpen;
+use WireElements\Pro\Icons\Briefcase;
+use WireElements\Pro\Icons\BugAnt;
+use WireElements\Pro\Icons\BuildingLibrary;
+use WireElements\Pro\Icons\BuildingOffice;
+use WireElements\Pro\Icons\BuildingOffice2;
+use WireElements\Pro\Icons\BuildingStorefront;
+use WireElements\Pro\Icons\Cake;
+use WireElements\Pro\Icons\Calculator;
+use WireElements\Pro\Icons\Calendar;
+use WireElements\Pro\Icons\CalendarDays;
+use WireElements\Pro\Icons\Camera;
+use WireElements\Pro\Icons\ChartBar;
+use WireElements\Pro\Icons\ChartBarSquare;
+use WireElements\Pro\Icons\ChartPie;
+use WireElements\Pro\Icons\ChatBubbleBottomCenter;
+use WireElements\Pro\Icons\ChatBubbleBottomCenterText;
+use WireElements\Pro\Icons\ChatBubbleLeft;
+use WireElements\Pro\Icons\ChatBubbleLeftEllipsis;
+use WireElements\Pro\Icons\ChatBubbleLeftRight;
+use WireElements\Pro\Icons\ChatBubbleOvalLeft;
+use WireElements\Pro\Icons\ChatBubbleOvalLeftEllipsis;
+use WireElements\Pro\Icons\Check;
+use WireElements\Pro\Icons\CheckBadge;
+use WireElements\Pro\Icons\CheckCircle;
+use WireElements\Pro\Icons\ChevronDoubleDown;
+use WireElements\Pro\Icons\ChevronDoubleLeft;
+use WireElements\Pro\Icons\ChevronDoubleRight;
+use WireElements\Pro\Icons\ChevronDoubleUp;
+use WireElements\Pro\Icons\ChevronDown;
+use WireElements\Pro\Icons\ChevronLeft;
+use WireElements\Pro\Icons\ChevronRight;
+use WireElements\Pro\Icons\ChevronUp;
+use WireElements\Pro\Icons\ChevronUpDown;
+use WireElements\Pro\Icons\CircleStack;
+use WireElements\Pro\Icons\Clipboard;
+use WireElements\Pro\Icons\ClipboardDocument;
+use WireElements\Pro\Icons\ClipboardDocumentCheck;
+use WireElements\Pro\Icons\ClipboardDocumentList;
+use WireElements\Pro\Icons\Clock;
+use WireElements\Pro\Icons\Cloud;
+use WireElements\Pro\Icons\CloudArrowDown;
+use WireElements\Pro\Icons\CloudArrowUp;
+use WireElements\Pro\Icons\CodeBracket;
+use WireElements\Pro\Icons\CodeBracketSquare;
+use WireElements\Pro\Icons\Cog;
+use WireElements\Pro\Icons\Cog6Tooth;
+use WireElements\Pro\Icons\Cog8Tooth;
+use WireElements\Pro\Icons\CommandLine;
+use WireElements\Pro\Icons\ComputerDesktop;
+use WireElements\Pro\Icons\CpuChip;
+use WireElements\Pro\Icons\CreditCard;
+use WireElements\Pro\Icons\Cube;
+use WireElements\Pro\Icons\CubeTransparent;
+use WireElements\Pro\Icons\CurrencyBangladeshi;
+use WireElements\Pro\Icons\CurrencyDollar;
+use WireElements\Pro\Icons\CurrencyEuro;
+use WireElements\Pro\Icons\CurrencyPound;
+use WireElements\Pro\Icons\CurrencyRupee;
+use WireElements\Pro\Icons\CurrencyYen;
+use WireElements\Pro\Icons\CursorArrowRays;
+use WireElements\Pro\Icons\CursorArrowRipple;
+use WireElements\Pro\Icons\DevicePhoneMobile;
+use WireElements\Pro\Icons\DeviceTablet;
+use WireElements\Pro\Icons\Document;
+use WireElements\Pro\Icons\DocumentArrowDown;
+use WireElements\Pro\Icons\DocumentArrowUp;
+use WireElements\Pro\Icons\DocumentChartBar;
+use WireElements\Pro\Icons\DocumentCheck;
+use WireElements\Pro\Icons\DocumentDuplicate;
+use WireElements\Pro\Icons\DocumentMagnifyingGlass;
+use WireElements\Pro\Icons\DocumentMinus;
+use WireElements\Pro\Icons\DocumentPlus;
+use WireElements\Pro\Icons\DocumentText;
+use WireElements\Pro\Icons\EllipsisHorizontal;
+use WireElements\Pro\Icons\EllipsisHorizontalCircle;
+use WireElements\Pro\Icons\EllipsisVertical;
+use WireElements\Pro\Icons\Envelope;
+use WireElements\Pro\Icons\EnvelopeOpen;
+use WireElements\Pro\Icons\ExclamationCircle;
+use WireElements\Pro\Icons\ExclamationTriangle;
+use WireElements\Pro\Icons\Eye;
+use WireElements\Pro\Icons\EyeDropper;
+use WireElements\Pro\Icons\EyeSlash;
+use WireElements\Pro\Icons\FaceFrown;
+use WireElements\Pro\Icons\FaceSmile;
+use WireElements\Pro\Icons\Film;
+use WireElements\Pro\Icons\FingerPrint;
+use WireElements\Pro\Icons\Fire;
+use WireElements\Pro\Icons\Flag;
+use WireElements\Pro\Icons\Folder;
+use WireElements\Pro\Icons\FolderArrowDown;
+use WireElements\Pro\Icons\FolderMinus;
+use WireElements\Pro\Icons\FolderOpen;
+use WireElements\Pro\Icons\FolderPlus;
+use WireElements\Pro\Icons\Forward;
+use WireElements\Pro\Icons\Funnel;
+use WireElements\Pro\Icons\Gif;
+use WireElements\Pro\Icons\Gift;
+use WireElements\Pro\Icons\GiftTop;
+use WireElements\Pro\Icons\GlobeAlt;
+use WireElements\Pro\Icons\GlobeAmericas;
+use WireElements\Pro\Icons\GlobeAsiaAustralia;
+use WireElements\Pro\Icons\GlobeEuropeAfrica;
+use WireElements\Pro\Icons\HandRaised;
+use WireElements\Pro\Icons\HandThumbDown;
+use WireElements\Pro\Icons\HandThumbUp;
+use WireElements\Pro\Icons\Hashtag;
+use WireElements\Pro\Icons\Heart;
+use WireElements\Pro\Icons\Home;
+use WireElements\Pro\Icons\HomeModern;
+use WireElements\Pro\Icons\Identification;
+use WireElements\Pro\Icons\Inbox;
+use WireElements\Pro\Icons\InboxArrowDown;
+use WireElements\Pro\Icons\InboxStack;
+use WireElements\Pro\Icons\InformationCircle;
+use WireElements\Pro\Icons\Key;
+use WireElements\Pro\Icons\Language;
+use WireElements\Pro\Icons\Lifebuoy;
+use WireElements\Pro\Icons\LightBulb;
+use WireElements\Pro\Icons\Link;
+use WireElements\Pro\Icons\ListBullet;
+use WireElements\Pro\Icons\LockClosed;
+use WireElements\Pro\Icons\LockOpen;
+use WireElements\Pro\Icons\MagnifyingGlass;
+use WireElements\Pro\Icons\MagnifyingGlassCircle;
+use WireElements\Pro\Icons\MagnifyingGlassMinus;
+use WireElements\Pro\Icons\MagnifyingGlassPlus;
+use WireElements\Pro\Icons\Map;
+use WireElements\Pro\Icons\MapPin;
+use WireElements\Pro\Icons\Megaphone;
+use WireElements\Pro\Icons\Microphone;
+use WireElements\Pro\Icons\Minus;
+use WireElements\Pro\Icons\MinusCircle;
+use WireElements\Pro\Icons\MinusSmall;
+use WireElements\Pro\Icons\Moon;
+use WireElements\Pro\Icons\MusicalNote;
+use WireElements\Pro\Icons\Newspaper;
+use WireElements\Pro\Icons\NoSymbol;
+use WireElements\Pro\Icons\PaintBrush;
+use WireElements\Pro\Icons\PaperAirplane;
+use WireElements\Pro\Icons\PaperClip;
+use WireElements\Pro\Icons\Pause;
+use WireElements\Pro\Icons\PauseCircle;
+use WireElements\Pro\Icons\Pencil;
+use WireElements\Pro\Icons\PencilSquare;
+use WireElements\Pro\Icons\Phone;
+use WireElements\Pro\Icons\PhoneArrowDownLeft;
+use WireElements\Pro\Icons\PhoneArrowUpRight;
+use WireElements\Pro\Icons\PhoneXMark;
+use WireElements\Pro\Icons\Photo;
+use WireElements\Pro\Icons\Play;
+use WireElements\Pro\Icons\PlayCircle;
+use WireElements\Pro\Icons\PlayPause;
+use WireElements\Pro\Icons\Plus;
+use WireElements\Pro\Icons\PlusCircle;
+use WireElements\Pro\Icons\PlusSmall;
+use WireElements\Pro\Icons\Power;
+use WireElements\Pro\Icons\PresentationChartBar;
+use WireElements\Pro\Icons\PresentationChartLine;
+use WireElements\Pro\Icons\Printer;
+use WireElements\Pro\Icons\PuzzlePiece;
+use WireElements\Pro\Icons\QrCode;
+use WireElements\Pro\Icons\QuestionMarkCircle;
+use WireElements\Pro\Icons\QueueList;
+use WireElements\Pro\Icons\Radio;
+use WireElements\Pro\Icons\ReceiptPercent;
+use WireElements\Pro\Icons\ReceiptRefund;
+use WireElements\Pro\Icons\RectangleGroup;
+use WireElements\Pro\Icons\RectangleStack;
+use WireElements\Pro\Icons\RocketLaunch;
+use WireElements\Pro\Icons\Rss;
+use WireElements\Pro\Icons\Scale;
+use WireElements\Pro\Icons\Scissors;
+use WireElements\Pro\Icons\Server;
+use WireElements\Pro\Icons\ServerStack;
+use WireElements\Pro\Icons\Share;
+use WireElements\Pro\Icons\ShieldCheck;
+use WireElements\Pro\Icons\ShieldExclamation;
+use WireElements\Pro\Icons\ShoppingBag;
+use WireElements\Pro\Icons\ShoppingCart;
+use WireElements\Pro\Icons\Signal;
+use WireElements\Pro\Icons\SignalSlash;
+use WireElements\Pro\Icons\Sparkles;
+use WireElements\Pro\Icons\SpeakerWave;
+use WireElements\Pro\Icons\SpeakerXMark;
+use WireElements\Pro\Icons\Square2Stack;
+use WireElements\Pro\Icons\Square3Stack3d;
+use WireElements\Pro\Icons\Squares2x2;
+use WireElements\Pro\Icons\SquaresPlus;
+use WireElements\Pro\Icons\Star;
+use WireElements\Pro\Icons\Stop;
+use WireElements\Pro\Icons\StopCircle;
+use WireElements\Pro\Icons\Sun;
+use WireElements\Pro\Icons\Swatch;
+use WireElements\Pro\Icons\TableCells;
+use WireElements\Pro\Icons\Tag;
+use WireElements\Pro\Icons\Ticket;
+use WireElements\Pro\Icons\Trash;
+use WireElements\Pro\Icons\Trophy;
+use WireElements\Pro\Icons\Truck;
+use WireElements\Pro\Icons\Tv;
+use WireElements\Pro\Icons\User;
+use WireElements\Pro\Icons\UserCircle;
+use WireElements\Pro\Icons\UserGroup;
+use WireElements\Pro\Icons\UserMinus;
+use WireElements\Pro\Icons\UserPlus;
+use WireElements\Pro\Icons\Users;
+use WireElements\Pro\Icons\Variable;
+use WireElements\Pro\Icons\VideoCamera;
+use WireElements\Pro\Icons\VideoCameraSlash;
+use WireElements\Pro\Icons\ViewColumns;
+use WireElements\Pro\Icons\ViewfinderCircle;
+use WireElements\Pro\Icons\Wallet;
+use WireElements\Pro\Icons\Wifi;
+use WireElements\Pro\Icons\Window;
+use WireElements\Pro\Icons\Wrench;
+use WireElements\Pro\Icons\WrenchScrewdriver;
+use WireElements\Pro\Icons\XCircle;
+use WireElements\Pro\Icons\XMark;
 
 // Build Font Awesome icon registry dynamically
 // Create anonymous classes for each Font Awesome icon to match Wire Elements' expected format
@@ -62,7 +355,7 @@ return [
             'view' => 'wire-elements-pro::modal.component',
             'placeholder' => 'wire-elements-pro::modal.placeholder',
             'property-resolvers' => [
-                \WireElements\Pro\Components\Modal\Resolvers\EnumPropertyResolver::class,
+                EnumPropertyResolver::class,
             ],
             'default-behavior' => [
                 'close-on-escape' => true,
@@ -78,7 +371,7 @@ return [
             'view' => 'wire-elements-pro::slide-over.component',
             'placeholder' => 'wire-elements-pro::slide-over.placeholder',
             'property-resolvers' => [
-                \WireElements\Pro\Components\Modal\Resolvers\EnumPropertyResolver::class,
+                EnumPropertyResolver::class,
             ],
             'default-behavior' => [
                 'close-on-escape' => true,
@@ -186,298 +479,298 @@ return [
     ],
 
     'icons' => [
-        'academic-cap' => WireElements\Pro\Icons\AcademicCap::class,
-        'adjustments-horizontal' => WireElements\Pro\Icons\AdjustmentsHorizontal::class,
-        'adjustments-vertical' => WireElements\Pro\Icons\AdjustmentsVertical::class,
-        'archive-box-arrow-down' => WireElements\Pro\Icons\ArchiveBoxArrowDown::class,
-        'archive-box-x-mark' => WireElements\Pro\Icons\ArchiveBoxXMark::class,
-        'archive-box' => WireElements\Pro\Icons\ArchiveBox::class,
-        'arrow-down-circle' => WireElements\Pro\Icons\ArrowDownCircle::class,
-        'arrow-down-left' => WireElements\Pro\Icons\ArrowDownLeft::class,
-        'arrow-down-on-square-stack' => WireElements\Pro\Icons\ArrowDownOnSquareStack::class,
-        'arrow-down-on-square' => WireElements\Pro\Icons\ArrowDownOnSquare::class,
-        'arrow-down-right' => WireElements\Pro\Icons\ArrowDownRight::class,
-        'arrow-down-tray' => WireElements\Pro\Icons\ArrowDownTray::class,
-        'arrow-down' => WireElements\Pro\Icons\ArrowDown::class,
-        'arrow-left-circle' => WireElements\Pro\Icons\ArrowLeftCircle::class,
-        'arrow-left-on-rectangle' => WireElements\Pro\Icons\ArrowLeftOnRectangle::class,
-        'arrow-left' => WireElements\Pro\Icons\ArrowLeft::class,
-        'arrow-long-down' => WireElements\Pro\Icons\ArrowLongDown::class,
-        'arrow-long-left' => WireElements\Pro\Icons\ArrowLongLeft::class,
-        'arrow-long-right' => WireElements\Pro\Icons\ArrowLongRight::class,
-        'arrow-long-up' => WireElements\Pro\Icons\ArrowLongUp::class,
-        'arrow-path-rounded-square' => WireElements\Pro\Icons\ArrowPathRoundedSquare::class,
-        'arrow-path' => WireElements\Pro\Icons\ArrowPath::class,
-        'arrow-right-circle' => WireElements\Pro\Icons\ArrowRightCircle::class,
-        'arrow-right-on-rectangle' => WireElements\Pro\Icons\ArrowRightOnRectangle::class,
-        'arrow-right' => WireElements\Pro\Icons\ArrowRight::class,
-        'arrow-small-down' => WireElements\Pro\Icons\ArrowSmallDown::class,
-        'arrow-small-left' => WireElements\Pro\Icons\ArrowSmallLeft::class,
-        'arrow-small-right' => WireElements\Pro\Icons\ArrowSmallRight::class,
-        'arrow-small-up' => WireElements\Pro\Icons\ArrowSmallUp::class,
-        'arrow-top-right-on-square' => WireElements\Pro\Icons\ArrowTopRightOnSquare::class,
-        'arrow-trending-down' => WireElements\Pro\Icons\ArrowTrendingDown::class,
-        'arrow-trending-up' => WireElements\Pro\Icons\ArrowTrendingUp::class,
-        'arrow-up-circle' => WireElements\Pro\Icons\ArrowUpCircle::class,
-        'arrow-up-left' => WireElements\Pro\Icons\ArrowUpLeft::class,
-        'arrow-up-on-square-stack' => WireElements\Pro\Icons\ArrowUpOnSquareStack::class,
-        'arrow-up-on-square' => WireElements\Pro\Icons\ArrowUpOnSquare::class,
-        'arrow-up-right' => WireElements\Pro\Icons\ArrowUpRight::class,
-        'arrow-up-tray' => WireElements\Pro\Icons\ArrowUpTray::class,
-        'arrow-up' => WireElements\Pro\Icons\ArrowUp::class,
-        'arrow-uturn-down' => WireElements\Pro\Icons\ArrowUturnDown::class,
-        'arrow-uturn-left' => WireElements\Pro\Icons\ArrowUturnLeft::class,
-        'arrow-uturn-right' => WireElements\Pro\Icons\ArrowUturnRight::class,
-        'arrow-uturn-up' => WireElements\Pro\Icons\ArrowUturnUp::class,
-        'arrows-pointing-in' => WireElements\Pro\Icons\ArrowsPointingIn::class,
-        'arrows-pointing-out' => WireElements\Pro\Icons\ArrowsPointingOut::class,
-        'arrows-right-left' => WireElements\Pro\Icons\ArrowsRightLeft::class,
-        'arrows-up-down' => WireElements\Pro\Icons\ArrowsUpDown::class,
-        'at-symbol' => WireElements\Pro\Icons\AtSymbol::class,
-        'backspace' => WireElements\Pro\Icons\Backspace::class,
-        'backward' => WireElements\Pro\Icons\Backward::class,
-        'banknotes' => WireElements\Pro\Icons\Banknotes::class,
-        'bars-2' => WireElements\Pro\Icons\Bars2::class,
-        'bars-3-bottom-left' => WireElements\Pro\Icons\Bars3BottomLeft::class,
-        'bars-3-bottom-right' => WireElements\Pro\Icons\Bars3BottomRight::class,
-        'bars-3-center-left' => WireElements\Pro\Icons\Bars3CenterLeft::class,
-        'bars-3' => WireElements\Pro\Icons\Bars3::class,
-        'bars-4' => WireElements\Pro\Icons\Bars4::class,
-        'bars-arrow-down' => WireElements\Pro\Icons\BarsArrowDown::class,
-        'bars-arrow-up' => WireElements\Pro\Icons\BarsArrowUp::class,
-        'battery-0' => WireElements\Pro\Icons\Battery0::class,
-        'battery-100' => WireElements\Pro\Icons\Battery100::class,
-        'battery-50' => WireElements\Pro\Icons\Battery50::class,
-        'beaker' => WireElements\Pro\Icons\Beaker::class,
-        'bell-alert' => WireElements\Pro\Icons\BellAlert::class,
-        'bell-slash' => WireElements\Pro\Icons\BellSlash::class,
-        'bell-snooze' => WireElements\Pro\Icons\BellSnooze::class,
-        'bell' => WireElements\Pro\Icons\Bell::class,
-        'bolt-slash' => WireElements\Pro\Icons\BoltSlash::class,
-        'bolt' => WireElements\Pro\Icons\Bolt::class,
-        'book-open' => WireElements\Pro\Icons\BookOpen::class,
-        'bookmark-slash' => WireElements\Pro\Icons\BookmarkSlash::class,
-        'bookmark-square' => WireElements\Pro\Icons\BookmarkSquare::class,
-        'bookmark' => WireElements\Pro\Icons\Bookmark::class,
-        'briefcase' => WireElements\Pro\Icons\Briefcase::class,
-        'bug-ant' => WireElements\Pro\Icons\BugAnt::class,
-        'building-library' => WireElements\Pro\Icons\BuildingLibrary::class,
-        'building-office-2' => WireElements\Pro\Icons\BuildingOffice2::class,
-        'building-office' => WireElements\Pro\Icons\BuildingOffice::class,
-        'building-storefront' => WireElements\Pro\Icons\BuildingStorefront::class,
-        'cake' => WireElements\Pro\Icons\Cake::class,
-        'calculator' => WireElements\Pro\Icons\Calculator::class,
-        'calendar-days' => WireElements\Pro\Icons\CalendarDays::class,
-        'calendar' => WireElements\Pro\Icons\Calendar::class,
-        'camera' => WireElements\Pro\Icons\Camera::class,
-        'chart-bar-square' => WireElements\Pro\Icons\ChartBarSquare::class,
-        'chart-bar' => WireElements\Pro\Icons\ChartBar::class,
-        'chart-pie' => WireElements\Pro\Icons\ChartPie::class,
-        'chat-bubble-bottom-center-text' => WireElements\Pro\Icons\ChatBubbleBottomCenterText::class,
-        'chat-bubble-bottom-center' => WireElements\Pro\Icons\ChatBubbleBottomCenter::class,
-        'chat-bubble-left-ellipsis' => WireElements\Pro\Icons\ChatBubbleLeftEllipsis::class,
-        'chat-bubble-left-right' => WireElements\Pro\Icons\ChatBubbleLeftRight::class,
-        'chat-bubble-left' => WireElements\Pro\Icons\ChatBubbleLeft::class,
-        'chat-bubble-oval-left-ellipsis' => WireElements\Pro\Icons\ChatBubbleOvalLeftEllipsis::class,
-        'chat-bubble-oval-left' => WireElements\Pro\Icons\ChatBubbleOvalLeft::class,
-        'check-badge' => WireElements\Pro\Icons\CheckBadge::class,
-        'check-circle' => WireElements\Pro\Icons\CheckCircle::class,
-        'check' => WireElements\Pro\Icons\Check::class,
-        'chevron-double-down' => WireElements\Pro\Icons\ChevronDoubleDown::class,
-        'chevron-double-left' => WireElements\Pro\Icons\ChevronDoubleLeft::class,
-        'chevron-double-right' => WireElements\Pro\Icons\ChevronDoubleRight::class,
-        'chevron-double-up' => WireElements\Pro\Icons\ChevronDoubleUp::class,
-        'chevron-down' => WireElements\Pro\Icons\ChevronDown::class,
-        'chevron-left' => WireElements\Pro\Icons\ChevronLeft::class,
-        'chevron-right' => WireElements\Pro\Icons\ChevronRight::class,
-        'chevron-up-down' => WireElements\Pro\Icons\ChevronUpDown::class,
-        'chevron-up' => WireElements\Pro\Icons\ChevronUp::class,
-        'circle-stack' => WireElements\Pro\Icons\CircleStack::class,
-        'clipboard-document-check' => WireElements\Pro\Icons\ClipboardDocumentCheck::class,
-        'clipboard-document-list' => WireElements\Pro\Icons\ClipboardDocumentList::class,
-        'clipboard-document' => WireElements\Pro\Icons\ClipboardDocument::class,
-        'clipboard' => WireElements\Pro\Icons\Clipboard::class,
-        'clock' => WireElements\Pro\Icons\Clock::class,
-        'cloud-arrow-down' => WireElements\Pro\Icons\CloudArrowDown::class,
-        'cloud-arrow-up' => WireElements\Pro\Icons\CloudArrowUp::class,
-        'cloud' => WireElements\Pro\Icons\Cloud::class,
-        'code-bracket-square' => WireElements\Pro\Icons\CodeBracketSquare::class,
-        'code-bracket' => WireElements\Pro\Icons\CodeBracket::class,
-        'cog-6-tooth' => WireElements\Pro\Icons\Cog6Tooth::class,
-        'cog-8-tooth' => WireElements\Pro\Icons\Cog8Tooth::class,
-        'cog' => WireElements\Pro\Icons\Cog::class,
-        'command-line' => WireElements\Pro\Icons\CommandLine::class,
-        'computer-desktop' => WireElements\Pro\Icons\ComputerDesktop::class,
-        'cpu-chip' => WireElements\Pro\Icons\CpuChip::class,
-        'credit-card' => WireElements\Pro\Icons\CreditCard::class,
-        'cube-transparent' => WireElements\Pro\Icons\CubeTransparent::class,
-        'cube' => WireElements\Pro\Icons\Cube::class,
-        'currency-bangladeshi' => WireElements\Pro\Icons\CurrencyBangladeshi::class,
-        'currency-dollar' => WireElements\Pro\Icons\CurrencyDollar::class,
-        'currency-euro' => WireElements\Pro\Icons\CurrencyEuro::class,
-        'currency-pound' => WireElements\Pro\Icons\CurrencyPound::class,
-        'currency-rupee' => WireElements\Pro\Icons\CurrencyRupee::class,
-        'currency-yen' => WireElements\Pro\Icons\CurrencyYen::class,
-        'cursor-arrow-rays' => WireElements\Pro\Icons\CursorArrowRays::class,
-        'cursor-arrow-ripple' => WireElements\Pro\Icons\CursorArrowRipple::class,
-        'device-phone-mobile' => WireElements\Pro\Icons\DevicePhoneMobile::class,
-        'device-tablet' => WireElements\Pro\Icons\DeviceTablet::class,
-        'document-arrow-down' => WireElements\Pro\Icons\DocumentArrowDown::class,
-        'document-arrow-up' => WireElements\Pro\Icons\DocumentArrowUp::class,
-        'document-chart-bar' => WireElements\Pro\Icons\DocumentChartBar::class,
-        'document-check' => WireElements\Pro\Icons\DocumentCheck::class,
-        'document-duplicate' => WireElements\Pro\Icons\DocumentDuplicate::class,
-        'document-magnifying-glass' => WireElements\Pro\Icons\DocumentMagnifyingGlass::class,
-        'document-minus' => WireElements\Pro\Icons\DocumentMinus::class,
-        'document-plus' => WireElements\Pro\Icons\DocumentPlus::class,
-        'document-text' => WireElements\Pro\Icons\DocumentText::class,
-        'document' => WireElements\Pro\Icons\Document::class,
-        'ellipsis-horizontal-circle' => WireElements\Pro\Icons\EllipsisHorizontalCircle::class,
-        'ellipsis-horizontal' => WireElements\Pro\Icons\EllipsisHorizontal::class,
-        'ellipsis-vertical' => WireElements\Pro\Icons\EllipsisVertical::class,
-        'envelope-open' => WireElements\Pro\Icons\EnvelopeOpen::class,
-        'envelope' => WireElements\Pro\Icons\Envelope::class,
-        'exclamation-circle' => WireElements\Pro\Icons\ExclamationCircle::class,
-        'exclamation-triangle' => WireElements\Pro\Icons\ExclamationTriangle::class,
-        'eye-dropper' => WireElements\Pro\Icons\EyeDropper::class,
-        'eye-slash' => WireElements\Pro\Icons\EyeSlash::class,
-        'eye' => WireElements\Pro\Icons\Eye::class,
-        'face-frown' => WireElements\Pro\Icons\FaceFrown::class,
-        'face-smile' => WireElements\Pro\Icons\FaceSmile::class,
-        'film' => WireElements\Pro\Icons\Film::class,
-        'finger-print' => WireElements\Pro\Icons\FingerPrint::class,
-        'fire' => WireElements\Pro\Icons\Fire::class,
-        'flag' => WireElements\Pro\Icons\Flag::class,
-        'folder-arrow-down' => WireElements\Pro\Icons\FolderArrowDown::class,
-        'folder-minus' => WireElements\Pro\Icons\FolderMinus::class,
-        'folder-open' => WireElements\Pro\Icons\FolderOpen::class,
-        'folder-plus' => WireElements\Pro\Icons\FolderPlus::class,
-        'folder' => WireElements\Pro\Icons\Folder::class,
-        'forward' => WireElements\Pro\Icons\Forward::class,
-        'funnel' => WireElements\Pro\Icons\Funnel::class,
-        'gif' => WireElements\Pro\Icons\Gif::class,
-        'gift-top' => WireElements\Pro\Icons\GiftTop::class,
-        'gift' => WireElements\Pro\Icons\Gift::class,
-        'globe-alt' => WireElements\Pro\Icons\GlobeAlt::class,
-        'globe-americas' => WireElements\Pro\Icons\GlobeAmericas::class,
-        'globe-asia-australia' => WireElements\Pro\Icons\GlobeAsiaAustralia::class,
-        'globe-europe-africa' => WireElements\Pro\Icons\GlobeEuropeAfrica::class,
-        'hand-raised' => WireElements\Pro\Icons\HandRaised::class,
-        'hand-thumb-down' => WireElements\Pro\Icons\HandThumbDown::class,
-        'hand-thumb-up' => WireElements\Pro\Icons\HandThumbUp::class,
-        'hashtag' => WireElements\Pro\Icons\Hashtag::class,
-        'heart' => WireElements\Pro\Icons\Heart::class,
-        'home-modern' => WireElements\Pro\Icons\HomeModern::class,
-        'home' => WireElements\Pro\Icons\Home::class,
-        'identification' => WireElements\Pro\Icons\Identification::class,
-        'inbox-arrow-down' => WireElements\Pro\Icons\InboxArrowDown::class,
-        'inbox-stack' => WireElements\Pro\Icons\InboxStack::class,
-        'inbox' => WireElements\Pro\Icons\Inbox::class,
-        'information-circle' => WireElements\Pro\Icons\InformationCircle::class,
-        'key' => WireElements\Pro\Icons\Key::class,
-        'language' => WireElements\Pro\Icons\Language::class,
-        'lifebuoy' => WireElements\Pro\Icons\Lifebuoy::class,
-        'light-bulb' => WireElements\Pro\Icons\LightBulb::class,
-        'link' => WireElements\Pro\Icons\Link::class,
-        'list-bullet' => WireElements\Pro\Icons\ListBullet::class,
-        'lock-closed' => WireElements\Pro\Icons\LockClosed::class,
-        'lock-open' => WireElements\Pro\Icons\LockOpen::class,
-        'magnifying-glass-circle' => WireElements\Pro\Icons\MagnifyingGlassCircle::class,
-        'magnifying-glass-minus' => WireElements\Pro\Icons\MagnifyingGlassMinus::class,
-        'magnifying-glass-plus' => WireElements\Pro\Icons\MagnifyingGlassPlus::class,
-        'magnifying-glass' => WireElements\Pro\Icons\MagnifyingGlass::class,
-        'map-pin' => WireElements\Pro\Icons\MapPin::class,
-        'map' => WireElements\Pro\Icons\Map::class,
-        'megaphone' => WireElements\Pro\Icons\Megaphone::class,
-        'microphone' => WireElements\Pro\Icons\Microphone::class,
-        'minus-circle' => WireElements\Pro\Icons\MinusCircle::class,
-        'minus-small' => WireElements\Pro\Icons\MinusSmall::class,
-        'minus' => WireElements\Pro\Icons\Minus::class,
-        'moon' => WireElements\Pro\Icons\Moon::class,
-        'musical-note' => WireElements\Pro\Icons\MusicalNote::class,
-        'newspaper' => WireElements\Pro\Icons\Newspaper::class,
-        'no-symbol' => WireElements\Pro\Icons\NoSymbol::class,
-        'paint-brush' => WireElements\Pro\Icons\PaintBrush::class,
-        'paper-airplane' => WireElements\Pro\Icons\PaperAirplane::class,
-        'paper-clip' => WireElements\Pro\Icons\PaperClip::class,
-        'pause-circle' => WireElements\Pro\Icons\PauseCircle::class,
-        'pause' => WireElements\Pro\Icons\Pause::class,
-        'pencil-square' => WireElements\Pro\Icons\PencilSquare::class,
-        'pencil' => WireElements\Pro\Icons\Pencil::class,
-        'phone-arrow-down-left' => WireElements\Pro\Icons\PhoneArrowDownLeft::class,
-        'phone-arrow-up-right' => WireElements\Pro\Icons\PhoneArrowUpRight::class,
-        'phone-x-mark' => WireElements\Pro\Icons\PhoneXMark::class,
-        'phone' => WireElements\Pro\Icons\Phone::class,
-        'photo' => WireElements\Pro\Icons\Photo::class,
-        'play-circle' => WireElements\Pro\Icons\PlayCircle::class,
-        'play-pause' => WireElements\Pro\Icons\PlayPause::class,
-        'play' => WireElements\Pro\Icons\Play::class,
-        'plus-circle' => WireElements\Pro\Icons\PlusCircle::class,
-        'plus-small' => WireElements\Pro\Icons\PlusSmall::class,
-        'plus' => WireElements\Pro\Icons\Plus::class,
-        'power' => WireElements\Pro\Icons\Power::class,
-        'presentation-chart-bar' => WireElements\Pro\Icons\PresentationChartBar::class,
-        'presentation-chart-line' => WireElements\Pro\Icons\PresentationChartLine::class,
-        'printer' => WireElements\Pro\Icons\Printer::class,
-        'puzzle-piece' => WireElements\Pro\Icons\PuzzlePiece::class,
-        'qr-code' => WireElements\Pro\Icons\QrCode::class,
-        'question-mark-circle' => WireElements\Pro\Icons\QuestionMarkCircle::class,
-        'queue-list' => WireElements\Pro\Icons\QueueList::class,
-        'radio' => WireElements\Pro\Icons\Radio::class,
-        'receipt-percent' => WireElements\Pro\Icons\ReceiptPercent::class,
-        'receipt-refund' => WireElements\Pro\Icons\ReceiptRefund::class,
-        'rectangle-group' => WireElements\Pro\Icons\RectangleGroup::class,
-        'rectangle-stack' => WireElements\Pro\Icons\RectangleStack::class,
-        'rocket-launch' => WireElements\Pro\Icons\RocketLaunch::class,
-        'rss' => WireElements\Pro\Icons\Rss::class,
-        'scale' => WireElements\Pro\Icons\Scale::class,
-        'scissors' => WireElements\Pro\Icons\Scissors::class,
-        'server-stack' => WireElements\Pro\Icons\ServerStack::class,
-        'server' => WireElements\Pro\Icons\Server::class,
-        'share' => WireElements\Pro\Icons\Share::class,
-        'shield-check' => WireElements\Pro\Icons\ShieldCheck::class,
-        'shield-exclamation' => WireElements\Pro\Icons\ShieldExclamation::class,
-        'shopping-bag' => WireElements\Pro\Icons\ShoppingBag::class,
-        'shopping-cart' => WireElements\Pro\Icons\ShoppingCart::class,
-        'signal-slash' => WireElements\Pro\Icons\SignalSlash::class,
-        'signal' => WireElements\Pro\Icons\Signal::class,
-        'sparkles' => WireElements\Pro\Icons\Sparkles::class,
-        'speaker-wave' => WireElements\Pro\Icons\SpeakerWave::class,
-        'speaker-x-mark' => WireElements\Pro\Icons\SpeakerXMark::class,
-        'square-2-stack' => WireElements\Pro\Icons\Square2Stack::class,
-        'square-3-stack-3d' => WireElements\Pro\Icons\Square3Stack3d::class,
-        'squares-2x2' => WireElements\Pro\Icons\Squares2x2::class,
-        'squares-plus' => WireElements\Pro\Icons\SquaresPlus::class,
-        'star' => WireElements\Pro\Icons\Star::class,
-        'stop-circle' => WireElements\Pro\Icons\StopCircle::class,
-        'stop' => WireElements\Pro\Icons\Stop::class,
-        'sun' => WireElements\Pro\Icons\Sun::class,
-        'swatch' => WireElements\Pro\Icons\Swatch::class,
-        'table-cells' => WireElements\Pro\Icons\TableCells::class,
-        'tag' => WireElements\Pro\Icons\Tag::class,
-        'ticket' => WireElements\Pro\Icons\Ticket::class,
-        'trash' => WireElements\Pro\Icons\Trash::class,
-        'trophy' => WireElements\Pro\Icons\Trophy::class,
-        'truck' => WireElements\Pro\Icons\Truck::class,
-        'tv' => WireElements\Pro\Icons\Tv::class,
-        'user-circle' => WireElements\Pro\Icons\UserCircle::class,
-        'user-group' => WireElements\Pro\Icons\UserGroup::class,
-        'user-minus' => WireElements\Pro\Icons\UserMinus::class,
-        'user-plus' => WireElements\Pro\Icons\UserPlus::class,
-        'user' => WireElements\Pro\Icons\User::class,
-        'users' => WireElements\Pro\Icons\Users::class,
-        'variable' => WireElements\Pro\Icons\Variable::class,
-        'video-camera-slash' => WireElements\Pro\Icons\VideoCameraSlash::class,
-        'video-camera' => WireElements\Pro\Icons\VideoCamera::class,
-        'view-columns' => WireElements\Pro\Icons\ViewColumns::class,
-        'viewfinder-circle' => WireElements\Pro\Icons\ViewfinderCircle::class,
-        'wallet' => WireElements\Pro\Icons\Wallet::class,
-        'wifi' => WireElements\Pro\Icons\Wifi::class,
-        'window' => WireElements\Pro\Icons\Window::class,
-        'wrench-screwdriver' => WireElements\Pro\Icons\WrenchScrewdriver::class,
-        'wrench' => WireElements\Pro\Icons\Wrench::class,
-        'x-circle' => WireElements\Pro\Icons\XCircle::class,
-        'x-mark' => WireElements\Pro\Icons\XMark::class,
+        'academic-cap' => AcademicCap::class,
+        'adjustments-horizontal' => AdjustmentsHorizontal::class,
+        'adjustments-vertical' => AdjustmentsVertical::class,
+        'archive-box-arrow-down' => ArchiveBoxArrowDown::class,
+        'archive-box-x-mark' => ArchiveBoxXMark::class,
+        'archive-box' => ArchiveBox::class,
+        'arrow-down-circle' => ArrowDownCircle::class,
+        'arrow-down-left' => ArrowDownLeft::class,
+        'arrow-down-on-square-stack' => ArrowDownOnSquareStack::class,
+        'arrow-down-on-square' => ArrowDownOnSquare::class,
+        'arrow-down-right' => ArrowDownRight::class,
+        'arrow-down-tray' => ArrowDownTray::class,
+        'arrow-down' => ArrowDown::class,
+        'arrow-left-circle' => ArrowLeftCircle::class,
+        'arrow-left-on-rectangle' => ArrowLeftOnRectangle::class,
+        'arrow-left' => ArrowLeft::class,
+        'arrow-long-down' => ArrowLongDown::class,
+        'arrow-long-left' => ArrowLongLeft::class,
+        'arrow-long-right' => ArrowLongRight::class,
+        'arrow-long-up' => ArrowLongUp::class,
+        'arrow-path-rounded-square' => ArrowPathRoundedSquare::class,
+        'arrow-path' => ArrowPath::class,
+        'arrow-right-circle' => ArrowRightCircle::class,
+        'arrow-right-on-rectangle' => ArrowRightOnRectangle::class,
+        'arrow-right' => ArrowRight::class,
+        'arrow-small-down' => ArrowSmallDown::class,
+        'arrow-small-left' => ArrowSmallLeft::class,
+        'arrow-small-right' => ArrowSmallRight::class,
+        'arrow-small-up' => ArrowSmallUp::class,
+        'arrow-top-right-on-square' => ArrowTopRightOnSquare::class,
+        'arrow-trending-down' => ArrowTrendingDown::class,
+        'arrow-trending-up' => ArrowTrendingUp::class,
+        'arrow-up-circle' => ArrowUpCircle::class,
+        'arrow-up-left' => ArrowUpLeft::class,
+        'arrow-up-on-square-stack' => ArrowUpOnSquareStack::class,
+        'arrow-up-on-square' => ArrowUpOnSquare::class,
+        'arrow-up-right' => ArrowUpRight::class,
+        'arrow-up-tray' => ArrowUpTray::class,
+        'arrow-up' => ArrowUp::class,
+        'arrow-uturn-down' => ArrowUturnDown::class,
+        'arrow-uturn-left' => ArrowUturnLeft::class,
+        'arrow-uturn-right' => ArrowUturnRight::class,
+        'arrow-uturn-up' => ArrowUturnUp::class,
+        'arrows-pointing-in' => ArrowsPointingIn::class,
+        'arrows-pointing-out' => ArrowsPointingOut::class,
+        'arrows-right-left' => ArrowsRightLeft::class,
+        'arrows-up-down' => ArrowsUpDown::class,
+        'at-symbol' => AtSymbol::class,
+        'backspace' => Backspace::class,
+        'backward' => Backward::class,
+        'banknotes' => Banknotes::class,
+        'bars-2' => Bars2::class,
+        'bars-3-bottom-left' => Bars3BottomLeft::class,
+        'bars-3-bottom-right' => Bars3BottomRight::class,
+        'bars-3-center-left' => Bars3CenterLeft::class,
+        'bars-3' => Bars3::class,
+        'bars-4' => Bars4::class,
+        'bars-arrow-down' => BarsArrowDown::class,
+        'bars-arrow-up' => BarsArrowUp::class,
+        'battery-0' => Battery0::class,
+        'battery-100' => Battery100::class,
+        'battery-50' => Battery50::class,
+        'beaker' => Beaker::class,
+        'bell-alert' => BellAlert::class,
+        'bell-slash' => BellSlash::class,
+        'bell-snooze' => BellSnooze::class,
+        'bell' => Bell::class,
+        'bolt-slash' => BoltSlash::class,
+        'bolt' => Bolt::class,
+        'book-open' => BookOpen::class,
+        'bookmark-slash' => BookmarkSlash::class,
+        'bookmark-square' => BookmarkSquare::class,
+        'bookmark' => Bookmark::class,
+        'briefcase' => Briefcase::class,
+        'bug-ant' => BugAnt::class,
+        'building-library' => BuildingLibrary::class,
+        'building-office-2' => BuildingOffice2::class,
+        'building-office' => BuildingOffice::class,
+        'building-storefront' => BuildingStorefront::class,
+        'cake' => Cake::class,
+        'calculator' => Calculator::class,
+        'calendar-days' => CalendarDays::class,
+        'calendar' => Calendar::class,
+        'camera' => Camera::class,
+        'chart-bar-square' => ChartBarSquare::class,
+        'chart-bar' => ChartBar::class,
+        'chart-pie' => ChartPie::class,
+        'chat-bubble-bottom-center-text' => ChatBubbleBottomCenterText::class,
+        'chat-bubble-bottom-center' => ChatBubbleBottomCenter::class,
+        'chat-bubble-left-ellipsis' => ChatBubbleLeftEllipsis::class,
+        'chat-bubble-left-right' => ChatBubbleLeftRight::class,
+        'chat-bubble-left' => ChatBubbleLeft::class,
+        'chat-bubble-oval-left-ellipsis' => ChatBubbleOvalLeftEllipsis::class,
+        'chat-bubble-oval-left' => ChatBubbleOvalLeft::class,
+        'check-badge' => CheckBadge::class,
+        'check-circle' => CheckCircle::class,
+        'check' => Check::class,
+        'chevron-double-down' => ChevronDoubleDown::class,
+        'chevron-double-left' => ChevronDoubleLeft::class,
+        'chevron-double-right' => ChevronDoubleRight::class,
+        'chevron-double-up' => ChevronDoubleUp::class,
+        'chevron-down' => ChevronDown::class,
+        'chevron-left' => ChevronLeft::class,
+        'chevron-right' => ChevronRight::class,
+        'chevron-up-down' => ChevronUpDown::class,
+        'chevron-up' => ChevronUp::class,
+        'circle-stack' => CircleStack::class,
+        'clipboard-document-check' => ClipboardDocumentCheck::class,
+        'clipboard-document-list' => ClipboardDocumentList::class,
+        'clipboard-document' => ClipboardDocument::class,
+        'clipboard' => Clipboard::class,
+        'clock' => Clock::class,
+        'cloud-arrow-down' => CloudArrowDown::class,
+        'cloud-arrow-up' => CloudArrowUp::class,
+        'cloud' => Cloud::class,
+        'code-bracket-square' => CodeBracketSquare::class,
+        'code-bracket' => CodeBracket::class,
+        'cog-6-tooth' => Cog6Tooth::class,
+        'cog-8-tooth' => Cog8Tooth::class,
+        'cog' => Cog::class,
+        'command-line' => CommandLine::class,
+        'computer-desktop' => ComputerDesktop::class,
+        'cpu-chip' => CpuChip::class,
+        'credit-card' => CreditCard::class,
+        'cube-transparent' => CubeTransparent::class,
+        'cube' => Cube::class,
+        'currency-bangladeshi' => CurrencyBangladeshi::class,
+        'currency-dollar' => CurrencyDollar::class,
+        'currency-euro' => CurrencyEuro::class,
+        'currency-pound' => CurrencyPound::class,
+        'currency-rupee' => CurrencyRupee::class,
+        'currency-yen' => CurrencyYen::class,
+        'cursor-arrow-rays' => CursorArrowRays::class,
+        'cursor-arrow-ripple' => CursorArrowRipple::class,
+        'device-phone-mobile' => DevicePhoneMobile::class,
+        'device-tablet' => DeviceTablet::class,
+        'document-arrow-down' => DocumentArrowDown::class,
+        'document-arrow-up' => DocumentArrowUp::class,
+        'document-chart-bar' => DocumentChartBar::class,
+        'document-check' => DocumentCheck::class,
+        'document-duplicate' => DocumentDuplicate::class,
+        'document-magnifying-glass' => DocumentMagnifyingGlass::class,
+        'document-minus' => DocumentMinus::class,
+        'document-plus' => DocumentPlus::class,
+        'document-text' => DocumentText::class,
+        'document' => Document::class,
+        'ellipsis-horizontal-circle' => EllipsisHorizontalCircle::class,
+        'ellipsis-horizontal' => EllipsisHorizontal::class,
+        'ellipsis-vertical' => EllipsisVertical::class,
+        'envelope-open' => EnvelopeOpen::class,
+        'envelope' => Envelope::class,
+        'exclamation-circle' => ExclamationCircle::class,
+        'exclamation-triangle' => ExclamationTriangle::class,
+        'eye-dropper' => EyeDropper::class,
+        'eye-slash' => EyeSlash::class,
+        'eye' => Eye::class,
+        'face-frown' => FaceFrown::class,
+        'face-smile' => FaceSmile::class,
+        'film' => Film::class,
+        'finger-print' => FingerPrint::class,
+        'fire' => Fire::class,
+        'flag' => Flag::class,
+        'folder-arrow-down' => FolderArrowDown::class,
+        'folder-minus' => FolderMinus::class,
+        'folder-open' => FolderOpen::class,
+        'folder-plus' => FolderPlus::class,
+        'folder' => Folder::class,
+        'forward' => Forward::class,
+        'funnel' => Funnel::class,
+        'gif' => Gif::class,
+        'gift-top' => GiftTop::class,
+        'gift' => Gift::class,
+        'globe-alt' => GlobeAlt::class,
+        'globe-americas' => GlobeAmericas::class,
+        'globe-asia-australia' => GlobeAsiaAustralia::class,
+        'globe-europe-africa' => GlobeEuropeAfrica::class,
+        'hand-raised' => HandRaised::class,
+        'hand-thumb-down' => HandThumbDown::class,
+        'hand-thumb-up' => HandThumbUp::class,
+        'hashtag' => Hashtag::class,
+        'heart' => Heart::class,
+        'home-modern' => HomeModern::class,
+        'home' => Home::class,
+        'identification' => Identification::class,
+        'inbox-arrow-down' => InboxArrowDown::class,
+        'inbox-stack' => InboxStack::class,
+        'inbox' => Inbox::class,
+        'information-circle' => InformationCircle::class,
+        'key' => Key::class,
+        'language' => Language::class,
+        'lifebuoy' => Lifebuoy::class,
+        'light-bulb' => LightBulb::class,
+        'link' => Link::class,
+        'list-bullet' => ListBullet::class,
+        'lock-closed' => LockClosed::class,
+        'lock-open' => LockOpen::class,
+        'magnifying-glass-circle' => MagnifyingGlassCircle::class,
+        'magnifying-glass-minus' => MagnifyingGlassMinus::class,
+        'magnifying-glass-plus' => MagnifyingGlassPlus::class,
+        'magnifying-glass' => MagnifyingGlass::class,
+        'map-pin' => MapPin::class,
+        'map' => Map::class,
+        'megaphone' => Megaphone::class,
+        'microphone' => Microphone::class,
+        'minus-circle' => MinusCircle::class,
+        'minus-small' => MinusSmall::class,
+        'minus' => Minus::class,
+        'moon' => Moon::class,
+        'musical-note' => MusicalNote::class,
+        'newspaper' => Newspaper::class,
+        'no-symbol' => NoSymbol::class,
+        'paint-brush' => PaintBrush::class,
+        'paper-airplane' => PaperAirplane::class,
+        'paper-clip' => PaperClip::class,
+        'pause-circle' => PauseCircle::class,
+        'pause' => Pause::class,
+        'pencil-square' => PencilSquare::class,
+        'pencil' => Pencil::class,
+        'phone-arrow-down-left' => PhoneArrowDownLeft::class,
+        'phone-arrow-up-right' => PhoneArrowUpRight::class,
+        'phone-x-mark' => PhoneXMark::class,
+        'phone' => Phone::class,
+        'photo' => Photo::class,
+        'play-circle' => PlayCircle::class,
+        'play-pause' => PlayPause::class,
+        'play' => Play::class,
+        'plus-circle' => PlusCircle::class,
+        'plus-small' => PlusSmall::class,
+        'plus' => Plus::class,
+        'power' => Power::class,
+        'presentation-chart-bar' => PresentationChartBar::class,
+        'presentation-chart-line' => PresentationChartLine::class,
+        'printer' => Printer::class,
+        'puzzle-piece' => PuzzlePiece::class,
+        'qr-code' => QrCode::class,
+        'question-mark-circle' => QuestionMarkCircle::class,
+        'queue-list' => QueueList::class,
+        'radio' => Radio::class,
+        'receipt-percent' => ReceiptPercent::class,
+        'receipt-refund' => ReceiptRefund::class,
+        'rectangle-group' => RectangleGroup::class,
+        'rectangle-stack' => RectangleStack::class,
+        'rocket-launch' => RocketLaunch::class,
+        'rss' => Rss::class,
+        'scale' => Scale::class,
+        'scissors' => Scissors::class,
+        'server-stack' => ServerStack::class,
+        'server' => Server::class,
+        'share' => Share::class,
+        'shield-check' => ShieldCheck::class,
+        'shield-exclamation' => ShieldExclamation::class,
+        'shopping-bag' => ShoppingBag::class,
+        'shopping-cart' => ShoppingCart::class,
+        'signal-slash' => SignalSlash::class,
+        'signal' => Signal::class,
+        'sparkles' => Sparkles::class,
+        'speaker-wave' => SpeakerWave::class,
+        'speaker-x-mark' => SpeakerXMark::class,
+        'square-2-stack' => Square2Stack::class,
+        'square-3-stack-3d' => Square3Stack3d::class,
+        'squares-2x2' => Squares2x2::class,
+        'squares-plus' => SquaresPlus::class,
+        'star' => Star::class,
+        'stop-circle' => StopCircle::class,
+        'stop' => Stop::class,
+        'sun' => Sun::class,
+        'swatch' => Swatch::class,
+        'table-cells' => TableCells::class,
+        'tag' => Tag::class,
+        'ticket' => Ticket::class,
+        'trash' => Trash::class,
+        'trophy' => Trophy::class,
+        'truck' => Truck::class,
+        'tv' => Tv::class,
+        'user-circle' => UserCircle::class,
+        'user-group' => UserGroup::class,
+        'user-minus' => UserMinus::class,
+        'user-plus' => UserPlus::class,
+        'user' => User::class,
+        'users' => Users::class,
+        'variable' => Variable::class,
+        'video-camera-slash' => VideoCameraSlash::class,
+        'video-camera' => VideoCamera::class,
+        'view-columns' => ViewColumns::class,
+        'viewfinder-circle' => ViewfinderCircle::class,
+        'wallet' => Wallet::class,
+        'wifi' => Wifi::class,
+        'window' => Window::class,
+        'wrench-screwdriver' => WrenchScrewdriver::class,
+        'wrench' => Wrench::class,
+        'x-circle' => XCircle::class,
+        'x-mark' => XMark::class,
 
         // Font Awesome nested structure (allows config('wire-elements-pro.icons.fas.download'))
         'fas' => $fontAwesomeIconsNested,

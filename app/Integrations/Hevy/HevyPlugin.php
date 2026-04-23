@@ -13,9 +13,11 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\User;
 use App\Services\TaskPipeline\TaskDefinition;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -371,7 +373,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
         ];
     }
 
-    public function initializeGroup(\App\Models\User $user): IntegrationGroup
+    public function initializeGroup(User $user): IntegrationGroup
     {
         return IntegrationGroup::create([
             'user_id' => $user->id,
@@ -387,7 +389,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
     /**
      * Back-compat helper used by some UI/tests: create a group-first and return a placeholder Integration.
      */
-    public function initialize(\App\Models\User $user): Integration
+    public function initialize(User $user): Integration
     {
         $group = $this->initializeGroup($user);
 
@@ -413,7 +415,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
         ]);
     }
 
-    public function handleOAuthCallback(\Illuminate\Http\Request $request, IntegrationGroup $group): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         throw new Exception('Hevy integration uses API key authentication and does not support OAuth');
     }
@@ -649,7 +651,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
         return [];
     }
 
-    public function handleWebhook(\Illuminate\Http\Request $request, Integration $integration): void
+    public function handleWebhook(Request $request, Integration $integration): void
     {
         // Hevy integration is pull-based via API key; no webhooks
         throw new Exception('Hevy integration does not support webhooks');

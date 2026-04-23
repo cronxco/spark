@@ -17,12 +17,12 @@
             </div>
         </div>
 
-        @if($tableData)
+        @if ($tableData)
             <div class="overflow-x-auto relative border-t border-gray-200">
                 <table class="w-full text-sm text-left text-gray-500 divide-y divide-gray-200">
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                     <tr>
-                        @foreach($tableHeaders as $header)
+                        @foreach ($tableHeaders as $header)
                             <th scope="col" class="py-3 px-6">
                                 {{ $header }}
                             </th>
@@ -30,9 +30,9 @@
                     </tr>
                     </thead>
                     <tbody>
-                    @foreach($tableData as $columns)
+                    @foreach ($tableData as $columns)
                         <tr class="bg-white border-b">
-                            @foreach($columns as $column)
+                            @foreach ($columns as $column)
                                 <td class="py-4 px-6">
                                     {{ $column }}
                                 </td>
@@ -44,7 +44,7 @@
             </div>
         @endif
 
-        @if($confirmPhrase)
+        @if ($confirmPhrase)
             <div class="px-4 sm:px-6">
                 <input type="text" id="confirm-phrase" wire:model.defer="confirmPhraseInput" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5" placeholder="{{ __("wire-elements-pro::modal.confirmation.please_enter_phrase_to_continue", ['phrase' => $confirmPhrase]) }}" required>
 

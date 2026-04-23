@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Integrations\PluginRegistry;
 use App\Jobs\Migrations\StartIntegrationMigration;
+use App\Jobs\Outline\OutlineMigrationPull;
 use App\Models\ActionProgress;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -90,7 +91,7 @@ class OutlineMigrationTest extends TestCase
         $job->handle();
 
         // Check that OutlineMigrationPull was dispatched
-        Bus::assertDispatched(\App\Jobs\Outline\OutlineMigrationPull::class, function ($job) use ($integration) {
+        Bus::assertDispatched(OutlineMigrationPull::class, function ($job) use ($integration) {
             // Use reflection to access protected properties for testing
             $reflection = new ReflectionClass($job);
             $integrationProperty = $reflection->getProperty('integration');

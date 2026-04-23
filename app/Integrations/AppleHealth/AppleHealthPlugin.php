@@ -5,6 +5,7 @@ namespace App\Integrations\AppleHealth;
 use App\Integrations\Base\WebhookPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\User;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -385,7 +386,7 @@ class AppleHealthPlugin extends WebhookPlugin
         ];
     }
 
-    public function initializeGroup(\App\Models\User $user): IntegrationGroup
+    public function initializeGroup(User $user): IntegrationGroup
     {
         // Use parent implementation to generate shared secret + webhook URL
         return parent::initializeGroup($user);

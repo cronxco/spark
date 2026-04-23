@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\ManageObjectTags;
 use App\Models\EventObject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +23,7 @@ class ObjectTaggingUiTest extends TestCase
 
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\ManageObjectTags::class, ['object' => $object])
+        Livewire::test(ManageObjectTags::class, ['object' => $object])
             ->call('addTag', 'alpha')
             ->call('addTag', 'beta')
             ->call('removeTag', 'alpha');
@@ -42,7 +43,7 @@ class ObjectTaggingUiTest extends TestCase
 
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\ManageObjectTags::class, ['object' => $object])
+        Livewire::test(ManageObjectTags::class, ['object' => $object])
             ->call('addTag', 'tag-whitelist-123')
             ->call('addTag', 'tag-initial-123')
             ->call('removeTag', 'tag-whitelist-123')

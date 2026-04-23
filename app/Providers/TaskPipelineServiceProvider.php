@@ -3,6 +3,17 @@
 namespace App\Providers;
 
 use App\Integrations\Contracts\SupportsTaskPipeline;
+use App\Jobs\TaskPipeline\Tasks\CalculateMetricStatsTask;
+use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
+use App\Jobs\TaskPipeline\Tasks\DetectTrendsTask;
+use App\Jobs\TaskPipeline\Tasks\DownloadImagesToMediaLibraryTask;
+use App\Jobs\TaskPipeline\Tasks\FindReceiptForTransactionTask;
+use App\Jobs\TaskPipeline\Tasks\GenerateEmbeddingTask;
+use App\Jobs\TaskPipeline\Tasks\LinkTransactionsTask;
+use App\Jobs\TaskPipeline\Tasks\MatchReceiptToTransactionTask;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Support\ServiceProvider;
@@ -39,7 +50,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'download_images_to_media_library',
             name: 'Download Images to Media Library',
             description: 'Download external images and store in Media Library with responsive variants',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\DownloadImagesToMediaLibraryTask::class,
+            jobClass: DownloadImagesToMediaLibraryTask::class,
             appliesTo: ['event', 'block', 'object'],
             conditions: [],
             dependencies: [],
@@ -49,7 +60,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             runOnUpdate: false,
             shouldRun: function ($model) {
                 // For Blocks: check for media_url or image in metadata
-                if ($model instanceof \App\Models\Block) {
+                if ($model instanceof Block) {
                     if ($model->media_url && ! $model->hasMedia('downloaded_images')) {
                         return true;
                     }
@@ -60,12 +71,12 @@ class TaskPipelineServiceProvider extends ServiceProvider
                 }
 
                 // For EventObjects: check for media_url
-                if ($model instanceof \App\Models\EventObject) {
+                if ($model instanceof EventObject) {
                     return $model->media_url && ! $model->hasMedia('downloaded_images');
                 }
 
                 // For Events: check if any blocks or objects have images to download
-                if ($model instanceof \App\Models\Event) {
+                if ($model instanceof Event) {
                     // Check blocks
                     foreach ($model->blocks as $block) {
                         if ($block->media_url && ! $block->hasMedia('downloaded_images')) {
@@ -98,7 +109,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'generate_embedding',
             name: 'Generate Embedding',
             description: 'Generate AI embedding for semantic search',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\GenerateEmbeddingTask::class,
+            jobClass: GenerateEmbeddingTask::class,
             appliesTo: ['event', 'block', 'object'],
             conditions: [],
             dependencies: [],
@@ -114,7 +125,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'calculate_metric_stats',
             name: 'Calculate Metric Statistics',
             description: 'Calculate mean, stddev, and normal bounds for metrics',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\CalculateMetricStatsTask::class,
+            jobClass: CalculateMetricStatsTask::class,
             appliesTo: ['event'],
             conditions: [],
             dependencies: [],
@@ -132,7 +143,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'detect_anomalies',
             name: 'Detect Anomalies',
             description: 'Detect if metric value is anomalous based on baseline statistics',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask::class,
+            jobClass: DetectAnomaliesTask::class,
             appliesTo: ['event'],
             conditions: [],
             dependencies: ['calculate_metric_stats'], // Requires stats first
@@ -164,7 +175,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'detect_trends',
             name: 'Detect Trends',
             description: 'Detect weekly, monthly, and quarterly metric trends',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\DetectTrendsTask::class,
+            jobClass: DetectTrendsTask::class,
             appliesTo: ['event'],
             conditions: [],
             dependencies: ['calculate_metric_stats'],
@@ -182,7 +193,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'match_receipt_to_transaction',
             name: 'Match Receipt to Transaction',
             description: 'Find matching transaction for a receipt',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\MatchReceiptToTransactionTask::class,
+            jobClass: MatchReceiptToTransactionTask::class,
             appliesTo: ['event'],
             conditions: [
                 'service' => 'receipt',
@@ -200,7 +211,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'find_receipt_for_transaction',
             name: 'Find Receipt for Transaction',
             description: 'Find matching receipt for a financial transaction',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\FindReceiptForTransactionTask::class,
+            jobClass: FindReceiptForTransactionTask::class,
             appliesTo: ['event'],
             conditions: [
                 'service' => ['monzo', 'gocardless'],
@@ -229,7 +240,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             key: 'link_transactions',
             name: 'Link Related Transactions',
             description: 'Find and link related transactions across providers',
-            jobClass: \App\Jobs\TaskPipeline\Tasks\LinkTransactionsTask::class,
+            jobClass: LinkTransactionsTask::class,
             appliesTo: ['event'],
             conditions: [
                 'service' => ['monzo', 'gocardless'],

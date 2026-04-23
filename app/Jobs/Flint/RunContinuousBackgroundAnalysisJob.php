@@ -12,6 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Sentry\SentrySdk;
+use Sentry\State\Scope;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 use Throwable;
@@ -41,7 +42,7 @@ class RunContinuousBackgroundAnalysisJob implements ShouldQueue
 
         // Capture in Sentry with context
         if ($exception) {
-            \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($exception) {
+            \Sentry\withScope(function (Scope $scope) use ($exception) {
                 $scope->setContext('job_failure', [
                     'stage' => 'pre_execution',
                     'user_id' => $this->user->id ?? 'unknown',
@@ -75,7 +76,7 @@ class RunContinuousBackgroundAnalysisJob implements ShouldQueue
         SentrySdk::getCurrentHub()->setSpan($transaction);
 
         // Set user context for Sentry
-        \Sentry\configureScope(function (\Sentry\State\Scope $scope) {
+        \Sentry\configureScope(function (Scope $scope) {
             $scope->setUser([
                 'id' => $this->user->id,
                 'email' => $this->user->email,
@@ -116,7 +117,7 @@ class RunContinuousBackgroundAnalysisJob implements ShouldQueue
             $transaction->finish();
 
             // Capture exception with full context in Sentry
-            \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($e) {
+            \Sentry\withScope(function (Scope $scope) use ($e) {
                 $scope->setContext('job', [
                     'attempt' => $this->attempts(),
                     'max_tries' => $this->tries,

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class ApiWebhookLoggingTest extends TestCase
@@ -267,7 +268,7 @@ class ApiWebhookLoggingTest extends TestCase
 
         // Act & Assert - Webhook handling should validate signatures properly
         // This test verifies that invalid signatures are rejected
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(HttpException::class);
         $this->expectExceptionMessage('Invalid Slack signature');
 
         $slackPlugin->handleWebhook($request, $this->integration);

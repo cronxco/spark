@@ -5,6 +5,7 @@ namespace App\Jobs\Data\Untappd;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Media\MediaDownloadHelper;
 
 class UntappdCreateBeerInfoBlocks extends BaseProcessingJob
 {
@@ -115,7 +116,7 @@ class UntappdCreateBeerInfoBlocks extends BaseProcessingJob
 
                 if ($md5Hash) {
                     // Use MediaDownloadHelper to handle deduplication
-                    $helper = app(\App\Services\Media\MediaDownloadHelper::class);
+                    $helper = app(MediaDownloadHelper::class);
                     $helper->attachExistingMedia($media, $block, 'downloaded_images');
                 } else {
                     // Fallback: copy without deduplication

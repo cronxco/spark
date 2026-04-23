@@ -9,6 +9,7 @@ use App\Models\ActionProgress;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Services\EmbeddingService;
 use Illuminate\Console\Command;
 
 class RegenerateEmbeddings extends Command
@@ -183,7 +184,7 @@ class RegenerateEmbeddings extends Command
                 if ($sync) {
                     // Run synchronously
                     $job = new $jobClass($record);
-                    $job->handle(app(\App\Services\EmbeddingService::class));
+                    $job->handle(app(EmbeddingService::class));
                 } else {
                     // Queue job
                     $jobClass::dispatch($record)->onQueue('embeddings');

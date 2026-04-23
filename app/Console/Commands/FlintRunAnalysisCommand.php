@@ -7,6 +7,7 @@ use App\Services\AgentOrchestrationService;
 use Exception;
 use Illuminate\Console\Command;
 use Sentry\SentrySdk;
+use Sentry\State\Scope;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 
@@ -89,7 +90,7 @@ class FlintRunAnalysisCommand extends Command
 
             foreach ($users as $user) {
                 try {
-                    \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($user) {
+                    \Sentry\configureScope(function (Scope $scope) use ($user) {
                         $scope->setUser([
                             'id' => $user->id,
                             'email' => $user->email,

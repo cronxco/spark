@@ -6,6 +6,7 @@ use App\Jobs\Flint\RunDigestGenerationJob;
 use App\Jobs\Flint\RunPreDigestRefreshJob;
 use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Models\User;
+use App\Services\AgentOrchestrationService;
 use App\Services\AssistantPromptingService;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,7 +42,7 @@ class OrchestrationTest extends TestCase
     public function pre_digest_refresh_dispatches_all_required_jobs(): void
     {
         // Mock the orchestration service
-        $mockOrchestration = Mockery::mock(\App\Services\AgentOrchestrationService::class);
+        $mockOrchestration = Mockery::mock(AgentOrchestrationService::class);
         $mockOrchestration->shouldReceive('runPreDigestRefresh')
             ->once()
             ->with($this->user)
@@ -64,7 +65,7 @@ class OrchestrationTest extends TestCase
     public function digest_generation_job_determines_correct_period(): void
     {
         // Mock the orchestration service to return a digest block ID
-        $mockOrchestration = Mockery::mock(\App\Services\AgentOrchestrationService::class);
+        $mockOrchestration = Mockery::mock(AgentOrchestrationService::class);
 
         // Test morning period (6:00 AM)
         $mockOrchestration->shouldReceive('runDigestGeneration')
@@ -103,7 +104,7 @@ class OrchestrationTest extends TestCase
     public function digest_generation_dispatches_notification_job(): void
     {
         // Mock the orchestration service
-        $mockOrchestration = Mockery::mock(\App\Services\AgentOrchestrationService::class);
+        $mockOrchestration = Mockery::mock(AgentOrchestrationService::class);
         $mockOrchestration->shouldReceive('runDigestGeneration')
             ->once()
             ->with($this->user, 'morning')
@@ -142,7 +143,7 @@ class OrchestrationTest extends TestCase
 
         // Should not throw an exception even if something fails internally
         try {
-            $job->handle(app(\App\Services\AgentOrchestrationService::class));
+            $job->handle(app(AgentOrchestrationService::class));
             $this->assertTrue(true); // Job completed without exception
         } catch (Exception $e) {
             $this->fail('Orchestration job should not throw exceptions: ' . $e->getMessage());
@@ -158,7 +159,7 @@ class OrchestrationTest extends TestCase
         $user3 = User::factory()->create();
 
         // Mock the orchestration service
-        $mockOrchestration = Mockery::mock(\App\Services\AgentOrchestrationService::class);
+        $mockOrchestration = Mockery::mock(AgentOrchestrationService::class);
         $mockOrchestration->shouldReceive('runPreDigestRefresh')
             ->times(3)
             ->andReturn([

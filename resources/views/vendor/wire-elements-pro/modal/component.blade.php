@@ -28,7 +28,7 @@
                  x-bind:class="activeComponentWidth"
                  x-trap.inert.noscroll="getElementBehavior('trap-focus') && open"
                  class="wep-modal-content">
-                @foreach($components as $id => $component)
+                @foreach ($components as $id => $component)
                     <div @click.outside="closeIf('close-on-backdrop-click')" x-show.immediate="activeComponent === '{{ $id }}'" x-ref="{{ $id }}" wire:key="{{ $id }}">
                         @livewire($component['name'], $component['arguments'], key($id))
                     </div>

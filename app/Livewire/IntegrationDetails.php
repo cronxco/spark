@@ -131,6 +131,21 @@ class IntegrationDetails extends Component
         $this->dispatch('integration-pause-toggled');
     }
 
+    public function reconnectIntegration(): void
+    {
+        $group = $this->integration->group;
+        if (! $group) {
+            $this->error('No integration group found.');
+
+            return;
+        }
+
+        $this->redirect(route('integrations.reconnect', [
+            'service' => $this->integration->service,
+            'group' => $group->id,
+        ]));
+    }
+
     public function openConfigureModal(): void
     {
         // This would open a configuration modal - for now just redirect to settings
@@ -221,8 +236,9 @@ class IntegrationDetails extends Component
 
     public function render()
     {
-        return view('livewire.integration-details')
-            ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+        return view('livewire.integration-details', [
+            'pluginClass' => $this->getPluginClass(),
+        ])->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
     }
 
     /**

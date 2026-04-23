@@ -6,6 +6,7 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class OuraSleepData extends BaseProcessingJob
@@ -59,7 +60,7 @@ class OuraSleepData extends BaseProcessingJob
     /**
      * Create enhanced sleep event with full API v2 field support
      */
-    private function createEnhancedSleepEvent(OuraPlugin $plugin, array $item, \Illuminate\Support\Collection $existingSourceIds): void
+    private function createEnhancedSleepEvent(OuraPlugin $plugin, array $item, Collection $existingSourceIds): void
     {
         $day = $item['day'] ?? null;
         if (! $day) {

@@ -1,11 +1,24 @@
 <?php
 
+use App\Http\Controllers\Admin\BlockViewController;
+use App\Http\Controllers\Admin\GoCardlessAdminController;
+use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Integrations\PluginRegistry;
 use App\Jobs\DeleteBinItemsBatch;
+use App\Livewire\Day;
+use App\Livewire\FinancialAccounts;
+use App\Livewire\FinancialAccountShow;
+use App\Livewire\IntegrationDetails;
+use App\Livewire\Media\Index;
+use App\Livewire\Media\Show;
+use App\Livewire\MetricDetail;
+use App\Livewire\MetricsOverview;
+use App\Livewire\ReceiptDetail;
+use App\Livewire\Receipts;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -40,11 +53,11 @@ Route::middleware(['auth'])->prefix('push')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     // Day-based timeline routes
-    Route::get('day/today', \App\Livewire\Day::class)->name('today.day');
-    Route::get('today', \App\Livewire\Day::class)->name('today.main');
-    Route::get('day/tomorrow', \App\Livewire\Day::class)->name('tomorrow');
-    Route::get('day/yesterday', \App\Livewire\Day::class)->name('day.yesterday');
-    Route::get('day/{date}', \App\Livewire\Day::class)->name('day.show');
+    Route::get('day/today', Day::class)->name('today.day');
+    Route::get('today', Day::class)->name('today.main');
+    Route::get('day/tomorrow', Day::class)->name('tomorrow');
+    Route::get('day/yesterday', Day::class)->name('day.yesterday');
+    Route::get('day/{date}', Day::class)->name('day.show');
     Route::redirect('settings', 'settings/profile');
 
     Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
@@ -64,16 +77,19 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('notifications', 'notifications.index')->name('notifications.index');
 
     // Media routes
-    Route::get('media', \App\Livewire\Media\Index::class)->name('media.index');
-    Route::get('media/{media:uuid}', \App\Livewire\Media\Show::class)->name('media.show');
+    Route::get('media', Index::class)->name('media.index');
+    Route::get('media/{media:uuid}', Show::class)->name('media.show');
 
     // Metrics routes
-    Route::get('metrics', \App\Livewire\MetricsOverview::class)->name('metrics.index');
-    Route::get('metrics/{metric}', \App\Livewire\MetricDetail::class)->whereUuid('metric')->name('metrics.show');
+    Route::get('metrics', MetricsOverview::class)->name('metrics.index');
+    Route::get('metrics/{metric}', MetricDetail::class)->whereUuid('metric')->name('metrics.show');
 
     Route::get('integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Route::get('integrations/{service}/reconnect/{group}', [IntegrationController::class, 'reconnect'])
+        ->whereUuid('group')
+        ->name('integrations.reconnect');
     Route::get('integrations/groups/{group}/onboarding', [IntegrationController::class, 'onboarding'])
         ->whereUuid('group')
         ->name('integrations.onboarding');
@@ -101,27 +117,27 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('plugins.show');
 
-    Route::get('integrations/{integration}/details', \App\Livewire\IntegrationDetails::class)
+    Route::get('integrations/{integration}/details', IntegrationDetails::class)
         ->whereUuid('integration')
         ->name('integrations.details');
 
     // Money routes
-    Route::get('money', \App\Livewire\FinancialAccounts::class)->name('money');
-    Route::get('money/{account}', \App\Livewire\FinancialAccountShow::class)->name('money.show');
+    Route::get('money', FinancialAccounts::class)->name('money');
+    Route::get('money/{account}', FinancialAccountShow::class)->name('money.show');
 
     // Receipts routes
-    Route::get('money/receipts', \App\Livewire\Receipts::class)->name('receipts.index');
-    Route::get('money/receipts/{id}', \App\Livewire\ReceiptDetail::class)->whereUuid('id')->name('receipts.show');
+    Route::get('money/receipts', Receipts::class)->name('receipts.index');
+    Route::get('money/receipts/{id}', ReceiptDetail::class)->whereUuid('id')->name('receipts.show');
 
     // Bookmarks routes
     Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks');
     Route::redirect('bookmarks/fetch', '/bookmarks?tab=urls')->name('bookmarks.fetch');
 
     // Map route
-    Route::get('map', \App\Livewire\Map\Index::class)->name('map.index');
+    Route::get('map', App\Livewire\Map\Index::class)->name('map.index');
 
     // Place detail route
-    Route::get('places/{place}', \App\Livewire\Places\Show::class)->whereUuid('place')->name('places.show');
+    Route::get('places/{place}', App\Livewire\Places\Show::class)->whereUuid('place')->name('places.show');
     // GoCardless bank selection page
     Route::get('integrations/groups/{group}/gocardless/bank-selection', function (IntegrationGroup $group) {
         if ((string) $group->user_id !== (string) Auth::id()) {
@@ -156,7 +172,7 @@ Route::middleware(['auth'])->group(function () {
                     Log::warning('GoCardless API returned empty institutions');
                     session(['gocardless_institutions_' . $group->id => []]);
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $logData = [
                     'error' => $e->getMessage(),
                     'country' => config('services.gocardless.country', 'GB'),
@@ -284,12 +300,12 @@ Route::get('auth/authelia/callback', function () {
 
 // Admin routes
 Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('gocardless', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'index'])->name('gocardless.index');
-    Route::delete('gocardless/agreements/{agreementId}', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
-    Route::delete('gocardless/requisitions/{requisitionId}', [App\Http\Controllers\Admin\GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
+    Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
+    Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
 
-    Route::get('migrations', [App\Http\Controllers\Admin\MigrationsController::class, 'index'])->name('migrations.index');
-    Route::post('migrations/oura', [App\Http\Controllers\Admin\MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
+    Route::get('migrations', [MigrationsController::class, 'index'])->name('migrations.index');
+    Route::post('migrations/oura', [MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
 
     Volt::route('daynotes', 'admin.daynotes')->name('daynotes.index');
     Volt::route('events', 'admin.events')->name('events.index');
@@ -302,7 +318,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Volt::route('search', 'admin.search')->name('search.index');
     Volt::route('duplicates', 'admin.duplicates.index')->name('duplicates.index');
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
-    Route::get('block-view', [App\Http\Controllers\Admin\BlockViewController::class, 'index'])->name('block-view.index');
+    Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
         DeleteBinItemsBatch::dispatch(Auth::id());
 

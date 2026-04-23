@@ -8,8 +8,10 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\GeocodingService;
+use App\Services\PlaceDetectionService;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -1376,7 +1378,7 @@ class MonzoPlugin extends OAuthPlugin
     /**
      * Make an authenticated request with automatic token refresh on 401
      */
-    protected function makeAuthenticatedMonzoRequest(string $method, string $endpoint, array $params = [], ?Integration $integration = null): \Illuminate\Http\Client\Response
+    protected function makeAuthenticatedMonzoRequest(string $method, string $endpoint, array $params = [], ?Integration $integration = null): Response
     {
         $url = $this->apiBase . $endpoint;
 
@@ -1763,7 +1765,7 @@ class MonzoPlugin extends OAuthPlugin
         }
 
         try {
-            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService = app(PlaceDetectionService::class);
             $placeService->detectAndLinkPlaceForEvent($event);
         } catch (Exception $e) {
             // Log error but don't fail the transaction processing

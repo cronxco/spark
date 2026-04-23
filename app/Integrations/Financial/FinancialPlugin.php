@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class FinancialPlugin extends ManualPlugin
 {
@@ -353,7 +355,7 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Get balance events query for a specific account (for pagination)
      */
-    public function getBalanceEventsQuery(EventObject $accountObject): \Illuminate\Database\Eloquent\Builder
+    public function getBalanceEventsQuery(EventObject $accountObject): Builder
     {
         return Event::where('actor_id', $accountObject->id)
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
@@ -375,10 +377,10 @@ class FinancialPlugin extends ManualPlugin
     /**
      * Batch load latest balances for multiple accounts (N+1 optimization)
      *
-     * @param  \Illuminate\Support\Collection  $accounts  Collection of EventObject accounts
-     * @return \Illuminate\Support\Collection Keyed by actor_id
+     * @param  Collection  $accounts  Collection of EventObject accounts
+     * @return Collection Keyed by actor_id
      */
-    public function getLatestBalancesForAccounts($accounts): \Illuminate\Support\Collection
+    public function getLatestBalancesForAccounts($accounts): Collection
     {
         $accountIds = $accounts->pluck('id')->toArray();
 

@@ -40,7 +40,7 @@ return new class extends Migration
     {
         try {
             DB::statement($sql);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
             throw $e;
         }

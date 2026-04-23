@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -407,7 +408,7 @@ class BlockTest extends TestCase
             'time' => '2024-06-15 10:30:00',
         ]);
 
-        $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $block->time);
+        $this->assertInstanceOf(Carbon::class, $block->time);
         $this->assertEquals('2024-06-15', $block->time->format('Y-m-d'));
     }
 }

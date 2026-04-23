@@ -14,7 +14,7 @@
          x-bind="container">
 
         <ul x-bind="results" class="wep-insert-results">
-            @forelse($this->results as $index => $result)
+            @forelse ($this->results as $index => $result)
                 @includeIf($result['view'])
             @empty
                 <li class="wep-insert-item-no-results" wire:key="no-results">
@@ -23,7 +23,7 @@
             @endforelse
         </ul>
 
-        @if($parameters['behavior']['show_keyboard_instructions'] ?? false)
+        @if ($parameters['behavior']['show_keyboard_instructions'] ?? false)
         <div class="wep-insert-instructions">
             <div>
                 <div class="wep-insert-instructions-arrow-container">

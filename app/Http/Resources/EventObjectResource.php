@@ -2,11 +2,12 @@
 
 namespace App\Http\Resources;
 
+use App\Models\EventObject;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Models\EventObject
+ * @mixin EventObject
  */
 class EventObjectResource extends JsonResource
 {

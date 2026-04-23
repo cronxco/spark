@@ -6,6 +6,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Media\MediaDeduplicationService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -252,7 +253,7 @@ class ProcessFetchedContent implements ShouldQueue
             }
 
             // Use deduplication service to attach the same image to source object
-            $deduplicationService = app(\App\Services\Media\MediaDeduplicationService::class);
+            $deduplicationService = app(MediaDeduplicationService::class);
             $deduplicationService->attachMediaToModel(
                 $articleImage,
                 $sourceObject,
