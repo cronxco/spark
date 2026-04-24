@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AasaController;
 use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
 use App\Http\Controllers\Admin\MigrationsController;
@@ -36,6 +37,10 @@ Route::get('/', function () {
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+// Apple App Site Association for Universal Links
+Route::get('.well-known/apple-app-site-association', [AasaController::class, 'show'])
+    ->name('aasa');
 
 // Push notification routes (public)
 Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])
