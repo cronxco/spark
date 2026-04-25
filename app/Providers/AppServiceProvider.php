@@ -2,18 +2,25 @@
 
 namespace App\Providers;
 
+use App\Events\Mobile\NewEventBroadcast;
+use App\Events\Mobile\NotificationReceived;
 use App\Jobs\Data\Receipt\FindReceiptForTransactionJob;
 use App\Models\Block;
 use App\Models\Event as EventModel;
 use App\Models\EventObject;
+use App\Notifications\SparkNotification;
 use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event;
 /** @phpstan-ignore-next-line */
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Horizon\Horizon;
@@ -23,6 +30,7 @@ use Sentry\Severity;
 use Sentry\Tracing\SpanContext;
 use SocialiteProviders\Authelia\Provider as AutheliaProvider;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('oauth', fn ($request) => Limit::perMinute(10)->by($request->ip()));
+
         // Register model observers for automatic embedding generation
         EventModel::observe(EventObserver::class);
         Block::observe(BlockObserver::class);
@@ -68,6 +78,61 @@ class AppServiceProvider extends ServiceProvider
                 ])) {
                 FindReceiptForTransactionJob::dispatch($event);
             }
+        });
+
+        // iOS broadcast on new Event creation. Throttled per-user via Redis to avoid
+        // flooding subscribers when bulk ingestion creates many events in quick succession.
+        // The 2-second SETNX window means we only emit one ping per user per burst —
+        // the iOS client then re-fetches the feed delta on its own schedule.
+        // If Redis is unreachable we fail open (broadcast) rather than silently dropping;
+        // the broadcast itself uses the configured driver (log in tests) and is a no-op
+        // when nothing is subscribed.
+        EventModel::created(function (EventModel $event) {
+            $userId = $event->integration?->user_id;
+            if (! $userId) {
+                return;
+            }
+
+            try {
+                $lockAcquired = (bool) Redis::set("broadcast:newevent:{$userId}", '1', 'EX', 2, 'NX');
+            } catch (Throwable) {
+                $lockAcquired = true;
+            }
+
+            if (! $lockAcquired) {
+                return;
+            }
+
+            event(NewEventBroadcast::fromEvent($event, (string) $userId));
+        });
+
+        // iOS broadcast on database notification persistence. Listens for the
+        // built-in NotificationSent event with channel='database' so the inbox
+        // mirror in the app updates in real time alongside the database insert.
+        Event::listen(function (NotificationSent $event) {
+            if ($event->channel !== 'database') {
+                return;
+            }
+
+            if (! $event->notification instanceof SparkNotification) {
+                return;
+            }
+
+            $notifiable = $event->notifiable;
+            if (! $notifiable || ! method_exists($notifiable, 'getKey')) {
+                return;
+            }
+
+            $payload = $event->notification->toArray($notifiable);
+
+            event(new NotificationReceived(
+                userId: (string) $notifiable->getKey(),
+                notificationId: (string) ($event->notification->id ?? ''),
+                type: (string) ($payload['type'] ?? $event->notification->getNotificationType()),
+                title: $payload['title'] ?? null,
+                body: $payload['message'] ?? null,
+                deepLink: $payload['action_url'] ?? null,
+            ));
         });
 
         // Sentry tracing for outgoing HTTP requests via Laravel Http client

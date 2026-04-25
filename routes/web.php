@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\AasaController;
 use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
 use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
@@ -37,6 +39,10 @@ Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// Apple App Site Association for Universal Links
+Route::get('.well-known/apple-app-site-association', [AasaController::class, 'show'])
+    ->name('aasa');
+
 // Push notification routes (public)
 Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])
     ->name('push.vapid-public-key');
@@ -49,6 +55,13 @@ Route::middleware(['auth'])->prefix('push')->group(function () {
     Route::get('subscriptions', [PushSubscriptionController::class, 'list'])->name('push.subscriptions');
     Route::delete('subscriptions/{id}', [PushSubscriptionController::class, 'destroy'])->name('push.subscriptions.destroy');
     Route::post('test', [PushSubscriptionController::class, 'test'])->name('push.test');
+});
+
+// OAuth PKCE authorization (iOS companion app)
+Route::middleware(['auth'])->group(function () {
+    Route::get('oauth/authorize', [OAuthController::class, 'authorize'])->name('oauth.authorize');
+    Route::post('oauth/authorize', [OAuthController::class, 'approve'])->name('oauth.approve');
+    Route::post('oauth/deny', [OAuthController::class, 'deny'])->name('oauth.deny');
 });
 
 Route::middleware(['auth'])->group(function () {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\Mobile\ActionProgressUpdated;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -154,6 +155,17 @@ class ActionProgress extends Model
                 'message' => $model->message,
                 'percentage' => $model->progress,
             ]];
+        });
+
+        static::saved(function (ActionProgress $model) {
+            if (
+                ! $model->wasRecentlyCreated
+                && ! $model->wasChanged(['progress', 'status', 'completed_at', 'failed_at', 'step', 'message'])
+            ) {
+                return;
+            }
+
+            event(ActionProgressUpdated::fromModel($model));
         });
     }
 

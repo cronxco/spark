@@ -3,7 +3,8 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\BlockResource;
-use App\Models\Block;
+use App\Services\Mobile\BlockLookup;
+use App\Services\Mobile\EventLookup;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -40,24 +41,11 @@ class GetBlockTool extends Tool
             return Response::error('Block ID is required.');
         }
 
-        // Validate UUID format
-        if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $blockId)) {
+        if (! preg_match(EventLookup::UUID_REGEX, $blockId)) {
             return Response::error('Invalid block ID format. Expected UUID.');
         }
 
-        // Get user's integration IDs for authorization
-        $userIntegrationIds = $user->integrations()->pluck('id')->toArray();
-
-        if (empty($userIntegrationIds)) {
-            return Response::error('No integrations found for user.');
-        }
-
-        // Find the block with authorization via event
-        $block = Block::query()
-            ->where('id', $blockId)
-            ->whereHas('event', fn ($q) => $q->whereIn('integration_id', $userIntegrationIds))
-            ->with(['event.integration', 'event.actor', 'event.target'])
-            ->first();
+        $block = app(BlockLookup::class)->find($user, $blockId);
 
         if (! $block) {
             return Response::error('Block not found or access denied.');

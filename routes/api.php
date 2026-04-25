@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\FetchApiController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
 use App\Http\Controllers\Api\SemanticSearchController;
+use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\EventApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -114,3 +115,15 @@ Route::middleware('sentry.api.logging')->group(function () {
 Route::get('user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum')->name('api.user');
+
+// OAuth PKCE token exchange + refresh (iOS companion app) — unauthenticated
+Route::post('oauth/token', [OAuthController::class, 'token'])->middleware('throttle:oauth')->name('oauth.token');
+Route::post('oauth/refresh', [OAuthController::class, 'refresh'])->middleware('throttle:oauth')->name('oauth.refresh');
+
+// Mobile API surface — gated behind config('ios.mobile_api_enabled') so it's
+// invisible in production until the iOS client is ready to ship. Default
+// ability is `ios:read`; write-side endpoints override to `ios:write`.
+Route::prefix('v1/mobile')
+    ->middleware(['ios.enabled', 'auth:sanctum', 'ability:ios:read', 'etag'])
+    ->name('api.v1.mobile.')
+    ->group(base_path('routes/mobile.php'));
