@@ -64,7 +64,20 @@ class ApnsLiveActivityService
             ])
             ->post($host . '/3/device/' . $token->push_token, $payload);
 
-        $token->forceFill(['last_pushed_at' => now()])->save();
+        if ($response->successful()) {
+            $token->forceFill(['last_pushed_at' => now()])->save();
+        } else {
+            $body = $response->json();
+            $reason = $body['reason'] ?? null;
+
+            if (in_array($reason, ['Unregistered', 'BadDeviceToken', 'ExpiredProviderToken'], true) || $response->status() === 410) {
+                Log::warning('ApnsLiveActivityService: Terminal error for token', [
+                    'token_id' => $token->id,
+                    'status' => $response->status(),
+                    'reason' => $reason,
+                ]);
+            }
+        }
 
         return $response;
     }

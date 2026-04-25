@@ -19,7 +19,7 @@ class DevicesController extends Controller
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'apns_token' => ['required', 'string', 'min:32', 'max:200'],
+            'apns_token' => ['required', 'string', 'size:64', 'regex:/^[0-9a-fA-F]{64}$/'],
             'app_environment' => ['required', 'string', 'in:sandbox,production'],
             'bundle_id' => ['required', 'string', 'max:100'],
             'app_version' => ['required', 'string', 'max:30'],

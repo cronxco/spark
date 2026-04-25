@@ -40,7 +40,6 @@ class LiveActivitiesController extends Controller
                 'activity_id' => $validated['activity_id'],
             ],
             [
-                'id' => (string) Str::uuid(),
                 'activity_type' => $validated['activity_type'],
                 'push_token' => $validated['push_token'],
                 'device_id' => $validated['device_id'] ?? null,

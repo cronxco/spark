@@ -96,7 +96,8 @@ class MapController extends Controller
 
         [$swLat, $swLng, $neLat, $neLng] = array_map(fn ($v) => (float) trim($v), $parts);
 
-        if ($swLat >= $neLat || $swLng >= $neLng) {
+        // TODO: Anti-meridian crossings (swLng > neLng) are not yet supported and require special handling (wraparound longitude logic)
+        if ($swLat >= $neLat) {
             return null;
         }
 
@@ -123,11 +124,20 @@ class MapController extends Controller
         }
 
         foreach ($places as $place) {
-            $meta = is_array($place->metadata) ? $place->metadata : [];
-            if (! isset($meta['latitude'], $meta['longitude'])) {
+            $lat = $place->latitude;
+            $lng = $place->longitude;
+
+            if ($lat === null || $lng === null) {
+                $meta = is_array($place->metadata) ? $place->metadata : [];
+                $lat = $meta['latitude'] ?? null;
+                $lng = $meta['longitude'] ?? null;
+            }
+
+            if ($lat === null || $lng === null) {
                 continue;
             }
-            $this->bucket($buckets, (float) $meta['latitude'], (float) $meta['longitude']);
+
+            $this->bucket($buckets, (float) $lat, (float) $lng);
         }
 
         return array_values($buckets);

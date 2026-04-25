@@ -11,8 +11,16 @@ class AasaController extends Controller
         $teamId = config('ios.apple_team_id');
         $bundleId = config('ios.app_bundle_id');
 
-        if (empty($teamId)) {
+        if (empty($teamId) && app()->environment('production')) {
             abort(500, 'Apple Team ID is not configured');
+        }
+
+        if (empty($teamId)) {
+            return response()->json([
+                'applinks' => [
+                    'details' => [],
+                ],
+            ]);
         }
 
         $appIdentifier = "{$teamId}.{$bundleId}";

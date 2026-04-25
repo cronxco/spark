@@ -1,7 +1,5 @@
 <?php
 
-use NotificationChannels\WebPush\PushSubscription;
-
 return [
     /*
      * VAPID keys are used for authentication with Web Push services.
@@ -16,7 +14,7 @@ return [
     /*
      * The model to use for push subscriptions.
      */
-    'model' => PushSubscription::class,
+    'model' => \App\Models\PushSubscription::class,
 
     /*
      * GCM Sender ID (optional, for legacy Chrome support)

@@ -27,9 +27,17 @@ class CompactPlaceResource extends JsonResource
             'type' => $this->type,
         ];
 
-        if (isset($metadata['latitude'], $metadata['longitude'])) {
-            $data['latitude'] = (float) $metadata['latitude'];
-            $data['longitude'] = (float) $metadata['longitude'];
+        $lat = $this->latitude;
+        $lng = $this->longitude;
+
+        if ($lat === null || $lng === null) {
+            $lat = $metadata['latitude'] ?? null;
+            $lng = $metadata['longitude'] ?? null;
+        }
+
+        if ($lat !== null && $lng !== null) {
+            $data['latitude'] = (float) $lat;
+            $data['longitude'] = (float) $lng;
         }
 
         if ($this->location_address) {

@@ -106,7 +106,9 @@ class ApnsChannel
             $client->addNotification($this->adapter->adapt($silent, $token));
         }
 
-        $client->push();
+        $responses = $client->push();
+
+        $this->dispatchEvents($notifiable, $notification, $responses);
     }
 
     /**

@@ -158,7 +158,13 @@ class ActionProgress extends Model
         });
 
         static::saved(function (ActionProgress $model) {
-            event(ActionProgressUpdated::fromModel($model));
+            if (! $model->wasChanged(['progress', 'status', 'completed_at', 'failed_at', 'step', 'message'])) {
+                return;
+            }
+
+            \Illuminate\Support\Facades\DB::afterCommit(function () use ($model) {
+                event(ActionProgressUpdated::fromModel($model));
+            });
         });
     }
 
