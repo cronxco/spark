@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Notifications\IntegrationAuthenticationFailed;
+use App\Support\Pkce;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -365,7 +366,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
      */
     protected function generateCodeVerifier(): string
     {
-        return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        return Pkce::generateCodeVerifier();
     }
 
     /**
@@ -373,7 +374,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
      */
     protected function generateCodeChallenge(string $codeVerifier): string
     {
-        return rtrim(strtr(base64_encode(hash('sha256', $codeVerifier, true)), '+/', '-_'), '=');
+        return Pkce::generateCodeChallenge($codeVerifier);
     }
 
     /**

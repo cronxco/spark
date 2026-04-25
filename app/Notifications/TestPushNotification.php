@@ -3,11 +3,15 @@
 namespace App\Notifications;
 
 use App\Models\User;
+use App\Notifications\Channels\ApnsChannel;
+use NotificationChannels\Apn\ApnMessage;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
 class TestPushNotification extends SparkNotification
 {
+    public function __construct(public string $platform = 'all') {}
+
     public function getNotificationType(): string
     {
         return 'test_push';
@@ -39,11 +43,23 @@ class TestPushNotification extends SparkNotification
     }
 
     /**
-     * Only send via push (not database or email)
+     * Route via the requested platform(s); never touches database/email.
      */
     public function via(User $notifiable): array
     {
-        return [WebPushChannel::class];
+        $channels = [];
+
+        if (in_array($this->platform, ['web', 'all'], true)
+            && $notifiable->pushSubscriptions()->where('device_type', 'web')->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        if (in_array($this->platform, ['ios', 'all'], true)
+            && $notifiable->pushSubscriptions()->apns()->exists()) {
+            $channels[] = ApnsChannel::class;
+        }
+
+        return $channels;
     }
 
     public function toWebPush(User $notifiable, $notification): WebPushMessage
@@ -59,8 +75,17 @@ class TestPushNotification extends SparkNotification
                 'type' => $this->getNotificationType(),
             ])
             ->options([
-                'TTL' => 300, // 5 minutes
+                'TTL' => 300,
                 'urgency' => 'normal',
             ]);
+    }
+
+    public function toApn(User $notifiable): ApnMessage
+    {
+        return ApnMessage::create()
+            ->title($this->getTitle())
+            ->body($this->getMessage())
+            ->sound('default')
+            ->badge(1);
     }
 }

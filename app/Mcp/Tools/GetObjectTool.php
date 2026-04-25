@@ -4,8 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventObjectResource;
 use App\Http\Resources\EventResource;
-use App\Models\Event;
-use App\Models\EventObject;
+use App\Services\Mobile\EventLookup;
+use App\Services\Mobile\ObjectLookup;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -42,16 +42,12 @@ class GetObjectTool extends Tool
             return Response::error('Object ID is required.');
         }
 
-        // Validate UUID format
-        if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $objectId)) {
+        if (! preg_match(EventLookup::UUID_REGEX, $objectId)) {
             return Response::error('Invalid object ID format. Expected UUID.');
         }
 
-        // Find the object (EventObjects are user-scoped)
-        $object = EventObject::query()
-            ->where('user_id', $user->id)
-            ->where('id', $objectId)
-            ->first();
+        $lookup = app(ObjectLookup::class);
+        $object = $lookup->find($user, $objectId);
 
         if (! $object) {
             return Response::error('Object not found or access denied.');
@@ -59,27 +55,10 @@ class GetObjectTool extends Tool
 
         $result = (new EventObjectResource($object))->resolve(request());
 
-        // Include recent events if requested
         $includeEvents = $request->get('include_events', true);
-        $eventLimit = (int) $request->get('event_limit', 10);
-        $eventLimit = max(1, min($eventLimit, 25));
-
         if ($includeEvents) {
-            // Get user's integration IDs
-            $userIntegrationIds = $user->integrations()->pluck('id')->toArray();
-
-            // Get recent events where this object is actor or target
-            $recentEvents = Event::query()
-                ->whereIn('integration_id', $userIntegrationIds)
-                ->where(function ($q) use ($objectId) {
-                    $q->where('actor_id', $objectId)
-                        ->orWhere('target_id', $objectId);
-                })
-                ->with(['integration', 'actor', 'target', 'blocks', 'tags'])
-                ->orderBy('time', 'desc')
-                ->limit($eventLimit)
-                ->get();
-
+            $eventLimit = (int) $request->get('event_limit', ObjectLookup::EVENT_LIMIT_DEFAULT);
+            $recentEvents = $lookup->recentEvents($object, $user, $eventLimit);
             $result['recent_events'] = EventResource::collection($recentEvents)->resolve(request());
         }
 

@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventResource;
-use App\Models\Event;
+use App\Services\Mobile\EventLookup;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -40,24 +40,15 @@ class GetEventTool extends Tool
             return Response::error('Event ID is required.');
         }
 
-        // Validate UUID format
-        if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $eventId)) {
+        if (! is_string($eventId)) {
+            return Response::error('Event ID must be a string.');
+        }
+
+        if (! preg_match(EventLookup::UUID_REGEX, $eventId)) {
             return Response::error('Invalid event ID format. Expected UUID.');
         }
 
-        // Get user's integration IDs for authorization
-        $userIntegrationIds = $user->integrations()->pluck('id')->toArray();
-
-        if (empty($userIntegrationIds)) {
-            return Response::error('No integrations found for user.');
-        }
-
-        // Find the event
-        $event = Event::query()
-            ->whereIn('integration_id', $userIntegrationIds)
-            ->where('id', $eventId)
-            ->with(['integration', 'actor', 'target', 'blocks', 'tags'])
-            ->first();
+        $event = app(EventLookup::class)->find($user, $eventId);
 
         if (! $event) {
             return Response::error('Event not found or access denied.');

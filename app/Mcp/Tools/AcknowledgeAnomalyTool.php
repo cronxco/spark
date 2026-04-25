@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Helpers\DateParser;
 use App\Mcp\Helpers\MetricIdentifierMap;
 use App\Models\MetricTrend;
+use App\Services\Mobile\AnomalyAcknowledgement;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -64,27 +65,24 @@ class AcknowledgeAnomalyTool extends Tool
             return Response::error("No unacknowledged anomalies found for {$statistic->getIdentifier()} on {$date->toDateString()}.");
         }
 
-        // Acknowledge each anomaly
+        $service = app(AnomalyAcknowledgement::class);
+
+        $metadata = [];
+        if ($note) {
+            $metadata['acknowledgement_note'] = $note;
+        }
+        if ($suppressUntil) {
+            $suppressDate = $this->parseDate($suppressUntil);
+            if ($suppressDate) {
+                $metadata['suppress_until'] = $suppressDate->toDateString();
+            }
+        }
+
         $acknowledged = 0;
         foreach ($anomalies as $anomaly) {
-            $anomaly->acknowledged_at = now();
-
-            $metadata = $anomaly->metadata ?? [];
-
-            if ($note) {
-                $metadata['acknowledgement_note'] = $note;
+            if ($service->acknowledge($user, (string) $anomaly->id, $metadata)) {
+                $acknowledged++;
             }
-
-            if ($suppressUntil) {
-                $suppressDate = $this->parseDate($suppressUntil);
-                if ($suppressDate) {
-                    $metadata['suppress_until'] = $suppressDate->toDateString();
-                }
-            }
-
-            $anomaly->metadata = $metadata;
-            $anomaly->save();
-            $acknowledged++;
         }
 
         $result = [
