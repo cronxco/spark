@@ -9,7 +9,6 @@ use App\Services\ApnsLiveActivityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 
 class LiveActivitiesController extends Controller
 {
