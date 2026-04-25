@@ -48,7 +48,7 @@ class ApnsChannel
 
         $this->dispatchEvents($notifiable, $notification, $responses);
 
-        $this->sendSilentCompanion($notifiable, $notification, $tokens);
+        $this->sendSilentCompanion($client, $notifiable, $notification, $tokens);
 
         return $responses;
     }
@@ -90,7 +90,7 @@ class ApnsChannel
     /**
      * Dispatch a silent content-available push so the client can sync.
      */
-    protected function sendSilentCompanion(mixed $notifiable, Notification $notification, array $tokens): void
+    protected function sendSilentCompanion(Client $client, mixed $notifiable, Notification $notification, array $tokens): void
     {
         $silent = (new ApnMessage)
             ->contentAvailable(1)
@@ -101,8 +101,6 @@ class ApnsChannel
                     : null,
                 'sync_cursor' => $notification->sparkSyncCursor ?? null,
             ], fn ($value) => $value !== null));
-
-        $client = $this->client;
 
         foreach ($tokens as $token) {
             $client->addNotification($this->adapter->adapt($silent, $token));

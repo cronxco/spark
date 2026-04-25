@@ -21,6 +21,8 @@ class OAuthRefreshToken extends Model
 {
     protected $table = 'oauth_refresh_tokens';
 
+    protected $hidden = ['token_hash'];
+
     protected $fillable = [
         'user_id',
         'token_hash',

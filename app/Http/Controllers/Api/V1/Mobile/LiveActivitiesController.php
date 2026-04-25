@@ -121,7 +121,7 @@ class LiveActivitiesController extends Controller
 
     protected function allowPush(LiveActivityToken $token): bool
     {
-        $key = 'la:push:' . $token->activity_id;
+        $key = 'la:push:' . $token->user_id . ':' . $token->activity_id;
 
         if (RateLimiter::tooManyAttempts($key, self::RATE_LIMIT_PER_HOUR)) {
             return false;

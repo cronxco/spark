@@ -52,9 +52,7 @@ class MapController extends Controller
         $places = EventObject::query()
             ->where('user_id', $user->id)
             ->where('concept', 'place')
-            ->whereRaw("((metadata->>'latitude')::float BETWEEN ? AND ?) AND ((metadata->>'longitude')::float BETWEEN ? AND ?)", [
-                $swLat, $neLat, $swLng, $neLng,
-            ])
+            ->withinBounds($neLat, $swLat, $neLng, $swLng)
             ->limit(self::CLUSTER_THRESHOLD + 1)
             ->get();
 

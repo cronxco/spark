@@ -12,10 +12,9 @@ use Throwable;
 
 /**
  * Surfaces the events a user has created/updated/deleted since a given
- * timestamp cursor so the iOS client can catch up from offline. The cursor is
- * an ISO-8601 timestamp (`updated_at`) — simple, monotonic, survives server
- * restarts. When we add broadcast-sequence delivery we'll swap this to use
- * the sequence id.
+ * (updated_at, id) cursor so the iOS client can catch up from offline.
+ * The cursor format is "{iso8601_updated_at}|{uuid}" — deterministic even
+ * when multiple events share the same updated_at timestamp.
  */
 class DeltaSync
 {
@@ -23,15 +22,25 @@ class DeltaSync
 
     public function delta(User $user, ?string $cursor, Request $request): array
     {
-        $since = $this->parseCursor($cursor);
+        [$since, $sinceId] = $this->parseCursor($cursor);
 
         $integrationIds = $user->integrations()->pluck('id')->all();
 
         $baseQuery = Event::query()
             ->withTrashed()
             ->when(! empty($integrationIds), fn ($q) => $q->whereIn('integration_id', $integrationIds), fn ($q) => $q->whereRaw('1 = 0'))
-            ->where('updated_at', '>', $since)
+            ->where(function ($q) use ($since, $sinceId): void {
+                $q->where('updated_at', '>', $since);
+
+                if ($sinceId !== null) {
+                    $q->orWhere(function ($q) use ($since, $sinceId): void {
+                        $q->where('updated_at', $since)
+                            ->where('id', '>', $sinceId);
+                    });
+                }
+            })
             ->orderBy('updated_at')
+            ->orderBy('id')
             ->limit(self::DEFAULT_LIMIT);
 
         $events = $baseQuery->get();
@@ -40,9 +49,10 @@ class DeltaSync
         $updated = $events->filter(fn (Event $e) => $e->deleted_at === null && $e->created_at < $since);
         $deleted = $events->filter(fn (Event $e) => $e->deleted_at !== null);
 
-        $nextCursor = $events->isNotEmpty()
-            ? optional($events->last()->updated_at)->toIso8601String()
-            : ($cursor ?? $since->toIso8601String());
+        $last = $events->last();
+        $nextCursor = $last
+            ? $last->updated_at->toIso8601String() . '|' . $last->id
+            : ($sinceId !== null ? $since->toIso8601String() . '|' . $sinceId : $since->toIso8601String());
 
         return [
             'created' => CompactEventResource::collection($created->values())->resolve($request),
@@ -52,16 +62,31 @@ class DeltaSync
         ];
     }
 
-    protected function parseCursor(?string $cursor): Carbon
+    /**
+     * Parse a cursor string into a (Carbon timestamp, string|null uuid) pair.
+     *
+     * Accepts both the legacy ISO-8601-only format and the canonical
+     * "{iso8601}|{uuid}" format so existing clients are not broken.
+     * Returns null for the id when no UUID tie-breaker is present.
+     *
+     * @return array{Carbon, string|null}
+     */
+    protected function parseCursor(?string $cursor): array
     {
         if (! $cursor) {
-            return SupportCarbon::now()->subDay();
+            return [SupportCarbon::now()->subDay(), null];
         }
 
         try {
-            return SupportCarbon::parse($cursor);
+            if (str_contains($cursor, '|')) {
+                [$timestamp, $id] = explode('|', $cursor, 2);
+
+                return [SupportCarbon::parse($timestamp), $id !== '' ? $id : null];
+            }
+
+            return [SupportCarbon::parse($cursor), null];
         } catch (Throwable) {
-            return SupportCarbon::now()->subDay();
+            return [SupportCarbon::now()->subDay(), null];
         }
     }
 }

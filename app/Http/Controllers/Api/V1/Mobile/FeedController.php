@@ -40,9 +40,9 @@ class FeedController extends Controller
 
         $response = response()->json($payload);
 
-        $latest = $events->first();
-        if ($latest && $latest->time) {
-            $response->header('Last-Modified', $latest->time->toRfc7231String());
+        $lastModified = $events->max('updated_at') ?? $events->first()?->time;
+        if ($lastModified) {
+            $response->header('Last-Modified', $lastModified->toRfc7231String());
         }
 
         return $response;

@@ -40,6 +40,10 @@ class GetEventTool extends Tool
             return Response::error('Event ID is required.');
         }
 
+        if (! is_string($eventId)) {
+            return Response::error('Event ID must be a string.');
+        }
+
         if (! preg_match(EventLookup::UUID_REGEX, $eventId)) {
             return Response::error('Invalid event ID format. Expected UUID.');
         }

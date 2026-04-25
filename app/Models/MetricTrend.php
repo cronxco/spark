@@ -6,6 +6,7 @@ use App\Events\Mobile\AnomalyRaised;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class MetricTrend extends Model
@@ -65,7 +66,9 @@ class MetricTrend extends Model
                 return;
             }
 
-            event(AnomalyRaised::fromTrend($model, (string) $userId));
+            DB::afterCommit(function () use ($model, $userId) {
+                event(AnomalyRaised::fromTrend($model, (string) $userId));
+            });
         });
     }
 

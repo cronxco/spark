@@ -23,6 +23,8 @@ class OAuthAuthorizationCode extends Model
 {
     protected $table = 'oauth_authorization_codes';
 
+    protected $hidden = ['code_hash'];
+
     protected $fillable = [
         'user_id',
         'code_hash',

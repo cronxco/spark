@@ -146,6 +146,35 @@ class OAuthFlowTest extends TestCase
     }
 
     #[Test]
+    public function denying_redirects_back_to_client_with_access_denied(): void
+    {
+        $user = User::factory()->create();
+        $params = $this->validParams();
+
+        $response = $this->actingAs($user)
+            ->post('/oauth/deny', $params);
+
+        $response->assertRedirect();
+
+        $location = $response->headers->get('Location');
+        $this->assertStringStartsWith('spark://auth/callback?', $location);
+
+        parse_str(parse_url($location, PHP_URL_QUERY), $query);
+        $this->assertSame('access_denied', $query['error']);
+        $this->assertSame($params['state'], $query['state']);
+        $this->assertArrayNotHasKey('code', $query);
+        $this->assertSame(0, OAuthAuthorizationCode::query()->count());
+    }
+
+    #[Test]
+    public function denying_requires_authentication(): void
+    {
+        $response = $this->post('/oauth/deny', $this->validParams());
+
+        $response->assertRedirect(route('login'));
+    }
+
+    #[Test]
     public function token_endpoint_exchanges_auth_code_for_access_and_refresh_tokens(): void
     {
         $user = User::factory()->create();

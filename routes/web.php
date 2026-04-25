@@ -24,14 +24,20 @@ Route::get('/', function () {
 Route::get('.well-known/apple-app-site-association', function () {
     $teamId = config('ios.apple_team_id', '');
     $bundleId = config('ios.app_bundle_id', 'co.cronx.spark');
-    $appId = $teamId === '' ? $bundleId : $teamId . '.' . $bundleId;
+
+    if ($teamId === '') {
+        Log::error('AASA: ios.apple_team_id is not configured');
+        abort(500, 'Apple Team ID is not configured.');
+    }
+
+    $appId = $teamId . '.' . $bundleId;
 
     return response()->json([
         'applinks' => [
             'apps' => [],
             'details' => [[
                 'appID' => $appId,
-                'paths' => ['/event/*', '/object/*', '/place/*'],
+                'paths' => ['/events/*', '/objects/*', '/places/*'],
             ]],
         ],
         'webcredentials' => [
@@ -62,6 +68,7 @@ Route::middleware(['auth'])->prefix('push')->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('oauth/authorize', [OAuthController::class, 'authorize'])->name('oauth.authorize');
     Route::post('oauth/authorize', [OAuthController::class, 'approve'])->name('oauth.approve');
+    Route::post('oauth/deny', [OAuthController::class, 'deny'])->name('oauth.deny');
 });
 
 Route::middleware(['auth'])->group(function () {

@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\EventObject;
 use App\Models\User;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -54,14 +55,14 @@ class MapControllerTest extends TestCase
             'user_id' => $this->user->id,
             'concept' => 'place',
             'title' => 'Inside',
-            'metadata' => ['latitude' => 51.5, 'longitude' => 0.0],
+            'location' => Point::makeGeodetic(51.5, 0.0),
         ]);
 
         EventObject::factory()->create([
             'user_id' => $this->user->id,
             'concept' => 'place',
             'title' => 'Outside',
-            'metadata' => ['latitude' => 48.8, 'longitude' => 2.3],
+            'location' => Point::makeGeodetic(48.8, 2.3),
         ]);
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);

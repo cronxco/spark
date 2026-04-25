@@ -75,6 +75,22 @@ class OAuthController extends Controller
     }
 
     /**
+     * Deny the authorization request: redirect back to the client with error=access_denied.
+     */
+    public function deny(Request $request): RedirectResponse
+    {
+        $params = $this->validateAuthorizeRequest($request);
+
+        $callback = $params['redirect_uri'] . '?' . http_build_query([
+            'error' => 'access_denied',
+            'error_description' => 'The user denied the authorization request.',
+            'state' => $params['state'],
+        ]);
+
+        return redirect()->away($callback);
+    }
+
+    /**
      * Exchange an authorization code (+ PKCE verifier) for access + refresh tokens.
      */
     public function token(Request $request): JsonResponse
@@ -234,7 +250,11 @@ class OAuthController extends Controller
         OAuthRefreshToken::query()
             ->where('user_id', $refresh->user_id)
             ->where('client_id', $refresh->client_id)
-            ->when($refresh->device_name !== null, fn ($q) => $q->where('device_name', $refresh->device_name))
+            ->when(
+                $refresh->device_name !== null,
+                fn ($q) => $q->where('device_name', $refresh->device_name),
+                fn ($q) => $q->whereNull('device_name'),
+            )
             ->whereNull('revoked_at')
             ->update(['revoked_at' => now()]);
     }
@@ -250,7 +270,10 @@ class OAuthController extends Controller
      */
     protected function scopeToAbilities(string $scope): array
     {
-        $abilities = array_values(array_filter(explode(' ', trim($scope))));
+        $allowed = ['ios:read', 'ios:write', 'ios:*'];
+
+        $tokens = array_values(array_filter(explode(' ', trim($scope))));
+        $abilities = array_values(array_intersect($tokens, $allowed));
 
         if ($abilities === [] || in_array('ios:*', $abilities, true)) {
             return ['ios:read', 'ios:write'];

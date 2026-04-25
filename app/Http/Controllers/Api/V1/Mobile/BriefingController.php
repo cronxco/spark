@@ -21,7 +21,12 @@ class BriefingController extends Controller
      */
     public function today(Request $request): JsonResponse
     {
-        $date = $this->resolveDate($request->query('date'));
+        $rawDate = $request->query('date');
+        if (is_array($rawDate)) {
+            return response()->json(['message' => 'Invalid date.'], 422);
+        }
+
+        $date = $this->resolveDate($rawDate);
 
         if ($date === null) {
             return response()->json(['message' => 'Invalid date.'], 422);
@@ -29,7 +34,11 @@ class BriefingController extends Controller
 
         $domains = null;
         if ($request->filled('domains')) {
-            $domains = array_values(array_filter(array_map('trim', explode(',', (string) $request->query('domains')))));
+            $rawDomains = $request->query('domains');
+            if (! is_string($rawDomains)) {
+                return response()->json(['message' => 'Invalid domains.'], 422);
+            }
+            $domains = array_values(array_filter(array_map('trim', explode(',', $rawDomains))));
             if ($domains === []) {
                 $domains = null;
             }
@@ -39,7 +48,7 @@ class BriefingController extends Controller
 
         return response()
             ->json($summary)
-            ->header('Last-Modified', $date->copy()->endOfDay()->toRfc7231String());
+            ->header('Last-Modified', $date->copy()->endOfDay()->min(Carbon::now())->toRfc7231String());
     }
 
     protected function resolveDate(?string $input): ?Carbon
@@ -61,9 +70,15 @@ class BriefingController extends Controller
     protected function parseIso(string $input): ?Carbon
     {
         try {
-            return Carbon::parse($input)->startOfDay();
+            $date = Carbon::createFromFormat('Y-m-d', $input);
         } catch (Exception) {
             return null;
         }
+
+        if ($date === false || $date->format('Y-m-d') !== $input) {
+            return null;
+        }
+
+        return $date->startOfDay();
     }
 }

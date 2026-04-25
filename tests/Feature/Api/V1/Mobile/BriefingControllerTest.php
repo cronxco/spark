@@ -46,6 +46,36 @@ class BriefingControllerTest extends TestCase
     }
 
     #[Test]
+    public function rejects_array_date_param(): void
+    {
+        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/briefing/today?date[]=2024-01-01')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Invalid date.');
+    }
+
+    #[Test]
+    public function rejects_array_domains_param(): void
+    {
+        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/briefing/today?domains[]=health')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Invalid domains.');
+    }
+
+    #[Test]
+    public function rejects_sloppy_iso_date_format(): void
+    {
+        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+
+        // Carbon::parse would accept these; createFromFormat('Y-m-d') must not.
+        $this->getJson('/api/v1/mobile/briefing/today?date=2024-1-1')->assertStatus(422);
+        $this->getJson('/api/v1/mobile/briefing/today?date=2024-13-01')->assertStatus(422);
+    }
+
+    #[Test]
     public function etag_returns_304_on_match(): void
     {
         Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);

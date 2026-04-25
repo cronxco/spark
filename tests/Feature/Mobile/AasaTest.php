@@ -19,12 +19,14 @@ class AasaTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'application/json')
             ->assertJsonPath('applinks.details.0.appID', 'ABCDE12345.co.cronx.spark')
-            ->assertJsonPath('applinks.details.0.paths.0', '/event/*')
+            ->assertJsonPath('applinks.details.0.paths.0', '/events/*')
+            ->assertJsonPath('applinks.details.0.paths.1', '/objects/*')
+            ->assertJsonPath('applinks.details.0.paths.2', '/places/*')
             ->assertJsonPath('webcredentials.apps.0', 'ABCDE12345.co.cronx.spark');
     }
 
     #[Test]
-    public function aasa_falls_back_to_bundle_id_when_team_missing(): void
+    public function aasa_returns_500_when_team_id_missing(): void
     {
         config([
             'ios.apple_team_id' => '',
@@ -32,7 +34,6 @@ class AasaTest extends TestCase
         ]);
 
         $this->get('/.well-known/apple-app-site-association')
-            ->assertOk()
-            ->assertJsonPath('applinks.details.0.appID', 'co.cronx.spark');
+            ->assertStatus(500);
     }
 }

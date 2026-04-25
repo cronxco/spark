@@ -4,7 +4,7 @@ namespace App\Events\Mobile;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  * companion APN HTTP/2 push to the activity push token is dispatched
  * separately by ApnsLiveActivityService.
  */
-class LiveActivityUpdate implements ShouldBroadcastNow
+class LiveActivityUpdate implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

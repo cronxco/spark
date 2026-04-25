@@ -54,7 +54,7 @@ class ApnsLiveActivityService
             : 'https://api.sandbox.push.apple.com';
 
         $response = $this->http->asJson()
-            ->withOptions(['http_version' => '2.0'])
+            ->withOptions(['version' => '2.0'])
             ->withHeaders([
                 'authorization' => 'bearer ' . $jwt,
                 'apns-push-type' => 'liveactivity',

@@ -29,17 +29,23 @@ class ObjectsController extends Controller
         }
 
         $payload = (new CompactObjectResource($object))->resolve($request);
+        $lastModified = $object->updated_at;
 
         if ($request->boolean('include_events', true)) {
-            $limit = (int) $request->query('event_limit', ObjectLookup::EVENT_LIMIT_DEFAULT);
+            $limit = max(1, min(ObjectLookup::EVENT_LIMIT_MAX, (int) $request->query('event_limit', ObjectLookup::EVENT_LIMIT_DEFAULT)));
             $events = $this->lookup->recentEvents($object, $user, $limit);
             $payload['recent_events'] = CompactEventResource::collection($events)->resolve($request);
+
+            $eventMax = $events->max('updated_at');
+            if ($eventMax && (! $lastModified || $eventMax > $lastModified)) {
+                $lastModified = $eventMax;
+            }
         }
 
         $response = response()->json($payload);
 
-        if ($object->updated_at) {
-            $response->header('Last-Modified', $object->updated_at->toRfc7231String());
+        if ($lastModified) {
+            $response->header('Last-Modified', $lastModified->toRfc7231String());
         }
 
         return $response;

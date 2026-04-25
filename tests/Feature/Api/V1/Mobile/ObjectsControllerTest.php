@@ -108,6 +108,73 @@ class ObjectsControllerTest extends TestCase
     }
 
     #[Test]
+    public function last_modified_reflects_newest_event_timestamp(): void
+    {
+        $object = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'updated_at' => Carbon::parse('2024-01-01 10:00:00'),
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'value' => 5,
+            'value_multiplier' => 1,
+            'value_unit' => 'GBP',
+            'time' => Carbon::parse('2024-01-02'),
+            'actor_id' => $object->id,
+        ]);
+
+        $event->forceFill(['updated_at' => Carbon::parse('2024-01-02 12:00:00')])->saveQuietly();
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson("/api/v1/mobile/objects/{$object->id}");
+
+        $response->assertOk();
+        $lastModified = $response->headers->get('Last-Modified');
+        $this->assertNotNull($lastModified);
+        $this->assertSame(
+            Carbon::parse('2024-01-02 12:00:00')->toRfc7231String(),
+            $lastModified,
+        );
+    }
+
+    #[Test]
+    public function event_limit_is_clamped_to_valid_range(): void
+    {
+        $object = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        for ($i = 0; $i < 30; $i++) {
+            Event::factory()->create([
+                'integration_id' => $this->integration->id,
+                'service' => 'monzo',
+                'domain' => 'money',
+                'action' => 'card_payment_to',
+                'value' => $i,
+                'value_multiplier' => 1,
+                'value_unit' => 'GBP',
+                'time' => Carbon::today()->subHours($i),
+                'actor_id' => $object->id,
+            ]);
+        }
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        // Over the max of 25 — should be clamped to 25.
+        $response = $this->getJson("/api/v1/mobile/objects/{$object->id}?event_limit=100");
+        $response->assertOk();
+        $this->assertCount(25, $response->json('recent_events'));
+
+        // Zero should be clamped to 1.
+        $response = $this->getJson("/api/v1/mobile/objects/{$object->id}?event_limit=0");
+        $response->assertOk();
+        $this->assertCount(1, $response->json('recent_events'));
+    }
+
+    #[Test]
     public function etag_returns_304_on_match(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
