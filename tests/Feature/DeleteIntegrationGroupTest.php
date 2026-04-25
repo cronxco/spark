@@ -20,6 +20,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -113,7 +114,7 @@ class DeleteIntegrationGroupTest extends TestCase
             'service' => 'github',
         ]);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
 
         Livewire::actingAs($user)
             ->test('actions.delete-integration-group')
@@ -334,7 +335,7 @@ class DeleteIntegrationGroupTest extends TestCase
         // Try to delete non-existent group (use a valid UUID format)
         $job = new DeleteIntegrationGroupJob('550e8400-e29b-41d4-a716-446655440000', $user->id);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
         $job->handle();
     }
 
@@ -349,7 +350,7 @@ class DeleteIntegrationGroupTest extends TestCase
         // User1 tries to delete user2's group
         $job = new DeleteIntegrationGroupJob($group->id, $user1->id);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
         $job->handle();
     }
 

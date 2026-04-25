@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\Migrations\FetchIntegrationPage;
+use App\Jobs\Migrations\ProcessIntegrationPage;
 use App\Jobs\Migrations\StartIntegrationMigration;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -21,7 +22,7 @@ class MigrationJobsTest extends TestCase
         $this->withoutExceptionHandling();
         Queue::fake();
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = User::factory()->create();
         $this->actingAs($user);
 
@@ -159,8 +160,8 @@ class MigrationJobsTest extends TestCase
         (new FetchIntegrationPage($integration, $context))->handle();
 
         Bus::assertChained([
-            \App\Jobs\Migrations\ProcessIntegrationPage::class,
-            \App\Jobs\Migrations\FetchIntegrationPage::class,
+            ProcessIntegrationPage::class,
+            FetchIntegrationPage::class,
         ]);
     }
 

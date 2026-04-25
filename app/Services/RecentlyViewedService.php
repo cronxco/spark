@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
 use Exception;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 
@@ -265,9 +266,9 @@ class RecentlyViewedService
      * Load the subject model from an activity record.
      *
      * @param  Activity  $activity  The activity record
-     * @return \Illuminate\Database\Eloquent\Model|null The loaded model or null
+     * @return Model|null The loaded model or null
      */
-    protected function loadSubject(Activity $activity): ?\Illuminate\Database\Eloquent\Model
+    protected function loadSubject(Activity $activity): ?Model
     {
         $subjectType = $activity->subject_type;
         $subjectId = $activity->subject_id;

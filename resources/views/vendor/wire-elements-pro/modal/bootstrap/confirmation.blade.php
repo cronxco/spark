@@ -6,11 +6,11 @@
 
         <p class="px-3 pt-3">{{ $prompt['message'] }}</p>
 
-        @if($tableData)
+        @if ($tableData)
             <table class="table border-top mb-0">
                 <thead>
                 <tr>
-                    @foreach($tableHeaders as $header)
+                    @foreach ($tableHeaders as $header)
                         <th scope="col" class="px-3 bg-light">
                             {{ $header }}
                         </th>
@@ -18,9 +18,9 @@
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($tableData as $columns)
+                @foreach ($tableData as $columns)
                     <tr>
-                        @foreach($columns as $column)
+                        @foreach ($columns as $column)
                             <td class="px-3">
                                 {{ $column }}
                             </td>
@@ -31,7 +31,7 @@
             </table>
         @endif
 
-        @if($confirmPhrase)
+        @if ($confirmPhrase)
             <div class="px-3 py-3">
                 <input class="form-control" type="text" wire:model.defer="confirmPhraseInput" placeholder="{{ __("wire-elements-pro::modal.confirmation.please_enter_phrase_to_continue", ['phrase' => $confirmPhrase]) }}" required>
 

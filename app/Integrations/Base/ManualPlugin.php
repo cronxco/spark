@@ -6,6 +6,7 @@ use App\Integrations\Contracts\IntegrationPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Illuminate\Http\Request;
 use InvalidArgumentException;
 use Throwable;
 
@@ -74,13 +75,13 @@ abstract class ManualPlugin implements IntegrationPlugin
         ]);
     }
 
-    public function handleOAuthCallback(\Illuminate\Http\Request $request, IntegrationGroup $group): void
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
     {
         // Manual integrations don't use OAuth
         throw new InvalidArgumentException('Manual integrations do not support OAuth');
     }
 
-    public function handleWebhook(\Illuminate\Http\Request $request, Integration $integration): void
+    public function handleWebhook(Request $request, Integration $integration): void
     {
         // Manual integrations don't use webhooks
         throw new InvalidArgumentException('Manual integrations do not support webhooks');

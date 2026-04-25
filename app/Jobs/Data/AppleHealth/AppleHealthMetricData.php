@@ -5,12 +5,13 @@ namespace App\Jobs\Data\AppleHealth;
 use App\Integrations\AppleHealth\AppleHealthPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
+use App\Models\Integration;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class AppleHealthMetricData extends BaseProcessingJob
 {
-    public function __construct(\App\Models\Integration $integration, array $rawData)
+    public function __construct(Integration $integration, array $rawData)
     {
         parent::__construct($integration, $rawData);
         $this->onQueue('pull');

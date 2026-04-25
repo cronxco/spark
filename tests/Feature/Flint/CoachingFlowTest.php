@@ -10,6 +10,7 @@ use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
 use App\Services\AssistantPromptingService;
+use App\Services\FlintBlockCreationService;
 use App\Services\PatternLearningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -209,7 +210,7 @@ class CoachingFlowTest extends TestCase
         $job->handle(
             app(PatternLearningService::class),
             $mockPrompting,
-            app(\App\Services\FlintBlockCreationService::class)
+            app(FlintBlockCreationService::class)
         );
 
         // Refresh session
@@ -306,7 +307,7 @@ class CoachingFlowTest extends TestCase
         $job->handle(
             app(PatternLearningService::class),
             $mockPrompting,
-            app(\App\Services\FlintBlockCreationService::class)
+            app(FlintBlockCreationService::class)
         );
 
         // Refresh anomaly

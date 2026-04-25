@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -62,7 +63,7 @@ class FinancialAccounts extends Component
     /**
      * Cache for batch-loaded balances (N+1 optimization)
      */
-    private ?\Illuminate\Support\Collection $balanceCache = null;
+    private ?Collection $balanceCache = null;
 
     public function updatedSearch(): void
     {

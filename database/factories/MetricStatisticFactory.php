@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\MetricStatistic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\MetricStatistic>
+ * @extends Factory<MetricStatistic>
  */
 class MetricStatisticFactory extends Factory
 {

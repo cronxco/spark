@@ -2,15 +2,19 @@
 
 namespace App\Livewire;
 
+use App\Actions\DispatchIntegrationFetchJobs;
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Livewire\Component;
+use Mary\Traits\Toast;
 
 class IntegrationDetails extends Component
 {
+    use Toast;
+
     public Integration $integration;
 
     public bool $showSidebar = false;
@@ -105,10 +109,15 @@ class IntegrationDetails extends Component
 
     public function triggerIntegrationUpdate(): void
     {
-        // Trigger an immediate update for this integration
-        $this->integration->trigger();
+        if ($this->integration->isPaused()) {
+            $this->error('Integration is paused.');
 
-        $this->dispatch('integration-update-triggered');
+            return;
+        }
+
+        (new DispatchIntegrationFetchJobs)->dispatch($this->integration);
+
+        $this->success('Update triggered successfully!');
     }
 
     public function toggleIntegrationPause(): void
@@ -120,6 +129,21 @@ class IntegrationDetails extends Component
         $this->integration->save();
 
         $this->dispatch('integration-pause-toggled');
+    }
+
+    public function reconnectIntegration(): void
+    {
+        $group = $this->integration->group;
+        if (! $group) {
+            $this->error('No integration group found.');
+
+            return;
+        }
+
+        $this->redirect(route('integrations.reconnect', [
+            'service' => $this->integration->service,
+            'group' => $group->id,
+        ]));
     }
 
     public function openConfigureModal(): void
@@ -212,8 +236,9 @@ class IntegrationDetails extends Component
 
     public function render()
     {
-        return view('livewire.integration-details')
-            ->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
+        return view('livewire.integration-details', [
+            'pluginClass' => $this->getPluginClass(),
+        ])->layout('components.layouts.app', ['title' => $this->integration->name . ' Details']);
     }
 
     /**

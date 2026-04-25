@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Sentry\State\Scope;
 
 abstract class BaseTaskJob implements ShouldQueue
 {
@@ -41,7 +42,7 @@ abstract class BaseTaskJob implements ShouldQueue
         } catch (Exception $e) {
             // Report to Sentry with comprehensive context
             if (app()->bound('sentry')) {
-                \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($e) {
+                \Sentry\withScope(function (Scope $scope) use ($e) {
                     $scope->setContext('task', [
                         'task_key' => $this->task->key,
                         'task_name' => $this->task->name,

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
 use App\Traits\TracksViews;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -447,12 +448,12 @@ class Block extends Model implements HasMedia
     /**
      * Scope for semantic search using vector similarity with temporal weighting
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  array  $embedding  The query embedding vector (1536 dimensions)
      * @param  float  $threshold  Maximum cosine distance (0-2, lower is more similar)
      * @param  int  $limit  Maximum number of results
      * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
@@ -484,13 +485,13 @@ class Block extends Model implements HasMedia
     /**
      * Scope for hybrid search (semantic + metadata filters) with temporal weighting
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  array  $embedding  The query embedding vector
      * @param  array  $filters  Additional metadata filters (event_id, block_type, etc.)
      * @param  float  $threshold  Maximum cosine distance
      * @param  int  $limit  Maximum number of results
      * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {

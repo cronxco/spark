@@ -11,6 +11,7 @@ use App\Models\Place;
 use App\Models\Relationship;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -110,7 +111,7 @@ class ShowTest extends TestCase
     #[Test]
     public function cannot_link_another_users_event_to_place(): void
     {
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
 
         // Create another user with their own integration and event
         $otherUser = User::factory()->create();

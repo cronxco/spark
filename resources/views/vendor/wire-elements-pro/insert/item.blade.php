@@ -1,12 +1,12 @@
 <x-wire-elements-pro::insert-item :item="$result" :index="$loop->index">
     <div class="wep-insert-item-inner">
-        @if($result['photo'])
+        @if ($result['photo'])
             <img src="{{ $result['photo'] }}" alt="" class="wep-insert-item-inner-photo">
         @endif
-        @if($result['headline'])
+        @if ($result['headline'])
         <span class="wep-insert-item-inner-headline">{{ $result['headline'] }}</span>
         @endif
-        @if($result['subheadline'])
+        @if ($result['subheadline'])
             <span class="wep-insert-item-inner-subheadline">{{ $result['subheadline'] }}</span>
         @endif
 

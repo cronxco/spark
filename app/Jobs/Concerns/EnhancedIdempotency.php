@@ -3,8 +3,11 @@
 namespace App\Jobs\Concerns;
 
 use App\Models\Event;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 trait EnhancedIdempotency
@@ -219,9 +222,9 @@ trait EnhancedIdempotency
     protected function isNonRetryableException(Throwable $exception): bool
     {
         $nonRetryable = [
-            \Illuminate\Auth\AuthenticationException::class,
-            \Illuminate\Auth\Access\AuthorizationException::class,
-            \Illuminate\Validation\ValidationException::class,
+            AuthenticationException::class,
+            AuthorizationException::class,
+            ValidationException::class,
         ];
 
         foreach ($nonRetryable as $class) {

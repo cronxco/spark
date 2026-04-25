@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Events\Mobile\ActionProgressUpdated;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -33,12 +34,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $progress
  * @property int $total
  * @property array|null $details
- * @property \Carbon\Carbon|null $completed_at
- * @property \Carbon\Carbon|null $failed_at
+ * @property Carbon|null $completed_at
+ * @property Carbon|null $failed_at
  * @property string|null $error_message
  * @property array|null $updates
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class ActionProgress extends Model
 {

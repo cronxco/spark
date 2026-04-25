@@ -85,6 +85,7 @@ Route::middleware('sentry.api.logging')->group(function () {
             'show' => 'api.integrations.show',
         ]);
         Route::post('integrations/{integration}/configure', [IntegrationApiController::class, 'configure'])->name('api.integrations.configure');
+        Route::post('integrations/{integration}/trigger', [IntegrationApiController::class, 'trigger'])->name('api.integrations.trigger');
         Route::delete('integrations/{integration}', [IntegrationApiController::class, 'destroy'])->name('api.integrations.destroy');
 
         // Fetch API

@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\PlaceDetectionService;
 use InvalidArgumentException;
 
 class DailyCheckinPlugin extends ManualPlugin
@@ -224,7 +225,7 @@ class DailyCheckinPlugin extends ManualPlugin
             $event->setLocation($latitude, $longitude, $address, 'daily_checkin');
 
             // Link to place
-            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService = app(PlaceDetectionService::class);
             $placeService->detectAndLinkPlaceForEvent($event);
         }
 

@@ -35,7 +35,7 @@ return new class extends Migration
             if (Schema::hasColumn(DB::getTablePrefix() . 'events', 'user_id')) {
                 $this->safeStatement('CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_user_time ON "' . DB::getTablePrefix() . 'events" (user_id, time)');
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // ignore if column doesn't exist
         }
 
@@ -64,7 +64,7 @@ return new class extends Migration
                 // Use default jsonb_ops to maximize compatibility
                 $this->safeStatement('CREATE INDEX CONCURRENTLY IF NOT EXISTS gin_objects_metadata ON "' . DB::getTablePrefix() . 'objects" USING GIN (metadata)');
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Older PG versions may not support jsonb_path_ops; ignore
         }
     }
@@ -98,7 +98,7 @@ return new class extends Migration
     {
         try {
             DB::statement($sql);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Swallow errors to avoid aborting entire migration; log is optional.
         }
     }

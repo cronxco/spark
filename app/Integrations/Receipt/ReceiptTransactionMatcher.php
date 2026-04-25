@@ -5,6 +5,7 @@ namespace App\Integrations\Receipt;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Relationship;
+use App\Services\CurrencyConversionService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Collection;
@@ -260,7 +261,7 @@ class ReceiptTransactionMatcher
         Event $receipt,
         Event $transaction
     ): array {
-        $conversionService = app(\App\Services\CurrencyConversionService::class);
+        $conversionService = app(CurrencyConversionService::class);
 
         // Scenario 1: Check if receipt has pre-computed GBP conversion in metadata
         $receiptMetadata = $receipt->event_metadata ?? [];

@@ -7,6 +7,7 @@ use App\Services\Media\MediaDeduplicationService;
 use App\Traits\TracksViews;
 use ArrayAccess;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -18,6 +19,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Tags\HasTags;
+use Spatie\Tags\Tag;
 
 class EventObject extends Model implements HasMedia
 {
@@ -329,7 +331,7 @@ class EventObject extends Model implements HasMedia
     /**
      * Override attachTags to log activity
      */
-    public function attachTags(array|ArrayAccess|\Spatie\Tags\Tag $tags, ?string $type = null): static
+    public function attachTags(array|ArrayAccess|Tag $tags, ?string $type = null): static
     {
         $className = static::getTagClassName();
 
@@ -359,7 +361,7 @@ class EventObject extends Model implements HasMedia
 
         collect($tags)
             ->filter()
-            ->each(function (\Spatie\Tags\Tag $tag) {
+            ->each(function (Tag $tag) {
                 $this->tags()->detach($tag);
                 // Log the tag removal
                 $this->logTagActivity($tag, null, 'removed');
@@ -371,12 +373,12 @@ class EventObject extends Model implements HasMedia
     /**
      * Scope for semantic search using vector embeddings with temporal weighting
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  array  $embedding  The query embedding vector
      * @param  float  $threshold  Maximum cosine distance (lower = more strict)
      * @param  int  $limit  Maximum number of results
      * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
@@ -410,13 +412,13 @@ class EventObject extends Model implements HasMedia
     /**
      * Scope for hybrid search (semantic + metadata filters) with temporal weighting
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  array  $embedding  The query embedding vector
      * @param  array  $filters  Additional metadata filters (concept, type, user_id, etc.)
      * @param  float  $threshold  Maximum cosine distance
      * @param  int  $limit  Maximum number of results
      * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
@@ -612,10 +614,10 @@ class EventObject extends Model implements HasMedia
     /**
      * Log tag activity to the activity log
      */
-    private function logTagActivity(string|\Spatie\Tags\Tag $tag, ?string $type, string $action): void
+    private function logTagActivity(string|Tag $tag, ?string $type, string $action): void
     {
         // Determine tag name and type
-        if ($tag instanceof \Spatie\Tags\Tag) {
+        if ($tag instanceof Tag) {
             $tagName = $tag->name;
             $tagType = $tag->type;
         } else {

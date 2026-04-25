@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Integrations\Oura;
 
+use App\Integrations\Contracts\SupportsValueMapping;
 use App\Integrations\Oura\OuraPlugin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -121,7 +122,7 @@ class OuraPluginTest extends TestCase
     public function plugin_implements_value_mapping(): void
     {
         // OuraPlugin implements SupportsValueMapping interface
-        $this->assertInstanceOf(\App\Integrations\Contracts\SupportsValueMapping::class, new OuraPlugin);
+        $this->assertInstanceOf(SupportsValueMapping::class, new OuraPlugin);
     }
 
     #[Test]

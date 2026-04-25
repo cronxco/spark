@@ -186,7 +186,7 @@ class OutlineData extends BaseProcessingJob
         return $blocks;
     }
 
-    private function reconcileTaskBlocks(\App\Models\Event $event, array $currentBlocks, bool $isDayNote, string $docId): void
+    private function reconcileTaskBlocks(Event $event, array $currentBlocks, bool $isDayNote, string $docId): void
     {
         // Build map of current by hash
         $currentByHash = [];

@@ -3,6 +3,9 @@
 namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\Media\MediaDownloadHelper;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -25,17 +28,17 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
         $downloadedCount = 0;
 
         // For Blocks: download from media_url and metadata
-        if ($this->model instanceof \App\Models\Block) {
+        if ($this->model instanceof Block) {
             $downloadedCount += $this->downloadBlockImages($this->model, $mediaHelper);
         }
 
         // For EventObjects: download from media_url
-        if ($this->model instanceof \App\Models\EventObject) {
+        if ($this->model instanceof EventObject) {
             $downloadedCount += $this->downloadEventObjectImages($this->model, $mediaHelper);
         }
 
         // For Events: download from all related blocks and objects
-        if ($this->model instanceof \App\Models\Event) {
+        if ($this->model instanceof Event) {
             $downloadedCount += $this->downloadEventImages($this->model, $mediaHelper);
         }
 
@@ -51,7 +54,7 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
     /**
      * Download images for a Block model.
      */
-    private function downloadBlockImages(\App\Models\Block $block, MediaDownloadHelper $mediaHelper): int
+    private function downloadBlockImages(Block $block, MediaDownloadHelper $mediaHelper): int
     {
         $count = 0;
 
@@ -120,7 +123,7 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
     /**
      * Download images for an EventObject model.
      */
-    private function downloadEventObjectImages(\App\Models\EventObject $object, MediaDownloadHelper $mediaHelper): int
+    private function downloadEventObjectImages(EventObject $object, MediaDownloadHelper $mediaHelper): int
     {
         $count = 0;
 
@@ -156,7 +159,7 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
     /**
      * Download images for an Event and all its related blocks and objects.
      */
-    private function downloadEventImages(\App\Models\Event $event, MediaDownloadHelper $mediaHelper): int
+    private function downloadEventImages(Event $event, MediaDownloadHelper $mediaHelper): int
     {
         $count = 0;
 

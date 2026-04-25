@@ -9,6 +9,7 @@ use App\Models\Person;
 use App\Models\Relationship;
 use App\Services\ImmichUrlBuilder;
 use App\Services\PhotoClusteringService;
+use App\Services\PlaceDetectionService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -197,7 +198,7 @@ class PhotosData extends BaseProcessingJob
     {
         try {
             // Use PlaceDetectionService to find/create Place
-            $placeService = app(\App\Services\PlaceDetectionService::class);
+            $placeService = app(PlaceDetectionService::class);
             $placeService->detectAndLinkPlaceForEvent($event);
 
             // If EXIF city missing, try to update cluster title with Place name

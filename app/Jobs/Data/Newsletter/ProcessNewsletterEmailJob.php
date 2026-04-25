@@ -16,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use ZBateson\MailMimeParser\Header\AddressHeader;
 use ZBateson\MailMimeParser\MailMimeParser;
 
 class ProcessNewsletterEmailJob implements ShouldQueue
@@ -138,7 +139,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             try {
                 $fromHeader = $message->getHeader('from');
                 // Check if this is an AddressHeader with getAddresses method
-                if ($fromHeader instanceof \ZBateson\MailMimeParser\Header\AddressHeader) {
+                if ($fromHeader instanceof AddressHeader) {
                     $fromAddresses = $fromHeader->getAddresses();
                     if (count($fromAddresses) > 0) {
                         $fromAddress = $fromAddresses[0];
