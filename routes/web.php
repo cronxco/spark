@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AasaController;
 use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
 use App\Http\Controllers\Admin\MigrationsController;
@@ -34,34 +35,13 @@ Route::get('/', function () {
     return redirect()->route('today.main');
 })->name('home');
 
-Route::get('.well-known/apple-app-site-association', function () {
-    $teamId = config('ios.apple_team_id', '');
-    $bundleId = config('ios.app_bundle_id', 'co.cronx.spark');
-
-    if ($teamId === '') {
-        Log::error('AASA: ios.apple_team_id is not configured');
-        abort(500, 'Apple Team ID is not configured.');
-    }
-
-    $appId = $teamId . '.' . $bundleId;
-
-    return response()->json([
-        'applinks' => [
-            'apps' => [],
-            'details' => [[
-                'appID' => $appId,
-                'paths' => ['/events/*', '/objects/*', '/places/*'],
-            ]],
-        ],
-        'webcredentials' => [
-            'apps' => [$appId],
-        ],
-    ], 200, ['Content-Type' => 'application/json']);
-})->name('aasa');
-
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+// Apple App Site Association for Universal Links
+Route::get('.well-known/apple-app-site-association', [AasaController::class, 'show'])
+    ->name('aasa');
 
 // Push notification routes (public)
 Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])
