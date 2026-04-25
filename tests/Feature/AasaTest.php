@@ -7,6 +7,16 @@ use Tests\TestCase;
 
 class AasaTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'ios.apple_team_id' => 'TESTTEAMID',
+            'ios.app_bundle_id' => 'co.cronx.spark',
+        ]);
+    }
+
     #[Test]
     public function aasa_endpoint_is_accessible_without_authentication(): void
     {
@@ -20,42 +30,45 @@ class AasaTest extends TestCase
         $response = $this->getJson('/.well-known/apple-app-site-association');
 
         $response->assertOk()
-            ->assertJsonPath('applinks.details.0.appIDs.0', 'co.cronx.spark');
+            ->assertJsonPath('applinks.details.0.appID', 'TESTTEAMID.co.cronx.spark');
     }
 
     #[Test]
-    public function aasa_response_contains_today_path(): void
+    public function aasa_response_contains_events_path(): void
     {
         $response = $this->getJson('/.well-known/apple-app-site-association');
 
-        $components = $response->json('applinks.details.0.components');
+        $paths = $response->json('applinks.details.0.paths');
 
-        $paths = array_column($components, '/');
-
-        $this->assertContains('/today', $paths);
+        $this->assertContains('/events/*', $paths);
     }
 
     #[Test]
-    public function aasa_response_contains_day_wildcard_path(): void
+    public function aasa_response_contains_objects_path(): void
     {
         $response = $this->getJson('/.well-known/apple-app-site-association');
 
-        $components = $response->json('applinks.details.0.components');
+        $paths = $response->json('applinks.details.0.paths');
 
-        $paths = array_column($components, '/');
-
-        $this->assertContains('/day/*', $paths);
+        $this->assertContains('/objects/*', $paths);
     }
 
     #[Test]
-    public function aasa_response_contains_event_wildcard_path(): void
+    public function aasa_response_contains_places_path(): void
     {
         $response = $this->getJson('/.well-known/apple-app-site-association');
 
-        $components = $response->json('applinks.details.0.components');
+        $paths = $response->json('applinks.details.0.paths');
 
-        $paths = array_column($components, '/');
+        $this->assertContains('/places/*', $paths);
+    }
 
-        $this->assertContains('/event/*', $paths);
+    #[Test]
+    public function aasa_response_contains_webcredentials(): void
+    {
+        $response = $this->getJson('/.well-known/apple-app-site-association');
+
+        $response->assertOk()
+            ->assertJsonPath('webcredentials.apps.0', 'TESTTEAMID.co.cronx.spark');
     }
 }

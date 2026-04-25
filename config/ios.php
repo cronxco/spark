@@ -15,9 +15,9 @@ return [
     'bundle_id' => 'co.cronx.spark',
 
     'aasa_paths' => [
-        '/event/*',
-        '/today',
-        '/day/*',
+        '/events/*',
+        '/objects/*',
+        '/places/*',
     ],
 
     /*
