@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 use Laravel\Socialite\Facades\Socialite;
@@ -37,13 +38,13 @@ Route::get('/auth/authelia/callback', function () {
     if (!$email) {
         return redirect('/')->withErrors(['authelia' => 'No email address returned from Authelia.']);
     }
-    $authUser = \App\Models\User::updateOrCreate(
+    $authUser = User::updateOrCreate(
         ['email' => $email],
         [
             'name' => $user->getName() ?: $user->getNickname() ?: $email,
             'password' => Hash::make(Str::random(32)),
         ]
     );
-    \Illuminate\Support\Facades\Auth::login($authUser);
+    Auth::login($authUser);
     return redirect('/dashboard');
 });

@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -14,7 +15,7 @@ class EventFactory extends Factory
     public function definition(): array
     {
         // Create actor and target objects with the same integration
-        $integration = \App\Models\Integration::factory()->create();
+        $integration = Integration::factory()->create();
         $actor = EventObject::factory()->create(['integration_id' => $integration->id]);
         $target = EventObject::factory()->create(['integration_id' => $integration->id]);
 
