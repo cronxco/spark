@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\User;
 use App\Services\EmbeddingService;
+use Illuminate\Support\Collection;
 use Throwable;
 
 /**
@@ -29,7 +30,7 @@ class SearchDispatcher
     public function __construct(protected ?EmbeddingService $embeddingService = null) {}
 
     /**
-     * @return array{mode: string, query: string, events: \Illuminate\Support\Collection, objects: \Illuminate\Support\Collection, integrations: \Illuminate\Support\Collection, metrics: \Illuminate\Support\Collection}
+     * @return array{mode: string, query: string, events: Collection, objects: Collection, integrations: Collection, metrics: Collection}
      */
     public function search(User $user, string $mode, string $query, int $limit = self::DEFAULT_LIMIT): array
     {

@@ -2,11 +2,12 @@
 
 namespace App\Http\Resources\Compact;
 
+use App\Models\Integration;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Models\Integration
+ * @mixin Integration
  */
 class CompactIntegrationResource extends JsonResource
 {

@@ -2,11 +2,12 @@
 
 namespace App\Http\Resources\Compact;
 
+use App\Models\Event;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Models\Event
+ * @mixin Event
  *
  * Mobile-optimised event shape. Based on EventResource::toCondensedArray()
  * but with a fixed contract — the iOS client decodes this into Swift structs,

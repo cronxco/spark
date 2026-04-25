@@ -6,6 +6,7 @@ use App\Mcp\Helpers\DateParser;
 use App\Models\Event;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class EventFeed
 {
@@ -21,7 +22,7 @@ class EventFeed
      * Returns a structured array matching the MCP tool's output so the tool
      * can stay a one-liner. `total_count` ignores the `$limit` cap.
      *
-     * @return array{service: string, action: ?string, total_count: int, returned_count: int, events: \Illuminate\Database\Eloquent\Collection}
+     * @return array{service: string, action: ?string, total_count: int, returned_count: int, events: Collection}
      */
     public function filter(
         User $user,

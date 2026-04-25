@@ -31,8 +31,8 @@ class PushSubscription extends BasePushSubscription
     ];
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeApns(Builder $query): Builder
     {
@@ -40,8 +40,8 @@ class PushSubscription extends BasePushSubscription
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeDeviceType(Builder $query, string $type): Builder
     {

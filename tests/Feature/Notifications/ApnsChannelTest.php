@@ -11,6 +11,7 @@ use Mockery;
 use NotificationChannels\Apn\ApnMessagePushType;
 use PHPUnit\Framework\Attributes\Test;
 use Pushok\Client;
+use Pushok\Notification;
 use Pushok\Notification as PushokNotification;
 use Pushok\Response;
 use Tests\TestCase;
@@ -20,7 +21,7 @@ class ApnsChannelTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * @var array<int, \Pushok\Notification>
+     * @var array<int, Notification>
      */
     protected array $capturedNotifications = [];
 

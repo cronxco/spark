@@ -22,7 +22,7 @@ class ApnsChannel
     /**
      * Send the notification to Apple Push Notification Service.
      *
-     * @return array<int, \Pushok\Response>|null
+     * @return array<int, Response>|null
      */
     public function send(mixed $notifiable, Notification $notification): ?array
     {
@@ -110,7 +110,7 @@ class ApnsChannel
     }
 
     /**
-     * @return array<int, \Pushok\Response>
+     * @return array<int, Response>
      */
     protected function sendNotifications(Client $client, ApnMessage $message, array $tokens): array
     {
