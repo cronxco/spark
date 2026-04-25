@@ -10,7 +10,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Fired when a MetricTrend with type=anomaly_high|anomaly_low is created.
+ * Fired when a MetricTrend with type=anomaly_high or anomaly_low is created.
  * Powers iOS push + in-app banner so the user can acknowledge anomalies live.
  */
 class AnomalyRaised implements ShouldBroadcastNow
