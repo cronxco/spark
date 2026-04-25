@@ -6,6 +6,7 @@ use App\Events\Mobile\ActionProgressUpdated;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 /**
  * ActionProgress Model
@@ -162,7 +163,7 @@ class ActionProgress extends Model
                 return;
             }
 
-            \Illuminate\Support\Facades\DB::afterCommit(function () use ($model) {
+            DB::afterCommit(function () use ($model) {
                 event(ActionProgressUpdated::fromModel($model));
             });
         });
