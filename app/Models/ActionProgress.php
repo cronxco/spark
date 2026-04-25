@@ -6,7 +6,6 @@ use App\Events\Mobile\ActionProgressUpdated;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\DB;
 
 /**
  * ActionProgress Model
@@ -159,13 +158,14 @@ class ActionProgress extends Model
         });
 
         static::saved(function (ActionProgress $model) {
-            if (! $model->wasChanged(['progress', 'status', 'completed_at', 'failed_at', 'step', 'message'])) {
+            if (
+                ! $model->wasRecentlyCreated
+                && ! $model->wasChanged(['progress', 'status', 'completed_at', 'failed_at', 'step', 'message'])
+            ) {
                 return;
             }
 
-            DB::afterCommit(function () use ($model) {
-                event(ActionProgressUpdated::fromModel($model));
-            });
+            event(ActionProgressUpdated::fromModel($model));
         });
     }
 

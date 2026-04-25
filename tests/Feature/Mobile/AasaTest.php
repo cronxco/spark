@@ -28,6 +28,8 @@ class AasaTest extends TestCase
     #[Test]
     public function aasa_returns_500_when_team_id_missing(): void
     {
+        $this->app->detectEnvironment(fn () => 'production');
+
         config([
             'ios.apple_team_id' => '',
             'ios.app_bundle_id' => 'co.cronx.spark',
