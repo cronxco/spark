@@ -241,7 +241,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Deploy
-        uses: deployphp/action@6242095e7207facf115ac4439760356bc52760ac # v1
+        uses: deployphp/action@a1b46c204dbde25a32ed0d7bb6751ac3377ca1e9 # v1
         env:
           DEPLOYER_USER: ${{ vars.DEPLOYER_USER }}
           DEPLOYER_HOSTNAME: ${{ vars.DEPLOYER_HOSTNAME }}
@@ -326,7 +326,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Deploy
-        uses: deployphp/action@6242095e7207facf115ac4439760356bc52760ac # v1
+        uses: deployphp/action@a1b46c204dbde25a32ed0d7bb6751ac3377ca1e9 # v1
         env:
           DEPLOYER_USER: ${{ vars.DEV_DEPLOYER_USER }}
           DEPLOYER_HOSTNAME: ${{ vars.DEV_DEPLOYER_HOSTNAME }}
