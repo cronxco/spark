@@ -14,6 +14,7 @@ docs/
 ├── Architecture/      # Core system and feature documentation
 ├── Guides/           # Setup and operational guides
 ├── Integrations/     # Service-specific documentation
+├── mobile/           # iOS companion app API
 └── UI and UX/        # User interface patterns
 ```
 
@@ -43,6 +44,7 @@ docs/
 | [INTEGRATION_PLUGINS.md](Architecture/INTEGRATION_PLUGINS.md) | Plugin architecture, base classes, and implementation patterns |
 | [JOBS.md](Architecture/JOBS.md)                               | Job system overview and base job classes                       |
 | [API.md](Architecture/API.md)                                 | REST API endpoints and authentication                          |
+| [MOBILE_API.md](mobile/MOBILE_API.md)                         | iOS companion app API — all 25 endpoints with schemas          |
 | [MEDIA.md](Architecture/MEDIA.md)                             | Media attachment system with MD5-based deduplication           |
 | [PLAYWRIGHT.md](Architecture/PLAYWRIGHT.md)                   | Browser automation for Fetch integration                       |
 

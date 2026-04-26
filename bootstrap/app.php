@@ -4,6 +4,7 @@ use App\Http\Middleware\CacheApiResponse;
 use App\Http\Middleware\EnsureIosMobileApiEnabled;
 use App\Http\Middleware\ETag;
 use App\Http\Middleware\SentryApiLogging;
+use App\Http\Middleware\SentryMobileApiLogging;
 use App\Http\Middleware\TrustProxies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register Sentry API logging middleware
         $middleware->alias([
             'sentry.api.logging' => SentryApiLogging::class,
+            'sentry.mobile.logging' => SentryMobileApiLogging::class,
             'cache.api' => CacheApiResponse::class,
             'ios.enabled' => EnsureIosMobileApiEnabled::class,
             'etag' => ETag::class,
