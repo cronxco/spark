@@ -145,6 +145,12 @@ class FeedControllerTest extends TestCase
             'metadata' => ['content' => 'A brief summary.'],
         ]);
 
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_summary_paragraph',
+            'metadata' => ['content' => 'A longer paragraph summary.'],
+        ]);
+
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
         $response = $this->getJson('/api/v1/mobile/feed?domain=knowledge')
@@ -153,6 +159,7 @@ class FeedControllerTest extends TestCase
         $item = $response->json('data.0');
         $this->assertSame('https://example.com/image.jpg', $item['target']['media_url']);
         $this->assertSame('A brief summary.', $item['tldr']);
+        $this->assertSame('A longer paragraph summary.', $item['summary_paragraph']);
     }
 
     #[Test]
