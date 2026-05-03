@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
+use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
 use App\Http\Controllers\Api\V1\Mobile\PingController;
@@ -35,6 +36,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('ping', PingController::class)->name('ping');
+
+Route::get('me', MeController::class)->name('me');
 
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
 
