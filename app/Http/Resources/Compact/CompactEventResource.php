@@ -67,6 +67,13 @@ class CompactEventResource extends JsonResource
             if ($tldr) {
                 $data['tldr'] = $tldr->getContent();
             }
+
+            $paragraph = $this->blocks->firstWhere('block_type', 'fetch_summary_paragraph')
+                ?? $this->blocks->firstWhere('block_type', 'newsletter_summary_paragraph');
+
+            if ($paragraph) {
+                $data['summary_paragraph'] = $paragraph->getContent();
+            }
         }
 
         return $data;
