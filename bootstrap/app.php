@@ -6,6 +6,7 @@ use App\Http\Middleware\ETag;
 use App\Http\Middleware\SentryApiLogging;
 use App\Http\Middleware\SentryMobileApiLogging;
 use App\Http\Middleware\TrustProxies;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -41,6 +42,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
         ]);
+
+        // Place mobile logging before auth in the priority list so it wraps the
+        // auth middleware and captures 401 responses, not just authenticated calls.
+        $middleware->prependToPriorityList(
+            AuthenticatesRequests::class,
+            SentryMobileApiLogging::class,
+        );
 
         // Exclude webhook routes from CSRF protection
         $middleware->validateCsrfTokens(except: [

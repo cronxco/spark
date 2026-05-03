@@ -44,7 +44,36 @@ class MetricsControllerTest extends TestCase
     #[Test]
     public function requires_authentication(): void
     {
+        $this->getJson('/api/v1/mobile/metrics')->assertStatus(401);
         $this->getJson('/api/v1/mobile/metrics/oura.sleep_score')->assertStatus(401);
+    }
+
+    #[Test]
+    public function lists_all_metrics_for_user(): void
+    {
+        $this->seedMetric();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/metrics')
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => [[
+                    'id', 'identifier', 'display_name', 'service',
+                    'action', 'unit', 'event_count', 'mean', 'last_event_at',
+                ]],
+            ])
+            ->assertJsonPath('data.0.service', 'oura')
+            ->assertJsonPath('data.0.action', 'had_sleep_score');
+    }
+
+    #[Test]
+    public function lists_empty_data_when_no_metrics_exist(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/metrics')
+            ->assertOk()
+            ->assertJson(['data' => []]);
     }
 
     #[Test]

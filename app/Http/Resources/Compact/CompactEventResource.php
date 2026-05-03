@@ -47,11 +47,26 @@ class CompactEventResource extends JsonResource
         }
 
         if ($this->relationLoaded('target') && $this->target) {
-            $data['target'] = [
+            $target = [
                 'id' => $this->target->id,
                 'title' => $this->target->title,
                 'concept' => $this->target->concept,
             ];
+
+            if ($this->domain === 'knowledge' && $this->target->media_url) {
+                $target['media_url'] = $this->target->media_url;
+            }
+
+            $data['target'] = $target;
+        }
+
+        if ($this->domain === 'knowledge' && $this->relationLoaded('blocks')) {
+            $tldr = $this->blocks->firstWhere('block_type', 'fetch_tldr')
+                ?? $this->blocks->firstWhere('block_type', 'newsletter_tldr');
+
+            if ($tldr) {
+                $data['tldr'] = $tldr->getContent();
+            }
         }
 
         return $data;

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -95,7 +96,80 @@ class FeedControllerTest extends TestCase
             ->assertStatus(304);
     }
 
-    protected function seedEvents(int $count): void
+    #[Test]
+    public function filters_feed_by_domain(): void
+    {
+        $this->seedEvents(2, domain: 'money');
+        $this->seedEvents(1, domain: 'health');
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson('/api/v1/mobile/feed?domain=money')
+            ->assertOk();
+
+        $this->assertCount(2, $response->json('data'));
+        $this->assertSame('money', $response->json('data.0.domain'));
+    }
+
+    #[Test]
+    public function rejects_invalid_domain(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/feed?domain=bogus')
+            ->assertStatus(422)
+            ->assertJsonStructure(['message', 'hint']);
+    }
+
+    #[Test]
+    public function knowledge_events_include_enrichment_fields(): void
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'media_url' => 'https://example.com/image.jpg',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'read_article',
+            'time' => now(),
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'A brief summary.'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson('/api/v1/mobile/feed?domain=knowledge')
+            ->assertOk();
+
+        $item = $response->json('data.0');
+        $this->assertSame('https://example.com/image.jpg', $item['target']['media_url']);
+        $this->assertSame('A brief summary.', $item['tldr']);
+    }
+
+    #[Test]
+    public function non_knowledge_events_omit_enrichment_fields(): void
+    {
+        $this->seedEvents(1, domain: 'money');
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed?domain=money')
+            ->assertOk()
+            ->json('data.0');
+
+        $this->assertArrayNotHasKey('tldr', $item);
+        $this->assertArrayNotHasKey('media_url', $item['target'] ?? []);
+    }
+
+    protected function seedEvents(int $count, string $domain = 'money'): void
     {
         $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -104,7 +178,7 @@ class FeedControllerTest extends TestCase
             Event::factory()->create([
                 'integration_id' => $this->integration->id,
                 'service' => 'monzo',
-                'domain' => 'money',
+                'domain' => $domain,
                 'action' => 'card_payment_to',
                 'value' => 10,
                 'value_multiplier' => 1,

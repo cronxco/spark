@@ -148,6 +148,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | `GET`  | `/events/{id}`              | Single event                                        |
 | `GET`  | `/objects/{id}`             | Single object with optional recent events           |
 | `GET`  | `/blocks/{id}`              | Single block                                        |
+| `GET`  | `/metrics`                  | All available metric identifiers and metadata       |
 | `GET`  | `/metrics/{metric}`         | Metric trend with baseline and daily values         |
 | `GET`  | `/widgets/today`            | Compact today widget payload (≤4 KB)                |
 | `GET`  | `/widgets/metrics/{metric}` | Tiny sparkline widget for a single metric           |
@@ -216,10 +217,13 @@ Cursor-paginated reverse-chronological feed of the user's events.
 
 **Query Parameters**
 
-| Parameter | Type    | Default | Description                         |
-| --------- | ------- | ------- | ----------------------------------- |
-| `cursor`  | string  | —       | Opaque cursor from a prior response |
-| `limit`   | integer | 20      | Items per page (max 100)            |
+| Parameter | Type    | Default | Description                                                            |
+| --------- | ------- | ------- | ---------------------------------------------------------------------- |
+| `cursor`  | string  | —       | Opaque cursor from a prior response                                    |
+| `limit`   | integer | 20      | Items per page (max 100)                                               |
+| `domain`  | string  | —       | Filter by domain: `health`, `money`, `media`, `knowledge`, or `online` |
+
+When `domain=knowledge` the response includes compact enrichment fields on each item — see [Knowledge Enrichment](#knowledge-enrichment) below.
 
 **Response `200`**
 
@@ -231,7 +235,20 @@ Cursor-paginated reverse-chronological feed of the user's events.
 }
 ```
 
+**Response `422`** — Invalid domain value. The response includes a `hint` listing valid domains.
+
 See [CompactEvent](#compactevent) for the item schema.
+
+#### Knowledge Enrichment
+
+When `domain=knowledge`, each `CompactEvent` in the feed may include two additional optional fields:
+
+| Field              | Type   | Description                                                    |
+| ------------------ | ------ | -------------------------------------------------------------- |
+| `tldr`             | string | Single-sentence TL;DR from the associated block (if generated) |
+| `target.media_url` | string | OG image URL on the target object (e.g. article hero image)    |
+
+Both fields are omitted rather than `null` when not available.
 
 ---
 
@@ -283,6 +300,34 @@ Returns a single Block by UUID.
 **Response `200`** — [CompactBlock](#compactblock)
 
 **Response `404`** — Block not found or belongs to another user.
+
+---
+
+### `GET /metrics`
+
+Returns all metric identifiers and metadata for the authenticated user. Use this to build a dynamic metrics catalogue instead of maintaining a hardcoded list.
+
+**Response `200`**
+
+```json
+{
+    "data": [
+        {
+            "id": "uuid",
+            "identifier": "oura.had_sleep_score.percent",
+            "display_name": "Sleep Score",
+            "service": "oura",
+            "action": "had_sleep_score",
+            "unit": "percent",
+            "event_count": 180,
+            "mean": 83.1,
+            "last_event_at": "2025-01-15T08:00:00+00:00"
+        }
+    ]
+}
+```
+
+Results are ordered by `service` then `action`. An empty `data` array is returned when no metrics have been computed yet.
 
 ---
 

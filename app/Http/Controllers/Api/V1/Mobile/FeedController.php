@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
+use App\Integrations\PluginRegistry;
 use App\Services\Mobile\EventFeed;
 use App\Support\CursorPaginator;
 use Illuminate\Http\JsonResponse;
@@ -21,11 +22,20 @@ class FeedController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $domain = $request->query('domain');
+
+        if ($domain !== null && ! in_array($domain, PluginRegistry::getValidDomains(), true)) {
+            return response()->json([
+                'message' => "Unknown domain: {$domain}.",
+                'hint' => 'Valid domains: ' . implode(', ', PluginRegistry::getValidDomains()),
+            ], 422);
+        }
+
         $cursor = $request->query('cursor');
         $limit = (int) $request->query('limit', CursorPaginator::DEFAULT_LIMIT);
 
         [$events, $nextCursor, $hasMore] = CursorPaginator::paginate(
-            $this->eventFeed->query($request->user()),
+            $this->eventFeed->query($request->user(), is_string($domain) ? $domain : null),
             is_string($cursor) && $cursor !== '' ? $cursor : null,
             $limit,
             timeColumn: 'time',

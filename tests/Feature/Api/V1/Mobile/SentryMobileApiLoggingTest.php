@@ -96,7 +96,7 @@ class SentryMobileApiLoggingTest extends TestCase
     }
 
     #[Test]
-    public function etag_304_client_response_is_still_logged_as_the_underlying_200(): void
+    public function etag_304_response_is_logged_as_304(): void
     {
         $logs = $this->collectLogs();
 
@@ -106,14 +106,26 @@ class SentryMobileApiLoggingTest extends TestCase
         $first = $this->getJson('/api/v1/mobile/ping')->assertOk();
         $etag = $first->headers->get('ETag');
 
-        // ETag middleware runs after logging middleware, so the client receives 304
-        // but the logger captures the underlying 200 (the full content that was available).
+        // The logging middleware now wraps the ETag middleware, so it sees the
+        // final 304 that the client receives rather than the underlying 200.
         $this->getJson('/api/v1/mobile/ping', ['If-None-Match' => $etag])->assertStatus(304);
 
-        // Two log entries should exist (one per request), both showing 200
         $mobileApiLogs = $logs->filter(fn ($e) => str_contains($e['message'], 'Mobile API:'));
         $this->assertCount(2, $mobileApiLogs);
-        $this->assertSame(200, $mobileApiLogs->last()['context']['response_status']);
+        $this->assertSame(304, $mobileApiLogs->last()['context']['response_status']);
+    }
+
+    #[Test]
+    public function unauthenticated_request_is_logged_with_401_status(): void
+    {
+        $logs = $this->collectLogs();
+
+        // No Sanctum::actingAs — request carries no credentials.
+        $this->getJson('/api/v1/mobile/ping')->assertUnauthorized();
+
+        $entry = $this->findMobileApiLog($logs);
+        $this->assertNotNull($entry, 'Expected a Mobile API log entry for the unauthenticated request.');
+        $this->assertSame(401, $entry['context']['response_status']);
     }
 
     #[Test]

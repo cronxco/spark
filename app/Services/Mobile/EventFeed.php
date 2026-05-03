@@ -76,14 +76,30 @@ class EventFeed
      * Build a base query for a user's events — used by the mobile `/feed` endpoint
      * which paginates via cursor rather than counting totals.
      *
+     * When `$domain` is provided the result is scoped to that domain and, for
+     * the `knowledge` domain, blocks are eager-loaded so the enrichment fields
+     * (`tldr`, `target.media_url`) can be resolved without extra queries.
+     *
      * @return Builder<Event>
      */
-    public function query(User $user): Builder
+    public function query(User $user, ?string $domain = null): Builder
     {
         $integrationIds = $user->integrations()->pluck('id')->all();
 
-        return Event::query()
+        $eagerLoads = ['actor', 'target', 'integration'];
+
+        if ($domain === 'knowledge') {
+            $eagerLoads[] = 'blocks';
+        }
+
+        $query = Event::query()
             ->whereIn('integration_id', empty($integrationIds) ? [-1] : $integrationIds)
-            ->with(['actor', 'target', 'integration']);
+            ->with($eagerLoads);
+
+        if ($domain !== null) {
+            $query->where('domain', $domain);
+        }
+
+        return $query;
     }
 }

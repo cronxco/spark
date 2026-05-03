@@ -124,6 +124,6 @@ Route::post('oauth/refresh', [OAuthController::class, 'refresh'])->middleware('t
 // invisible in production until the iOS client is ready to ship. Default
 // ability is `ios:read`; write-side endpoints override to `ios:write`.
 Route::prefix('v1/mobile')
-    ->middleware(['ios.enabled', 'auth:sanctum', 'ability:ios:read', 'etag', 'sentry.mobile.logging'])
+    ->middleware(['ios.enabled', 'sentry.mobile.logging', 'auth:sanctum', 'ability:ios:read', 'etag'])
     ->name('api.v1.mobile.')
     ->group(base_path('routes/mobile.php'));

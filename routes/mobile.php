@@ -43,6 +43,7 @@ Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->name('objects.show');
 Route::get('blocks/{id}', [BlocksController::class, 'show'])->name('blocks.show');
+Route::get('metrics', [MetricsController::class, 'index'])->name('metrics.index');
 Route::get('metrics/{metric}', [MetricsController::class, 'show'])->name('metrics.show');
 
 Route::get('widgets/today', [WidgetsController::class, 'today'])->name('widgets.today');
