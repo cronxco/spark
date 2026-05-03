@@ -27,6 +27,13 @@ class OAuthController extends Controller
     public const REFRESH_TOKEN_TTL_DAYS = 60;
 
     /**
+     * Seconds after a rotation within which a replay is treated as a network
+     * race condition rather than token theft. Keeps the user's current tokens
+     * alive instead of doing a full device revocation.
+     */
+    public const REPLAY_GRACE_SECONDS = 30;
+
+    /**
      * Show the consent screen for an OAuth PKCE authorization request.
      */
     public function authorize(Request $request): View|RedirectResponse
@@ -161,11 +168,21 @@ class OAuthController extends Controller
                 return $this->oauthError('invalid_grant', 'Refresh token not recognized.', 400);
             }
 
-            // Replay of a revoked token → assume compromise; revoke every token for this device.
             if ($refresh->revoked_at !== null) {
-                $this->revokeDeviceTokens($refresh);
+                // If the token was rotated very recently it is almost certainly a
+                // server-restart race condition: the rotation completed but the
+                // response never reached the client, so it retried with the old
+                // token. In that window we return 401 without touching other tokens
+                // so the user just has to re-authenticate once.
+                // Outside the grace period we assume actual token theft and nuke
+                // every token for the device.
+                if ($refresh->revoked_at->lt(now()->subSeconds(self::REPLAY_GRACE_SECONDS))) {
+                    $this->revokeDeviceTokens($refresh);
 
-                return $this->oauthError('invalid_grant', 'Refresh token already used; all device tokens revoked.', 401);
+                    return $this->oauthError('invalid_grant', 'Refresh token already used; all device tokens revoked.', 401);
+                }
+
+                return $this->oauthError('invalid_grant', 'Refresh token already used.', 401);
             }
 
             if ($refresh->expires_at->isPast()) {

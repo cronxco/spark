@@ -3,9 +3,11 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class SentryMobileApiLogging
 {
@@ -16,8 +18,25 @@ class SentryMobileApiLogging
 
     public function handle(Request $request, Closure $next): Response
     {
-        $response = $next($request);
+        try {
+            $response = $next($request);
+        } catch (Throwable $e) {
+            // auth:sanctum and other guards throw exceptions rather than returning a
+            // response. We take ownership here: report (no-op for non-reportable
+            // exceptions like AuthenticationException) and render, so logging always
+            // captures the resulting HTTP status code.
+            $handler = app(ExceptionHandler::class);
+            $handler->report($e);
+            $response = $handler->render($request, $e);
+        }
 
+        $this->logRequest($request, $response);
+
+        return $response;
+    }
+
+    private function logRequest(Request $request, Response $response): void
+    {
         $status = $response->getStatusCode();
         $content = $response->getContent();
 
@@ -44,8 +63,6 @@ class SentryMobileApiLogging
             'Mobile API: ' . $request->method() . ' ' . $request->path(),
             array_filter($context, fn ($v) => $v !== null),
         );
-
-        return $response;
     }
 
     /**

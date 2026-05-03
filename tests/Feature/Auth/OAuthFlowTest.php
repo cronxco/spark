@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Http\Controllers\Auth\OAuthController;
 use App\Models\OAuthAuthorizationCode;
 use App\Models\OAuthRefreshToken;
 use App\Models\User;
@@ -322,7 +323,7 @@ class OAuthFlowTest extends TestCase
     }
 
     #[Test]
-    public function refresh_endpoint_revokes_all_device_tokens_on_replay(): void
+    public function refresh_replay_within_grace_window_returns_401_without_revoking_all_device_tokens(): void
     {
         $user = User::factory()->create();
         [$code, $verifier] = $this->performAuthorize($user);
@@ -342,7 +343,53 @@ class OAuthFlowTest extends TestCase
             'client_id' => 'ios',
         ])->json();
 
-        // Replay of the now-revoked first refresh token.
+        // The old token was just revoked — we are still inside the grace window.
+        $replay = $this->postJson('/api/oauth/refresh', [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $first['refresh_token'],
+            'client_id' => 'ios',
+        ]);
+
+        $replay->assertStatus(401);
+        $replay->assertJson(['error' => 'invalid_grant']);
+
+        // The rotated token (from the successful rotation) must still be active —
+        // only the replayed old token is revoked, not the whole device.
+        $newHash = hash('sha256', $rotated['refresh_token']);
+        $this->assertNull(OAuthRefreshToken::query()->where('token_hash', $newHash)->value('revoked_at'));
+
+        // The current access token (from the rotation) must survive too.
+        $rotatedAccessId = (int) explode('|', $rotated['access_token'])[0];
+        $this->assertNotNull(PersonalAccessToken::query()->find($rotatedAccessId));
+    }
+
+    #[Test]
+    public function refresh_replay_outside_grace_window_revokes_all_device_tokens(): void
+    {
+        $user = User::factory()->create();
+        [$code, $verifier] = $this->performAuthorize($user);
+
+        $first = $this->postJson('/api/oauth/token', [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'code_verifier' => $verifier,
+            'client_id' => 'ios',
+            'redirect_uri' => 'spark://auth/callback',
+        ])->json();
+
+        // First refresh: succeeds, rotates.
+        $rotated = $this->postJson('/api/oauth/refresh', [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $first['refresh_token'],
+            'client_id' => 'ios',
+        ])->json();
+
+        // Back-date the revocation to simulate a stale replay well outside the grace window.
+        $oldHash = hash('sha256', $first['refresh_token']);
+        OAuthRefreshToken::query()
+            ->where('token_hash', $oldHash)
+            ->update(['revoked_at' => now()->subSeconds(OAuthController::REPLAY_GRACE_SECONDS + 1)]);
+
         $replay = $this->postJson('/api/oauth/refresh', [
             'grant_type' => 'refresh_token',
             'refresh_token' => $first['refresh_token'],
