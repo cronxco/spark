@@ -57,10 +57,10 @@ class MetricsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/metrics')
             ->assertOk()
             ->assertJsonStructure([
-                [[
+                '*' => [
                     'id', 'identifier', 'display_name', 'service',
                     'domain', 'action', 'unit', 'event_count', 'mean', 'last_event_at',
-                ]],
+                ],
             ])
             ->assertJsonPath('0.identifier', 'oura.sleep_score')
             ->assertJsonPath('0.service', 'oura')
