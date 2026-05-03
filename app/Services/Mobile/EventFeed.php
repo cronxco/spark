@@ -5,6 +5,7 @@ namespace App\Services\Mobile;
 use App\Mcp\Helpers\DateParser;
 use App\Models\Event;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -82,7 +83,7 @@ class EventFeed
      *
      * @return Builder<Event>
      */
-    public function query(User $user, ?string $domain = null): Builder
+    public function query(User $user, ?string $domain = null, ?Carbon $date = null): Builder
     {
         $integrationIds = $user->integrations()->pluck('id')->all();
 
@@ -98,6 +99,12 @@ class EventFeed
 
         if ($domain !== null) {
             $query->where('domain', $domain);
+        }
+
+        if ($date !== null) {
+            $query->whereBetween('time', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
+        } else {
+            $query->where('time', '<=', now());
         }
 
         return $query;

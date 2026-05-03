@@ -222,6 +222,12 @@ Cursor-paginated reverse-chronological feed of the user's events.
 | `cursor`  | string  | —       | Opaque cursor from a prior response                                    |
 | `limit`   | integer | 20      | Items per page (max 100)                                               |
 | `domain`  | string  | —       | Filter by domain: `health`, `money`, `media`, `knowledge`, or `online` |
+| `date`    | string  | —       | Restrict to a single calendar day (`YYYY-MM-DD`); past or future       |
+
+**Date behaviour**
+
+- **No `date`** (default): returns events up to and including the current moment, paging backwards. Future events are excluded.
+- **`date` specified**: returns only events whose `time` falls within that calendar day (midnight–23:59:59 UTC). Cursor pagination still applies within the day. Can be a past or future date.
 
 When `domain=knowledge` the response includes compact enrichment fields on each item — see [Knowledge Enrichment](#knowledge-enrichment) below.
 
@@ -235,7 +241,7 @@ When `domain=knowledge` the response includes compact enrichment fields on each 
 }
 ```
 
-**Response `422`** — Invalid domain value. The response includes a `hint` listing valid domains.
+**Response `422`** — Invalid domain value or malformed `date` parameter.
 
 See [CompactEvent](#compactevent) for the item schema.
 

@@ -7,8 +7,11 @@ use App\Http\Resources\Compact\CompactEventResource;
 use App\Integrations\PluginRegistry;
 use App\Services\Mobile\EventFeed;
 use App\Support\CursorPaginator;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 
 class FeedController extends Controller
 {
@@ -31,11 +34,26 @@ class FeedController extends Controller
             ], 422);
         }
 
+        $dateParam = $request->query('date');
+        $date = null;
+
+        if ($dateParam !== null) {
+            try {
+                $parsed = Carbon::createFromFormat('Y-m-d', is_string($dateParam) ? $dateParam : '');
+                if ($parsed === false || $parsed->format('Y-m-d') !== $dateParam) {
+                    throw new InvalidArgumentException;
+                }
+                $date = $parsed;
+            } catch (Exception) {
+                return response()->json(['message' => 'Invalid date. Use YYYY-MM-DD format.'], 422);
+            }
+        }
+
         $cursor = $request->query('cursor');
         $limit = (int) $request->query('limit', CursorPaginator::DEFAULT_LIMIT);
 
         [$events, $nextCursor, $hasMore] = CursorPaginator::paginate(
-            $this->eventFeed->query($request->user(), is_string($domain) ? $domain : null),
+            $this->eventFeed->query($request->user(), is_string($domain) ? $domain : null, $date),
             is_string($cursor) && $cursor !== '' ? $cursor : null,
             $limit,
             timeColumn: 'time',
