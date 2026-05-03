@@ -169,6 +169,58 @@ class FeedControllerTest extends TestCase
         $this->assertArrayNotHasKey('media_url', $item['target'] ?? []);
     }
 
+    #[Test]
+    public function default_feed_excludes_future_events(): void
+    {
+        $this->seedEvents(2);
+        $this->seedEventsAtTime(1, Carbon::now()->addDay());
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson('/api/v1/mobile/feed')->assertOk();
+
+        $this->assertCount(2, $response->json('data'));
+    }
+
+    #[Test]
+    public function date_parameter_returns_only_events_from_that_date(): void
+    {
+        $targetDate = Carbon::now()->subDays(3)->startOfDay();
+        $this->seedEventsAtTime(2, $targetDate->copy()->addHours(10));
+        $this->seedEvents(2);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson('/api/v1/mobile/feed?date=' . $targetDate->format('Y-m-d'))->assertOk();
+
+        $this->assertCount(2, $response->json('data'));
+        foreach ($response->json('data') as $event) {
+            $this->assertSame($targetDate->format('Y-m-d'), Carbon::parse($event['time'])->format('Y-m-d'));
+        }
+    }
+
+    #[Test]
+    public function date_parameter_can_target_a_future_date(): void
+    {
+        $futureDate = Carbon::now()->addDays(2)->startOfDay();
+        $this->seedEventsAtTime(1, $futureDate->copy()->addHours(9));
+        $this->seedEvents(2);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson('/api/v1/mobile/feed?date=' . $futureDate->format('Y-m-d'))->assertOk();
+
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame($futureDate->format('Y-m-d'), Carbon::parse($response->json('data.0.time'))->format('Y-m-d'));
+    }
+
+    #[Test]
+    public function rejects_invalid_date_format(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/feed?date=not-a-date')
+            ->assertStatus(422)
+            ->assertJsonStructure(['message']);
+    }
+
     protected function seedEvents(int $count, string $domain = 'money'): void
     {
         $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -184,6 +236,27 @@ class FeedControllerTest extends TestCase
                 'value_multiplier' => 1,
                 'value_unit' => 'GBP',
                 'time' => Carbon::now()->subMinutes($i),
+                'actor_id' => $actor->id,
+                'target_id' => $target->id,
+            ]);
+        }
+    }
+
+    protected function seedEventsAtTime(int $count, Carbon $time, string $domain = 'money'): void
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        foreach (range(0, $count - 1) as $i) {
+            Event::factory()->create([
+                'integration_id' => $this->integration->id,
+                'service' => 'monzo',
+                'domain' => $domain,
+                'action' => 'card_payment_to',
+                'value' => 10,
+                'value_multiplier' => 1,
+                'value_unit' => 'GBP',
+                'time' => $time->copy()->addMinutes($i),
                 'actor_id' => $actor->id,
                 'target_id' => $target->id,
             ]);
