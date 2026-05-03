@@ -27,9 +27,9 @@ class MetricsController extends Controller
             ->orderBy('action')
             ->get();
 
-        return response()->json([
-            'data' => CompactMetricResource::collection($metrics)->resolve($request),
-        ]);
+        return response()->json(
+            CompactMetricResource::collection($metrics)->resolve($request),
+        );
     }
 
     /**
@@ -51,17 +51,37 @@ class MetricsController extends Controller
             ], 404);
         }
 
-        $payload = $this->trendService->trend(
-            $user,
-            $metric,
-            $request->query('from', '30_days_ago'),
-            $request->query('to', 'today'),
-        );
+        [$from, $to] = $this->dateRangeForRequest($request);
+
+        $payload = $this->trendService->trend($user, $metric, $from, $to);
 
         if ($payload === null) {
             return response()->json(['message' => 'Invalid date range.'], 422);
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function dateRangeForRequest(Request $request): array
+    {
+        $range = $request->query('range');
+
+        if (! is_string($range)) {
+            return [
+                $request->query('from', '30_days_ago'),
+                $request->query('to', 'today'),
+            ];
+        }
+
+        return match ($range) {
+            '7d' => ['6_days_ago', 'today'],
+            '30d' => ['29_days_ago', 'today'],
+            '90d' => ['89_days_ago', 'today'],
+            '1y' => ['364_days_ago', 'today'],
+            default => [$range, $range],
+        };
     }
 }

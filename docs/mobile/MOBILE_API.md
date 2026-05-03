@@ -249,10 +249,11 @@ See [CompactEvent](#compactevent) for the item schema.
 
 When `domain=knowledge`, each `CompactEvent` in the feed may include two additional optional fields:
 
-| Field              | Type   | Description                                                    |
-| ------------------ | ------ | -------------------------------------------------------------- |
-| `tldr`             | string | Single-sentence TL;DR from the associated block (if generated) |
-| `target.media_url` | string | OG image URL on the target object (e.g. article hero image)    |
+| Field               | Type   | Description                                                    |
+| ------------------- | ------ | -------------------------------------------------------------- |
+| `tldr`              | string | Single-sentence TL;DR from the associated block (if generated) |
+| `summary_paragraph` | string | Longer summary paragraph from the associated block (if exists) |
+| `target.media_url`  | string | OG image URL on the target object (e.g. article hero image)    |
 
 Both fields are omitted rather than `null` when not available.
 
@@ -316,24 +317,23 @@ Returns all metric identifiers and metadata for the authenticated user. Use this
 **Response `200`**
 
 ```json
-{
-    "data": [
-        {
-            "id": "uuid",
-            "identifier": "oura.had_sleep_score.percent",
-            "display_name": "Sleep Score",
-            "service": "oura",
-            "action": "had_sleep_score",
-            "unit": "percent",
-            "event_count": 180,
-            "mean": 83.1,
-            "last_event_at": "2025-01-15T08:00:00+00:00"
-        }
-    ]
-}
+[
+    {
+        "id": "uuid",
+        "identifier": "oura.sleep_score",
+        "display_name": "Sleep Score",
+        "service": "oura",
+        "domain": "health",
+        "action": "had_sleep_score",
+        "unit": "percent",
+        "event_count": 180,
+        "mean": 83.1,
+        "last_event_at": "2025-01-15T08:00:00+00:00"
+    }
+]
 ```
 
-Results are ordered by `service` then `action`. An empty `data` array is returned when no metrics have been computed yet.
+Results are ordered by `service` then `action`. An empty array is returned when no metrics have been computed yet.
 
 ---
 
@@ -349,6 +349,7 @@ Returns a metric trend with per-day values, summary statistics, and optional bas
 | --------- | ------ | ------------- | --------------------------------------------- |
 | `from`    | string | `30_days_ago` | Start date (`YYYY-MM-DD` or relative keyword) |
 | `to`      | string | `today`       | End date (`YYYY-MM-DD` or relative keyword)   |
+| `range`   | string | `null`        | Preset range: `7d`, `30d`, `90d`, or `1y`     |
 
 **Relative Date Keywords**: `today`, `yesterday`, `7_days_ago`, `30_days_ago`, `90_days_ago`
 
@@ -940,6 +941,7 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "identifier": "oura.sleep_score",
     "display_name": "Sleep Score",
     "service": "oura",
+    "domain": "health",
     "action": "sleep_score",
     "unit": "score",
     "event_count": 365,

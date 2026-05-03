@@ -57,13 +57,15 @@ class MetricsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/metrics')
             ->assertOk()
             ->assertJsonStructure([
-                'data' => [[
+                [[
                     'id', 'identifier', 'display_name', 'service',
-                    'action', 'unit', 'event_count', 'mean', 'last_event_at',
+                    'domain', 'action', 'unit', 'event_count', 'mean', 'last_event_at',
                 ]],
             ])
-            ->assertJsonPath('data.0.service', 'oura')
-            ->assertJsonPath('data.0.action', 'had_sleep_score');
+            ->assertJsonPath('0.identifier', 'oura.sleep_score')
+            ->assertJsonPath('0.service', 'oura')
+            ->assertJsonPath('0.domain', 'health')
+            ->assertJsonPath('0.action', 'had_sleep_score');
     }
 
     #[Test]
@@ -73,7 +75,7 @@ class MetricsControllerTest extends TestCase
 
         $this->getJson('/api/v1/mobile/metrics')
             ->assertOk()
-            ->assertJson(['data' => []]);
+            ->assertExactJson([]);
     }
 
     #[Test]
@@ -93,6 +95,24 @@ class MetricsControllerTest extends TestCase
             ])
             ->assertJsonPath('service', 'oura')
             ->assertJsonPath('action', 'had_sleep_score');
+    }
+
+    #[Test]
+    public function returns_trend_payload_for_range_query(): void
+    {
+        $this->seedMetric();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        Carbon::setTestNow('2026-05-03 12:00:00');
+
+        try {
+            $this->getJson('/api/v1/mobile/metrics/oura.sleep_score?range=7d')
+                ->assertOk()
+                ->assertJsonPath('range.from', '2026-04-27')
+                ->assertJsonPath('range.to', '2026-05-03');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     #[Test]
