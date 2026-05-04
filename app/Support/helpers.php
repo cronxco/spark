@@ -217,7 +217,7 @@ if (! function_exists('format_duration')) {
 
         // Less than 1 minute: show only seconds
         if ($seconds < 60) {
-            return $seconds . 's';
+            return $seconds.'s';
         }
 
         // Less than 1 hour: show minutes and seconds
@@ -275,7 +275,7 @@ if (! function_exists('format_block_value_display')) {
 
         // Handle percent
         if (strtolower($unit) === 'percent') {
-            return $numericValue . '%';
+            return $numericValue.'%';
         }
 
         // Handle currency codes
@@ -286,7 +286,7 @@ if (! function_exists('format_block_value_display')) {
         ];
 
         if (isset($currencySymbols[$unit])) {
-            return $currencySymbols[$unit] . $numericValue;
+            return $currencySymbols[$unit].$numericValue;
         }
 
         // Handle time in seconds - convert to duration format
@@ -295,7 +295,7 @@ if (! function_exists('format_block_value_display')) {
         }
 
         // Default: space between value and unit
-        return $numericValue . ' ' . $unit;
+        return $numericValue.' '.$unit;
     }
 }
 
@@ -358,7 +358,55 @@ if (! function_exists('format_event_value_display')) {
         }
 
         // Default fallback: simple concatenation
-        return (string) $value . ($unit ? (' ' . $unit) : '');
+        return (string) $value.($unit ? (' '.$unit) : '');
+    }
+}
+
+if (! function_exists('format_event_display_value')) {
+    /**
+     * Duration-aware display formatter for event values.
+     *
+     * Extends format_event_value_display() by first checking whether the unit
+     * is a duration (ms/s/m/h and aliases) and converting to a compact string
+     * like "2h5m" before falling through to plugin Blade formatters. Both the
+     * webapp (Day::formatValueDisplay) and the mobile API resource call this
+     * so they can never diverge.
+     */
+    function format_event_display_value(mixed $value, ?string $unit, ?string $service = null, ?string $action = null): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $durationUnits = [
+            'ms', 'millisecond', 'milliseconds',
+            's', 'sec', 'secs', 'second', 'seconds',
+            'm', 'min', 'mins', 'minute', 'minutes',
+            'h', 'hr', 'hrs', 'hour', 'hours',
+        ];
+
+        if ($unit && in_array(strtolower($unit), $durationUnits, true)) {
+            $u = strtolower($unit);
+            $numeric = (float) $value;
+
+            if (in_array($u, ['ms', 'millisecond', 'milliseconds'], true)) {
+                $seconds = $numeric / 1000.0;
+            } elseif (in_array($u, ['m', 'min', 'mins', 'minute', 'minutes'], true)) {
+                $seconds = $numeric * 60.0;
+            } elseif (in_array($u, ['h', 'hr', 'hrs', 'hour', 'hours'], true)) {
+                $seconds = $numeric * 3600.0;
+            } else {
+                $seconds = $numeric;
+            }
+
+            if ($seconds < 1) {
+                return ((int) round($seconds * 1000)).'ms';
+            }
+
+            return format_duration($seconds);
+        }
+
+        return format_event_value_display($value, $unit, $service, $action, 'action');
     }
 }
 
@@ -450,10 +498,10 @@ if (! function_exists('get_integration_log_channel')) {
         $filename = generate_api_log_filename($service, $integrationId, $perInstance);
         $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
 
-        $baseConfig['path'] = storage_path('logs/' . $filename);
+        $baseConfig['path'] = storage_path('logs/'.$filename);
 
         // Create the channel dynamically if it doesn't exist
-        if (! config('logging.channels.' . $channelName)) {
+        if (! config('logging.channels.'.$channelName)) {
             Log::build($baseConfig);
         }
 
@@ -504,7 +552,7 @@ if (! function_exists('log_integration_api_request')) {
 
         $filename = generate_api_log_filename($service, $integrationId, $perInstance);
         $channelName = pathinfo($filename, PATHINFO_FILENAME);
-        $baseConfig['path'] = storage_path('logs/' . $filename);
+        $baseConfig['path'] = storage_path('logs/'.$filename);
 
         $logger = Log::build($baseConfig);
 
@@ -567,7 +615,7 @@ if (! function_exists('log_integration_api_response')) {
                         return is_array($header) ? $header : [$header];
                     }, sanitizeHeaders($headers)),
                     'response_body' => strlen($body) > 10000
-                        ? substr($body, 0, 10000) . '... [TRUNCATED]'
+                        ? substr($body, 0, 10000).'... [TRUNCATED]'
                         : $body,
                     'timestamp' => now()->toISOString(),
                 ]);
@@ -586,7 +634,7 @@ if (! function_exists('log_integration_api_response')) {
 
         $filename = generate_api_log_filename($service, $integrationId, $perInstance);
         $channelName = pathinfo($filename, PATHINFO_FILENAME);
-        $baseConfig['path'] = storage_path('logs/' . $filename);
+        $baseConfig['path'] = storage_path('logs/'.$filename);
 
         $logger = Log::build($baseConfig);
 
@@ -602,7 +650,7 @@ if (! function_exists('log_integration_api_response')) {
                     return is_array($header) ? $header : [$header];
                 }, sanitizeHeaders($headers)),
                 'response_body' => strlen($body) > 10000
-                    ? substr($body, 0, 10000) . '... [TRUNCATED]'
+                    ? substr($body, 0, 10000).'... [TRUNCATED]'
                     : $body,
                 'timestamp' => now()->toISOString(),
             ]);
@@ -620,7 +668,7 @@ if (! function_exists('log_integration_api_response')) {
                 return is_array($header) ? $header : [$header];
             }, sanitizeHeaders($headers)),
             'response_body' => strlen($body) > 10000
-                ? substr($body, 0, 10000) . '... [TRUNCATED]'
+                ? substr($body, 0, 10000).'... [TRUNCATED]'
                 : $body,
             'timestamp' => now()->toISOString(),
         ]);
@@ -647,7 +695,7 @@ if (! function_exists('log_integration_webhook')) {
 
         $filename = generate_api_log_filename($service, $integrationId, $perInstance);
         $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
-        $baseConfig['path'] = storage_path('logs/' . $filename);
+        $baseConfig['path'] = storage_path('logs/'.$filename);
 
         $logger = Log::build($baseConfig);
         $logger->debug('Webhook Payload', [
@@ -727,7 +775,7 @@ if (! function_exists('truncate_to_words')) {
         $positions = array_keys($words);
         $truncatePosition = $positions[$wordLimit] ?? strlen($text);
 
-        return substr($text, 0, $truncatePosition) . '...';
+        return substr($text, 0, $truncatePosition).'...';
     }
 }
 
@@ -768,7 +816,7 @@ if (! function_exists('karakeep_add_bookmark')) {
             }
 
             $response = Http::withToken($accessToken)
-                ->post(rtrim($karakeepUrl, '/') . '/api/v1/bookmarks', $payload);
+                ->post(rtrim($karakeepUrl, '/').'/api/v1/bookmarks', $payload);
 
             if ($response->successful()) {
                 Log::info('Successfully added bookmark to Karakeep', [
@@ -814,7 +862,7 @@ if (! function_exists('get_domain_from_url')) {
     {
         // Add protocol if not present to help parse_url work correctly
         if (! preg_match('~^(?:f|ht)tps?://~i', $url)) {
-            $url = 'http://' . $url;
+            $url = 'http://'.$url;
         }
 
         $host = parse_url($url, PHP_URL_HOST);
@@ -846,15 +894,15 @@ if (! function_exists('get_domain_from_url')) {
 
         // Check if we have a two-part TLD (e.g., co.uk)
         if ($numParts >= 3) {
-            $possibleTld = $parts[$numParts - 2] . '.' . $parts[$numParts - 1];
+            $possibleTld = $parts[$numParts - 2].'.'.$parts[$numParts - 1];
             if (in_array($possibleTld, $twoPartTlds, true)) {
                 // Return domain.co.uk format (last 3 parts)
-                return $parts[$numParts - 3] . '.' . $possibleTld;
+                return $parts[$numParts - 3].'.'.$possibleTld;
             }
         }
 
         // Default: Get the last two parts (domain.tld)
-        $domain = $parts[$numParts - 2] . '.' . $parts[$numParts - 1];
+        $domain = $parts[$numParts - 2].'.'.$parts[$numParts - 1];
 
         return $domain;
     }
@@ -912,7 +960,7 @@ if (! function_exists('heroicon_to_fontawesome')) {
         // Auto-convert: o-icon-name -> fas.icon-name
         $baseName = preg_replace('/^[os]-/', '', $heroiconName);
 
-        return 'fas.' . $baseName;
+        return 'fas.'.$baseName;
     }
 }
 
@@ -1232,12 +1280,12 @@ if (! function_exists('render_media_object_responsive')) {
             // Build srcset if conversions exist
             $srcset = [];
             if ($media->hasGeneratedConversion('thumbnail')) {
-                $srcset[] = $thumbnailUrl . ' 300w';
+                $srcset[] = $thumbnailUrl.' 300w';
             }
             if ($media->hasGeneratedConversion('medium')) {
-                $srcset[] = $mediumUrl . ' 800w';
+                $srcset[] = $mediumUrl.' 800w';
             }
-            $srcset[] = $baseUrl . ' ' . ($media->getCustomProperty('width') ?? '1200') . 'w';
+            $srcset[] = $baseUrl.' '.($media->getCustomProperty('width') ?? '1200').'w';
 
             $srcsetAttr = implode(', ', $srcset);
 

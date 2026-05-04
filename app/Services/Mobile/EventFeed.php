@@ -87,14 +87,11 @@ class EventFeed
     {
         $integrationIds = $user->integrations()->pluck('id')->all();
 
-        $eagerLoads = ['actor', 'target', 'integration'];
-
-        if ($domain === 'knowledge') {
-            $eagerLoads[] = 'blocks';
-        }
+        $eagerLoads = ['actor', 'target', 'integration', 'tags', 'blocks'];
 
         $query = Event::query()
             ->whereIn('integration_id', empty($integrationIds) ? [-1] : $integrationIds)
+            ->withCount('blocks')
             ->with($eagerLoads);
 
         if ($domain !== null) {

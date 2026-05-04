@@ -238,8 +238,6 @@ Cursor-paginated reverse-chronological feed of the user's events.
 - **No `date`** (default): returns events up to and including the current moment, paging backwards. Future events are excluded.
 - **`date` specified**: returns only events whose `time` falls within that calendar day (midnight–23:59:59 UTC). Cursor pagination still applies within the day. Can be a past or future date.
 
-When `domain=knowledge` the response includes compact enrichment fields on each item — see [Knowledge Enrichment](#knowledge-enrichment) below.
-
 **Response `200`**
 
 ```json
@@ -252,25 +250,13 @@ When `domain=knowledge` the response includes compact enrichment fields on each 
 
 **Response `422`** — Invalid domain value or malformed `date` parameter.
 
-See [CompactEvent](#compactevent) for the item schema.
-
-#### Knowledge Enrichment
-
-When `domain=knowledge`, each `CompactEvent` in the feed may include two additional optional fields:
-
-| Field               | Type   | Description                                                    |
-| ------------------- | ------ | -------------------------------------------------------------- |
-| `tldr`              | string | Single-sentence TL;DR from the associated block (if generated) |
-| `summary_paragraph` | string | Longer summary paragraph from the associated block (if exists) |
-| `target.media_url`  | string | OG image URL on the target object (e.g. article hero image)    |
-
-Both fields are omitted rather than `null` when not available.
+See [CompactEvent](#compactevent) for the item schema. Feed items include `tags`, `blocks_count`, and `tldr` (when a `*_tldr` block exists), but do **not** embed the full `blocks` array — tap through to `GET /events/{id}` to retrieve that.
 
 ---
 
 ### `GET /events/{id}`
 
-Returns a single event by UUID.
+Returns a single event by UUID. The response includes the full embedded `blocks` array (not present in feed items).
 
 **Response `200`** — [CompactEvent](#compactevent)
 
@@ -323,7 +309,7 @@ Returns a single Block by UUID.
 
 Returns all metric identifiers and metadata for the authenticated user. Use this to build a dynamic metrics catalogue instead of maintaining a hardcoded list.
 
-**Response `200`**
+**Response `200`** — flat array (not wrapped in `data`)
 
 ```json
 [
@@ -342,7 +328,7 @@ Returns all metric identifiers and metadata for the authenticated user. Use this
 ]
 ```
 
-Results are ordered by `service` then `action`. An empty array is returned when no metrics have been computed yet.
+The `identifier` is formatted as `{service}.{action_without_had_prefix}` (e.g. `oura.sleep_score`). Results are ordered by `service` then `action`. An empty array is returned when no metrics have been computed yet.
 
 ---
 
@@ -354,13 +340,15 @@ Returns a metric trend with per-day values, summary statistics, and optional bas
 
 **Query Parameters**
 
-| Parameter | Type   | Default       | Description                                   |
-| --------- | ------ | ------------- | --------------------------------------------- |
-| `from`    | string | `30_days_ago` | Start date (`YYYY-MM-DD` or relative keyword) |
-| `to`      | string | `today`       | End date (`YYYY-MM-DD` or relative keyword)   |
-| `range`   | string | `null`        | Preset range: `7d`, `30d`, `90d`, or `1y`     |
+| Parameter | Type   | Default       | Description                                              |
+| --------- | ------ | ------------- | -------------------------------------------------------- |
+| `range`   | string | —             | Preset: `7d`, `30d`, `90d`, `1y` (overrides `from`/`to`) |
+| `from`    | string | `30_days_ago` | Start date (`YYYY-MM-DD` or relative keyword)            |
+| `to`      | string | `today`       | End date (`YYYY-MM-DD` or relative keyword)              |
 
 **Relative Date Keywords**: `today`, `yesterday`, `7_days_ago`, `30_days_ago`, `90_days_ago`
+
+When `range` is provided it takes precedence over `from`/`to`. Preset mappings: `7d` → last 7 days, `30d` → last 30 days, `90d` → last 90 days, `1y` → last 365 days.
 
 **Response `200`**
 
@@ -891,24 +879,52 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "time": "2025-01-15T09:30:00+00:00",
     "service": "oura",
     "domain": "health",
-    "action": "sleep_score",
+    "action": "had_sleep_score",
+    "display_name": "Sleep Score",
+    "hidden": false,
     "value": "82",
     "unit": "score",
+    "display_value": "82 score",
     "url": "https://...",
     "actor": {
         "id": "uuid",
         "title": "Oura Ring",
-        "concept": "device"
+        "concept": "device",
+        "type": "oura_device",
+        "media_url": "https://..."
     },
     "target": {
         "id": "uuid",
         "title": "Sleep Session",
-        "concept": "session"
-    }
+        "concept": "session",
+        "type": "sleep_session",
+        "media_url": null
+    },
+    "tags": [
+        { "name": "running", "type": null }
+    ],
+    "tldr": "Optional single-sentence summary from any *_tldr block.",
+    "blocks_count": 3,
+    "blocks": [ CompactBlock, ... ]
 }
 ```
 
-`value`, `unit`, `url`, `actor`, and `target` are omitted when not present. `value` is formatted according to the event's `value_multiplier` and formatter.
+**Field notes:**
+
+| Field           | Always present | Description                                                                  |
+| --------------- | -------------- | ---------------------------------------------------------------------------- |
+| `display_name`  | Yes            | Human-readable action label from plugin registry                             |
+| `hidden`        | Yes            | `true` if this action should be hidden in default UI (e.g. balance updates)  |
+| `value`         | No             | Formatted numeric value (applies `value_multiplier`); omitted when no value  |
+| `unit`          | No             | Unit string; omitted when no value                                           |
+| `display_value` | No             | Fully formatted string, e.g. `"£10.50"`; omitted when no value               |
+| `url`           | No             | Omitted when not set on the event                                            |
+| `actor`         | No             | Omitted when not set; `media_url` within may be `null`                       |
+| `target`        | No             | Omitted when not set; `media_url` within may be `null`                       |
+| `tldr`          | No             | Content of the first block whose `block_type` contains `tldr`; any domain    |
+| `tags`          | Yes            | Always an array (empty when no tags); each item has `name` and `type`        |
+| `blocks_count`  | Feed only      | Integer count of attached blocks; present in `/feed`, absent in `/events/id` |
+| `blocks`        | Detail only    | Full block array; present in `GET /events/{id}`, absent in `/feed`           |
 
 ### CompactObject
 
@@ -965,7 +981,7 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "display_name": "Sleep Score",
     "service": "oura",
     "domain": "health",
-    "action": "sleep_score",
+    "action": "had_sleep_score",
     "unit": "score",
     "event_count": 365,
     "mean": 83.1,
@@ -973,7 +989,7 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
 }
 ```
 
-`mean` is `null` when insufficient data exists.
+`identifier` is `{service}.{action_without_had_prefix}`, e.g. `oura.sleep_score`. `mean` is `null` when insufficient data exists. `domain` is derived from the service/action and can be used for colour-coding (`health`, `activity`, `money`, `media`, `knowledge`, `online`).
 
 ### CompactPlace
 

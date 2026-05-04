@@ -75,7 +75,7 @@ class FeedControllerTest extends TestCase
         $first = $this->getJson('/api/v1/mobile/feed?limit=2')->assertOk();
         $cursor = $first->json('next_cursor');
 
-        $second = $this->getJson('/api/v1/mobile/feed?limit=2&cursor=' . urlencode($cursor))
+        $second = $this->getJson('/api/v1/mobile/feed?limit=2&cursor='.urlencode($cursor))
             ->assertOk()
             ->assertJsonPath('has_more', false);
 
@@ -121,7 +121,7 @@ class FeedControllerTest extends TestCase
     }
 
     #[Test]
-    public function knowledge_events_include_enrichment_fields(): void
+    public function knowledge_events_include_target_media_url_and_blocks_count(): void
     {
         $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
         $target = EventObject::factory()->create([
@@ -158,22 +158,124 @@ class FeedControllerTest extends TestCase
 
         $item = $response->json('data.0');
         $this->assertSame('https://example.com/image.jpg', $item['target']['media_url']);
+        $this->assertSame(2, $item['blocks_count']);
         $this->assertSame('A brief summary.', $item['tldr']);
-        $this->assertSame('A longer paragraph summary.', $item['summary_paragraph']);
+        $this->assertArrayNotHasKey('summary_paragraph', $item);
+        $this->assertArrayNotHasKey('blocks', $item);
     }
 
     #[Test]
-    public function non_knowledge_events_omit_enrichment_fields(): void
+    public function feed_events_never_embed_blocks_array_only_count(): void
     {
         $this->seedEvents(1, domain: 'money');
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')
+            ->assertOk()
+            ->json('data.0');
+
+        $this->assertArrayNotHasKey('blocks', $item);
+        $this->assertArrayHasKey('blocks_count', $item);
+        $this->assertArrayNotHasKey('summary_paragraph', $item);
+    }
+
+    #[Test]
+    public function tldr_appears_in_feed_for_any_domain_when_tldr_block_exists(): void
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'time' => now(),
+            'actor_id' => $actor->id,
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'payment_tldr',
+            'metadata' => ['content' => 'You paid Pret £3.50.'],
+        ]);
+
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
         $item = $this->getJson('/api/v1/mobile/feed?domain=money')
             ->assertOk()
             ->json('data.0');
 
-        $this->assertArrayNotHasKey('tldr', $item);
-        $this->assertArrayNotHasKey('media_url', $item['target'] ?? []);
+        $this->assertSame('You paid Pret £3.50.', $item['tldr']);
+        $this->assertArrayNotHasKey('blocks', $item);
+    }
+
+    #[Test]
+    public function feed_events_include_actor_and_target_type(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertArrayHasKey('type', $item['actor']);
+        $this->assertArrayHasKey('type', $item['target']);
+    }
+
+    #[Test]
+    public function feed_events_include_media_url_on_actor_and_target(): void
+    {
+        $actor = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'media_url' => 'https://example.com/actor.jpg',
+        ]);
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'media_url' => 'https://example.com/target.jpg',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'value' => 10,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertSame('https://example.com/actor.jpg', $item['actor']['media_url']);
+        $this->assertSame('https://example.com/target.jpg', $item['target']['media_url']);
+    }
+
+    #[Test]
+    public function feed_events_include_tags_as_objects(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertArrayHasKey('tags', $item);
+        $this->assertIsArray($item['tags']);
+    }
+
+    #[Test]
+    public function feed_events_include_blocks_count(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertArrayHasKey('blocks_count', $item);
+        $this->assertIsInt($item['blocks_count']);
+        $this->assertSame(0, $item['blocks_count']);
     }
 
     #[Test]
@@ -196,7 +298,7 @@ class FeedControllerTest extends TestCase
         $this->seedEvents(2);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $response = $this->getJson('/api/v1/mobile/feed?date=' . $targetDate->format('Y-m-d'))->assertOk();
+        $response = $this->getJson('/api/v1/mobile/feed?date='.$targetDate->format('Y-m-d'))->assertOk();
 
         $this->assertCount(2, $response->json('data'));
         foreach ($response->json('data') as $event) {
@@ -212,7 +314,7 @@ class FeedControllerTest extends TestCase
         $this->seedEvents(2);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $response = $this->getJson('/api/v1/mobile/feed?date=' . $futureDate->format('Y-m-d'))->assertOk();
+        $response = $this->getJson('/api/v1/mobile/feed?date='.$futureDate->format('Y-m-d'))->assertOk();
 
         $this->assertCount(1, $response->json('data'));
         $this->assertSame($futureDate->format('Y-m-d'), Carbon::parse($response->json('data.0.time'))->format('Y-m-d'));
@@ -226,6 +328,56 @@ class FeedControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/feed?date=not-a-date')
             ->assertStatus(422)
             ->assertJsonStructure(['message']);
+    }
+
+    #[Test]
+    public function events_include_display_name_and_hidden_flag(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertSame('Card Payment', $item['display_name']);
+        $this->assertFalse($item['hidden']);
+    }
+
+    #[Test]
+    public function events_with_value_include_display_value(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertArrayHasKey('display_value', $item);
+        $this->assertIsString($item['display_value']);
+        $this->assertNotEmpty($item['display_value']);
+    }
+
+    #[Test]
+    public function hidden_action_is_flagged_in_feed(): void
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value' => 10000,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'actor_id' => $actor->id,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertTrue($item['hidden']);
+        $this->assertSame('Balance Update', $item['display_name']);
     }
 
     protected function seedEvents(int $count, string $domain = 'money'): void
