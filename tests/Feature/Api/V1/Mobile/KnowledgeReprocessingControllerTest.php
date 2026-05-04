@@ -24,6 +24,8 @@ class KnowledgeReprocessingControllerTest extends TestCase
 
     protected User $user;
 
+    private int $knowledgeObjectSequence = 0;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -180,7 +182,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
             'user_id' => $user->id,
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
-            'title' => 'Example Article',
+            'title' => 'Example Article ' . $this->nextKnowledgeObjectSequence(),
             'url' => 'https://example.com/article',
             'content' => $webpageContent,
         ]);
@@ -204,7 +206,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
             'user_id' => $this->user->id,
             'concept' => 'publication',
             'type' => 'newsletter_publication',
-            'title' => 'Example Newsletter',
+            'title' => 'Example Newsletter ' . $this->nextKnowledgeObjectSequence(),
             'content' => $publicationContent,
         ]);
 
@@ -220,5 +222,10 @@ class KnowledgeReprocessingControllerTest extends TestCase
                 'raw_html' => $rawHtml,
             ], fn ($value) => $value !== null),
         ]);
+    }
+
+    private function nextKnowledgeObjectSequence(): int
+    {
+        return ++$this->knowledgeObjectSequence;
     }
 }
