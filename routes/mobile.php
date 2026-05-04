@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
+use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
@@ -117,3 +118,7 @@ Route::patch('settings/notifications', [NotificationSettingsController::class, '
 Route::post('anomalies/{id}/acknowledge', [AnomaliesController::class, 'acknowledge'])
     ->middleware('ability:ios:write')
     ->name('anomalies.acknowledge');
+
+Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('knowledge.events.reprocess');

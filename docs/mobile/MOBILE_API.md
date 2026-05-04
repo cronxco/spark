@@ -623,17 +623,18 @@ All write endpoints require `ios:write` ability.
 
 ### Summary
 
-| Method   | Path                           | Description                       |
-| -------- | ------------------------------ | --------------------------------- |
-| `POST`   | `/devices`                     | Register an APNs device token     |
-| `DELETE` | `/devices/{id}`                | Unregister a device               |
-| `POST`   | `/health/samples`              | Ingest HealthKit samples (batch)  |
-| `POST`   | `/live-activities`             | Start a Live Activity             |
-| `PATCH`  | `/live-activities/{id}`        | Push a Live Activity update       |
-| `DELETE` | `/live-activities/{id}`        | End a Live Activity               |
-| `POST`   | `/live-activities/{id}/tokens` | Rotate a Live Activity push token |
-| `POST`   | `/check-ins`                   | Submit a daily mood check-in      |
-| `POST`   | `/anomalies/{id}/acknowledge`  | Acknowledge a metric anomaly      |
+| Method   | Path                               | Description                       |
+| -------- | ---------------------------------- | --------------------------------- |
+| `POST`   | `/devices`                         | Register an APNs device token     |
+| `DELETE` | `/devices/{id}`                    | Unregister a device               |
+| `POST`   | `/health/samples`                  | Ingest HealthKit samples (batch)  |
+| `POST`   | `/live-activities`                 | Start a Live Activity             |
+| `PATCH`  | `/live-activities/{id}`            | Push a Live Activity update       |
+| `DELETE` | `/live-activities/{id}`            | End a Live Activity               |
+| `POST`   | `/live-activities/{id}/tokens`     | Rotate a Live Activity push token |
+| `POST`   | `/check-ins`                       | Submit a daily mood check-in      |
+| `POST`   | `/anomalies/{id}/acknowledge`      | Acknowledge a metric anomaly      |
+| `POST`   | `/knowledge/events/{id}/reprocess` | Queue knowledge AI reprocessing   |
 
 ---
 
@@ -879,6 +880,51 @@ Acknowledges a metric anomaly, optionally suppressing future alerts until a date
 ```
 
 **Response `404`** — Anomaly not found or belongs to another user.
+
+---
+
+### `POST /knowledge/events/{id}/reprocess`
+
+Queues AI reprocessing for a Fetch or Newsletter knowledge event owned by the authenticated user.
+
+`{id}` is the UUID of the event to repair.
+
+**Request Body**
+
+```json
+{
+    "mode": "auto"
+}
+```
+
+| Field  | Type   | Required | Description                                               |
+| ------ | ------ | -------- | --------------------------------------------------------- |
+| `mode` | string | No       | `auto`, `summary_only`, or `refetch`. Defaults to `auto`. |
+
+**Modes**
+
+| Mode           | Description                                                                            |
+| -------------- | -------------------------------------------------------------------------------------- |
+| `auto`         | Prefer the earliest available pipeline step: extract from raw content, then summarize. |
+| `summary_only` | Generate TLDR/summary blocks from existing extracted content.                          |
+| `refetch`      | Fetch-only. Force-refresh the original URL before extraction and summaries.            |
+
+Newsletter events cannot use `refetch`.
+
+**Response `202`**
+
+```json
+{
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "service": "fetch",
+    "status": "queued",
+    "mode": "auto"
+}
+```
+
+**Response `404`** — Knowledge event not found or belongs to another user.
+
+**Response `422`** — Unsupported event, invalid mode, missing integration, missing source content, or newsletter `refetch`.
 
 ---
 
