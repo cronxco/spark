@@ -549,11 +549,35 @@ Returns geo-located events and places within a bounding box. When the result cou
 {
     "clusters": [],
     "markers": {
-        "events": [ CompactEvent, ... ],
-        "places": [ CompactPlace, ... ]
+        "events": [
+            {
+                "id": "uuid",
+                "kind": "transaction",
+                "lat": 51.5225,
+                "lng": -0.0745,
+                "title": "Craft Metropolis",
+                "subtitle": "£30.00",
+                "time": "2026-04-25T14:27:02+00:00",
+                "service": "monzo"
+            }
+        ],
+        "places": [
+            {
+                "id": "uuid",
+                "kind": "place",
+                "lat": 51.52,
+                "lng": -0.08,
+                "title": "Home",
+                "subtitle": null,
+                "time": null,
+                "service": null
+            }
+        ]
     }
 }
 ```
+
+`markers.events` and `markers.places` use compact map pin objects, not feed resources. `kind` is one of `place`, `transaction`, `workout`, or `event`. Events without event-level coordinates or a located target object are omitted.
 
 **Response `200` — Clusters (>500 items)**
 
