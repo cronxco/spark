@@ -238,6 +238,11 @@ Cursor-paginated reverse-chronological feed of the user's events.
 - **No `date`** (default): returns events up to and including the current moment, paging backwards. Future events are excluded.
 - **`date` specified**: returns only events whose `time` falls within that calendar day (midnight–23:59:59 UTC). Cursor pagination still applies within the day. Can be a past or future date.
 
+**Date behaviour**
+
+- **No `date`** (default): returns events up to and including the current moment, paging backwards. Future events are excluded.
+- **`date` specified**: returns only events whose `time` falls within that calendar day (midnight–23:59:59 UTC). Cursor pagination still applies within the day. Can be a past or future date.
+
 **Response `200`**
 
 ```json
@@ -340,11 +345,11 @@ Returns a metric trend with per-day values, summary statistics, and optional bas
 
 **Query Parameters**
 
-| Parameter | Type   | Default       | Description                                              |
-| --------- | ------ | ------------- | -------------------------------------------------------- |
-| `range`   | string | —             | Preset: `7d`, `30d`, `90d`, `1y` (overrides `from`/`to`) |
-| `from`    | string | `30_days_ago` | Start date (`YYYY-MM-DD` or relative keyword)            |
-| `to`      | string | `today`       | End date (`YYYY-MM-DD` or relative keyword)              |
+| Parameter | Type   | Default       | Description                                   |
+| --------- | ------ | ------------- | --------------------------------------------- |
+| `from`    | string | `30_days_ago` | Start date (`YYYY-MM-DD` or relative keyword) |
+| `to`      | string | `today`       | End date (`YYYY-MM-DD` or relative keyword)   |
+| `range`   | string | `null`        | Preset range: `7d`, `30d`, `90d`, or `1y`     |
 
 **Relative Date Keywords**: `today`, `yesterday`, `7_days_ago`, `30_days_ago`, `90_days_ago`
 
