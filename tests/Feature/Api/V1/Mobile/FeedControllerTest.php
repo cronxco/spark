@@ -75,7 +75,7 @@ class FeedControllerTest extends TestCase
         $first = $this->getJson('/api/v1/mobile/feed?limit=2')->assertOk();
         $cursor = $first->json('next_cursor');
 
-        $second = $this->getJson('/api/v1/mobile/feed?limit=2&cursor='.urlencode($cursor))
+        $second = $this->getJson('/api/v1/mobile/feed?limit=2&cursor=' . urlencode($cursor))
             ->assertOk()
             ->assertJsonPath('has_more', false);
 
@@ -298,7 +298,7 @@ class FeedControllerTest extends TestCase
         $this->seedEvents(2);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $response = $this->getJson('/api/v1/mobile/feed?date='.$targetDate->format('Y-m-d'))->assertOk();
+        $response = $this->getJson('/api/v1/mobile/feed?date=' . $targetDate->format('Y-m-d'))->assertOk();
 
         $this->assertCount(2, $response->json('data'));
         foreach ($response->json('data') as $event) {
@@ -314,7 +314,7 @@ class FeedControllerTest extends TestCase
         $this->seedEvents(2);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $response = $this->getJson('/api/v1/mobile/feed?date='.$futureDate->format('Y-m-d'))->assertOk();
+        $response = $this->getJson('/api/v1/mobile/feed?date=' . $futureDate->format('Y-m-d'))->assertOk();
 
         $this->assertCount(1, $response->json('data'));
         $this->assertSame($futureDate->format('Y-m-d'), Carbon::parse($response->json('data.0.time'))->format('Y-m-d'));
