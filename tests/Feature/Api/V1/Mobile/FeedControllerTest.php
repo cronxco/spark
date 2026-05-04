@@ -369,6 +369,67 @@ class FeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function hidden_action_uses_integration_service_when_event_service_does_not_match_plugin(): void
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'legacy_monzo',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value' => 10000,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'actor_id' => $actor->id,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertTrue($item['hidden']);
+        $this->assertSame('Balance Update', $item['display_name']);
+    }
+
+    #[Test]
+    public function gocardless_balance_updates_are_hidden_in_feed(): void
+    {
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'gocardless',
+        ]);
+
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'gocardless',
+        ]);
+
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'gocardless',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value' => 10000,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'actor_id' => $actor->id,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertTrue($item['hidden']);
+        $this->assertSame('Balance Update', $item['display_name']);
+    }
+
+    #[Test]
     public function default_feed_excludes_future_events(): void
     {
         $this->seedEvents(2);

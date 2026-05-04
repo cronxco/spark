@@ -92,11 +92,55 @@ class CompactEventResource extends JsonResource
             $data['blocks_count'] = $this->blocks_count;
         }
 
-        $pluginClass = PluginRegistry::getPlugin($this->service);
-        $actionConfig = $pluginClass ? ($pluginClass::getActionTypes()[$this->action] ?? []) : [];
+        $actionConfig = $this->actionConfig();
         $data['display_name'] = $actionConfig['display_name'] ?? format_action_title($this->action);
         $data['hidden'] = (bool) ($actionConfig['hidden'] ?? false);
 
         return $data;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function actionConfig(): array
+    {
+        foreach ($this->pluginLookupKeys() as $service) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+
+            if (! $pluginClass) {
+                continue;
+            }
+
+            $actionConfig = $pluginClass::getActionTypes()[$this->action] ?? null;
+
+            if ($actionConfig !== null) {
+                return $actionConfig;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function pluginLookupKeys(): array
+    {
+        $services = [$this->service];
+
+        if ($this->relationLoaded('integration') && $this->integration?->service) {
+            $services[] = $this->integration->service;
+        }
+
+        return collect($services)
+            ->filter(fn ($service) => is_string($service) && $service !== '')
+            ->flatMap(fn (string $service) => [
+                $service,
+                str_replace('_', '-', $service),
+                str_replace('-', '_', $service),
+            ])
+            ->unique()
+            ->values()
+            ->all();
     }
 }
