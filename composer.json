@@ -30,7 +30,7 @@
         "livewire/livewire": "^3.6",
         "livewire/volt": "^1.7",
         "openai-php/laravel": "^0.18.0",
-        "owenvoke/blade-fontawesome": "^2.9",
+        "owenvoke/blade-fontawesome": "^3.0",
         "pgvector/pgvector": "^0.2.2",
         "pragmarx/version": "dev-master",
         "predis/predis": "^3.2",
