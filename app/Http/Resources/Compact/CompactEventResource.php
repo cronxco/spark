@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Compact;
 
+use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -32,6 +33,12 @@ class CompactEventResource extends JsonResource
         if ($this->value !== null) {
             $data['value'] = $this->formatted_value;
             $data['unit'] = $this->value_unit;
+            $data['display_value'] = format_event_display_value(
+                $this->formatted_value,
+                $this->value_unit,
+                $this->service,
+                $this->action,
+            );
         }
 
         if ($this->url) {
@@ -43,38 +50,52 @@ class CompactEventResource extends JsonResource
                 'id' => $this->actor->id,
                 'title' => $this->actor->title,
                 'concept' => $this->actor->concept,
+                'type' => $this->actor->type,
+                'media_url' => $this->actor->media_url,
             ];
         }
 
         if ($this->relationLoaded('target') && $this->target) {
-            $target = [
+            $data['target'] = [
                 'id' => $this->target->id,
                 'title' => $this->target->title,
                 'concept' => $this->target->concept,
+                'type' => $this->target->type,
+                'media_url' => $this->target->media_url,
             ];
-
-            if ($this->domain === 'knowledge' && $this->target->media_url) {
-                $target['media_url'] = $this->target->media_url;
-            }
-
-            $data['target'] = $target;
         }
 
-        if ($this->domain === 'knowledge' && $this->relationLoaded('blocks')) {
-            $tldr = $this->blocks->firstWhere('block_type', 'fetch_tldr')
-                ?? $this->blocks->firstWhere('block_type', 'newsletter_tldr');
+        if ($this->relationLoaded('tags')) {
+            $data['tags'] = $this->tags->map(fn ($tag) => [
+                'name' => $tag->name,
+                'type' => $tag->type,
+            ])->values()->all();
+        }
+
+        if ($this->relationLoaded('blocks')) {
+            $tldr = $this->blocks->first(
+                fn ($block) => str_contains($block->block_type, 'tldr'),
+            );
 
             if ($tldr) {
                 $data['tldr'] = $tldr->getContent();
             }
 
-            $paragraph = $this->blocks->firstWhere('block_type', 'fetch_summary_paragraph')
-                ?? $this->blocks->firstWhere('block_type', 'newsletter_summary_paragraph');
-
-            if ($paragraph) {
-                $data['summary_paragraph'] = $paragraph->getContent();
+            // Full blocks array only in the detail endpoint. The feed uses withCount('blocks')
+            // which sets blocks_count, signalling list mode where the array would be too heavy.
+            if (! isset($this->blocks_count)) {
+                $data['blocks'] = CompactBlockResource::collection($this->blocks)->resolve($request);
             }
         }
+
+        if (isset($this->blocks_count)) {
+            $data['blocks_count'] = $this->blocks_count;
+        }
+
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        $actionConfig = $pluginClass ? ($pluginClass::getActionTypes()[$this->action] ?? []) : [];
+        $data['display_name'] = $actionConfig['display_name'] ?? format_action_title($this->action);
+        $data['hidden'] = (bool) ($actionConfig['hidden'] ?? false);
 
         return $data;
     }

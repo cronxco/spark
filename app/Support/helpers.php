@@ -362,6 +362,54 @@ if (! function_exists('format_event_value_display')) {
     }
 }
 
+if (! function_exists('format_event_display_value')) {
+    /**
+     * Duration-aware display formatter for event values.
+     *
+     * Extends format_event_value_display() by first checking whether the unit
+     * is a duration (ms/s/m/h and aliases) and converting to a compact string
+     * like "2h5m" before falling through to plugin Blade formatters. Both the
+     * webapp (Day::formatValueDisplay) and the mobile API resource call this
+     * so they can never diverge.
+     */
+    function format_event_display_value(mixed $value, ?string $unit, ?string $service = null, ?string $action = null): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $durationUnits = [
+            'ms', 'millisecond', 'milliseconds',
+            's', 'sec', 'secs', 'second', 'seconds',
+            'm', 'min', 'mins', 'minute', 'minutes',
+            'h', 'hr', 'hrs', 'hour', 'hours',
+        ];
+
+        if ($unit && in_array(strtolower($unit), $durationUnits, true)) {
+            $u = strtolower($unit);
+            $numeric = (float) $value;
+
+            if (in_array($u, ['ms', 'millisecond', 'milliseconds'], true)) {
+                $seconds = $numeric / 1000.0;
+            } elseif (in_array($u, ['m', 'min', 'mins', 'minute', 'minutes'], true)) {
+                $seconds = $numeric * 60.0;
+            } elseif (in_array($u, ['h', 'hr', 'hrs', 'hour', 'hours'], true)) {
+                $seconds = $numeric * 3600.0;
+            } else {
+                $seconds = $numeric;
+            }
+
+            if ($seconds < 1) {
+                return ((int) round($seconds * 1000)) . 'ms';
+            }
+
+            return format_duration($seconds);
+        }
+
+        return format_event_value_display($value, $unit, $service, $action, 'action');
+    }
+}
+
 /**
  * Sanitize headers for logging (remove sensitive data)
  */

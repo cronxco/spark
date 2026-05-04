@@ -903,14 +903,12 @@ class Day extends Component
 
     public function formatValueDisplay($event): string
     {
-        $value = $event->formatted_value ?? $event->value;
-        $unit = $event->value_unit;
-
-        if ($this->isDurationUnit($unit)) {
-            return $this->formatDurationShort($value, $unit);
-        }
-
-        return format_event_value_display($value, $unit, $event->service, $event->action, 'action');
+        return format_event_display_value(
+            $event->formatted_value ?? $event->value,
+            $event->value_unit,
+            $event->service,
+            $event->action,
+        );
     }
 
     // -------------------------------------------------------------------------
