@@ -76,7 +76,7 @@ Schedule::job(new RefreshExpiringCookies)
 
 // Repair Fetch/Newsletter knowledge events that never received AI summary blocks.
 Schedule::job(new ProcessMissingKnowledgeSummariesJob(limit: 100))
-    ->dailyAt('03:30')
+    ->everySixHours()
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();
