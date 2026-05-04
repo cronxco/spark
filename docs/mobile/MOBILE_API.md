@@ -143,6 +143,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | Method | Path                        | Description                                         |
 | ------ | --------------------------- | --------------------------------------------------- |
 | `GET`  | `/ping`                     | Health check                                        |
+| `GET`  | `/me`                       | Authenticated user profile                          |
 | `GET`  | `/briefing/today`           | Daily summary across all domains                    |
 | `GET`  | `/feed`                     | Cursor-paginated reverse-chronological event feed   |
 | `GET`  | `/events/{id}`              | Single event                                        |
@@ -175,6 +176,14 @@ Health check for the full middleware stack. Use after a token refresh to verify 
     "server_time": "2025-01-15T09:30:00+00:00"
 }
 ```
+
+---
+
+### `GET /me`
+
+Returns the authenticated user's profile. The `id` field is used as the Reverb WebSocket channel identifier for real-time subscriptions.
+
+**Response `200`** — [UserProfile](#userprofile)
 
 ---
 
@@ -859,6 +868,20 @@ Acknowledges a metric anomaly, optionally suppressing future alerts until a date
 ## Response Schemas
 
 These schemas are stable contracts. The iOS client decodes them into Swift structs — shape changes require an explicit migration.
+
+### UserProfile
+
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Will",
+    "email": "will@cronx.co",
+    "timezone": "Europe/London",
+    "avatar_url": null
+}
+```
+
+`timezone` may be `null` when not set on the user. `avatar_url` is always `null` until a media/avatar system is introduced.
 
 ### CompactEvent
 
