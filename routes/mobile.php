@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
+use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
 use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
@@ -39,6 +40,8 @@ Route::get('ping', PingController::class)->name('ping');
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
 
 Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
+
+Route::get('notifications', [NotificationsController::class, 'index'])->name('notifications.index');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->name('objects.show');
@@ -106,3 +109,15 @@ Route::post('check-ins', [CheckInsController::class, 'store'])
 Route::post('anomalies/{id}/acknowledge', [AnomaliesController::class, 'acknowledge'])
     ->middleware('ability:ios:write')
     ->name('anomalies.acknowledge');
+
+Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.read');
+
+Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.read-all');
+
+Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.destroy');

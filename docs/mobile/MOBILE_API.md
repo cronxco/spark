@@ -74,6 +74,14 @@ All errors return JSON:
 }
 ```
 
+Unmatched `/api/*` routes return the same sanitized JSON shape in production:
+
+```json
+{
+    "message": "Not found."
+}
+```
+
 ### HTTP Status Codes
 
 | Status | Meaning                                     |
@@ -145,6 +153,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | `GET`  | `/ping`                     | Health check                                        |
 | `GET`  | `/briefing/today`           | Daily summary across all domains                    |
 | `GET`  | `/feed`                     | Cursor-paginated reverse-chronological event feed   |
+| `GET`  | `/notifications`            | Cursor-paginated notifications inbox                |
 | `GET`  | `/events/{id}`              | Single event                                        |
 | `GET`  | `/objects/{id}`             | Single object with optional recent events           |
 | `GET`  | `/blocks/{id}`              | Single block                                        |
@@ -249,6 +258,44 @@ When `domain=knowledge`, each `CompactEvent` in the feed may include two additio
 | `target.media_url` | string | OG image URL on the target object (e.g. article hero image)    |
 
 Both fields are omitted rather than `null` when not available.
+
+---
+
+### `GET /notifications`
+
+Cursor-paginated reverse-chronological inbox of the user's database notifications.
+
+**Query Parameters**
+
+| Parameter | Type    | Default | Description                         |
+| --------- | ------- | ------- | ----------------------------------- |
+| `cursor`  | string  | —       | Opaque cursor from a prior response |
+| `limit`   | integer | 50      | Items per page (max 200)            |
+
+**Response `200`**
+
+```json
+{
+    "data": [
+        {
+            "id": "uuid",
+            "title": "Integration Completed",
+            "body": "Your Monzo integration completed successfully.",
+            "domain": "money",
+            "is_read": false,
+            "received_at": "2025-01-15T09:30:00.000000Z",
+            "entity": {
+                "kind": "integration",
+                "id": "uuid"
+            }
+        }
+    ],
+    "next_cursor": "opaque-cursor",
+    "has_more": true
+}
+```
+
+See [CompactNotification](#compactnotification) for the item schema.
 
 ---
 
@@ -601,6 +648,9 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/live-activities/{id}/tokens` | Rotate a Live Activity push token |
 | `POST`   | `/check-ins`                   | Submit a daily mood check-in      |
 | `POST`   | `/anomalies/{id}/acknowledge`  | Acknowledge a metric anomaly      |
+| `POST`   | `/notifications/{id}/read`     | Mark one notification as read     |
+| `POST`   | `/notifications/read-all`      | Mark all notifications as read    |
+| `DELETE` | `/notifications/{id}`          | Delete one notification           |
 
 ---
 
@@ -849,6 +899,34 @@ Acknowledges a metric anomaly, optionally suppressing future alerts until a date
 
 ---
 
+### `POST /notifications/{id}/read`
+
+Marks a single notification as read.
+
+**Response `204`** — No content.
+
+**Response `404`** — Notification not found or belongs to another user.
+
+---
+
+### `POST /notifications/read-all`
+
+Marks all unread notifications for the authenticated user as read.
+
+**Response `204`** — No content.
+
+---
+
+### `DELETE /notifications/{id}`
+
+Deletes a single notification from the authenticated user's inbox.
+
+**Response `204`** — No content.
+
+**Response `404`** — Notification not found or belongs to another user.
+
+---
+
 ## Response Schemas
 
 These schemas are stable contracts. The iOS client decodes them into Swift structs — shape changes require an explicit migration.
@@ -943,6 +1021,35 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
 ```
 
 `mean` is `null` when insufficient data exists.
+
+### CompactNotification
+
+```json
+{
+    "id": "uuid",
+    "title": "Integration Completed",
+    "body": "Your Monzo integration completed successfully.",
+    "domain": "money",
+    "is_read": false,
+    "received_at": "2025-01-15T09:30:00.000000Z",
+    "entity": {
+        "kind": "integration",
+        "id": "uuid"
+    }
+}
+```
+
+| Field         | Type    | Description                                                |
+| ------------- | ------- | ---------------------------------------------------------- |
+| `id`          | UUID    | Database notification ID                                   |
+| `title`       | string  | Notification title, defaults to `"Notification"` if absent |
+| `body`        | string  | Optional message body                                      |
+| `domain`      | string  | Optional Spark domain, when the notification carries one   |
+| `is_read`     | boolean | `true` when `read_at` is set                               |
+| `received_at` | string  | ISO timestamp for notification creation                    |
+| `entity`      | object  | Optional deep-link target with `kind` and `id`             |
+
+`body`, `domain`, and `entity` are `null` when not present. `entity.kind` is one of `event`, `object`, `metric`, `place`, `anomaly`, or `integration`.
 
 ### CompactPlace
 
