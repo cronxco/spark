@@ -20,7 +20,13 @@ class ReceiptTransactionMatcher
     {
         $hints = $receiptEvent->event_metadata['matching_hints'] ?? null;
 
-        if (! $hints || ! isset($hints['suggested_amount'])) {
+        if (
+            ! is_array($hints)
+            || ! isset($hints['suggested_amount'])
+            || ! is_array($hints['suggested_date_range'] ?? null)
+            || empty($hints['suggested_date_range']['start'])
+            || empty($hints['suggested_date_range']['end'])
+        ) {
             Log::warning('Receipt: No matching hints available', [
                 'receipt_id' => $receiptEvent->id,
             ]);
@@ -28,8 +34,11 @@ class ReceiptTransactionMatcher
             return collect();
         }
 
-        $startTime = Carbon::parse($hints['suggested_date_range']['start'])->subHours(2);
-        $endTime = Carbon::parse($hints['suggested_date_range']['end'])->addHours(2);
+        $start = $hints['suggested_date_range']['start'];
+        $end = $hints['suggested_date_range']['end'];
+
+        $startTime = Carbon::parse($start)->subHours(2);
+        $endTime = Carbon::parse($end)->addHours(2);
 
         Log::info('Receipt: Searching for transaction matches', [
             'receipt_id' => $receiptEvent->id,
