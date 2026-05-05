@@ -94,6 +94,7 @@ class CompactEventResource extends JsonResource
 
         $actionConfig = $this->actionConfig();
         $data['display_name'] = $actionConfig['display_name'] ?? format_action_title($this->action);
+        $data['display_with_object'] = (bool) ($actionConfig['display_with_object'] ?? true);
         $data['hidden'] = (bool) ($actionConfig['hidden'] ?? false);
 
         return $data;
