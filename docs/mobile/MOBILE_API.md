@@ -685,6 +685,7 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/notifications/{id}/read`         | Mark one notification as read     |
 | `POST`   | `/notifications/read-all`          | Mark all notifications as read    |
 | `DELETE` | `/notifications/{id}`              | Delete one notification           |
+
 ---
 
 ### `POST /devices`
@@ -957,6 +958,7 @@ Deletes a single notification from the authenticated user's inbox.
 **Response `204`** — No content.
 
 **Response `404`** — Notification not found or belongs to another user.
+
 ### `POST /knowledge/events/{id}/reprocess`
 
 Queues AI reprocessing for a Fetch or Newsletter knowledge event owned by the authenticated user.
@@ -1030,6 +1032,7 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "domain": "health",
     "action": "had_sleep_score",
     "display_name": "Sleep Score",
+    "display_with_object": true,
     "hidden": false,
     "value": "82",
     "unit": "score",
@@ -1060,20 +1063,21 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
 
 **Field notes:**
 
-| Field           | Always present | Description                                                                  |
-| --------------- | -------------- | ---------------------------------------------------------------------------- |
-| `display_name`  | Yes            | Human-readable action label from plugin registry                             |
-| `hidden`        | Yes            | `true` if this action should be hidden in default UI (e.g. balance updates)  |
-| `value`         | No             | Formatted numeric value (applies `value_multiplier`); omitted when no value  |
-| `unit`          | No             | Unit string; omitted when no value                                           |
-| `display_value` | No             | Fully formatted string, e.g. `"£10.50"`; omitted when no value               |
-| `url`           | No             | Omitted when not set on the event                                            |
-| `actor`         | No             | Omitted when not set; `media_url` within may be `null`                       |
-| `target`        | No             | Omitted when not set; `media_url` within may be `null`                       |
-| `tldr`          | No             | Content of the first block whose `block_type` contains `tldr`; any domain    |
-| `tags`          | Yes            | Always an array (empty when no tags); each item has `name` and `type`        |
-| `blocks_count`  | Feed only      | Integer count of attached blocks; present in `/feed`, absent in `/events/id` |
-| `blocks`        | Detail only    | Full block array; present in `GET /events/{id}`, absent in `/feed`           |
+| Field                 | Always present | Description                                                                    |
+| --------------------- | -------------- | ------------------------------------------------------------------------------ |
+| `display_name`        | Yes            | Human-readable action label from plugin registry                               |
+| `display_with_object` | Yes            | `true` if UI should include the related object title when rendering the action |
+| `hidden`              | Yes            | `true` if this action should be hidden in default UI (e.g. balance updates)    |
+| `value`               | No             | Formatted numeric value (applies `value_multiplier`); omitted when no value    |
+| `unit`                | No             | Unit string; omitted when no value                                             |
+| `display_value`       | No             | Fully formatted string, e.g. `"£10.50"`; omitted when no value                 |
+| `url`                 | No             | Omitted when not set on the event                                              |
+| `actor`               | No             | Omitted when not set; `media_url` within may be `null`                         |
+| `target`              | No             | Omitted when not set; `media_url` within may be `null`                         |
+| `tldr`                | No             | Content of the first block whose `block_type` contains `tldr`; any domain      |
+| `tags`                | Yes            | Always an array (empty when no tags); each item has `name` and `type`          |
+| `blocks_count`        | Feed only      | Integer count of attached blocks; present in `/feed`, absent in `/events/id`   |
+| `blocks`              | Detail only    | Full block array; present in `GET /events/{id}`, absent in `/feed`             |
 
 ### CompactObject
 
