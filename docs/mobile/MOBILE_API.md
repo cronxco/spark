@@ -685,7 +685,6 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/notifications/{id}/read`         | Mark one notification as read     |
 | `POST`   | `/notifications/read-all`          | Mark all notifications as read    |
 | `DELETE` | `/notifications/{id}`              | Delete one notification           |
-
 ---
 
 ### `POST /devices`
