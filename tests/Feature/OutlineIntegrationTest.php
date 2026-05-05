@@ -7,15 +7,14 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OutlineIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function creates_task_blocks_from_document_text(): void
     {
         $integration = $this->makeIntegration();
@@ -71,9 +70,7 @@ class OutlineIntegrationTest extends TestCase
         $this->assertSame([false, true], $checkedValues);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deleted_task_is_soft_deleted_on_reprocess(): void
     {
         $integration = $this->makeIntegration();
@@ -136,6 +133,51 @@ class OutlineIntegrationTest extends TestCase
         $deleted = $blocks->firstWhere('deleted_at', '!=', null);
         $this->assertTrue((bool) ($deleted->metadata['removed'] ?? false));
         $this->assertNotEmpty($deleted->metadata['removed_at'] ?? null);
+    }
+
+    #[Test]
+    public function moved_tasks_with_same_titles_can_be_recreated_after_soft_delete(): void
+    {
+        $integration = $this->makeIntegration();
+
+        $docBase = [
+            'id' => 'doc-3',
+            'title' => 'Test Document 3',
+            'collectionId' => 'col-1',
+            'createdAt' => now()->toIso8601String(),
+            'url' => '/d/test-doc-3',
+            'createdBy' => [
+                'id' => 'user-1',
+                'name' => 'Alice',
+                'createdAt' => now()->subYear()->toIso8601String(),
+                'avatarUrl' => null,
+            ],
+        ];
+
+        (new OutlineData($integration, [
+            'collections' => [],
+            'documents' => [array_merge($docBase, [
+                'text' => "- [ ] Reused\n- [ ] Other",
+            ])],
+        ]))->handle();
+
+        (new OutlineData($integration, [
+            'collections' => [],
+            'documents' => [array_merge($docBase, [
+                'text' => "- [ ] Other\n- [ ] Reused",
+            ])],
+        ]))->handle();
+
+        $event = Event::where('integration_id', $integration->id)
+            ->where('source_id', 'outline_doc_doc-3')
+            ->firstOrFail();
+
+        $blocks = $event->blocks()->withTrashed()->get();
+
+        $this->assertSame(4, $blocks->count());
+        $this->assertSame(2, $blocks->whereNull('deleted_at')->count());
+        $this->assertSame(2, $blocks->whereNotNull('deleted_at')->count());
+        $this->assertSame(['Other', 'Reused'], $blocks->whereNull('deleted_at')->pluck('title')->sort()->values()->all());
     }
 
     private function makeIntegration(array $config = []): Integration

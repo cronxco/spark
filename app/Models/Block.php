@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -115,8 +116,21 @@ class Block extends Model implements HasMedia
             return $existingBlock;
         }
 
-        // Create new block
-        return static::create(array_merge($attributes, $values, ['event_id' => $eventId]));
+        try {
+            return static::create(array_merge($attributes, $values, ['event_id' => $eventId]));
+        } catch (UniqueConstraintViolationException $e) {
+            $existingBlock = static::where($searchCriteria)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (! $existingBlock) {
+                throw $e;
+            }
+
+            $existingBlock->update(array_merge($attributes, $values));
+
+            return $existingBlock;
+        }
     }
 
     /**

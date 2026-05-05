@@ -905,7 +905,7 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "block_type": "biometric",
     "title": "Heart Rate",
     "time": "2025-01-15T09:30:00+00:00",
-    "content": "Optional text content (truncated at 500 chars)...",
+    "content": "Optional text content",
     "value": "72",
     "unit": "bpm",
     "media_url": "https://..."
