@@ -62,6 +62,20 @@ class BlocksControllerTest extends TestCase
     }
 
     #[Test]
+    public function returns_full_block_content_without_truncation(): void
+    {
+        $content = str_repeat('Long mobile block content. ', 30);
+        $block = $this->createBlock([
+            'metadata' => ['content' => $content],
+        ]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson("/api/v1/mobile/blocks/{$block->id}")
+            ->assertOk()
+            ->assertJsonPath('content', $content);
+    }
+
+    #[Test]
     public function denies_access_to_other_users_blocks(): void
     {
         $block = $this->createBlock();
@@ -91,7 +105,10 @@ class BlocksControllerTest extends TestCase
             ->assertStatus(304);
     }
 
-    protected function createBlock(): Block
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function createBlock(array $attributes = []): Block
     {
         $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -109,10 +126,10 @@ class BlocksControllerTest extends TestCase
             'target_id' => $target->id,
         ]);
 
-        return Block::factory()->create([
+        return Block::factory()->create(array_merge([
             'event_id' => $event->id,
             'title' => 'Test Block',
             'block_type' => 'note',
-        ]);
+        ], $attributes));
     }
 }

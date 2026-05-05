@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -279,9 +280,9 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             ]);
             $receivedTime = now();
         }
-        // Create newsletter event
-        $event = Event::create([
-            'source_id' => $parsedEmail['message_id'] ?: 'newsletter_' . Str::uuid(),
+        $sourceId = $parsedEmail['message_id'] ?: 'newsletter_' . Str::uuid();
+        $eventData = [
+            'source_id' => $sourceId,
             'time' => $receivedTime,
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
@@ -300,10 +301,49 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                 'email_from_name' => $parsedEmail['from_name'],
                 'email_received_at' => $receivedTime->toIso8601String(),
                 'email_message_id' => $parsedEmail['message_id'],
-                'raw_html' => $parsedEmail['text_html'],
                 's3_object_key' => $this->s3ObjectKey,
             ],
-        ]);
+        ];
+
+        $existingEvent = Event::where('integration_id', $this->integration->id)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        if ($existingEvent) {
+            $existingEvent->update([
+                'time' => $receivedTime,
+                'target_id' => $publication->id,
+                'event_metadata' => array_merge($existingEvent->event_metadata ?? [], $eventData['event_metadata']),
+            ]);
+
+            Log::info('Newsletter: Reused existing newsletter event', [
+                'event_id' => $existingEvent->id,
+                'publication_id' => $publication->id,
+                'subject' => $parsedEmail['subject'],
+            ]);
+
+            return $existingEvent;
+        }
+
+        try {
+            $event = Event::create($eventData);
+        } catch (UniqueConstraintViolationException $e) {
+            $event = Event::where('integration_id', $this->integration->id)
+                ->where('source_id', $sourceId)
+                ->first();
+
+            if (! $event) {
+                throw $e;
+            }
+
+            Log::info('Newsletter: Reused newsletter event after duplicate insert race', [
+                'event_id' => $event->id,
+                'publication_id' => $publication->id,
+                'subject' => $parsedEmail['subject'],
+            ]);
+
+            return $event;
+        }
 
         Log::info('Newsletter: Created newsletter event', [
             'event_id' => $event->id,
