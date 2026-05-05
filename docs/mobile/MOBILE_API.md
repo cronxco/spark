@@ -151,6 +151,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | Method | Path                        | Description                                         |
 | ------ | --------------------------- | --------------------------------------------------- |
 | `GET`  | `/ping`                     | Health check                                        |
+| `GET`  | `/me`                       | Authenticated user profile                          |
 | `GET`  | `/briefing/today`           | Daily summary across all domains                    |
 | `GET`  | `/feed`                     | Cursor-paginated reverse-chronological event feed   |
 | `GET`  | `/notifications`            | Cursor-paginated notifications inbox                |
@@ -184,6 +185,14 @@ Health check for the full middleware stack. Use after a token refresh to verify 
     "server_time": "2025-01-15T09:30:00+00:00"
 }
 ```
+
+---
+
+### `GET /me`
+
+Returns the authenticated user's profile. The `id` field is used as the Reverb WebSocket channel identifier for real-time subscriptions.
+
+**Response `200`** — [UserProfile](#userprofile)
 
 ---
 
@@ -231,8 +240,17 @@ Cursor-paginated reverse-chronological feed of the user's events.
 | `cursor`  | string  | —       | Opaque cursor from a prior response                                    |
 | `limit`   | integer | 20      | Items per page (max 100)                                               |
 | `domain`  | string  | —       | Filter by domain: `health`, `money`, `media`, `knowledge`, or `online` |
+| `date`    | string  | —       | Restrict to a single calendar day (`YYYY-MM-DD`); past or future       |
 
-When `domain=knowledge` the response includes compact enrichment fields on each item — see [Knowledge Enrichment](#knowledge-enrichment) below.
+**Date behaviour**
+
+- **No `date`** (default): returns events up to and including the current moment, paging backwards. Future events are excluded.
+- **`date` specified**: returns only events whose `time` falls within that calendar day (midnight–23:59:59 UTC). Cursor pagination still applies within the day. Can be a past or future date.
+
+**Date behaviour**
+
+- **No `date`** (default): returns events up to and including the current moment, paging backwards. Future events are excluded.
+- **`date` specified**: returns only events whose `time` falls within that calendar day (midnight–23:59:59 UTC). Cursor pagination still applies within the day. Can be a past or future date.
 
 **Response `200`**
 
@@ -244,20 +262,9 @@ When `domain=knowledge` the response includes compact enrichment fields on each 
 }
 ```
 
-**Response `422`** — Invalid domain value. The response includes a `hint` listing valid domains.
+**Response `422`** — Invalid domain value or malformed `date` parameter.
 
-See [CompactEvent](#compactevent) for the item schema.
-
-#### Knowledge Enrichment
-
-When `domain=knowledge`, each `CompactEvent` in the feed may include two additional optional fields:
-
-| Field              | Type   | Description                                                    |
-| ------------------ | ------ | -------------------------------------------------------------- |
-| `tldr`             | string | Single-sentence TL;DR from the associated block (if generated) |
-| `target.media_url` | string | OG image URL on the target object (e.g. article hero image)    |
-
-Both fields are omitted rather than `null` when not available.
+See [CompactEvent](#compactevent) for the item schema. Feed items include `tags`, `blocks_count`, and `tldr` (when a `*_tldr` block exists), but do **not** embed the full `blocks` array — tap through to `GET /events/{id}` to retrieve that.
 
 ---
 
@@ -301,7 +308,7 @@ See [CompactNotification](#compactnotification) for the item schema.
 
 ### `GET /events/{id}`
 
-Returns a single event by UUID.
+Returns a single event by UUID. The response includes the full embedded `blocks` array (not present in feed items).
 
 **Response `200`** — [CompactEvent](#compactevent)
 
@@ -354,27 +361,26 @@ Returns a single Block by UUID.
 
 Returns all metric identifiers and metadata for the authenticated user. Use this to build a dynamic metrics catalogue instead of maintaining a hardcoded list.
 
-**Response `200`**
+**Response `200`** — flat array (not wrapped in `data`)
 
 ```json
-{
-    "data": [
-        {
-            "id": "uuid",
-            "identifier": "oura.had_sleep_score.percent",
-            "display_name": "Sleep Score",
-            "service": "oura",
-            "action": "had_sleep_score",
-            "unit": "percent",
-            "event_count": 180,
-            "mean": 83.1,
-            "last_event_at": "2025-01-15T08:00:00+00:00"
-        }
-    ]
-}
+[
+    {
+        "id": "uuid",
+        "identifier": "oura.sleep_score",
+        "display_name": "Sleep Score",
+        "service": "oura",
+        "domain": "health",
+        "action": "had_sleep_score",
+        "unit": "percent",
+        "event_count": 180,
+        "mean": 83.1,
+        "last_event_at": "2025-01-15T08:00:00+00:00"
+    }
+]
 ```
 
-Results are ordered by `service` then `action`. An empty `data` array is returned when no metrics have been computed yet.
+The `identifier` is formatted as `{service}.{action_without_had_prefix}` (e.g. `oura.sleep_score`). Results are ordered by `service` then `action`. An empty array is returned when no metrics have been computed yet.
 
 ---
 
@@ -390,8 +396,11 @@ Returns a metric trend with per-day values, summary statistics, and optional bas
 | --------- | ------ | ------------- | --------------------------------------------- |
 | `from`    | string | `30_days_ago` | Start date (`YYYY-MM-DD` or relative keyword) |
 | `to`      | string | `today`       | End date (`YYYY-MM-DD` or relative keyword)   |
+| `range`   | string | `null`        | Preset range: `7d`, `30d`, `90d`, or `1y`     |
 
 **Relative Date Keywords**: `today`, `yesterday`, `7_days_ago`, `30_days_ago`, `90_days_ago`
+
+When `range` is provided it takes precedence over `from`/`to`. Preset mappings: `7d` → last 7 days, `30d` → last 30 days, `90d` → last 90 days, `1y` → last 365 days.
 
 **Response `200`**
 
@@ -587,11 +596,35 @@ Returns geo-located events and places within a bounding box. When the result cou
 {
     "clusters": [],
     "markers": {
-        "events": [ CompactEvent, ... ],
-        "places": [ CompactPlace, ... ]
+        "events": [
+            {
+                "id": "uuid",
+                "kind": "transaction",
+                "lat": 51.5225,
+                "lng": -0.0745,
+                "title": "Craft Metropolis",
+                "subtitle": "£30.00",
+                "time": "2026-04-25T14:27:02+00:00",
+                "service": "monzo"
+            }
+        ],
+        "places": [
+            {
+                "id": "uuid",
+                "kind": "place",
+                "lat": 51.52,
+                "lng": -0.08,
+                "title": "Home",
+                "subtitle": null,
+                "time": null,
+                "service": null
+            }
+        ]
     }
 }
 ```
+
+`markers.events` and `markers.places` use compact map pin objects, not feed resources. `kind` is one of `place`, `transaction`, `workout`, or `event`. Events without event-level coordinates or a located target object are omitted.
 
 **Response `200` — Clusters (>500 items)**
 
@@ -637,21 +670,21 @@ All write endpoints require `ios:write` ability.
 
 ### Summary
 
-| Method   | Path                           | Description                       |
-| -------- | ------------------------------ | --------------------------------- |
-| `POST`   | `/devices`                     | Register an APNs device token     |
-| `DELETE` | `/devices/{id}`                | Unregister a device               |
-| `POST`   | `/health/samples`              | Ingest HealthKit samples (batch)  |
-| `POST`   | `/live-activities`             | Start a Live Activity             |
-| `PATCH`  | `/live-activities/{id}`        | Push a Live Activity update       |
-| `DELETE` | `/live-activities/{id}`        | End a Live Activity               |
-| `POST`   | `/live-activities/{id}/tokens` | Rotate a Live Activity push token |
-| `POST`   | `/check-ins`                   | Submit a daily mood check-in      |
-| `POST`   | `/anomalies/{id}/acknowledge`  | Acknowledge a metric anomaly      |
-| `POST`   | `/notifications/{id}/read`     | Mark one notification as read     |
-| `POST`   | `/notifications/read-all`      | Mark all notifications as read    |
-| `DELETE` | `/notifications/{id}`          | Delete one notification           |
-
+| Method   | Path                               | Description                       |
+| -------- | ---------------------------------- | --------------------------------- |
+| `POST`   | `/devices`                         | Register an APNs device token     |
+| `DELETE` | `/devices/{id}`                    | Unregister a device               |
+| `POST`   | `/health/samples`                  | Ingest HealthKit samples (batch)  |
+| `POST`   | `/live-activities`                 | Start a Live Activity             |
+| `PATCH`  | `/live-activities/{id}`            | Push a Live Activity update       |
+| `DELETE` | `/live-activities/{id}`            | End a Live Activity               |
+| `POST`   | `/live-activities/{id}/tokens`     | Rotate a Live Activity push token |
+| `POST`   | `/check-ins`                       | Submit a daily mood check-in      |
+| `POST`   | `/anomalies/{id}/acknowledge`      | Acknowledge a metric anomaly      |
+| `POST`   | `/knowledge/events/{id}/reprocess` | Queue knowledge AI reprocessing   |
+| `POST`   | `/notifications/{id}/read`         | Mark one notification as read     |
+| `POST`   | `/notifications/read-all`          | Mark all notifications as read    |
+| `DELETE` | `/notifications/{id}`              | Delete one notification           |
 ---
 
 ### `POST /devices`
@@ -924,12 +957,68 @@ Deletes a single notification from the authenticated user's inbox.
 **Response `204`** — No content.
 
 **Response `404`** — Notification not found or belongs to another user.
+### `POST /knowledge/events/{id}/reprocess`
+
+Queues AI reprocessing for a Fetch or Newsletter knowledge event owned by the authenticated user.
+
+`{id}` is the UUID of the event to repair.
+
+**Request Body**
+
+```json
+{
+    "mode": "auto"
+}
+```
+
+| Field  | Type   | Required | Description                                               |
+| ------ | ------ | -------- | --------------------------------------------------------- |
+| `mode` | string | No       | `auto`, `summary_only`, or `refetch`. Defaults to `auto`. |
+
+**Modes**
+
+| Mode           | Description                                                                            |
+| -------------- | -------------------------------------------------------------------------------------- |
+| `auto`         | Prefer the earliest available pipeline step: extract from raw content, then summarize. |
+| `summary_only` | Generate TLDR/summary blocks from existing extracted content.                          |
+| `refetch`      | Fetch-only. Force-refresh the original URL before extraction and summaries.            |
+
+Newsletter events cannot use `refetch`.
+
+**Response `202`**
+
+```json
+{
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "service": "fetch",
+    "status": "queued",
+    "mode": "auto"
+}
+```
+
+**Response `404`** — Knowledge event not found or belongs to another user.
+
+**Response `422`** — Unsupported event, invalid mode, missing integration, missing source content, or newsletter `refetch`.
 
 ---
 
 ## Response Schemas
 
 These schemas are stable contracts. The iOS client decodes them into Swift structs — shape changes require an explicit migration.
+
+### UserProfile
+
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Will",
+    "email": "will@cronx.co",
+    "timezone": "Europe/London",
+    "avatar_url": null
+}
+```
+
+`timezone` may be `null` when not set on the user. `avatar_url` is always `null` until a media/avatar system is introduced.
 
 ### CompactEvent
 
@@ -939,24 +1028,52 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "time": "2025-01-15T09:30:00+00:00",
     "service": "oura",
     "domain": "health",
-    "action": "sleep_score",
+    "action": "had_sleep_score",
+    "display_name": "Sleep Score",
+    "hidden": false,
     "value": "82",
     "unit": "score",
+    "display_value": "82 score",
     "url": "https://...",
     "actor": {
         "id": "uuid",
         "title": "Oura Ring",
-        "concept": "device"
+        "concept": "device",
+        "type": "oura_device",
+        "media_url": "https://..."
     },
     "target": {
         "id": "uuid",
         "title": "Sleep Session",
-        "concept": "session"
-    }
+        "concept": "session",
+        "type": "sleep_session",
+        "media_url": null
+    },
+    "tags": [
+        { "name": "running", "type": null }
+    ],
+    "tldr": "Optional single-sentence summary from any *_tldr block.",
+    "blocks_count": 3,
+    "blocks": [ CompactBlock, ... ]
 }
 ```
 
-`value`, `unit`, `url`, `actor`, and `target` are omitted when not present. `value` is formatted according to the event's `value_multiplier` and formatter.
+**Field notes:**
+
+| Field           | Always present | Description                                                                  |
+| --------------- | -------------- | ---------------------------------------------------------------------------- |
+| `display_name`  | Yes            | Human-readable action label from plugin registry                             |
+| `hidden`        | Yes            | `true` if this action should be hidden in default UI (e.g. balance updates)  |
+| `value`         | No             | Formatted numeric value (applies `value_multiplier`); omitted when no value  |
+| `unit`          | No             | Unit string; omitted when no value                                           |
+| `display_value` | No             | Fully formatted string, e.g. `"£10.50"`; omitted when no value               |
+| `url`           | No             | Omitted when not set on the event                                            |
+| `actor`         | No             | Omitted when not set; `media_url` within may be `null`                       |
+| `target`        | No             | Omitted when not set; `media_url` within may be `null`                       |
+| `tldr`          | No             | Content of the first block whose `block_type` contains `tldr`; any domain    |
+| `tags`          | Yes            | Always an array (empty when no tags); each item has `name` and `type`        |
+| `blocks_count`  | Feed only      | Integer count of attached blocks; present in `/feed`, absent in `/events/id` |
+| `blocks`        | Detail only    | Full block array; present in `GET /events/{id}`, absent in `/feed`           |
 
 ### CompactObject
 
@@ -1012,7 +1129,8 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
     "identifier": "oura.sleep_score",
     "display_name": "Sleep Score",
     "service": "oura",
-    "action": "sleep_score",
+    "domain": "health",
+    "action": "had_sleep_score",
     "unit": "score",
     "event_count": 365,
     "mean": 83.1,
@@ -1020,7 +1138,7 @@ These schemas are stable contracts. The iOS client decodes them into Swift struc
 }
 ```
 
-`mean` is `null` when insufficient data exists.
+`identifier` is `{service}.{action_without_had_prefix}`, e.g. `oura.sleep_score`. `mean` is `null` when insufficient data exists. `domain` is derived from the service/action and can be used for colour-coding (`health`, `activity`, `money`, `media`, `knowledge`, `online`).
 
 ### CompactNotification
 

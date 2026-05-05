@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Compact\CompactEventResource;
-use App\Http\Resources\Compact\CompactPlaceResource;
 use App\Models\Event;
 use App\Models\EventObject;
 use Illuminate\Http\JsonResponse;
@@ -41,8 +39,17 @@ class MapController extends Controller
         if (! empty($integrationIds)) {
             $events = Event::query()
                 ->whereIn('integration_id', $integrationIds)
-                ->hasLocation()
-                ->withinBounds($neLat, $swLat, $neLng, $swLng)
+                ->where(function ($query) use ($neLat, $swLat, $neLng, $swLng) {
+                    $query
+                        ->where(function ($query) use ($neLat, $swLat, $neLng, $swLng) {
+                            $query->hasLocation()
+                                ->withinBounds($neLat, $swLat, $neLng, $swLng);
+                        })
+                        ->orWhereHas('target', function ($query) use ($neLat, $swLat, $neLng, $swLng) {
+                            $query->hasLocation()
+                                ->withinBounds($neLat, $swLat, $neLng, $swLng);
+                        });
+                })
                 ->with(['actor', 'target'])
                 ->orderBy('time', 'desc')
                 ->limit(self::CLUSTER_THRESHOLD + 1)
@@ -68,8 +75,16 @@ class MapController extends Controller
         return response()->json([
             'clusters' => [],
             'markers' => [
-                'events' => CompactEventResource::collection($events)->resolve($request),
-                'places' => CompactPlaceResource::collection($places)->resolve($request),
+                'events' => $events
+                    ->map(fn (Event $event) => $this->eventMarker($event))
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'places' => $places
+                    ->map(fn (EventObject $place) => $this->placeMarker($place))
+                    ->filter()
+                    ->values()
+                    ->all(),
             ],
         ]);
     }
@@ -115,29 +130,23 @@ class MapController extends Controller
         $buckets = [];
 
         foreach ($events as $event) {
-            $lat = $event->latitude;
-            $lng = $event->longitude;
-            if ($lat === null || $lng === null) {
+            $coordinates = $this->eventCoordinates($event);
+
+            if ($coordinates === null) {
                 continue;
             }
-            $this->bucket($buckets, $lat, $lng);
+
+            $this->bucket($buckets, $coordinates['lat'], $coordinates['lng']);
         }
 
         foreach ($places as $place) {
-            $lat = $place->latitude;
-            $lng = $place->longitude;
+            $coordinates = $this->objectCoordinates($place);
 
-            if ($lat === null || $lng === null) {
-                $meta = is_array($place->metadata) ? $place->metadata : [];
-                $lat = $meta['latitude'] ?? null;
-                $lng = $meta['longitude'] ?? null;
-            }
-
-            if ($lat === null || $lng === null) {
+            if ($coordinates === null) {
                 continue;
             }
 
-            $this->bucket($buckets, (float) $lat, (float) $lng);
+            $this->bucket($buckets, $coordinates['lat'], $coordinates['lng']);
         }
 
         return array_values($buckets);
@@ -155,5 +164,134 @@ class MapController extends Controller
         }
 
         $buckets[$key]['count']++;
+    }
+
+    /**
+     * @return array{id: string, kind: string, lat: float, lng: float, title: string, subtitle: string|null, time: string|null, service: string|null}|null
+     */
+    protected function eventMarker(Event $event): ?array
+    {
+        $coordinates = $this->eventCoordinates($event);
+
+        if ($coordinates === null) {
+            return null;
+        }
+
+        return [
+            'id' => $event->id,
+            'kind' => $this->eventKind($event),
+            'lat' => $coordinates['lat'],
+            'lng' => $coordinates['lng'],
+            'title' => $this->eventTitle($event),
+            'subtitle' => $this->eventSubtitle($event),
+            'time' => $event->time?->toIso8601String(),
+            'service' => $event->service,
+        ];
+    }
+
+    /**
+     * @return array{id: string, kind: string, lat: float, lng: float, title: string, subtitle: null, time: null, service: null}|null
+     */
+    protected function placeMarker(EventObject $place): ?array
+    {
+        $coordinates = $this->objectCoordinates($place);
+
+        if ($coordinates === null) {
+            return null;
+        }
+
+        return [
+            'id' => $place->id,
+            'kind' => 'place',
+            'lat' => $coordinates['lat'],
+            'lng' => $coordinates['lng'],
+            'title' => $place->title,
+            'subtitle' => null,
+            'time' => null,
+            'service' => null,
+        ];
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    protected function eventCoordinates(Event $event): ?array
+    {
+        return $this->coordinatesFromModel($event)
+            ?? ($event->relationLoaded('target') && $event->target
+                ? $this->objectCoordinates($event->target)
+                : null);
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    protected function objectCoordinates(EventObject $object): ?array
+    {
+        return $this->coordinatesFromModel($object);
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    protected function coordinatesFromModel(Event|EventObject $model): ?array
+    {
+        $lat = $model->latitude;
+        $lng = $model->longitude;
+
+        if (($lat === null || $lng === null) && $model instanceof EventObject) {
+            $metadata = is_array($model->metadata) ? $model->metadata : [];
+            $lat = $metadata['latitude'] ?? null;
+            $lng = $metadata['longitude'] ?? null;
+        }
+
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        return [
+            'lat' => (float) $lat,
+            'lng' => (float) $lng,
+        ];
+    }
+
+    protected function eventKind(Event $event): string
+    {
+        if ($event->domain === 'money') {
+            return 'transaction';
+        }
+
+        if ($event->domain === 'health' && $event->action === 'did_workout') {
+            return 'workout';
+        }
+
+        return 'event';
+    }
+
+    protected function eventTitle(Event $event): string
+    {
+        if ($event->target?->title) {
+            return $event->target->title;
+        }
+
+        if ($event->actor?->title) {
+            return $event->actor->title;
+        }
+
+        return format_action_title($event->action);
+    }
+
+    protected function eventSubtitle(Event $event): ?string
+    {
+        if ($event->value === null) {
+            return null;
+        }
+
+        return format_event_display_value(
+            $event->formatted_value,
+            $event->value_unit,
+            $event->service,
+            $event->action,
+        );
     }
 }

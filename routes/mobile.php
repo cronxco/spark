@@ -9,10 +9,13 @@ use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
+use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
+use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
+use App\Http\Controllers\Api\V1\Mobile\NotificationSettingsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
 use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
@@ -36,6 +39,11 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('ping', PingController::class)->name('ping');
+
+Route::get('me', MeController::class)->name('me');
+
+Route::get('settings/notifications', [NotificationSettingsController::class, 'show'])
+    ->name('settings.notifications.show');
 
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
 
@@ -106,6 +114,10 @@ Route::post('check-ins', [CheckInsController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('check-ins.store');
 
+Route::patch('settings/notifications', [NotificationSettingsController::class, 'update'])
+    ->middleware('ability:ios:write')
+    ->name('settings.notifications.update');
+
 Route::post('anomalies/{id}/acknowledge', [AnomaliesController::class, 'acknowledge'])
     ->middleware('ability:ios:write')
     ->name('anomalies.acknowledge');
@@ -121,3 +133,6 @@ Route::post('notifications/read-all', [NotificationsController::class, 'markAllR
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
     ->middleware('ability:ios:write')
     ->name('notifications.destroy');
+Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('knowledge.events.reprocess');
