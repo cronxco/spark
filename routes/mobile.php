@@ -110,6 +110,12 @@ Route::post('live-activities/{id}/tokens', [LiveActivitiesController::class, 're
     ->middleware('ability:ios:write')
     ->name('live-activities.tokens');
 
+Route::get('check-ins', [CheckInsController::class, 'index'])
+    ->name('check-ins.index');
+
+Route::get('check-ins/history', [CheckInsController::class, 'history'])
+    ->name('check-ins.history');
+
 Route::post('check-ins', [CheckInsController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('check-ins.store');
