@@ -55,10 +55,23 @@ class MoneyAccountResource extends JsonResource
     {
         return [
             'id' => $event->id,
-            'balance' => (float) ($event->event_metadata['balance'] ?? 0),
+            'balance' => $this->resolveBalance($event),
             'currency' => $event->value_unit ?? $currency,
             'time' => $event->time?->toIso8601String(),
             'notes' => $event->event_metadata['notes'] ?? null,
         ];
+    }
+
+    private function resolveBalance(Event $event): float
+    {
+        if (isset($event->event_metadata['balance'])) {
+            return (float) $event->event_metadata['balance'];
+        }
+
+        if ($event->value !== null && $event->value_multiplier && $event->value_multiplier > 1) {
+            return $event->value / $event->value_multiplier;
+        }
+
+        return (float) ($event->value ?? 0);
     }
 }
