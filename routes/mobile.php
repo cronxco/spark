@@ -84,6 +84,9 @@ Route::get('sync/delta', [SyncController::class, 'delta'])->name('sync.delta');
 |
 */
 
+Route::get('devices', [DevicesController::class, 'index'])
+    ->name('devices.index');
+
 Route::post('devices', [DevicesController::class, 'register'])
     ->middleware('ability:ios:write')
     ->name('devices.register');

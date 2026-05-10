@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PushSubscription;
 use App\Models\Session;
 use Carbon\Carbon;
 use Jenssegers\Agent\Agent;
@@ -12,6 +13,7 @@ new class extends Component {
     use Toast;
 
     public array $sessions = [];
+    public array $mobileDevices = [];
 
     /**
      * Mount the component.
@@ -19,6 +21,7 @@ new class extends Component {
     public function mount(): void
     {
         $this->loadSessions();
+        $this->loadMobileDevices();
     }
 
     /**
@@ -52,6 +55,42 @@ new class extends Component {
                 'last_activity_human' => Carbon::createFromTimestamp($session->last_activity)->diffForHumans(),
             ];
         })->toArray();
+    }
+
+    /**
+     * Load registered iOS mobile devices.
+     */
+    public function loadMobileDevices(): void
+    {
+        $this->mobileDevices = Auth::user()
+            ->pushSubscriptions()
+            ->apns()
+            ->orderByDesc('updated_at')
+            ->get()
+            ->map(fn (PushSubscription $device) => [
+                'id' => $device->id,
+                'os_version' => $device->os_version,
+                'app_version' => $device->app_version,
+                'app_environment' => $device->app_environment,
+                'last_active' => $device->updated_at?->diffForHumans(),
+                'registered' => $device->created_at?->diffForHumans(),
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Remove a registered mobile device.
+     */
+    public function revokeMobileDevice(int $id): void
+    {
+        $deleted = Auth::user()->pushSubscriptions()->where('id', $id)->delete();
+
+        if ($deleted) {
+            $this->loadMobileDevices();
+            $this->success('Mobile device removed successfully.');
+        } else {
+            $this->error('Device not found.');
+        }
     }
 
     /**
@@ -209,6 +248,69 @@ new class extends Component {
                                         />
                                     </div>
                                 @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    </div>
+    <!-- Mobile Devices Card -->
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Mobile Devices') }}</h3>
+
+            @if (count($mobileDevices) === 0)
+                <div class="text-center py-8">
+                    <div class="text-base-content/50">
+                        <x-icon name="fab.apple" class="w-10 h-10 mx-auto mb-4" />
+                        <p>{{ __('No iOS devices registered.') }}</p>
+                    </div>
+                </div>
+            @else
+                <div class="space-y-3">
+                    @foreach ($mobileDevices as $device)
+                        <div class="border border-base-300 bg-base-100 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-shrink-0">
+                                        <x-icon name="fab.apple" class="w-6 h-6 text-primary" />
+                                    </div>
+
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <h4 class="font-medium">
+                                                {{ $device['os_version'] ?? 'iOS Device' }}
+                                            </h4>
+                                            @if (($device['app_environment'] ?? '') === 'sandbox')
+                                                <x-badge value="{{ __('Sandbox') }}" class="badge-warning badge-sm" />
+                                            @endif
+                                        </div>
+
+                                        <div class="text-sm text-base-content/70 space-y-1">
+                                            @if ($device['app_version'])
+                                                <p>
+                                                    <x-icon name="fas.mobile-screen" class="w-3 h-3 inline mr-1" />
+                                                    {{ __('App version') }} {{ $device['app_version'] }}
+                                                </p>
+                                            @endif
+                                            <p>
+                                                <x-icon name="fas.clock" class="w-3 h-3 inline mr-1" />
+                                                {{ __('Last seen') }} {{ $device['last_active'] }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex-shrink-0">
+                                    <x-button
+                                        label="{{ __('Remove') }}"
+                                        wire:click="revokeMobileDevice({{ $device['id'] }})"
+                                        class="btn-outline btn-error btn-sm"
+                                        spinner="revokeMobileDevice({{ $device['id'] }})"
+                                        confirm="{{ __('Remove this iOS device? It will stop receiving push notifications.') }}"
+                                    />
+                                </div>
                             </div>
                         </div>
                     @endforeach
