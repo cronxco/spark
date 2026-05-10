@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Mobile\CheckInsController;
 use App\Http\Controllers\Api\V1\Mobile\DevicesController;
 use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
+use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
@@ -143,6 +144,22 @@ Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
 Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('knowledge.events.reprocess');
+
+/*
+|--------------------------------------------------------------------------
+| Flint digest endpoints
+|--------------------------------------------------------------------------
+*/
+
+Route::get('flint/digests', [FlintDigestsController::class, 'index'])
+    ->name('flint.digests.index');
+
+Route::get('flint/digests/{id}', [FlintDigestsController::class, 'show'])
+    ->name('flint.digests.show');
+
+Route::post('flint/questions/{block}/answer', [FlintDigestsController::class, 'answer'])
+    ->middleware('ability:ios:write')
+    ->name('flint.questions.answer');
 
 /*
 |--------------------------------------------------------------------------
