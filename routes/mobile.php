@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
+use App\Http\Controllers\Api\V1\Mobile\MoneyAccountsController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationSettingsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
@@ -142,3 +143,34 @@ Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
 Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('knowledge.events.reprocess');
+
+/*
+|--------------------------------------------------------------------------
+| Money endpoints
+|--------------------------------------------------------------------------
+*/
+
+Route::get('money/accounts', [MoneyAccountsController::class, 'index'])
+    ->name('money.accounts.index');
+
+Route::get('money/accounts/{id}', [MoneyAccountsController::class, 'show'])
+    ->name('money.accounts.show');
+
+Route::get('money/accounts/{id}/balances', [MoneyAccountsController::class, 'balances'])
+    ->name('money.accounts.balances');
+
+Route::post('money/accounts', [MoneyAccountsController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.store');
+
+Route::patch('money/accounts/{id}', [MoneyAccountsController::class, 'update'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.update');
+
+Route::delete('money/accounts/{id}', [MoneyAccountsController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.destroy');
+
+Route::post('money/accounts/{id}/balances', [MoneyAccountsController::class, 'addBalance'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.balances.store');
