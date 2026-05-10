@@ -23,6 +23,51 @@ class DevicesControllerTest extends TestCase
     }
 
     #[Test]
+    public function index_requires_authentication(): void
+    {
+        $this->getJson('/api/v1/mobile/devices')->assertStatus(401);
+    }
+
+    #[Test]
+    public function index_returns_ios_devices_for_authenticated_user(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('a', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+            'app_environment' => 'sandbox',
+            'bundle_id' => 'co.cronx.spark',
+            'app_version' => '1.0.0',
+            'os_version' => '18.1',
+        ]);
+
+        $this->getJson('/api/v1/mobile/devices')
+            ->assertOk()
+            ->assertJsonCount(1, 'devices')
+            ->assertJsonPath('devices.0.device_type', 'ios')
+            ->assertJsonPath('devices.0.app_environment', 'sandbox')
+            ->assertJsonPath('devices.0.app_version', '1.0.0')
+            ->assertJsonPath('devices.0.os_version', '18.1');
+    }
+
+    #[Test]
+    public function index_excludes_another_users_devices(): void
+    {
+        $other = User::factory()->create();
+        $other->pushSubscriptions()->create([
+            'endpoint' => str_repeat('f', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/devices')
+            ->assertOk()
+            ->assertJsonCount(0, 'devices');
+    }
+
+    #[Test]
     public function register_requires_authentication(): void
     {
         $this->postJson('/api/v1/mobile/devices', $this->payload())->assertStatus(401);
