@@ -34,6 +34,7 @@ class SparkServer extends Server
      * tools/list see everything without needing a cursor follow-up.
      */
     public int $defaultPaginationLength = 50;
+
     /**
      * The MCP server's name.
      */
