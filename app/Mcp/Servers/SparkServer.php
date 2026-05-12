@@ -30,6 +30,11 @@ use Laravel\Mcp\Server\Transport\JsonRpcRequest;
 class SparkServer extends Server
 {
     /**
+     * Return all tools in a single page so MCP clients that don't paginate
+     * tools/list see everything without needing a cursor follow-up.
+     */
+    public int $defaultPaginationLength = 50;
+    /**
      * The MCP server's name.
      */
     protected string $name = 'Spark';
