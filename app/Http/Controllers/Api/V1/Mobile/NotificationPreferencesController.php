@@ -22,7 +22,7 @@ class NotificationPreferencesController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        return response()->json($this->mobilePayload($request->user()->getNotificationPreferences()));
+        return response()->json($this->mobilePayload($request->user()->settings['notifications'] ?? []));
     }
 
     /**
@@ -44,7 +44,7 @@ class NotificationPreferencesController extends Controller
             'push_types' => $categories,
             'delayed_sending' => [
                 'mode' => $validated['delivery_mode'],
-                'digest_time' => $validated['digest_time'] ?? '09:00',
+                'digest_time' => $validated['digest_time'] ?? '08:00',
             ],
         ]);
 
@@ -65,7 +65,7 @@ class NotificationPreferencesController extends Controller
                 ->mapWithKeys(fn (string $category) => [$category => $pushTypes[$category] ?? true])
                 ->all(),
             'delivery_mode' => $delayed['mode'] ?? 'immediate',
-            'digest_time' => $delayed['digest_time'] ?? '09:00',
+            'digest_time' => $delayed['digest_time'] ?? '08:00',
         ];
     }
 }

@@ -31,23 +31,33 @@ class NotificationSettingsController extends Controller
     public function update(Request $request): JsonResponse
     {
         $categoryRules = collect(self::CATEGORIES)
-            ->mapWithKeys(fn (string $category) => ["categories.{$category}" => ['required', 'boolean']])
+            ->mapWithKeys(fn (string $category) => ["categories.{$category}" => ['required_unless:delivery_mode,work_hours', 'boolean']])
             ->all();
 
         $validated = $request->validate([
-            'categories' => ['required', 'array'],
-            'delivery_mode' => ['required', 'string', Rule::in(['immediate', 'daily_digest'])],
-            'digest_time' => ['required', 'date_format:H:i'],
+            'categories' => ['sometimes', 'array'],
+            'delivery_mode' => ['required', 'string', Rule::in(['immediate', 'work_hours', 'daily_digest'])],
+            'digest_time' => ['nullable', 'date_format:H:i'],
             ...$categoryRules,
         ]);
 
+        $categories = $validated['categories'] ?? [];
+        $categories = array_replace(
+            array_fill_keys(self::CATEGORIES, true),
+            array_intersect_key($categories, array_flip(self::CATEGORIES)),
+        );
+
         $request->user()->updateNotificationPreferences([
-            'push_types' => $validated['categories'],
+            'push_types' => $categories,
             'delayed_sending' => [
                 'mode' => $validated['delivery_mode'],
-                'digest_time' => $validated['digest_time'],
+                'digest_time' => $validated['digest_time'] ?? '08:00',
             ],
         ]);
+
+        if ($validated['delivery_mode'] === 'work_hours') {
+            return response()->json(null, 204);
+        }
 
         return response()->json($this->mobilePreferences($request));
     }
