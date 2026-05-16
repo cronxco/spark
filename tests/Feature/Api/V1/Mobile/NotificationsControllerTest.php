@@ -121,6 +121,7 @@ class NotificationsControllerTest extends TestCase
     {
         $this->notification(['title' => 'One'], Carbon::now());
         $this->notification(['title' => 'Two'], Carbon::now()->subMinute());
+
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
         $this->postJson('/api/v1/mobile/notifications/read-all')

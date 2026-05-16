@@ -12,7 +12,7 @@ return [
     |
     */
 
-    'bundle_id' => 'co.cronx.spark',
+    'bundle_id' => 'co.cronx.sparkapp',
 
     'aasa_paths' => [
         '/events/*',
@@ -47,5 +47,5 @@ return [
 
     'apple_team_id' => env('APPLE_TEAM_ID', ''),
 
-    'app_bundle_id' => env('APN_BUNDLE_ID', 'co.cronx.spark'),
+    'app_bundle_id' => env('APN_BUNDLE_ID', 'co.cronx.sparkapp'),
 ];

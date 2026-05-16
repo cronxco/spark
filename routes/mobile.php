@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\MoneyAccountsController;
+use App\Http\Controllers\Api\V1\Mobile\NotificationPreferencesController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationSettingsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
@@ -74,6 +75,12 @@ Route::get('map/data', [MapController::class, 'data'])->name('map.data');
 
 Route::get('sync/delta', [SyncController::class, 'delta'])->name('sync.delta');
 
+Route::get('settings/notifications', [NotificationPreferencesController::class, 'show'])
+    ->name('settings.notifications.show');
+
+Route::get('notifications', [NotificationsController::class, 'index'])
+    ->name('notifications.index');
+
 /*
 |--------------------------------------------------------------------------
 | Write-side endpoints
@@ -91,9 +98,29 @@ Route::post('devices', [DevicesController::class, 'register'])
     ->middleware('ability:ios:write')
     ->name('devices.register');
 
+Route::post('devices/test', [DevicesController::class, 'test'])
+    ->middleware('ability:ios:write')
+    ->name('devices.test');
+
 Route::delete('devices/{id}', [DevicesController::class, 'destroy'])
     ->middleware('ability:ios:write')
     ->name('devices.destroy');
+
+Route::patch('settings/notifications', [NotificationPreferencesController::class, 'update'])
+    ->middleware('ability:ios:write')
+    ->name('settings.notifications.update');
+
+Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.read-all');
+
+Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.read');
+
+Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.destroy');
 
 Route::post('health/samples', [HealthController::class, 'samples'])
     ->middleware('ability:ios:write')

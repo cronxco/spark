@@ -7,7 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-class NotificationSettingsController extends Controller
+class NotificationPreferencesController extends Controller
 {
     private const CATEGORIES = [
         'anomaly',
@@ -22,7 +22,7 @@ class NotificationSettingsController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        return response()->json($this->mobilePreferences($request));
+        return response()->json($this->mobilePayload($request->user()->settings['notifications'] ?? []));
     }
 
     /**
@@ -30,22 +30,15 @@ class NotificationSettingsController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $categoryRules = collect(self::CATEGORIES)
-            ->mapWithKeys(fn (string $category) => ["categories.{$category}" => ['required_unless:delivery_mode,work_hours', 'boolean']])
-            ->all();
-
         $validated = $request->validate([
             'categories' => ['sometimes', 'array'],
-            'delivery_mode' => ['required', 'string', Rule::in(['immediate', 'work_hours', 'daily_digest'])],
+            'categories.*' => ['boolean'],
+            'delivery_mode' => ['required', Rule::in(['immediate', 'work_hours', 'daily_digest'])],
             'digest_time' => ['nullable', 'date_format:H:i'],
-            ...$categoryRules,
         ]);
 
         $categories = $validated['categories'] ?? [];
-        $categories = array_replace(
-            array_fill_keys(self::CATEGORIES, true),
-            array_intersect_key($categories, array_flip(self::CATEGORIES)),
-        );
+        $categories = array_intersect_key($categories, array_flip(self::CATEGORIES));
 
         $request->user()->updateNotificationPreferences([
             'push_types' => $categories,
@@ -55,25 +48,24 @@ class NotificationSettingsController extends Controller
             ],
         ]);
 
-        if ($validated['delivery_mode'] === 'work_hours') {
-            return response()->json(null, 204);
-        }
-
-        return response()->json($this->mobilePreferences($request));
+        return response()->json(null, 204);
     }
 
-    private function mobilePreferences(Request $request): array
+    /**
+     * @param  array<string, mixed>  $preferences
+     * @return array<string, mixed>
+     */
+    private function mobilePayload(array $preferences): array
     {
-        $notifications = $request->user()->fresh()->settings['notifications'] ?? [];
-        $pushTypes = $notifications['push_types'] ?? [];
-        $delayedSending = $notifications['delayed_sending'] ?? [];
+        $pushTypes = $preferences['push_types'] ?? [];
+        $delayed = $preferences['delayed_sending'] ?? [];
 
         return [
             'categories' => collect(self::CATEGORIES)
                 ->mapWithKeys(fn (string $category) => [$category => $pushTypes[$category] ?? true])
                 ->all(),
-            'delivery_mode' => $delayedSending['mode'] ?? 'immediate',
-            'digest_time' => $delayedSending['digest_time'] ?? '08:00',
+            'delivery_mode' => $delayed['mode'] ?? 'immediate',
+            'digest_time' => $delayed['digest_time'] ?? '08:00',
         ];
     }
 }
