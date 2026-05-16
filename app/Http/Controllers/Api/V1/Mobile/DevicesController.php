@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Models\PushSubscription;
+use App\Notifications\TestPushNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,15 +28,20 @@ class DevicesController extends Controller
             'device_name' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $subscription = $request->user()->pushSubscriptions()
+        $user = $request->user();
+
+        $subscription = PushSubscription::query()
             ->updateOrCreate(
                 ['endpoint' => $validated['apns_token']],
                 [
+                    'subscribable_type' => get_class($user),
+                    'subscribable_id' => $user->getKey(),
                     'device_type' => PushSubscription::DEVICE_TYPE_IOS,
                     'app_environment' => $validated['app_environment'],
                     'bundle_id' => $validated['bundle_id'],
                     'app_version' => $validated['app_version'],
                     'os_version' => $validated['os_version'],
+                    'device_name' => $validated['device_name'] ?? null,
                 ],
             );
 
@@ -59,6 +65,20 @@ class DevicesController extends Controller
         }
 
         $subscription->delete();
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * POST /api/v1/mobile/devices/test
+     */
+    public function test(Request $request): JsonResponse
+    {
+        if (! $request->user()->pushSubscriptions()->apns()->exists()) {
+            return response()->json(['message' => 'No iOS push subscriptions registered.'], 400);
+        }
+
+        $request->user()->notify(new TestPushNotification('ios'));
 
         return response()->json(null, 204);
     }

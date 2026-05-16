@@ -80,7 +80,7 @@ return [
         'apn' => [
             'key_id' => env('APN_KEY_ID'),
             'team_id' => env('APN_TEAM_ID'),
-            'app_bundle_id' => env('APN_BUNDLE_ID', 'co.cronx.spark'),
+            'app_bundle_id' => env('APN_BUNDLE_ID', 'co.cronx.sparkapp'),
             'private_key_path' => env('APN_PRIVATE_KEY_PATH'),
             'private_key_secret' => env('APN_PRIVATE_KEY_SECRET'),
             'production' => env('APN_PRODUCTION', false),

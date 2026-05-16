@@ -2,9 +2,11 @@
 
 namespace App\Notifications\Channels;
 
+use App\Models\PushSubscription;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 use NotificationChannels\Apn\ApnAdapter;
 use NotificationChannels\Apn\ApnMessage;
 use NotificationChannels\Apn\ApnMessagePushType;
@@ -13,6 +15,13 @@ use Pushok\Response;
 
 class ApnsChannel
 {
+    private const PERMANENT_FAILURES = [
+        'BadDeviceToken',
+        'DeviceTokenNotForTopic',
+        'TopicDisallowed',
+        'Unregistered',
+    ];
+
     public function __construct(
         protected Client $client,
         protected Dispatcher $events,
@@ -30,10 +39,30 @@ class ApnsChannel
             return null;
         }
 
-        $subscriptions = $notifiable->pushSubscriptions()->apns()->get();
+        $targetEnvironment = config('broadcasting.connections.apn.production')
+            ? 'production'
+            : 'sandbox';
+
+        $subscriptions = $notifiable->pushSubscriptions()
+            ->apns()
+            ->where(function ($query) use ($targetEnvironment) {
+                $query
+                    ->where('app_environment', $targetEnvironment)
+                    ->orWhereNull('app_environment');
+            })
+            ->get();
 
         if ($subscriptions->isEmpty()) {
             return null;
+        }
+
+        $totalIosSubscriptions = $notifiable->pushSubscriptions()->apns()->count();
+        if ($totalIosSubscriptions > $subscriptions->count()) {
+            Log::info('Skipped APNs subscriptions for non-target environment', [
+                'target_environment' => $targetEnvironment,
+                'selected' => $subscriptions->count(),
+                'total_ios' => $totalIosSubscriptions,
+            ]);
         }
 
         $message = $notification->toApn($notifiable);
@@ -140,6 +169,24 @@ class ApnsChannel
                     'error' => $response->getErrorReason(),
                 ],
             ));
+
+            $reason = $response->getErrorReason();
+            Log::warning('APNs delivery failed', [
+                'apns_id' => $response->getApnsId(),
+                'reason' => $reason,
+                'environment' => config('broadcasting.connections.apn.production') ? 'production' : 'sandbox',
+                'bundle_id' => config('broadcasting.connections.apn.app_bundle_id'),
+                'notification_type' => method_exists($notification, 'getNotificationType')
+                    ? $notification->getNotificationType()
+                    : get_class($notification),
+            ]);
+
+            if (in_array($reason, self::PERMANENT_FAILURES, true)) {
+                PushSubscription::query()
+                    ->apns()
+                    ->where('endpoint', $response->getDeviceToken())
+                    ->delete();
+            }
         }
     }
 }

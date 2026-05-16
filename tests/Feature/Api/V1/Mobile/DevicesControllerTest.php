@@ -4,7 +4,9 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\PushSubscription;
 use App\Models\User;
+use App\Notifications\TestPushNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -54,6 +56,7 @@ class DevicesControllerTest extends TestCase
             'endpoint' => $token,
             'device_type' => 'ios',
             'subscribable_id' => $this->user->id,
+            'device_name' => 'iPhone 15 Pro',
         ]);
     }
 
@@ -99,6 +102,30 @@ class DevicesControllerTest extends TestCase
     }
 
     #[Test]
+    public function register_transfers_existing_token_to_current_user(): void
+    {
+        $other = User::factory()->create();
+        $token = str_repeat('f', 64);
+
+        $other->pushSubscriptions()->create([
+            'endpoint' => $token,
+            'device_type' => 'ios',
+            'app_environment' => 'sandbox',
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson('/api/v1/mobile/devices', $this->payload($token))
+            ->assertStatus(201);
+
+        $this->assertEquals(1, PushSubscription::where('endpoint', $token)->count());
+        $this->assertDatabaseHas('push_subscriptions', [
+            'endpoint' => $token,
+            'subscribable_id' => $this->user->id,
+        ]);
+    }
+
+    #[Test]
     public function destroy_denies_another_users_device(): void
     {
         $other = User::factory()->create();
@@ -113,12 +140,46 @@ class DevicesControllerTest extends TestCase
             ->assertStatus(404);
     }
 
+    /**
+     * @test
+     */
+    #[Test]
+    public function push_requires_ios_subscription(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson('/api/v1/mobile/devices/test')
+            ->assertStatus(400);
+    }
+
+    /**
+     * @test
+     */
+    #[Test]
+    public function push_sends_ios_notification(): void
+    {
+        Notification::fake();
+
+        $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('1', 64),
+            'device_type' => 'ios',
+            'app_environment' => 'sandbox',
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson('/api/v1/mobile/devices/test')
+            ->assertStatus(204);
+
+        Notification::assertSentTo($this->user, TestPushNotification::class);
+    }
+
     protected function payload(?string $token = null): array
     {
         return [
             'apns_token' => $token ?? str_repeat('a', 64),
             'app_environment' => 'sandbox',
-            'bundle_id' => 'co.cronx.spark',
+            'bundle_id' => 'co.cronx.sparkapp',
             'app_version' => '1.0.0',
             'os_version' => '18.1',
             'device_name' => 'iPhone 15 Pro',

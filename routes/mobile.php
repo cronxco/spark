@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
+use App\Http\Controllers\Api\V1\Mobile\NotificationPreferencesController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
 use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
@@ -61,6 +62,9 @@ Route::get('map/data', [MapController::class, 'data'])->name('map.data');
 
 Route::get('sync/delta', [SyncController::class, 'delta'])->name('sync.delta');
 
+Route::get('settings/notifications', [NotificationPreferencesController::class, 'show'])
+    ->name('settings.notifications.show');
+
 /*
 |--------------------------------------------------------------------------
 | Write-side endpoints
@@ -75,9 +79,17 @@ Route::post('devices', [DevicesController::class, 'register'])
     ->middleware('ability:ios:write')
     ->name('devices.register');
 
+Route::post('devices/test', [DevicesController::class, 'test'])
+    ->middleware('ability:ios:write')
+    ->name('devices.test');
+
 Route::delete('devices/{id}', [DevicesController::class, 'destroy'])
     ->middleware('ability:ios:write')
     ->name('devices.destroy');
+
+Route::patch('settings/notifications', [NotificationPreferencesController::class, 'update'])
+    ->middleware('ability:ios:write')
+    ->name('settings.notifications.update');
 
 Route::post('health/samples', [HealthController::class, 'samples'])
     ->middleware('ability:ios:write')

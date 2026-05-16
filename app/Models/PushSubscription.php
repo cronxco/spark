@@ -11,6 +11,7 @@ use NotificationChannels\WebPush\PushSubscription as BasePushSubscription;
  * @property string|null $bundle_id
  * @property string|null $app_version
  * @property string|null $os_version
+ * @property string|null $device_name
  */
 class PushSubscription extends BasePushSubscription
 {
@@ -19,6 +20,8 @@ class PushSubscription extends BasePushSubscription
     public const DEVICE_TYPE_IOS = 'ios';
 
     protected $fillable = [
+        'subscribable_type',
+        'subscribable_id',
         'endpoint',
         'public_key',
         'auth_token',
@@ -28,6 +31,7 @@ class PushSubscription extends BasePushSubscription
         'bundle_id',
         'app_version',
         'os_version',
+        'device_name',
     ];
 
     /**
