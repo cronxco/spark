@@ -66,7 +66,7 @@ class NotificationsControllerTest extends TestCase
         $first = $this->getJson('/api/v1/mobile/notifications?limit=1')->assertOk();
         $cursor = $first->json('next_cursor');
 
-        $this->getJson('/api/v1/mobile/notifications?limit=1&cursor=' . urlencode($cursor))
+        $this->getJson('/api/v1/mobile/notifications?limit=1&cursor='.urlencode($cursor))
             ->assertOk()
             ->assertJsonPath('data.0.title', 'Second')
             ->assertJsonPath('has_more', false)
@@ -121,6 +121,7 @@ class NotificationsControllerTest extends TestCase
     {
         $this->notification(['title' => 'One'], Carbon::now());
         $this->notification(['title' => 'Two'], Carbon::now()->subMinute());
+
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
         $this->postJson('/api/v1/mobile/notifications/read-all')
