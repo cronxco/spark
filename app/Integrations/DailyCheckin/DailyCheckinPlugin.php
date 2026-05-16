@@ -132,6 +132,7 @@ class DailyCheckinPlugin extends ManualPlugin
      * @param  float|null  $latitude  Optional latitude coordinate
      * @param  float|null  $longitude  Optional longitude coordinate
      * @param  string|null  $address  Optional address string
+     * @param  string|null  $notes  Optional free-text notes
      * @return Event The created or updated event
      */
     public function createCheckinEvent(
@@ -142,7 +143,8 @@ class DailyCheckinPlugin extends ManualPlugin
         string $date,
         ?float $latitude = null,
         ?float $longitude = null,
-        ?string $address = null
+        ?string $address = null,
+        ?string $notes = null
     ): Event {
         // Validate period
         if (! in_array($period, ['morning', 'afternoon'])) {
@@ -214,6 +216,7 @@ class DailyCheckinPlugin extends ManualPlugin
                     'mental_energy' => $mental,
                     'date' => $date,
                     'has_location' => $latitude !== null && $longitude !== null,
+                    'notes' => $notes,
                 ],
                 'target_id' => $dayObject->id,
                 'actor_id' => $userObject->id,
@@ -266,8 +269,10 @@ class DailyCheckinPlugin extends ManualPlugin
             $q->where('user_id', $userId);
         })
             ->where('service', 'daily_checkin')
-            ->whereIn('action', ['had_morning_checkin', 'had_afternoon_checkin'])
-            ->whereDate('time', $date)
+            ->whereIn('source_id', [
+                'daily_checkin_morning_' . $date,
+                'daily_checkin_afternoon_' . $date,
+            ])
             ->with('blocks')
             ->get();
 

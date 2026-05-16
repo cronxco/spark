@@ -58,7 +58,8 @@ class EventsControllerTest extends TestCase
             ->assertJsonPath('id', $event->id)
             ->assertJsonPath('service', 'monzo')
             ->assertJsonPath('action', 'card_payment_to')
-            ->assertJsonStructure(['id', 'time', 'service', 'domain', 'action', 'actor', 'target']);
+            ->assertJsonPath('display_with_object', true)
+            ->assertJsonStructure(['id', 'time', 'service', 'domain', 'action', 'display_with_object', 'actor', 'target']);
     }
 
     #[Test]

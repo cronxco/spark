@@ -11,6 +11,32 @@ use Illuminate\Http\Request;
 class DevicesController extends Controller
 {
     /**
+     * GET /api/v1/mobile/devices
+     *
+     * Returns all iOS push subscriptions registered for the authenticated user.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $devices = $request->user()
+            ->pushSubscriptions()
+            ->apns()
+            ->get()
+            ->map(fn (PushSubscription $sub) => [
+                'id' => $sub->id,
+                'device_type' => $sub->device_type,
+                'endpoint' => $sub->endpoint,
+                'app_environment' => $sub->app_environment,
+                'bundle_id' => $sub->bundle_id,
+                'app_version' => $sub->app_version,
+                'os_version' => $sub->os_version,
+                'created_at' => $sub->created_at?->toIso8601String(),
+                'updated_at' => $sub->updated_at?->toIso8601String(),
+            ]);
+
+        return response()->json(['devices' => $devices]);
+    }
+
+    /**
      * POST /api/v1/mobile/devices
      *
      * Upserts a PushSubscription keyed on `(user_id, endpoint)` where the

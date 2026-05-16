@@ -7,10 +7,13 @@ use App\Http\Controllers\Api\V1\Mobile\CheckInsController;
 use App\Http\Controllers\Api\V1\Mobile\DevicesController;
 use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
+use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
+use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
+use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationPreferencesController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
@@ -37,9 +40,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('ping', PingController::class)->name('ping');
 
+Route::get('me', MeController::class)->name('me');
+
+Route::get('settings/notifications', [NotificationSettingsController::class, 'show'])
+    ->name('settings.notifications.show');
+
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
 
 Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
+
+Route::get('notifications', [NotificationsController::class, 'index'])->name('notifications.index');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->name('objects.show');
@@ -74,6 +84,9 @@ Route::get('settings/notifications', [NotificationPreferencesController::class, 
 | stacks `ability:ios:write` so tokens missing the write scope are rejected.
 |
 */
+
+Route::get('devices', [DevicesController::class, 'index'])
+    ->name('devices.index');
 
 Route::post('devices', [DevicesController::class, 'register'])
     ->middleware('ability:ios:write')
@@ -111,10 +124,82 @@ Route::post('live-activities/{id}/tokens', [LiveActivitiesController::class, 're
     ->middleware('ability:ios:write')
     ->name('live-activities.tokens');
 
+Route::get('check-ins', [CheckInsController::class, 'index'])
+    ->name('check-ins.index');
+
+Route::get('check-ins/history', [CheckInsController::class, 'history'])
+    ->name('check-ins.history');
+
 Route::post('check-ins', [CheckInsController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('check-ins.store');
 
+Route::patch('settings/notifications', [NotificationSettingsController::class, 'update'])
+    ->middleware('ability:ios:write')
+    ->name('settings.notifications.update');
+
 Route::post('anomalies/{id}/acknowledge', [AnomaliesController::class, 'acknowledge'])
     ->middleware('ability:ios:write')
     ->name('anomalies.acknowledge');
+
+Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.read');
+
+Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.read-all');
+
+Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.destroy');
+Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('knowledge.events.reprocess');
+
+/*
+|--------------------------------------------------------------------------
+| Flint digest endpoints
+|--------------------------------------------------------------------------
+*/
+
+Route::get('flint/digests', [FlintDigestsController::class, 'index'])
+    ->name('flint.digests.index');
+
+Route::get('flint/digests/{id}', [FlintDigestsController::class, 'show'])
+    ->name('flint.digests.show');
+
+Route::post('flint/questions/{block}/answer', [FlintDigestsController::class, 'answer'])
+    ->middleware('ability:ios:write')
+    ->name('flint.questions.answer');
+
+/*
+|--------------------------------------------------------------------------
+| Money endpoints
+|--------------------------------------------------------------------------
+*/
+
+Route::get('money/accounts', [MoneyAccountsController::class, 'index'])
+    ->name('money.accounts.index');
+
+Route::get('money/accounts/{id}', [MoneyAccountsController::class, 'show'])
+    ->name('money.accounts.show');
+
+Route::get('money/accounts/{id}/balances', [MoneyAccountsController::class, 'balances'])
+    ->name('money.accounts.balances');
+
+Route::post('money/accounts', [MoneyAccountsController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.store');
+
+Route::patch('money/accounts/{id}', [MoneyAccountsController::class, 'update'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.update');
+
+Route::delete('money/accounts/{id}', [MoneyAccountsController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.destroy');
+
+Route::post('money/accounts/{id}/balances', [MoneyAccountsController::class, 'addBalance'])
+    ->middleware('ability:ios:write')
+    ->name('money.accounts.balances.store');

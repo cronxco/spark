@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ReceiptTransactionMatcherTest extends TestCase
@@ -42,7 +43,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->matcher = new ReceiptTransactionMatcher;
     }
 
-    /** @test */
+    #[Test]
     public function it_can_be_instantiated()
     {
         $matcher = new ReceiptTransactionMatcher;
@@ -50,7 +51,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertInstanceOf(ReceiptTransactionMatcher::class, $matcher);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_empty_collection_when_no_matching_hints()
     {
         $merchant = EventObject::factory()->create([
@@ -76,7 +77,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertTrue($candidates->isEmpty());
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_empty_collection_when_matching_hints_missing_amount()
     {
         $merchant = EventObject::factory()->create([
@@ -110,7 +111,38 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertTrue($candidates->isEmpty());
     }
 
-    /** @test */
+    #[Test]
+    public function it_returns_empty_collection_when_matching_hints_missing_date_range()
+    {
+        $merchant = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'merchant',
+            'type' => 'receipt_merchant',
+            'title' => 'Test Merchant',
+        ]);
+
+        $receipt = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'receipt',
+            'domain' => 'money',
+            'action' => 'had_receipt_from',
+            'target_id' => $merchant->id,
+            'value' => 1500,
+            'value_unit' => 'GBP',
+            'event_metadata' => [
+                'matching_hints' => [
+                    'suggested_amount' => 1500,
+                    'suggested_date_range' => null,
+                ],
+            ],
+        ]);
+
+        $candidates = $this->matcher->findCandidateMatches($receipt);
+
+        $this->assertTrue($candidates->isEmpty());
+    }
+
+    #[Test]
     public function it_can_flag_receipt_for_review()
     {
         $merchant = EventObject::factory()->create([
@@ -144,7 +176,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEmpty($merchant->metadata['candidate_matches']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_receipt_without_target_when_flagging()
     {
         // Create a receipt with a target
@@ -177,7 +209,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertArrayNotHasKey('needs_review', $merchant->metadata ?? []);
     }
 
-    /** @test */
+    #[Test]
     public function it_finds_monzo_transaction_candidates()
     {
         // Create a receipt with matching hints
@@ -248,7 +280,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals('monzo', $candidates->first()['source']);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_out_low_confidence_matches()
     {
         // Create a receipt
@@ -318,7 +350,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertIsIterable($candidates);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_receipt_relationship()
     {
         $receiptMerchant = EventObject::factory()->create([
@@ -388,7 +420,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals($transaction->id, $receiptMerchant->metadata['matched_transaction_id']);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_receipt_relationship_with_correct_value_fields()
     {
         $receiptMerchant = EventObject::factory()->create([

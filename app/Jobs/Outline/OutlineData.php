@@ -242,6 +242,27 @@ class OutlineData extends BaseProcessingJob
         // Create new tasks not present before
         foreach ($currentByHash as $hash => $b) {
             if (! isset($seen[$hash])) {
+                $activeBlock = $event->blocks()
+                    ->where('title', $b['title'] ?? '')
+                    ->where('block_type', $b['block_type'] ?? '')
+                    ->whereNull('deleted_at')
+                    ->first();
+
+                if ($activeBlock) {
+                    $activeBlock->update([
+                        'time' => $b['time'] ?? $event->time,
+                        'metadata' => $b['metadata'] ?? [],
+                        'url' => $b['url'] ?? null,
+                        'media_url' => $b['media_url'] ?? null,
+                        'value' => $b['value'] ?? null,
+                        'value_multiplier' => $b['value_multiplier'] ?? 1,
+                        'value_unit' => $b['value_unit'] ?? null,
+                        'embeddings' => $b['embeddings'] ?? null,
+                    ]);
+
+                    continue;
+                }
+
                 $event->createBlock([
                     'time' => $b['time'] ?? $event->time,
                     'block_type' => $b['block_type'] ?? '',

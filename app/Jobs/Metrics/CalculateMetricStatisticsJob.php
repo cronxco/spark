@@ -139,14 +139,15 @@ class CalculateMetricStatisticsJob implements ShouldQueue
     protected function calculateMetricStatistics(string $userId, string $service, string $action, string $valueUnit): void
     {
         $eventsTable = (new Event)->getTable();
+        $eventAlias = DB::getTablePrefix() . 'e';
 
         // Mirrors Event::getFormattedValueAttribute() in SQL: null/0/1 multipliers
         // pass the raw value through, everything else divides.
-        $formattedExpr = <<<'SQL'
+        $formattedExpr = <<<SQL
             CASE
-                WHEN e.value_multiplier IS NULL OR e.value_multiplier IN (0, 1)
-                    THEN e.value::double precision
-                ELSE e.value::double precision / e.value_multiplier
+                WHEN {$eventAlias}.value_multiplier IS NULL OR {$eventAlias}.value_multiplier IN (0, 1)
+                    THEN {$eventAlias}.value::double precision
+                ELSE {$eventAlias}.value::double precision / {$eventAlias}.value_multiplier
             END
         SQL;
 
@@ -161,13 +162,13 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             ->whereNull('e.deleted_at')
             ->selectRaw(<<<SQL
                 COUNT(*) AS total_count,
-                MIN(e.time) AS first_event_at,
-                MAX(e.time) AS last_event_at,
-                COUNT(*) FILTER (WHERE e.value <> 0) AS formatted_count,
-                MIN({$formattedExpr}) FILTER (WHERE e.value <> 0) AS min_value,
-                MAX({$formattedExpr}) FILTER (WHERE e.value <> 0) AS max_value,
-                AVG({$formattedExpr}) FILTER (WHERE e.value <> 0) AS mean_value,
-                STDDEV_POP({$formattedExpr}) FILTER (WHERE e.value <> 0) AS stddev_value
+                MIN({$eventAlias}.time) AS first_event_at,
+                MAX({$eventAlias}.time) AS last_event_at,
+                COUNT(*) FILTER (WHERE {$eventAlias}.value <> 0) AS formatted_count,
+                MIN({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS min_value,
+                MAX({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS max_value,
+                AVG({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS mean_value,
+                STDDEV_POP({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS stddev_value
             SQL)
             ->first();
 

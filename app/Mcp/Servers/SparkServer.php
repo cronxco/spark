@@ -4,12 +4,14 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Resources\DayContextResource;
 use App\Mcp\Tools\AcknowledgeAnomalyTool;
+use App\Mcp\Tools\CreateFlintDigestTool;
 use App\Mcp\Tools\GetBaselinesTool;
 use App\Mcp\Tools\GetBlockTool;
 use App\Mcp\Tools\GetDayContextTool;
 use App\Mcp\Tools\GetDaySummaryTool;
 use App\Mcp\Tools\GetEventsByFilterTool;
 use App\Mcp\Tools\GetEventTool;
+use App\Mcp\Tools\GetLatestFlintDigestTool;
 use App\Mcp\Tools\GetMetricTrendTool;
 use App\Mcp\Tools\GetObjectTool;
 use App\Mcp\Tools\GetServiceStatusTool;
@@ -27,6 +29,12 @@ use Laravel\Mcp\Server\Transport\JsonRpcRequest;
 
 class SparkServer extends Server
 {
+    /**
+     * Return all tools in a single page so MCP clients that don't paginate
+     * tools/list see everything without needing a cursor follow-up.
+     */
+    public int $defaultPaginationLength = 50;
+
     /**
      * The MCP server's name.
      */
@@ -74,6 +82,10 @@ class SparkServer extends Server
         ## Actions
         - `trigger-integration-update`: Trigger an immediate on-demand fetch for a specific integration or all instances of a service (e.g. `service: "oura"`). Does not affect the scheduled pull cycle.
 
+        ### Flint Digest
+        - `create-flint-digest`: Create a Flint digest event with an optional array of blocks. Supports `flint_user_question` (questions for the user with optional multiple-choice), `flint_editorial_note` (AI commentary), and any other `flint_*` block type. Returns event_id and block_ids.
+        - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
+
         ## Workflow Tips
         - Start with `get-day-summary` for daily briefings — it replaces multiple get-day-context + parsing calls.
         - Use `get-baselines` to discover available metrics, then `get-metric-trend` for analysis.
@@ -105,6 +117,8 @@ class SparkServer extends Server
         GetObjectTool::class,
         GetBlockTool::class,
         TriggerIntegrationUpdateTool::class,
+        CreateFlintDigestTool::class,
+        GetLatestFlintDigestTool::class,
     ];
 
     /**

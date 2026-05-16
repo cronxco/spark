@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AssistantContextController;
 use App\Http\Controllers\Api\FetchApiController;
+use App\Http\Controllers\Api\FlintQuestionsController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
 use App\Http\Controllers\Api\SemanticSearchController;
@@ -93,6 +94,9 @@ Route::middleware('sentry.api.logging')->group(function () {
 
         // Assistant Context API
         Route::get('assistant/context', [AssistantContextController::class, 'index'])->name('api.assistant.context');
+
+        // Flint Questions API
+        Route::post('flint/questions/{block}/answer', [FlintQuestionsController::class, 'answer'])->name('api.flint.questions.answer');
 
         // Clear card stream cache
         Route::post('clear-card-cache', function (Request $request) {

@@ -14,16 +14,16 @@ use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MetricTrackingTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_creation_dispatches_task_pipeline_and_anomaly_detection(): void
     {
         // Enable task pipeline for this test
@@ -70,9 +70,7 @@ class MetricTrackingTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function calculate_metric_statistics_job_creates_statistics(): void
     {
         $user = User::factory()->create();
@@ -134,9 +132,7 @@ class MetricTrackingTest extends TestCase
         $this->assertEqualsWithDelta($mean + 2 * $expectedStddev, (float) $metric->normal_upper_bound, 0.0001);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function calculate_metric_statistics_job_applies_value_multiplier(): void
     {
         $user = User::factory()->create();
@@ -187,9 +183,69 @@ class MetricTrackingTest extends TestCase
         $this->assertEqualsWithDelta(max($values), (float) $metric->max_value, 0.0001);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
+    public function calculate_metric_statistics_job_handles_prefixed_table_aliases(): void
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+        ]);
+
+        $actor = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
+
+        for ($i = 0; $i < 40; $i++) {
+            Event::create([
+                'source_id' => 'prefixed-' . $i,
+                'time' => now()->subDays(40 - $i),
+                'integration_id' => $integration->id,
+                'actor_id' => $actor->id,
+                'target_id' => $target->id,
+                'service' => 'apple_health',
+                'domain' => 'health',
+                'action' => 'had_apple_exercise_time',
+                'value' => 20 + $i,
+                'value_multiplier' => 1,
+                'value_unit' => 'min',
+            ]);
+        }
+
+        $connection = DB::connection();
+        $originalPrefix = $connection->getTablePrefix();
+
+        if ($originalPrefix === '') {
+            DB::statement('CREATE TEMP VIEW dev_events AS SELECT * FROM events');
+            DB::statement('CREATE TEMP VIEW dev_integrations AS SELECT * FROM integrations');
+            DB::statement('CREATE TEMP TABLE dev_metric_statistics (LIKE metric_statistics INCLUDING DEFAULTS)');
+
+            $connection->setTablePrefix('dev_');
+        }
+
+        try {
+            $job = new class extends CalculateMetricStatisticsJob
+            {
+                public function calculate(string $userId, string $service, string $action, string $valueUnit): void
+                {
+                    $this->calculateMetricStatistics($userId, $service, $action, $valueUnit);
+                }
+            };
+
+            $job->calculate($user->id, 'apple_health', 'had_apple_exercise_time', 'min');
+
+            $this->assertDatabaseHas('metric_statistics', [
+                'user_id' => $user->id,
+                'service' => 'apple_health',
+                'action' => 'had_apple_exercise_time',
+                'value_unit' => 'min',
+            ]);
+        } finally {
+            $connection->setTablePrefix($originalPrefix);
+        }
+    }
+
+    #[Test]
     public function calculate_metric_statistics_job_skips_when_fewer_than_ten_events(): void
     {
         $user = User::factory()->create();
@@ -227,9 +283,7 @@ class MetricTrackingTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function anomaly_detection_creates_trend_for_high_value(): void
     {
         $user = User::factory()->create();
@@ -278,9 +332,7 @@ class MetricTrackingTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_disable_metric_tracking(): void
     {
         $user = User::factory()->create();
@@ -292,9 +344,7 @@ class MetricTrackingTest extends TestCase
         $this->assertTrue($user->isMetricTrackingDisabled('oura', 'had_readiness_score', 'percent'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_enable_metric_tracking(): void
     {
         $user = User::factory()->create();
@@ -307,9 +357,7 @@ class MetricTrackingTest extends TestCase
         $this->assertFalse($user->isMetricTrackingDisabled('oura', 'had_readiness_score', 'percent'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function metrics_overview_page_is_accessible(): void
     {
         $user = User::factory()->create();
@@ -319,9 +367,7 @@ class MetricTrackingTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function metric_detail_page_is_accessible(): void
     {
         $user = User::factory()->create();
@@ -332,9 +378,7 @@ class MetricTrackingTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_cannot_view_another_users_metric(): void
     {
         $user1 = User::factory()->create();
@@ -346,9 +390,7 @@ class MetricTrackingTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function trend_can_be_acknowledged(): void
     {
         $trend = MetricTrend::factory()->create(['acknowledged_at' => null]);
@@ -360,9 +402,7 @@ class MetricTrackingTest extends TestCase
         $this->assertNotNull($trend->fresh()->acknowledged_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_set_anomaly_detection_mode_override(): void
     {
         $user = User::factory()->create();
@@ -374,9 +414,7 @@ class MetricTrackingTest extends TestCase
         $this->assertEquals('retrospective', $user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_clear_anomaly_detection_mode_override(): void
     {
         $user = User::factory()->create();
@@ -389,9 +427,7 @@ class MetricTrackingTest extends TestCase
         $this->assertNull($user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function metric_statistic_can_delete_all_anomalies(): void
     {
         $user = User::factory()->create();
@@ -420,9 +456,7 @@ class MetricTrackingTest extends TestCase
         $this->assertEquals('trend_up_weekly', $metric->trends()->first()->type);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function anomaly_detection_skipped_when_user_override_is_disabled(): void
     {
         $user = User::factory()->create();

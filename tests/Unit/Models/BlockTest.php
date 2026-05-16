@@ -153,6 +153,33 @@ class BlockTest extends TestCase
     }
 
     #[Test]
+    public function update_or_create_for_event_can_recreate_soft_deleted_block_key(): void
+    {
+        $block1 = Block::updateOrCreateForEvent($this->event->id, [
+            'title' => 'Reusable Task',
+            'block_type' => 'doc_task',
+        ], [
+            'value' => 100,
+        ]);
+
+        $block1->delete();
+
+        $block2 = Block::updateOrCreateForEvent($this->event->id, [
+            'title' => 'Reusable Task',
+            'block_type' => 'doc_task',
+        ], [
+            'value' => 200,
+        ]);
+
+        $this->assertNotEquals($block1->id, $block2->id);
+        $this->assertSame(200, $block2->value);
+        $this->assertSame(1, Block::where('event_id', $this->event->id)
+            ->where('title', 'Reusable Task')
+            ->where('block_type', 'doc_task')
+            ->count());
+    }
+
+    #[Test]
     public function update_or_create_creates_separate_blocks_for_different_types(): void
     {
         $block1 = Block::updateOrCreateForEvent($this->event->id, [

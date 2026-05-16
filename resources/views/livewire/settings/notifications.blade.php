@@ -98,25 +98,30 @@ new class extends Component {
     {
         $user = Auth::user();
         $this->pushSubscriptions = $user->pushSubscriptions()
-            ->select('id', 'endpoint', 'created_at')
+            ->select('id', 'endpoint', 'device_type', 'created_at')
             ->get()
             ->map(function ($subscription) {
-                $endpoint = $subscription->endpoint;
-                $browser = 'Unknown';
-
-                if (str_contains($endpoint, 'fcm.googleapis.com')) {
-                    $browser = 'Chrome/Android';
-                } elseif (str_contains($endpoint, 'mozilla.com')) {
-                    $browser = 'Firefox';
-                } elseif (str_contains($endpoint, 'windows.com')) {
-                    $browser = 'Edge';
-                } elseif (str_contains($endpoint, 'apple.com') || str_contains($endpoint, 'push.apple')) {
-                    $browser = 'Safari/iOS';
+                if ($subscription->device_type === 'ios') {
+                    $label = 'iOS App';
+                } else {
+                    $endpoint = $subscription->endpoint;
+                    if (str_contains($endpoint, 'fcm.googleapis.com')) {
+                        $label = 'Chrome/Android';
+                    } elseif (str_contains($endpoint, 'mozilla.com')) {
+                        $label = 'Firefox';
+                    } elseif (str_contains($endpoint, 'windows.com')) {
+                        $label = 'Edge';
+                    } elseif (str_contains($endpoint, 'apple.com') || str_contains($endpoint, 'push.apple')) {
+                        $label = 'Safari';
+                    } else {
+                        $label = 'Web Browser';
+                    }
                 }
 
                 return [
                     'id' => $subscription->id,
-                    'browser' => $browser,
+                    'device_type' => $subscription->device_type ?? 'web',
+                    'label' => $label,
                     'created_at' => $subscription->created_at->diffForHumans(),
                 ];
             })
@@ -140,13 +145,28 @@ new class extends Component {
     {
         $user = Auth::user();
 
-        if (!$user->pushSubscriptions()->exists()) {
+        if (! $user->pushSubscriptions()->exists()) {
             $this->error('No devices registered for push notifications');
+
             return;
         }
 
         $user->notify(new TestPushNotification);
         $this->success('Test notification sent!');
+    }
+
+    public function sendTestIosNotification(): void
+    {
+        $user = Auth::user();
+
+        if (! $user->pushSubscriptions()->apns()->exists()) {
+            $this->error('No iOS devices registered for push notifications');
+
+            return;
+        }
+
+        $user->notify(new TestPushNotification('ios'));
+        $this->success('Test notification sent to iOS!');
     }
 
     public function savePreferences(): void
@@ -301,8 +321,12 @@ new class extends Component {
                         @foreach ($pushSubscriptions as $subscription)
                             <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
                                 <div class="flex items-center gap-2">
-                                    <x-icon name="fas.mobile-screen" class="w-4 h-4 text-base-content/50" />
-                                    <span class="text-sm">{{ $subscription['browser'] }}</span>
+                                    @if ($subscription['device_type'] === 'ios')
+                                        <x-icon name="fab.apple" class="w-4 h-4 text-base-content/50" />
+                                    @else
+                                        <x-icon name="fas.globe" class="w-4 h-4 text-base-content/50" />
+                                    @endif
+                                    <span class="text-sm">{{ $subscription['label'] }}</span>
                                     <span class="text-xs text-base-content/50">{{ $subscription['created_at'] }}</span>
                                 </div>
                                 <button
@@ -317,23 +341,48 @@ new class extends Component {
                 </div>
             @endif
 
-            <!-- Test Notification -->
+            <!-- Test Notifications -->
             @if (count($pushSubscriptions) > 0)
-                <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg mb-4">
-                    <div>
-                        <div class="font-medium text-sm">{{ __('Test Push Notification') }}</div>
-                        <div class="text-xs text-base-content/60">{{ __('Send a test notification to all your devices') }}</div>
+                @php
+                    $hasIos = collect($pushSubscriptions)->contains('device_type', 'ios');
+                    $hasWeb = collect($pushSubscriptions)->contains('device_type', 'web');
+                @endphp
+
+                @if ($hasWeb)
+                    <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg mb-2">
+                        <div>
+                            <div class="font-medium text-sm">{{ __('Test Web Push') }}</div>
+                            <div class="text-xs text-base-content/60">{{ __('Send a test notification to your web browsers') }}</div>
+                        </div>
+                        <button
+                            wire:click="sendTestNotification"
+                            class="btn btn-outline btn-sm"
+                            wire:loading.attr="disabled"
+                            wire:target="sendTestNotification"
+                        >
+                            <span wire:loading wire:target="sendTestNotification" class="loading loading-spinner loading-xs"></span>
+                            <span wire:loading.remove wire:target="sendTestNotification">{{ __('Send Test') }}</span>
+                        </button>
                     </div>
-                    <button
-                        wire:click="sendTestNotification"
-                        class="btn btn-outline btn-sm"
-                        wire:loading.attr="disabled"
-                        wire:target="sendTestNotification"
-                    >
-                        <span wire:loading wire:target="sendTestNotification" class="loading loading-spinner loading-xs"></span>
-                        <span wire:loading.remove wire:target="sendTestNotification">{{ __('Send Test') }}</span>
-                    </button>
-                </div>
+                @endif
+
+                @if ($hasIos)
+                    <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg mb-4">
+                        <div>
+                            <div class="font-medium text-sm">{{ __('Test iOS Push') }}</div>
+                            <div class="text-xs text-base-content/60">{{ __('Send a test notification to your iOS app') }}</div>
+                        </div>
+                        <button
+                            wire:click="sendTestIosNotification"
+                            class="btn btn-outline btn-sm"
+                            wire:loading.attr="disabled"
+                            wire:target="sendTestIosNotification"
+                        >
+                            <span wire:loading wire:target="sendTestIosNotification" class="loading loading-spinner loading-xs"></span>
+                            <span wire:loading.remove wire:target="sendTestIosNotification">{{ __('Send Test') }}</span>
+                        </button>
+                    </div>
+                @endif
             @endif
 
             <!-- Per-type Push Settings -->

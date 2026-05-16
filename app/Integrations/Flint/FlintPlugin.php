@@ -321,6 +321,26 @@ class FlintPlugin extends ManualPlugin
                 'value_unit' => 'confidence',
                 'value_multiplier' => 100,
             ],
+
+            // Agent-created blocks
+            'flint_user_question' => [
+                'display_name' => 'User Question',
+                'description' => 'A question posed by an AI agent for the user to answer',
+                'icon' => 'fas.circle-question',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => false,
+                'value_unit' => null,
+            ],
+            'flint_editorial_note' => [
+                'display_name' => 'Editorial Note',
+                'description' => 'Freeform AI commentary or editorial observation',
+                'icon' => 'fas.pen-nib',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => false,
+                'value_unit' => null,
+            ],
         ];
     }
 

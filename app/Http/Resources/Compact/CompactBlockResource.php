@@ -25,9 +25,7 @@ class CompactBlockResource extends JsonResource
 
         $content = $this->resource->getContent();
         if ($content) {
-            $data['content'] = mb_strlen($content, 'UTF-8') > 500
-                ? mb_substr($content, 0, 500, 'UTF-8') . '...'
-                : $content;
+            $data['content'] = $content;
         }
 
         if ($this->value !== null) {

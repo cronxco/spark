@@ -483,6 +483,11 @@ new class extends Component {
                             <x-icon name="fas.plus" class="w-4 h-4" />
                             {{ __('Add Another') }}
                         </a>
+                        <a href="{{ route('integrations.reconnect', ['service' => $plugin['identifier'], 'group' => $group['id']]) }}"
+                            class="btn btn-ghost btn-sm w-full text-xs">
+                            <x-icon name="fas.rotate" class="w-3 h-3" />
+                            {{ __('Re-authenticate') }}
+                        </a>
                         @endif
                         @else
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $plugin['identifier']]) }}" class="w-full">
