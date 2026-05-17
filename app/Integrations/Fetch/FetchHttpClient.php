@@ -3,6 +3,7 @@
 namespace App\Integrations\Fetch;
 
 use App\Models\IntegrationGroup;
+use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
@@ -20,6 +21,9 @@ class FetchHttpClient
      */
     public static function fetchWithCookies(string $url, IntegrationGroup $group): ResponseInterface
     {
+        $urlSafety = app(UrlSafetyValidator::class);
+        $urlSafety->validate($url);
+
         $domain = self::getDomainFromUrl($url);
         $domainConfig = self::getCookiesForDomain($domain, $group);
 
@@ -33,12 +37,7 @@ class FetchHttpClient
         // Create Guzzle client
         $client = new Client([
             'timeout' => 30,
-            'allow_redirects' => [
-                'max' => 10,
-                'strict' => false,
-                'referer' => true,
-                'track_redirects' => true,
-            ],
+            'allow_redirects' => $urlSafety->guzzleRedirectConfig(),
             'verify' => true,
             'cookies' => $cookieJar,
             'headers' => $headers,
@@ -124,18 +123,67 @@ class FetchHttpClient
     {
         $cookieJar = new CookieJar;
 
-        foreach ($cookies as $name => $value) {
+        foreach (self::normalizeCookies($cookies) as $cookie) {
             $cookieJar->setCookie(new SetCookie([
-                'Domain' => '.' . $domain, // Leading dot makes it work for subdomains
-                'Name' => $name,
-                'Value' => $value,
+                'Domain' => $cookie['domain'] ?: ('.' . $domain),
+                'Path' => $cookie['path'] ?: '/',
+                'Name' => $cookie['name'],
+                'Value' => $cookie['value'],
+                'Expires' => $cookie['expires'] ?: null,
                 'Discard' => false,
-                'Secure' => true,
-                'HttpOnly' => true,
+                'Secure' => $cookie['secure'],
+                'HttpOnly' => $cookie['httpOnly'],
             ]));
         }
 
         return $cookieJar;
+    }
+
+    /**
+     * Normalize stored cookies, accepting both the legacy {name: value}
+     * map and the richer list-of-objects shape that preserves attributes.
+     *
+     * @param  array<string|int, mixed>  $cookies
+     * @return list<array{name:string,value:string,domain:string,path:string,secure:bool,httpOnly:bool,sameSite:?string,expires:?int}>
+     */
+    public static function normalizeCookies(array $cookies): array
+    {
+        $normalized = [];
+
+        foreach ($cookies as $key => $entry) {
+            if (is_array($entry)) {
+                if (! isset($entry['name'])) {
+                    continue;
+                }
+
+                $normalized[] = [
+                    'name' => (string) $entry['name'],
+                    'value' => (string) ($entry['value'] ?? ''),
+                    'domain' => (string) ($entry['domain'] ?? ''),
+                    'path' => (string) ($entry['path'] ?? ''),
+                    'secure' => (bool) ($entry['secure'] ?? true),
+                    'httpOnly' => (bool) ($entry['httpOnly'] ?? true),
+                    'sameSite' => $entry['sameSite'] ?? null,
+                    'expires' => isset($entry['expires']) ? (int) $entry['expires'] : null,
+                ];
+
+                continue;
+            }
+
+            // Legacy {name: value} map.
+            $normalized[] = [
+                'name' => (string) $key,
+                'value' => (string) $entry,
+                'domain' => '',
+                'path' => '',
+                'secure' => true,
+                'httpOnly' => true,
+                'sameSite' => null,
+                'expires' => null,
+            ];
+        }
+
+        return $normalized;
     }
 
     /**

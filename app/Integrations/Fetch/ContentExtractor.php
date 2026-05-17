@@ -15,7 +15,7 @@ class ContentExtractor
      *
      * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
      */
-    public static function extract(string $html, string $url): array
+    public static function extract(string $html, string $url, ?string $userId = null): array
     {
         // Create Readability configuration
         $config = new Configuration([
@@ -40,10 +40,10 @@ class ContentExtractor
             ];
 
             // Validate extracted content
-            $validation = self::validate($extracted, $html);
+            $validation = self::validate($extracted, $html, $url);
 
             // Write debug file with extracted content
-            self::writeDebugExtraction($url, $extracted, $validation);
+            self::writeDebugExtraction($url, $extracted, $validation, $userId);
 
             if (! $validation['success']) {
                 Log::warning('Fetch: Content extraction validation failed', [
@@ -99,8 +99,15 @@ class ContentExtractor
      * @param  string|null  $textContent  Optional extracted text content for length-based detection
      * @return bool|array Returns true/false for simple detection, or array with details if $returnDetails is true
      */
-    public static function detectPaywall(string $html, ?string $textContent = null, bool $returnDetails = false): bool|array
+    public static function detectPaywall(string $html, ?string $textContent = null, bool $returnDetails = false, ?string $url = null): bool|array
     {
+        // Per-domain override: never flag ignored domains
+        if ($url !== null && self::paywallIgnoredForUrl($url)) {
+            return $returnDetails
+                ? ['detected' => false, 'type' => null, 'indicators' => [], 'truncated' => false]
+                : false;
+        }
+
         // HTML class/id/data attribute indicators
         $htmlIndicators = [
             'class="paywall"',
@@ -147,12 +154,14 @@ class ContentExtractor
 
         $lowerHtml = strtolower($html);
         $detectedIndicators = [];
+        $strongIndicators = [];
         $paywallType = null;
 
-        // Check HTML indicators
+        // Check HTML indicators (explicit paywall markup — strong/reliable signal)
         foreach ($htmlIndicators as $indicator) {
             if (str_contains($lowerHtml, strtolower($indicator))) {
                 $detectedIndicators[] = $indicator;
+                $strongIndicators[] = $indicator;
             }
         }
 
@@ -226,7 +235,21 @@ class ContentExtractor
             }
         }
 
-        $isPaywall = ! empty($detectedIndicators) || $contentTruncated;
+        // Loosened decision to cut false positives on pages that load fine:
+        // - explicit paywall markup is a reliable signal on its own
+        // - otherwise require multiple indicators AND suspiciously short content
+        //   (a stray "free trial"/"to continue reading" string is not enough)
+        $minStrong = (int) config('fetch.paywall.min_strong_indicators', 2);
+        $maxLen = (int) config('fetch.paywall.max_content_length', 600);
+        $contentLen = $textContent !== null ? strlen($textContent) : null;
+
+        $isPaywall = ! empty($strongIndicators)
+            || (
+                count($detectedIndicators) >= $minStrong
+                && $contentLen !== null
+                && $contentLen < $maxLen
+            )
+            || $contentTruncated;
 
         if ($returnDetails) {
             return [
@@ -308,12 +331,42 @@ class ContentExtractor
     }
 
     /**
+     * Whether paywall detection is disabled for this URL's domain.
+     */
+    private static function paywallIgnoredForUrl(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if ($host === '') {
+            return false;
+        }
+
+        $host = preg_replace('/^www\./', '', $host);
+
+        foreach ((array) config('fetch.paywall.ignored_domains', []) as $domain) {
+            $domain = strtolower(preg_replace('/^www\./', '', trim((string) $domain)));
+            if ($domain !== '' && ($host === $domain || str_ends_with($host, '.' . $domain))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Write most recent content extraction to debug file
      */
-    private static function writeDebugExtraction(string $url, array $extracted, array $validation): void
+    private static function writeDebugExtraction(string $url, array $extracted, array $validation, ?string $userId = null): void
     {
+        if (! config('fetch.debug', false)) {
+            return;
+        }
+
         try {
-            $logPath = storage_path('logs/fetch_extraction_last.json');
+            $dir = storage_path('logs/fetch/' . ($userId ?? 'unknown'));
+            if (! is_dir($dir)) {
+                mkdir($dir, 0750, true);
+            }
+            $logPath = $dir . '/extraction_last.json';
 
             $debugData = [
                 'timestamp' => now()->toIso8601String(),
@@ -347,7 +400,7 @@ class ContentExtractor
      *
      * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
      */
-    private static function validate(array $extracted, string $html): array
+    private static function validate(array $extracted, string $html, ?string $url = null): array
     {
         $title = $extracted['title'] ?? '';
         $textContent = $extracted['text_content'] ?? '';
@@ -381,7 +434,7 @@ class ContentExtractor
 
         // Check for paywall BEFORE checking content length
         // This ensures paywall indicators are detected even with short content
-        $paywallCheck = self::detectPaywall($html, $textContent, true);
+        $paywallCheck = self::detectPaywall($html, $textContent, true, $url);
         if ($paywallCheck['detected']) {
             $paywallType = $paywallCheck['type'] ?? 'unknown';
 

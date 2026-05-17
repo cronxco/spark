@@ -2,6 +2,7 @@
 
 namespace App\Services\Media;
 
+use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Http;
@@ -36,6 +37,16 @@ class MediaDownloadHelper
         array $customProperties = []
     ): ?Media {
         try {
+            if (! app(UrlSafetyValidator::class)->isSafe($url)) {
+                Log::warning('Refused to download media from unsafe URL', [
+                    'url' => $url,
+                    'model' => get_class($model),
+                    'model_id' => $model->id,
+                ]);
+
+                return null;
+            }
+
             // Download the file
             $response = Http::timeout(30)
                 ->withOptions(['verify' => config('media-library.media_downloader_ssl', true)])

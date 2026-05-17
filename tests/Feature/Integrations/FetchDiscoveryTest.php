@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FetchDiscoveryTest extends TestCase
@@ -63,7 +64,7 @@ class FetchDiscoveryTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_discovers_urls_from_event_object_url_field()
     {
         // Configure Fetch to monitor the source integration
@@ -113,7 +114,7 @@ class FetchDiscoveryTest extends TestCase
         $this->assertEquals($this->sourceIntegration->id, $discoveredUrl->metadata['discovered_from_integration_id']);
     }
 
-    /** @test */
+    #[Test]
     public function it_discovers_urls_from_event_object_metadata()
     {
         $this->fetchIntegration->update([
@@ -161,7 +162,7 @@ class FetchDiscoveryTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_discovers_urls_from_event_metadata()
     {
         $this->fetchIntegration->update([
@@ -217,7 +218,7 @@ class FetchDiscoveryTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_deduplicates_discovered_urls()
     {
         $this->fetchIntegration->update([
@@ -277,7 +278,7 @@ class FetchDiscoveryTest extends TestCase
         $this->assertEquals(1, $count);
     }
 
-    /** @test */
+    #[Test]
     public function it_does_not_rediscover_existing_urls()
     {
         $this->fetchIntegration->update([
@@ -338,7 +339,7 @@ class FetchDiscoveryTest extends TestCase
         $this->assertEquals('manual', $url->metadata['subscription_source']);
     }
 
-    /** @test */
+    #[Test]
     public function it_only_discovers_from_configured_integrations()
     {
         // Create another integration that is NOT monitored
@@ -418,7 +419,7 @@ class FetchDiscoveryTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_empty_monitor_integrations_gracefully()
     {
         // No integrations configured to monitor

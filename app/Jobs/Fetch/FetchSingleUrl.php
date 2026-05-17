@@ -10,6 +10,7 @@ use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
+use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaywrightHealthMetrics;
 use Exception;
@@ -52,6 +53,16 @@ class FetchSingleUrl implements ShouldQueue
             Log::error('Fetch: Webpage object not found', [
                 'webpage_id' => $this->webpageObjectId,
             ]);
+
+            return;
+        }
+
+        if (! app(UrlSafetyValidator::class)->isSafe($this->url)) {
+            Log::warning('Fetch: Refusing to fetch unsafe URL', [
+                'webpage_id' => $this->webpageObjectId,
+                'url' => $this->url,
+            ]);
+            $this->updateWebpageError($webpage, 'URL is not allowed (private/internal host blocked)');
 
             return;
         }
@@ -121,7 +132,7 @@ class FetchSingleUrl implements ShouldQueue
             ]);
 
             // Extract content using Readability
-            $extraction = ContentExtractor::extract($html, $this->url);
+            $extraction = ContentExtractor::extract($html, $this->url, $webpage->user_id);
 
             if (! $extraction['success']) {
                 $reason = $extraction['reason'] ?? 'Unknown error';
@@ -145,7 +156,7 @@ class FetchSingleUrl implements ShouldQueue
 
                     if ($archiveResult['success']) {
                         // Re-extract content from archive
-                        $archiveExtraction = ContentExtractor::extract($archiveResult['html'], $this->url);
+                        $archiveExtraction = ContentExtractor::extract($archiveResult['html'], $this->url, $webpage->user_id);
 
                         if ($archiveExtraction['success']) {
                             Log::info('Fetch: Archive bypass successful', [
@@ -464,6 +475,7 @@ class FetchSingleUrl implements ShouldQueue
     {
         $metadata = $webpage->metadata ?? [];
         $metadata['last_checked_at'] = now()->toIso8601String();
+        $metadata['pipeline_status'] = 'failed';
         $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
         $consecutiveFailures = ($metadata['last_error']['consecutive_failures'] ?? 0) + 1;
         $metadata['last_error'] = [

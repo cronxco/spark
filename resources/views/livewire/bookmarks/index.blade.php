@@ -249,8 +249,13 @@ new class extends Component
             return $event->event_metadata['url'];
         }
 
+        // Fetch stores the page URL on the webpage object's url column
+        if ($event->target && ! empty($event->target->url)) {
+            return $event->target->url;
+        }
+
         // Check for link in blocks (BlueSky)
-        $linkPreview = $event->blocks->firstWhere('type', 'link_preview');
+        $linkPreview = $event->blocks->firstWhere('block_type', 'link_preview');
         if ($linkPreview && ! empty($linkPreview->metadata['url'])) {
             return $linkPreview->metadata['url'];
         }
@@ -277,19 +282,19 @@ new class extends Component
     public function getBookmarkImage(Event $event): ?string
     {
         // Check Fetch metadata block
-        $metadataBlock = $event->blocks->firstWhere('type', 'fetch_metadata');
+        $metadataBlock = $event->blocks->firstWhere('block_type', 'fetch_metadata');
         if ($metadataBlock && ! empty($metadataBlock->metadata['image'])) {
             return $metadataBlock->metadata['image'];
         }
 
         // Check Karakeep bookmark metadata
-        $karakeepMetadata = $event->blocks->firstWhere('type', 'bookmark_metadata');
+        $karakeepMetadata = $event->blocks->firstWhere('block_type', 'bookmark_metadata');
         if ($karakeepMetadata && ! empty($karakeepMetadata->metadata['image'])) {
             return $karakeepMetadata->metadata['image'];
         }
 
         // Check BlueSky post media
-        $postMedia = $event->blocks->firstWhere('type', 'post_media');
+        $postMedia = $event->blocks->firstWhere('block_type', 'post_media');
         if ($postMedia && ! empty($postMedia->metadata['images'][0])) {
             return $postMedia->metadata['images'][0];
         }
@@ -297,6 +302,11 @@ new class extends Component
         // Check target metadata
         if ($event->target && ! empty($event->target->metadata['image'])) {
             return $event->target->metadata['image'];
+        }
+
+        // Fetch stores the article image on the webpage object's media_url column
+        if ($event->target && ! empty($event->target->media_url)) {
+            return $event->target->media_url;
         }
 
         return null;
@@ -363,6 +373,7 @@ new class extends Component
             return [
                 'id' => $obj->id,
                 'object_id' => $obj->id,
+                'event_id' => $metadata['latest_event_id'] ?? null,
                 'url' => $obj->url,
                 'title' => $obj->title,
                 'domain' => $metadata['domain'] ?? parse_url($obj->url, PHP_URL_HOST),
@@ -504,6 +515,13 @@ new class extends Component
 
     public function loadUrls(): void
     {
+        // Recurring URLs are now a paginated computed property; bust its cache.
+        unset($this->recurringUrls);
+    }
+
+    #[Computed]
+    public function recurringUrls()
+    {
         $query = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
@@ -557,7 +575,7 @@ new class extends Component
                 break;
         }
 
-        $this->urls = $query->get()->map(function ($obj) {
+        return $query->paginate($this->perPage, ['*'], 'urlsPage')->through(function ($obj) {
             $metadata = $obj->metadata ?? [];
 
             return [
@@ -574,7 +592,7 @@ new class extends Component
                 'last_fetch_method' => $metadata['last_fetch_method'] ?? null,
                 'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10), // Last 10 entries
             ];
-        })->toArray();
+        });
     }
 
     public function loadCookies(): void
@@ -892,6 +910,12 @@ new class extends Component
             'newUrl' => 'required|url|max:2048',
         ]);
 
+        if (! app(\App\Services\Fetch\UrlSafetyValidator::class)->isSafe($this->newUrl)) {
+            $this->error('This URL is not allowed.');
+
+            return;
+        }
+
         // Check if URL already exists as a subscription (allow if it's only discovered)
         $existing = EventObject::where('user_id', Auth::id())
             ->where('concept', 'bookmark')
@@ -977,6 +1001,22 @@ new class extends Component
         $eventObject->delete();
         $this->success('URL deleted successfully.');
         $this->loadData();
+    }
+
+    public function resetPlaywrightLearning(string $id): void
+    {
+        $eventObject = EventObject::find($id);
+
+        if (! $eventObject || $eventObject->user_id !== Auth::id()) {
+            $this->error('URL not found.');
+
+            return;
+        }
+
+        (new FetchEngineManager)->resetPlaywrightLearning($eventObject);
+
+        $this->success('Reset learned Playwright requirement for this URL.');
+        $this->loadUrls();
     }
 
     public function fetchNow(string $id, bool $forceRefresh = false): void
@@ -1503,7 +1543,7 @@ new class extends Component
 
         try {
             $tokenName = 'Bookmark API: '.$this->newTokenName;
-            $token = Auth::user()->createToken($tokenName);
+            $token = Auth::user()->createToken($tokenName, ['bookmark:write']);
 
             $this->newlyCreatedToken = $token->plainTextToken;
             $this->temporaryTokenValue = $token->plainTextToken;

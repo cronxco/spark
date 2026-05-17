@@ -25,48 +25,29 @@ class FetchScheduledUrls extends BaseFetchJob
             'user_id' => $this->integration->user_id,
         ]);
 
-        // Query all enabled fetch_webpage EventObjects for this integration
-        // EventObjects don't have integration_id, filter by fetch_integration_id in metadata
-        $webpages = EventObject::where('user_id', $this->integration->user_id)
+        // Query enabled fetch_webpage EventObjects for this integration. EventObjects
+        // don't have an integration_id column, so filter by fetch_integration_id in
+        // metadata. All filtering is pushed into the database (JSON operators) so we
+        // never load the user's entire webpage set into memory.
+        // - belongs to this integration
+        // - enabled (missing => true)
+        // - fetch_mode 'once' only when never fetched (fetch_count = 0); any other
+        //   mode (including missing) is treated as recurring => always eligible
+        $enabledWebpages = EventObject::where('user_id', $this->integration->user_id)
             ->where('concept', 'bookmark')
             ->where('type', 'fetch_webpage')
             ->whereNotNull('url')
+            ->whereRaw("metadata->>'fetch_integration_id' = ?", [$this->integration->id])
+            ->whereRaw("(metadata->>'enabled' IS NULL OR metadata->>'enabled' = 'true')")
+            ->whereRaw("(
+                metadata->>'fetch_mode' IS NULL
+                OR metadata->>'fetch_mode' <> 'once'
+                OR COALESCE((metadata->>'fetch_count')::int, 0) = 0
+            )")
             ->get();
-
-        // Filter to only this integration's URLs and enabled URLs
-        // For one-time fetch mode, only fetch if never fetched before (fetch_count = 0)
-        $enabledWebpages = $webpages->filter(function ($webpage) {
-            $metadata = $webpage->metadata ?? [];
-
-            // Must belong to this integration and be enabled
-            if (($metadata['fetch_integration_id'] ?? null) !== $this->integration->id) {
-                return false;
-            }
-
-            if (($metadata['enabled'] ?? true) !== true) {
-                return false;
-            }
-
-            // Check fetch mode
-            $fetchMode = $metadata['fetch_mode'] ?? 'recurring'; // Default to recurring for backward compatibility
-            $fetchCount = $metadata['fetch_count'] ?? 0;
-
-            // Recurring mode: always fetch if enabled
-            if ($fetchMode === 'recurring') {
-                return true;
-            }
-
-            // One-time mode: only fetch if never fetched before
-            if ($fetchMode === 'once') {
-                return $fetchCount === 0;
-            }
-
-            return true; // Unknown mode, default to allowing fetch
-        });
 
         Log::info('Fetch: Found URLs to fetch', [
             'integration_id' => $this->integration->id,
-            'total_urls' => $webpages->count(),
             'enabled_urls' => $enabledWebpages->count(),
         ]);
 

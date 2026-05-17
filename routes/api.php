@@ -90,7 +90,9 @@ Route::middleware('sentry.api.logging')->group(function () {
         Route::delete('integrations/{integration}', [IntegrationApiController::class, 'destroy'])->name('api.integrations.destroy');
 
         // Fetch API
-        Route::post('fetch/bookmarks', [FetchApiController::class, 'bookmarkUrl'])->name('api.fetch.bookmarks.store');
+        Route::post('fetch/bookmarks', [FetchApiController::class, 'bookmarkUrl'])
+            ->middleware('ability:bookmark:write')
+            ->name('api.fetch.bookmarks.store');
 
         // Assistant Context API
         Route::get('assistant/context', [AssistantContextController::class, 'index'])->name('api.assistant.context');

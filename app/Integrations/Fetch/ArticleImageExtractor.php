@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Fetch;
 
+use App\Services\Fetch\UrlSafetyValidator;
 use DOMDocument;
 use DOMXPath;
 use Exception;
@@ -458,6 +459,7 @@ class ArticleImageExtractor
             return false;
         }
 
-        return true;
+        // Block private/internal hosts (SSRF) — image URLs are downloaded server-side
+        return app(UrlSafetyValidator::class)->isSafe($url);
     }
 }

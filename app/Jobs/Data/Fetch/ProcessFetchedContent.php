@@ -135,6 +135,13 @@ class ProcessFetchedContent implements ShouldQueue
                     'action' => $action,
                 ]);
 
+                // Link the webpage object to the Event so saved pages can open Event detail
+                $webpageMetadata = $this->webpage->metadata ?? [];
+                $webpageMetadata['latest_event_id'] = $event->id;
+                $webpageMetadata['latest_event_at'] = now()->toIso8601String();
+                $webpageMetadata['pipeline_status'] = 'processed';
+                $this->webpage->update(['metadata' => $webpageMetadata]);
+
                 // Create Block 1: Raw Content
                 $event->createBlock([
                     'title' => 'Raw Content',

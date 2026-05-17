@@ -2,10 +2,11 @@
 
 namespace App\Livewire;
 
-use App\Integrations\PluginRegistry;
+use App\Exceptions\UnsafeUrlException;
 use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\EventObject;
-use App\Models\Integration;
+use App\Services\Fetch\FetchIntegrationResolver;
+use App\Services\Fetch\UrlSafetyValidator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -40,17 +41,19 @@ class BookmarkUrl extends Component
     {
         $this->validate();
 
-        // Get or create Fetch integration for this user
-        $fetchIntegration = $this->getFetchIntegration();
+        // Normalize URL
+        $normalizedUrl = $this->normalizeUrl($this->url);
 
-        if (! $fetchIntegration) {
-            $this->addError('url', 'Fetch integration not found. Please set up Fetch first.');
+        try {
+            app(UrlSafetyValidator::class)->validate($normalizedUrl);
+        } catch (UnsafeUrlException) {
+            $this->addError('url', 'This URL is not allowed.');
 
             return;
         }
 
-        // Normalize URL
-        $normalizedUrl = $this->normalizeUrl($this->url);
+        // Get or create Fetch integration for this user
+        $fetchIntegration = app(FetchIntegrationResolver::class)->resolve(Auth::user());
 
         // Get domain for title
         $domain = $this->getDomainFromUrl($normalizedUrl);
@@ -114,26 +117,6 @@ class BookmarkUrl extends Component
     public function render()
     {
         return view('livewire.bookmark-url');
-    }
-
-    /**
-     * Get or find the Fetch integration for the authenticated user.
-     */
-    private function getFetchIntegration(): ?Integration
-    {
-        // Find Fetch plugin
-        $fetchPlugin = PluginRegistry::getPlugin('fetch');
-        if (! $fetchPlugin) {
-            return null;
-        }
-
-        // Find active Fetch integration for this user (not paused)
-        $integrations = Integration::where('user_id', Auth::id())
-            ->where('service', 'fetch')
-            ->get();
-
-        // Filter out paused integrations
-        return $integrations->first(fn ($integration) => ! $integration->isPaused());
     }
 
     /**

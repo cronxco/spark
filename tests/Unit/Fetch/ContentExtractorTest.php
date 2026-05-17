@@ -3,6 +3,7 @@
 namespace Tests\Unit\Fetch;
 
 use App\Integrations\Fetch\ContentExtractor;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ContentExtractorTest extends TestCase
@@ -156,6 +157,51 @@ class ContentExtractorTest extends TestCase
             $this->assertFalse($result['success'], "Failed to detect paywall for: {$indicator}");
             $this->assertStringContainsString('paywall', strtolower($result['reason']));
         }
+    }
+
+    #[Test]
+    public function it_does_not_flag_a_full_article_with_a_single_stray_indicator()
+    {
+        $body = str_repeat('This is a long, substantial article body with plenty of real content that loads perfectly fine in a browser. ', 30);
+
+        $html = "
+            <!DOCTYPE html>
+            <html>
+            <head><title>A Real Article</title></head>
+            <body>
+                <article>
+                    <p>{$body}</p>
+                    <footer>Want a free trial? See our other plans.</footer>
+                </article>
+            </body>
+            </html>
+        ";
+
+        $result = ContentExtractor::extract($html, 'https://example.com/real');
+
+        $this->assertTrue($result['success'], 'A full article with one stray phrase should not be flagged as a paywall');
+    }
+
+    #[Test]
+    public function it_honours_per_domain_paywall_override()
+    {
+        config(['fetch.paywall.ignored_domains' => ['paywalled.example']]);
+
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Premium Article</title></head>
+            <body>
+                <div class="paywall">
+                    <p>Subscribe to continue reading this premium subscriber-only article behind a hard paywall.</p>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $detected = ContentExtractor::detectPaywall($html, 'short', false, 'https://paywalled.example/post');
+
+        $this->assertFalse($detected, 'Ignored domains must never be flagged as paywalled');
     }
 
     /** @test */

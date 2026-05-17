@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
+use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -63,6 +64,15 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                         $q->whereIn('integration_id', $monitoredIntegrationIds);
                     });
             })
+            // Eager-load the monitored events so we don't query per-object (N+1)
+            ->with([
+                'actorEvents' => function ($q) use ($monitoredIntegrationIds) {
+                    $q->whereIn('integration_id', $monitoredIntegrationIds)->select('id', 'actor_id', 'integration_id');
+                },
+                'targetEvents' => function ($q) use ($monitoredIntegrationIds) {
+                    $q->whereIn('integration_id', $monitoredIntegrationIds)->select('id', 'target_id', 'integration_id');
+                },
+            ])
             ->get();
 
         Log::debug('DiscoverUrlsFromIntegrations: Found EventObjects', [
@@ -70,9 +80,9 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
         ]);
 
         foreach ($eventObjects as $object) {
-            // Get integration_id from the object's events (either as actor or target)
-            $integrationId = $object->actorEvents()->whereIn('integration_id', $monitoredIntegrationIds)->value('integration_id')
-                ?? $object->targetEvents()->whereIn('integration_id', $monitoredIntegrationIds)->value('integration_id');
+            // Get integration_id from the pre-loaded events (either as actor or target)
+            $integrationId = $object->actorEvents->first()?->integration_id
+                ?? $object->targetEvents->first()?->integration_id;
 
             // Extract from url field
             // Only URLs from url field will update the source object/event with fetched content
@@ -117,12 +127,10 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
 
         // Extract URLs from Events
         // Check if Events have a url field, and also check event_metadata
+        // Monitored integrations already belong to this user, so filtering by
+        // integration scopes to the user; chunk to avoid loading all events.
         $events = Event::whereIn('integration_id', $monitoredIntegrationIds)
-            ->get();
-
-        Log::debug('DiscoverUrlsFromIntegrations: Found Events', [
-            'count' => $events->count(),
-        ]);
+            ->lazyById(500);
 
         foreach ($events as $event) {
             // Check if event has a url field (EventObjects have url, but Events might in event_metadata)
@@ -244,6 +252,14 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
 
                 if (! $domain) {
                     Log::warning('DiscoverUrlsFromIntegrations: Invalid URL, skipping', [
+                        'url' => $urlData['url'],
+                    ]);
+
+                    continue;
+                }
+
+                if (! app(UrlSafetyValidator::class)->isSafe($urlData['url'])) {
+                    Log::warning('DiscoverUrlsFromIntegrations: Unsafe URL, skipping', [
                         'url' => $urlData['url'],
                     ]);
 

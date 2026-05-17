@@ -70,10 +70,10 @@
 </div>
 
 <!-- URLs List -->
-@if (count($urls) > 0)
+@if ($this->recurringUrls->count() > 0)
 <div class="space-y-4">
-    @foreach ($urls as $url)
-    <div class="card bg-base-200 shadow">
+    @foreach ($this->recurringUrls as $url)
+    <div class="card bg-base-200 shadow" wire:key="recurring-url-{{ $url['id'] }}">
         <div class="card-body">
             <div class="flex flex-col sm:flex-row sm:items-start gap-4">
                 <!-- Favicon & URL -->
@@ -196,6 +196,15 @@
             </div>
             @endif
 
+            <div class="mt-2">
+                <button wire:click="resetPlaywrightLearning('{{ $url['id'] }}')"
+                    wire:confirm="Reset the learned Playwright requirement for this URL?"
+                    class="btn btn-ghost btn-xs">
+                    <x-icon name="fas.arrow-rotate-left" class="w-3 h-3" />
+                    Reset learned Playwright requirement
+                </button>
+            </div>
+
             <!-- Fetch History -->
             @if (!empty($url['playwright_history']) && count($url['playwright_history']) > 0)
             <div class="mt-4">
@@ -270,6 +279,9 @@
         </div>
     </div>
     @endforeach
+</div>
+<div class="mt-4">
+    {{ $this->recurringUrls->links() }}
 </div>
 @else
 <div class="card bg-base-200 shadow">
