@@ -20,7 +20,9 @@ class AdminPushNotification extends Notification
 
     public function via(User $notifiable): array
     {
-        return [WebPushChannel::class];
+        return $notifiable->pushSubscriptions()->validWebPush()->exists()
+            ? [WebPushChannel::class]
+            : [];
     }
 
     public function toWebPush(User $notifiable, $notification): WebPushMessage

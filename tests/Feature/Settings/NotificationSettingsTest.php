@@ -50,6 +50,9 @@ class NotificationSettingsTest extends TestCase
         $this->user->pushSubscriptions()->create([
             'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-token',
             'device_type' => PushSubscription::DEVICE_TYPE_WEB,
+            'public_key' => 'public-key',
+            'auth_token' => 'auth-token',
+            'content_encoding' => 'aesgcm',
         ]);
 
         Volt::test('settings.notifications')

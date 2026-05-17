@@ -1386,9 +1386,26 @@ PROMPT;
             return [];
         }
 
-        // Filter patterns by confidence threshold
+        // Filter patterns by confidence threshold and required fields.
         return array_filter($json, function ($pattern) {
-            return isset($pattern['confidence']) && $pattern['confidence'] >= 0.6;
+            if (! is_array($pattern)) {
+                return false;
+            }
+
+            if (! isset($pattern['confidence']) || $pattern['confidence'] < 0.6) {
+                return false;
+            }
+
+            if (empty($pattern['title']) || empty($pattern['pattern_type'])) {
+                Log::warning('Flint: Skipping malformed detected pattern', [
+                    'missing_title' => empty($pattern['title']),
+                    'missing_pattern_type' => empty($pattern['pattern_type']),
+                ]);
+
+                return false;
+            }
+
+            return true;
         });
     }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -96,6 +97,18 @@ class User extends Authenticatable
     public function metricStatistics()
     {
         return $this->hasMany(MetricStatistic::class);
+    }
+
+    /**
+     * Route only complete browser push subscriptions to WebPush.
+     *
+     * @return Collection<int, PushSubscription>
+     */
+    public function routeNotificationForWebPush(): Collection
+    {
+        return $this->pushSubscriptions()
+            ->validWebPush()
+            ->get();
     }
 
     /**

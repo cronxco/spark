@@ -47,6 +47,25 @@ class PushSubscription extends BasePushSubscription
      * @param  Builder<static>  $query
      * @return Builder<static>
      */
+    public function scopeValidWebPush(Builder $query): Builder
+    {
+        return $query
+            ->where(function (Builder $query) {
+                $query->where('device_type', self::DEVICE_TYPE_WEB)
+                    ->orWhereNull('device_type');
+            })
+            ->whereNotNull('public_key')
+            ->where('public_key', '!=', '')
+            ->whereNotNull('auth_token')
+            ->where('auth_token', '!=', '')
+            ->whereNotNull('content_encoding')
+            ->where('content_encoding', '!=', '');
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeDeviceType(Builder $query, string $type): Builder
     {
         return $query->where('device_type', $type);

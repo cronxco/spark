@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Compact;
 
 use App\Models\Block;
+use App\Support\EntityReferenceResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,9 +24,17 @@ class CompactBlockResource extends JsonResource
             'time' => $this->time?->toIso8601String(),
         ];
 
+        $references = EntityReferenceResolver::resolveEvents(
+            $this->metadata['referenced_event_ids'] ?? [],
+        );
+
         $content = $this->resource->getContent();
         if ($content) {
-            $data['content'] = $content;
+            $data['content'] = EntityReferenceResolver::linkify($content, $references);
+        }
+
+        if (! empty($references)) {
+            $data['references'] = $references;
         }
 
         if ($this->value !== null) {

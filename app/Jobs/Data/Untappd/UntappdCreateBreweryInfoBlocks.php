@@ -6,7 +6,7 @@ use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Services\Media\MediaDownloadHelper;
+use App\Services\Media\MediaDeduplicationService;
 
 class UntappdCreateBreweryInfoBlocks extends BaseProcessingJob
 {
@@ -127,9 +127,8 @@ class UntappdCreateBreweryInfoBlocks extends BaseProcessingJob
                 $md5Hash = $media->getCustomProperty('md5_hash');
 
                 if ($md5Hash) {
-                    // Use MediaDownloadHelper to handle deduplication
-                    $helper = app(MediaDownloadHelper::class);
-                    $helper->attachExistingMedia($media, $block, 'downloaded_images');
+                    $deduplicationService = app(MediaDeduplicationService::class);
+                    $deduplicationService->attachMediaToModel($media, $block, 'downloaded_images');
                 } else {
                     // Fallback: copy without deduplication
                     $block->copyMedia($media->getPath())->toMediaCollection('downloaded_images');

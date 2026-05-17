@@ -28,7 +28,7 @@ class DailyDigestReady extends Notification implements ShouldQueue
             $channels[] = 'mail';
         }
 
-        if ($notifiable->hasPushNotificationsEnabled() && $notifiable->pushSubscriptions()->exists()) {
+        if ($notifiable->hasPushNotificationsEnabled() && $notifiable->pushSubscriptions()->validWebPush()->exists()) {
             $channels[] = WebPushChannel::class;
         }
 

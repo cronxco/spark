@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\Channels\ApnsChannel;
 use Illuminate\Bus\Queueable;
@@ -148,21 +147,16 @@ abstract class SparkNotification extends Notification implements ShouldQueue
      */
     protected function pushChannelsFor(User $notifiable): array
     {
-        $deviceTypes = $notifiable->pushSubscriptions()
-            ->pluck('device_type')
-            ->map(fn ($type) => $type ?: PushSubscription::DEVICE_TYPE_WEB)
-            ->unique();
-
         $channels = [];
-        foreach ($deviceTypes as $type) {
-            if ($type === PushSubscription::DEVICE_TYPE_IOS) {
-                $channels[] = ApnsChannel::class;
-            } else {
-                $channels[] = WebPushChannel::class;
-            }
+        if ($notifiable->pushSubscriptions()->apns()->exists()) {
+            $channels[] = ApnsChannel::class;
         }
 
-        return array_values(array_unique($channels));
+        if ($notifiable->pushSubscriptions()->validWebPush()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
     }
 
     /**

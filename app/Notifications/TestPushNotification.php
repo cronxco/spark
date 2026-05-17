@@ -50,7 +50,7 @@ class TestPushNotification extends SparkNotification
         $channels = [];
 
         if (in_array($this->platform, ['web', 'all'], true)
-            && $notifiable->pushSubscriptions()->where('device_type', 'web')->exists()) {
+            && $notifiable->pushSubscriptions()->validWebPush()->exists()) {
             $channels[] = WebPushChannel::class;
         }
 

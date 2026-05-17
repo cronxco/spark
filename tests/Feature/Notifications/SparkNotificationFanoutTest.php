@@ -39,6 +39,9 @@ class SparkNotificationFanoutTest extends TestCase
         $user->pushSubscriptions()->create([
             'endpoint' => 'https://example.com/push',
             'device_type' => PushSubscription::DEVICE_TYPE_WEB,
+            'public_key' => 'public-key',
+            'auth_token' => 'auth-token',
+            'content_encoding' => 'aesgcm',
         ]);
 
         $notification = new TestFanoutNotification;
@@ -60,6 +63,9 @@ class SparkNotificationFanoutTest extends TestCase
         $user->pushSubscriptions()->create([
             'endpoint' => 'https://example.com/push',
             'device_type' => PushSubscription::DEVICE_TYPE_WEB,
+            'public_key' => 'public-key',
+            'auth_token' => 'auth-token',
+            'content_encoding' => 'aesgcm',
         ]);
 
         $channels = (new TestFanoutNotification)->via($user);
@@ -77,5 +83,51 @@ class SparkNotificationFanoutTest extends TestCase
 
         $this->assertNotContains(ApnsChannel::class, $channels);
         $this->assertNotContains(WebPushChannel::class, $channels);
+    }
+
+    #[Test]
+    public function via_does_not_include_webpush_for_incomplete_web_subscription(): void
+    {
+        $user = User::factory()->create();
+        $user->pushSubscriptions()->create([
+            'endpoint' => 'https://example.com/push',
+            'device_type' => PushSubscription::DEVICE_TYPE_WEB,
+            'public_key' => 'public-key',
+            'auth_token' => 'auth-token',
+            'content_encoding' => null,
+        ]);
+
+        $channels = (new TestFanoutNotification)->via($user);
+
+        $this->assertNotContains(WebPushChannel::class, $channels);
+    }
+
+    #[Test]
+    public function route_notification_for_webpush_returns_only_complete_web_subscriptions(): void
+    {
+        $user = User::factory()->create();
+        $valid = $user->pushSubscriptions()->create([
+            'endpoint' => 'https://example.com/push',
+            'device_type' => PushSubscription::DEVICE_TYPE_WEB,
+            'public_key' => 'public-key',
+            'auth_token' => 'auth-token',
+            'content_encoding' => 'aesgcm',
+        ]);
+        $user->pushSubscriptions()->create([
+            'endpoint' => 'https://example.com/incomplete',
+            'device_type' => PushSubscription::DEVICE_TYPE_WEB,
+            'public_key' => 'public-key',
+            'auth_token' => 'auth-token',
+            'content_encoding' => null,
+        ]);
+        $user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('a', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+        ]);
+
+        $subscriptions = $user->routeNotificationForWebPush();
+
+        $this->assertCount(1, $subscriptions);
+        $this->assertTrue($subscriptions->first()->is($valid));
     }
 }
