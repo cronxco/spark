@@ -20,8 +20,8 @@
             <div class="form-control sm:w-48">
                 <select wire:model.live="savedStatusFilter" class="select select-bordered">
                     <option value="all">All Status</option>
-                    <option value="fetched">Fetched</option>
-                    <option value="error">Error</option>
+                    <option value="success">Fetched</option>
+                    <option value="errors">Error</option>
                     <option value="pending">Pending</option>
                 </select>
             </div>
@@ -62,9 +62,16 @@
                             {{ $page['url'] }}
                         </a>
                     </div>
-                    <a href="{{ route('events.show', $page['object_id']) }}" wire:navigate class="font-semibold mb-1 hover:text-primary inline-block">
-                        {{ $page['title'] === $page['url'] ? 'Not yet fetched' : $page['title'] }}
+                    @if ($page['event_id'])
+                    <a href="{{ route('events.show', $page['event_id']) }}" wire:navigate class="font-semibold mb-1 hover:text-primary inline-block">
+                        {{ $page['title'] === $page['url'] ? $page['url'] : $page['title'] }}
                     </a>
+                    @else
+                    <span class="font-semibold mb-1 inline-block text-base-content/60" title="This page is still being fetched">
+                        {{ $page['title'] === $page['url'] ? $page['url'] : $page['title'] }}
+                        <span class="badge badge-ghost badge-sm ml-2">Processing…</span>
+                    </span>
+                    @endif
                     <div class="flex flex-wrap gap-2 items-center text-sm text-base-content/70">
                         <span class="flex items-center gap-1">
                             <x-icon name="fas.globe" class="w-3 h-3" />

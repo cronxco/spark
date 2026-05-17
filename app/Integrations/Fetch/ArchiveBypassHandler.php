@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Fetch;
 
+use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -84,6 +85,15 @@ class ArchiveBypassHandler
                 'html' => null,
                 'archive_url' => null,
                 'error' => 'Archive bypass is disabled',
+            ];
+        }
+
+        if (! app(UrlSafetyValidator::class)->isSafe($originalUrl)) {
+            return [
+                'success' => false,
+                'html' => null,
+                'archive_url' => null,
+                'error' => 'URL is not allowed',
             ];
         }
 

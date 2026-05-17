@@ -116,8 +116,18 @@
                                     <td><x-badge value="No" class="badge-neutral badge-sm" /></td>
                                     <td>Force re-fetch if exists (default: false)</td>
                                 </tr>
+                                <tr>
+                                    <td><code class="text-xs">fetch_mode</code></td>
+                                    <td><span class="badge badge-sm badge-info">string</span></td>
+                                    <td><x-badge value="No" class="badge-neutral badge-sm" /></td>
+                                    <td><code class="text-xs">once</code> or <code class="text-xs">recurring</code> (default: <code class="text-xs">once</code>)</td>
+                                </tr>
                             </tbody>
                         </table>
+                        <div class="alert alert-info mt-4 text-sm">
+                            <x-icon name="fas.shield-halved" class="w-4 h-4" />
+                            <span>Bookmark API tokens are scoped to the <code class="text-xs">bookmark:write</code> ability and can only be used to save bookmarks. Tokens created before this change keep working.</span>
+                        </div>
                     </div>
                 </div>
             </div>

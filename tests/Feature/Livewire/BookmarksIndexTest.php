@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Volt\Volt;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BookmarksIndexTest extends TestCase
@@ -36,9 +37,7 @@ class BookmarksIndexTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function bookmarks_page_loads_successfully(): void
     {
         $response = $this->actingAs($this->user)->get('/bookmarks');
@@ -47,9 +46,7 @@ class BookmarksIndexTest extends TestCase
         $response->assertSeeLivewire('bookmarks.index');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function old_fetch_route_redirects_to_new_bookmarks_route(): void
     {
         $response = $this->actingAs($this->user)->get('/bookmarks/fetch');
@@ -57,9 +54,7 @@ class BookmarksIndexTest extends TestCase
         $response->assertRedirect('/bookmarks?tab=urls');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function default_tab_is_all_bookmarks(): void
     {
         $this->actingAs($this->user);
@@ -68,9 +63,7 @@ class BookmarksIndexTest extends TestCase
             ->assertSet('activeTab', 'all');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function tab_parameter_sets_active_tab(): void
     {
         $this->actingAs($this->user);
@@ -89,9 +82,7 @@ class BookmarksIndexTest extends TestCase
             ->assertSet('activeTab', 'saved');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_tabs_are_accessible(): void
     {
         $tabs = ['all', 'saved', 'urls', 'cookies', 'discovery', 'stats', 'playwright', 'api'];
@@ -102,9 +93,7 @@ class BookmarksIndexTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function saved_pages_shows_only_once_mode_bookmarks(): void
     {
         $this->actingAs($this->user);
@@ -134,9 +123,7 @@ class BookmarksIndexTest extends TestCase
         $this->assertEquals($savedPage->id, $savedPages[0]['id']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function saved_pages_filters_by_search(): void
     {
         $this->actingAs($this->user);
@@ -168,9 +155,7 @@ class BookmarksIndexTest extends TestCase
         $this->assertEquals('Laravel Documentation', $savedPages[0]['title']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function saved_pages_filters_by_domain(): void
     {
         $this->actingAs($this->user);
@@ -198,9 +183,7 @@ class BookmarksIndexTest extends TestCase
         $this->assertEquals('laravel.com', $savedPages[0]['domain']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function saved_pages_filters_by_status(): void
     {
         $this->actingAs($this->user);
@@ -247,9 +230,7 @@ class BookmarksIndexTest extends TestCase
         $this->assertEquals('success.com', $savedPages[0]['domain']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function saved_pages_sorts_correctly(): void
     {
         $this->actingAs($this->user);
@@ -297,9 +278,7 @@ class BookmarksIndexTest extends TestCase
         $this->assertEquals('Old Page', $savedPages[1]['title']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function clear_saved_filters_resets_all_filters(): void
     {
         $this->actingAs($this->user);
@@ -316,9 +295,7 @@ class BookmarksIndexTest extends TestCase
             ->assertSet('savedSortBy', 'last_changed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function delete_saved_removes_bookmark(): void
     {
         $this->actingAs($this->user);
@@ -337,9 +314,7 @@ class BookmarksIndexTest extends TestCase
         $this->assertModelMissing($page);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function delete_saved_only_allows_deleting_own_bookmarks(): void
     {
         $this->actingAs($this->user);
@@ -357,9 +332,7 @@ class BookmarksIndexTest extends TestCase
             ->assertForbidden();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function saved_domain_options_returns_unique_domains(): void
     {
         $this->actingAs($this->user);
@@ -392,9 +365,7 @@ class BookmarksIndexTest extends TestCase
         $response->assertSee('php.net');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function component_requires_authentication(): void
     {
         $response = $this->get('/bookmarks');

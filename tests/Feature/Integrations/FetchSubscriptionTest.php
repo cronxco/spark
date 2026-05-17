@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FetchSubscriptionTest extends TestCase
@@ -46,7 +47,7 @@ class FetchSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function user_can_subscribe_to_url()
     {
         $url = 'https://example.com/article';
@@ -78,7 +79,7 @@ class FetchSubscriptionTest extends TestCase
         $this->assertEquals($this->integration->id, $eventObject->metadata['integration_id']);
     }
 
-    /** @test */
+    #[Test]
     public function user_can_disable_url_subscription()
     {
         $eventObject = EventObject::create([
@@ -103,7 +104,7 @@ class FetchSubscriptionTest extends TestCase
         $this->assertFalse($eventObject->metadata['enabled']);
     }
 
-    /** @test */
+    #[Test]
     public function user_can_delete_url_subscription()
     {
         $eventObject = EventObject::create([
@@ -129,7 +130,7 @@ class FetchSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function disabled_urls_are_not_fetched()
     {
         $enabledUrl = EventObject::create([
@@ -175,7 +176,7 @@ class FetchSubscriptionTest extends TestCase
         $this->assertFalse($enabledUrls->contains('id', $disabledUrl->id));
     }
 
-    /** @test */
+    #[Test]
     public function url_metadata_tracks_fetch_statistics()
     {
         $eventObject = EventObject::create([
@@ -210,7 +211,7 @@ class FetchSubscriptionTest extends TestCase
         $this->assertNotNull($eventObject->metadata['content_hash']);
     }
 
-    /** @test */
+    #[Test]
     public function url_can_track_consecutive_failures()
     {
         $eventObject = EventObject::create([
@@ -241,7 +242,7 @@ class FetchSubscriptionTest extends TestCase
         $this->assertEquals('Connection timeout', $eventObject->metadata['last_error']['message']);
     }
 
-    /** @test */
+    #[Test]
     public function url_is_auto_disabled_after_five_consecutive_failures()
     {
         $eventObject = EventObject::create([

@@ -2,14 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\UnsafeUrlException;
 use App\Http\Controllers\Controller;
 use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\EventObject;
+use App\Services\Fetch\FetchIntegrationResolver;
+use App\Services\Fetch\UrlSafetyValidator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class FetchApiController extends Controller
 {
+    public function __construct(
+        protected UrlSafetyValidator $urlSafety,
+        protected FetchIntegrationResolver $integrationResolver
+    ) {}
+
     /**
      * Bookmark a URL for fetching.
      */
@@ -35,6 +43,16 @@ class FetchApiController extends Controller
         $forceRefresh = $validated['force_refresh'] ?? false;
         $fetchMode = $validated['fetch_mode'] ?? 'once'; // Default to one-time fetch for API bookmarks
 
+        try {
+            $this->urlSafety->validate($url);
+        } catch (UnsafeUrlException $e) {
+            return response()->json([
+                'success' => false,
+                'state' => 'rejected',
+                'errors' => ['url' => ['This URL is not allowed.']],
+            ], 422);
+        }
+
         // Parse domain from URL
         $domain = parse_url($url, PHP_URL_HOST);
 
@@ -45,23 +63,20 @@ class FetchApiController extends Controller
             ->where('url', $url)
             ->first();
 
+        $integration = $this->integrationResolver->resolve($request->user());
+
         if ($existingBookmark) {
             // If force refresh is requested, dispatch job for existing bookmark
             $jobDispatched = false;
             if ($forceRefresh && $fetchImmediately) {
-                $integration = $request->user()->integrations()
-                    ->where('service', 'fetch')
-                    ->first();
-
-                if ($integration) {
-                    FetchSingleUrl::dispatch($integration, $existingBookmark->id, $existingBookmark->url, true);
-                    $jobDispatched = true;
-                }
+                FetchSingleUrl::dispatch($integration, $existingBookmark->id, $existingBookmark->url, true);
+                $jobDispatched = true;
             }
 
             // Return existing bookmark
             return response()->json([
                 'success' => true,
+                'state' => $jobDispatched ? 'refreshed' : 'already_exists',
                 'bookmark' => [
                     'id' => $existingBookmark->id,
                     'url' => $existingBookmark->url,
@@ -73,11 +88,6 @@ class FetchApiController extends Controller
                 'message' => $jobDispatched ? 'Force refresh dispatched' : 'Bookmark already exists',
             ]);
         }
-
-        // Get user's Fetch integration to store in metadata
-        $integration = $request->user()->integrations()
-            ->where('service', 'fetch')
-            ->first();
 
         // Create new bookmark
         $bookmark = EventObject::create([
@@ -107,6 +117,7 @@ class FetchApiController extends Controller
 
         return response()->json([
             'success' => true,
+            'state' => $jobDispatched ? 'queued' : 'pending_no_fetch',
             'bookmark' => [
                 'id' => $bookmark->id,
                 'url' => $bookmark->url,
@@ -115,6 +126,9 @@ class FetchApiController extends Controller
                 'created_at' => $bookmark->created_at->toISOString(),
             ],
             'job_dispatched' => $jobDispatched,
+            'message' => $jobDispatched
+                ? 'Bookmark queued for fetching'
+                : 'Bookmark saved; set fetch_immediately to queue a fetch',
         ]);
     }
 }

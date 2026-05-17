@@ -84,7 +84,7 @@ class PlaywrightFetchClient
             ]);
 
             // Write most recent response to debug file
-            $this->writeDebugResponse($url, $data);
+            $this->writeDebugResponse($url, $data, $group->user_id);
 
             // Update last_used_at
             FetchHttpClient::updateLastUsed($domain, $group);
@@ -315,25 +315,40 @@ class PlaywrightFetchClient
      */
     protected function updateCookiesIfChanged(string $domain, IntegrationGroup $group, array $newCookies): void
     {
-        // Convert Playwright cookies back to simple format
-        $simpleCookies = [];
+        // Preserve full cookie attributes (expiry, SameSite, Secure, HttpOnly, path, domain)
+        $incoming = [];
         foreach ($newCookies as $cookie) {
             $cookieDomain = ltrim($cookie['domain'] ?? '', '.');
             if ($cookieDomain === $domain || str_ends_with($cookieDomain, '.' . $domain)) {
-                $simpleCookies[$cookie['name']] = $cookie['value'];
+                $incoming[] = [
+                    'name' => $cookie['name'],
+                    'value' => $cookie['value'],
+                    'domain' => $cookie['domain'] ?? ('.' . $domain),
+                    'path' => $cookie['path'] ?? '/',
+                    'secure' => (bool) ($cookie['secure'] ?? true),
+                    'httpOnly' => (bool) ($cookie['httpOnly'] ?? true),
+                    'sameSite' => $cookie['sameSite'] ?? null,
+                    'expires' => isset($cookie['expires']) ? (int) $cookie['expires'] : null,
+                ];
             }
         }
 
-        if (empty($simpleCookies)) {
+        if (empty($incoming)) {
             return;
         }
 
-        // Get current cookies
+        // Merge with existing cookies by (name, domain, path) — don't blindly overwrite the set
         $currentConfig = FetchHttpClient::getCookiesForDomain($domain, $group);
-        $currentCookies = $currentConfig['cookies'] ?? [];
+        $existing = FetchHttpClient::normalizeCookies($currentConfig['cookies'] ?? []);
 
-        // Check if cookies actually changed
-        if ($simpleCookies !== $currentCookies) {
+        $merged = [];
+        foreach (array_merge($existing, $incoming) as $cookie) {
+            $key = $cookie['name'] . '|' . $cookie['domain'] . '|' . $cookie['path'];
+            $merged[$key] = $cookie; // incoming entries (later) win
+        }
+        $merged = array_values($merged);
+
+        if ($merged !== $existing) {
             $authMetadata = $group->auth_metadata ?? [];
             $domains = $authMetadata['domains'] ?? [];
 
@@ -341,7 +356,7 @@ class PlaywrightFetchClient
                 $domains[$domain] = [];
             }
 
-            $domains[$domain]['cookies'] = $simpleCookies;
+            $domains[$domain]['cookies'] = $merged;
             $domains[$domain]['updated_at'] = now()->toIso8601String();
 
             $authMetadata['domains'] = $domains;
@@ -349,7 +364,7 @@ class PlaywrightFetchClient
 
             Log::info('Fetch: Cookies auto-updated from Playwright session', [
                 'domain' => $domain,
-                'cookie_count' => count($simpleCookies),
+                'cookie_count' => count($merged),
             ]);
         }
     }
@@ -369,10 +384,18 @@ class PlaywrightFetchClient
     /**
      * Write most recent Playwright response to debug file
      */
-    protected function writeDebugResponse(string $url, array $data): void
+    protected function writeDebugResponse(string $url, array $data, ?string $userId = null): void
     {
+        if (! config('fetch.debug', false)) {
+            return;
+        }
+
         try {
-            $logPath = storage_path('logs/fetch_playwright_last.json');
+            $dir = storage_path('logs/fetch/' . ($userId ?? 'unknown'));
+            if (! is_dir($dir)) {
+                mkdir($dir, 0750, true);
+            }
+            $logPath = $dir . '/playwright_last.json';
 
             $debugData = [
                 'timestamp' => now()->toIso8601String(),
