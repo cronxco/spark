@@ -17,6 +17,7 @@ use App\Services\FutureAgentService;
 use App\Services\InsightDeduplicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -210,6 +211,30 @@ JSON;
         $this->assertCount(2, $result);
         $this->assertEquals('High Confidence', $result[0]['title']);
         $this->assertEquals('Medium Confidence', $result[2]['title']);
+    }
+
+    #[Test]
+    public function it_filters_patterns_missing_required_fields()
+    {
+        $response = [
+            ['title' => 'Missing Type', 'confidence' => 0.8],
+            ['pattern_type' => 'trend', 'confidence' => 0.8],
+            ['title' => 'Complete Pattern', 'pattern_type' => 'trend', 'confidence' => 0.8],
+        ];
+
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('parsePatternDetectionResponse');
+        $method->setAccessible(true);
+
+        $mockService = Mockery::mock(AgentOrchestrationService::class)
+            ->makePartial()
+            ->shouldAllowMockingProtectedMethods();
+        $mockService->shouldReceive('extractJson')->andReturn($response);
+
+        $result = $method->invoke($mockService, json_encode($response));
+
+        $this->assertCount(1, $result);
+        $this->assertEquals('Complete Pattern', array_values($result)[0]['title']);
     }
 
     /** @test */

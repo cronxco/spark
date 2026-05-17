@@ -191,6 +191,9 @@ class CreateFlintDigestTool extends Tool
                         ->description('Block title.'),
                     'content' => $schema->string()
                         ->description('Markdown content — for flint_editorial_note and other content blocks.'),
+                    'referenced_event_ids' => $schema->array()
+                        ->items($schema->string())
+                        ->description('Event UUIDs this block draws on. Surfaced to the client as tappable reference chips and linkified inline in the content.'),
                     'question' => $schema->string()
                         ->description('For flint_user_question: the question text to display to the user.'),
                     'topic' => $schema->string()
@@ -239,6 +242,7 @@ class CreateFlintDigestTool extends Tool
 
         return [
             'content' => $blockData['content'] ?? '',
+            'referenced_event_ids' => $blockData['referenced_event_ids'] ?? [],
         ];
     }
 }

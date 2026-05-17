@@ -80,6 +80,26 @@ class FetchSingleUrl implements ShouldQueue
             $result = $engine->fetch($this->url, $group, $webpage);
 
             if ($result['error']) {
+                if ($this->isHandledPermanentFetchFailure($result['error'])) {
+                    $durationMs = round((microtime(true) - $startTime) * 1000);
+                    $this->updateWebpageError($webpage, $result['error']);
+                    $engine->updateLastHistoryEntry($webpage, [
+                        'outcome' => 'failed',
+                        'duration_ms' => $durationMs,
+                        'status_code' => $this->statusCodeFromError($result['error']),
+                    ]);
+
+                    $metrics = new PlaywrightHealthMetrics;
+                    $metrics->recordFetch($result['method'] ?? 'http', false, (int) $durationMs, 'blocked');
+
+                    Log::warning('Fetch: Permanent fetch failure handled without retry', [
+                        'url' => $this->url,
+                        'error' => $result['error'],
+                    ]);
+
+                    return;
+                }
+
                 throw new Exception($result['error']);
             }
 
@@ -357,6 +377,26 @@ class FetchSingleUrl implements ShouldQueue
         }
 
         return false;
+    }
+
+    private function isHandledPermanentFetchFailure(string $error): bool
+    {
+        $lowerError = strtolower($error);
+
+        return str_contains($lowerError, '403 forbidden')
+            && (
+                str_contains($lowerError, 'just a moment')
+                || str_contains($lowerError, 'cloudflare')
+            );
+    }
+
+    private function statusCodeFromError(string $error): int
+    {
+        if (preg_match('/\\b([1-5]\\d{2})\\b/', $error, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 0;
     }
 
     /**

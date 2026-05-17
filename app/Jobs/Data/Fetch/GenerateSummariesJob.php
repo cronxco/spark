@@ -185,6 +185,11 @@ PROMPT;
             finish_ai_request_span($aiSpan, $usage, $finishReason);
 
             $summaries = json_decode($result->choices[0]->message->content, true);
+            if (! is_array($summaries)) {
+                throw new Exception('Summary response was not valid JSON');
+            }
+
+            $summaries = $this->normaliseSummaries($summaries);
 
             // Validate response structure
             $requiredKeys = ['summary_tweet', 'summary_short', 'summary_paragraph', 'key_takeaways', 'tldr', 'emoji', 'tags'];
@@ -207,6 +212,23 @@ PROMPT;
 
             throw $e;
         }
+    }
+
+    private function normaliseSummaries(array $summaries): array
+    {
+        if (! isset($summaries['summary_tweet'])) {
+            $source = $summaries['summary_short'] ?? $summaries['tldr'] ?? null;
+
+            if (is_string($source) && $source !== '') {
+                $summaries['summary_tweet'] = mb_substr($source, 0, 280);
+
+                Log::warning('Fetch: Repaired missing summary_tweet from summary response', [
+                    'source_key' => isset($summaries['summary_short']) ? 'summary_short' : 'tldr',
+                ]);
+            }
+        }
+
+        return $summaries;
     }
 
     private function createSummaryBlocks(array $summaries): void

@@ -145,7 +145,7 @@ new class extends Component {
     {
         $user = Auth::user();
 
-        if (! $user->pushSubscriptions()->exists()) {
+        if (! $user->pushSubscriptions()->validWebPush()->exists()) {
             $this->error('No devices registered for push notifications');
 
             return;
@@ -564,4 +564,3 @@ new class extends Component {
         </div>
     </div>
 </div>
-

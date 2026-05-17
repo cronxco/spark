@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
+use App\Support\EntityReferenceResolver;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -132,7 +133,19 @@ class FlintDigestsController extends Controller
     {
         $eventMeta = $event->event_metadata ?? [];
 
-        $blocks = $event->blocks->map(function (Block $block): array {
+        // Batch-resolve every referenced event across all blocks in one query,
+        // then hand each block its own ordered slice — avoids N+1.
+        $allReferencedIds = $event->blocks
+            ->flatMap(fn (Block $block) => $block->metadata['referenced_event_ids'] ?? [])
+            ->unique()
+            ->values()
+            ->all();
+
+        $referenceLookup = collect(
+            EntityReferenceResolver::resolveEvents($allReferencedIds)
+        )->keyBy('id');
+
+        $blocks = $event->blocks->map(function (Block $block) use ($referenceLookup): array {
             $base = [
                 'id' => $block->id,
                 'block_type' => $block->block_type,
@@ -151,7 +164,20 @@ class FlintDigestsController extends Controller
                 $base['answered_at'] = $meta['answered_at'] ?? null;
                 $base['answered'] = ! is_null($meta['answer'] ?? null);
             } else {
-                $base['content'] = $block->getContent();
+                $references = collect($block->metadata['referenced_event_ids'] ?? [])
+                    ->map(fn ($id) => $referenceLookup->get($id))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $base['content'] = EntityReferenceResolver::linkify(
+                    $block->getContent(),
+                    $references,
+                );
+
+                if (! empty($references)) {
+                    $base['references'] = $references;
+                }
             }
 
             return $base;

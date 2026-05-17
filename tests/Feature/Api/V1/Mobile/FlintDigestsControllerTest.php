@@ -140,6 +140,64 @@ class FlintDigestsControllerTest extends TestCase
             ->assertJsonPath('block_count', 2);
     }
 
+    #[Test]
+    public function content_blocks_expose_resolved_references_and_linkified_prose(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $referenced = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'testsvc',
+            'domain' => 'health',
+            'action' => 'morning_walk',
+            'time' => Carbon::today()->midDay(),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_health_insight',
+            'title' => 'Health',
+            'metadata' => [
+                'content' => 'You did a Morning Walk before breakfast.',
+                'referenced_event_ids' => [$referenced->id],
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $response = $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.references.0.type', 'event')
+            ->assertJsonPath('blocks.0.references.0.id', $referenced->id)
+            ->assertJsonPath('blocks.0.references.0.title', 'Morning Walk')
+            ->assertJsonPath('blocks.0.references.0.domain', 'health');
+
+        $this->assertStringContainsString(
+            '[Morning Walk](https://spark.cronx.co/event/' . $referenced->id . ')',
+            $response->json('blocks.0.content'),
+        );
+    }
+
+    #[Test]
+    public function content_blocks_without_references_omit_the_key(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_editorial_note',
+            'title' => 'Note',
+            'metadata' => ['content' => 'Just a plain note.'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.content', 'Just a plain note.')
+            ->assertJsonMissingPath('blocks.0.references');
+    }
+
     // -------------------------------------------------------------------------
     // GET /flint/digests/{id}
     // -------------------------------------------------------------------------
