@@ -153,6 +153,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | `GET`  | `/ping`                     | Health check                                        |
 | `GET`  | `/me`                       | Authenticated user profile                          |
 | `GET`  | `/briefing/today`           | Daily summary across all domains                    |
+| `GET`  | `/health/dashboard`         | Fitness-first Health tab dashboard                  |
 | `GET`  | `/feed`                     | Cursor-paginated reverse-chronological event feed   |
 | `GET`  | `/notifications`            | Cursor-paginated notifications inbox                |
 | `GET`  | `/events/{id}`              | Single event                                        |
@@ -226,6 +227,169 @@ Returns a structured daily summary across all domains for a given date.
 ```
 
 The shape of each section is domain-specific and driven by `DaySummaryService`.
+
+---
+
+### `GET /health/dashboard`
+
+Returns a curated, mobile-ready Health dashboard for the Explore -> Health tab. This endpoint does not replace `/briefing/today` or `/metrics/{metric}`; it aggregates selected Oura, Apple Health, Hevy, metric baseline/trend, and Flint health insight data into a stable dashboard shape.
+
+**Query Parameters**
+
+| Parameter | Type   | Default | Description                                       |
+| --------- | ------ | ------- | ------------------------------------------------- |
+| `date`    | string | today   | `YYYY-MM-DD`, `today`, `yesterday`, or `tomorrow` |
+| `range`   | string | `7d`    | Trend range: `7d`, `30d`, or `90d`                |
+
+Array query parameters and sloppy dates such as `2026-5-18` return `422`.
+
+**Response `200`**
+
+```json
+{
+    "date": "2026-05-18",
+    "timezone": "Europe/London",
+    "range": "7d",
+    "generated_at": "2026-05-18T19:30:00+00:00",
+    "sync_status": {
+        "apple_health": {
+            "event_count": 28,
+            "last_event_time": "2026-05-18T16:39:00+00:00",
+            "coverage": "partial"
+        }
+    },
+    "hero": {
+        "score": 58,
+        "kind": "readiness",
+        "status": "critical",
+        "title": "Take a lighter day",
+        "subtitle": "Readiness is 27.5% below baseline.",
+        "primary_event_id": "uuid",
+        "factors": [
+            {
+                "label": "Resting Heart Rate",
+                "value": -13,
+                "unit": "percent",
+                "status": "low"
+            }
+        ]
+    },
+    "fitness": {
+        "today": {
+            "steps": {
+                "value": 7411,
+                "unit": "steps",
+                "vs_baseline_pct": -14.4
+            },
+            "distance": {
+                "value": 6.119,
+                "unit": "km",
+                "vs_baseline_pct": 6.8
+            },
+            "active_energy": {
+                "value": 606.878,
+                "unit": "kcal",
+                "vs_baseline_pct": 1.2
+            },
+            "exercise": { "value": 68, "unit": "min", "vs_baseline_pct": -2.2 },
+            "stand": { "value": 8, "unit": "hours", "vs_baseline_pct": -8.5 },
+            "workout_count": 5,
+            "workout_duration_seconds": 3218,
+            "workout_energy_kcal": 365,
+            "strength_volume": { "value": 5330, "unit": "kg" }
+        },
+        "workouts": [
+            {
+                "event_id": "uuid",
+                "source": "apple_health",
+                "kind": "cardio",
+                "type": "Run",
+                "title": "Run",
+                "start": "2026-05-18T10:22:54+00:00",
+                "end": "2026-05-18T10:37:01+00:00",
+                "duration_seconds": 846.921,
+                "energy_kcal": 135.695,
+                "distance": { "value": 1.976, "unit": "km" },
+                "intensity": { "value": 9.498, "unit": "kcal/hr·kg" },
+                "route_available": true
+            },
+            {
+                "event_id": "uuid",
+                "source": "hevy",
+                "kind": "strength",
+                "title": "Legs",
+                "start": "2026-05-18T09:37:49+00:00",
+                "duration_seconds": 0,
+                "volume": { "value": 5330, "unit": "kg" },
+                "exercises": [
+                    {
+                        "name": "Leg Press (Machine)",
+                        "sets": 4,
+                        "volume": { "value": 4200, "unit": "kg" }
+                    }
+                ]
+            }
+        ]
+    },
+    "body_metrics": [
+        {
+            "id": "apple_health.had_heart_rate_variability.ms",
+            "event_id": "uuid",
+            "label": "HRV",
+            "value": 44.503,
+            "unit": "ms",
+            "vs_baseline_pct": -16,
+            "is_anomaly": false,
+            "status": "low"
+        }
+    ],
+    "trends": [
+        {
+            "metric": "apple_health.had_step_count.steps",
+            "label": "Steps",
+            "service": "apple_health",
+            "action": "had_step_count",
+            "unit": "steps",
+            "range": { "from": "2026-05-12", "to": "2026-05-18" },
+            "daily_values": [
+                {
+                    "date": "2026-05-18",
+                    "value": 7411,
+                    "vs_baseline_pct": -14.4,
+                    "is_anomaly": false
+                }
+            ],
+            "summary": {
+                "min": 7411,
+                "max": 7411,
+                "mean": 7411,
+                "data_points": 1,
+                "trend_direction": "up"
+            },
+            "baseline": {
+                "mean": 8658,
+                "stddev": 1200,
+                "normal_lower": 6258,
+                "normal_upper": 11058,
+                "sample_days": 60
+            }
+        }
+    ],
+    "insights": [
+        {
+            "block_id": "uuid",
+            "event_id": "uuid",
+            "title": "Recovery note",
+            "content": "Prioritise recovery today.",
+            "time": "2026-05-18T12:01:00+00:00"
+        }
+    ]
+}
+```
+
+`hero` is `null` when no suitable current-day health metric exists. `fitness.workouts`, `body_metrics`, `trends`, and `insights` are always present arrays. Apple Health workouts are preferred over duplicate Oura workouts when they start within 10 minutes and energy differs by less than 15%; Hevy workouts are always retained.
+
+Status labels are deterministic: `critical`, `low`, `normal`, or `high`. Lower-is-better comparisons are used for resting heart rate, stress, cardiovascular age, and temperature deviation.
 
 ---
 
@@ -685,6 +849,7 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/notifications/{id}/read`         | Mark one notification as read     |
 | `POST`   | `/notifications/read-all`          | Mark all notifications as read    |
 | `DELETE` | `/notifications/{id}`              | Delete one notification           |
+
 ---
 
 ### `POST /devices`
