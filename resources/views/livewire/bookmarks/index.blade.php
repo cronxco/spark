@@ -379,6 +379,14 @@ new class extends Component
                 'domain' => $metadata['domain'] ?? parse_url($obj->url, PHP_URL_HOST),
                 'last_checked_at' => $metadata['last_checked_at'] ?? null,
                 'last_error' => $metadata['last_error'] ?? null,
+                'last_fetch_method' => $metadata['last_fetch_method'] ?? null,
+                'last_selected_fetch_method' => $metadata['last_selected_fetch_method'] ?? null,
+                'last_actual_fetch_method' => $metadata['last_actual_fetch_method'] ?? null,
+                'last_playwright_error' => $metadata['last_playwright_error'] ?? null,
+                'last_playwright_reached_worker' => $metadata['last_playwright_reached_worker'] ?? null,
+                'last_playwright_worker_status' => $metadata['last_playwright_worker_status'] ?? null,
+                'error_screenshot_url' => get_media_temporary_url($obj, 'error_screenshots'),
+                'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10),
                 'created_at' => $obj->time,
             ];
         });
@@ -409,7 +417,7 @@ new class extends Component
         $this->savedSortBy = 'last_changed';
     }
 
-    public function reFetchSaved(string $id): void
+    public function reFetchSaved(string $id, ?string $methodOverride = null): void
     {
         $webpage = EventObject::findOrFail($id);
 
@@ -419,9 +427,9 @@ new class extends Component
         }
 
         // Dispatch fetch job
-        FetchSingleUrl::dispatch($this->integration, $webpage->id, $webpage->url, forceRefresh: true);
+        FetchSingleUrl::dispatch($this->integration, $webpage->id, $webpage->url, forceRefresh: true, methodOverride: $methodOverride);
 
-        $this->success('Re-fetch queued successfully');
+        $this->success($this->fetchQueuedMessage($methodOverride, true));
         unset($this->savedPages);
     }
 
@@ -590,6 +598,12 @@ new class extends Component
                 'subscription_source' => $metadata['subscription_source'] ?? 'manual',
                 'fetch_count' => $metadata['fetch_count'] ?? 0,
                 'last_fetch_method' => $metadata['last_fetch_method'] ?? null,
+                'last_selected_fetch_method' => $metadata['last_selected_fetch_method'] ?? null,
+                'last_actual_fetch_method' => $metadata['last_actual_fetch_method'] ?? null,
+                'last_playwright_error' => $metadata['last_playwright_error'] ?? null,
+                'last_playwright_reached_worker' => $metadata['last_playwright_reached_worker'] ?? null,
+                'last_playwright_worker_status' => $metadata['last_playwright_worker_status'] ?? null,
+                'error_screenshot_url' => get_media_temporary_url($obj, 'error_screenshots'),
                 'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10), // Last 10 entries
             ];
         });
@@ -1019,7 +1033,7 @@ new class extends Component
         $this->loadUrls();
     }
 
-    public function fetchNow(string $id, bool $forceRefresh = false): void
+    public function fetchNow(string $id, bool $forceRefresh = false, ?string $methodOverride = null): void
     {
         $eventObject = EventObject::find($id);
 
@@ -1030,9 +1044,8 @@ new class extends Component
         }
 
         try {
-            FetchSingleUrl::dispatch($this->integration, $eventObject->id, $eventObject->url, $forceRefresh);
-            $message = $forceRefresh ? 'Force refresh queued. Will regenerate AI summaries even if content unchanged.' : 'Fetch job queued. Check back shortly for results.';
-            $this->success($message);
+            FetchSingleUrl::dispatch($this->integration, $eventObject->id, $eventObject->url, $forceRefresh, $methodOverride);
+            $this->success($this->fetchQueuedMessage($methodOverride, $forceRefresh));
         } catch (\Exception $e) {
             Log::error('Failed to dispatch fetch job', [
                 'object_id' => $id,
@@ -1611,11 +1624,62 @@ new class extends Component
             'paywall_detected' => 'Previous fetch encountered paywall',
             'learned' => 'Previously successful with Playwright',
             'user_preference' => 'Manual preference set',
+            'forced_playwright' => 'Manually retried with Playwright',
+            'forced_http' => 'Manually retried with HTTP',
             'escalated' => 'Auto-escalated after failures',
             'error_detected' => 'Previous errors detected',
-            'default' => 'Default HTTP fetch',
+            'default' => 'Default Playwright fetch',
             'playwright_disabled' => 'Playwright disabled',
             default => ucfirst(str_replace('_', ' ', $reason)),
+        };
+    }
+
+    private function getOutcomeLabel(?string $outcome): string
+    {
+        return match ($outcome) {
+            'playwright_success' => 'Playwright success',
+            'http_success' => 'HTTP success',
+            'playwright_failed_http_fallback_success' => 'Fallback success',
+            'playwright_failed_http_fallback_failed' => 'Fallback failed',
+            'playwright_failed' => 'Playwright failed',
+            'http_failed' => 'HTTP failed',
+            'success' => 'Success',
+            'failed' => 'Failed',
+            'success_via_archive' => 'Archive success',
+            null => 'Pending',
+            default => ucfirst(str_replace('_', ' ', $outcome)),
+        };
+    }
+
+    private function getOutcomeBadgeClass(?string $outcome): string
+    {
+        return match ($outcome) {
+            'playwright_success', 'http_success', 'success', 'success_via_archive' => 'badge-success',
+            'playwright_failed_http_fallback_success' => 'badge-warning',
+            'playwright_failed_http_fallback_failed', 'playwright_failed', 'http_failed', 'failed' => 'badge-error',
+            null => 'badge-ghost',
+            default => 'badge-neutral',
+        };
+    }
+
+    private function getFetchMethodBadgeClass(?string $method): string
+    {
+        return match ($method) {
+            'playwright' => 'badge-info',
+            'http (fallback)', 'http_fallback' => 'badge-warning',
+            'http' => 'badge-neutral',
+            default => 'badge-ghost',
+        };
+    }
+
+    private function fetchQueuedMessage(?string $methodOverride, bool $forceRefresh): string
+    {
+        return match ($methodOverride) {
+            'playwright' => 'Playwright retry queued.',
+            'http' => 'HTTP retry queued.',
+            default => $forceRefresh
+                ? 'Force refresh queued. Will regenerate AI summaries even if content unchanged.'
+                : 'Fetch job queued. Check back shortly for results.',
         };
     }
 
@@ -1779,4 +1843,3 @@ new class extends Component
         </div>
     </div>
     @endif
-
