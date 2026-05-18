@@ -316,15 +316,19 @@ class PlaywrightFetchClient
     {
         $playwrightCookies = [];
 
-        foreach ($cookies as $name => $value) {
+        foreach (FetchHttpClient::normalizeCookies($cookies) as $cookie) {
+            if ($cookie['name'] === '') {
+                continue;
+            }
+
             $playwrightCookies[] = [
-                'name' => $name,
-                'value' => $value,
-                'domain' => '.' . $domain, // Leading dot for subdomain support
-                'path' => '/',
-                'secure' => true,
-                'httpOnly' => true,
-                'sameSite' => 'Lax',
+                'name' => (string) $cookie['name'],
+                'value' => (string) $cookie['value'],
+                'domain' => $cookie['domain'] ?: ('.' . $domain),
+                'path' => $cookie['path'] ?: '/',
+                'secure' => (bool) $cookie['secure'],
+                'httpOnly' => (bool) $cookie['httpOnly'],
+                'sameSite' => $cookie['sameSite'] ?: 'Lax',
             ];
         }
 
