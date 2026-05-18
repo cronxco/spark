@@ -3,13 +3,44 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Services\Mobile\HealthDashboardService;
 use App\Services\Mobile\HealthSampleService;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class HealthController extends Controller
 {
-    public function __construct(protected HealthSampleService $samples) {}
+    public function __construct(
+        protected HealthSampleService $samples,
+        protected HealthDashboardService $dashboard,
+    ) {}
+
+    /**
+     * GET /api/v1/mobile/health/dashboard
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $rawDate = $request->query('date');
+        if (is_array($rawDate)) {
+            return response()->json(['message' => 'Invalid date.'], 422);
+        }
+
+        $date = $this->resolveDate($rawDate);
+        if ($date === null) {
+            return response()->json(['message' => 'Invalid date.'], 422);
+        }
+
+        $range = $request->query('range', '7d');
+        if (! is_string($range) || ! in_array($range, ['7d', '30d', '90d'], true)) {
+            return response()->json(['message' => 'Invalid range.'], 422);
+        }
+
+        return response()
+            ->json($this->dashboard->dashboard($request->user(), $date, $range))
+            ->header('Last-Modified', $date->copy()->endOfDay()->min(Carbon::now())->toRfc7231String());
+    }
 
     /**
      * POST /api/v1/mobile/health/samples
@@ -36,5 +67,36 @@ class HealthController extends Controller
         $results = $this->samples->ingest($request->user(), $validated['samples']);
 
         return response()->json(['results' => $results]);
+    }
+
+    protected function resolveDate(?string $input): ?Carbon
+    {
+        if ($input === null || $input === '') {
+            return Carbon::today();
+        }
+
+        $input = strtolower(trim($input));
+
+        return match ($input) {
+            'today' => Carbon::today(),
+            'yesterday' => Carbon::yesterday(),
+            'tomorrow' => Carbon::tomorrow(),
+            default => $this->parseIso($input),
+        };
+    }
+
+    protected function parseIso(string $input): ?Carbon
+    {
+        try {
+            $date = Carbon::createFromFormat('Y-m-d', $input);
+        } catch (Exception) {
+            return null;
+        }
+
+        if ($date === false || $date->format('Y-m-d') !== $input) {
+            return null;
+        }
+
+        return $date->startOfDay();
     }
 }

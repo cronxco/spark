@@ -50,6 +50,9 @@ Route::get('settings/notifications', [NotificationSettingsController::class, 'sh
 
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
 
+Route::get('health/dashboard', [HealthController::class, 'dashboard'])
+    ->name('health.dashboard');
+
 Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
 
 Route::get('notifications', [NotificationsController::class, 'index'])->name('notifications.index');
