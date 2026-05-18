@@ -43,7 +43,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
             ->chunk(100, function ($events) use (&$count) {
                 foreach ($events as $event) {
                     // Check if anomaly detection has already been run successfully
-                    $executions = $event->metadata['task_executions'] ?? [];
+                    $executions = $event->event_metadata['task_executions'] ?? [];
                     $lastAttempt = $executions['detect_anomalies']['last_attempt'] ?? null;
 
                     // Skip if already successfully detected

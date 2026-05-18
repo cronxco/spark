@@ -111,7 +111,7 @@ A task definition specifies:
 
 ### Task Lifecycle
 
-1. **Registration** - Task registered in TaskPipelineServiceProvider
+1. **Registration** - Task registered in TaskPipelineServiceProvider; boot-time validation checks all declared deps exist
 2. **Trigger** - Event/model created/updated or scheduled
 3. **Dispatch** - ProcessTaskPipelineJob finds applicable tasks
 4. **Execution** - Tasks run in dependency order
@@ -129,8 +129,9 @@ dependencies: ['calculate_metric_stats', 'generate_embedding']
 The system ensures:
 
 - Dependencies run first
-- Circular dependencies are detected
+- Circular dependencies are detected and thrown at runtime (`CircularDependencyException`)
 - Order is deterministic
+- All declared dependencies are validated at boot time (`UnresolvableDependencyException` if a dep key is never registered)
 
 ## Getting Started
 
@@ -498,14 +499,35 @@ Horizon configuration (already set up):
 Configured in `routes/console.php`:
 
 ```php
-// Daily: Trend detection
+// Daily: Trend detection (dispatches DetectTrendsTask for recent events)
 Schedule::job(new DispatchTrendDetectionTasksJob)->daily();
 
-// Daily: Retrospective anomaly detection
+// Daily: Retrospective anomaly detection (re-processes yesterday's events)
 Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)->daily();
 ```
 
-**Note:** Metric statistics calculation now runs automatically in the task pipeline on event creation and update, so no scheduled job is needed.
+**Note:** Metric statistics calculation runs automatically in the task pipeline on event creation and update — no scheduled job is needed. The old `CalculateMetricStatisticsJob`, `DetectMetricTrendsJob`, and `DetectRetrospectiveMetricAnomaliesJob` batch jobs remain available for manual dispatch via the UI but are no longer scheduled.
+
+### RunIntegrationTask Job Whitelist
+
+`RunIntegrationTask` (used by the `task` and `outline` integration plugins) can dispatch arbitrary job classes. The allowed list is **always enforced** — add new classes to `config/app.php` or extend via the `ALLOWED_TASK_JOBS` env var.
+
+```php
+// config/app.php
+'allowed_task_jobs' => array_merge(
+    [
+        'App\\Jobs\\Outline\\PinTodayDayNote',   // Outline 'pin_today' preset
+        'App\\Jobs\\Outline\\GenerateDayNotes',   // Outline 'generate_year' preset
+    ],
+    env('ALLOWED_TASK_JOBS') ? explode(',', env('ALLOWED_TASK_JOBS')) : []
+),
+```
+
+Artisan commands (`task_mode: artisan`) are unrestricted by default. Set `ALLOWED_TASK_COMMANDS` (comma-separated) to restrict them:
+
+```
+ALLOWED_TASK_COMMANDS=queue:prune-batches,horizon:snapshot
+```
 
 ### Task Retry Configuration
 
@@ -679,43 +701,6 @@ $this->model->withoutEvents(function() use ($data) {
 - Track queue depth in Horizon
 - Review task execution rates in admin UI
 - Set up alerts for high failure rates
-
-## Migration Guide
-
-### From Old System
-
-If migrating from scattered observers/listeners:
-
-1. **Identify existing tasks:**
-    - Search for Observer files
-    - Check AppServiceProvider boot listeners
-    - Review scheduled jobs
-
-2. **Create task jobs:**
-    - Move logic to task job classes
-    - Extend BaseTaskJob
-    - Keep existing functionality intact
-
-3. **Register tasks:**
-    - Add to TaskPipelineServiceProvider
-    - Define conditions and dependencies
-
-4. **Populate initial state:**
-
-    ```bash
-    php artisan task-pipeline:populate-initial-state --dry-run
-    php artisan task-pipeline:populate-initial-state
-    ```
-
-5. **Test in parallel:**
-    - Run both systems temporarily
-    - Compare results
-    - Verify execution tracking
-
-6. **Cutover:**
-    - Remove old observers
-    - Clean up listeners
-    - Monitor for issues
 
 ## Support
 

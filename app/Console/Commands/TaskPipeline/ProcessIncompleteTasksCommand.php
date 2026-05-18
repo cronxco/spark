@@ -63,7 +63,7 @@ class ProcessIncompleteTasksCommand extends Command
             foreach ($filters as $key => $value) {
                 $filterStrings[] = "{$key}={$value}";
             }
-            $this->comment('Filters: ' . implode(', ', $filterStrings));
+            $this->comment('Filters: '.implode(', ', $filterStrings));
         }
 
         $this->newLine();
@@ -71,7 +71,6 @@ class ProcessIncompleteTasksCommand extends Command
         $modelTypes = $this->getModelTypes();
         $results = [];
         $totalIncomplete = 0;
-        $totalPrefillable = 0;
 
         foreach ($modelTypes as $modelClass => $modelName) {
             $this->comment("Scanning {$modelName} records...");
@@ -86,7 +85,6 @@ class ProcessIncompleteTasksCommand extends Command
             ];
 
             $totalIncomplete += $result['incomplete'];
-            $totalPrefillable += $result['prefillable'];
         }
 
         $this->newLine();
@@ -97,13 +95,11 @@ class ProcessIncompleteTasksCommand extends Command
             $results
         );
 
-        // Add totals row
         $batchSize = (int) $this->option('batch-size');
         $batchCount = (int) ceil($totalIncomplete / $batchSize);
 
         $this->newLine();
         $this->info("Would process {$totalIncomplete} models in {$batchCount} batches of {$batchSize}");
-        $this->info("Estimated embedding pre-fills: {$totalPrefillable}");
         $this->newLine();
         $this->comment('Run without --dry-run to execute.');
 
@@ -119,7 +115,7 @@ class ProcessIncompleteTasksCommand extends Command
         $batchSize = (int) $this->option('batch-size');
         $filters = $this->getFilters();
 
-        $this->info('Starting batch processing for ' . count($modelTypes) . ' model type(s)...');
+        $this->info('Starting batch processing for '.count($modelTypes).' model type(s)...');
         $this->newLine();
 
         // Create progress record (use first user as owner for system commands)
@@ -133,7 +129,7 @@ class ProcessIncompleteTasksCommand extends Command
         $progressRecord = ActionProgress::createProgress(
             $userId,
             'task_pipeline_batch',
-            'batch_' . now()->timestamp,
+            'batch_'.now()->timestamp,
             'starting',
             'Starting batch task pipeline processing...',
             0
@@ -149,7 +145,7 @@ class ProcessIncompleteTasksCommand extends Command
                 $batchSize,
                 $filters,
                 $progressRecord->id,
-                ['processed' => 0, 'examined' => 0, 'prefilled' => 0, 'failed' => 0]
+                ['processed' => 0, 'examined' => 0, 'failed' => 0]
             )->onQueue('tasks');
 
             $this->line("  ✓ {$modelName} batch job dispatched (offset: 0)");
@@ -189,7 +185,6 @@ class ProcessIncompleteTasksCommand extends Command
         $total = $query->count();
         $examined = 0;
         $incomplete = 0;
-        $prefillable = 0;
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
 
         if ($total === 0) {
@@ -197,20 +192,15 @@ class ProcessIncompleteTasksCommand extends Command
                 'total' => 0,
                 'examined' => 0,
                 'incomplete' => 0,
-                'prefillable' => 0,
             ];
         }
 
-        $query->orderBy('created_at', 'desc')->chunk(100, function ($models) use (&$examined, &$incomplete, &$prefillable, $limit) {
+        $query->orderBy('created_at', 'desc')->chunk(100, function ($models) use (&$examined, &$incomplete, $limit) {
             foreach ($models as $model) {
                 $examined++;
 
                 if ($this->hasIncompleteTasks($model)) {
                     $incomplete++;
-
-                    if ($this->canPrefillEmbedding($model)) {
-                        $prefillable++;
-                    }
 
                     if ($limit && $incomplete >= $limit) {
                         return false; // Stop chunking
@@ -223,7 +213,6 @@ class ProcessIncompleteTasksCommand extends Command
             'total' => $total,
             'examined' => $examined,
             'incomplete' => $incomplete,
-            'prefillable' => $prefillable,
         ];
     }
 
@@ -241,41 +230,13 @@ class ProcessIncompleteTasksCommand extends Command
         $executions = $this->getTaskExecutions($model);
 
         foreach ($applicableTasks as $task) {
-            // Special case: embedding with metadata
-            if ($task->key === 'generate_embedding') {
-                $metadataField = $this->getMetadataField($model);
-                $metadata = $model->$metadataField ?? [];
-
-                if (isset($metadata['embedding_generated_at']) && ! empty($model->embeddings)) {
-                    continue; // Completed
-                }
-            }
-
-            // Check execution status
             $lastAttempt = $executions[$task->key]['last_attempt'] ?? null;
             if (! $lastAttempt || $lastAttempt['status'] !== 'success') {
-                return true; // Found incomplete task
+                return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * Check if model can pre-fill embedding
-     */
-    protected function canPrefillEmbedding(Model $model): bool
-    {
-        $metadataField = $this->getMetadataField($model);
-        $metadata = $model->$metadataField ?? [];
-
-        if (! isset($metadata['embedding_generated_at']) || empty($model->embeddings)) {
-            return false;
-        }
-
-        $executions = $this->getTaskExecutions($model);
-
-        return ! isset($executions['generate_embedding']['last_success']);
     }
 
     /**

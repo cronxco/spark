@@ -2,9 +2,7 @@
 
 namespace App\Jobs\TaskPipeline;
 
-use App\Jobs\Base\BaseEffectJob;
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
-use App\Models\Integration;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Batchable;
@@ -87,35 +85,8 @@ class ProcessTaskPipelineJob implements ShouldQueue
         // Dispatch to appropriate queue
         $jobClass = $task->jobClass;
 
-        // Check if job extends BaseEffectJob - they expect (Integration, array) instead of (Model, TaskDefinition)
-        if (is_subclass_of($jobClass, BaseEffectJob::class)) {
-            // Extract integration from the model
-            $integration = $this->model instanceof Integration
-                ? $this->model
-                : $this->model->integration;
-
-            if (! $integration) {
-                $this->updateTaskStatus($task, 'failed', [
-                    'error' => 'No integration found for effect job',
-                    'completed_at' => now()->toIso8601String(),
-                ]);
-
-                return;
-            }
-
-            // Prepare parameters from task metadata
-            $parameters = [
-                'task_key' => $task->key,
-                'triggered_by' => $this->trigger,
-                'model_type' => class_basename($this->model),
-                'model_id' => $this->model->id,
-            ];
-
-            dispatch(new $jobClass($integration, $parameters))->onQueue($task->queue);
-        } else {
-            // Standard task jobs expect (Model, TaskDefinition)
-            dispatch(new $jobClass($this->model, $task))->onQueue($task->queue);
-        }
+        // Standard task jobs expect (Model, TaskDefinition)
+        dispatch(new $jobClass($this->model, $task))->onQueue($task->queue);
     }
 
     /**
