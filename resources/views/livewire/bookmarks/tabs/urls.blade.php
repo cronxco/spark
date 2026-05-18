@@ -126,7 +126,11 @@
 
                     <!-- Fetch Method Badge -->
                     @if (isset($url['last_fetch_method']))
-                    <x-badge value="{{ $url['last_fetch_method'] }}" class="badge-info badge-sm" />
+                    <x-badge value="{{ $url['last_fetch_method'] }}" class="badge-sm {{ $this->getFetchMethodBadgeClass($url['last_fetch_method']) }}" />
+                    @endif
+
+                    @if ($url['last_selected_fetch_method'] && $url['last_fetch_method'] && $url['last_selected_fetch_method'] !== $url['last_actual_fetch_method'])
+                    <x-badge value="selected {{ $url['last_selected_fetch_method'] }}" class="badge-ghost badge-sm" />
                     @endif
 
                     <!-- Actions Dropdown -->
@@ -142,6 +146,14 @@
                             title="Force Refresh"
                             icon="fas.repeat"
                             wire:click="fetchNow('{{ $url['id'] }}', true)" />
+                        <x-menu-item
+                            title="Retry with Playwright"
+                            icon="fas.desktop"
+                            wire:click="fetchNow('{{ $url['id'] }}', true, 'playwright')" />
+                        <x-menu-item
+                            title="Retry with HTTP"
+                            icon="fas.globe"
+                            wire:click="fetchNow('{{ $url['id'] }}', true, 'http')" />
                         <x-menu-separator />
                         <x-menu-item
                             title="{{ $url['enabled'] ? 'Disable' : 'Enable' }}"
@@ -157,8 +169,9 @@
             </div>
 
             <!-- Error Message -->
-            @if ($url['last_error'])
+            @if ($url['last_error'] || $url['last_playwright_error'] || $url['error_screenshot_url'])
             <div class="mt-4 space-y-3">
+                @if ($url['last_error'])
                 <div class="alert alert-error">
                     <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
                     <span class="text-sm">
@@ -170,25 +183,31 @@
                         @endif
                     </span>
                 </div>
+                @endif
 
-                @php
-                    $eventObject = \App\Models\EventObject::find($url['id']);
-                    $errorScreenshot = $eventObject?->getFirstMediaUrl('error_screenshots');
-                @endphp
+                @if ($url['last_playwright_error'])
+                <div class="alert alert-warning">
+                    <x-icon name="fas.desktop" class="w-5 h-5" />
+                    <span class="text-sm">
+                        Playwright failed{{ $url['last_playwright_reached_worker'] === false ? ' before reaching the browser' : '' }}:
+                        {{ $url['last_playwright_error'] }}
+                    </span>
+                </div>
+                @endif
 
-                @if ($errorScreenshot)
+                @if ($url['error_screenshot_url'])
                 <div class="card bg-base-300">
                     <div class="card-body p-3">
                         <div class="flex items-center gap-2 mb-2">
                             <x-icon name="fas.camera" class="w-4 h-4 text-warning" />
                             <span class="text-xs font-medium text-base-content/70">Screenshot of failed fetch</span>
                         </div>
-                        <a href="{{ $errorScreenshot }}" target="_blank" class="block">
-                            <img src="{{ $errorScreenshot }}" alt="Error screenshot" class="w-full rounded-lg border border-base-content/10 hover:border-warning transition-colors" />
+                        <a href="{{ $url['error_screenshot_url'] }}" target="_blank" class="block">
+                            <img src="{{ $url['error_screenshot_url'] }}" alt="Error screenshot" class="w-full rounded-lg border border-base-content/10 hover:border-warning transition-colors" />
                         </a>
                         <p class="text-xs text-base-content/60 mt-2">
                             This screenshot shows what Playwright saw when trying to fetch the page.
-                            <a href="{{ $errorScreenshot }}" target="_blank" class="link link-warning">Click to view full size</a>
+                            <a href="{{ $url['error_screenshot_url'] }}" target="_blank" class="link link-warning">Click to view full size</a>
                         </p>
                     </div>
                 </div>
@@ -221,7 +240,8 @@
                                 <thead>
                                     <tr>
                                         <th>Time</th>
-                                        <th>Method</th>
+                                        <th>Selected</th>
+                                        <th>Actual</th>
                                         <th>Reason</th>
                                         <th>Outcome</th>
                                         <th>Duration</th>
@@ -237,7 +257,10 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <x-badge value="{{ $entry['decision'] }}" class="badge-xs {{ $entry['decision'] === 'playwright' ? 'badge-info' : 'badge-neutral' }}" />
+                                            <x-badge value="{{ $entry['selected_method'] ?? $entry['decision'] ?? '-' }}" class="badge-xs {{ $this->getFetchMethodBadgeClass($entry['selected_method'] ?? $entry['decision'] ?? null) }}" />
+                                        </td>
+                                        <td>
+                                            <x-badge value="{{ $entry['actual_method'] ?? '-' }}" class="badge-xs {{ $this->getFetchMethodBadgeClass($entry['actual_method'] ?? null) }}" />
                                         </td>
                                         <td>
                                             <span class="text-xs" title="{{ $this->getReasonLabel($entry['reason']) }}">
@@ -245,13 +268,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            @if (is_null($entry['outcome']))
-                                            <x-badge value="pending" class="badge-xs badge-ghost" />
-                                            @elseif ($entry['outcome'] === 'success')
-                                            <x-badge value="success" class="badge-xs badge-success" />
-                                            @else
-                                            <x-badge value="failed" class="badge-xs badge-error" />
-                                            @endif
+                                            <x-badge value="{{ $this->getOutcomeLabel($entry['outcome'] ?? null) }}" class="badge-xs {{ $this->getOutcomeBadgeClass($entry['outcome'] ?? null) }}" />
                                         </td>
                                         <td>
                                             @if ($entry['duration_ms'])
@@ -268,6 +285,11 @@
                                             @endif
                                         </td>
                                     </tr>
+                                    @if (!empty($entry['playwright_error']))
+                                    <tr>
+                                        <td colspan="7" class="text-xs text-warning">Playwright error: {{ $entry['playwright_error'] }}</td>
+                                    </tr>
+                                    @endif
                                     @endforeach
                                 </tbody>
                             </table>

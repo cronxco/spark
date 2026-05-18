@@ -179,17 +179,17 @@ class EventObject extends Model implements HasMedia
             ->height(300)
             ->sharpen(10)
             ->nonQueued()
-            ->performOnCollections('screenshots', 'downloaded_images', 'article_images');
+            ->performOnCollections('screenshots', 'error_screenshots', 'downloaded_images', 'article_images');
 
         $this->addMediaConversion('medium')
             ->width(800)
             ->keepOriginalImageFormat()
-            ->performOnCollections('screenshots', 'downloaded_images', 'article_images');
+            ->performOnCollections('screenshots', 'error_screenshots', 'downloaded_images', 'article_images');
 
         $this->addMediaConversion('webp')
             ->width(800)
             ->format('webp')
-            ->performOnCollections('screenshots', 'downloaded_images', 'article_images');
+            ->performOnCollections('screenshots', 'error_screenshots', 'downloaded_images', 'article_images');
     }
 
     public function user()

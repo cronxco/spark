@@ -31,26 +31,26 @@ class PlaywrightFetchClient
      */
     public function fetch(string $url, IntegrationGroup $group): array
     {
-        $this->ensureWorkerAvailable();
-
-        $domain = FetchHttpClient::getDomainFromUrl($url);
-        $domainConfig = FetchHttpClient::getCookiesForDomain($domain, $group);
-
-        // Convert cookies to Playwright format
-        $playwrightCookies = $this->convertCookiesToPlaywrightFormat($domain, $domainConfig['cookies'] ?? []);
-
-        // Get user agent from headers
-        $userAgent = $domainConfig['headers']['User-Agent'] ?? null;
-
-        Log::debug('Fetch: Playwright request', [
-            'url' => $url,
-            'domain' => $domain,
-            'has_cookies' => ! empty($playwrightCookies),
-            'cookie_count' => count($playwrightCookies),
-            'worker_url' => $this->workerUrl,
-        ]);
-
         try {
+            $workerHealth = $this->ensureWorkerAvailable();
+
+            $domain = FetchHttpClient::getDomainFromUrl($url);
+            $domainConfig = FetchHttpClient::getCookiesForDomain($domain, $group);
+
+            // Convert cookies to Playwright format
+            $playwrightCookies = $this->convertCookiesToPlaywrightFormat($domain, $domainConfig['cookies'] ?? []);
+
+            // Get user agent from headers
+            $userAgent = $domainConfig['headers']['User-Agent'] ?? null;
+
+            Log::debug('Fetch: Playwright request', [
+                'url' => $url,
+                'domain' => $domain,
+                'has_cookies' => ! empty($playwrightCookies),
+                'cookie_count' => count($playwrightCookies),
+                'worker_url' => $this->workerUrl,
+            ]);
+
             // Check if context persistence is enabled
             $usePersistence = config('services.playwright.context_persistence_enabled', true);
 
@@ -102,6 +102,8 @@ class PlaywrightFetchClient
                 'screenshot' => $data['screenshot'] ?? null,
                 'cookies' => $data['cookies'] ?? [],
                 'error' => null,
+                'reached_worker' => true,
+                'worker_health' => $workerHealth,
                 'meta' => $data['meta'] ?? [],
             ];
 
@@ -120,6 +122,8 @@ class PlaywrightFetchClient
                 'screenshot' => null,
                 'cookies' => [],
                 'error' => $e->getMessage(),
+                'reached_worker' => ! str_contains($e->getMessage(), 'worker is not available'),
+                'worker_health' => $this->getHealthData(),
             ];
         }
     }
@@ -178,21 +182,38 @@ class PlaywrightFetchClient
      */
     public function isAvailable(): bool
     {
+        $health = $this->getHealthData();
+
+        return ($health['status'] ?? '') === 'ok' && ($health['connected'] ?? false);
+    }
+
+    /**
+     * Get the raw worker health payload, or null when the worker cannot be reached.
+     */
+    public function getHealthData(): ?array
+    {
         try {
             $response = Http::timeout(5)->get("{$this->workerUrl}/health");
 
             if (! $response->successful()) {
-                return false;
+                return [
+                    'status' => 'unavailable',
+                    'http_status' => $response->status(),
+                    'worker_url' => $this->workerUrl,
+                ];
             }
 
-            $health = $response->json();
-
-            return ($health['status'] ?? '') === 'ok' && ($health['connected'] ?? false);
-
+            return array_merge($response->json() ?? [], [
+                'worker_url' => $this->workerUrl,
+            ]);
         } catch (Exception $e) {
             Log::debug('Fetch: Playwright worker not available', ['error' => $e->getMessage()]);
 
-            return false;
+            return [
+                'status' => 'unreachable',
+                'error' => $e->getMessage(),
+                'worker_url' => $this->workerUrl,
+            ];
         }
     }
 
@@ -374,11 +395,15 @@ class PlaywrightFetchClient
      *
      * @throws Exception
      */
-    protected function ensureWorkerAvailable(): void
+    protected function ensureWorkerAvailable(): array
     {
-        if (! $this->isAvailable()) {
+        $health = $this->getHealthData();
+
+        if (($health['status'] ?? '') !== 'ok' || ! ($health['connected'] ?? false)) {
             throw new Exception('Playwright worker is not available. Please ensure the playwright-worker service is running.');
         }
+
+        return $health;
     }
 
     /**
