@@ -82,7 +82,7 @@ class TaskRegistry
             if ($resolved->isEmpty() && $remaining->isNotEmpty()) {
                 // Circular dependency detected
                 throw new CircularDependencyException(
-                    'Circular dependency detected in tasks: '.$remaining->pluck('key')->join(', ')
+                    'Circular dependency detected in tasks: ' . $remaining->pluck('key')->join(', ')
                 );
             }
 
@@ -116,7 +116,7 @@ class TaskRegistry
 
         if (! empty($errors)) {
             throw new UnresolvableDependencyException(
-                "Task dependency validation failed:\n".implode("\n", $errors)
+                "Task dependency validation failed:\n" . implode("\n", $errors)
             );
         }
     }

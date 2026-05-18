@@ -16,17 +16,6 @@ class DetectTrendsTaskTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function makeTask(): TaskDefinition
-    {
-        return new TaskDefinition(
-            key: 'detect_trends',
-            name: 'Detect Trends',
-            description: 'Detect metric trends',
-            jobClass: DetectTrendsTask::class,
-            appliesTo: ['event'],
-        );
-    }
-
     #[Test]
     public function does_nothing_when_event_has_no_value(): void
     {
@@ -175,5 +164,16 @@ class DetectTrendsTaskTest extends TestCase
 
         // Weekly trend count unchanged — no duplicate created for the same period
         $this->assertEquals(1, MetricTrend::where('type', 'trend_up_weekly')->count());
+    }
+
+    protected function makeTask(): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: 'detect_trends',
+            name: 'Detect Trends',
+            description: 'Detect metric trends',
+            jobClass: DetectTrendsTask::class,
+            appliesTo: ['event'],
+        );
     }
 }

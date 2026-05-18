@@ -27,7 +27,7 @@ class HevyAutoCoachTask extends BaseTaskJob
         $result = $effect->handle();
 
         if (! ($result['success'] ?? false)) {
-            throw new RuntimeException('HevyAutoCoachEffect failed: '.($result['message'] ?? 'unknown error'));
+            throw new RuntimeException('HevyAutoCoachEffect failed: ' . ($result['message'] ?? 'unknown error'));
         }
     }
 }

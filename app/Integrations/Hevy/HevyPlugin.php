@@ -438,7 +438,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
             'limit' => 100,
         ]);
 
-        $endpoint = '/v1/workouts?'.$query;
+        $endpoint = '/v1/workouts?' . $query;
         $json = [];
         try {
             $json = $this->getJson($endpoint, $integration);
@@ -506,7 +506,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                     'limit' => 100,
                 ]);
 
-                $endpoint = '/v1/routines?'.$query;
+                $endpoint = '/v1/routines?' . $query;
                 $json = $this->getJson($endpoint, $integration);
 
                 $routines = $json['routines'] ?? $json['data'] ?? [];
@@ -552,7 +552,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
     public function updateRoutine(Integration $integration, string $routineId, array $updates): array
     {
         $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
-        $url = $this->baseUrl.'/v1/routines/'.$routineId;
+        $url = $this->baseUrl . '/v1/routines/' . $routineId;
 
         log_integration_api_request('hevy', 'PUT', "/v1/routines/{$routineId}", ['api-key' => '***'], $updates, $integration->id);
 
@@ -562,7 +562,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
         log_integration_api_response('hevy', 'PUT', "/v1/routines/{$routineId}", $response->status(), $response->body(), $response->headers(), $integration->id);
 
         if (! $response->successful()) {
-            throw new RuntimeException('Hevy routine update failed: '.$response->status().' - '.$response->body());
+            throw new RuntimeException('Hevy routine update failed: ' . $response->status() . ' - ' . $response->body());
         }
 
         return $response->json() ?? [];
@@ -605,7 +605,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                     'page' => $page,
                 ]);
 
-                $endpoint = '/v1/workouts?'.$query;
+                $endpoint = '/v1/workouts?' . $query;
                 $json = $this->getJson($endpoint, $integration);
 
                 $workouts = $json['workouts'] ?? $json['data'] ?? [];
@@ -691,7 +691,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
             'user_id' => $integration->user_id,
             'concept' => 'workout',
             'type' => 'hevy_workout',
-            'title' => $title.' ('.substr($workoutId, 0, 8).')',
+            'title' => $title . ' (' . substr($workoutId, 0, 8) . ')',
         ], [
             'time' => $startIso,
             'content' => Arr::get($workout, 'description') ?? 'Hevy workout',
@@ -795,7 +795,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                 $event->createBlock([
                     'block_type' => 'exercise',
                     'time' => $startIso,
-                    'title' => $exerciseName.' - Set '.$setNum,
+                    'title' => $exerciseName . ' - Set ' . $setNum,
                     'metadata' => $metadata,
                     'url' => null,
                     'media_url' => null,
@@ -811,7 +811,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                 $event->createBlock([
                     'block_type' => 'exercise_summary',
                     'time' => $startIso,
-                    'title' => $exerciseName.' - Total Volume',
+                    'title' => $exerciseName . ' - Total Volume',
                     'metadata' => [
                         'exercise_name' => $exerciseName,
                         'total_volume' => $exerciseVolume,
@@ -871,7 +871,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                 'end_date' => $endDate,
                 'limit' => 100,
             ]);
-            $sweepEndpoint = '/v1/workouts?'.$sweepQuery;
+            $sweepEndpoint = '/v1/workouts?' . $sweepQuery;
             $sweepJson = $this->getJson($sweepEndpoint, $integration);
 
             $sweepItems = [];
@@ -912,7 +912,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
     {
         $apiKey = (string) ($integration->configuration['api_key'] ?? $this->apiKey ?? '');
         // In tests we allow empty; in production recommend providing api key
-        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl.$endpoint : $this->baseUrl.'/'.ltrim($endpoint, '/');
+        $url = Str::startsWith($endpoint, '/') ? $this->baseUrl . $endpoint : $this->baseUrl . '/' . ltrim($endpoint, '/');
 
         $headers = ['api-key' => $apiKey];
 
@@ -940,7 +940,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
         );
 
         if (! $response->successful()) {
-            throw new RuntimeException('Hevy API request failed with status '.$response->status());
+            throw new RuntimeException('Hevy API request failed with status ' . $response->status());
         }
 
         return $response->json() ?? [];
