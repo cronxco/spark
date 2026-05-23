@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 
 class ProcessTaskPipelineJob implements ShouldQueue
 {
@@ -31,11 +32,12 @@ class ProcessTaskPipelineJob implements ShouldQueue
 
     public function handle(): void
     {
-        $tasks = TaskRegistry::getTasksForModel($this->model, $this->trigger);
+        $applicableTasks = TaskRegistry::getTasksForModel($this->model, $this->trigger);
+        $tasks = $applicableTasks;
 
         // Apply task filter if provided
         if ($this->taskFilter) {
-            $tasks = $tasks->whereIn('key', $this->taskFilter);
+            $tasks = $this->expandTaskFilterWithDependencies($applicableTasks, $this->taskFilter);
         }
 
         // Filter out already-executed tasks (unless force)
@@ -70,9 +72,23 @@ class ProcessTaskPipelineJob implements ShouldQueue
      */
     protected function dispatchTask(TaskDefinition $task): void
     {
+        $this->model->refresh();
+
         // Check if applicable
         if (! $task->isApplicableTo($this->model)) {
             $this->markNotApplicable($task);
+
+            return;
+        }
+
+        if ($failedDependency = $this->firstFailedDependency($this->model, $task)) {
+            $this->markBlocked($task, $failedDependency);
+
+            return;
+        }
+
+        if ($incompleteDependency = $this->firstIncompleteDependency($this->model, $task)) {
+            $this->markWaiting($task, $incompleteDependency);
 
             return;
         }
@@ -115,5 +131,50 @@ class ProcessTaskPipelineJob implements ShouldQueue
             'completed_at' => now()->toIso8601String(),
             'triggered_by' => $this->trigger,
         ]);
+    }
+
+    protected function markWaiting(TaskDefinition $task, string $dependencyKey): void
+    {
+        $this->updateTaskStatus($task, 'waiting', [
+            'waiting_for' => $dependencyKey,
+            'triggered_by' => $this->trigger,
+            ...($this->changedFields ? ['changed_fields' => $this->changedFields] : []),
+        ]);
+    }
+
+    protected function markBlocked(TaskDefinition $task, string $dependencyKey): void
+    {
+        $this->updateTaskStatus($task, 'blocked', [
+            'blocked_by' => $dependencyKey,
+            'completed_at' => now()->toIso8601String(),
+            'triggered_by' => $this->trigger,
+            ...($this->changedFields ? ['changed_fields' => $this->changedFields] : []),
+        ]);
+    }
+
+    protected function expandTaskFilterWithDependencies(Collection $applicableTasks, array $taskFilter): Collection
+    {
+        $tasksByKey = $applicableTasks->keyBy('key');
+        $selected = collect();
+        $pendingKeys = $taskFilter;
+
+        while ($pendingKeys !== []) {
+            $taskKey = array_shift($pendingKeys);
+            $task = $tasksByKey->get($taskKey);
+
+            if (! $task || $selected->has($taskKey)) {
+                continue;
+            }
+
+            $selected->put($taskKey, $task);
+
+            foreach ($task->dependencies as $dependencyKey) {
+                if ($tasksByKey->has($dependencyKey) && ! $selected->has($dependencyKey)) {
+                    $pendingKeys[] = $dependencyKey;
+                }
+            }
+        }
+
+        return $selected->sortByDesc('priority')->values();
     }
 }

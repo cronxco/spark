@@ -60,6 +60,20 @@ class TaskRegistry
     }
 
     /**
+     * Get the keys for tasks that directly depend on the given task.
+     *
+     * @return array<int, string>
+     */
+    public static function getDependentTaskKeys(string $taskKey): array
+    {
+        return collect(static::$tasks)
+            ->filter(fn (TaskDefinition $task) => in_array($taskKey, $task->dependencies, true))
+            ->keys()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Resolve the execution order based on task dependencies
      *
      * @throws CircularDependencyException

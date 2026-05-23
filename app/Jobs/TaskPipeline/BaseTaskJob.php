@@ -4,6 +4,7 @@ namespace App\Jobs\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskRegistry;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,11 +34,33 @@ abstract class BaseTaskJob implements ShouldQueue
      */
     public function handle(): void
     {
+        $this->model->refresh();
+
+        if ($failedDependency = $this->firstFailedDependency($this->model, $this->task)) {
+            $this->updateStatus('blocked', [
+                'blocked_by' => $failedDependency,
+                'completed_at' => now()->toIso8601String(),
+            ]);
+
+            return;
+        }
+
+        if ($incompleteDependency = $this->firstIncompleteDependency($this->model, $this->task)) {
+            $this->updateStatus('waiting', [
+                'waiting_for' => $incompleteDependency,
+            ]);
+
+            $this->release(30);
+
+            return;
+        }
+
         $this->updateStatus('running');
 
         try {
             $this->execute();
             $this->updateStatus('success', ['completed_at' => now()->toIso8601String()]);
+            $this->dispatchDependentTasks();
 
         } catch (Exception $e) {
             // Report to Sentry with comprehensive context
@@ -101,6 +124,21 @@ abstract class BaseTaskJob implements ShouldQueue
         }
 
         $this->setTaskExecutions($this->model, $executions);
+    }
+
+    protected function dispatchDependentTasks(): void
+    {
+        $dependentTaskKeys = TaskRegistry::getDependentTaskKeys($this->task->key);
+
+        if ($dependentTaskKeys === []) {
+            return;
+        }
+
+        ProcessTaskPipelineJob::dispatch(
+            model: $this->model->fresh(),
+            trigger: 'manual',
+            taskFilter: $dependentTaskKeys,
+        )->onQueue('tasks');
     }
 
     /**

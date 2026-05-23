@@ -9,6 +9,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TaskPipelineModelObserverTest extends TestCase
@@ -20,9 +21,7 @@ class TaskPipelineModelObserverTest extends TestCase
         config(['app.enable_task_pipeline' => false]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function create_flows_dispatch_pipeline_for_events_blocks_and_objects(): void
     {
         $user = User::factory()->create();
@@ -63,9 +62,7 @@ class TaskPipelineModelObserverTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_update_dispatches_for_changed_derived_data_fields(): void
     {
         $event = Event::factory()->create(['action' => 'paid']);
@@ -84,9 +81,7 @@ class TaskPipelineModelObserverTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_update_ignores_fields_that_do_not_change_derived_data(): void
     {
         $event = Event::factory()->create(['event_metadata' => []]);
@@ -99,9 +94,7 @@ class TaskPipelineModelObserverTest extends TestCase
         Queue::assertNotPushed(ProcessTaskPipelineJob::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function block_update_dispatches_for_block_and_refreshes_parent_event_summary_embedding(): void
     {
         $event = Event::factory()->create();
@@ -134,9 +127,7 @@ class TaskPipelineModelObserverTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function object_update_dispatches_for_changed_derived_data_fields(): void
     {
         $object = EventObject::factory()->create(['title' => 'Original title']);

@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CommandsTest extends TestCase
@@ -19,9 +20,7 @@ class CommandsTest extends TestCase
         TaskRegistry::clear();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function list_tasks_command_displays_registered_tasks(): void
     {
         TaskRegistry::register(new TaskDefinition(
@@ -38,9 +37,7 @@ class CommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function list_tasks_command_with_json_output(): void
     {
         TaskRegistry::register(new TaskDefinition(
@@ -56,9 +53,7 @@ class CommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function list_tasks_command_filters_by_model_type(): void
     {
         TaskRegistry::register(new TaskDefinition(
@@ -83,9 +78,7 @@ class CommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function rerun_command_validates_model_type(): void
     {
         $this->artisan('task-pipeline:rerun test_task invalid_model abc-123')
@@ -93,9 +86,7 @@ class CommandsTest extends TestCase
             ->assertExitCode(1);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function bulk_rerun_command_validates_model_type(): void
     {
         $this->artisan('task-pipeline:bulk-rerun test_task invalid_model')
@@ -103,9 +94,7 @@ class CommandsTest extends TestCase
             ->assertExitCode(1);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function bulk_rerun_command_dry_run_mode(): void
     {
         // Create a test event so the command has something to find

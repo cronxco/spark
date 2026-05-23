@@ -8,6 +8,7 @@ use App\Services\EmbeddingService;
 use App\Services\TaskPipeline\TaskDefinition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -15,9 +16,7 @@ class GenerateEmbeddingTaskTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function stores_successful_embedding_and_marks_task_successful(): void
     {
         $event = Event::factory()->create([
@@ -46,9 +45,7 @@ class GenerateEmbeddingTaskTest extends TestCase
         $this->assertSame('success', $event->event_metadata['task_executions']['generate_embedding']['last_success']['status']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function provider_failure_marks_task_failed_and_does_not_store_embedding(): void
     {
         $event = Event::factory()->create();
@@ -73,9 +70,7 @@ class GenerateEmbeddingTaskTest extends TestCase
         $this->assertArrayNotHasKey('last_success', $event->event_metadata['task_executions']['generate_embedding']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function zero_vector_marks_task_failed_and_does_not_store_embedding(): void
     {
         $event = Event::factory()->create();
