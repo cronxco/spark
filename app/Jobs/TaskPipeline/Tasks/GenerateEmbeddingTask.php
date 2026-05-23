@@ -6,6 +6,7 @@ use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\Event;
 use App\Services\EmbeddingService;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class GenerateEmbeddingTask extends BaseTaskJob
 {
@@ -30,6 +31,10 @@ class GenerateEmbeddingTask extends BaseTaskJob
 
         // Generate embedding
         $embedding = $embeddingService->embed($searchableText);
+
+        if (EmbeddingService::isZeroVector($embedding)) {
+            throw new RuntimeException('Embedding provider returned a zero vector');
+        }
 
         // Get embedding metadata
         $embeddingMetadata = $embeddingService->getEmbeddingMetadata();

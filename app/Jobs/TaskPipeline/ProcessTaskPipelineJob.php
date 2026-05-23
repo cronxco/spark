@@ -26,6 +26,7 @@ class ProcessTaskPipelineJob implements ShouldQueue
         public string $trigger = 'created',
         public ?array $taskFilter = null,  // Only run specific tasks
         public bool $force = false,        // Re-run even if already executed
+        public array $changedFields = [],  // Fields that triggered an update run
     ) {}
 
     public function handle(): void
@@ -80,6 +81,7 @@ class ProcessTaskPipelineJob implements ShouldQueue
         $this->updateTaskStatus($task, 'pending', [
             'started_at' => now()->toIso8601String(),
             'triggered_by' => $this->trigger,
+            ...($this->changedFields ? ['changed_fields' => $this->changedFields] : []),
         ]);
 
         // Dispatch to appropriate queue

@@ -87,6 +87,24 @@ class EmbeddingService
     }
 
     /**
+     * Check whether an embedding vector contains only zeros.
+     */
+    public static function isZeroVector(array $embedding): bool
+    {
+        if ($embedding === []) {
+            return false;
+        }
+
+        foreach ($embedding as $value) {
+            if ((float) $value != 0.0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Get metadata about the embedding configuration
      */
     public function getEmbeddingMetadata(): array
@@ -110,8 +128,7 @@ class EmbeddingService
     public function embed(string $text, bool $useCache = true): array
     {
         if (empty(trim($text))) {
-            // Return zero vector for empty text
-            return array_fill(0, $this->dimensions, 0.0);
+            throw new Exception('Cannot generate embedding for empty text');
         }
 
         // Use cache to avoid redundant API calls for the same text
@@ -120,17 +137,27 @@ class EmbeddingService
             $cached = Cache::get($cacheKey);
 
             if ($cached !== null) {
-                return $cached;
+                try {
+                    return $this->validateEmbedding($cached);
+                } catch (Exception) {
+                    Cache::forget($cacheKey);
+                }
             }
         }
 
         $embeddings = $this->embedBatch([$text]);
 
-        if ($useCache && ! empty($embeddings)) {
-            Cache::put('embedding:' . md5($text), $embeddings[0], now()->addDays(30));
+        if (! isset($embeddings[0])) {
+            throw new Exception('OpenAI API returned no embedding data');
         }
 
-        return $embeddings[0] ?? array_fill(0, $this->dimensions, 0.0);
+        $embedding = $this->validateEmbedding($embeddings[0]);
+
+        if ($useCache) {
+            Cache::put('embedding:' . md5($text), $embedding, now()->addDays(30));
+        }
+
+        return $embedding;
     }
 
     /**
@@ -147,16 +174,14 @@ class EmbeddingService
             return [];
         }
 
-        // Filter out empty strings
-        $nonEmptyTexts = array_filter($texts, fn ($text) => ! empty(trim($text)));
-
-        if (empty($nonEmptyTexts)) {
-            // Return zero vectors for all texts
-            return array_fill(0, count($texts), array_fill(0, $this->dimensions, 0.0));
+        foreach ($texts as $index => $text) {
+            if (empty(trim($text))) {
+                throw new Exception("Cannot generate embedding for empty text at index {$index}");
+            }
         }
 
         // Truncate texts to avoid token limits (8191 tokens for text-embedding-3-small)
-        $truncatedTexts = array_map(fn ($text) => $this->truncateText($text), $nonEmptyTexts);
+        $truncatedTexts = array_map(fn ($text) => $this->truncateText($text), $texts);
 
         try {
             $headers = [
@@ -191,21 +216,51 @@ class EmbeddingService
                 throw new Exception('Invalid response from OpenAI API');
             }
 
-            // Extract embeddings from response
-            $embeddings = array_map(function ($item) {
-                return $item['embedding'] ?? array_fill(0, $this->dimensions, 0.0);
-            }, $data['data']);
+            if (count($data['data']) !== count($texts)) {
+                throw new Exception('OpenAI API returned an unexpected number of embeddings');
+            }
 
-            return $embeddings;
+            return array_map(function ($item, $index) {
+                if (! isset($item['embedding']) || ! is_array($item['embedding'])) {
+                    throw new Exception("OpenAI API response missing embedding at index {$index}");
+                }
+
+                return $this->validateEmbedding($item['embedding']);
+            }, $data['data'], array_keys($data['data']));
         } catch (Exception $e) {
             Log::error('Failed to generate embeddings', [
                 'error' => $e->getMessage(),
                 'texts_count' => count($texts),
             ]);
 
-            // Return zero vectors as fallback
-            return array_fill(0, count($texts), array_fill(0, $this->dimensions, 0.0));
+            throw $e;
         }
+    }
+
+    /**
+     * Validate a provider/cached embedding before it can be stored or reused.
+     */
+    private function validateEmbedding(array $embedding): array
+    {
+        if (count($embedding) !== $this->dimensions) {
+            throw new Exception("Embedding vector has invalid dimensions: expected {$this->dimensions}, got " . count($embedding));
+        }
+
+        $normalized = [];
+
+        foreach ($embedding as $index => $value) {
+            if (! is_numeric($value)) {
+                throw new Exception("Embedding vector contains a non-numeric value at index {$index}");
+            }
+
+            $normalized[] = (float) $value;
+        }
+
+        if (self::isZeroVector($normalized)) {
+            throw new Exception('Embedding provider returned a zero vector');
+        }
+
+        return $normalized;
     }
 
     /**

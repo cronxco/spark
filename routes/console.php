@@ -6,7 +6,6 @@ use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\RunPatternDetectionJob;
 use App\Jobs\Flint\RunPreDigestRefreshJob;
 use App\Jobs\Flint\SendDigestNotificationJob;
-use App\Jobs\Knowledge\ProcessMissingKnowledgeSummariesJob;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
 use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\User;
@@ -62,13 +61,6 @@ Schedule::job(new CheckCookieExpiryJob)
 // Refresh expiring cookies daily at 2am
 Schedule::job(new RefreshExpiringCookies)
     ->dailyAt('02:00')
-    ->onOneServer()
-    ->withoutOverlapping()
-    ->sentryMonitor();
-
-// Repair Fetch/Newsletter knowledge events that never received AI summary blocks.
-Schedule::job(new ProcessMissingKnowledgeSummariesJob(limit: 100))
-    ->everySixHours()
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();

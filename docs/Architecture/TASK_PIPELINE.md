@@ -539,6 +539,10 @@ public $tries = 3;               // 3 attempts
 public $backoff = [30, 120, 300]; // 30s, 2m, 5m
 ```
 
+Task jobs update metadata to `failed` and re-throw exceptions, so Laravel's queue worker can apply the retry policy. A failed task attempt is visible in the model's `task_executions` metadata with the exception message in `last_attempt.error`; only completed runs write `last_success`.
+
+`generate_embedding` has an additional provider-request retry inside `EmbeddingService`: the OpenAI embeddings HTTP request uses `retry(3, 1000)` after a 30 second timeout. If the provider still fails, returns malformed data, or returns an all-zero vector, the exception is allowed to fail the task. Zero vectors are not stored as successful embeddings.
+
 Override in your task:
 
 ```php

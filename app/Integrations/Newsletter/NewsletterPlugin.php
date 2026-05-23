@@ -3,14 +3,19 @@
 namespace App\Integrations\Newsletter;
 
 use App\Integrations\Base\WebhookPlugin;
+use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\Data\Newsletter\ProcessNewsletterEmailJob;
+use App\Jobs\TaskPipeline\Tasks\NewsletterExtractContentTask;
+use App\Jobs\TaskPipeline\Tasks\NewsletterGenerateSummariesTask;
+use App\Models\Event;
 use App\Models\Integration;
+use App\Services\TaskPipeline\TaskDefinition;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class NewsletterPlugin extends WebhookPlugin
+class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
 {
     public static function getIdentifier(): string
     {
@@ -137,6 +142,40 @@ class NewsletterPlugin extends WebhookPlugin
                 'description' => 'Newsletter system user (Me)',
                 'hidden' => true,
             ],
+        ];
+    }
+
+    public static function getTaskDefinitions(): array
+    {
+        return [
+            new TaskDefinition(
+                key: 'newsletter_extract_content',
+                name: 'Newsletter: Extract Content',
+                description: 'Extract clean Markdown from raw newsletter HTML using AI',
+                jobClass: NewsletterExtractContentTask::class,
+                appliesTo: ['event'],
+                conditions: ['service' => 'newsletter', 'domain' => 'knowledge'],
+                runOnCreate: true,
+                runOnUpdate: false,
+                shouldRun: fn (Event $event) => ! empty($event->event_metadata['raw_html'])
+                    && empty($event->target?->metadata['extracted_at']),
+            ),
+            new TaskDefinition(
+                key: 'newsletter_generate_summaries',
+                name: 'Newsletter: Generate Summaries',
+                description: 'Generate AI summary blocks and tags for a newsletter event',
+                jobClass: NewsletterGenerateSummariesTask::class,
+                appliesTo: ['event'],
+                conditions: ['service' => 'newsletter', 'domain' => 'knowledge'],
+                dependencies: ['newsletter_extract_content'],
+                runOnCreate: true,
+                runOnUpdate: false,
+                shouldRun: fn (Event $event) => ! empty($event->target?->content)
+                    && ! $event->blocks()->where('block_type', 'newsletter_tldr')
+                        ->whereNotNull('metadata->content')
+                        ->whereNull('deleted_at')
+                        ->exists(),
+            ),
         ];
     }
 
