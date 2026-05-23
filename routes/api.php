@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FlintQuestionsController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
 use App\Http\Controllers\Api\SemanticSearchController;
+use App\Http\Controllers\Api\TaskExecutionController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\EventApiController;
 use Illuminate\Http\Request;
@@ -99,6 +100,10 @@ Route::middleware('sentry.api.logging')->group(function () {
 
         // Flint Questions API
         Route::post('flint/questions/{block}/answer', [FlintQuestionsController::class, 'answer'])->name('api.flint.questions.answer');
+
+        // Task Executions API
+        Route::get('task-executions', [TaskExecutionController::class, 'index'])->name('api.task-executions.index');
+        Route::get('task-executions/{taskExecution}', [TaskExecutionController::class, 'show'])->name('api.task-executions.show');
 
         // Clear card stream cache
         Route::post('clear-card-cache', function (Request $request) {

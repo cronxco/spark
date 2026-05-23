@@ -2,8 +2,8 @@
 
 namespace App\Jobs\TaskPipeline\Concerns;
 
-use App\Models\Event;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,7 +14,7 @@ trait InteractsWithTaskMetadata
      */
     protected function getMetadataField(Model $model): string
     {
-        return $model instanceof Event ? 'event_metadata' : 'metadata';
+        return app(TaskExecutionStore::class)->metadataField($model);
     }
 
     /**
@@ -22,10 +22,7 @@ trait InteractsWithTaskMetadata
      */
     protected function getTaskExecutions(Model $model): array
     {
-        $field = $this->getMetadataField($model);
-        $metadata = $model->$field ?? [];
-
-        return $metadata['task_executions'] ?? [];
+        return app(TaskExecutionStore::class)->getTaskExecutions($model);
     }
 
     /**
@@ -33,13 +30,7 @@ trait InteractsWithTaskMetadata
      */
     protected function setTaskExecutions(Model $model, array $executions): void
     {
-        $field = $this->getMetadataField($model);
-        $metadata = $model->$field ?? [];
-        $metadata['task_executions'] = $executions;
-
-        $model->withoutEvents(function () use ($model, $field, $metadata) {
-            $model->update([$field => $metadata]);
-        });
+        app(TaskExecutionStore::class)->setTaskExecutions($model, $executions);
     }
 
     protected function taskSucceeded(Model $model, string $taskKey): bool

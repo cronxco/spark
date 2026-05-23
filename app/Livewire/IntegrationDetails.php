@@ -8,6 +8,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
@@ -247,9 +248,8 @@ class IntegrationDetails extends Component
     protected function shouldExpandTasksSection(): bool
     {
         // Expand if there are failed or pending tasks
-        // For Integration, task_executions are stored in configuration column
-        $configuration = $this->integration->configuration ?? [];
-        $executions = $configuration['task_executions'] ?? [];
+        $executions = app(TaskExecutionStore::class)
+            ->getTaskExecutions($this->integration);
 
         foreach ($executions as $execution) {
             $status = $execution['last_attempt']['status'] ?? null;

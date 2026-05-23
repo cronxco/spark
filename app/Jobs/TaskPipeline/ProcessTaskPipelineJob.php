@@ -4,6 +4,7 @@ namespace App\Jobs\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -112,13 +113,14 @@ class ProcessTaskPipelineJob implements ShouldQueue
      */
     protected function updateTaskStatus(TaskDefinition $task, string $status, array $data): void
     {
-        $executions = $this->getTaskExecutions($this->model);
-
-        $executions[$task->key]['last_attempt'] = array_merge($data, [
-            'status' => $status,
-        ]);
-
-        $this->setTaskExecutions($this->model, $executions);
+        app(TaskExecutionStore::class)->recordStatus(
+            model: $this->model,
+            task: $task,
+            status: $status,
+            data: $data,
+            jobContext: $this,
+            mergeLastAttempt: false,
+        );
     }
 
     /**

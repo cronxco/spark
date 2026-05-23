@@ -364,8 +364,7 @@
                 <div class="pb-4 border-b border-base-200" wire:init="loadTasks">
                     @if ($tasksLoaded)
                         @php
-                            $configuration = $integration->configuration ?? [];
-                            $executions = $configuration['task_executions'] ?? [];
+                            $executions = app(\App\Services\TaskPipeline\TaskExecutionStore::class)->getTaskExecutions($integration);
                             $failedCount = collect($executions)->filter(fn($e) => ($e['last_attempt']['status'] ?? null) === 'failed')->count();
                             $pendingCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['pending', 'running']))->count();
                             $executedCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['success', 'failed', 'running', 'pending']))->count();

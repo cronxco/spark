@@ -334,8 +334,8 @@ new class extends Component
     protected function shouldExpandTasksSection(): bool
     {
         // Expand if there are failed or pending tasks
-        $metadata = $this->block->metadata ?? [];
-        $executions = $metadata['task_executions'] ?? [];
+        $executions = app(\App\Services\TaskPipeline\TaskExecutionStore::class)
+            ->getTaskExecutions($this->block);
 
         foreach ($executions as $execution) {
             $status = $execution['last_attempt']['status'] ?? null;
@@ -811,8 +811,7 @@ new class extends Component
                 <div class="pb-4 border-b border-base-200">
                     @if ($drawerContentLoaded && $tasksLoaded)
                         @php
-                            $metadata = $block->metadata ?? [];
-                            $executions = $metadata['task_executions'] ?? [];
+                            $executions = app(\App\Services\TaskPipeline\TaskExecutionStore::class)->getTaskExecutions($block);
                             $failedCount = collect($executions)->filter(fn($e) => ($e['last_attempt']['status'] ?? null) === 'failed')->count();
                             $pendingCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['pending', 'running']))->count();
                             $executedCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['success', 'failed', 'running', 'pending']))->count();

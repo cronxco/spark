@@ -3,6 +3,7 @@
 namespace App\Jobs\TaskPipeline;
 
 use App\Models\Event;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,6 +29,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
         Log::info('Starting scheduled retrospective anomaly detection');
 
         $count = 0;
+        $store = app(TaskExecutionStore::class);
 
         // Find all events with metrics from yesterday
         // This allows retrospective detection for:
@@ -40,10 +42,10 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                 now()->subDay()->startOfDay(),
                 now()->subDay()->endOfDay(),
             ])
-            ->chunk(100, function ($events) use (&$count) {
+            ->chunk(100, function ($events) use (&$count, $store) {
                 foreach ($events as $event) {
                     // Check if anomaly detection has already been run successfully
-                    $executions = $event->event_metadata['task_executions'] ?? [];
+                    $executions = $store->getTaskExecutions($event);
                     $lastAttempt = $executions['detect_anomalies']['last_attempt'] ?? null;
 
                     // Skip if already successfully detected

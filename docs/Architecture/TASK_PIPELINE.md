@@ -55,14 +55,16 @@ Event/Object/Block Created/Updated
 4. **BaseTaskJob** - Abstract base class for task implementations
 5. **InteractsWithTaskMetadata** - Trait for metadata field handling
 
-### Metadata Storage
+### Execution Storage
 
-Task executions are tracked in model metadata fields:
+Task executions are tracked in the `task_executions` table and mirrored to model metadata during the transition:
 
 - **Event**: Uses `event_metadata['task_executions']`
 - **Block**: Uses `metadata['task_executions']`
 - **EventObject**: Uses `metadata['task_executions']`
-- **Integration**: Uses `metadata['task_executions']`
+- **Integration**: Uses `configuration['task_executions']`
+
+The table is the source of truth for current state with one row per `entity_type`, `entity_id`, and `task_key`. `TaskExecutionStore` reads table rows first and falls back to legacy metadata for records that have not been backfilled yet.
 
 Structure:
 
@@ -157,6 +159,21 @@ php artisan task-pipeline:populate-initial-state --model=event
 
 # Limit for testing
 php artisan task-pipeline:populate-initial-state --limit=100
+```
+
+### Backfill Table-Backed Executions
+
+Backfill legacy metadata into `task_executions` using Redis migration workers:
+
+```bash
+# Count in-process only
+php artisan task-pipeline:migrate-executions --model=event --dry-run
+
+# Dispatch batched Redis migration jobs
+php artisan task-pipeline:migrate-executions --batch-size=500
+
+# Overwrite existing task_executions rows while rerunning
+php artisan task-pipeline:migrate-executions --force
 ```
 
 ### Re-run a Task

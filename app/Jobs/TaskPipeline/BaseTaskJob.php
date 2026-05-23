@@ -4,6 +4,7 @@ namespace App\Jobs\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -106,24 +107,13 @@ abstract class BaseTaskJob implements ShouldQueue
      */
     protected function updateStatus(string $status, array $additionalData = []): void
     {
-        $executions = $this->getTaskExecutions($this->model);
-
-        $executionData = array_merge([
-            'status' => $status,
-        ], $additionalData);
-
-        // Update last_attempt
-        $executions[$this->task->key]['last_attempt'] = array_merge(
-            $executions[$this->task->key]['last_attempt'] ?? [],
-            $executionData
+        app(TaskExecutionStore::class)->recordStatus(
+            model: $this->model,
+            task: $this->task,
+            status: $status,
+            data: $additionalData,
+            jobContext: $this,
         );
-
-        // Update last_success if applicable
-        if ($status === 'success') {
-            $executions[$this->task->key]['last_success'] = $executionData;
-        }
-
-        $this->setTaskExecutions($this->model, $executions);
     }
 
     protected function dispatchDependentTasks(): void
