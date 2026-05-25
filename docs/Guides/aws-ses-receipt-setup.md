@@ -169,7 +169,7 @@ Go to: https://console.aws.amazon.com/sns/v3/home?region=eu-west-1#/topics
 ### 3.3 Note the Topic ARN
 
 ```
-arn:aws:sns:eu-west-1:123456789012:receipt-emails-topic
+
 ```
 
 Save this for your `.env` file (`AWS_SNS_RECEIPT_TOPIC_ARN`).

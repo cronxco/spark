@@ -101,7 +101,7 @@ class DetectTrendsTask extends BaseTaskJob
                     'comparison_months' => $months,
                     'comparison_start' => $comparisonStart->toDateString(),
                     'comparison_end' => $comparisonEnd->toDateString(),
-                ]);
+                ], suggestBaselineReview: true);
                 break;
             }
         }
@@ -134,7 +134,7 @@ class DetectTrendsTask extends BaseTaskJob
                     'comparison_quarters' => $quarters,
                     'comparison_start' => $comparisonStart->toDateString(),
                     'comparison_end' => $comparisonEnd->toDateString(),
-                ]);
+                ], suggestBaselineReview: true);
                 break;
             }
         }
@@ -149,6 +149,7 @@ class DetectTrendsTask extends BaseTaskJob
         float $currentValue,
         float $deviation,
         array $metadata,
+        bool $suggestBaselineReview = false,
     ): void {
         $existing = MetricTrend::where('metric_statistic_id', $metric->id)
             ->where('type', $type)
@@ -172,6 +173,10 @@ class DetectTrendsTask extends BaseTaskJob
             'significance_score' => min($deviation / self::CHANGE_THRESHOLD, 1.0),
             'metadata' => $metadata,
         ]);
+
+        if ($suggestBaselineReview && $metric->baseline_reset_suggested_at === null) {
+            $metric->update(['baseline_reset_suggested_at' => now()]);
+        }
 
         Log::info('Detected metric trend via TaskPipeline', [
             'event_id' => $this->model->id,

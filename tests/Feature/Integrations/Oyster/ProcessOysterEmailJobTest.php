@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Integrations\Oyster;
 
+use App\Integrations\Oyster\OysterTransportModeDetector;
 use App\Jobs\Data\Oyster\LinkOysterJourneyEventsJob;
 use App\Jobs\Data\Oyster\ProcessOysterEmailJob;
 use App\Models\Event;
@@ -12,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ProcessOysterEmailJobTest extends TestCase
@@ -53,7 +55,7 @@ class ProcessOysterEmailJobTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_be_instantiated()
     {
         $job = new ProcessOysterEmailJob(
@@ -64,7 +66,7 @@ class ProcessOysterEmailJobTest extends TestCase
         $this->assertInstanceOf(ProcessOysterEmailJob::class, $job);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_correct_timeout()
     {
         $job = new ProcessOysterEmailJob(
@@ -75,7 +77,7 @@ class ProcessOysterEmailJobTest extends TestCase
         $this->assertEquals(300, $job->timeout);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_unique_id_based_on_integration_and_content()
     {
         $s3Key = 'oyster/test-email-123.eml';
@@ -87,7 +89,7 @@ class ProcessOysterEmailJobTest extends TestCase
         $this->assertStringContainsString($this->integration->id, $uniqueId);
     }
 
-    /** @test */
+    #[Test]
     public function it_processes_csv_and_creates_events()
     {
         Queue::fake([LinkOysterJourneyEventsJob::class]);
@@ -158,7 +160,7 @@ CSV;
         Queue::assertPushed(LinkOysterJourneyEventsJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_processes_top_up_entries()
     {
         Queue::fake([LinkOysterJourneyEventsJob::class]);
@@ -183,7 +185,7 @@ CSV;
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_transport_mode_metadata()
     {
         Queue::fake([LinkOysterJourneyEventsJob::class]);
@@ -217,9 +219,69 @@ CSV;
 
         $this->assertNotNull($tramEvent);
         $this->assertEquals('Tram', $tramEvent->event_metadata['transport_mode_display']);
+
+        // Check tags are attached
+        $this->assertTrue($nationalRailEvent->hasTag('national_rail'));
+        $this->assertEquals('transport_mode', $nationalRailEvent->tagsWithType('transport_mode')->first()->type);
+        $this->assertTrue($tramEvent->hasTag('tram'));
     }
 
-    /** @test */
+    #[Test]
+    public function it_attaches_transport_mode_tags_to_both_touched_in_and_touched_out()
+    {
+        Queue::fake([LinkOysterJourneyEventsJob::class]);
+
+        $csvContent = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+28-Nov-2025,17:47,18:14,"Victoria (platforms 9-19) [National Rail] to East Croydon [National Rail]",2.80,,8.41,""
+CSV;
+
+        $email = $this->createMockEmail($csvContent);
+
+        $job = new ProcessOysterEmailJob($this->integration, null, $email);
+        $job->handle();
+
+        $touchedIn = Event::where('integration_id', $this->integration->id)
+            ->where('action', 'touched_in_at')
+            ->first();
+
+        $touchedOut = Event::where('integration_id', $this->integration->id)
+            ->where('action', 'touched_out_at')
+            ->first();
+
+        $this->assertNotNull($touchedIn);
+        $this->assertNotNull($touchedOut);
+        $this->assertTrue($touchedIn->hasTag(OysterTransportModeDetector::MODE_NATIONAL_RAIL));
+        $this->assertTrue($touchedOut->hasTag(OysterTransportModeDetector::MODE_NATIONAL_RAIL));
+    }
+
+    #[Test]
+    public function it_does_not_attach_tag_for_unknown_transport_mode()
+    {
+        Queue::fake([LinkOysterJourneyEventsJob::class]);
+
+        // A journey that would resolve to unknown mode (no mode annotation, no "to" pattern)
+        $csvContent = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+28-Nov-2025,17:47,,"Unknown journey type",.00,,8.41,""
+CSV;
+
+        $email = $this->createMockEmail($csvContent);
+
+        $job = new ProcessOysterEmailJob($this->integration, null, $email);
+        $job->handle();
+
+        $events = Event::where('integration_id', $this->integration->id)
+            ->where('action', 'touched_in_at')
+            ->get();
+
+        // Unrecognizable journey formats produce no events (no origin detected), so no tags either
+        $this->assertEmpty($events);
+    }
+
+    #[Test]
     public function it_is_idempotent_and_does_not_duplicate_events()
     {
         Queue::fake([LinkOysterJourneyEventsJob::class]);
@@ -247,7 +309,7 @@ CSV;
         $this->assertCount(1, $events);
     }
 
-    /** @test */
+    #[Test]
     public function it_reuses_existing_station_objects()
     {
         Queue::fake([LinkOysterJourneyEventsJob::class]);

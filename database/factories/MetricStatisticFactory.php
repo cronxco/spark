@@ -36,6 +36,10 @@ class MetricStatisticFactory extends Factory
             'normal_lower_bound' => $mean - (2 * $stddev),
             'normal_upper_bound' => $mean + (2 * $stddev),
             'last_calculated_at' => now(),
+            'baseline_window_days' => MetricStatistic::DEFAULT_WINDOW_DAYS,
+            'baseline_reset_suggested_at' => null,
+            'anomaly_high_suppressed_until' => null,
+            'anomaly_low_suppressed_until' => null,
         ];
     }
 }
