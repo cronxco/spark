@@ -30,11 +30,11 @@ class FetchEngineManager
     /**
      * Fetch a URL using the appropriate engine (Playwright or HTTP)
      *
-     * @return array ['html' => string, 'status_code' => int, 'screenshot' => ?string, 'method' => string, 'error' => ?string]
+     * @return array ['html' => string, 'status_code' => int, 'screenshot' => ?string, 'method' => string, 'selected_method' => string, 'error' => ?string]
      */
-    public function fetch(string $url, IntegrationGroup $group, ?EventObject $webpage = null): array
+    public function fetch(string $url, IntegrationGroup $group, ?EventObject $webpage = null, ?string $methodOverride = null): array
     {
-        $method = $this->determineMethod($url, $webpage);
+        $method = $this->determineMethod($url, $webpage, $methodOverride);
 
         Log::debug('Fetch: Engine selected', [
             'url' => $url,
@@ -82,10 +82,17 @@ class FetchEngineManager
         $entry = [
             'timestamp' => now()->toIso8601String(),
             'decision' => $decision,
+            'selected_method' => $decision,
+            'actual_method' => null,
             'reason' => $reason,
             'outcome' => null,
             'stealth_enabled' => config('services.playwright.stealth_enabled', true),
             'context_cached' => false,
+            'playwright_reached_worker' => null,
+            'playwright_error' => null,
+            'playwright_worker_status' => null,
+            'final_status_code' => null,
+            'fallback_status_code' => null,
             'duration_ms' => null,
             'status_code' => null,
         ];
@@ -193,9 +200,25 @@ class FetchEngineManager
     /**
      * Determine which fetch method to use
      */
-    protected function determineMethod(string $url, ?EventObject $webpage): string
+    protected function determineMethod(string $url, ?EventObject $webpage, ?string $methodOverride = null): string
     {
         $reason = 'default';
+
+        if ($methodOverride === 'playwright') {
+            $this->logFetchDecision($webpage, 'playwright', 'forced_playwright', [
+                'forced' => true,
+            ]);
+
+            return 'playwright';
+        }
+
+        if ($methodOverride === 'http') {
+            $this->logFetchDecision($webpage, 'http', 'forced_http', [
+                'forced' => true,
+            ]);
+
+            return 'http';
+        }
 
         // If Playwright is disabled, always use HTTP
         if (! $this->playwrightEnabled) {
@@ -270,9 +293,12 @@ class FetchEngineManager
      */
     protected function fetchWithPlaywright(string $url, IntegrationGroup $group, ?EventObject $webpage): array
     {
+        $playwrightResult = null;
+
         try {
             $client = new PlaywrightFetchClient;
             $result = $client->fetch($url, $group);
+            $playwrightResult = $result;
 
             if (! $result['success']) {
                 throw new Exception($result['error'] ?? 'Playwright fetch failed');
@@ -288,17 +314,42 @@ class FetchEngineManager
                 'status_code' => 200,
                 'screenshot' => $result['screenshot'] ?? null,
                 'method' => 'playwright',
+                'selected_method' => 'playwright',
+                'actual_method' => 'playwright',
                 'error' => null,
+                'playwright_error' => null,
+                'playwright_reached_worker' => $result['reached_worker'] ?? true,
+                'playwright_worker_status' => $result['worker_health'] ?? null,
+                'playwright_meta' => $result['meta'] ?? [],
             ];
 
         } catch (Exception $e) {
+            $workerHealth = $playwrightResult['worker_health'] ?? null;
+
+            if (! $workerHealth) {
+                try {
+                    $workerHealth = (new PlaywrightFetchClient)->getHealthData();
+                } catch (Exception) {
+                    $workerHealth = null;
+                }
+            }
+
             Log::warning('Fetch: Playwright failed, attempting HTTP fallback', [
                 'url' => $url,
                 'error' => $e->getMessage(),
             ]);
 
             // Fall back to HTTP
-            return $this->fetchWithHttp($url, $group, true);
+            $fallbackResult = $this->fetchWithHttp($url, $group, true);
+
+            return array_merge($fallbackResult, [
+                'selected_method' => 'playwright',
+                'actual_method' => 'http_fallback',
+                'playwright_error' => $e->getMessage(),
+                'playwright_reached_worker' => $playwrightResult['reached_worker'] ?? ! str_contains($e->getMessage(), 'worker is not available'),
+                'playwright_worker_status' => $workerHealth,
+                'fallback_status_code' => $fallbackResult['status_code'],
+            ]);
         }
     }
 
@@ -315,6 +366,8 @@ class FetchEngineManager
                 'status_code' => $response->getStatusCode(),
                 'screenshot' => null,
                 'method' => $isFallback ? 'http (fallback)' : 'http',
+                'selected_method' => $isFallback ? 'playwright' : 'http',
+                'actual_method' => $isFallback ? 'http_fallback' : 'http',
                 'error' => null,
             ];
 
@@ -324,6 +377,8 @@ class FetchEngineManager
                 'status_code' => 0,
                 'screenshot' => null,
                 'method' => $isFallback ? 'http (fallback)' : 'http',
+                'selected_method' => $isFallback ? 'playwright' : 'http',
+                'actual_method' => $isFallback ? 'http_fallback' : 'http',
                 'error' => $e->getMessage(),
             ];
         }

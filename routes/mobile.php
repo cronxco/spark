@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
 use App\Http\Controllers\Api\V1\Mobile\SearchController;
 use App\Http\Controllers\Api\V1\Mobile\SyncController;
+use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController;
+use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController;
 use App\Http\Controllers\Api\V1\Mobile\WidgetsController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +51,9 @@ Route::get('settings/notifications', [NotificationSettingsController::class, 'sh
     ->name('settings.notifications.show');
 
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
+
+Route::get('health/dashboard', [HealthController::class, 'dashboard'])
+    ->name('health.dashboard');
 
 Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
 
@@ -174,6 +179,19 @@ Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
 Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('knowledge.events.reprocess');
+
+/*
+|--------------------------------------------------------------------------
+| Up to Speed endpoints
+|--------------------------------------------------------------------------
+*/
+
+Route::get('up-to-speed', UpToSpeedController::class)
+    ->name('up-to-speed.index');
+
+Route::post('up-to-speed/read', UpToSpeedReadController::class)
+    ->middleware('ability:ios:write')
+    ->name('up-to-speed.read');
 
 /*
 |--------------------------------------------------------------------------

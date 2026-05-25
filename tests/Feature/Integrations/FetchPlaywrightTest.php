@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FetchPlaywrightTest extends TestCase
@@ -37,9 +38,7 @@ class FetchPlaywrightTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function engine_manager_defaults_to_http_when_playwright_disabled(): void
     {
         config(['services.playwright.enabled' => false]);
@@ -70,9 +69,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertEquals('http', $result['method']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function engine_manager_uses_http_fallback_when_playwright_unavailable(): void
     {
         config(['services.playwright.enabled' => true]);
@@ -104,11 +101,62 @@ class FetchPlaywrightTest extends TestCase
 
         // Since Playwright worker is not actually running in tests, it should fall back to HTTP
         $this->assertContains($result['method'], ['http', 'http (fallback)']);
+        $this->assertEquals('playwright', $result['selected_method']);
+        $this->assertEquals('http_fallback', $result['actual_method']);
+        $this->assertFalse($result['playwright_reached_worker']);
+        $this->assertNotEmpty($result['playwright_error']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
+    public function fetch_job_records_playwright_fallback_as_fallback_not_plain_success(): void
+    {
+        Queue::fake([ProcessFetchedContent::class]);
+        config(['services.playwright.enabled' => true]);
+
+        Http::fake([
+            '*/health' => Http::response(['status' => 'error', 'connected' => false], 500),
+            'https://example.com*' => Http::response('<html><head><title>Fallback Page</title></head><body><article><h1>Fallback Page</h1><p>This is fallback content with enough words for extraction to succeed. This paragraph exists so readability has a meaningful article body to parse during the fetch test.</p></article></body></html>', 200),
+        ]);
+
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'fetch',
+            'instance_type' => 'fetcher',
+            'integration_group_id' => $group->id,
+        ]);
+
+        $webpage = EventObject::create([
+            'user_id' => $user->id,
+            'concept' => 'bookmark',
+            'type' => 'fetch_webpage',
+            'url' => 'https://example.com',
+            'title' => 'Fallback Page',
+            'metadata' => [
+                'enabled' => true,
+                'domain' => 'example.com',
+                'fetch_integration_id' => $integration->id,
+                'requires_playwright' => true,
+            ],
+        ]);
+
+        (new FetchSingleUrl($integration, $webpage->id, $webpage->url))->handle();
+
+        $webpage->refresh();
+        $history = $webpage->metadata['playwright_history'] ?? [];
+        $last = end($history);
+
+        $this->assertEquals('http (fallback)', $webpage->metadata['last_fetch_method']);
+        $this->assertEquals('playwright', $webpage->metadata['last_selected_fetch_method']);
+        $this->assertEquals('http_fallback', $webpage->metadata['last_actual_fetch_method']);
+        $this->assertEquals('playwright_failed_http_fallback_success', $last['outcome']);
+        $this->assertEquals('http_fallback', $last['actual_method']);
+        $this->assertFalse($last['playwright_reached_worker']);
+        $this->assertNotEmpty($last['playwright_error']);
+    }
+
+    #[Test]
     public function playwright_client_detects_unavailable_worker(): void
     {
         // Mock Playwright worker as unavailable
@@ -123,9 +171,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertFalse($isAvailable);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function engine_manager_learns_playwright_requirement(): void
     {
         config(['services.playwright.enabled' => false]); // Disabled for this test
@@ -162,9 +208,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertNotNull($webpage->metadata['playwright_learned_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function engine_manager_escalates_on_robot_detection(): void
     {
         config(['services.playwright.enabled' => true]);
@@ -206,9 +250,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertIsArray($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function js_required_domains_use_playwright(): void
     {
         config([
@@ -245,11 +287,11 @@ class FetchPlaywrightTest extends TestCase
         $this->assertNotNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_job_stores_fetch_method_in_metadata(): void
     {
+        config(['services.playwright.enabled' => false]);
+
         // Fake the queue to prevent ProcessFetchedContent from dispatching
         Queue::fake([ProcessFetchedContent::class]);
 
@@ -301,9 +343,7 @@ class FetchPlaywrightTest extends TestCase
         Queue::assertPushed(ProcessFetchedContent::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function playwright_stats_are_calculated_correctly(): void
     {
         $user = User::factory()->create();

@@ -35,7 +35,8 @@ class FetchSingleUrl implements ShouldQueue
         public Integration $integration,
         public string $webpageObjectId,
         public string $url,
-        public bool $forceRefresh = false
+        public bool $forceRefresh = false,
+        public ?string $methodOverride = null
     ) {}
 
     public function handle(): void
@@ -88,16 +89,21 @@ class FetchSingleUrl implements ShouldQueue
             }
 
             // Fetch URL using engine manager (auto-selects between Playwright and HTTP)
-            $result = $engine->fetch($this->url, $group, $webpage);
+            $result = $engine->fetch($this->url, $group, $webpage, $this->methodOverride);
 
             if ($result['error']) {
                 if ($this->isHandledPermanentFetchFailure($result['error'])) {
                     $durationMs = round((microtime(true) - $startTime) * 1000);
                     $this->updateWebpageError($webpage, $result['error']);
                     $engine->updateLastHistoryEntry($webpage, [
-                        'outcome' => 'failed',
+                        'outcome' => $this->fetchOutcome($result, false),
                         'duration_ms' => $durationMs,
                         'status_code' => $this->statusCodeFromError($result['error']),
+                        'actual_method' => $result['actual_method'] ?? $result['method'] ?? null,
+                        'playwright_error' => $result['playwright_error'] ?? null,
+                        'playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+                        'playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+                        'fallback_status_code' => $result['fallback_status_code'] ?? null,
                     ]);
 
                     $metrics = new PlaywrightHealthMetrics;
@@ -208,38 +214,20 @@ class FetchSingleUrl implements ShouldQueue
                     }
                 }
 
-                // Save screenshot on failure if we have one (for debugging paywall/robot checks)
-                if ($screenshot && $shouldTryArchive) {
-                    try {
-                        $mediaHelper = app(MediaDownloadHelper::class);
-                        $fileName = 'error-screenshot-' . now()->format('Y-m-d-His') . '.png';
-
-                        $mediaHelper->attachMediaFromBase64(
-                            $screenshot,
-                            $webpage,
-                            $fileName,
-                            'error_screenshots'
-                        );
-
-                        Log::info('Fetch: Saved screenshot of failed fetch', [
-                            'url' => $this->url,
-                            'reason' => $reason,
-                        ]);
-                    } catch (Exception $e) {
-                        Log::warning('Fetch: Failed to save error screenshot', [
-                            'url' => $this->url,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
+                $this->saveErrorScreenshot($webpage, $screenshot, $reason);
 
                 $this->updateWebpageError($webpage, $reason);
 
                 // Update history with failure
                 $engine->updateLastHistoryEntry($webpage, [
-                    'outcome' => 'failed',
+                    'outcome' => $this->fetchOutcome($result, false),
                     'duration_ms' => $durationMs,
                     'status_code' => $statusCode,
+                    'actual_method' => $result['actual_method'] ?? $method,
+                    'playwright_error' => $result['playwright_error'] ?? null,
+                    'playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+                    'playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+                    'fallback_status_code' => $result['fallback_status_code'] ?? null,
                 ]);
 
                 return;
@@ -266,13 +254,26 @@ class FetchSingleUrl implements ShouldQueue
             // Update webpage metadata with fetch method
             $metadata = $webpage->metadata ?? [];
             $metadata['last_fetch_method'] = $method;
+            $metadata['last_selected_fetch_method'] = $result['selected_method'] ?? $method;
+            $metadata['last_actual_fetch_method'] = $result['actual_method'] ?? $method;
+            $metadata['last_playwright_error'] = $result['playwright_error'] ?? null;
+            $metadata['last_playwright_reached_worker'] = $result['playwright_reached_worker'] ?? null;
+            $metadata['last_playwright_worker_status'] = $result['playwright_worker_status'] ?? null;
+            $metadata['last_fallback_status_code'] = $result['fallback_status_code'] ?? null;
             $webpage->update(['metadata' => $metadata]);
 
             // Update history with success
             $engine->updateLastHistoryEntry($webpage, [
-                'outcome' => 'success',
+                'outcome' => $this->fetchOutcome($result, true),
                 'duration_ms' => $durationMs,
                 'status_code' => $statusCode,
+                'final_status_code' => $statusCode,
+                'actual_method' => $result['actual_method'] ?? $method,
+                'playwright_error' => $result['playwright_error'] ?? null,
+                'playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+                'playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+                'fallback_status_code' => $result['fallback_status_code'] ?? null,
+                'playwright_meta' => $result['playwright_meta'] ?? null,
             ]);
 
             // Record metrics
@@ -408,6 +409,69 @@ class FetchSingleUrl implements ShouldQueue
         }
 
         return 0;
+    }
+
+    private function fetchOutcome(array $result, bool $success): string
+    {
+        $actualMethod = $result['actual_method'] ?? $result['method'] ?? 'unknown';
+
+        if ($success) {
+            return match ($actualMethod) {
+                'playwright' => 'playwright_success',
+                'http_fallback', 'http (fallback)' => 'playwright_failed_http_fallback_success',
+                'http' => 'http_success',
+                default => 'success',
+            };
+        }
+
+        return match ($actualMethod) {
+            'playwright' => 'playwright_failed',
+            'http_fallback', 'http (fallback)' => 'playwright_failed_http_fallback_failed',
+            'http' => 'http_failed',
+            default => 'failed',
+        };
+    }
+
+    private function saveErrorScreenshot(EventObject $webpage, ?string $screenshot, string $reason): void
+    {
+        if (! $screenshot) {
+            return;
+        }
+
+        try {
+            $mediaHelper = app(MediaDownloadHelper::class);
+            $fileName = 'error-screenshot-' . now()->format('Y-m-d-His') . '.png';
+
+            $media = $mediaHelper->attachMediaFromBase64(
+                $screenshot,
+                $webpage,
+                $fileName,
+                'error_screenshots',
+                [
+                    'reason' => $reason,
+                    'url' => $this->url,
+                    'captured_at' => now()->toIso8601String(),
+                ]
+            );
+
+            if ($media) {
+                $metadata = $webpage->metadata ?? [];
+                $metadata['last_error_screenshot_media_uuid'] = $media->uuid;
+                $metadata['last_error_screenshot_at'] = now()->toIso8601String();
+                $webpage->update(['metadata' => $metadata]);
+            }
+
+            Log::info('Fetch: Saved screenshot of failed fetch', [
+                'url' => $this->url,
+                'reason' => $reason,
+                'media_uuid' => $media?->uuid,
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Fetch: Failed to save error screenshot', [
+                'url' => $this->url,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
