@@ -559,7 +559,7 @@ class DaySummaryService
                 if ($summary) {
                     $content = $summary->getContent();
                     $bookmark['summary'] = mb_strlen($content, 'UTF-8') > 300
-                        ? mb_substr($content, 0, 300, 'UTF-8') . '...'
+                        ? mb_substr($content, 0, 300, 'UTF-8').'...'
                         : $content;
                 }
 
@@ -691,6 +691,17 @@ class DaySummaryService
             ->whereDate('detected_at', $date)
             ->with('metricStatistic')
             ->get();
+
+        $trends = $trends->filter(function ($trend) {
+            $stat = $trend->metricStatistic;
+            if (! $stat) {
+                return true;
+            }
+
+            $suppressionColumn = $trend->type === 'anomaly_high' ? 'anomaly_high_suppressed_until' : 'anomaly_low_suppressed_until';
+
+            return ! ($stat->{$suppressionColumn} && now()->isBefore($stat->{$suppressionColumn}));
+        });
 
         return $trends->map(function ($trend) {
             $stat = $trend->metricStatistic;

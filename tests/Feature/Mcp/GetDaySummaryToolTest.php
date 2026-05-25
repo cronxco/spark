@@ -452,6 +452,7 @@ class GetDaySummaryToolTest extends TestCase
             'action' => 'had_sleep_score',
             'value_unit' => 'percent',
             'mean_value' => 80,
+            'anomaly_low_suppressed_until' => Carbon::tomorrow()->endOfDay(),
         ]);
 
         MetricTrend::factory()->create([
@@ -462,7 +463,6 @@ class GetDaySummaryToolTest extends TestCase
             'baseline_value' => 80,
             'deviation' => 0.3125,
             'acknowledged_at' => null,
-            'metadata' => ['suppress_until' => Carbon::tomorrow()->toDateString()],
         ]);
 
         $service = app(DaySummaryService::class);
