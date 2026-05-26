@@ -263,6 +263,11 @@ class ProcessOysterEmailJob implements ShouldQueue
                 $touchedInEvent->inheritLocationFromTarget();
             }
 
+            // Tag transport mode
+            if ($journey['transport_mode'] !== OysterTransportModeDetector::MODE_UNKNOWN) {
+                $touchedInEvent->attachTag($journey['transport_mode'], 'transport_mode');
+            }
+
             // Create touched_out event if there's a destination
             if (! empty($journey['destination'])) {
                 $destinationStation = $stationLookup->getOrCreateStationObject(
@@ -304,6 +309,11 @@ class ProcessOysterEmailJob implements ShouldQueue
                 // Inherit location from station
                 if ($destinationStation->location && ! $touchedOutEvent->location) {
                     $touchedOutEvent->inheritLocationFromTarget();
+                }
+
+                // Tag transport mode
+                if ($journey['transport_mode'] !== OysterTransportModeDetector::MODE_UNKNOWN) {
+                    $touchedOutEvent->attachTag($journey['transport_mode'], 'transport_mode');
                 }
             }
         }

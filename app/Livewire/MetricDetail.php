@@ -2,7 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Jobs\CalculateMetricStatisticsJob;
+use App\Jobs\Metrics\CalculateMetricStatisticsJob;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;

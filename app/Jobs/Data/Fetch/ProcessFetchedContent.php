@@ -213,18 +213,20 @@ class ProcessFetchedContent implements ShouldQueue
                 return;
             }
 
-            // Dispatch content extraction job
-            ExtractContentJob::dispatch(
-                $this->integration,
-                $event,
-                $this->webpage,
-                $this->extracted,
-                $sourceObjectId,
-                $sourceEventId,
-                $sourceIsObject
-            );
+            if ($isLinkable) {
+                // Linkable discovered URLs have no Event, so they stay on the direct job path.
+                ExtractContentJob::dispatch(
+                    $this->integration,
+                    null,
+                    $this->webpage,
+                    $this->extracted,
+                    $sourceObjectId,
+                    $sourceEventId,
+                    $sourceIsObject
+                );
+            }
 
-            Log::info('Fetch: Dispatched content extraction job', [
+            Log::info('Fetch: AI processing handoff complete', [
                 'event_id' => $event?->id,
                 'url' => $this->webpage->url,
                 'is_linkable' => $isLinkable,

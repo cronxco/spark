@@ -47,7 +47,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
             $this->stats = [
                 'processed' => 0,
                 'examined' => 0,
-                'prefilled' => 0,
                 'failed' => 0,
             ];
         }
@@ -118,14 +117,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
             return;
         }
 
-        // Pre-fill embedding tasks where applicable
-        $prefilled = 0;
-        foreach ($incompleteModels as $model) {
-            if ($this->preFillEmbeddingTask($model)) {
-                $prefilled++;
-            }
-        }
-
         // Create batch of ProcessTaskPipelineJob for each model
         $jobs = [];
         foreach ($incompleteModels as $model) {
@@ -140,7 +131,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
         // Update stats
         $this->stats['processed'] += $incompleteModels->count();
         $this->stats['examined'] += $examined;
-        $this->stats['prefilled'] += $prefilled;
 
         // Update progress
         $this->updateProgress();
@@ -201,7 +191,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
                                 $progress->markCompleted([
                                     'total_processed' => $stats['processed'],
                                     'total_examined' => $stats['examined'],
-                                    'total_prefilled' => $stats['prefilled'],
                                     'total_failed' => $stats['failed'],
                                 ]);
                             }
@@ -326,79 +315,13 @@ class ProcessIncompleteBatchJob implements ShouldQueue
         $executions = $this->getTaskExecutions($model);
 
         foreach ($applicableTasks as $task) {
-            // Special case: embedding with metadata
-            if ($task->key === 'generate_embedding') {
-                if ($this->hasCompletedEmbedding($model)) {
-                    continue;
-                }
-            }
-
-            // Check execution status
             $lastAttempt = $executions[$task->key]['last_attempt'] ?? null;
             if (! $lastAttempt || $lastAttempt['status'] !== 'success') {
-                return true; // Found incomplete task
+                return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * Check if model has completed embedding
-     */
-    protected function hasCompletedEmbedding(Model $model): bool
-    {
-        $metadataField = $this->getMetadataField($model);
-        $metadata = $model->$metadataField ?? [];
-
-        return isset($metadata['embedding_generated_at']) && ! empty($model->embeddings);
-    }
-
-    /**
-     * Pre-fill embedding task execution record if completed
-     */
-    protected function preFillEmbeddingTask(Model $model): bool
-    {
-        // Check if embedding is complete but not tracked
-        $metadataField = $this->getMetadataField($model);
-        $metadata = $model->$metadataField ?? [];
-
-        if (! isset($metadata['embedding_generated_at']) || empty($model->embeddings)) {
-            return false; // Not complete
-        }
-
-        // Check if already tracked
-        $executions = $this->getTaskExecutions($model);
-        if (isset($executions['generate_embedding']['last_success'])) {
-            return false; // Already tracked
-        }
-
-        // Pre-fill execution record
-        $executions['generate_embedding'] = [
-            'last_attempt' => [
-                'started_at' => $metadata['embedding_generated_at'],
-                'completed_at' => $metadata['embedding_generated_at'],
-                'status' => 'success',
-                'attempts' => 1,
-                'triggered_by' => 'backfill',
-            ],
-            'last_success' => [
-                'started_at' => $metadata['embedding_generated_at'],
-                'completed_at' => $metadata['embedding_generated_at'],
-                'status' => 'success',
-                'attempts' => 1,
-                'triggered_by' => 'backfill',
-            ],
-        ];
-
-        $this->setTaskExecutions($model, $executions);
-
-        Log::info('Pre-filled embedding task execution', [
-            'model_type' => get_class($model),
-            'model_id' => $model->id,
-        ]);
-
-        return true; // Pre-filled
     }
 
     /**
@@ -426,7 +349,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
                 'model_type' => $modelName,
                 'processed' => $this->stats['processed'],
                 'examined' => $this->stats['examined'],
-                'prefilled' => $this->stats['prefilled'],
                 'failed' => $this->stats['failed'],
             ]
         );
@@ -453,7 +375,6 @@ class ProcessIncompleteBatchJob implements ShouldQueue
         $progress->markCompleted([
             'total_processed' => $this->stats['processed'],
             'total_examined' => $this->stats['examined'],
-            'total_prefilled' => $this->stats['prefilled'],
             'total_failed' => $this->stats['failed'],
         ]);
     }

@@ -47,10 +47,11 @@ class RunIntegrationTask implements ShouldQueue
                     throw new Exception('Invalid task_job_class');
                 }
 
-                // Optional whitelist enforcement for job classes
+                // Whitelist is always enforced. To add a new job class, update
+                // app.allowed_task_jobs in config/app.php (or ALLOWED_TASK_JOBS env var).
                 $allowedJobs = config('app.allowed_task_jobs');
-                if (is_array($allowedJobs) && ! in_array($jobClass, $allowedJobs, true)) {
-                    throw new Exception('Job class not allowed');
+                if (! in_array($jobClass, $allowedJobs, true)) {
+                    throw new Exception("Job class not in allowed_task_jobs whitelist: {$jobClass}");
                 }
 
                 $jobInstance = null;

@@ -692,14 +692,15 @@ class DaySummaryService
             ->with('metricStatistic')
             ->get();
 
-        // Also respect suppress_until
         $trends = $trends->filter(function ($trend) {
-            $suppressUntil = $trend->metadata['suppress_until'] ?? null;
-            if ($suppressUntil && Carbon::parse($suppressUntil)->isFuture()) {
-                return false;
+            $stat = $trend->metricStatistic;
+            if (! $stat) {
+                return true;
             }
 
-            return true;
+            $suppressionColumn = $trend->type === 'anomaly_high' ? 'anomaly_high_suppressed_until' : 'anomaly_low_suppressed_until';
+
+            return ! ($stat->{$suppressionColumn} && now()->isBefore($stat->{$suppressionColumn}));
         });
 
         return $trends->map(function ($trend) {

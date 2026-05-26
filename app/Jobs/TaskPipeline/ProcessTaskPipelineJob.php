@@ -2,10 +2,9 @@
 
 namespace App\Jobs\TaskPipeline;
 
-use App\Jobs\Base\BaseEffectJob;
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
-use App\Models\Integration;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -14,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 
 class ProcessTaskPipelineJob implements ShouldQueue
 {
@@ -28,15 +28,17 @@ class ProcessTaskPipelineJob implements ShouldQueue
         public string $trigger = 'created',
         public ?array $taskFilter = null,  // Only run specific tasks
         public bool $force = false,        // Re-run even if already executed
+        public array $changedFields = [],  // Fields that triggered an update run
     ) {}
 
     public function handle(): void
     {
-        $tasks = TaskRegistry::getTasksForModel($this->model, $this->trigger);
+        $applicableTasks = TaskRegistry::getTasksForModel($this->model, $this->trigger);
+        $tasks = $applicableTasks;
 
         // Apply task filter if provided
         if ($this->taskFilter) {
-            $tasks = $tasks->whereIn('key', $this->taskFilter);
+            $tasks = $this->expandTaskFilterWithDependencies($applicableTasks, $this->taskFilter);
         }
 
         // Filter out already-executed tasks (unless force)
@@ -71,9 +73,23 @@ class ProcessTaskPipelineJob implements ShouldQueue
      */
     protected function dispatchTask(TaskDefinition $task): void
     {
+        $this->model->refresh();
+
         // Check if applicable
         if (! $task->isApplicableTo($this->model)) {
             $this->markNotApplicable($task);
+
+            return;
+        }
+
+        if ($failedDependency = $this->firstFailedDependency($this->model, $task)) {
+            $this->markBlocked($task, $failedDependency);
+
+            return;
+        }
+
+        if ($incompleteDependency = $this->firstIncompleteDependency($this->model, $task)) {
+            $this->markWaiting($task, $incompleteDependency);
 
             return;
         }
@@ -82,40 +98,14 @@ class ProcessTaskPipelineJob implements ShouldQueue
         $this->updateTaskStatus($task, 'pending', [
             'started_at' => now()->toIso8601String(),
             'triggered_by' => $this->trigger,
+            ...($this->changedFields ? ['changed_fields' => $this->changedFields] : []),
         ]);
 
         // Dispatch to appropriate queue
         $jobClass = $task->jobClass;
 
-        // Check if job extends BaseEffectJob - they expect (Integration, array) instead of (Model, TaskDefinition)
-        if (is_subclass_of($jobClass, BaseEffectJob::class)) {
-            // Extract integration from the model
-            $integration = $this->model instanceof Integration
-                ? $this->model
-                : $this->model->integration;
-
-            if (! $integration) {
-                $this->updateTaskStatus($task, 'failed', [
-                    'error' => 'No integration found for effect job',
-                    'completed_at' => now()->toIso8601String(),
-                ]);
-
-                return;
-            }
-
-            // Prepare parameters from task metadata
-            $parameters = [
-                'task_key' => $task->key,
-                'triggered_by' => $this->trigger,
-                'model_type' => class_basename($this->model),
-                'model_id' => $this->model->id,
-            ];
-
-            dispatch(new $jobClass($integration, $parameters))->onQueue($task->queue);
-        } else {
-            // Standard task jobs expect (Model, TaskDefinition)
-            dispatch(new $jobClass($this->model, $task))->onQueue($task->queue);
-        }
+        // Standard task jobs expect (Model, TaskDefinition)
+        dispatch(new $jobClass($this->model, $task))->onQueue($task->queue);
     }
 
     /**
@@ -123,13 +113,14 @@ class ProcessTaskPipelineJob implements ShouldQueue
      */
     protected function updateTaskStatus(TaskDefinition $task, string $status, array $data): void
     {
-        $executions = $this->getTaskExecutions($this->model);
-
-        $executions[$task->key]['last_attempt'] = array_merge($data, [
-            'status' => $status,
-        ]);
-
-        $this->setTaskExecutions($this->model, $executions);
+        app(TaskExecutionStore::class)->recordStatus(
+            model: $this->model,
+            task: $task,
+            status: $status,
+            data: $data,
+            jobContext: $this,
+            mergeLastAttempt: false,
+        );
     }
 
     /**
@@ -142,5 +133,50 @@ class ProcessTaskPipelineJob implements ShouldQueue
             'completed_at' => now()->toIso8601String(),
             'triggered_by' => $this->trigger,
         ]);
+    }
+
+    protected function markWaiting(TaskDefinition $task, string $dependencyKey): void
+    {
+        $this->updateTaskStatus($task, 'waiting', [
+            'waiting_for' => $dependencyKey,
+            'triggered_by' => $this->trigger,
+            ...($this->changedFields ? ['changed_fields' => $this->changedFields] : []),
+        ]);
+    }
+
+    protected function markBlocked(TaskDefinition $task, string $dependencyKey): void
+    {
+        $this->updateTaskStatus($task, 'blocked', [
+            'blocked_by' => $dependencyKey,
+            'completed_at' => now()->toIso8601String(),
+            'triggered_by' => $this->trigger,
+            ...($this->changedFields ? ['changed_fields' => $this->changedFields] : []),
+        ]);
+    }
+
+    protected function expandTaskFilterWithDependencies(Collection $applicableTasks, array $taskFilter): Collection
+    {
+        $tasksByKey = $applicableTasks->keyBy('key');
+        $selected = collect();
+        $pendingKeys = $taskFilter;
+
+        while ($pendingKeys !== []) {
+            $taskKey = array_shift($pendingKeys);
+            $task = $tasksByKey->get($taskKey);
+
+            if (! $task || $selected->has($taskKey)) {
+                continue;
+            }
+
+            $selected->put($taskKey, $task);
+
+            foreach ($task->dependencies as $dependencyKey) {
+                if ($tasksByKey->has($dependencyKey) && ! $selected->has($dependencyKey)) {
+                    $pendingKeys[] = $dependencyKey;
+                }
+            }
+        }
+
+        return $selected->sortByDesc('priority')->values();
     }
 }

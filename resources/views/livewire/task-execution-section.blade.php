@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\TaskPipeline\TaskRegistry;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Livewire\Volt\Component;
 use Illuminate\Database\Eloquent\Model;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
@@ -73,15 +74,7 @@ new class extends Component {
 
     protected function getTaskExecutions(): array
     {
-        // Determine which field to use based on model type
-        $field = match (get_class($this->model)) {
-            \App\Models\Event::class => 'event_metadata',
-            \App\Models\Integration::class => 'configuration',
-            default => 'metadata', // EventObject, Block
-        };
-
-        $metadata = $this->model->$field ?? [];
-        return $metadata['task_executions'] ?? [];
+        return app(TaskExecutionStore::class)->getTaskExecutions($this->model->refresh());
     }
 }; ?>
 

@@ -2,8 +2,8 @@
 
 namespace Tests\Unit\Jobs;
 
-use App\Jobs\Data\Newsletter\ExtractNewsletterContentJob;
 use App\Jobs\Data\Newsletter\ProcessNewsletterEmailJob;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -150,6 +150,7 @@ class ProcessNewsletterEmailJobTest extends TestCase
     #[Test]
     public function it_reuses_existing_event_for_duplicate_message_id()
     {
+        config(['app.enable_task_pipeline' => true]);
         Queue::fake();
 
         $rawEmail = $this->rawEmailContent('duplicate-message@example.test', '<p>Hello duplicate</p>');
@@ -161,12 +162,13 @@ class ProcessNewsletterEmailJobTest extends TestCase
             ->where('source_id', 'duplicate-message@example.test')
             ->count());
 
-        Queue::assertPushed(ExtractNewsletterContentJob::class, 2);
+        Queue::assertPushed(ProcessTaskPipelineJob::class);
     }
 
     #[Test]
-    public function it_does_not_store_raw_html_in_event_metadata()
+    public function it_stores_raw_html_in_event_metadata()
     {
+        config(['app.enable_task_pipeline' => true]);
         Queue::fake();
 
         $rawEmail = $this->rawEmailContent('metadata-message@example.test', '<html><body><p>Stored elsewhere</p></body></html>');
@@ -175,8 +177,9 @@ class ProcessNewsletterEmailJobTest extends TestCase
 
         $event = Event::where('source_id', 'metadata-message@example.test')->firstOrFail();
 
-        $this->assertArrayNotHasKey('raw_html', $event->event_metadata);
+        $this->assertSame('<html><body><p>Stored elsewhere</p></body></html>', $event->event_metadata['raw_html']);
         $this->assertSame('metadata-message@example.test', $event->event_metadata['email_message_id']);
+        Queue::assertPushed(ProcessTaskPipelineJob::class);
     }
 
     private function rawEmailContent(string $messageId, string $html): string

@@ -12,6 +12,8 @@ class MetricStatistic extends Model
 {
     use HasFactory;
 
+    public const DEFAULT_WINDOW_DAYS = 90;
+
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -31,6 +33,10 @@ class MetricStatistic extends Model
         'normal_lower_bound',
         'normal_upper_bound',
         'last_calculated_at',
+        'baseline_window_days',
+        'baseline_reset_suggested_at',
+        'anomaly_high_suppressed_until',
+        'anomaly_low_suppressed_until',
     ];
 
     protected $casts = [
@@ -44,6 +50,10 @@ class MetricStatistic extends Model
         'normal_lower_bound' => 'decimal:6',
         'normal_upper_bound' => 'decimal:6',
         'last_calculated_at' => 'datetime',
+        'baseline_window_days' => 'integer',
+        'baseline_reset_suggested_at' => 'datetime',
+        'anomaly_high_suppressed_until' => 'datetime',
+        'anomaly_low_suppressed_until' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

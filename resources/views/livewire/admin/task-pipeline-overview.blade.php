@@ -1,9 +1,8 @@
 <?php
 
 use App\Services\TaskPipeline\TaskRegistry;
+use App\Models\TaskExecution;
 use App\Models\Event;
-use App\Models\Block;
-use App\Models\EventObject;
 use Livewire\Volt\Component;
 
 new class extends Component {
@@ -37,64 +36,55 @@ new class extends Component {
 
     protected function getRecentFailures(): array
     {
-        $failures = [];
-        $since = now()->subDay();
-
-        // Check Events
-        foreach (Event::where('updated_at', '>=', $since)->get() as $event) {
-            $executions = $event->event_metadata['task_executions'] ?? [];
-            foreach ($executions as $taskKey => $execution) {
-                if (($execution['last_attempt']['status'] ?? null) === 'failed') {
-                    $failures[] = [
-                        'id' => $event->id . '-' . $taskKey,
-                        'task_name' => TaskRegistry::getTask($taskKey)?->name ?? $taskKey,
-                        'model_type' => 'Event',
-                        'model_id' => $event->id,
-                        'model_url' => route('events.show', $event), // Adjust route as needed
-                        'error' => $execution['last_attempt']['error'] ?? 'Unknown error',
-                        'failed_at' => $execution['last_attempt']['completed_at'] ?? null,
-                    ];
-                }
-            }
-        }
-
-        return collect($failures)->sortByDesc('failed_at')->take(10)->values()->toArray();
+        return TaskExecution::query()
+            ->where('status', 'failed')
+            ->where('updated_at', '>=', now()->subDay())
+            ->latest('updated_at')
+            ->take(10)
+            ->get()
+            ->map(fn(TaskExecution $execution) => [
+                'id' => $execution->id,
+                'task_name' => $execution->task_name ?? TaskRegistry::getTask($execution->task_key)?->name ?? $execution->task_key,
+                'model_type' => ucfirst($execution->entity_type),
+                'model_id' => $execution->entity_id,
+                'model_url' => $execution->entity_type === 'event' ? route('events.show', $execution->entity_id) : '#',
+                'error' => $execution->error ?? 'Unknown error',
+                'failed_at' => $execution->completed_at?->toIso8601String(),
+            ])
+            ->values()
+            ->toArray();
     }
 
     protected function getTaskStatistics(): array
     {
-        $pending = 0;
-        $failed = 0;
-        $success = 0;
         $since = now()->subDay();
 
-        // Count from Events
-        foreach (Event::where('updated_at', '>=', $since)->get() as $event) {
-            $executions = $event->event_metadata['task_executions'] ?? [];
-            foreach ($executions as $execution) {
-                $status = $execution['last_attempt']['status'] ?? null;
-                match($status) {
-                    'pending', 'running' => $pending++,
-                    'failed' => $failed++,
-                    'success' => $success++,
-                    default => null,
-                };
-            }
-        }
+        $counts = TaskExecution::query()
+            ->where('updated_at', '>=', $since)
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
 
-        return [$pending, $failed, $success];
+        return [
+            (int) ($counts['pending'] ?? 0) + (int) ($counts['running'] ?? 0),
+            (int) ($counts['failed'] ?? 0),
+            (int) ($counts['success'] ?? 0),
+        ];
     }
 
     public function retryFailure(string $failureId): void
     {
-        [$modelId, $taskKey] = explode('-', $failureId, 2);
+        $execution = TaskExecution::find($failureId);
+        if (! $execution || $execution->entity_type !== 'event') {
+            return;
+        }
 
-        $event = Event::find($modelId);
+        $event = Event::find($execution->entity_id);
         if ($event) {
             App\Jobs\TaskPipeline\ProcessTaskPipelineJob::dispatch(
                 model: $event,
                 trigger: 'manual',
-                taskFilter: [$taskKey],
+                taskFilter: [$execution->task_key],
                 force: true,
             )->onQueue('tasks');
 

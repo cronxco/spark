@@ -6,10 +6,8 @@ use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\RunPatternDetectionJob;
 use App\Jobs\Flint\RunPreDigestRefreshJob;
 use App\Jobs\Flint\SendDigestNotificationJob;
-use App\Jobs\Knowledge\ProcessMissingKnowledgeSummariesJob;
-use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
-use App\Jobs\Metrics\DetectRetrospectiveMetricAnomaliesJob;
+use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
+use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
@@ -30,22 +28,15 @@ Schedule::job(new CheckIntegrationUpdates)
     ->onOneServer()
     ->sentryMonitor();
 
-// Calculate metric statistics hourly
-Schedule::job(new CalculateMetricStatisticsJob)
-    ->hourly()
-    ->withoutOverlapping()
-    ->onOneServer()
-    ->sentryMonitor();
-
-// Detect metric trends daily
-Schedule::job(new DetectMetricTrendsJob)
+// Detect metric trends daily via task pipeline
+Schedule::job(new DispatchTrendDetectionTasksJob)
     ->daily()
     ->withoutOverlapping()
     ->onOneServer()
     ->sentryMonitor();
 
-// Detect retrospective metric anomalies daily
-Schedule::job(new DetectRetrospectiveMetricAnomaliesJob)
+// Detect retrospective metric anomalies daily via task pipeline
+Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)
     ->daily()
     ->withoutOverlapping()
     ->onOneServer()
@@ -70,13 +61,6 @@ Schedule::job(new CheckCookieExpiryJob)
 // Refresh expiring cookies daily at 2am
 Schedule::job(new RefreshExpiringCookies)
     ->dailyAt('02:00')
-    ->onOneServer()
-    ->withoutOverlapping()
-    ->sentryMonitor();
-
-// Repair Fetch/Newsletter knowledge events that never received AI summary blocks.
-Schedule::job(new ProcessMissingKnowledgeSummariesJob(limit: 100))
-    ->everySixHours()
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();

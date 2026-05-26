@@ -12,6 +12,7 @@ use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TaskPipelineIntegrationTest extends TestCase
@@ -24,9 +25,7 @@ class TaskPipelineIntegrationTest extends TestCase
         TaskRegistry::clear();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function dispatches_applicable_tasks_on_event_creation(): void
     {
         Queue::fake();
@@ -56,9 +55,7 @@ class TaskPipelineIntegrationTest extends TestCase
         Queue::assertPushed(ProcessTaskPipelineJob::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function does_not_dispatch_tasks_when_conditions_not_met(): void
     {
         Queue::fake();
@@ -123,9 +120,7 @@ class TaskPipelineIntegrationTest extends TestCase
         $this->assertArrayNotHasKey('monzo_only_task', $executions);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function respects_task_dependencies(): void
     {
         TaskRegistry::clear();
@@ -160,9 +155,142 @@ class TaskPipelineIntegrationTest extends TestCase
         $this->assertEquals('task2', $ordered->last()->key);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
+    public function dispatcher_only_queues_dependent_tasks_after_prerequisites_succeed(): void
+    {
+        Queue::fake();
+
+        TaskRegistry::register(new TaskDefinition(
+            key: 'prerequisite_task',
+            name: 'Prerequisite Task',
+            description: 'Must complete first',
+            jobClass: RecordingPrerequisiteTask::class,
+            appliesTo: ['event'],
+            dependencies: [],
+            priority: 100,
+        ));
+
+        TaskRegistry::register(new TaskDefinition(
+            key: 'dependent_task',
+            name: 'Dependent Task',
+            description: 'Must wait',
+            jobClass: RecordingDependentTask::class,
+            appliesTo: ['event'],
+            dependencies: ['prerequisite_task'],
+            priority: 90,
+        ));
+
+        $event = Event::factory()->create();
+
+        (new ProcessTaskPipelineJob($event, 'created'))->handle();
+
+        Queue::assertPushed(RecordingPrerequisiteTask::class, 1);
+        Queue::assertNotPushed(RecordingDependentTask::class);
+
+        $executions = $event->refresh()->event_metadata['task_executions'];
+        $this->assertSame('pending', $executions['prerequisite_task']['last_attempt']['status']);
+        $this->assertSame('waiting', $executions['dependent_task']['last_attempt']['status']);
+        $this->assertSame('prerequisite_task', $executions['dependent_task']['last_attempt']['waiting_for']);
+    }
+
+    #[Test]
+    public function dependent_task_job_does_not_execute_when_queue_runs_out_of_order(): void
+    {
+        Queue::fake();
+        RecordingDependentTask::$executed = [];
+
+        $prerequisite = new TaskDefinition(
+            key: 'prerequisite_task',
+            name: 'Prerequisite Task',
+            description: 'Must complete first',
+            jobClass: RecordingPrerequisiteTask::class,
+            appliesTo: ['event'],
+        );
+
+        $dependent = new TaskDefinition(
+            key: 'dependent_task',
+            name: 'Dependent Task',
+            description: 'Must wait',
+            jobClass: RecordingDependentTask::class,
+            appliesTo: ['event'],
+            dependencies: ['prerequisite_task'],
+        );
+
+        TaskRegistry::register($prerequisite);
+        TaskRegistry::register($dependent);
+
+        $event = Event::factory()->create();
+
+        (new RecordingDependentTask($event, $dependent))->handle();
+
+        $this->assertSame([], RecordingDependentTask::$executed);
+        $this->assertSame(
+            'waiting',
+            $event->refresh()->event_metadata['task_executions']['dependent_task']['last_attempt']['status']
+        );
+
+        $event->update([
+            'event_metadata' => [
+                'task_executions' => [
+                    'prerequisite_task' => [
+                        'last_attempt' => ['status' => 'failed'],
+                    ],
+                ],
+            ],
+        ]);
+
+        (new RecordingDependentTask($event, $dependent))->handle();
+
+        $executions = $event->refresh()->event_metadata['task_executions'];
+        $this->assertSame([], RecordingDependentTask::$executed);
+        $this->assertSame('blocked', $executions['dependent_task']['last_attempt']['status']);
+        $this->assertSame('prerequisite_task', $executions['dependent_task']['last_attempt']['blocked_by']);
+    }
+
+    #[Test]
+    public function successful_task_completion_dispatches_dependent_tasks_for_re_evaluation(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        RecordingPrerequisiteTask::$executed = [];
+
+        $prerequisite = new TaskDefinition(
+            key: 'prerequisite_task',
+            name: 'Prerequisite Task',
+            description: 'Must complete first',
+            jobClass: RecordingPrerequisiteTask::class,
+            appliesTo: ['event'],
+        );
+
+        $dependent = new TaskDefinition(
+            key: 'dependent_task',
+            name: 'Dependent Task',
+            description: 'Must wait',
+            jobClass: RecordingDependentTask::class,
+            appliesTo: ['event'],
+            dependencies: ['prerequisite_task'],
+        );
+
+        TaskRegistry::register($prerequisite);
+        TaskRegistry::register($dependent);
+
+        $event = Event::factory()->create();
+
+        (new RecordingPrerequisiteTask($event, $prerequisite))->handle();
+
+        $this->assertSame([$event->id], RecordingPrerequisiteTask::$executed);
+        $this->assertSame(
+            'success',
+            $event->refresh()->event_metadata['task_executions']['prerequisite_task']['last_attempt']['status']
+        );
+
+        Queue::assertPushed(
+            ProcessTaskPipelineJob::class,
+            fn (ProcessTaskPipelineJob $job) => $job->model->is($event)
+                && $job->taskFilter === ['dependent_task']
+        );
+    }
+
+    #[Test]
     public function filters_tasks_by_service_condition(): void
     {
         TaskRegistry::clear();

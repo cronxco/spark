@@ -123,6 +123,19 @@ class MetricTrend extends Model
     public function acknowledge(): void
     {
         $this->update(['acknowledged_at' => now()]);
+
+        // Clear the baseline review flag if no unacknowledged monthly/quarterly trends remain
+        $hasRemainingTrends = MetricTrend::where('metric_statistic_id', $this->metric_statistic_id)
+            ->whereIn('type', [
+                'trend_up_monthly', 'trend_down_monthly',
+                'trend_up_quarterly', 'trend_down_quarterly',
+            ])
+            ->whereNull('acknowledged_at')
+            ->exists();
+
+        if (! $hasRemainingTrends) {
+            $this->metricStatistic?->update(['baseline_reset_suggested_at' => null]);
+        }
     }
 
     /**

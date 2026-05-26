@@ -2,9 +2,8 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
-use App\Jobs\Data\Fetch\GenerateSummariesJob;
-use App\Jobs\Data\Newsletter\ExtractNewsletterContentJob;
 use App\Jobs\Fetch\FetchSingleUrl;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -99,8 +98,9 @@ class KnowledgeReprocessingControllerTest extends TestCase
             'mode' => 'summary_only',
         ])->assertAccepted();
 
-        Queue::assertPushed(GenerateSummariesJob::class, fn (GenerateSummariesJob $job) => $job->event->is($event)
-            && $job->articleText === 'Existing extracted markdown.');
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn (ProcessTaskPipelineJob $job) => $job->model->is($event)
+            && $job->trigger === 'manual'
+            && $job->taskFilter === ['fetch_generate_summaries']);
     }
 
     #[Test]
@@ -114,18 +114,24 @@ class KnowledgeReprocessingControllerTest extends TestCase
             ->assertAccepted()
             ->assertJsonPath('service', 'newsletter');
 
-        Queue::assertPushed(ExtractNewsletterContentJob::class, fn (ExtractNewsletterContentJob $job) => $job->event->is($event)
-            && $job->rawContent === '<main>Newsletter body</main>');
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn (ProcessTaskPipelineJob $job) => $job->model->is($event)
+            && $job->trigger === 'manual'
+            && $job->taskFilter === ['newsletter_extract_content', 'newsletter_generate_summaries']);
     }
 
     #[Test]
-    public function newsletter_reprocess_requires_content_when_raw_html_is_missing(): void
+    public function newsletter_auto_queues_pipeline_when_raw_html_and_content_are_missing(): void
     {
         $event = $this->createNewsletterEvent(rawHtml: null, publicationContent: null);
+        Queue::fake();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess")
-            ->assertStatus(422);
+            ->assertAccepted();
+
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn (ProcessTaskPipelineJob $job) => $job->model->is($event)
+            && $job->trigger === 'manual'
+            && $job->taskFilter === ['newsletter_extract_content', 'newsletter_generate_summaries']);
     }
 
     #[Test]

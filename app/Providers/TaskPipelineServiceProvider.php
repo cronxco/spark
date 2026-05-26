@@ -38,6 +38,11 @@ class TaskPipelineServiceProvider extends ServiceProvider
     {
         $this->registerCoreTasks();
         $this->registerPluginTasks();
+
+        // Fail fast if any task declares a dependency that was never registered.
+        // This runs on every boot so misconfigured deps are caught immediately
+        // rather than surfacing as silent no-ops or runtime exceptions.
+        TaskRegistry::validateDependencies();
     }
 
     /**

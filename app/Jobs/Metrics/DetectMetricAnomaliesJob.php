@@ -84,6 +84,12 @@ class DetectMetricAnomaliesJob implements ShouldQueue
         // Determine anomaly type
         $type = $isAnomalyHigh ? 'anomaly_high' : 'anomaly_low';
 
+        // Skip if the user has actively suppressed this direction
+        $suppressionColumn = $type === 'anomaly_high' ? 'anomaly_high_suppressed_until' : 'anomaly_low_suppressed_until';
+        if ($metricStatistic->{$suppressionColumn} && now()->isBefore($metricStatistic->{$suppressionColumn})) {
+            return;
+        }
+
         // Check if we've already recorded this anomaly
         $existingAnomaly = MetricTrend::where('metric_statistic_id', $metricStatistic->id)
             ->where('type', $type)
@@ -108,7 +114,7 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             'baseline_value' => $metricStatistic->mean_value,
             'current_value' => $value,
             'deviation' => $deviation,
-            'significance_score' => min($deviation / 2, 1.0), // Normalize to 0-1 scale
+            'significance_score' => tanh($deviation / 2),
             'metadata' => [
                 'event_id' => $this->event->id,
                 'normal_lower_bound' => $metricStatistic->normal_lower_bound,

@@ -55,14 +55,16 @@ Event/Object/Block Created/Updated
 4. **BaseTaskJob** - Abstract base class for task implementations
 5. **InteractsWithTaskMetadata** - Trait for metadata field handling
 
-### Metadata Storage
+### Execution Storage
 
-Task executions are tracked in model metadata fields:
+Task executions are tracked in the `task_executions` table and mirrored to model metadata during the transition:
 
 - **Event**: Uses `event_metadata['task_executions']`
 - **Block**: Uses `metadata['task_executions']`
 - **EventObject**: Uses `metadata['task_executions']`
-- **Integration**: Uses `metadata['task_executions']`
+- **Integration**: Uses `configuration['task_executions']`
+
+The table is the source of truth for current state with one row per `entity_type`, `entity_id`, and `task_key`. `TaskExecutionStore` reads table rows first and falls back to legacy metadata for records that have not been backfilled yet.
 
 Structure:
 
@@ -111,7 +113,7 @@ A task definition specifies:
 
 ### Task Lifecycle
 
-1. **Registration** - Task registered in TaskPipelineServiceProvider
+1. **Registration** - Task registered in TaskPipelineServiceProvider; boot-time validation checks all declared deps exist
 2. **Trigger** - Event/model created/updated or scheduled
 3. **Dispatch** - ProcessTaskPipelineJob finds applicable tasks
 4. **Execution** - Tasks run in dependency order
@@ -129,8 +131,9 @@ dependencies: ['calculate_metric_stats', 'generate_embedding']
 The system ensures:
 
 - Dependencies run first
-- Circular dependencies are detected
+- Circular dependencies are detected and thrown at runtime (`CircularDependencyException`)
 - Order is deterministic
+- All declared dependencies are validated at boot time (`UnresolvableDependencyException` if a dep key is never registered)
 
 ## Getting Started
 
@@ -156,6 +159,21 @@ php artisan task-pipeline:populate-initial-state --model=event
 
 # Limit for testing
 php artisan task-pipeline:populate-initial-state --limit=100
+```
+
+### Backfill Table-Backed Executions
+
+Backfill legacy metadata into `task_executions` using Redis migration workers:
+
+```bash
+# Count in-process only
+php artisan task-pipeline:migrate-executions --model=event --dry-run
+
+# Dispatch batched Redis migration jobs
+php artisan task-pipeline:migrate-executions --batch-size=500
+
+# Overwrite existing task_executions rows while rerunning
+php artisan task-pipeline:migrate-executions --force
 ```
 
 ### Re-run a Task
@@ -498,14 +516,35 @@ Horizon configuration (already set up):
 Configured in `routes/console.php`:
 
 ```php
-// Daily: Trend detection
+// Daily: Trend detection (dispatches DetectTrendsTask for recent events)
 Schedule::job(new DispatchTrendDetectionTasksJob)->daily();
 
-// Daily: Retrospective anomaly detection
+// Daily: Retrospective anomaly detection (re-processes yesterday's events)
 Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)->daily();
 ```
 
-**Note:** Metric statistics calculation now runs automatically in the task pipeline on event creation and update, so no scheduled job is needed.
+**Note:** Metric statistics calculation runs automatically in the task pipeline on event creation and update — no scheduled job is needed. The old `CalculateMetricStatisticsJob`, `DetectMetricTrendsJob`, and `DetectRetrospectiveMetricAnomaliesJob` batch jobs remain available for manual dispatch via the UI but are no longer scheduled.
+
+### RunIntegrationTask Job Whitelist
+
+`RunIntegrationTask` (used by the `task` and `outline` integration plugins) can dispatch arbitrary job classes. The allowed list is **always enforced** — add new classes to `config/app.php` or extend via the `ALLOWED_TASK_JOBS` env var.
+
+```php
+// config/app.php
+'allowed_task_jobs' => array_merge(
+    [
+        'App\\Jobs\\Outline\\PinTodayDayNote',   // Outline 'pin_today' preset
+        'App\\Jobs\\Outline\\GenerateDayNotes',   // Outline 'generate_year' preset
+    ],
+    env('ALLOWED_TASK_JOBS') ? explode(',', env('ALLOWED_TASK_JOBS')) : []
+),
+```
+
+Artisan commands (`task_mode: artisan`) are unrestricted by default. Set `ALLOWED_TASK_COMMANDS` (comma-separated) to restrict them:
+
+```
+ALLOWED_TASK_COMMANDS=queue:prune-batches,horizon:snapshot
+```
 
 ### Task Retry Configuration
 
@@ -516,6 +555,10 @@ public $timeout = 120;           // 2 minutes
 public $tries = 3;               // 3 attempts
 public $backoff = [30, 120, 300]; // 30s, 2m, 5m
 ```
+
+Task jobs update metadata to `failed` and re-throw exceptions, so Laravel's queue worker can apply the retry policy. A failed task attempt is visible in the model's `task_executions` metadata with the exception message in `last_attempt.error`; only completed runs write `last_success`.
+
+`generate_embedding` has an additional provider-request retry inside `EmbeddingService`: the OpenAI embeddings HTTP request uses `retry(3, 1000)` after a 30 second timeout. If the provider still fails, returns malformed data, or returns an all-zero vector, the exception is allowed to fail the task. Zero vectors are not stored as successful embeddings.
 
 Override in your task:
 
@@ -679,43 +722,6 @@ $this->model->withoutEvents(function() use ($data) {
 - Track queue depth in Horizon
 - Review task execution rates in admin UI
 - Set up alerts for high failure rates
-
-## Migration Guide
-
-### From Old System
-
-If migrating from scattered observers/listeners:
-
-1. **Identify existing tasks:**
-    - Search for Observer files
-    - Check AppServiceProvider boot listeners
-    - Review scheduled jobs
-
-2. **Create task jobs:**
-    - Move logic to task job classes
-    - Extend BaseTaskJob
-    - Keep existing functionality intact
-
-3. **Register tasks:**
-    - Add to TaskPipelineServiceProvider
-    - Define conditions and dependencies
-
-4. **Populate initial state:**
-
-    ```bash
-    php artisan task-pipeline:populate-initial-state --dry-run
-    php artisan task-pipeline:populate-initial-state
-    ```
-
-5. **Test in parallel:**
-    - Run both systems temporarily
-    - Compare results
-    - Verify execution tracking
-
-6. **Cutover:**
-    - Remove old observers
-    - Clean up listeners
-    - Monitor for issues
 
 ## Support
 

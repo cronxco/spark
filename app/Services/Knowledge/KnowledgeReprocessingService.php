@@ -2,11 +2,8 @@
 
 namespace App\Services\Knowledge;
 
-use App\Jobs\Data\Fetch\ExtractContentJob;
-use App\Jobs\Data\Fetch\GenerateSummariesJob;
-use App\Jobs\Data\Newsletter\ExtractNewsletterContentJob;
-use App\Jobs\Data\Newsletter\GenerateNewsletterSummariesJob;
 use App\Jobs\Fetch\FetchSingleUrl;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -138,24 +135,16 @@ class KnowledgeReprocessingService
             return;
         }
 
-        $extracted = $this->buildFetchExtractedPayload($event);
-
-        if ($mode === self::MODE_AUTO && ! empty($extracted['text_content'])) {
-            ExtractContentJob::dispatch($event->integration, $event, $webpage, $extracted);
-
-            return;
-        }
-
-        if (empty($webpage->content)) {
+        if ($mode === self::MODE_SUMMARY_ONLY && empty($webpage->content)) {
             throw new InvalidArgumentException('Fetch webpage has no extracted content to summarize.');
         }
 
-        GenerateSummariesJob::dispatch(
-            $event->integration,
-            $event,
-            $webpage,
-            $extracted,
-            $webpage->content,
+        ProcessTaskPipelineJob::dispatch(
+            model: $event,
+            trigger: 'manual',
+            taskFilter: $mode === self::MODE_AUTO
+                ? ['fetch_extract_content', 'fetch_generate_summaries']
+                : ['fetch_generate_summaries'],
         );
     }
 
@@ -171,45 +160,17 @@ class KnowledgeReprocessingService
             throw new InvalidArgumentException('Newsletter event does not have a publication target.');
         }
 
-        $rawHtml = $event->event_metadata['raw_html'] ?? null;
-
-        if ($mode === self::MODE_AUTO && is_string($rawHtml) && $rawHtml !== '') {
-            ExtractNewsletterContentJob::dispatch($event->integration, $event, $publication, $rawHtml);
-
-            return;
-        }
-
-        if (empty($publication->content)) {
+        if ($mode === self::MODE_SUMMARY_ONLY && empty($publication->content)) {
             throw new InvalidArgumentException('Newsletter event has no extracted content to summarize.');
         }
 
-        GenerateNewsletterSummariesJob::dispatch(
-            $event->integration,
-            $event,
-            $publication,
-            $publication->content,
+        ProcessTaskPipelineJob::dispatch(
+            model: $event,
+            trigger: 'manual',
+            taskFilter: $mode === self::MODE_AUTO
+                ? ['newsletter_extract_content', 'newsletter_generate_summaries']
+                : ['newsletter_generate_summaries'],
         );
-    }
-
-    /**
-     * @return array{title: string, content: string, text_content: string, excerpt: string, author: ?string, image: ?string, direction: string}
-     */
-    private function buildFetchExtractedPayload(Event $event): array
-    {
-        $webpage = $event->target;
-        $contentBlock = $event->blocks->firstWhere('block_type', 'fetch_content');
-        $blockMetadata = $contentBlock?->metadata ?? [];
-        $webpageMetadata = $webpage?->metadata ?? [];
-
-        return [
-            'title' => $webpage?->title ?: ($event->event_metadata['title'] ?? 'Untitled'),
-            'content' => (string) ($blockMetadata['html'] ?? $webpage?->content ?? ''),
-            'text_content' => (string) ($blockMetadata['text'] ?? ''),
-            'excerpt' => (string) ($blockMetadata['excerpt'] ?? $webpage?->content ?? ''),
-            'author' => $webpageMetadata['author'] ?? null,
-            'image' => $webpageMetadata['image_url'] ?? $webpage?->media_url,
-            'direction' => $webpageMetadata['direction'] ?? 'ltr',
-        ];
     }
 
     private function whereUsableTldrBlock(Builder $query, string $blockType): void

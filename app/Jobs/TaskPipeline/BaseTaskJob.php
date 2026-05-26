@@ -4,6 +4,8 @@ namespace App\Jobs\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Services\TaskPipeline\TaskRegistry;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,11 +35,33 @@ abstract class BaseTaskJob implements ShouldQueue
      */
     public function handle(): void
     {
+        $this->model->refresh();
+
+        if ($failedDependency = $this->firstFailedDependency($this->model, $this->task)) {
+            $this->updateStatus('blocked', [
+                'blocked_by' => $failedDependency,
+                'completed_at' => now()->toIso8601String(),
+            ]);
+
+            return;
+        }
+
+        if ($incompleteDependency = $this->firstIncompleteDependency($this->model, $this->task)) {
+            $this->updateStatus('waiting', [
+                'waiting_for' => $incompleteDependency,
+            ]);
+
+            $this->release(30);
+
+            return;
+        }
+
         $this->updateStatus('running');
 
         try {
             $this->execute();
             $this->updateStatus('success', ['completed_at' => now()->toIso8601String()]);
+            $this->dispatchDependentTasks();
 
         } catch (Exception $e) {
             // Report to Sentry with comprehensive context
@@ -83,24 +107,28 @@ abstract class BaseTaskJob implements ShouldQueue
      */
     protected function updateStatus(string $status, array $additionalData = []): void
     {
-        $executions = $this->getTaskExecutions($this->model);
-
-        $executionData = array_merge([
-            'status' => $status,
-        ], $additionalData);
-
-        // Update last_attempt
-        $executions[$this->task->key]['last_attempt'] = array_merge(
-            $executions[$this->task->key]['last_attempt'] ?? [],
-            $executionData
+        app(TaskExecutionStore::class)->recordStatus(
+            model: $this->model,
+            task: $this->task,
+            status: $status,
+            data: $additionalData,
+            jobContext: $this,
         );
+    }
 
-        // Update last_success if applicable
-        if ($status === 'success') {
-            $executions[$this->task->key]['last_success'] = $executionData;
+    protected function dispatchDependentTasks(): void
+    {
+        $dependentTaskKeys = TaskRegistry::getDependentTaskKeys($this->task->key);
+
+        if ($dependentTaskKeys === []) {
+            return;
         }
 
-        $this->setTaskExecutions($this->model, $executions);
+        ProcessTaskPipelineJob::dispatch(
+            model: $this->model->fresh(),
+            trigger: 'manual',
+            taskFilter: $dependentTaskKeys,
+        )->onQueue('tasks');
     }
 
     /**

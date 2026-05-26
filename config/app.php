@@ -123,10 +123,33 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    // Whitelist of allowed artisan task commands for Task plugin execution (comma-separated in env)
+    /*
+     * Whitelist of job classes that RunIntegrationTask may dispatch.
+     *
+     * Validation is ALWAYS enforced — this list is the source of truth.
+     * Add new classes here when creating new Outline/Task presets, or extend
+     * via the ALLOWED_TASK_JOBS env var (comma-separated FQCNs) for runtime overrides.
+     *
+     * Known usages:
+     *   OutlinePlugin 'pin_today' preset     → PinTodayDayNote
+     *   OutlinePlugin 'generate_year' preset → GenerateDayNotes
+     */
+    'allowed_task_jobs' => array_merge(
+        [
+            'App\\Jobs\\Outline\\PinTodayDayNote',
+            'App\\Jobs\\Outline\\GenerateDayNotes',
+        ],
+        env('ALLOWED_TASK_JOBS') ? explode(',', env('ALLOWED_TASK_JOBS')) : []
+    ),
+
+    /*
+     * Whitelist of Artisan commands that RunIntegrationTask may invoke.
+     *
+     * null = no restriction (allow any command). Set ALLOWED_TASK_COMMANDS to a
+     * comma-separated list to lock this down for production hardening.
+     * Example: ALLOWED_TASK_COMMANDS=queue:prune-batches,horizon:snapshot
+     */
     'allowed_task_commands' => env('ALLOWED_TASK_COMMANDS') ? explode(',', env('ALLOWED_TASK_COMMANDS')) : null,
-    // Whitelist of allowed job classes for Task plugin execution (comma-separated FQCNs)
-    'allowed_task_jobs' => env('ALLOWED_TASK_JOBS') ? explode(',', env('ALLOWED_TASK_JOBS')) : null,
 
     // Enable/disable TaskPipeline job dispatch (disabled in testing by default to improve performance)
     'enable_task_pipeline' => env('ENABLE_TASK_PIPELINE', true),

@@ -4,12 +4,17 @@ namespace App\Integrations\Fetch;
 
 use App\Integrations\Base\ManualPlugin;
 use App\Integrations\Contracts\SupportsSpotlightCommands;
+use App\Integrations\Contracts\SupportsTaskPipeline;
+use App\Jobs\TaskPipeline\Tasks\FetchExtractContentTask;
+use App\Jobs\TaskPipeline\Tasks\FetchGenerateSummariesTask;
+use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\TaskPipeline\TaskDefinition;
 use Throwable;
 
-class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
+class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, SupportsTaskPipeline
 {
     public static function getServiceType(): string
     {
@@ -214,6 +219,40 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands
                 'description' => 'Fetch system user',
                 'hidden' => true,
             ],
+        ];
+    }
+
+    public static function getTaskDefinitions(): array
+    {
+        return [
+            new TaskDefinition(
+                key: 'fetch_extract_content',
+                name: 'Fetch: Extract Content',
+                description: 'Extract clean Markdown from fetched article HTML using AI',
+                jobClass: FetchExtractContentTask::class,
+                appliesTo: ['event'],
+                conditions: ['service' => 'fetch', 'domain' => 'knowledge'],
+                runOnCreate: true,
+                runOnUpdate: false,
+                shouldRun: fn (Event $event) => $event->blocks()->where('block_type', 'fetch_content')->exists()
+                    && empty($event->target?->content),
+            ),
+            new TaskDefinition(
+                key: 'fetch_generate_summaries',
+                name: 'Fetch: Generate Summaries',
+                description: 'Generate AI summary blocks and tags for a fetched article',
+                jobClass: FetchGenerateSummariesTask::class,
+                appliesTo: ['event'],
+                conditions: ['service' => 'fetch', 'domain' => 'knowledge'],
+                dependencies: ['fetch_extract_content'],
+                runOnCreate: true,
+                runOnUpdate: false,
+                shouldRun: fn (Event $event) => ! empty($event->target?->content)
+                    && ! $event->blocks()->where('block_type', 'fetch_tldr')
+                        ->whereNotNull('metadata->content')
+                        ->whereNull('deleted_at')
+                        ->exists(),
+            ),
         ];
     }
 

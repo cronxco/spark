@@ -44,7 +44,10 @@ class CalculateMetricStatsTask extends BaseTaskJob
             return;
         }
 
-        // Get all events for this metric via integration relationship
+        $domain = $this->model->domain;
+        $windowDays = MetricStatistic::DEFAULT_WINDOW_DAYS;
+
+        // Get events within the rolling window for this metric via integration relationship
         $events = Event::whereHas('integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
@@ -53,40 +56,54 @@ class CalculateMetricStatsTask extends BaseTaskJob
             ->where('value_unit', $valueUnit)
             ->whereNotNull('value')
             ->whereNull('deleted_at')
+            ->where('time', '>=', now()->subDays($windowDays))
             ->orderBy('time')
             ->get();
 
+        $identifier = ['user_id' => $userId, 'service' => $service, 'action' => $action, 'value_unit' => $valueUnit];
+
         if ($events->count() < 10) {
-            Log::debug('Insufficient events for metric statistics', [
+            Log::debug('Insufficient events for metric statistics within window', [
                 'user_id' => $userId,
                 'service' => $service,
                 'action' => $action,
                 'value_unit' => $valueUnit,
                 'count' => $events->count(),
+                'window_days' => $windowDays,
             ]);
+
+            $this->clearMetricStatistics($identifier, $windowDays);
 
             return;
         }
 
-        // Check if we have at least 30 days of data
+        // Check if we have at least 30 days of data within the window
         $firstEvent = $events->first();
         $lastEvent = $events->last();
         $daysBetween = $firstEvent->time->diffInDays($lastEvent->time);
 
         if ($daysBetween < 30) {
-            Log::debug('Insufficient time range for metric statistics', [
+            Log::debug('Insufficient time range for metric statistics within window', [
                 'user_id' => $userId,
                 'service' => $service,
                 'action' => $action,
                 'value_unit' => $valueUnit,
                 'days' => $daysBetween,
+                'window_days' => $windowDays,
             ]);
+
+            $this->clearMetricStatistics($identifier, $windowDays);
 
             return;
         }
 
-        // Calculate statistics using formatted values
-        $values = $events->map(fn ($event) => $event->getFormattedValueAttribute())->filter()->values();
+        // Financial metrics legitimately record zero values (e.g. spending category
+        // with no transactions on a given day). All other domains treat zero as "no
+        // reading" and exclude those events from baseline statistics.
+        $includeZeros = $domain === 'money';
+        $values = $events->map(fn ($event) => $event->getFormattedValueAttribute())
+            ->filter(fn ($v) => $v !== null && ($includeZeros || $v != 0))
+            ->values();
 
         if ($values->isEmpty()) {
             return;
@@ -98,12 +115,7 @@ class CalculateMetricStatsTask extends BaseTaskJob
 
         // Create or update metric statistic
         MetricStatistic::updateOrCreate(
-            [
-                'user_id' => $userId,
-                'service' => $service,
-                'action' => $action,
-                'value_unit' => $valueUnit,
-            ],
+            $identifier,
             [
                 'event_count' => $values->count(),
                 'first_event_at' => $firstEvent->time,
@@ -114,6 +126,7 @@ class CalculateMetricStatsTask extends BaseTaskJob
                 'stddev_value' => $stddev,
                 'normal_lower_bound' => $mean - (2 * $stddev),
                 'normal_upper_bound' => $mean + (2 * $stddev),
+                'baseline_window_days' => $windowDays,
                 'last_calculated_at' => now(),
             ]
         );
@@ -126,6 +139,29 @@ class CalculateMetricStatsTask extends BaseTaskJob
             'count' => $values->count(),
             'mean' => $mean,
             'stddev' => $stddev,
+            'window_days' => $windowDays,
+        ]);
+    }
+
+    /**
+     * Null out computed stats on an existing row so stale bounds are not used for anomaly detection.
+     *
+     * @param  array<string, string>  $identifier
+     */
+    protected function clearMetricStatistics(array $identifier, int $windowDays): void
+    {
+        MetricStatistic::where($identifier)->update([
+            'event_count' => 0,
+            'first_event_at' => null,
+            'last_event_at' => null,
+            'min_value' => null,
+            'max_value' => null,
+            'mean_value' => null,
+            'stddev_value' => null,
+            'normal_lower_bound' => null,
+            'normal_upper_bound' => null,
+            'baseline_window_days' => $windowDays,
+            'last_calculated_at' => now(),
         ]);
     }
 

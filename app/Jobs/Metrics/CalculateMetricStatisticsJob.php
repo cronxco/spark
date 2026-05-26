@@ -53,7 +53,8 @@ class CalculateMetricStatisticsJob implements ShouldQueue
                     $metricData->user_id,
                     $metricData->service,
                     $metricData->action,
-                    $metricData->value_unit
+                    $metricData->value_unit,
+                    $metricData->domain ?? 'health'
                 );
             }
 
@@ -84,12 +85,12 @@ class CalculateMetricStatisticsJob implements ShouldQueue
 
         return DB::table($eventsTable)
             ->join('integrations', $eventsTable . '.integration_id', '=', 'integrations.id')
-            ->select('integrations.user_id as user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit')
+            ->select('integrations.user_id as user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
             ->whereNull($eventsTable . '.deleted_at')
             ->whereNull('integrations.deleted_at')
             ->whereNotNull($eventsTable . '.value')
             ->whereNotNull($eventsTable . '.value_unit')
-            ->groupBy('integrations.user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit')
+            ->groupBy('integrations.user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
             ->having(DB::raw('COUNT(*)'), '>=', 10) // At least 10 events
             ->get()
             ->filter(function ($metricData) {
@@ -136,7 +137,7 @@ class CalculateMetricStatisticsJob implements ShouldQueue
      * JSON metadata columns), so `SELECT *` on a multi-million-row history
      * dominated database egress and wall-time.
      */
-    protected function calculateMetricStatistics(string $userId, string $service, string $action, string $valueUnit): void
+    protected function calculateMetricStatistics(string $userId, string $service, string $action, string $valueUnit, string $domain = 'health'): void
     {
         $eventsTable = (new Event)->getTable();
         $eventAlias = DB::getTablePrefix() . 'e';
@@ -151,6 +152,13 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             END
         SQL;
 
+        $windowDays = MetricStatistic::DEFAULT_WINDOW_DAYS;
+
+        // Financial metrics legitimately record zero values (e.g. a spending category
+        // with no transactions on a given day). All other domains treat zero as "no
+        // reading" and exclude those events from baseline statistics.
+        $zeroFilter = ($domain !== 'money') ? "FILTER (WHERE {$eventAlias}.value <> 0)" : '';
+
         $row = DB::table($eventsTable . ' as e')
             ->join('integrations as i', 'e.integration_id', '=', 'i.id')
             ->where('i.user_id', $userId)
@@ -160,28 +168,34 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             ->where('e.value_unit', $valueUnit)
             ->whereNotNull('e.value')
             ->whereNull('e.deleted_at')
+            ->where('e.time', '>=', now()->subDays($windowDays))
             ->selectRaw(<<<SQL
                 COUNT(*) AS total_count,
                 MIN({$eventAlias}.time) AS first_event_at,
                 MAX({$eventAlias}.time) AS last_event_at,
-                COUNT(*) FILTER (WHERE {$eventAlias}.value <> 0) AS formatted_count,
-                MIN({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS min_value,
-                MAX({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS max_value,
-                AVG({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS mean_value,
-                STDDEV_POP({$formattedExpr}) FILTER (WHERE {$eventAlias}.value <> 0) AS stddev_value
+                COUNT(*) {$zeroFilter} AS formatted_count,
+                MIN({$formattedExpr}) {$zeroFilter} AS min_value,
+                MAX({$formattedExpr}) {$zeroFilter} AS max_value,
+                AVG({$formattedExpr}) {$zeroFilter} AS mean_value,
+                STDDEV_POP({$formattedExpr}) {$zeroFilter} AS stddev_value
             SQL)
             ->first();
 
         $totalCount = (int) ($row->total_count ?? 0);
 
+        $identifier = ['user_id' => $userId, 'service' => $service, 'action' => $action, 'value_unit' => $valueUnit];
+
         if ($totalCount < 10) {
-            Log::info('Insufficient events for metric', [
+            Log::info('Insufficient events for metric within window', [
                 'user_id' => $userId,
                 'service' => $service,
                 'action' => $action,
                 'value_unit' => $valueUnit,
                 'count' => $totalCount,
+                'window_days' => $windowDays,
             ]);
+
+            $this->clearMetricStatistics($identifier, $windowDays);
 
             return;
         }
@@ -196,13 +210,16 @@ class CalculateMetricStatisticsJob implements ShouldQueue
         $daysBetween = $firstEventAt->diffInDays($lastEventAt);
 
         if ($daysBetween < 30) {
-            Log::info('Insufficient time range for metric', [
+            Log::info('Insufficient time range for metric within window', [
                 'user_id' => $userId,
                 'service' => $service,
                 'action' => $action,
                 'value_unit' => $valueUnit,
                 'days' => $daysBetween,
+                'window_days' => $windowDays,
             ]);
+
+            $this->clearMetricStatistics($identifier, $windowDays);
 
             return;
         }
@@ -217,12 +234,7 @@ class CalculateMetricStatisticsJob implements ShouldQueue
         $stddev = (float) ($row->stddev_value ?? 0.0);
 
         MetricStatistic::updateOrCreate(
-            [
-                'user_id' => $userId,
-                'service' => $service,
-                'action' => $action,
-                'value_unit' => $valueUnit,
-            ],
+            $identifier,
             [
                 'event_count' => $formattedCount,
                 'first_event_at' => $firstEventAt,
@@ -233,6 +245,7 @@ class CalculateMetricStatisticsJob implements ShouldQueue
                 'stddev_value' => $stddev,
                 'normal_lower_bound' => $mean - (2 * $stddev),
                 'normal_upper_bound' => $mean + (2 * $stddev),
+                'baseline_window_days' => $windowDays,
                 'last_calculated_at' => now(),
             ]
         );
@@ -245,6 +258,29 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             'count' => $formattedCount,
             'mean' => $mean,
             'stddev' => $stddev,
+            'window_days' => $windowDays,
+        ]);
+    }
+
+    /**
+     * Null out computed stats on an existing row so stale bounds are not used for anomaly detection.
+     *
+     * @param  array<string, string>  $identifier
+     */
+    protected function clearMetricStatistics(array $identifier, int $windowDays): void
+    {
+        MetricStatistic::where($identifier)->update([
+            'event_count' => 0,
+            'first_event_at' => null,
+            'last_event_at' => null,
+            'min_value' => null,
+            'max_value' => null,
+            'mean_value' => null,
+            'stddev_value' => null,
+            'normal_lower_bound' => null,
+            'normal_upper_bound' => null,
+            'baseline_window_days' => $windowDays,
+            'last_calculated_at' => now(),
         ]);
     }
 

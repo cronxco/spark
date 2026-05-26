@@ -99,7 +99,12 @@ class GetBaselinesTool extends Tool
                 'status' => 'insufficient_data',
                 'unit' => $statistic->value_unit,
                 'sample_days' => $statistic->event_count,
+                'window_days' => $statistic->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
                 'display_name' => $statistic->getDisplayName(),
+                'baseline_review_suggested' => $statistic->baseline_reset_suggested_at !== null,
+                'baseline_review_suggested_since' => $statistic->baseline_reset_suggested_at?->toDateString(),
+                'anomaly_high_suppressed_until' => $statistic->anomaly_high_suppressed_until?->toDateString(),
+                'anomaly_low_suppressed_until' => $statistic->anomaly_low_suppressed_until?->toDateString(),
             ];
         }
 
@@ -113,7 +118,12 @@ class GetBaselinesTool extends Tool
             'normal_lower' => round($statistic->normal_lower_bound, 2),
             'normal_upper' => round($statistic->normal_upper_bound, 2),
             'sample_days' => $statistic->event_count,
+            'window_days' => $statistic->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
             'display_name' => $statistic->getDisplayName(),
+            'baseline_review_suggested' => $statistic->baseline_reset_suggested_at !== null,
+            'baseline_review_suggested_since' => $statistic->baseline_reset_suggested_at?->toDateString(),
+            'anomaly_high_suppressed_until' => $statistic->anomaly_high_suppressed_until?->toDateString(),
+            'anomaly_low_suppressed_until' => $statistic->anomaly_low_suppressed_until?->toDateString(),
         ];
     }
 }

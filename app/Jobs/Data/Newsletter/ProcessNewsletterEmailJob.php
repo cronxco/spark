@@ -63,14 +63,6 @@ class ProcessNewsletterEmailJob implements ShouldQueue
             // Create newsletter event
             $event = $this->createNewsletterEvent($publication, $parsedEmail);
 
-            // Dispatch content extraction job
-            ExtractNewsletterContentJob::dispatch(
-                $this->integration,
-                $event,
-                $publication,
-                $parsedEmail['text_html'] ?: $parsedEmail['text_plain']
-            );
-
             Log::info('Newsletter: Successfully processed newsletter email', [
                 'integration_id' => $this->integration->id,
                 's3_object_key' => $this->s3ObjectKey,
@@ -302,6 +294,7 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                 'email_received_at' => $receivedTime->toIso8601String(),
                 'email_message_id' => $parsedEmail['message_id'],
                 's3_object_key' => $this->s3ObjectKey,
+                'raw_html' => $parsedEmail['text_html'] ?: $parsedEmail['text_plain'],
             ],
         ];
 

@@ -8,6 +8,7 @@ use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\Effects\Hevy\HevyAnalyzeProgressionEffect;
 use App\Jobs\Effects\Hevy\HevyAutoCoachEffect;
 use App\Jobs\Effects\Hevy\HevyUpdateRoutineEffect;
+use App\Jobs\TaskPipeline\Tasks\HevyAutoCoachTask;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -327,7 +328,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
                 key: 'hevy_auto_coach',
                 name: 'Hevy Auto Coach',
                 description: 'Automatically analyze workouts and update routines with progressive overload recommendations',
-                jobClass: HevyAutoCoachEffect::class,
+                jobClass: HevyAutoCoachTask::class,
                 appliesTo: ['event'],
                 conditions: [
                     'service' => 'hevy',

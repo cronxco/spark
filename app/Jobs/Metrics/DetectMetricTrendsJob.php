@@ -231,6 +231,10 @@ class DetectMetricTrendsJob implements ShouldQueue
                         ],
                     ]);
 
+                    if ($metric->baseline_reset_suggested_at === null) {
+                        $metric->update(['baseline_reset_suggested_at' => now()]);
+                    }
+
                     Log::info('Detected monthly trend', [
                         'metric_id' => $metric->id,
                         'type' => $type,
@@ -310,6 +314,10 @@ class DetectMetricTrendsJob implements ShouldQueue
                             'comparison_end' => $comparisonEnd->toDateString(),
                         ],
                     ]);
+
+                    if ($metric->baseline_reset_suggested_at === null) {
+                        $metric->update(['baseline_reset_suggested_at' => now()]);
+                    }
 
                     Log::info('Detected quarterly trend', [
                         'metric_id' => $metric->id,

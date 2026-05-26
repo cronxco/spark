@@ -3,6 +3,7 @@
 namespace App\Services\TaskPipeline;
 
 use App\Services\TaskPipeline\Exceptions\CircularDependencyException;
+use App\Services\TaskPipeline\Exceptions\UnresolvableDependencyException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -59,6 +60,20 @@ class TaskRegistry
     }
 
     /**
+     * Get the keys for tasks that directly depend on the given task.
+     *
+     * @return array<int, string>
+     */
+    public static function getDependentTaskKeys(string $taskKey): array
+    {
+        return collect(static::$tasks)
+            ->filter(fn (TaskDefinition $task) => in_array($taskKey, $task->dependencies, true))
+            ->keys()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Resolve the execution order based on task dependencies
      *
      * @throws CircularDependencyException
@@ -67,13 +82,15 @@ class TaskRegistry
     {
         $ordered = collect();
         $remaining = $tasks->keyBy('key');
+        // Keys present in the input batch — deps NOT in this set are externally satisfied
+        $inputKeys = $remaining->keys()->all();
 
         while ($remaining->isNotEmpty()) {
             // Find tasks whose dependencies are all satisfied
-            $resolved = $remaining->filter(function ($task) use ($ordered) {
-                // All dependencies already in ordered list?
+            $resolved = $remaining->filter(function ($task) use ($ordered, $inputKeys) {
+                // A dependency is satisfied if it's already ordered OR it's not in this batch
                 return collect($task->dependencies)
-                    ->every(fn ($dep) => $ordered->has($dep));
+                    ->every(fn ($dep) => $ordered->has($dep) || ! in_array($dep, $inputKeys, true));
             });
 
             if ($resolved->isEmpty() && $remaining->isNotEmpty()) {
@@ -88,6 +105,34 @@ class TaskRegistry
         }
 
         return $ordered;
+    }
+
+    /**
+     * Validate that all declared dependencies exist in the registry.
+     *
+     * Call once after all tasks have been registered (e.g. end of ServiceProvider::boot).
+     * Throws UnresolvableDependencyException listing every missing dep, so one boot-time
+     * failure surfaces all misconfigured tasks at once rather than failing silently at runtime.
+     *
+     * @throws UnresolvableDependencyException
+     */
+    public static function validateDependencies(): void
+    {
+        $errors = [];
+
+        foreach (static::$tasks as $task) {
+            foreach ($task->dependencies as $dep) {
+                if (! isset(static::$tasks[$dep])) {
+                    $errors[] = "Task '{$task->key}' declares dependency '{$dep}' which is not registered.";
+                }
+            }
+        }
+
+        if (! empty($errors)) {
+            throw new UnresolvableDependencyException(
+                "Task dependency validation failed:\n" . implode("\n", $errors)
+            );
+        }
     }
 
     /**
