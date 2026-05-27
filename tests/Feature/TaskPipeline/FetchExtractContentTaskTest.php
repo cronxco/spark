@@ -40,14 +40,41 @@ class FetchExtractContentTaskTest extends TestCase
     }
 
     #[Test]
-    public function should_run_guard_skips_when_webpage_content_already_exists(): void
+    public function it_is_applicable_even_when_webpage_content_is_pre_populated_with_excerpt(): void
     {
-        [$event] = $this->fetchEvent(webpageContent: 'Already extracted', blockText: 'Raw article text');
+        // Regression: ProcessFetchedContent sets content = excerpt before the pipeline runs.
+        // The task must still run so extraction replaces the excerpt with the full article.
+        [$event] = $this->fetchEvent(webpageContent: 'Short excerpt, not yet extracted', blockText: 'Raw article text');
 
         $definition = collect(FetchPlugin::getTaskDefinitions())
             ->firstWhere('key', 'fetch_extract_content');
 
-        $this->assertFalse($definition->isApplicableTo($event));
+        $this->assertTrue($definition->isApplicableTo($event));
+    }
+
+    #[Test]
+    public function it_is_not_applicable_when_no_fetch_content_block_exists(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        $integration = Integration::factory()->create(['service' => 'fetch']);
+        $webpage = EventObject::factory()->create([
+            'user_id' => $integration->user_id,
+            'concept' => 'webpage',
+            'type' => 'fetch_webpage',
+            'content' => null,
+        ]);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'target_id' => $webpage->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'fetched',
+        ]);
+
+        $definition = collect(FetchPlugin::getTaskDefinitions())
+            ->firstWhere('key', 'fetch_extract_content');
+
+        $this->assertFalse($definition->isApplicableTo($event->fresh(['blocks', 'target'])));
     }
 
     #[Test]

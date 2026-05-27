@@ -234,8 +234,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
                 conditions: ['service' => 'fetch', 'domain' => 'knowledge'],
                 runOnCreate: true,
                 runOnUpdate: false,
-                shouldRun: fn (Event $event) => $event->blocks()->where('block_type', 'fetch_content')->exists()
-                    && empty($event->target?->content),
+                shouldRun: fn (Event $event) => $event->blocks()->where('block_type', 'fetch_content')->exists(),
             ),
             new TaskDefinition(
                 key: 'fetch_generate_summaries',
