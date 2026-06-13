@@ -7,6 +7,8 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -232,8 +234,97 @@ class CheckInsControllerTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // POST /api/v1/mobile/check-ins/media
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function media_requires_authentication(): void
+    {
+        $this->uploadImage($this->createTestImageContent())->assertStatus(401);
+    }
+
+    #[Test]
+    public function media_requires_write_ability(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->uploadImage($this->createTestImageContent())->assertStatus(403);
+    }
+
+    #[Test]
+    public function media_rejects_unsupported_content_type(): void
+    {
+        $this->prepareMediaTest();
+
+        $this->uploadImage('not an image', 'application/pdf')->assertStatus(415);
+    }
+
+    #[Test]
+    public function media_rejects_empty_body(): void
+    {
+        $this->prepareMediaTest();
+
+        $this->uploadImage('', 'image/jpeg')->assertStatus(422);
+    }
+
+    #[Test]
+    public function media_stores_photo_and_attaches_it_to_the_day(): void
+    {
+        $this->prepareMediaTest();
+
+        $this->uploadImage($this->createTestImageContent())
+            ->assertStatus(201)
+            ->assertJsonPath('action', 'shared_a_photo');
+
+        $event = Event::where('service', 'daily_checkin')
+            ->where('action', 'shared_a_photo')
+            ->first();
+
+        $this->assertNotNull($event);
+
+        $block = $event->blocks()->where('block_type', 'photo')->first();
+        $this->assertNotNull($block);
+        $this->assertSame(1, $block->getMedia('downloaded_images')->count());
+
+        // Attached to the day object.
+        $this->assertDatabaseHas('objects', [
+            'id' => $event->target_id,
+            'concept' => 'day',
+            'type' => 'day',
+        ]);
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    protected function prepareMediaTest(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Storage::fake('public');
+        config(['media-library.disk_name' => 'public']);
+        // The photo event/block dispatches the task pipeline on create; keep it out.
+        config(['app.enable_task_pipeline' => false]);
+    }
+
+    protected function uploadImage(string $content, string $contentType = 'image/jpeg'): TestResponse
+    {
+        return $this->call('POST', '/api/v1/mobile/check-ins/media', [], [], [], [
+            'CONTENT_TYPE' => $contentType,
+            'HTTP_ACCEPT' => 'application/json',
+        ], $content);
+    }
+
+    protected function createTestImageContent(): string
+    {
+        $image = imagecreatetruecolor(1, 1);
+        ob_start();
+        imagejpeg($image);
+        $content = ob_get_clean();
+        imagedestroy($image);
+
+        return $content;
+    }
 
     protected function payload(array $overrides = []): array
     {

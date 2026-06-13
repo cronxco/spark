@@ -25,6 +25,8 @@ class EventsControllerTest extends TestCase
     {
         parent::setUp();
         config(['ios.mobile_api_enabled' => true]);
+        // Note writes create a block; keep the task pipeline (embedding etc.) out of these tests.
+        config(['app.enable_task_pipeline' => false]);
 
         $this->user = User::factory()->create();
 
@@ -100,6 +102,90 @@ class EventsControllerTest extends TestCase
 
         $this->getJson("/api/v1/mobile/events/{$event->id}", ['If-None-Match' => $etag])
             ->assertStatus(304);
+    }
+
+    #[Test]
+    public function update_note_sets_a_note_and_returns_it(): void
+    {
+        $event = $this->createEvent();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Remember this one'])
+            ->assertOk()
+            ->assertJsonPath('id', $event->id)
+            ->assertJsonPath('note', 'Remember this one');
+
+        $this->assertDatabaseHas('blocks', [
+            'event_id' => $event->id,
+            'block_type' => 'note',
+            'title' => 'Note',
+        ]);
+
+        // The note block must not leak into the generic blocks grid.
+        $this->getJson("/api/v1/mobile/events/{$event->id}")
+            ->assertOk()
+            ->assertJsonPath('note', 'Remember this one')
+            ->assertJsonMissing(['block_type' => 'note']);
+    }
+
+    #[Test]
+    public function update_note_is_idempotent_and_updates_existing_note(): void
+    {
+        $event = $this->createEvent();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'First'])->assertOk();
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Second'])
+            ->assertOk()
+            ->assertJsonPath('note', 'Second');
+
+        $this->assertSame(1, $event->blocks()->where('block_type', 'note')->count());
+    }
+
+    #[Test]
+    public function update_note_with_null_clears_the_note(): void
+    {
+        $event = $this->createEvent();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Temp'])->assertOk();
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => null])
+            ->assertOk()
+            ->assertJsonMissingPath('note');
+
+        // The note block is soft-deleted; no live note block should remain.
+        $this->assertSame(0, $event->blocks()->where('block_type', 'note')->whereNull('deleted_at')->count());
+    }
+
+    #[Test]
+    public function update_note_requires_write_ability(): void
+    {
+        $event = $this->createEvent();
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'nope'])
+            ->assertStatus(403);
+    }
+
+    #[Test]
+    public function update_note_denies_other_users_events(): void
+    {
+        $event = $this->createEvent();
+        $otherUser = User::factory()->create();
+        Sanctum::actingAs($otherUser, ['ios:read', 'ios:write']);
+
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'hi'])
+            ->assertStatus(404);
+    }
+
+    #[Test]
+    public function update_note_rejects_overlong_note(): void
+    {
+        $event = $this->createEvent();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => str_repeat('a', 10001)])
+            ->assertStatus(422);
     }
 
     protected function createEvent(): Event

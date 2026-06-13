@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController;
+use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
+use App\Http\Controllers\Api\V1\Mobile\BookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\BriefingController;
 use App\Http\Controllers\Api\V1\Mobile\CheckInsController;
 use App\Http\Controllers\Api\V1\Mobile\DevicesController;
@@ -60,6 +62,9 @@ Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
 Route::get('notifications', [NotificationsController::class, 'index'])->name('notifications.index');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
+Route::patch('events/{id}/note', [EventsController::class, 'updateNote'])
+    ->middleware('ability:ios:write')
+    ->name('events.note.update');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->name('objects.show');
 Route::get('blocks/{id}', [BlocksController::class, 'show'])->name('blocks.show');
 Route::get('metrics', [MetricsController::class, 'index'])->name('metrics.index');
@@ -73,6 +78,12 @@ Route::get('search', [SearchController::class, 'index'])->name('search.index');
 
 Route::get('integrations', [IntegrationsController::class, 'index'])->name('integrations.index');
 Route::get('integrations/{id}', [IntegrationsController::class, 'show'])->name('integrations.show');
+Route::post('integrations/{id}/sync', [IntegrationsController::class, 'sync'])
+    ->middleware('ability:ios:write')
+    ->name('integrations.sync');
+Route::post('integrations/{id}/oauth/start', [IntegrationsController::class, 'oauthStart'])
+    ->middleware('ability:ios:write')
+    ->name('integrations.oauth.start');
 
 Route::get('places/{id}', [PlacesController::class, 'show'])->name('places.show');
 
@@ -157,6 +168,10 @@ Route::post('check-ins', [CheckInsController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('check-ins.store');
 
+Route::post('check-ins/media', [CheckInsController::class, 'media'])
+    ->middleware('ability:ios:write')
+    ->name('check-ins.media');
+
 Route::patch('settings/notifications', [NotificationSettingsController::class, 'update'])
     ->middleware('ability:ios:write')
     ->name('settings.notifications.update');
@@ -179,6 +194,27 @@ Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
 Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('knowledge.events.reprocess');
+
+Route::post('bookmarks', [BookmarksController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('bookmarks.store');
+
+/*
+|--------------------------------------------------------------------------
+| API token management
+|--------------------------------------------------------------------------
+*/
+
+Route::get('api-tokens', [ApiTokensController::class, 'index'])
+    ->name('api-tokens.index');
+
+Route::post('api-tokens', [ApiTokensController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('api-tokens.store');
+
+Route::delete('api-tokens/{id}', [ApiTokensController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('api-tokens.destroy');
 
 /*
 |--------------------------------------------------------------------------
