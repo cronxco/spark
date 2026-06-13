@@ -42,15 +42,38 @@ class DevicesControllerTest extends TestCase
             'bundle_id' => 'co.cronx.spark',
             'app_version' => '1.0.0',
             'os_version' => '18.1',
+            'device_name' => 'Will’s iPhone',
         ]);
 
         $this->getJson('/api/v1/mobile/devices')
             ->assertOk()
             ->assertJsonCount(1, 'devices')
+            // iOS RegisteredDevice contract: name + platform are required by the
+            // client decoder, last_seen_at and is_current_device are optional.
+            ->assertJsonPath('devices.0.name', 'Will’s iPhone')
+            ->assertJsonPath('devices.0.platform', 'ios')
+            ->assertJsonPath('devices.0.is_current_device', false)
+            ->assertJsonStructure(['devices' => [['id', 'name', 'platform', 'last_seen_at', 'is_current_device']]])
             ->assertJsonPath('devices.0.device_type', 'ios')
             ->assertJsonPath('devices.0.app_environment', 'sandbox')
             ->assertJsonPath('devices.0.app_version', '1.0.0')
             ->assertJsonPath('devices.0.os_version', '18.1');
+    }
+
+    #[Test]
+    public function index_falls_back_to_a_default_name_when_device_name_is_missing(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        // device_name is nullable, but the iOS decoder requires a non-null name.
+        $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('a', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+        ]);
+
+        $this->getJson('/api/v1/mobile/devices')
+            ->assertOk()
+            ->assertJsonPath('devices.0.name', 'iPhone');
     }
 
     #[Test]
