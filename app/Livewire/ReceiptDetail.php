@@ -5,22 +5,29 @@ namespace App\Livewire;
 use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
 use App\Models\Relationship;
+use App\Traits\AuthorizesOwnership;
 use Exception;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReceiptDetail extends Component
 {
+    use AuthorizesOwnership;
+
     public Event $receipt;
 
     public bool $showMatchModal = false;
 
     public function mount(string $id): void
     {
+        // Scope to the authenticated user via the receipt's integration —
+        // a receipt belonging to another user yields a 404.
         $this->receipt = Event::with(['target', 'blocks', 'integration'])
             ->where('service', 'receipt')
+            ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
             ->findOrFail($id);
     }
 
@@ -36,7 +43,11 @@ class ReceiptDetail extends Component
 
     public function createManualMatch(string $transactionId): void
     {
-        $transaction = Event::find($transactionId);
+        $this->authorizeReceipt();
+
+        $transaction = Event::whereKey($transactionId)
+            ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
+            ->first();
 
         if (! $transaction) {
             $this->dispatch('notify', [
@@ -68,6 +79,8 @@ class ReceiptDetail extends Component
 
     public function removeMatch(): void
     {
+        $this->authorizeReceipt();
+
         // Find and delete the receipt_for relationship
         Relationship::where('from_type', Event::class)
             ->where('from_id', $this->receipt->id)
@@ -94,6 +107,8 @@ class ReceiptDetail extends Component
 
     public function downloadOriginalEmail(): ?StreamedResponse
     {
+        $this->authorizeReceipt();
+
         $merchant = $this->receipt->target;
         $s3Key = $merchant?->metadata['s3_object_key'] ?? null;
 
@@ -134,6 +149,8 @@ class ReceiptDetail extends Component
 
     public function deleteReceipt(): void
     {
+        $this->authorizeReceipt();
+
         // Soft delete the receipt event (cascade will handle blocks and relationships)
         $this->receipt->delete();
 
@@ -173,6 +190,16 @@ class ReceiptDetail extends Component
             'matchedTransaction' => $this->matchedTransaction,
             'candidateMatches' => $this->candidateMatches,
         ])->title('Receipt Details - ' . $this->receipt->target?->title ?? 'Receipt');
+    }
+
+    /**
+     * Re-assert ownership of the hydrated receipt. Livewire rehydrates public
+     * Eloquent properties by key without re-running mount(), so every action
+     * that touches $this->receipt must guard against a tampered snapshot.
+     */
+    private function authorizeReceipt(): void
+    {
+        $this->authorizeOwner($this->receipt->integration?->user_id);
     }
 
     private function calculateMatchConfidence(Event $receipt, Event $transaction): float

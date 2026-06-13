@@ -2,8 +2,12 @@
 
 namespace App\Livewire\Media;
 
+use App\Models\Block;
+use App\Models\EventObject;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -106,6 +110,9 @@ class Index extends Component
             ])
             ->with(['model']);
 
+        // Only ever show media owned by the authenticated user.
+        $this->scopeToOwnedMedia($deduplicatedQuery);
+
         // Search filter
         if ($this->search) {
             $deduplicatedQuery->where(function ($q) {
@@ -165,9 +172,10 @@ class Index extends Component
 
     public function modelTypes()
     {
-        // Cache for 5 minutes to avoid repeated full table scans
-        return Cache::remember('media:model_types', 300, function () {
-            return Media::select('model_type')
+        // Cache per-user for 5 minutes to avoid repeated full table scans
+        return Cache::remember('media:model_types:' . Auth::id(), 300, function () {
+            return $this->scopeToOwnedMedia(Media::query())
+                ->select('model_type')
                 ->distinct()
                 ->whereNotNull('model_type')
                 ->pluck('model_type')
@@ -181,9 +189,10 @@ class Index extends Component
 
     public function collections()
     {
-        // Cache for 5 minutes to avoid repeated full table scans
-        return Cache::remember('media:collection_names', 300, function () {
-            return Media::select('collection_name')
+        // Cache per-user for 5 minutes to avoid repeated full table scans
+        return Cache::remember('media:collection_names:' . Auth::id(), 300, function () {
+            return $this->scopeToOwnedMedia(Media::query())
+                ->select('collection_name')
                 ->distinct()
                 ->whereNotNull('collection_name')
                 ->pluck('collection_name')
@@ -197,9 +206,10 @@ class Index extends Component
 
     public function mimeTypes()
     {
-        // Cache for 5 minutes to avoid repeated full table scans
-        return Cache::remember('media:mime_types', 300, function () {
-            return Media::select('mime_type')
+        // Cache per-user for 5 minutes to avoid repeated full table scans
+        return Cache::remember('media:mime_types:' . Auth::id(), 300, function () {
+            return $this->scopeToOwnedMedia(Media::query())
+                ->select('mime_type')
                 ->distinct()
                 ->whereNotNull('mime_type')
                 ->pluck('mime_type')
@@ -221,7 +231,8 @@ class Index extends Component
 
         try {
             DB::transaction(function () {
-                Media::whereIn('id', $this->selectedItems)->delete();
+                // Scope to owned media so arbitrary ids can't delete another user's files.
+                $this->scopeToOwnedMedia(Media::whereIn('id', $this->selectedItems))->delete();
             });
 
             // Clear media filter caches after deletion
@@ -248,12 +259,34 @@ class Index extends Component
     }
 
     /**
+     * Constrain a Media query to records whose parent model is owned by the
+     * authenticated user. Media hangs off EventObject (user_id) and Block
+     * (through its event's integration); anything else is excluded.
+     */
+    private function scopeToOwnedMedia(Builder $query): Builder
+    {
+        $userId = Auth::id();
+
+        return $query->whereHasMorph(
+            'model',
+            [EventObject::class, Block::class],
+            function (Builder $q, string $type) use ($userId) {
+                if ($type === EventObject::class) {
+                    $q->where('user_id', $userId);
+                } elseif ($type === Block::class) {
+                    $q->whereHas('event.integration', fn (Builder $iq) => $iq->where('user_id', $userId));
+                }
+            },
+        );
+    }
+
+    /**
      * Clear cached media filter values when media changes
      */
     private function clearMediaFilterCaches(): void
     {
-        Cache::forget('media:model_types');
-        Cache::forget('media:collection_names');
-        Cache::forget('media:mime_types');
+        Cache::forget('media:model_types:' . Auth::id());
+        Cache::forget('media:collection_names:' . Auth::id());
+        Cache::forget('media:mime_types:' . Auth::id());
     }
 }

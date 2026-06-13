@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -230,6 +231,60 @@ class ReceiptsTest extends TestCase
     }
 
     #[Test]
+    public function listing_only_includes_the_authenticated_users_receipts(): void
+    {
+        $merchant = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $ownReceipt = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'receipt',
+            'domain' => 'money',
+            'action' => 'had_receipt_from',
+            'target_id' => $merchant->id,
+        ]);
+
+        $otherReceipt = $this->otherUsersReceipt();
+
+        $receipts = Livewire::test(Receipts::class)->viewData('receipts');
+        $ids = collect($receipts->items())->pluck('id');
+
+        $this->assertTrue($ids->contains($ownReceipt->id));
+        $this->assertFalse($ids->contains($otherReceipt->id));
+    }
+
+    #[Test]
+    public function delete_receipt_ignores_another_users_receipt(): void
+    {
+        $otherReceipt = $this->otherUsersReceipt();
+
+        Livewire::test(Receipts::class)->call('deleteReceipt', $otherReceipt->id);
+
+        $this->assertDatabaseHas('events', ['id' => $otherReceipt->id, 'deleted_at' => null]);
+    }
+
+    #[Test]
+    public function remove_match_ignores_another_users_receipt(): void
+    {
+        $otherReceipt = $this->otherUsersReceipt();
+
+        // Pre-existing match relationship for the other user's receipt.
+        Relationship::create([
+            'user_id' => $otherReceipt->integration->user_id,
+            'from_type' => Event::class,
+            'from_id' => $otherReceipt->id,
+            'to_type' => Event::class,
+            'to_id' => (string) Str::uuid(),
+            'type' => 'receipt_for',
+        ]);
+
+        Livewire::test(Receipts::class)->call('removeMatch', $otherReceipt->id);
+
+        $this->assertDatabaseHas('relationships', [
+            'from_id' => $otherReceipt->id,
+            'type' => 'receipt_for',
+        ]);
+    }
+
+    #[Test]
     public function per_page_can_be_changed(): void
     {
         $component = Livewire::test(Receipts::class);
@@ -260,5 +315,26 @@ class ReceiptsTest extends TestCase
 
         // The page should be reset (this is handled by resetPage in updatedStatusFilter)
         $component->assertOk();
+    }
+
+    private function otherUsersReceipt(): Event
+    {
+        $otherUser = User::factory()->create();
+        $otherGroup = IntegrationGroup::factory()->create([
+            'user_id' => $otherUser->id,
+            'service' => 'receipt',
+        ]);
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $otherUser->id,
+            'integration_group_id' => $otherGroup->id,
+            'service' => 'receipt',
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'receipt',
+            'domain' => 'money',
+            'action' => 'had_receipt_from',
+        ]);
     }
 }

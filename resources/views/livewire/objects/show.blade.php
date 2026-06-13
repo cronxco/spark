@@ -4,6 +4,7 @@ use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Traits\AuthorizesOwnership;
 use App\Traits\HasProgressiveLoading;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -17,6 +18,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
+    use AuthorizesOwnership;
     use HasProgressiveLoading;
 
     public EventObject $object;
@@ -72,6 +74,9 @@ new class extends Component
             'user_id' => $object->user_id,
             'auth_id' => auth()->id(),
         ]);
+
+        // Ownership: objects are owned directly by a user.
+        $this->authorizeOwner($object->user_id);
 
         try {
             // Load only the bare minimum - just the object itself
