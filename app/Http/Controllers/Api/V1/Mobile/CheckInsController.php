@@ -17,6 +17,19 @@ use Illuminate\Support\Str;
 class CheckInsController extends Controller
 {
     /**
+     * Allowed image mime types → file extension for shared photos.
+     */
+    private const ALLOWED_IMAGE_TYPES = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/heic' => 'heic',
+        'image/heif' => 'heif',
+        'image/webp' => 'webp',
+    ];
+
+    private const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB
+
+    /**
      * GET /api/v1/mobile/check-ins?date=YYYY-MM-DD
      *
      * Returns morning and afternoon completion status for a given date.
@@ -60,8 +73,8 @@ class CheckInsController extends Controller
 
         $sourceIds = [];
         foreach (CarbonPeriod::create($from, $to) as $date) {
-            $sourceIds[] = 'daily_checkin_morning_'.$date->toDateString();
-            $sourceIds[] = 'daily_checkin_afternoon_'.$date->toDateString();
+            $sourceIds[] = 'daily_checkin_morning_' . $date->toDateString();
+            $sourceIds[] = 'daily_checkin_afternoon_' . $date->toDateString();
         }
 
         $events = Event::whereHas('integration', function ($q) use ($request) {
@@ -152,19 +165,6 @@ class CheckInsController extends Controller
     }
 
     /**
-     * Allowed image mime types → file extension for shared photos.
-     */
-    private const ALLOWED_IMAGE_TYPES = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/heic' => 'heic',
-        'image/heif' => 'heif',
-        'image/webp' => 'webp',
-    ];
-
-    private const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB
-
-    /**
      * POST /api/v1/mobile/check-ins/media
      *
      * Accepts a raw image body (Content-Type: image/*) from the iOS share
@@ -197,7 +197,7 @@ class CheckInsController extends Controller
         }
 
         $extension = self::ALLOWED_IMAGE_TYPES[$contentType];
-        $fileName = 'shared_'.Str::uuid().'.'.$extension;
+        $fileName = 'shared_' . Str::uuid() . '.' . $extension;
         $tempPath = tempnam(sys_get_temp_dir(), 'spark_share_') ?: null;
 
         if ($tempPath === null || file_put_contents($tempPath, $content) === false) {

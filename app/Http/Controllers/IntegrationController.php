@@ -61,12 +61,12 @@ class IntegrationController extends Controller
                 }
 
                 // Check if we have an institution selected
-                $institutionId = session('gocardless_institution_id_'.$group->id);
+                $institutionId = session('gocardless_institution_id_' . $group->id);
 
                 Log::info('GoCardless institution ID from session', [
                     'group_id' => $group->id,
                     'institution_id' => $institutionId,
-                    'session_key' => 'gocardless_institution_id_'.$group->id,
+                    'session_key' => 'gocardless_institution_id_' . $group->id,
                     'session_id' => session()->getId(),
                 ]);
 
@@ -117,7 +117,7 @@ class IntegrationController extends Controller
             ]);
 
             return redirect()->route('integrations.index')
-                ->with('error', 'Failed to initiate OAuth flow: '.$e->getMessage());
+                ->with('error', 'Failed to initiate OAuth flow: ' . $e->getMessage());
         }
     }
 
@@ -273,7 +273,7 @@ class IntegrationController extends Controller
             if ($service === 'gocardless') {
                 session()->forget([
                     'gocardless_oauth_group_id',
-                    'gocardless_institution_id_'.$group->id,
+                    'gocardless_institution_id_' . $group->id,
                 ]);
 
                 Log::info('GoCardless OAuth callback: session data cleaned up', [
@@ -346,39 +346,8 @@ class IntegrationController extends Controller
             }
 
             return redirect()->route('integrations.index')
-                ->with('error', 'Failed to connect integration: '.$e->getMessage());
+                ->with('error', 'Failed to connect integration: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Read and clear the mobile-reauth marker on a group. Returns whether the
-     * OAuth flow was started from the iOS app (see
-     * Api\V1\Mobile\IntegrationsController::oauthStart).
-     */
-    private function consumeMobileReauthOrigin(IntegrationGroup $group): bool
-    {
-        $metadata = $group->auth_metadata ?? [];
-
-        if (empty($metadata['mobile_reauth_origin'])) {
-            return false;
-        }
-
-        unset($metadata['mobile_reauth_origin'], $metadata['mobile_reauth_started_at']);
-        $group->auth_metadata = $metadata;
-        $group->save();
-
-        return true;
-    }
-
-    /**
-     * Redirect to the iOS app's custom scheme to close the in-app
-     * ASWebAuthenticationSession after a mobile-initiated reauth.
-     */
-    private function mobileReauthRedirect(bool $success): RedirectResponse
-    {
-        $status = $success ? 'success' : 'error';
-
-        return redirect()->away('spark://integrations/reauth-complete?status='.$status);
     }
 
     public function initialize(string $service)
@@ -463,7 +432,7 @@ class IntegrationController extends Controller
             ]);
 
             return redirect()->route('integrations.index')
-                ->with('error', 'Failed to initiate reconnection: '.$e->getMessage());
+                ->with('error', 'Failed to initiate reconnection: ' . $e->getMessage());
         }
     }
 
@@ -564,7 +533,7 @@ class IntegrationController extends Controller
                     case 'integer':
                         $fieldRules[] = 'integer';
                         if ($min !== null) {
-                            $fieldRules[] = 'min:'.$min;
+                            $fieldRules[] = 'min:' . $min;
                         }
                         break;
                     case 'array':
@@ -792,7 +761,7 @@ class IntegrationController extends Controller
                             // Name the instance: prefer type label (avoid duplicated service name)
                             $typeLabel = $typesMeta[$type]['label'] ?? ucfirst($type);
                             $base = $instanceNames[$type] ?? $typeLabel;
-                            $customName = trim($base.' - '.($presetName ?? ucfirst($presetKey)));
+                            $customName = trim($base . ' - ' . ($presetName ?? ucfirst($presetKey)));
                             $instance->update(['name' => $customName]);
 
                             if ($request->boolean('run_migration')) {
@@ -835,5 +804,36 @@ class IntegrationController extends Controller
 
         return redirect()->route('integrations.index')
             ->with('success', $successMessage);
+    }
+
+    /**
+     * Read and clear the mobile-reauth marker on a group. Returns whether the
+     * OAuth flow was started from the iOS app (see
+     * Api\V1\Mobile\IntegrationsController::oauthStart).
+     */
+    private function consumeMobileReauthOrigin(IntegrationGroup $group): bool
+    {
+        $metadata = $group->auth_metadata ?? [];
+
+        if (empty($metadata['mobile_reauth_origin'])) {
+            return false;
+        }
+
+        unset($metadata['mobile_reauth_origin'], $metadata['mobile_reauth_started_at']);
+        $group->auth_metadata = $metadata;
+        $group->save();
+
+        return true;
+    }
+
+    /**
+     * Redirect to the iOS app's custom scheme to close the in-app
+     * ASWebAuthenticationSession after a mobile-initiated reauth.
+     */
+    private function mobileReauthRedirect(bool $success): RedirectResponse
+    {
+        $status = $success ? 'success' : 'error';
+
+        return redirect()->away('spark://integrations/reauth-complete?status=' . $status);
     }
 }
