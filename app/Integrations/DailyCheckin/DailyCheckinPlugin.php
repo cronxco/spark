@@ -7,7 +7,9 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaceDetectionService;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class DailyCheckinPlugin extends ManualPlugin
@@ -78,6 +80,13 @@ class DailyCheckinPlugin extends ManualPlugin
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">/10</span>',
                 'hidden' => false,
             ],
+            'shared_a_photo' => [
+                'icon' => 'fas.camera',
+                'display_name' => 'Shared a Photo',
+                'description' => 'A photo shared to Spark for the day',
+                'display_with_object' => false,
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -98,6 +107,13 @@ class DailyCheckinPlugin extends ManualPlugin
                 'description' => 'Mental energy rating (1-5)',
                 'display_with_object' => false,
                 'value_unit' => 'out of 5',
+                'hidden' => false,
+            ],
+            'photo' => [
+                'icon' => 'fas.camera',
+                'display_name' => 'Photo',
+                'description' => 'A photo shared to Spark',
+                'display_with_object' => false,
                 'hidden' => false,
             ],
         ];
@@ -165,7 +181,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'title' => $date,
             ],
             [
-                'time' => $date . ' 00:00:00',
+                'time' => $date.' 00:00:00',
                 'content' => null,
                 'metadata' => [],
             ]
@@ -189,13 +205,13 @@ class DailyCheckinPlugin extends ManualPlugin
 
         // Determine action and default time based on period
         $action = $period === 'morning' ? 'had_morning_checkin' : 'had_afternoon_checkin';
-        $defaultTime = $period === 'morning' ? $date . ' 08:00:00' : $date . ' 17:00:00';
+        $defaultTime = $period === 'morning' ? $date.' 08:00:00' : $date.' 17:00:00';
 
         // Calculate combined value (out of 10)
         $combinedValue = $physical + $mental;
 
         // Create or update the event
-        $sourceId = 'daily_checkin_' . $period . '_' . $date;
+        $sourceId = 'daily_checkin_'.$period.'_'.$date;
 
         $event = Event::updateOrCreate(
             [
@@ -257,6 +273,86 @@ class DailyCheckinPlugin extends ManualPlugin
     }
 
     /**
+     * Attach a shared photo to the given day.
+     *
+     * Creates an event (action `shared_a_photo`) targeting the day object and
+     * a `photo` block, then attaches the supplied image file to the block's
+     * media library collection. Mirrors createCheckinEvent's day/user wiring.
+     *
+     * @param  Integration  $integration  The daily check-in integration
+     * @param  string  $date  Date in Y-m-d format the photo belongs to
+     * @param  string  $imagePath  Absolute path to the image file on disk
+     * @param  string  $fileName  Original/desired file name (with extension)
+     */
+    public function createPhotoEvent(
+        Integration $integration,
+        string $date,
+        string $imagePath,
+        string $fileName,
+    ): Event {
+        $dayObject = EventObject::firstOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $date,
+            ],
+            [
+                'time' => $date.' 00:00:00',
+                'content' => null,
+                'metadata' => [],
+            ]
+        );
+
+        $user = User::find($integration->user_id);
+        $userObject = EventObject::firstOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'user',
+                'type' => 'user',
+                'title' => $user ? $user->name : 'User',
+            ],
+            [
+                'time' => now(),
+                'content' => null,
+                'metadata' => [],
+            ]
+        );
+
+        $event = Event::create([
+            'integration_id' => $integration->id,
+            'source_id' => 'daily_checkin_photo_'.$date.'_'.Str::uuid(),
+            'time' => now(),
+            'service' => 'daily_checkin',
+            'domain' => self::getDomain(),
+            'action' => 'shared_a_photo',
+            'event_metadata' => [
+                'date' => $date,
+                'source' => 'ios_share_extension',
+            ],
+            'target_id' => $dayObject->id,
+            'actor_id' => $userObject->id,
+        ]);
+
+        $block = $event->createBlock([
+            'title' => 'Photo',
+            'block_type' => 'photo',
+            'time' => $event->time,
+            'metadata' => ['date' => $date],
+        ]);
+
+        app(MediaDownloadHelper::class)->attachMediaFromBase64(
+            base64_encode((string) file_get_contents($imagePath)),
+            $block,
+            $fileName,
+            'downloaded_images',
+            ['source' => 'ios_share_extension'],
+        );
+
+        return $event;
+    }
+
+    /**
      * Get check-in events for a specific date
      *
      * @param  int|string  $userId  The user ID
@@ -270,8 +366,8 @@ class DailyCheckinPlugin extends ManualPlugin
         })
             ->where('service', 'daily_checkin')
             ->whereIn('source_id', [
-                'daily_checkin_morning_' . $date,
-                'daily_checkin_afternoon_' . $date,
+                'daily_checkin_morning_'.$date,
+                'daily_checkin_afternoon_'.$date,
             ])
             ->with('blocks')
             ->get();

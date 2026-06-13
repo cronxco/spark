@@ -18,6 +18,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class CompactEventResource extends JsonResource
 {
     /**
+     * Block type that stores a user-authored note for an event. Mirrored in
+     * EventsController::updateNote, which writes/clears this block.
+     */
+    public const NOTE_BLOCK_TYPE = 'note';
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -81,10 +87,26 @@ class CompactEventResource extends JsonResource
                 $data['tldr'] = $tldr->getContent();
             }
 
+            // User-authored note lives in a dedicated `note` block. It surfaces as a
+            // top-level `note` field (the iOS detail screen has its own note editor)
+            // and is excluded from the generic blocks grid below to avoid duplication.
+            // The blocks relation is withTrashed(), so ignore soft-deleted note
+            // blocks (a cleared note) when surfacing the current note.
+            $note = $this->blocks->first(
+                fn ($block) => $block->block_type === self::NOTE_BLOCK_TYPE && $block->deleted_at === null,
+            );
+
+            if ($note) {
+                $data['note'] = $note->getContent();
+            }
+
             // Full blocks array only in the detail endpoint. The feed uses withCount('blocks')
             // which sets blocks_count, signalling list mode where the array would be too heavy.
             if (! isset($this->blocks_count)) {
-                $data['blocks'] = CompactBlockResource::collection($this->blocks)->resolve($request);
+                $blocks = $this->blocks->reject(
+                    fn ($block) => $block->block_type === self::NOTE_BLOCK_TYPE,
+                );
+                $data['blocks'] = CompactBlockResource::collection($blocks)->resolve($request);
             }
         }
 
