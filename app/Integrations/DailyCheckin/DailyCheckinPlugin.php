@@ -85,6 +85,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'display_name' => 'Shared a Photo',
                 'description' => 'A photo shared to Spark for the day',
                 'display_with_object' => false,
+                'value_unit' => null,
                 'hidden' => false,
             ],
         ];
@@ -114,6 +115,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'display_name' => 'Photo',
                 'description' => 'A photo shared to Spark',
                 'display_with_object' => false,
+                'value_unit' => null,
                 'hidden' => false,
             ],
         ];
