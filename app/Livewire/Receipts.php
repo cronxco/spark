@@ -6,6 +6,7 @@ use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
 use App\Models\Relationship;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -75,8 +76,8 @@ class Receipts extends Component
 
     public function createManualMatch(string $receiptId, string $transactionId): void
     {
-        $receipt = Event::find($receiptId);
-        $transaction = Event::find($transactionId);
+        $receipt = $this->findOwnedEvent($receiptId);
+        $transaction = $this->findOwnedEvent($transactionId);
 
         if (! $receipt || ! $transaction) {
             $this->dispatch('notify', [
@@ -107,7 +108,7 @@ class Receipts extends Component
 
     public function removeMatch(string $receiptId): void
     {
-        $receipt = Event::find($receiptId);
+        $receipt = $this->findOwnedEvent($receiptId);
 
         if (! $receipt) {
             return;
@@ -137,7 +138,7 @@ class Receipts extends Component
 
     public function deleteReceipt(string $receiptId): void
     {
-        $receipt = Event::find($receiptId);
+        $receipt = $this->findOwnedEvent($receiptId);
 
         if (! $receipt || $receipt->service !== 'receipt') {
             return;
@@ -157,6 +158,7 @@ class Receipts extends Component
         $query = Event::where('service', 'receipt')
             ->where('domain', 'money')
             ->where('action', 'had_receipt_from')
+            ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
             ->with(['target', 'blocks', 'integration']);
 
         // Apply status filter
@@ -200,6 +202,17 @@ class Receipts extends Component
         return view('livewire.receipts', [
             'receipts' => $this->receipts,
         ]);
+    }
+
+    /**
+     * Resolve an event by id, scoped to the authenticated user via its
+     * integration. Returns null for events the user does not own.
+     */
+    private function findOwnedEvent(string $id): ?Event
+    {
+        return Event::whereKey($id)
+            ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
+            ->first();
     }
 
     private function calculateMatchConfidence(Event $receipt, Event $transaction): float

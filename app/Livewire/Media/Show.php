@@ -2,14 +2,18 @@
 
 namespace App\Livewire\Media;
 
+use App\Models\Block;
+use App\Models\EventObject;
+use App\Traits\AuthorizesOwnership;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Mary\Traits\Toast;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Show extends Component
 {
-    use Toast;
+    use AuthorizesOwnership, Toast;
 
     public Media $media;
 
@@ -45,6 +49,7 @@ class Show extends Component
     public function mount(Media $media): void
     {
         $this->media = $media->load(['model']);
+        $this->authorizeMedia();
         $this->resetEditForm();
     }
 
@@ -74,6 +79,8 @@ class Show extends Component
 
     public function saveEdit(): void
     {
+        $this->authorizeMedia();
+
         $this->validate([
             'editName' => 'required|string|max:255',
             'editFileName' => 'required|string|max:255',
@@ -106,6 +113,8 @@ class Show extends Component
 
     public function deleteMedia(): void
     {
+        $this->authorizeMedia();
+
         try {
             $mediaId = $this->media->id;
             $this->media->delete();
@@ -154,7 +163,10 @@ class Show extends Component
         return Media::where('custom_properties->md5_hash', $md5Hash)
             ->with(['model'])
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            // Don't reveal other users' copies of a deduplicated file.
+            ->filter(fn (Media $instance) => $this->ownerIdFor($instance) === Auth::id())
+            ->values();
     }
 
     /**
@@ -221,5 +233,30 @@ class Show extends Component
             'allInstances' => $this->getAllInstances(),
             'instancesCount' => $this->getInstancesCount(),
         ]);
+    }
+
+    /**
+     * Resolve the owning user id of a media item via its parent model, then
+     * abort 403 unless it belongs to the authenticated user. Media hangs off
+     * EventObject (user_id) or Block (through its event's integration); any
+     * other parent type is treated as unowned and denied.
+     */
+    private function authorizeMedia(): void
+    {
+        $this->authorizeOwner($this->ownerIdFor($this->media));
+    }
+
+    /**
+     * Resolve the owning user id of an arbitrary media item via its parent model.
+     */
+    private function ownerIdFor(Media $media): int|string|null
+    {
+        $model = $media->model;
+
+        return match (true) {
+            $model instanceof EventObject => $model->user_id,
+            $model instanceof Block => $model->event?->integration?->user_id,
+            default => null,
+        };
     }
 }

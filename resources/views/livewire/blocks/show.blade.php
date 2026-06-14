@@ -3,6 +3,7 @@
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
+use App\Traits\AuthorizesOwnership;
 use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
 use Spatie\Activitylog\Models\Activity;
@@ -13,6 +14,8 @@ layout('components.layouts.app');
 
 new class extends Component
 {
+    use AuthorizesOwnership;
+
     public Block $block;
     public bool $showSidebar = false;
     public string $comment = '';
@@ -53,7 +56,10 @@ new class extends Component
     public function mount(Block $block): void
     {
         // Load only the event relationship initially
-        $this->block = $block->load(['event']);
+        $this->block = $block->load(['event.integration']);
+
+        // Ownership: blocks belong to a user through their event's integration.
+        $this->authorizeOwner($this->block->event?->integration?->user_id);
 
         // Track this view in the activity log (debounced to prevent duplicate views)
         $this->block->logViewIfNotRecent(5);

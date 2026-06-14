@@ -4,24 +4,33 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BinAdminTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
-    public function admin_bin_page_loads_for_authenticated_user()
+    #[Test]
+    public function admin_bin_page_loads_for_admin_user()
     {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($this->admin())
             ->get(route('admin.bin.index'));
 
         $response->assertSuccessful();
     }
 
-    /** @test */
+    #[Test]
+    public function admin_bin_page_is_forbidden_for_non_admin()
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('admin.bin.index'))
+            ->assertForbidden();
+    }
+
+    #[Test]
     public function admin_bin_page_requires_authentication()
     {
         $response = $this->get(route('admin.bin.index'));
@@ -29,17 +38,34 @@ class BinAdminTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
-    /** @test */
-    public function admin_bin_delete_endpoint_works()
+    #[Test]
+    public function admin_bin_delete_endpoint_works_for_admin()
     {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($this->admin())
             ->post(route('admin.bin.delete'));
 
         $response->assertSuccessful();
         $response->assertJson([
             'message' => 'Deletion process started. All items will be permanently deleted.',
         ]);
+    }
+
+    #[Test]
+    public function admin_bin_delete_endpoint_is_forbidden_for_non_admin()
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('admin.bin.delete'))
+            ->assertForbidden();
+    }
+
+    private function admin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->is_admin = true;
+        $admin->save();
+
+        return $admin;
     }
 }
