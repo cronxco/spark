@@ -88,6 +88,21 @@ class DailyCheckinPlugin extends ManualPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            // Canonical "time travel" event: a user-acknowledged change to their
+            // effective timezone while travelling. The latest such event is the
+            // acknowledged effective timezone; absence falls back to the user's
+            // profile timezone. `time` is the absolute acknowledgement timestamp;
+            // `event_metadata` carries `timezone`, `previous_timezone`,
+            // `device_id` (nullable) and `source` ("user_acknowledged"). It does
+            // not mutate the user's home/profile timezone.
+            'time_travel' => [
+                'icon' => 'fas.plane',
+                'display_name' => 'Time Travel',
+                'description' => 'Acknowledged a change to the effective timezone',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => true,
+            ],
         ];
     }
 
@@ -378,5 +393,125 @@ class DailyCheckinPlugin extends ManualPlugin
             'morning' => $events->firstWhere('action', 'had_morning_checkin'),
             'afternoon' => $events->firstWhere('action', 'had_afternoon_checkin'),
         ];
+    }
+
+    /**
+     * Resolve the user's latest acknowledged "time travel" event, if any.
+     *
+     * This is the single source of truth for the acknowledged effective
+     * timezone. It is scoped to the user's own Daily Check-in integration and
+     * ordered so the most recent acknowledgement wins.
+     *
+     * @param  int|string  $userId  The user ID
+     */
+    public function getLatestTimezoneEvent(int|string $userId): ?Event
+    {
+        return Event::whereHas('integration', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->where('service', 'daily_checkin')
+            ->where('action', 'time_travel')
+            // Order by the microsecond-precision metadata stamp; `time`/`created_at`
+            // are only second-precise and cannot disambiguate same-second events.
+            ->orderByDesc('event_metadata->acknowledged_at')
+            ->orderByDesc('time')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Resolve the user's effective timezone state.
+     *
+     * Returns the acknowledged travel timezone when a `time_travel` event
+     * exists, otherwise falls back to the user's home/profile timezone. The
+     * shape matches the mobile GET contract.
+     *
+     * @return array{timezone: string, source: string, acknowledged_at: ?string, event_id: ?string, device_id: ?string}
+     */
+    public function resolveEffectiveTimezone(User $user): array
+    {
+        $event = $this->getLatestTimezoneEvent($user->id);
+
+        if ($event === null) {
+            return [
+                'timezone' => $user->getTimezone(),
+                'source' => 'profile',
+                'acknowledged_at' => null,
+                'event_id' => null,
+                'device_id' => null,
+            ];
+        }
+
+        $metadata = $event->event_metadata ?? [];
+
+        return [
+            'timezone' => $metadata['timezone'] ?? $user->getTimezone(),
+            'source' => 'time_travel',
+            'acknowledged_at' => $metadata['acknowledged_at'] ?? $event->time?->toIso8601String(),
+            'event_id' => $event->id,
+            'device_id' => $metadata['device_id'] ?? null,
+        ];
+    }
+
+    /**
+     * Record a user-acknowledged change to the effective timezone as a new
+     * `time_travel` event.
+     *
+     * The `$previousTimezone` is derived server-side from the current effective
+     * timezone; a contradictory client value must not be trusted. `users`
+     * profile timezone is intentionally left unchanged.
+     *
+     * @param  Integration  $integration  The user's Daily Check-in integration
+     * @param  string  $timezone  The new effective IANA timezone identifier
+     * @param  string  $previousTimezone  The server-derived prior timezone
+     * @param  string|null  $deviceId  Optional registered device id
+     */
+    public function createTimezoneEvent(
+        Integration $integration,
+        string $timezone,
+        string $previousTimezone,
+        ?string $deviceId = null,
+    ): Event {
+        $user = User::find($integration->user_id);
+        $userObject = EventObject::firstOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'user',
+                'type' => 'user',
+                'title' => $user ? $user->name : 'User',
+            ],
+            [
+                'time' => now(),
+                'content' => null,
+                'metadata' => [],
+            ]
+        );
+
+        // The events table has no insertion-ordered column (its primary key is a
+        // random UUID) and Eloquent's date grammar truncates the `time`/`created_at`
+        // columns to whole seconds, so two acknowledgements within the same second
+        // cannot be ordered reliably by those columns. We therefore stamp a
+        // microsecond-precision `acknowledged_at` into the metadata and resolve the
+        // latest event by it — see getLatestTimezoneEvent(). The fixed-width format
+        // sorts lexicographically in chronological order.
+        $acknowledgedAt = now();
+
+        return Event::create([
+            'integration_id' => $integration->id,
+            'source_id' => 'daily_checkin_time_travel_' . Str::uuid(),
+            'time' => $acknowledgedAt,
+            'service' => 'daily_checkin',
+            'domain' => self::getDomain(),
+            'action' => 'time_travel',
+            'event_metadata' => [
+                'timezone' => $timezone,
+                'previous_timezone' => $previousTimezone,
+                'device_id' => $deviceId,
+                'source' => 'user_acknowledged',
+                'acknowledged_at' => $acknowledgedAt->utc()->format('Y-m-d\TH:i:s.u\Z'),
+            ],
+            'target_id' => $userObject->id,
+            'actor_id' => $userObject->id,
+        ]);
     }
 }
