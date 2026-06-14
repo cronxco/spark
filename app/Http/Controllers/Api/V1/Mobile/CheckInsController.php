@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CheckInsController extends Controller
@@ -223,6 +224,67 @@ class CheckInsController extends Controller
             (new CompactEventResource($event->fresh(['actor', 'target', 'blocks', 'tags', 'integration'])))->resolve($request),
             201,
         );
+    }
+
+    /**
+     * GET /api/v1/mobile/check-ins/timezone
+     *
+     * Returns the user's effective timezone state. When a `time_travel`
+     * acknowledgement exists, `source` is `time_travel` and the acknowledgement
+     * fields are populated; otherwise it falls back to the profile timezone.
+     */
+    public function showTimezone(Request $request): JsonResponse
+    {
+        $state = (new DailyCheckinPlugin)->resolveEffectiveTimezone($request->user());
+
+        return response()->json($state);
+    }
+
+    /**
+     * POST /api/v1/mobile/check-ins/timezone
+     *
+     * Atomically records a user-acknowledged change to the effective timezone
+     * as a Daily Check-in `time_travel` event and returns the resulting state.
+     *
+     * The prior timezone is derived server-side from the current effective
+     * timezone; a contradictory client `previous_timezone` is ignored. Repeated
+     * submissions of the already-effective timezone are a no-op (idempotent) so
+     * no duplicate consecutive events are created. The user's profile timezone
+     * is never mutated.
+     */
+    public function storeTimezone(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'timezone' => ['required', 'string', 'timezone:all'],
+            'previous_timezone' => ['nullable', 'string', 'timezone:all'],
+            'device_id' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $plugin = new DailyCheckinPlugin;
+        $user = $request->user();
+
+        $current = $plugin->resolveEffectiveTimezone($user);
+
+        // Comparing IANA identifiers (not UTC offsets) means DST transitions
+        // within a single zone never trigger a new acknowledgement.
+        if ($validated['timezone'] === $current['timezone']) {
+            return response()->json($current, 200);
+        }
+
+        $state = DB::transaction(function () use ($plugin, $request, $validated, $current) {
+            $integration = $this->resolveIntegration($request);
+
+            $plugin->createTimezoneEvent(
+                $integration,
+                $validated['timezone'],
+                $current['timezone'],
+                $validated['device_id'] ?? null,
+            );
+
+            return $plugin->resolveEffectiveTimezone($request->user());
+        });
+
+        return response()->json($state, 201);
     }
 
     protected function resolveIntegration(Request $request): Integration

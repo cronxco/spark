@@ -164,6 +164,13 @@ Route::get('check-ins', [CheckInsController::class, 'index'])
 Route::get('check-ins/history', [CheckInsController::class, 'history'])
     ->name('check-ins.history');
 
+Route::get('check-ins/timezone', [CheckInsController::class, 'showTimezone'])
+    ->name('check-ins.timezone.show');
+
+Route::post('check-ins/timezone', [CheckInsController::class, 'storeTimezone'])
+    ->middleware('ability:ios:write')
+    ->name('check-ins.timezone.store');
+
 Route::post('check-ins', [CheckInsController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('check-ins.store');
