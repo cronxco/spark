@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CacheApiResponse;
 use App\Http\Middleware\EnsureIosMobileApiEnabled;
+use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\ETag;
 use App\Http\Middleware\SentryApiLogging;
 use App\Http\Middleware\SentryMobileApiLogging;
@@ -43,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'etag' => ETag::class,
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
+            'admin' => EnsureUserIsAdmin::class,
         ]);
 
         // Place mobile logging before auth in the priority list so it wraps the

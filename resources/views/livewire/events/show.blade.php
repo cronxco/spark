@@ -2,6 +2,7 @@
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Traits\AuthorizesOwnership;
 use App\Traits\HasProgressiveLoading;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
@@ -12,6 +13,7 @@ use Spatie\Tags\Tag;
 
 new class extends Component
 {
+    use AuthorizesOwnership;
     use HasProgressiveLoading;
 
     public Event $event;
@@ -68,6 +70,9 @@ new class extends Component
     {
         // Load only the bare minimum - just the event with integration for display
         $this->event = $event->load(['integration']);
+
+        // Ownership: events belong to a user through their integration.
+        $this->authorizeOwner($this->event->integration?->user_id);
 
         // Track this view in the activity log (debounced to prevent duplicate views)
         $this->event->logViewIfNotRecent(5);

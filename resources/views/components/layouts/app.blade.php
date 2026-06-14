@@ -190,6 +190,7 @@
                     <x-menu-item title="API Tokens" icon="fas.key" link="{{ route('settings.api-tokens') }}" :active="request()->routeIs('settings.api-tokens')" />
                 </x-menu-sub>
 
+                @if (auth()->user()?->is_admin)
                 <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')" data-hotkey="g a">
                     <x-menu-item title="Sense Check" icon="fas.brain" link="{{ route('admin.sense-check.index') }}" :active="request()->routeIs('admin.sense-check.*')" />
                     <x-menu-item title="Day Notes" icon="fas.calendar-day" link="{{ route('admin.daynotes.index') }}" :active="request()->routeIs('admin.daynotes.*')" />
@@ -206,6 +207,7 @@
                     <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
                 </x-menu-sub>
+                @endif
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
             </x-menu>
         </x-slot:sidebar>
