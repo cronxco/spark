@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Integrations\DailyCheckin\DailyCheckinPlugin;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -482,8 +483,9 @@ class CheckInsControllerTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('timezone', 'Asia/Tokyo');
 
-        // The second event's derived previous timezone is the first acknowledged zone.
-        $latest = Event::where('action', 'time_travel')->orderByDesc('time')->orderByDesc('id')->first();
+        // The latest event's derived previous timezone is the first acknowledged zone.
+        $latest = (new DailyCheckinPlugin)->getLatestTimezoneEvent($this->user->id);
+        $this->assertSame('Asia/Tokyo', $latest->event_metadata['timezone']);
         $this->assertSame('America/New_York', $latest->event_metadata['previous_timezone']);
     }
 

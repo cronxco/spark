@@ -411,6 +411,9 @@ class DailyCheckinPlugin extends ManualPlugin
         })
             ->where('service', 'daily_checkin')
             ->where('action', 'time_travel')
+            // Order by the microsecond-precision metadata stamp; `time`/`created_at`
+            // are only second-precise and cannot disambiguate same-second events.
+            ->orderByDesc('event_metadata->acknowledged_at')
             ->orderByDesc('time')
             ->orderByDesc('id')
             ->first();
@@ -444,7 +447,7 @@ class DailyCheckinPlugin extends ManualPlugin
         return [
             'timezone' => $metadata['timezone'] ?? $user->getTimezone(),
             'source' => 'time_travel',
-            'acknowledged_at' => $event->time?->toIso8601String(),
+            'acknowledged_at' => $metadata['acknowledged_at'] ?? $event->time?->toIso8601String(),
             'event_id' => $event->id,
             'device_id' => $metadata['device_id'] ?? null,
         ];
@@ -484,10 +487,19 @@ class DailyCheckinPlugin extends ManualPlugin
             ]
         );
 
+        // The events table has no insertion-ordered column (its primary key is a
+        // random UUID) and Eloquent's date grammar truncates the `time`/`created_at`
+        // columns to whole seconds, so two acknowledgements within the same second
+        // cannot be ordered reliably by those columns. We therefore stamp a
+        // microsecond-precision `acknowledged_at` into the metadata and resolve the
+        // latest event by it — see getLatestTimezoneEvent(). The fixed-width format
+        // sorts lexicographically in chronological order.
+        $acknowledgedAt = now();
+
         return Event::create([
             'integration_id' => $integration->id,
             'source_id' => 'daily_checkin_time_travel_' . Str::uuid(),
-            'time' => now(),
+            'time' => $acknowledgedAt,
             'service' => 'daily_checkin',
             'domain' => self::getDomain(),
             'action' => 'time_travel',
@@ -496,6 +508,7 @@ class DailyCheckinPlugin extends ManualPlugin
                 'previous_timezone' => $previousTimezone,
                 'device_id' => $deviceId,
                 'source' => 'user_acknowledged',
+                'acknowledged_at' => $acknowledgedAt->utc()->format('Y-m-d\TH:i:s.u\Z'),
             ],
             'target_id' => $userObject->id,
             'actor_id' => $userObject->id,
