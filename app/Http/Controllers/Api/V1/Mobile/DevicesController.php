@@ -23,6 +23,14 @@ class DevicesController extends Controller
             ->get()
             ->map(fn (PushSubscription $sub) => [
                 'id' => $sub->id,
+                // Fields consumed by the iOS RegisteredDevice model. `name` and
+                // `platform` are required by the client decoder, so they must
+                // always be present and non-null.
+                'name' => $sub->device_name ?: 'iPhone',
+                'platform' => $sub->device_type,
+                'last_seen_at' => $sub->updated_at?->toIso8601String(),
+                'is_current_device' => false,
+                // Richer fields retained for web/admin consumers.
                 'device_type' => $sub->device_type,
                 'endpoint' => $sub->endpoint,
                 'app_environment' => $sub->app_environment,

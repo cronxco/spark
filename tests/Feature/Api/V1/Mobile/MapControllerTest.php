@@ -138,6 +138,39 @@ class MapControllerTest extends TestCase
     }
 
     #[Test]
+    public function maps_event_kind_from_domain_and_action(): void
+    {
+        $integration = Integration::factory()->create(['user_id' => $this->user->id]);
+
+        $workout = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'apple_health',
+            'domain' => 'health',
+            'action' => 'did_workout',
+            'location' => Point::makeGeodetic(51.5, 0.1),
+        ]);
+
+        $generic = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'calendar',
+            'domain' => 'calendar',
+            'action' => 'attended',
+            'location' => Point::makeGeodetic(51.6, 0.2),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $markers = collect(
+            $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
+                ->assertOk()
+                ->json('markers.events')
+        )->keyBy('id');
+
+        $this->assertSame('workout', $markers[$workout->id]['kind']);
+        $this->assertSame('event', $markers[$generic->id]['kind']);
+    }
+
+    #[Test]
     public function returns_empty_marker_arrays_when_nothing_in_bbox(): void
     {
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
