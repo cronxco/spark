@@ -247,6 +247,11 @@ class IntegrationController extends Controller
             }
         }
 
+        // If the OAuth flow was started from the iOS app, bridge the terminal
+        // redirects back to the `spark://` custom scheme so the in-app
+        // ASWebAuthenticationSession closes. Consume (clear) the marker now.
+        $mobileReauthOrigin = $this->consumeMobileReauthOrigin($group);
+
         try {
             if (method_exists($plugin, 'handleOAuthCallback')) {
                 Log::info('Calling plugin handleOAuthCallback', [
@@ -307,6 +312,10 @@ class IntegrationController extends Controller
                 'group_id' => $group->id,
             ]);
 
+            if ($mobileReauthOrigin) {
+                return $this->mobileReauthRedirect(true);
+            }
+
             // If group already has integrations, this is a reconnect — skip onboarding
             if ($group->integrations()->exists()) {
                 return redirect()->route('integrations.index')
@@ -331,6 +340,10 @@ class IntegrationController extends Controller
                     'error' => $request->get('error'),
                 ],
             ]);
+
+            if ($mobileReauthOrigin) {
+                return $this->mobileReauthRedirect(false);
+            }
 
             return redirect()->route('integrations.index')
                 ->with('error', 'Failed to connect integration: ' . $e->getMessage());
@@ -791,5 +804,36 @@ class IntegrationController extends Controller
 
         return redirect()->route('integrations.index')
             ->with('success', $successMessage);
+    }
+
+    /**
+     * Read and clear the mobile-reauth marker on a group. Returns whether the
+     * OAuth flow was started from the iOS app (see
+     * Api\V1\Mobile\IntegrationsController::oauthStart).
+     */
+    private function consumeMobileReauthOrigin(IntegrationGroup $group): bool
+    {
+        $metadata = $group->auth_metadata ?? [];
+
+        if (empty($metadata['mobile_reauth_origin'])) {
+            return false;
+        }
+
+        unset($metadata['mobile_reauth_origin'], $metadata['mobile_reauth_started_at']);
+        $group->auth_metadata = $metadata;
+        $group->save();
+
+        return true;
+    }
+
+    /**
+     * Redirect to the iOS app's custom scheme to close the in-app
+     * ASWebAuthenticationSession after a mobile-initiated reauth.
+     */
+    private function mobileReauthRedirect(bool $success): RedirectResponse
+    {
+        $status = $success ? 'success' : 'error';
+
+        return redirect()->away('spark://integrations/reauth-complete?status=' . $status);
     }
 }

@@ -17,6 +17,19 @@ use Illuminate\Support\Str;
 class CheckInsController extends Controller
 {
     /**
+     * Allowed image mime types → file extension for shared photos.
+     */
+    private const ALLOWED_IMAGE_TYPES = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/heic' => 'heic',
+        'image/heif' => 'heif',
+        'image/webp' => 'webp',
+    ];
+
+    private const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB
+
+    /**
      * GET /api/v1/mobile/check-ins?date=YYYY-MM-DD
      *
      * Returns morning and afternoon completion status for a given date.
@@ -147,6 +160,67 @@ class CheckInsController extends Controller
 
         return response()->json(
             (new CompactEventResource($event))->resolve($request),
+            201,
+        );
+    }
+
+    /**
+     * POST /api/v1/mobile/check-ins/media
+     *
+     * Accepts a raw image body (Content-Type: image/*) from the iOS share
+     * extension's background upload task — this is NOT multipart form data.
+     * The photo is attached to the day's check-in record. An optional `date`
+     * query param (Y-m-d) overrides the default of today.
+     */
+    public function media(Request $request): JsonResponse
+    {
+        $contentType = strtolower(trim(explode(';', (string) $request->header('Content-Type'))[0]));
+
+        if (! array_key_exists($contentType, self::ALLOWED_IMAGE_TYPES)) {
+            return response()->json(['message' => 'Unsupported media type.'], 415);
+        }
+
+        $content = $request->getContent();
+        $size = strlen($content);
+
+        if ($size === 0) {
+            return response()->json(['message' => 'Empty request body.'], 422);
+        }
+
+        if ($size > self::MAX_IMAGE_BYTES) {
+            return response()->json(['message' => 'Image exceeds the maximum allowed size.'], 422);
+        }
+
+        $date = $request->query('date');
+        if (! is_string($date) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $date = Carbon::now()->toDateString();
+        }
+
+        $extension = self::ALLOWED_IMAGE_TYPES[$contentType];
+        $fileName = 'shared_' . Str::uuid() . '.' . $extension;
+        $tempPath = tempnam(sys_get_temp_dir(), 'spark_share_') ?: null;
+
+        if ($tempPath === null || file_put_contents($tempPath, $content) === false) {
+            return response()->json(['message' => 'Could not store the uploaded image.'], 500);
+        }
+
+        try {
+            $integration = $this->resolveIntegration($request);
+
+            $event = (new DailyCheckinPlugin)->createPhotoEvent(
+                $integration,
+                $date,
+                $tempPath,
+                $fileName,
+            );
+        } finally {
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+        }
+
+        return response()->json(
+            (new CompactEventResource($event->fresh(['actor', 'target', 'blocks', 'tags', 'integration'])))->resolve($request),
             201,
         );
     }
