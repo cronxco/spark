@@ -2661,20 +2661,21 @@
         },
         {
             "name": "laravel-notification-channels/apn",
-            "version": "v6.3.0",
+            "version": "v6.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel-notification-channels/apn.git",
-                "reference": "d886e871a97766e7cda074d08cb8b6cecc0ab4b6"
+                "reference": "2caf55a0d12e27fb3a33084a4bac31c9d65605ee"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel-notification-channels/apn/zipball/d886e871a97766e7cda074d08cb8b6cecc0ab4b6",
-                "reference": "d886e871a97766e7cda074d08cb8b6cecc0ab4b6",
+                "url": "https://api.github.com/repos/laravel-notification-channels/apn/zipball/2caf55a0d12e27fb3a33084a4bac31c9d65605ee",
+                "reference": "2caf55a0d12e27fb3a33084a4bac31c9d65605ee",
                 "shasum": ""
             },
             "require": {
                 "edamov/pushok": "^0.18|^0.19",
+                "illuminate/cache": "^12.0|^13.0",
                 "illuminate/config": "^12.0|^13.0",
                 "illuminate/events": "^12.0|^13.0",
                 "illuminate/notifications": "^12.0|^13.0",
@@ -2714,9 +2715,9 @@
             "homepage": "https://github.com/laravel-notification-channels/apn",
             "support": {
                 "issues": "https://github.com/laravel-notification-channels/apn/issues",
-                "source": "https://github.com/laravel-notification-channels/apn/tree/v6.3.0"
+                "source": "https://github.com/laravel-notification-channels/apn/tree/v6.4.0"
             },
-            "time": "2026-04-15T07:03:36+00:00"
+            "time": "2026-05-05T08:32:11+00:00"
         },
         {
             "name": "laravel-notification-channels/webpush",
@@ -12588,16 +12589,16 @@
         },
         {
             "name": "web-token/jwt-library",
-            "version": "4.1.6",
+            "version": "4.1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/web-token/jwt-library.git",
-                "reference": "e8ab00927a3856f3f0c8218226382cd6a58928a1"
+                "reference": "fbcbf2c276d04d8b056f5c2957815abd5dfb704d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/web-token/jwt-library/zipball/e8ab00927a3856f3f0c8218226382cd6a58928a1",
-                "reference": "e8ab00927a3856f3f0c8218226382cd6a58928a1",
+                "url": "https://api.github.com/repos/web-token/jwt-library/zipball/fbcbf2c276d04d8b056f5c2957815abd5dfb704d",
+                "reference": "fbcbf2c276d04d8b056f5c2957815abd5dfb704d",
                 "shasum": ""
             },
             "require": {
@@ -12661,7 +12662,7 @@
             ],
             "support": {
                 "issues": "https://github.com/web-token/jwt-library/issues",
-                "source": "https://github.com/web-token/jwt-library/tree/4.1.6"
+                "source": "https://github.com/web-token/jwt-library/tree/4.1.7"
             },
             "funding": [
                 {
@@ -12673,7 +12674,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-04-14T07:44:20+00:00"
+            "time": "2026-06-06T18:12:39+00:00"
         },
         {
             "name": "willscottuk/monzo-php",
