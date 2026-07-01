@@ -6325,16 +6325,16 @@
         },
         {
             "name": "phpseclib/phpseclib",
-            "version": "3.0.51",
+            "version": "3.0.55",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpseclib/phpseclib.git",
-                "reference": "d59c94077f9c9915abb51ddb52ce85188ece1748"
+                "reference": "db9744e6d47e742b1f974e965ad49bdd041105af"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/d59c94077f9c9915abb51ddb52ce85188ece1748",
-                "reference": "d59c94077f9c9915abb51ddb52ce85188ece1748",
+                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/db9744e6d47e742b1f974e965ad49bdd041105af",
+                "reference": "db9744e6d47e742b1f974e965ad49bdd041105af",
                 "shasum": ""
             },
             "require": {
@@ -6415,7 +6415,7 @@
             ],
             "support": {
                 "issues": "https://github.com/phpseclib/phpseclib/issues",
-                "source": "https://github.com/phpseclib/phpseclib/tree/3.0.51"
+                "source": "https://github.com/phpseclib/phpseclib/tree/3.0.55"
             },
             "funding": [
                 {
@@ -6431,7 +6431,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-10T01:33:53+00:00"
+            "time": "2026-06-14T23:24:10+00:00"
         },
         {
             "name": "pragmarx/version",
@@ -7974,16 +7974,16 @@
         },
         {
             "name": "revolution/atproto-lexicon-contracts",
-            "version": "1.0.86",
+            "version": "1.0.93",
             "source": {
                 "type": "git",
                 "url": "https://github.com/invokable/atproto-lexicon-contracts.git",
-                "reference": "96058d81ccba880928e873112ce1499540cfcc0e"
+                "reference": "dcba977a1ad713e7e2205e17b02a2cb7c038424d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/invokable/atproto-lexicon-contracts/zipball/96058d81ccba880928e873112ce1499540cfcc0e",
-                "reference": "96058d81ccba880928e873112ce1499540cfcc0e",
+                "url": "https://api.github.com/repos/invokable/atproto-lexicon-contracts/zipball/dcba977a1ad713e7e2205e17b02a2cb7c038424d",
+                "reference": "dcba977a1ad713e7e2205e17b02a2cb7c038424d",
                 "shasum": ""
             },
             "require": {
@@ -8017,7 +8017,7 @@
                 "contracts"
             ],
             "support": {
-                "source": "https://github.com/invokable/atproto-lexicon-contracts/tree/1.0.86"
+                "source": "https://github.com/invokable/atproto-lexicon-contracts/tree/1.0.93"
             },
             "funding": [
                 {
@@ -8025,35 +8025,35 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-01-28T05:05:21+00:00"
+            "time": "2026-04-22T23:11:51+00:00"
         },
         {
             "name": "revolution/laravel-bluesky",
-            "version": "1.1.8",
+            "version": "1.2.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/invokable/laravel-bluesky.git",
-                "reference": "b7b84e9cb3cd7d8deaaa165f7d4d2b31ce5a2d19"
+                "reference": "897dd44fe88a636a449c990044eb071c997e963b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/invokable/laravel-bluesky/zipball/b7b84e9cb3cd7d8deaaa165f7d4d2b31ce5a2d19",
-                "reference": "b7b84e9cb3cd7d8deaaa165f7d4d2b31ce5a2d19",
+                "url": "https://api.github.com/repos/invokable/laravel-bluesky/zipball/897dd44fe88a636a449c990044eb071c997e963b",
+                "reference": "897dd44fe88a636a449c990044eb071c997e963b",
                 "shasum": ""
             },
             "require": {
                 "firebase/php-jwt": "^7.0",
                 "guzzlehttp/guzzle": "^7.8",
-                "illuminate/support": "^11.30||^12.0",
+                "illuminate/support": "^12.0||^13.0",
                 "laravel/socialite": "^5.16",
-                "php": "^8.2",
+                "php": "^8.3",
                 "phpseclib/phpseclib": "^3.0",
-                "revolution/atproto-lexicon-contracts": "1.0.86",
+                "revolution/atproto-lexicon-contracts": "1.0.93",
                 "yocto/yoclib-multibase": "^1.2"
             },
             "require-dev": {
                 "laravel/pint": "^1.22",
-                "orchestra/testbench": "^9.0||^10.0",
+                "orchestra/testbench": "^11.0",
                 "revolt/event-loop": "^1.0",
                 "revolution/laravel-boost-copilot-cli": "^2.0",
                 "workerman/workerman": "^5.0"
@@ -8098,7 +8098,7 @@
                 "socialite"
             ],
             "support": {
-                "source": "https://github.com/invokable/laravel-bluesky/tree/1.1.8"
+                "source": "https://github.com/invokable/laravel-bluesky/tree/1.2.3"
             },
             "funding": [
                 {
@@ -8106,7 +8106,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-19T23:33:40+00:00"
+            "time": "2026-04-27T12:18:11+00:00"
         },
         {
             "name": "robsontenorio/mary",
