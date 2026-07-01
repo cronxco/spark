@@ -438,16 +438,16 @@
         },
         {
             "name": "clickbar/laravel-magellan",
-            "version": "2.1.0",
+            "version": "2.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/clickbar/laravel-magellan.git",
-                "reference": "cc16837c97bd6ddce3a85b2d7a4abe801c0f1360"
+                "reference": "263a07726952fef2b374ae5dcdab1d1b05a5bedd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/clickbar/laravel-magellan/zipball/cc16837c97bd6ddce3a85b2d7a4abe801c0f1360",
-                "reference": "cc16837c97bd6ddce3a85b2d7a4abe801c0f1360",
+                "url": "https://api.github.com/repos/clickbar/laravel-magellan/zipball/263a07726952fef2b374ae5dcdab1d1b05a5bedd",
+                "reference": "263a07726952fef2b374ae5dcdab1d1b05a5bedd",
                 "shasum": ""
             },
             "require": {
@@ -517,9 +517,9 @@
             ],
             "support": {
                 "issues": "https://github.com/clickbar/laravel-magellan/issues",
-                "source": "https://github.com/clickbar/laravel-magellan/tree/2.1.0"
+                "source": "https://github.com/clickbar/laravel-magellan/tree/2.2.0"
             },
-            "time": "2026-03-17T08:29:27+00:00"
+            "time": "2026-05-11T12:10:35+00:00"
         },
         {
             "name": "clue/redis-protocol",
