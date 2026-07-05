@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "58f78b1ce45c72725183029e9888a1e9",
+    "content-hash": "423cdc0388972bc76afe843876145ef1",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -5476,16 +5476,16 @@
         },
         {
             "name": "openai-php/client",
-            "version": "v0.18.0",
+            "version": "v0.20.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/openai-php/client.git",
-                "reference": "3362ab004fcfc9d77df3aff7671fbcbe70177cae"
+                "reference": "b5c0e1e0f210e6b9aca5ee048157fcf3039ca91f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/openai-php/client/zipball/3362ab004fcfc9d77df3aff7671fbcbe70177cae",
-                "reference": "3362ab004fcfc9d77df3aff7671fbcbe70177cae",
+                "url": "https://api.github.com/repos/openai-php/client/zipball/b5c0e1e0f210e6b9aca5ee048157fcf3039ca91f",
+                "reference": "b5c0e1e0f210e6b9aca5ee048157fcf3039ca91f",
                 "shasum": ""
             },
             "require": {
@@ -5498,16 +5498,16 @@
                 "psr/http-message": "^1.1.0|^2.0.0"
             },
             "require-dev": {
-                "guzzlehttp/guzzle": "^7.9.3",
-                "guzzlehttp/psr7": "^2.7.1",
-                "laravel/pint": "^1.24.0",
+                "guzzlehttp/guzzle": "^7.10.0",
+                "guzzlehttp/psr7": "^2.8.0",
+                "laravel/pint": "^1.25.1",
                 "mockery/mockery": "^1.6.12",
-                "nunomaduro/collision": "^8.8.0",
-                "pestphp/pest": "^3.8.2|^4.0.0",
+                "nunomaduro/collision": "^8.8.3",
+                "pestphp/pest": "^3.8.2|^4.1.4",
                 "pestphp/pest-plugin-arch": "^3.1.1|^4.0.0",
                 "pestphp/pest-plugin-type-coverage": "^3.5.1|^4.0.0",
-                "phpstan/phpstan": "^1.12.25",
-                "symfony/var-dumper": "^7.2.6"
+                "phpstan/phpstan": "^1.12.32",
+                "symfony/var-dumper": "^7.3.5"
             },
             "type": "library",
             "autoload": {
@@ -5547,7 +5547,7 @@
             ],
             "support": {
                 "issues": "https://github.com/openai-php/client/issues",
-                "source": "https://github.com/openai-php/client/tree/v0.18.0"
+                "source": "https://github.com/openai-php/client/tree/v0.20.0"
             },
             "funding": [
                 {
@@ -5563,26 +5563,26 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-10-31T18:58:57+00:00"
+            "time": "2026-06-13T12:14:23+00:00"
         },
         {
             "name": "openai-php/laravel",
-            "version": "v0.18.0",
+            "version": "v0.20.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/openai-php/laravel.git",
-                "reference": "ca7714bd20333ae4dbae8dbedcfa20f4384f9b19"
+                "reference": "d6535960d7fe67c30025ae83f00005b4a2d10278"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/openai-php/laravel/zipball/ca7714bd20333ae4dbae8dbedcfa20f4384f9b19",
-                "reference": "ca7714bd20333ae4dbae8dbedcfa20f4384f9b19",
+                "url": "https://api.github.com/repos/openai-php/laravel/zipball/d6535960d7fe67c30025ae83f00005b4a2d10278",
+                "reference": "d6535960d7fe67c30025ae83f00005b4a2d10278",
                 "shasum": ""
             },
             "require": {
                 "guzzlehttp/guzzle": "^7.9.3",
-                "laravel/framework": "^11.29|^12.12",
-                "openai-php/client": "^0.18.0",
+                "laravel/framework": "^11.29|^12.12|^13.0",
+                "openai-php/client": "^0.20.0",
                 "php": "^8.2.0"
             },
             "require-dev": {
@@ -5632,7 +5632,7 @@
             ],
             "support": {
                 "issues": "https://github.com/openai-php/laravel/issues",
-                "source": "https://github.com/openai-php/laravel/tree/v0.18.0"
+                "source": "https://github.com/openai-php/laravel/tree/v0.20.0"
             },
             "funding": [
                 {
@@ -5652,7 +5652,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2025-10-31T19:08:58+00:00"
+            "time": "2026-06-15T09:10:22+00:00"
         },
         {
             "name": "owenvoke/blade-fontawesome",
