@@ -414,7 +414,7 @@ class DailyCheckinPlugin extends ManualPlugin
             ->where('action', 'time_travel')
             // Order by the microsecond-precision metadata stamp; `time`/`created_at`
             // are only second-precise and cannot disambiguate same-second events.
-            ->orderByDesc('event_metadata->acknowledged_at')
+            ->orderByRaw("COALESCE((event_metadata->>'acknowledged_at')::timestamptz, time) DESC")
             ->orderByDesc('time')
             ->orderByDesc('id')
             ->first();

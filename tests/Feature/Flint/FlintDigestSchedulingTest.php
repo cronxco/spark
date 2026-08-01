@@ -2,10 +2,8 @@
 
 namespace Tests\Feature\Flint;
 
-use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
-use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
@@ -151,26 +149,9 @@ class FlintDigestSchedulingTest extends TestCase
     }
 
     #[Test]
-    public function notify_task_dispatches_notification_on_digest_creation(): void
+    public function digest_notification_is_not_dispatched_from_summary_event_creation(): void
     {
-        Bus::fake();
-        $user = $this->newYorkUser();
-
-        $integration = Integration::factory()->create([
-            'user_id' => $user->id,
-            'service' => 'flint',
-        ]);
-        $digest = Event::factory()->create([
-            'integration_id' => $integration->id,
-            'service' => 'flint',
-            'action' => 'had_summary',
-            'event_metadata' => ['period' => 'morning'],
-        ]);
-
-        $task = TaskRegistry::getTask('notify_on_digest_ready');
-        (new NotifyOnDigestReadyTask($digest, $task))->handle();
-
-        Bus::assertDispatched(SendDigestNotificationJob::class, fn ($job) => $job->user->id === $user->id);
+        $this->assertNull(TaskRegistry::getTask('notify_on_digest_ready'));
     }
 
     #[Test]

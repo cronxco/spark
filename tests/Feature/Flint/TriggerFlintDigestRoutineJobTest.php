@@ -44,7 +44,12 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
                 && $request['local_date'] === '2026-06-14'
                 && $request['timezone'] === 'America/New_York'
                 && $request['trigger_reason'] === 'scheduled'
-                && $request['user_id'] === (string) $this->user->id;
+                && $request['user_id'] === (string) $this->user->id
+                && $request['idempotency_key'] === TriggerFlintDigestRoutineJob::markerKey(
+                    $this->user->id,
+                    '2026-06-14',
+                    'evening',
+                );
         });
 
         $this->assertTrue(Cache::has(
@@ -101,6 +106,23 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
         Http::assertNothingSent();
         $this->assertFalse(Cache::has(
             TriggerFlintDigestRoutineJob::markerKey($this->user->id, '2026-06-14', 'evening')
+        ));
+    }
+
+    #[Test]
+    public function releases_the_marker_when_the_webhook_fails(): void
+    {
+        Http::fake(['*' => Http::response(['error' => 'unavailable'], 500)]);
+
+        try {
+            $this->runJob('morning');
+            $this->fail('Expected the webhook failure to be thrown.');
+        } catch (\Illuminate\Http\Client\RequestException) {
+            // Expected: the job should be retried by the queue.
+        }
+
+        $this->assertFalse(Cache::has(
+            TriggerFlintDigestRoutineJob::markerKey($this->user->id, '2026-06-14', 'morning')
         ));
     }
 

@@ -13,6 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Fires the outbound webhook that asks the Claude Code Routine to generate a
@@ -56,7 +57,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     {
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->period);
 
-        if (Cache::has($markerKey)) {
+        if (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
             Log::info('Flint routine trigger skipped (already triggered)', [
                 'user_id' => $this->user->id,
                 'period' => $this->period,
@@ -72,7 +73,6 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
                 'period' => $this->period,
                 'local_date' => $this->localDate,
             ]);
-            Cache::put($markerKey, true, $this->markerTtlSeconds());
 
             return;
         }
@@ -84,6 +84,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
                 'user_id' => $this->user->id,
                 'period' => $this->period,
             ]);
+            Cache::forget($markerKey);
 
             return;
         }
@@ -95,15 +96,22 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'timezone' => $this->timezone,
             'trigger_reason' => $this->triggerReason,
             'sleep_score_event_id' => $this->sleepScoreEventId,
+            'idempotency_key' => $markerKey,
         ];
 
-        $request = Http::withSentryTracing()->asJson();
+        $request = Http::withSentryTracing()->asJson()->timeout(20)->connectTimeout(5);
 
         if ($secret = config('services.flint_routine.secret')) {
             $request = $request->withToken($secret);
         }
 
-        $response = $request->post($url, $payload);
+        try {
+            $response = $request->post($url, $payload);
+        } catch (Throwable $exception) {
+            Cache::forget($markerKey);
+
+            throw $exception;
+        }
 
         if (! $response->successful()) {
             Log::error('Flint routine webhook returned a non-2xx response', [
@@ -112,10 +120,9 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
                 'status' => $response->status(),
             ]);
 
+            Cache::forget($markerKey);
             $response->throw();
         }
-
-        Cache::put($markerKey, true, $this->markerTtlSeconds());
 
         Log::info('Flint routine webhook triggered', [
             'user_id' => $this->user->id,

@@ -198,7 +198,7 @@ class NotificationTest extends TestCase
             'concept' => 'day',
             'type' => 'day',
             'title' => $localDate,
-            'time' => Carbon::parse($localDate),
+            'time' => Carbon::parse($localDate, 'UTC'),
         ]);
 
         // Mirror production storage: the had_summary event's `time` is the
@@ -209,13 +209,13 @@ class NotificationTest extends TestCase
             'target_id' => $dayObject->id,
             'service' => 'flint',
             'action' => 'had_summary',
-            'time' => Carbon::parse($localDate), // 2026-06-14 00:00 UTC
+            'time' => Carbon::parse($localDate, 'UTC'), // 2026-06-14 00:00 UTC
         ]);
 
         Block::create([
             'event_id' => $flintEvent->id,
             'block_type' => 'flint_digest',
-            'time' => Carbon::parse($localDate),
+            'time' => Carbon::parse($localDate, 'UTC'),
             'metadata' => [
                 'headline' => 'Evening Digest',
                 'summary' => 'Far-west summary.',

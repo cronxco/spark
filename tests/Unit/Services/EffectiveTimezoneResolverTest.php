@@ -106,6 +106,19 @@ class EffectiveTimezoneResolverTest extends TestCase
     }
 
     #[Test]
+    public function point_in_time_prefers_a_newer_stamped_acknowledgement_over_a_legacy_event(): void
+    {
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        $this->makeLegacyTimezoneEvent($user, 'Asia/Tokyo', Carbon::parse('2026-06-10 10:00', 'UTC'));
+        $this->makeTimezoneEvent($user, 'America/New_York', '2026-06-12T10:00:00.000000Z');
+
+        $this->assertSame(
+            'America/New_York',
+            app(EffectiveTimezoneResolver::class)->timezoneForAt($user, Carbon::parse('2026-06-14 12:00', 'UTC')),
+        );
+    }
+
+    #[Test]
     public function point_in_time_at_now_matches_the_live_effective_timezone(): void
     {
         $resolver = app(EffectiveTimezoneResolver::class);

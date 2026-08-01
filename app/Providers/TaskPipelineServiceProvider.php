@@ -277,24 +277,6 @@ class TaskPipelineServiceProvider extends ServiceProvider
             runOnUpdate: false,
         ));
 
-        // Digest notification - notify the user when a Flint digest is written,
-        // rather than on a fixed clock (morning timing is variable).
-        TaskRegistry::register(new TaskDefinition(
-            key: 'notify_on_digest_ready',
-            name: 'Notify on Digest Ready',
-            description: 'Send the daily digest notification when a Flint digest summary is created',
-            jobClass: NotifyOnDigestReadyTask::class,
-            appliesTo: ['event'],
-            conditions: [
-                'service' => 'flint',
-                'action' => 'had_summary',
-            ],
-            dependencies: [],
-            queue: 'tasks',
-            priority: 40,
-            runOnCreate: true,
-            runOnUpdate: false,
-        ));
     }
 
     /**

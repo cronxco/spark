@@ -135,6 +135,7 @@ class TagsControllerTest extends TestCase
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
         $tag = Tag::findOrCreate('person', 'spark');
+        $this->createEvent('Tagged')->attachTags([$tag]);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
         $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", [
@@ -145,6 +146,21 @@ class TagsControllerTest extends TestCase
         $this->getJson("/api/v1/mobile/objects/{$object->id}")
             ->assertOk()
             ->assertJsonPath('tags.0.id', (string) $tag->id);
+    }
+
+    #[Test]
+    public function cannot_attach_a_tag_that_is_not_visible_to_the_user(): void
+    {
+        $event = $this->createEvent('Tagged');
+        $hidden = Tag::findOrCreate('private-other-user-tag', 'spark');
+        $otherObject = EventObject::factory()->create(['user_id' => User::factory()->create()->id]);
+        $otherObject->attachTags([$hidden]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
+            'tag_id' => $hidden->id,
+        ])->assertNotFound();
     }
 
     #[Test]

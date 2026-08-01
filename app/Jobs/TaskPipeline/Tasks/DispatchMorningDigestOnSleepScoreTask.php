@@ -30,7 +30,7 @@ class DispatchMorningDigestOnSleepScoreTask extends BaseTaskJob
         }
 
         $settings = $user->settings['flint'] ?? [];
-        if (($settings['digests_enabled'] ?? false) === false) {
+        if (! ($settings['digests_enabled'] ?? false)) {
             return;
         }
 

@@ -13,8 +13,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Spatie\Tags\Tag;
 
 class TagsController extends Controller
@@ -69,11 +67,13 @@ class TagsController extends Controller
         }
 
         $tag = $this->withTotals(collect([$tag]))->first();
-        $items = $this->taggedItems($request->user(), $tag);
+        $limit = (int) ($validated['limit'] ?? self::DEFAULT_LIMIT);
+        $offset = $this->cursorOffset($validated['cursor'] ?? null);
+        $items = $this->taggedItems($request->user(), $tag, $offset + $limit + 1);
         [$page, $nextCursor, $hasMore] = $this->paginate(
             $items,
             $validated['cursor'] ?? null,
-            (int) ($validated['limit'] ?? self::DEFAULT_LIMIT),
+            $limit,
         );
 
         return response()->json([
@@ -160,13 +160,19 @@ class TagsController extends Controller
     private function attach(Request $request, Event|EventObject $entity): JsonResponse
     {
         $validated = $request->validate([
-            'tag_id' => ['nullable', 'string', Rule::exists('tags', 'id')],
+            'tag_id' => ['nullable', 'integer'],
             'name' => ['required_without:tag_id', 'nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:100'],
         ]);
 
         if (isset($validated['tag_id'])) {
-            $tag = Tag::findOrFail($validated['tag_id']);
+            $tag = $this->tagQuery($request->user())
+                ->whereKey($validated['tag_id'])
+                ->first();
+
+            if (! $tag) {
+                return response()->json(['message' => 'Tag not found.'], 404);
+            }
         } else {
             [$name, $type] = $this->normaliseTag(
                 (string) $validated['name'],
@@ -270,7 +276,7 @@ class TagsController extends Controller
         });
     }
 
-    private function taggedItems(User $user, Tag $tag): Collection
+    private function taggedItems(User $user, Tag $tag, int $maximumItems): Collection
     {
         $integrationIds = $user->integrations()->pluck('id');
 
@@ -278,6 +284,8 @@ class TagsController extends Controller
             ->withAnyTags([$tag])
             ->whereIn('integration_id', $integrationIds)
             ->with(['actor', 'target'])
+            ->latest('time')
+            ->limit($maximumItems)
             ->get()
             ->map(fn (Event $event) => [
                 'sort_time' => $event->time ?? $event->created_at,
@@ -293,6 +301,8 @@ class TagsController extends Controller
         $objects = EventObject::query()
             ->withAnyTags([$tag])
             ->where('user_id', $user->id)
+            ->latest('time')
+            ->limit($maximumItems)
             ->get()
             ->map(fn (EventObject $object) => [
                 'sort_time' => $object->time ?? $object->created_at,
@@ -305,14 +315,16 @@ class TagsController extends Controller
                 ],
             ]);
 
-        $blockIds = DB::table('taggables')
-            ->where('tag_id', $tag->id)
-            ->where('taggable_type', Block::class)
-            ->pluck('taggable_id');
-
         $blocks = Block::query()
-            ->whereIn('id', $blockIds)
+            ->join('taggables', function ($join) {
+                $join->on('taggables.taggable_id', '=', 'blocks.id')
+                    ->where('taggables.taggable_type', Block::class);
+            })
+            ->where('taggables.tag_id', $tag->id)
             ->whereHas('event', fn (Builder $events) => $events->whereIn('integration_id', $integrationIds))
+            ->latest('time')
+            ->limit($maximumItems)
+            ->select('blocks.*')
             ->get()
             ->map(fn (Block $block) => [
                 'sort_time' => $block->time ?? $block->created_at,
@@ -367,7 +379,7 @@ class TagsController extends Controller
     private function paginate(Collection $items, ?string $cursor, int $limit): array
     {
         $limit = max(1, min($limit, self::MAX_LIMIT));
-        $offset = $cursor ? (int) base64_decode(strtr($cursor, '-_', '+/')) : 0;
+        $offset = $this->cursorOffset($cursor);
         $page = $items->slice($offset, $limit)->values();
         $nextOffset = $offset + $page->count();
         $hasMore = $nextOffset < $items->count();
@@ -376,5 +388,10 @@ class TagsController extends Controller
             : null;
 
         return [$page, $nextCursor, $hasMore];
+    }
+
+    private function cursorOffset(?string $cursor): int
+    {
+        return $cursor ? max(0, (int) base64_decode(strtr($cursor, '-_', '+/'), true)) : 0;
     }
 }
