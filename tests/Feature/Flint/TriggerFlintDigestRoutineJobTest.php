@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -117,7 +118,7 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
         try {
             $this->runJob('morning');
             $this->fail('Expected the webhook failure to be thrown.');
-        } catch (\Illuminate\Http\Client\RequestException) {
+        } catch (RequestException) {
             // Expected: the job should be retried by the queue.
         }
 
