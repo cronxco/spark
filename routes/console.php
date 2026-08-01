@@ -4,14 +4,16 @@ use App\Jobs\CheckIntegrationUpdates;
 use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\RunPatternDetectionJob;
-use App\Jobs\Flint\RunPreDigestRefreshJob;
-use App\Jobs\Flint\SendDigestNotificationJob;
+use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
 use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
+use App\Models\Event;
 use App\Models\User;
+use App\Services\EffectiveTimezoneResolver;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Laravel\Horizon\Console\SnapshotCommand;
@@ -68,81 +70,59 @@ Schedule::job(new RefreshExpiringCookies)
 // Flint digest dispatcher (runs every 15 minutes to check for scheduled digests)
 // New flow: -15min = agents run + digest generation, 0min = send notification
 Schedule::call(function () {
+    $resolver = app(EffectiveTimezoneResolver::class);
+
+    // The id of the user's Oura sleep-score event for a local wake date, or null
+    // if it hasn't been ingested yet. Used to gate the morning digest.
+    $sleepScoreEventIdFor = fn (User $user, string $localDate): ?string => Event::query()
+        ->where('service', 'oura')
+        ->where('action', 'had_sleep_score')
+        ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
+        ->where('event_metadata->day', $localDate)
+        ->value('id');
+
     $users = User::whereNotNull('settings->flint->digests_enabled')
         ->where('settings->flint->digests_enabled', '!=', false)
         ->get();
 
-    $preDigestDispatched = 0;
-    $notificationDispatched = 0;
-
     foreach ($users as $user) {
-
-        Log::info('Checking digest for user', [
-            'user_id' => $user->id,
-        ]);
-
         $settings = $user->settings['flint'] ?? [];
 
-        // Get user's timezone (default to Europe/London)
-        $userTimezone = $settings['schedule_timezone'] ?? 'Europe/London';
-
-        // Check if it's a weekday or weekend in user's timezone
-        $now = now()->timezone($userTimezone);
+        // Schedule against the user's effective (acknowledged travel) timezone.
+        $tz = $resolver->timezoneFor($user);
+        $now = $resolver->now($user);
+        $today = $resolver->today($user)->toDateString();
         $isWeekend = $now->isWeekend();
 
-        // Get schedule times for this day type
-        $scheduleTimes = $isWeekend
-            ? ($settings['schedule_times_weekend'] ?? ['08:00', '19:00'])
-            : ($settings['schedule_times_weekday'] ?? ['06:00', '18:00']);
+        $morningTime = $isWeekend
+            ? ($settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend'))
+            : ($settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday'));
+        $eveningTime = $settings['evening_time'] ?? config('services.flint_routine.evening_time');
+        $fallbackTime = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
 
-        foreach ($scheduleTimes as $scheduleTime) {
-            Log::info('Evaluating digest schedule', [
-                'user_id' => $user->id,
-                'schedule_time' => $scheduleTime,
-                'timezone' => $userTimezone,
-                'is_weekend' => $isWeekend,
-            ]);
-            // Parse schedule time (e.g., "06:00")
-            $scheduleCarbon = Carbon::parse($scheduleTime, $userTimezone);
-            $minutesUntil = $now->diffInMinutes($scheduleCarbon, false);
+        // Evening digest: pure time gate at the configured evening slot.
+        $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
+        if ($now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
+            dispatch(new TriggerFlintDigestRoutineJob($user, 'evening', $today, $tz, 'scheduled'))
+                ->onQueue('flint');
+        }
 
-            // If digest scheduled in the next 15 minutes or sooner, run pre-digest refresh
-            if ($minutesUntil >= 1 && $minutesUntil <= 15) {
-                Log::info('Dispatching pre-digest refresh (15 min before digest)', [
-                    'user_id' => $user->id,
-                    'schedule_time' => $scheduleTime,
-                    'timezone' => $userTimezone,
-                    'is_weekend' => $isWeekend,
-                ]);
+        // Morning digest: fire at the LATER of the morning slot and the Oura
+        // sleep-score event, with a hard fallback cutoff if sleep never arrives.
+        // (Low-latency firing when sleep lands after the slot is handled by
+        // DispatchMorningDigestOnSleepScoreTask; this is the backstop.)
+        $morningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'morning');
+        if ($now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
+            $sleepEventId = $sleepScoreEventIdFor($user, $today);
 
-                dispatch(new RunPreDigestRefreshJob($user, $scheduleTime))->onQueue('flint');
-                // Job will auto-chain to RunDigestGenerationJob when agents complete
-
-                $preDigestDispatched++;
-            }
-
-            // If digest scheduled right now, send notification
-            // Allow a small window of -5 to 0 minutes to account for scheduling delays
-            if ($minutesUntil >= -5 && $minutesUntil <= 0) {
-                Log::info('Dispatching digest notification', [
-                    'user_id' => $user->id,
-                    'schedule_time' => $scheduleTime,
-                    'timezone' => $userTimezone,
-                    'is_weekend' => $isWeekend,
-                ]);
-
-                dispatch(new SendDigestNotificationJob($user, $scheduleTime))->onQueue('flint');
-
-                $notificationDispatched++;
+            if ($sleepEventId !== null) {
+                dispatch(new TriggerFlintDigestRoutineJob($user, 'morning', $today, $tz, 'scheduled', $sleepEventId))
+                    ->onQueue('flint');
+            } elseif ($now->gte(Carbon::parse($fallbackTime, $tz))) {
+                dispatch(new TriggerFlintDigestRoutineJob($user, 'morning', $today, $tz, 'fallback'))
+                    ->onQueue('flint');
             }
         }
-    }
-
-    if ($preDigestDispatched > 0 || $notificationDispatched > 0) {
-        Log::info('Flint digest jobs dispatched', [
-            'pre_digest_count' => $preDigestDispatched,
-            'notification_count' => $notificationDispatched,
-        ]);
     }
 })
     ->everyFifteenMinutes()

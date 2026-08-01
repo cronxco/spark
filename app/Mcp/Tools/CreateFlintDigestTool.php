@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -152,6 +153,9 @@ class CreateFlintDigestTool extends Tool
 
             $blockIds[] = $block->id;
         }
+
+        dispatch(new SendDigestNotificationJob($user, '00:00', $period, (string) $event->id))
+            ->onQueue('flint');
 
         return Response::text(json_encode([
             'event_id' => $event->id,
