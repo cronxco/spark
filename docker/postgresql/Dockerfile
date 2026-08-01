@@ -1,4 +1,4 @@
-FROM pgvector/pgvector:0.8.2-pg17@sha256:494dff7e67e7bc2c826b94c331364978d145ebb86fd338154138b084223b7f67
+FROM pgvector/pgvector:0.8.4-pg17@sha256:dd467f03ca5c5581222490e5217e48a262864ccb659be559f8491bbafdc97da0
 
 # Install PostGIS
 RUN apt-get update && \
