@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
 use App\Http\Controllers\Api\V1\Mobile\SearchController;
 use App\Http\Controllers\Api\V1\Mobile\SyncController;
+use App\Http\Controllers\Api\V1\Mobile\TagsController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController;
 use App\Http\Controllers\Api\V1\Mobile\WidgetsController;
@@ -75,6 +76,22 @@ Route::get('widgets/metrics/{metric}', [WidgetsController::class, 'metric'])->na
 Route::get('widgets/spend', [WidgetsController::class, 'spend'])->name('widgets.spend');
 
 Route::get('search', [SearchController::class, 'index'])->name('search.index');
+
+Route::get('tags', [TagsController::class, 'index'])->name('tags.index');
+Route::get('tags/suggest', [TagsController::class, 'suggest'])->name('tags.suggest');
+Route::get('tags/{id}', [TagsController::class, 'show'])->name('tags.show');
+Route::post('events/{id}/tags', [TagsController::class, 'storeEventTag'])
+    ->middleware('ability:ios:write')
+    ->name('events.tags.store');
+Route::delete('events/{id}/tags/{tagId}', [TagsController::class, 'destroyEventTag'])
+    ->middleware('ability:ios:write')
+    ->name('events.tags.destroy');
+Route::post('objects/{id}/tags', [TagsController::class, 'storeObjectTag'])
+    ->middleware('ability:ios:write')
+    ->name('objects.tags.store');
+Route::delete('objects/{id}/tags/{tagId}', [TagsController::class, 'destroyObjectTag'])
+    ->middleware('ability:ios:write')
+    ->name('objects.tags.destroy');
 
 Route::get('integrations', [IntegrationsController::class, 'index'])->name('integrations.index');
 Route::get('integrations/{id}', [IntegrationsController::class, 'show'])->name('integrations.show');

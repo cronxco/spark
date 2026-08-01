@@ -25,6 +25,7 @@ class ObjectLookup
         return EventObject::query()
             ->where('user_id', $user->id)
             ->where('id', $objectId)
+            ->with('tags')
             ->first();
     }
 

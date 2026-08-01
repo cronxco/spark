@@ -214,4 +214,16 @@ return [
         'cache_ttl_hours' => (int) env('METOFFICE_CACHE_TTL', 1),
     ],
 
+    // Claude Code Routine webhook that generates Flint morning/evening digests.
+    // Spark owns the timing (in the user's effective timezone) and POSTs to the
+    // routine, which calls back via the create-flint-digest MCP tool.
+    'flint_routine' => [
+        'url' => env('FLINT_ROUTINE_WEBHOOK_URL'),
+        'secret' => env('FLINT_ROUTINE_WEBHOOK_SECRET'),
+        'morning_time_weekday' => env('FLINT_MORNING_WEEKDAY', '07:30'),
+        'morning_time_weekend' => env('FLINT_MORNING_WEEKEND', '09:30'),
+        'evening_time' => env('FLINT_EVENING_TIME', '19:30'),
+        'morning_fallback' => env('FLINT_MORNING_FALLBACK', '11:00'),
+    ],
+
 ];

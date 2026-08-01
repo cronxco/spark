@@ -9,6 +9,8 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\Outline\OutlinePullTodayDayNote;
 use App\Models\Event;
 use App\Models\Integration;
+use App\Models\User;
+use App\Services\EffectiveTimezoneResolver;
 use App\Traits\HasProgressiveLoading;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -67,20 +69,24 @@ class Day extends Component
 
     public function mount(): void
     {
-        // Initialize date from route
+        // Initialize date from route, using the user's effective timezone so the
+        // "today"/"yesterday"/"tomorrow" boundaries match what the user sees (CRX-682).
+        $user = auth()->guard('web')->user();
+        $today = user_today($user);
+
         try {
             if (request()->routeIs('today.*')) {
-                $this->date = Carbon::today()->format('Y-m-d');
+                $this->date = $today->format('Y-m-d');
             } elseif (request()->routeIs('day.yesterday')) {
-                $this->date = Carbon::yesterday()->format('Y-m-d');
+                $this->date = $today->copy()->subDay()->format('Y-m-d');
             } elseif (request()->routeIs('tomorrow')) {
-                $this->date = Carbon::tomorrow()->format('Y-m-d');
+                $this->date = $today->copy()->addDay()->format('Y-m-d');
             } else {
                 $param = request()->route('date');
-                $this->date = $param ? Carbon::parse($param)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
+                $this->date = $param ? Carbon::parse($param)->format('Y-m-d') : $today->format('Y-m-d');
             }
         } catch (Throwable $e) {
-            $this->date = Carbon::today()->format('Y-m-d');
+            $this->date = $today->format('Y-m-d');
         }
 
         // Initialize collections
@@ -105,11 +111,18 @@ class Day extends Component
             return;
         }
 
+        $user = auth()->guard('web')->user();
+        $timezone = $user ? $this->timezoneForDate($user, $this->date) : 'UTC';
+
+        // Resolve the selected local day's bounds in the user's effective timezone,
+        // then convert to UTC for the (UTC-stored) `time` column query (CRX-682).
         try {
-            $selectedDate = Carbon::parse($this->date);
+            $dayStart = Carbon::parse($this->date, $timezone)->startOfDay();
         } catch (Throwable $e) {
-            $selectedDate = Carbon::today();
+            $dayStart = Carbon::today($timezone);
         }
+        $dayStartUtc = $dayStart->copy()->utc();
+        $dayEndUtc = $dayStart->copy()->endOfDay()->utc();
 
         // Load events with actor and target relationships
         // These are essential for display and must load together
@@ -135,7 +148,7 @@ class Day extends Component
                     $q->whereRaw('1 = 0');
                 }
             })
-            ->whereDate('time', $selectedDate)
+            ->whereBetween('time', [$dayStartUtc, $dayEndUtc])
             ->orderBy('time', 'desc');
 
         $this->allEvents = $query->get();
@@ -508,28 +521,31 @@ class Day extends Component
     public function navigateToDate(): void
     {
         try {
-            $selected = Carbon::parse($this->date)->startOfDay();
-            $today = Carbon::today();
+            // Compare calendar dates in the user's effective timezone (CRX-682),
+            // not absolute instants, so the "today/yesterday/tomorrow" routes resolve
+            // correctly for non-UTC users.
+            $selected = Carbon::parse($this->date)->format('Y-m-d');
+            $today = user_today(auth()->guard('web')->user());
 
-            if ($selected->equalTo($today)) {
+            if ($selected === $today->format('Y-m-d')) {
                 $this->redirect(route('today.main'), navigate: true);
 
                 return;
             }
 
-            if ($selected->equalTo($today->copy()->subDay())) {
+            if ($selected === $today->copy()->subDay()->format('Y-m-d')) {
                 $this->redirect(route('day.yesterday'), navigate: true);
 
                 return;
             }
 
-            if ($selected->equalTo($today->copy()->addDay())) {
+            if ($selected === $today->copy()->addDay()->format('Y-m-d')) {
                 $this->redirect(route('tomorrow'), navigate: true);
 
                 return;
             }
 
-            $this->redirect(route('day.show', ['date' => $selected->format('Y-m-d')]), navigate: true);
+            $this->redirect(route('day.show', ['date' => $selected]), navigate: true);
         } catch (Throwable $e) {
             // Ignore
         }
@@ -1030,5 +1046,30 @@ class Day extends Component
         ]);
 
         $this->filteredEvents = $filtered->values();
+    }
+
+    /**
+     * Resolve the IANA timezone to render a given local date in.
+     *
+     * The current and future days always use the live effective timezone, so
+     * "today" never regresses (CRX-682). Past days use point-in-time resolution —
+     * the timezone that was acknowledged on that date — probed at noon UTC of the
+     * target date to break the tz/day-boundary circularity at extreme offsets.
+     */
+    private function timezoneForDate(User $user, string $date): string
+    {
+        $resolver = app(EffectiveTimezoneResolver::class);
+
+        try {
+            $isPast = $date < $resolver->today($user)->toDateString();
+        } catch (Throwable $e) {
+            return $resolver->timezoneFor($user);
+        }
+
+        if (! $isPast) {
+            return $resolver->timezoneFor($user);
+        }
+
+        return $resolver->timezoneForAt($user, Carbon::parse($date, 'UTC')->setTime(12, 0));
     }
 }

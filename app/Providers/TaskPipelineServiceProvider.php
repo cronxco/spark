@@ -257,6 +257,44 @@ class TaskPipelineServiceProvider extends ServiceProvider
             runOnCreate: true,
             runOnUpdate: false,
         ));
+
+        // Morning Flint digest trigger - fires the digest routine the moment the
+        // Oura sleep-score event lands (when the morning slot has already passed).
+        TaskRegistry::register(new TaskDefinition(
+            key: 'dispatch_morning_digest_on_sleep_score',
+            name: 'Dispatch Morning Digest on Sleep Score',
+            description: 'Trigger the morning Flint digest routine when the Oura sleep score arrives',
+            jobClass: DispatchMorningDigestOnSleepScoreTask::class,
+            appliesTo: ['event'],
+            conditions: [
+                'service' => 'oura',
+                'action' => 'had_sleep_score',
+            ],
+            dependencies: [],
+            queue: 'tasks',
+            priority: 40,
+            runOnCreate: true,
+            runOnUpdate: false,
+        ));
+
+        // Digest notification - notify the user when a Flint digest is written,
+        // rather than on a fixed clock (morning timing is variable).
+        TaskRegistry::register(new TaskDefinition(
+            key: 'notify_on_digest_ready',
+            name: 'Notify on Digest Ready',
+            description: 'Send the daily digest notification when a Flint digest summary is created',
+            jobClass: NotifyOnDigestReadyTask::class,
+            appliesTo: ['event'],
+            conditions: [
+                'service' => 'flint',
+                'action' => 'had_summary',
+            ],
+            dependencies: [],
+            queue: 'tasks',
+            priority: 40,
+            runOnCreate: true,
+            runOnUpdate: false,
+        ));
     }
 
     /**

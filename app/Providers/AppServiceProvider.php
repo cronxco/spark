@@ -12,12 +12,13 @@ use App\Notifications\SparkNotification;
 use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
+use App\Services\EffectiveTimezoneResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Notifications\Events\NotificationSent;
-use Illuminate\Support\Facades\Event;
 /** @phpstan-ignore-next-line */
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Redis;
@@ -39,7 +40,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Memoize effective-timezone resolution within a single request or queued
+        // job. `scoped` (not `singleton`) so long-lived Horizon workers flush the
+        // memo between jobs and pick up a freshly acknowledged timezone.
+        $this->app->scoped(EffectiveTimezoneResolver::class);
     }
 
     /**

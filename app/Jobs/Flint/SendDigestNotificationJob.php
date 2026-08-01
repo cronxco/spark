@@ -6,6 +6,8 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use App\Services\EffectiveTimezoneResolver;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -58,16 +60,25 @@ class SendDigestNotificationJob implements ShouldQueue
                 'period' => $period,
             ]);
 
-            // Find the most recent digest block for this user created today
-            $today = now()->startOfDay();
+            // Find the most recent digest block for this user's *effective-timezone*
+            // local day, not the server (UTC) day. The digest `had_summary` event is
+            // stored with `time` anchored at the local date's 00:00 UTC marker (see
+            // CreateFlintDigestTool), so we bound the query by that same local date in
+            // UTC. Using a server-tz day boundary would wrongly drop a far-west user's
+            // digest once UTC rolls past midnight. If that storage ever moves to a real
+            // `now()` instant, these bounds must be revisited.
+            $localDate = app(EffectiveTimezoneResolver::class)->today($this->user)->toDateString();
+            $dayStartUtc = Carbon::parse($localDate, 'UTC')->startOfDay();
+            $dayEndUtc = Carbon::parse($localDate, 'UTC')->endOfDay();
+
             $digestBlock = Block::whereIn('block_type', ['flint_summarised_headline', 'flint_digest'])
-                ->whereHas('event', function ($query) use ($today) {
+                ->whereHas('event', function ($query) use ($dayStartUtc, $dayEndUtc) {
                     $query->where('service', 'flint')
                         ->whereIn('action', ['had_summary', 'had_analysis'])
                         ->whereHas('integration', function ($q) {
                             $q->where('user_id', $this->user->id);
                         })
-                        ->where('time', '>=', $today);
+                        ->whereBetween('time', [$dayStartUtc, $dayEndUtc]);
                 })
                 ->with(['event.target'])
                 ->orderBy('created_at', 'desc')
