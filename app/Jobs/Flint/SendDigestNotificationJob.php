@@ -6,6 +6,8 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use App\Services\EffectiveTimezoneResolver;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +30,9 @@ class SendDigestNotificationJob implements ShouldQueue
 
     public function __construct(
         public User $user,
-        public string $scheduleTime
+        public string $scheduleTime,
+        public ?string $period = null,
+        public ?string $digestEventId = null,
     ) {}
 
     public function handle(): void
@@ -50,7 +54,7 @@ class SendDigestNotificationJob implements ShouldQueue
         });
 
         try {
-            $period = $this->getDigestPeriod($this->scheduleTime);
+            $period = $this->period ?? $this->getDigestPeriod($this->scheduleTime);
 
             Log::info('Sending digest notification', [
                 'user_id' => $this->user->id,
@@ -58,16 +62,35 @@ class SendDigestNotificationJob implements ShouldQueue
                 'period' => $period,
             ]);
 
-            // Find the most recent digest block for this user created today
-            $today = now()->startOfDay();
+            // Find the most recent digest block for this user's *effective-timezone*
+            // local day, not the server (UTC) day. The digest `had_summary` event is
+            // stored with `time` anchored at the local date's 00:00 UTC marker (see
+            // CreateFlintDigestTool), so we bound the query by that same local date in
+            // UTC. Using a server-tz day boundary would wrongly drop a far-west user's
+            // digest once UTC rolls past midnight. If that storage ever moves to a real
+            // `now()` instant, these bounds must be revisited.
+            $localDate = app(EffectiveTimezoneResolver::class)->today($this->user)->toDateString();
+            $dayStartUtc = Carbon::parse($localDate, 'UTC')->startOfDay();
+            $dayEndUtc = Carbon::parse($localDate, 'UTC')->endOfDay();
+            $analysisStartUtc = Carbon::parse($localDate, app(EffectiveTimezoneResolver::class)->timezoneFor($this->user))->startOfDay()->utc();
+            $analysisEndUtc = Carbon::parse($localDate, app(EffectiveTimezoneResolver::class)->timezoneFor($this->user))->endOfDay()->utc();
+
             $digestBlock = Block::whereIn('block_type', ['flint_summarised_headline', 'flint_digest'])
-                ->whereHas('event', function ($query) use ($today) {
+                ->when($this->digestEventId, fn ($query) => $query->where('event_id', $this->digestEventId))
+                ->whereHas('event', function ($query) use ($dayStartUtc, $dayEndUtc, $analysisStartUtc, $analysisEndUtc) {
                     $query->where('service', 'flint')
-                        ->whereIn('action', ['had_summary', 'had_analysis'])
                         ->whereHas('integration', function ($q) {
                             $q->where('user_id', $this->user->id);
                         })
-                        ->where('time', '>=', $today);
+                        ->where(function ($query) use ($dayStartUtc, $dayEndUtc, $analysisStartUtc, $analysisEndUtc) {
+                            $query->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
+                                $query->where('action', 'had_summary')
+                                    ->whereBetween('time', [$dayStartUtc, $dayEndUtc]);
+                            })->orWhere(function ($query) use ($analysisStartUtc, $analysisEndUtc) {
+                                $query->where('action', 'had_analysis')
+                                    ->whereBetween('time', [$analysisStartUtc, $analysisEndUtc]);
+                            });
+                        });
                 })
                 ->with(['event.target'])
                 ->orderBy('created_at', 'desc')

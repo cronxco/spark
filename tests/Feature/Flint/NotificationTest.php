@@ -9,8 +9,10 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NotificationTest extends TestCase
@@ -36,9 +38,14 @@ class NotificationTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    #[Test]
     public function sends_digest_notification_when_digest_exists(): void
     {
         Notification::fake();
@@ -96,9 +103,7 @@ class NotificationTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function does_not_send_notification_when_no_digest_found(): void
     {
         Notification::fake();
@@ -111,9 +116,7 @@ class NotificationTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function notification_contains_correct_digest_data(): void
     {
         Notification::fake();
@@ -169,6 +172,64 @@ class NotificationTest extends TestCase
                     && $notification->period === 'evening'
                     && count($notification->blocks) > 0;
             }
+        );
+    }
+
+    /**
+     * The digest block lookup must use the user's effective-timezone local day,
+     * not the server (UTC) day. A far-west user's digest is dated for their local
+     * day but stored at that date's 00:00 UTC marker (see CreateFlintDigestTool);
+     * once UTC has rolled past midnight, a server-tz `startOfDay()` bound would
+     * wrongly exclude it. Reproduces and guards the far-west day-boundary bug.
+     */
+    #[Test]
+    public function finds_digest_using_effective_timezone_local_day_for_far_west_user(): void
+    {
+        Notification::fake();
+
+        $this->user->setTimezone('Pacific/Honolulu'); // UTC-10, no time_travel event => profile tz
+
+        $localDate = '2026-06-14';
+
+        // The user is late in their local day; UTC has already rolled to the 15th.
+        Carbon::setTestNow(Carbon::parse("{$localDate} 22:00", 'Pacific/Honolulu')); // = 2026-06-15 08:00 UTC
+
+        $dayObject = EventObject::factory()->create([
+            'concept' => 'day',
+            'type' => 'day',
+            'title' => $localDate,
+            'time' => Carbon::parse($localDate, 'UTC'),
+        ]);
+
+        // Mirror production storage: the had_summary event's `time` is the
+        // local_date anchored at 00:00 UTC (CreateFlintDigestTool:113), which is
+        // BEFORE now()->startOfDay() (= 2026-06-15 00:00 UTC) at this moment.
+        $flintEvent = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'target_id' => $dayObject->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => Carbon::parse($localDate, 'UTC'), // 2026-06-14 00:00 UTC
+        ]);
+
+        Block::create([
+            'event_id' => $flintEvent->id,
+            'block_type' => 'flint_digest',
+            'time' => Carbon::parse($localDate, 'UTC'),
+            'metadata' => [
+                'headline' => 'Evening Digest',
+                'summary' => 'Far-west summary.',
+            ],
+        ]);
+
+        $job = new SendDigestNotificationJob($this->user, '18:00');
+        $job->handle();
+
+        Notification::assertSentTo(
+            [$this->user],
+            DailyDigestReady::class,
+            fn ($notification) => $notification->digestObject->id === $dayObject->id
+                && $notification->period === 'evening'
         );
     }
 }
