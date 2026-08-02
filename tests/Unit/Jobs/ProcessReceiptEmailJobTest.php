@@ -9,6 +9,8 @@ use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class ProcessReceiptEmailJobTest extends TestCase
@@ -38,7 +40,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_be_instantiated()
     {
         $job = new ProcessReceiptEmailJob(
@@ -49,7 +51,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertInstanceOf(ProcessReceiptEmailJob::class, $job);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_correct_timeout()
     {
         $job = new ProcessReceiptEmailJob(
@@ -60,7 +62,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertEquals(300, $job->timeout);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_correct_retry_settings()
     {
         $job = new ProcessReceiptEmailJob(
@@ -72,7 +74,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertEquals([60, 300, 900], $job->backoff);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_unique_id_based_on_integration_and_s3_key()
     {
         $s3Key = 'receipts/test-email-123.eml';
@@ -85,7 +87,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertStringContainsString(md5($s3Key), $uniqueId);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_different_unique_ids_for_different_s3_keys()
     {
         $job1 = new ProcessReceiptEmailJob(
@@ -101,7 +103,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertNotEquals($job1->uniqueId(), $job2->uniqueId());
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_different_unique_ids_for_different_integrations()
     {
         $anotherIntegration = Integration::factory()->create([
@@ -119,7 +121,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertNotEquals($job1->uniqueId(), $job2->uniqueId());
     }
 
-    /** @test */
+    #[Test]
     public function it_can_be_dispatched_to_queue()
     {
         Queue::fake();
@@ -135,7 +137,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function it_stores_s3_object_key()
     {
         $s3Key = 'receipts/folder/subfolder/email-12345.eml';
@@ -144,7 +146,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertEquals($s3Key, $job->s3ObjectKey);
     }
 
-    /** @test */
+    #[Test]
     public function it_stores_integration_reference()
     {
         $job = new ProcessReceiptEmailJob(
@@ -157,7 +159,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertEquals('receipts', $job->integration->instance_type);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_s3_keys_with_special_characters()
     {
         $s3Key = 'receipts/2024/01/email with spaces & special+chars.eml';
@@ -167,7 +169,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertStringContainsString(md5($s3Key), $job->uniqueId());
     }
 
-    /** @test */
+    #[Test]
     public function it_implements_should_queue_interface()
     {
         $job = new ProcessReceiptEmailJob(
@@ -178,7 +180,7 @@ class ProcessReceiptEmailJobTest extends TestCase
         $this->assertInstanceOf(ShouldQueue::class, $job);
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_enhanced_idempotency_trait()
     {
         $job = new ProcessReceiptEmailJob(
@@ -189,5 +191,54 @@ class ProcessReceiptEmailJobTest extends TestCase
         // EnhancedIdempotency trait provides uniqueId method
         $this->assertTrue(method_exists($job, 'uniqueId'));
         $this->assertNotEmpty($job->uniqueId());
+    }
+
+    #[Test]
+    public function it_captures_the_message_id_header_when_parsing_an_email()
+    {
+        $job = new ProcessReceiptEmailJob(
+            $this->integration,
+            'receipts/test-email.eml'
+        );
+
+        $rawEmail = <<<'EMAIL'
+        From: receipts@digitalocean.com
+        To: receipts@spark.cronx.co
+        Subject: Your DigitalOcean Invoice
+        Date: Sat, 01 Aug 2026 09:10:00 +0000
+        Message-ID: <invoice-abc123@digitalocean.com>
+        Content-Type: text/plain; charset=utf-8
+
+        Thanks for your payment.
+        EMAIL;
+
+        $parseEmail = new ReflectionMethod($job, 'parseEmail');
+        $result = $parseEmail->invoke($job, $rawEmail);
+
+        $this->assertSame('invoice-abc123@digitalocean.com', $result['message_id']);
+    }
+
+    #[Test]
+    public function it_returns_an_empty_message_id_when_the_header_is_missing()
+    {
+        $job = new ProcessReceiptEmailJob(
+            $this->integration,
+            'receipts/test-email.eml'
+        );
+
+        $rawEmail = <<<'EMAIL'
+        From: receipts@digitalocean.com
+        To: receipts@spark.cronx.co
+        Subject: Your DigitalOcean Invoice
+        Date: Sat, 01 Aug 2026 09:10:00 +0000
+        Content-Type: text/plain; charset=utf-8
+
+        Thanks for your payment.
+        EMAIL;
+
+        $parseEmail = new ReflectionMethod($job, 'parseEmail');
+        $result = $parseEmail->invoke($job, $rawEmail);
+
+        $this->assertSame('', $result['message_id']);
     }
 }
