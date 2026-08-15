@@ -1,23 +1,23 @@
 # ADR 0017: Task Pipeline for Derived Analysis
 
-**Status: Accepted (reconstructed current state)**
+**Status: Accepted**
 
-> **Note**: This ADR records observed implementation. It is not evidence that the design was intentionally chosen or is sufficient.
+> **Note**: Implementation evidence is retained; the Product Owner decision below establishes the current policy.
 
 ## Context
 A task-pipeline provider and queued jobs execute registry-defined, dependency-aware derived analysis.
 
 ## Decision
-The current system uses a task pipeline for derived work.
+Spark uses an explicit task-pipeline dependency state machine. Failed or cancelled prerequisites block downstream work; `failed`, `blocked`, `skipped`, and `succeeded` are distinct states; retries/restarts are auditable and may unblock dependents only after the prerequisite succeeds.
 
 ## Consequences
-Task behavior inherits queue failure semantics; ownership, dependency failure, and replay policy remain open.
+Task behavior inherits ADR 0009 queue recovery policy. State transitions, replay authority, and ownership must preserve the selected dependency semantics.
 
 ## Alternatives rejected
-No explicit historical rejection is evidenced.
+Independent best-effort downstream execution and pipeline fail-fast cancellation were rejected.
 
 ## Related repository paths
 `app/Providers/TaskPipelineServiceProvider.php`, `app/Jobs/TaskPipeline/`, `docs/Architecture/TASK_PIPELINE.md`.
 
 ## Evidence gaps / open questions
-Define task status guarantees and replay authority.
+Define state-transition implementation, audit evidence, and authorised replay ownership.
