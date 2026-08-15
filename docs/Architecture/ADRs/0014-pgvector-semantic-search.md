@@ -17,7 +17,7 @@ Embedding work is queued; provider/model changes, replay, and extension compatib
 No explicit historical rejection is evidenced.
 
 ## Related repository paths
-`database/migrations/2022_08_03_000000_create_vector_extension.php`, `database/migrations/2025_11_15_000001_update_embeddings_to_vector_type.php`, `2025_11_15_000002_add_vector_indexes.php`, `docs/Architecture/SEMANTIC_SEARCH.md`.
+`database/migrations/2022_08_03_000000_create_vector_extension.php`, `database/migrations/2025_11_15_000001_update_embeddings_to_vector_type.php`, `database/migrations/2025_11_15_000002_add_vector_indexes.php`, `docs/Architecture/SEMANTIC_SEARCH.md`.
 
 ## Evidence gaps / open questions
 Define re-indexing and rollback policy.

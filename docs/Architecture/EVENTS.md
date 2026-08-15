@@ -87,7 +87,7 @@ Events are soft-deletable and support tags, activity logging, and view tracking.
 ### Relationships
 
 - `integration()` - BelongsTo Integration
-- `source()` - BelongsTo EventObject (via `source_id`)
+- **Warning — unsupported relationship:** `source()` is a legacy model method. `source_id` is external text from the source system, not an EventObject foreign key; this is not a supported EventObject relationship or contract.
 - `actor()` - BelongsTo EventObject - Who/what performed the action
 - `target()` - BelongsTo EventObject - What the action was performed on
 - `blocks()` - HasMany Block - Data visualizations/summaries

@@ -17,7 +17,7 @@ An event for tenant A can reference an object for tenant B if application valida
 No explicit historical rejection is evidenced.
 
 ## Related repository paths
-`database/migrations/2025_07_27_142753_create_integrations_table.php`, `2025_07_27_143050_create_objects_table.php`, `2025_07_27_143829_create_events_table.php`, `2025_11_09_163057_create_relationships_table.php`, `app/Models/Event.php`, `app/Http/Controllers/EventApiController.php`, `app/Traits/AuthorizesOwnership.php`.
+`database/migrations/2025_07_27_142753_create_integrations_table.php`, `database/migrations/2025_07_27_143050_create_objects_table.php`, `database/migrations/2025_07_27_143829_create_events_table.php`, `database/migrations/2025_11_09_163057_create_relationships_table.php`, `app/Models/Event.php`, `app/Http/Controllers/EventApiController.php`, `app/Traits/AuthorizesOwnership.php`.
 
 ## Evidence gaps / open questions
 See [ADR 0004](0004-proposed-tenant-integrity-hardening.md); define test coverage and historical-data audit.

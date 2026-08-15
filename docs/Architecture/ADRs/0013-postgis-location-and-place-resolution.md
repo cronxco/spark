@@ -17,7 +17,7 @@ Spatial lookup is indexed. Extension rollback is database-wide and unsafe guaran
 No explicit historical rejection is evidenced.
 
 ## Related repository paths
-`database/migrations/2025_12_25_120651_enable_postgis_extension.php`, `2025_12_25_120706_add_location_to_events_table.php`, `2025_12_25_120729_add_location_to_event_objects_table.php`, `app/Models/Place.php`, `docs/Architecture/PLACES.md`.
+`database/migrations/2025_12_25_120651_enable_postgis_extension.php`, `database/migrations/2025_12_25_120706_add_location_to_events_table.php`, `database/migrations/2025_12_25_120729_add_location_to_event_objects_table.php`, `app/Models/Place.php`, `docs/Architecture/PLACES.md`.
 
 ## Evidence gaps / open questions
 Define precision, retention, and rollback policy.

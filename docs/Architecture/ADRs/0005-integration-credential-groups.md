@@ -17,7 +17,7 @@ Credential reuse is possible across instances. Encryption-at-rest, rotation, acc
 No explicit historical rejection is evidenced.
 
 ## Related repository paths
-`database/migrations/2025_07_27_142700_create_integration_groups_table.php`, `2025_07_27_142753_create_integrations_table.php`, `app/Models/IntegrationGroup.php`, `app/Models/Integration.php`.
+`database/migrations/2025_07_27_142700_create_integration_groups_table.php`, `database/migrations/2025_07_27_142753_create_integrations_table.php`, `app/Models/IntegrationGroup.php`, `app/Models/Integration.php`.
 
 ## Evidence gaps / open questions
 See [ADR 0018](0018-proposed-credential-security-hardening.md).
