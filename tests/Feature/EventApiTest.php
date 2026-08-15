@@ -27,8 +27,17 @@ class EventApiTest extends TestCase
     #[Test]
     public function unauthenticated_users_cannot_create_events()
     {
-        $response = $this->postJson('/api/events', []);
+        $payload = $this->eventPayload('00000000-0000-4000-8000-000000000000');
+        $objectsBefore = EventObject::count();
+        $eventsBefore = Event::count();
+        $blocksBefore = Block::count();
+
+        $response = $this->postJson('/api/events', $payload);
+
         $response->assertStatus(401);
+        $this->assertSame($objectsBefore, EventObject::count());
+        $this->assertSame($eventsBefore, Event::count());
+        $this->assertSame($blocksBefore, Block::count());
     }
 
     #[Test]
@@ -95,40 +104,30 @@ class EventApiTest extends TestCase
     }
 
     #[Test]
-    public function event_creation_rejects_another_users_integration_without_writing_records(): void
+    public function event_creation_rejects_foreign_and_unknown_integrations_opaquely_without_writing_records(): void
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
         Sanctum::actingAs($user);
 
         $otherIntegration = Integration::factory()->create(['user_id' => $otherUser->id]);
-        $payload = $this->eventPayload($otherIntegration->id);
+        $foreignPayload = $this->eventPayload($otherIntegration->id);
+        $unknownPayload = $this->eventPayload('00000000-0000-4000-8000-000000000000');
         $objectsBefore = EventObject::count();
         $eventsBefore = Event::count();
         $blocksBefore = Block::count();
 
-        $response = $this->postJson('/api/events', $payload);
+        $foreignResponse = $this->postJson('/api/events', $foreignPayload);
 
-        $response->assertNotFound();
+        $foreignResponse->assertNotFound();
         $this->assertSame($objectsBefore, EventObject::count());
         $this->assertSame($eventsBefore, Event::count());
         $this->assertSame($blocksBefore, Block::count());
-    }
 
-    #[Test]
-    public function event_creation_rejects_an_unknown_integration_without_writing_records(): void
-    {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        $unknownResponse = $this->postJson('/api/events', $unknownPayload);
 
-        $payload = $this->eventPayload('00000000-0000-4000-8000-000000000000');
-        $objectsBefore = EventObject::count();
-        $eventsBefore = Event::count();
-        $blocksBefore = Block::count();
-
-        $response = $this->postJson('/api/events', $payload);
-
-        $response->assertNotFound();
+        $unknownResponse->assertNotFound();
+        $this->assertSame($foreignResponse->getContent(), $unknownResponse->getContent());
         $this->assertSame($objectsBefore, EventObject::count());
         $this->assertSame($eventsBefore, Event::count());
         $this->assertSame($blocksBefore, Block::count());
@@ -142,10 +141,16 @@ class EventApiTest extends TestCase
 
         $payload = $this->eventPayload('00000000-0000-4000-8000-000000000000');
         unset($payload['event']['integration_id']);
+        $objectsBefore = EventObject::count();
+        $eventsBefore = Event::count();
+        $blocksBefore = Block::count();
 
         $this->postJson('/api/events', $payload)
             ->assertUnprocessable()
             ->assertJsonValidationErrors('event.integration_id');
+        $this->assertSame($objectsBefore, EventObject::count());
+        $this->assertSame($eventsBefore, Event::count());
+        $this->assertSame($blocksBefore, Block::count());
     }
 
     /**
