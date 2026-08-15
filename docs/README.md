@@ -12,6 +12,7 @@ Welcome to the Spark documentation. This directory contains comprehensive docume
 ```
 docs/
 ├── Architecture/      # Core system and feature documentation
+├── Architecture/ADRs/ # Reconstructed architecture decision records
 ├── Guides/           # Setup and operational guides
 ├── Integrations/     # Service-specific documentation
 ├── mobile/           # iOS companion app API
@@ -28,6 +29,10 @@ docs/
 | [DOCS_STYLE_GUIDE.md](DOCS_STYLE_GUIDE.md) | Documentation standards and templates                           |
 
 ### Core Architecture
+
+| Document | Description |
+| --- | --- |
+| [ADR index](Architecture/ADRs/README.md) | Evidence-backed reconstructed decisions and open-decision register |
 
 | Document                                          | Description                                                                      |
 | ------------------------------------------------- | -------------------------------------------------------------------------------- |
