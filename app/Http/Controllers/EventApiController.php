@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class EventApiController extends Controller
 {
@@ -72,13 +73,25 @@ class EventApiController extends Controller
             'blocks.*' => 'array',
         ]);
 
-        $result = DB::transaction(function () use ($validated) {
+        Validator::make($validated, [
+            'event.integration_id' => 'required|uuid',
+        ])->validate();
+
+        $user = $request->user();
+        $integration = $user->integrations()->findOrFail($validated['event']['integration_id']);
+
+        $result = DB::transaction(function () use ($validated, $user, $integration) {
             // Create actor object
-            $actor = EventObject::create($validated['actor']);
+            $actor = EventObject::create(array_merge($validated['actor'], [
+                'user_id' => $user->id,
+            ]));
             // Create target object
-            $target = EventObject::create($validated['target']);
+            $target = EventObject::create(array_merge($validated['target'], [
+                'user_id' => $user->id,
+            ]));
             // Create event, linking actor and target
             $eventData = array_merge($validated['event'], [
+                'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'target_id' => $target->id,
             ]);
