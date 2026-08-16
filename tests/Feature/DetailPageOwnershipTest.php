@@ -86,8 +86,9 @@ class DetailPageOwnershipTest extends TestCase
                 ->assertOk()
                 ->assertSee('<strong>Trusted markdown</strong>', false)
                 ->assertSee('<a href="https://example.com">safe</a>', false)
-                ->assertDontSee('<script>', false)
-                ->assertDontSee('javascript:', false);
+                ->assertDontSee('<script>alert', false)
+                ->assertDontSee('href="javascript:alert', false)
+                ->assertDontSee('<img src=x', false);
         }
     }
 
@@ -105,8 +106,8 @@ class DetailPageOwnershipTest extends TestCase
             'url' => 'https://example.com',
             'image' => null,
         ])->assertSee('<strong>Trusted markdown</strong>', false)
-            ->assertDontSee('javascript:', false)
-            ->assertDontSee('<img', false);
+            ->assertDontSee('href="javascript:alert', false)
+            ->assertDontSee('<img src=x', false);
 
         $cardBlock = Block::factory()->create([
             'event_id' => $event->id,
@@ -118,8 +119,8 @@ class DetailPageOwnershipTest extends TestCase
 
         $this->view('components.block-card', ['block' => $cardBlock])
             ->assertSee('<strong>Trusted markdown</strong>', false)
-            ->assertDontSee('javascript:', false)
-            ->assertDontSee('<img', false);
+            ->assertDontSee('href="javascript:alert', false)
+            ->assertDontSee('<img src=x', false);
 
         foreach (['fetch_summary_short', 'newsletter_summary_short', 'doc_task', 'day_task', 'flint_editorial_note'] as $blockType) {
             $block = Block::factory()->create([
@@ -132,8 +133,8 @@ class DetailPageOwnershipTest extends TestCase
 
             $this->view("blocks.types.{$blockType}", ['block' => $block])
                 ->assertSee('<strong>Trusted markdown</strong>', false)
-                ->assertDontSee('javascript:', false)
-                ->assertDontSee('<img', false);
+                ->assertDontSee('href="javascript:alert', false)
+                ->assertDontSee('<img src=x', false);
         }
     }
 

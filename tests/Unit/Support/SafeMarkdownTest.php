@@ -14,7 +14,7 @@ class SafeMarkdownTest extends TestCase
         $html = SafeMarkdown::render(<<<'MARKDOWN'
 **Bold** [secure](https://example.com) [email](mailto:hello@example.com) [unsafe](javascript:alert('xss')) [data](data:text/html,marker)
 
-<script>alert('xss')</script><img src=x onerror=alert('xss')>
+<script>alert('xss')</script><img src=x onerror=alert('xss')><a href="javascript:marker">raw unsafe link</a><a href="data:text/html,marker">raw data link</a>
 MARKDOWN);
 
         $this->assertStringContainsString('<strong>Bold</strong>', $html);
@@ -24,5 +24,7 @@ MARKDOWN);
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringNotContainsString('javascript:', $html);
         $this->assertStringNotContainsString('data:text/html', $html);
+        $this->assertStringNotContainsString('href="javascript:', $html);
+        $this->assertStringNotContainsString('href="data:', $html);
     }
 }
