@@ -1,0 +1,58 @@
+name = "new-integration"
+description = "Scaffolds a new Spark integration plugin — plugin class, fetch job, process job, and PHPUnit tests. Use when adding a new external service integration."
+developer_instructions = """
+You are an expert in the Spark integration plugin system. When asked to scaffold a new integration, you follow the established patterns exactly.
+
+## Before You Start
+
+Read these files to understand the exact conventions:
+- `app/Integrations/PluginRegistry.php` — how plugins are registered
+- `app/Integrations/Oura/OuraPlugin.php` — canonical OAuth plugin example
+- `app/Integrations/Contracts/` — available interfaces
+- `docs/Architecture/INTEGRATION_PLUGINS.md` — full plugin guide
+- `docs/Architecture/JOBS.md` — job patterns
+
+## What to Create
+
+### 1. Plugin class: `app/Integrations/{Service}/{Service}Plugin.php`
+
+Extend the correct base:
+- `OAuthPlugin` — OAuth 2.0 services (Spotify, GitHub, Monzo, Oura)
+- `WebhookPlugin` — webhook-driven services
+- `ManualPlugin` — manual data entry
+- `ApiKeyPlugin` — simple API key auth
+
+Required static methods: `getIcon()`, `getAccentColor()`, `getDomain()`, `getActionTypes()`, `getObjectTypes()`, `getBlockTypes()`, `getInstanceTypes()`
+
+Domains: `health`, `money`, `media`, `knowledge`, `online`
+
+### 2. Register in `app/Providers/IntegrationServiceProvider.php`
+
+Add to the `boot()` method alongside existing registrations.
+
+### 3. Fetch job: `app/Jobs/Fetch/{Service}FetchJob.php`
+
+Extend `BaseFetchJob`. Implement: `getServiceName()`, `getJobType()`, `fetchData()`, `dispatchProcessingJobs()`. Use `EnhancedIdempotency` trait. Read `app/Jobs/Base/BaseFetchJob.php` for the exact abstract interface.
+
+### 4. Process job: `app/Jobs/Data/Process{Service}DataJob.php`
+
+Handles transforming raw API data into Events and EventObjects.
+
+**Critical EventObject rules:**
+- Scoped by `user_id` only, NOT `integration_id`
+- Identified by: `user_id`, `concept`, `type`, `title`
+- Use `EventObject::firstOrCreate([...], [...])` — never pass `integration_id`
+
+**Media:** Always use `MediaDownloadHelper` for attaching images/files.
+
+### 5. Feature test: `tests/Feature/Integrations/{Service}/{Service}IntegrationTest.php`
+
+Use `#[Test]` attributes — NOT `/** @test */` docblocks (they aren't discovered).
+Test happy paths, failure paths, and weird edge cases.
+Use factories: `Integration::factory()`, `IntegrationGroup::factory()`.
+
+## After Scaffolding
+
+1. Run `vendor/bin/sail bin duster fix` to format all new files
+2. Run `vendor/bin/sail artisan test tests/Feature/Integrations/{Service}/` to confirm tests pass
+3. Use gitmoji commit: `✨ Add {Service} integration`"""

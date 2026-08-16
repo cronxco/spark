@@ -73,6 +73,7 @@ class CompactEventResource extends JsonResource
 
         if ($this->relationLoaded('tags')) {
             $data['tags'] = $this->tags->map(fn ($tag) => [
+                'id' => (string) $tag->id,
                 'name' => $tag->name,
                 'type' => $tag->type,
             ])->values()->all();

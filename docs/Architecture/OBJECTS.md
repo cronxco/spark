@@ -83,7 +83,7 @@ EventObjects are soft-deletable and support tags, media, activity logging, and v
 ### Relationships
 
 - `user()` - BelongsTo User
-- `integration()` - BelongsTo Integration (nullable, resolved from metadata or joins)
+- **Warning — unsupported relationship:** `integration()` is a legacy model method with no `integration_id` column backing it. EventObjects are user-scoped and this is not a supported Integration relationship or contract.
 - `actorEvents()` - HasMany Event (where this is `actor_id`)
 - `targetEvents()` - HasMany Event (where this is `target_id`)
 - `events()` - Union of actorEvents and targetEvents

@@ -69,6 +69,11 @@ class EventResource extends JsonResource
             $data['url'] = $this->url;
         }
 
+        // Message-ID for email-derived events (receipts, newsletters)
+        if ($messageId = ($this->event_metadata['email_message_id'] ?? null)) {
+            $data['message_id'] = $messageId;
+        }
+
         // Location if present
         if ($this->location_address) {
             $data['location_address'] = $this->location_address;

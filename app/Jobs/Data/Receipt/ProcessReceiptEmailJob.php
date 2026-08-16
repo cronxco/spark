@@ -148,6 +148,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
             $subject = $message->getHeaderValue('subject') ?: 'No Subject';
             $from = $message->getHeaderValue('from') ?: '';
             $date = $message->getHeaderValue('date') ?: now()->toRfc2822String();
+            $messageId = $message->getHeaderValue('message-id') ?: '';
 
             // Extract text content
             $textPlain = $message->getTextContent() ?: '';
@@ -174,6 +175,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
             Log::info('Receipt: Parsed email', [
                 'subject' => $subject,
                 'from' => $from,
+                'message_id' => $messageId,
                 'text_length' => strlen($combinedText),
                 'attachments_count' => count($attachments),
             ]);
@@ -182,6 +184,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 'subject' => $subject,
                 'from' => $from,
                 'date' => $date,
+                'message_id' => $messageId,
                 'text_plain' => $textPlain,
                 'text_html' => $textHtml,
                 'pdf_text' => $pdfText,
@@ -308,6 +311,8 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 'transaction_summary' => $receiptData['transaction_summary'],
                 'matching_hints' => $receiptData['matching_hints'],
                 'raw_extraction' => $receiptData, // Store full extraction for debugging
+                'email_message_id' => $parsedEmail['message_id'],
+                'raw_email_s3_key' => $this->s3ObjectKey,
             ],
             'target_id' => $merchant->id,
             'target_metadata' => [],

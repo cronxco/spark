@@ -4,6 +4,7 @@ use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\EffectiveTimezoneResolver;
 use App\Services\LoggingService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -16,44 +17,35 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 if (! function_exists('user_now')) {
     /**
-     * Get the current time in the user's timezone.
+     * Get the current time in the user's effective timezone (latest acknowledged
+     * travel timezone, falling back to the profile timezone, then UTC).
      * If no user is provided, falls back to UTC.
      */
     function user_now(?User $user = null): Carbon
     {
-        $timezone = $user?->getTimezone() ?? 'UTC';
-
-        return Carbon::now($timezone);
+        return app(EffectiveTimezoneResolver::class)->now($user);
     }
 }
 
 if (! function_exists('user_today')) {
     /**
-     * Get today's date in the user's timezone.
+     * Get today's date in the user's effective timezone.
      * If no user is provided, falls back to UTC.
      */
     function user_today(?User $user = null): Carbon
     {
-        $timezone = $user?->getTimezone() ?? 'UTC';
-
-        return Carbon::today($timezone);
+        return app(EffectiveTimezoneResolver::class)->today($user);
     }
 }
 
 if (! function_exists('to_user_timezone')) {
     /**
-     * Convert a datetime to the user's timezone.
+     * Convert a datetime to the user's effective timezone.
      * If no user is provided, returns the datetime as-is.
      */
     function to_user_timezone(Carbon $datetime, ?User $user = null): Carbon
     {
-        if (! $user) {
-            return $datetime;
-        }
-
-        $timezone = $user->getTimezone();
-
-        return $datetime->copy()->setTimezone($timezone);
+        return app(EffectiveTimezoneResolver::class)->convert($datetime, $user);
     }
 }
 

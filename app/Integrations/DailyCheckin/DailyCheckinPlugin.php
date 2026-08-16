@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\User;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaceDetectionService;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -413,7 +414,45 @@ class DailyCheckinPlugin extends ManualPlugin
             ->where('action', 'time_travel')
             // Order by the microsecond-precision metadata stamp; `time`/`created_at`
             // are only second-precise and cannot disambiguate same-second events.
-            ->orderByDesc('event_metadata->acknowledged_at')
+            ->orderByRaw("COALESCE((event_metadata->>'acknowledged_at')::timestamptz, time) DESC")
+            ->orderByDesc('time')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Resolve the user's latest acknowledged "time travel" event as of a given
+     * instant — the most recent acknowledgement whose timestamp is at-or-before
+     * `$instant`. Used to render historical days in the timezone that was
+     * acknowledged on that date (point-in-time resolution).
+     *
+     * The comparison prefers the microsecond-precision `acknowledged_at` metadata
+     * stamp (written in the fixed-width `Y-m-d\TH:i:s.u\Z` format, which sorts
+     * lexicographically in chronological order). Older events that predate that
+     * stamp lack the key, so they fall back to the second-precise `time` column.
+     *
+     * @param  int|string  $userId  The user ID
+     */
+    public function getLatestTimezoneEventAt(int|string $userId, Carbon $instant): ?Event
+    {
+        $stamp = $instant->copy()->utc()->format('Y-m-d\TH:i:s.u\Z');
+
+        return Event::whereHas('integration', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->where('service', 'daily_checkin')
+            ->where('action', 'time_travel')
+            ->where(function ($q) use ($stamp, $instant) {
+                $q->where('event_metadata->acknowledged_at', '<=', $stamp)
+                    ->orWhere(function ($q2) use ($instant) {
+                        $q2->whereNull('event_metadata->acknowledged_at')
+                            ->where('time', '<=', $instant);
+                    });
+            })
+            // NULLS LAST is required here: Postgres sorts NULL first in a DESC
+            // order by default, which would let a legacy event with no stamp
+            // outrank a newer, properly-stamped acknowledgement.
+            ->orderByRaw("(event_metadata->>'acknowledged_at') DESC NULLS LAST")
             ->orderByDesc('time')
             ->orderByDesc('id')
             ->first();
