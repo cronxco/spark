@@ -70,6 +70,28 @@ class DetailPageOwnershipTest extends TestCase
     }
 
     #[Test]
+    public function detail_pages_render_stored_markdown_safely(): void
+    {
+        $content = "**Trusted markdown** [safe](https://example.com) [unsafe](javascript:alert('xss'))\n\n<script>alert('xss')</script>";
+        $object = EventObject::factory()->create([
+            'user_id' => $this->owner->id,
+            'content' => $content,
+        ]);
+        $event = $this->ownedEvent();
+        $event->update(['target_id' => $object->id]);
+
+        foreach ([route('objects.show', $object), route('events.show', $event)] as $route) {
+            $this->actingAs($this->owner)
+                ->get($route)
+                ->assertOk()
+                ->assertSee('<strong>Trusted markdown</strong>', false)
+                ->assertSee('<a href="https://example.com">safe</a>', false)
+                ->assertDontSee('<script>', false)
+                ->assertDontSee('javascript:', false);
+        }
+    }
+
+    #[Test]
     public function block_detail_is_forbidden_for_non_owner(): void
     {
         $block = Block::factory()->create(['event_id' => $this->ownedEvent()->id]);

@@ -66,7 +66,7 @@ EventObjects are soft-deletable and support tags, media, activity logging, and v
 | `concept`              | text          | Category of object (user, account, track, device, etc.)          |
 | `type`                 | text          | Specific type within concept (spotify_track, bank_account, etc.) |
 | `title`                | text          | Display name (lockable)                                          |
-| `content`              | text          | Full content/description (lockable)                              |
+| `content`              | text          | Full Markdown content/description (lockable); raw HTML is stripped on detail pages |
 | `metadata`             | JSON          | Custom data (locked flag, integration info, etc.)                |
 | `url`                  | text          | Associated URL                                                   |
 | `media_url`            | text          | Legacy media URL (migrated to Media Library)                     |

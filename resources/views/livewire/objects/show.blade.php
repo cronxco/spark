@@ -833,7 +833,7 @@ new class extends Component
                     <x-slot:content>
                         <div class="max-w-prose mx-auto pt-4">
                             <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                                {!! Str::markdown($this->object->content) !!}
+                                {!! \App\Support\SafeMarkdown::render($this->object->content) !!}
                             </div>
                         </div>
                     </x-slot:content>
