@@ -418,6 +418,20 @@ class BlockTest extends TestCase
     }
 
     #[Test]
+    public function it_strips_unsafe_markup_when_rendering_content_as_html(): void
+    {
+        $block = Block::factory()->create([
+            'event_id' => $this->event->id,
+            'metadata' => ['content' => "[unsafe](javascript:alert('xss')) <img src=x onerror=alert('xss')>"],
+        ]);
+
+        $html = $block->getContentAsHtml();
+
+        $this->assertStringNotContainsString('javascript:', $html);
+        $this->assertStringNotContainsString('<img', $html);
+    }
+
+    #[Test]
     public function validation_rules_include_unique_title_per_event(): void
     {
         $rules = Block::validationRules($this->event->id);

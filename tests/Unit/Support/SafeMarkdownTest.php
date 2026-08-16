@@ -12,7 +12,7 @@ class SafeMarkdownTest extends TestCase
     public function it_preserves_markdown_and_safe_links_while_stripping_raw_html_and_unsafe_links(): void
     {
         $html = SafeMarkdown::render(<<<'MARKDOWN'
-**Bold** [secure](https://example.com) [email](mailto:hello@example.com) [unsafe](javascript:alert('xss'))
+**Bold** [secure](https://example.com) [email](mailto:hello@example.com) [unsafe](javascript:alert('xss')) [data](data:text/html,marker)
 
 <script>alert('xss')</script><img src=x onerror=alert('xss')>
 MARKDOWN);
@@ -23,5 +23,6 @@ MARKDOWN);
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringNotContainsString('javascript:', $html);
+        $this->assertStringNotContainsString('data:text/html', $html);
     }
 }

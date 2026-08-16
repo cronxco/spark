@@ -30,7 +30,7 @@ $model = $block->metadata['model'] ?? null;
         <div class="relative">
             <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
                 <div class="text-base text-base-content/80 leading-relaxed prose prose-base max-w-none">
-                    {!! str($summary)->markdown() !!}
+                    {!! \App\Support\SafeMarkdown::render($summary) !!}
                 </div>
             </div>
             {{-- AI Badge --}}

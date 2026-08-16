@@ -323,7 +323,7 @@ if ($block->hasContent()) {
 
 **`getContentAsHtml(): ?string`**
 
-Converts markdown content to HTML using a Markdown parser.
+Converts Markdown content to safe HTML using the shared renderer. Raw HTML and unsafe link schemes are stripped.
 
 ```php
 $html = $block->getContentAsHtml();

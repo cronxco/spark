@@ -28,7 +28,7 @@ $wordCount = $block->metadata['word_count'] ?? str_word_count($summary);
         <div class="relative">
             <div class="bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg p-3 border border-warning/50">
                 <div class="text-sm text-base-content/80 leading-relaxed prose prose-sm max-w-none">
-                    {!! str($summary)->markdown() !!}
+                    {!! \App\Support\SafeMarkdown::render($summary) !!}
                 </div>
             </div>
             {{-- AI Badge --}}

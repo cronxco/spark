@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
+use App\Support\SafeMarkdown;
 use App\Traits\TracksViews;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -421,7 +422,7 @@ class Block extends Model implements HasMedia
             return null;
         }
 
-        return Str::markdown($content);
+        return SafeMarkdown::render($content);
     }
 
     /**

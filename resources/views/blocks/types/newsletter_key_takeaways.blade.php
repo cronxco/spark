@@ -38,7 +38,7 @@ $takeaways = array_filter(array_map('trim', preg_split('/[\n\r]+/', $takeaways))
                             <x-icon name="fas.check" class="w-4 h-4 text-warning" />
                         </div>
                         <p class="text-sm text-base-content/80 leading-relaxed flex-1">
-                            {!! str(is_string($takeaway) ? $takeaway : ($takeaway['text'] ?? $takeaway['content'] ?? ''))->markdown() !!}
+                            {!! \App\Support\SafeMarkdown::render(is_string($takeaway) ? $takeaway : ($takeaway['text'] ?? $takeaway['content'] ?? '')) !!}
                         </p>
                     </div>
                     @endforeach

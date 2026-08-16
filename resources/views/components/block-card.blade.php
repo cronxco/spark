@@ -186,7 +186,7 @@ if (!$isValueBlock) {
             {{-- Content Preview --}}
             @if ($contentPreview)
                 <div class="prose prose-sm max-w-none text-base-content/70 line-clamp-5">
-                    {!! Str::markdown($contentPreview) !!}
+                    {!! \App\Support\SafeMarkdown::render($contentPreview) !!}
                 </div>
             @endif
 

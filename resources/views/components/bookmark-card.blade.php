@@ -96,7 +96,7 @@
         <!-- Summary -->
         @if ($summary)
             <div class="text-sm text-base-content/70 line-clamp-5 leading-relaxed prose prose-sm max-w-none">
-                {!! Str::markdown($summary) !!}
+                {!! \App\Support\SafeMarkdown::render($summary) !!}
             </div>
         @endif
 
