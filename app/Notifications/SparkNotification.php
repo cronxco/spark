@@ -16,6 +16,13 @@ abstract class SparkNotification extends Notification implements ShouldQueue
     use Queueable;
 
     /**
+     * Dedicated queue so delivery is handled by a monitored Horizon supervisor
+     * (see config/horizon.php) instead of falling onto an unmonitored default
+     * queue.
+     */
+    public $queue = 'notifications';
+
+    /**
      * Get the notification type identifier for preferences
      */
     abstract public function getNotificationType(): string;

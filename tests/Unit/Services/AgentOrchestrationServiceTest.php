@@ -237,6 +237,25 @@ JSON;
         $this->assertEquals('Complete Pattern', array_values($result)[0]['title']);
     }
 
+    #[Test]
+    public function it_builds_pattern_detection_prompt_without_error_when_existing_pattern_is_missing_fields()
+    {
+        $existingPatterns = [
+            ['title' => 'Complete Pattern', 'pattern_type' => 'trend', 'confidence' => 0.8],
+            ['title' => 'Missing Type Only'],
+        ];
+
+        $reflection = new ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildPatternDetectionPrompt');
+        $method->setAccessible(true);
+
+        $prompt = $method->invoke($this->service, $this->user, [], $existingPatterns);
+
+        $this->assertStringContainsString('Complete Pattern', $prompt);
+        $this->assertStringContainsString('Missing Type Only', $prompt);
+        $this->assertStringContainsString('unknown', $prompt);
+    }
+
     /** @test */
     public function it_determines_period_correctly()
     {

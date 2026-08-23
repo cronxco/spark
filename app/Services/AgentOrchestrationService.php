@@ -1300,8 +1300,11 @@ PROMPT;
             $patternsText .= "These patterns were detected in the past. Validate if they still hold true or if they've evolved:\n\n";
 
             foreach ($existingPatterns as $pattern) {
-                $patternsText .= "- **{$pattern['title']}** ({$pattern['pattern_type']})\n";
-                $patternsText .= "  Confidence: {$pattern['confidence']}\n";
+                $patternTitle = $pattern['title'] ?? '(untitled)';
+                $patternType = $pattern['pattern_type'] ?? 'unknown';
+                $patternConfidence = $pattern['confidence'] ?? 'n/a';
+                $patternsText .= "- **{$patternTitle}** ({$patternType})\n";
+                $patternsText .= "  Confidence: {$patternConfidence}\n";
                 if (! empty($pattern['description'])) {
                     $patternsText .= "  Description: {$pattern['description']}\n";
                 }
