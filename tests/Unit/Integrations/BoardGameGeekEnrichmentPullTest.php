@@ -61,7 +61,7 @@ class BoardGameGeekEnrichmentPullTest extends TestCase
         BoardGameGeekEnrichmentPull::dispatchSync($integration, 'event-id', 'Catan');
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/search') && $request['query'] === 'Catan');
-        Http::assertSent(fn ($request) => str_contains($request->url(), '/thing') && $request['id'] === '13');
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/thing') && $request['id'] === '13' && (int) $request['stats'] === 1);
         Queue::assertPushed(BoardGameGeekEnrichmentData::class, 1);
     }
 

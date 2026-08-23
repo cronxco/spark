@@ -106,9 +106,15 @@ class AssistantPromptingService
                     $payload = [
                         'model' => $model,
                         'messages' => $messages,
-                        'temperature' => $temperature,
                         'max_completion_tokens' => $maxCompletionTokens,
                     ];
+
+                    // GPT-5 reasoning models reject any temperature other than
+                    // their default (1) with a 400 error, so it's only sent
+                    // for models that actually support it.
+                    if (! $this->isReasoningModel($model)) {
+                        $payload['temperature'] = $temperature;
+                    }
 
                     if ($tools !== null) {
                         $payload['tools'] = $tools;
@@ -191,6 +197,15 @@ class AssistantPromptingService
             'Failed to generate agent response after ' . self::MAX_RETRIES . ' attempts: ' .
             $lastException->getMessage()
         );
+    }
+
+    /**
+     * GPT-5 and o-series reasoning models reject a non-default temperature
+     * value with a 400 error, so callers need to know when to omit it.
+     */
+    private function isReasoningModel(string $model): bool
+    {
+        return (bool) preg_match('/^(gpt-5|o1|o3|o4)(-|$)/', $model);
     }
 
     /**

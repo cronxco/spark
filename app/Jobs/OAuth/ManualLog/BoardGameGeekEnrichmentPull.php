@@ -60,7 +60,7 @@ class BoardGameGeekEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'game' => null];
         }
 
-        $detailResponse = Http::get("{$baseUrl}/thing", ['id' => $bggId]);
+        $detailResponse = Http::get("{$baseUrl}/thing", ['id' => $bggId, 'stats' => 1]);
 
         if (! $detailResponse->successful()) {
             return ['event_id' => $this->eventId, 'game' => null];

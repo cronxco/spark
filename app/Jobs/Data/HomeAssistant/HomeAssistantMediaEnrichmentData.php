@@ -215,10 +215,11 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
         $posterPath = $match['poster_path'] ?? null;
         $mediaUrl = $posterPath ? config('services.tmdb.image_base_url') . $posterPath : null;
 
-        $event->target->update([
+        $event->target->update(array_filter([
             'type' => $isTv ? 'tv_episode' : 'movie',
             'content' => $match['overview'] ?? null,
             'media_url' => $mediaUrl,
+        ], fn ($value) => $value !== null) + [
             'metadata' => array_merge($event->target->metadata ?? [], array_filter([
                 'tmdb_id' => $match['id'] ?? null,
                 'media_type' => $match['media_type'] ?? null,

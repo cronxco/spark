@@ -183,7 +183,7 @@ $save = function (): void {
                     <li class="text-sm flex items-center justify-between">
                         <span>{{ $entry->target?->title }}</span>
                         <span class="text-base-content/50">
-                            {{ $entry->value ? $entry->value . '/5 · ' : '' }}{{ $entry->time->diffForHumans() }}
+                            {{ $entry->value !== null ? $entry->formatted_value . '/5 · ' : '' }}{{ $entry->time->diffForHumans() }}
                         </span>
                     </li>
                 @endforeach
