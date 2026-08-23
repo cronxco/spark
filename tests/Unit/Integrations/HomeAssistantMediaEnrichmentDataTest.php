@@ -8,7 +8,10 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\AssistantPromptingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use OpenAI\Laravel\Facades\OpenAI;
+use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
@@ -61,7 +64,7 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
         $this->mock(AssistantPromptingService::class)
             ->shouldReceive('generateResponse')
             ->once()
-            ->andReturn('{"match_index": 1}');
+            ->andReturn('{"tmdb_id": 2}');
 
         [$integration, $event] = $this->makeWatchEvent('Loki');
 
@@ -81,12 +84,64 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     }
 
     #[Test]
+    public function lets_the_llm_retry_via_the_search_tmdb_tool_when_the_initial_search_found_nothing(): void
+    {
+        config(['services.tmdb.api_key' => 'test-key']);
+
+        OpenAI::fake([
+            CreateResponse::fake([
+                'choices' => [[
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => null,
+                        'tool_calls' => [[
+                            'id' => 'call_1',
+                            'type' => 'function',
+                            'function' => [
+                                'name' => 'search_tmdb',
+                                'arguments' => json_encode(['query' => 'Loki']),
+                            ],
+                        ]],
+                    ],
+                ]],
+            ]),
+            CreateResponse::fake([
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => '{"tmdb_id": 555}'],
+                ]],
+            ]),
+        ]);
+
+        Http::fake([
+            'api.themoviedb.org/*' => Http::response([
+                'results' => [
+                    ['id' => 555, 'media_type' => 'tv', 'name' => 'Loki', 'vote_average' => 8.2],
+                ],
+            ], 200),
+        ]);
+
+        [$integration, $event] = $this->makeWatchEvent('Live: Loki S2');
+
+        $job = new HomeAssistantMediaEnrichmentData($integration, [
+            'event_id' => $event->id,
+            'title' => 'Live: Loki S2',
+            'candidates' => [],
+        ]);
+
+        $job->handle();
+
+        $event->refresh();
+        $this->assertSame('tv_episode', $event->target->type);
+        $this->assertSame(555, $event->target->metadata['tmdb_id']);
+    }
+
+    #[Test]
     public function leaves_the_event_unchanged_when_the_llm_rejects_all_candidates(): void
     {
         $this->mock(AssistantPromptingService::class)
             ->shouldReceive('generateResponse')
             ->once()
-            ->andReturn('{"match_index": null}');
+            ->andReturn('{"tmdb_id": null}');
 
         [$integration, $event] = $this->makeWatchEvent('Sky Sports Formula 1');
 

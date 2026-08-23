@@ -50,6 +50,9 @@ class AssistantPromptingService
     /**
      * Generate a response using OpenAI for agent tasks
      */
+    /**
+     * @param  array{model?: string, user_id?: string, context?: array, max_completion_tokens?: int, temperature?: float, tools?: array, tool_executor?: callable(string, array): mixed, max_tool_rounds?: int}  $options
+     */
     public function generateResponse(string $prompt, array $options = []): string
     {
         $model = $options['model'] ?? config('services.openai.models.gpt5_mini');
@@ -57,6 +60,9 @@ class AssistantPromptingService
         $context = $options['context'] ?? [];
         $maxCompletionTokens = $options['max_completion_tokens'] ?? 8000;
         $temperature = $options['temperature'] ?? 1;
+        $tools = $options['tools'] ?? null;
+        $toolExecutor = $options['tool_executor'] ?? null;
+        $maxToolRounds = $options['max_tool_rounds'] ?? 3;
 
         // Extract AI-specific metadata from context
         $promptType = $context['prompt_type'] ?? 'unknown';
@@ -85,49 +91,84 @@ class AssistantPromptingService
                     );
                 }
 
-                // Start Sentry AI request span
                 $messages = [['role' => 'user', 'content' => $prompt]];
-                $aiSpan = start_ai_request_span($model, $messages, [
-                    'temperature' => $temperature,
-                    'max_completion_tokens' => $maxCompletionTokens,
-                ]);
+                $toolRounds = 0;
+                $result = null;
 
-                $response = OpenAI::chat()->create([
-                    'model' => $model,
-                    'messages' => $messages,
-                    'temperature' => $temperature,
-                    'max_completion_tokens' => $maxCompletionTokens,
-                ]);
+                while (true) {
+                    // Start Sentry AI request span - one per actual API call,
+                    // since a tool-calling conversation is multiple requests.
+                    $aiSpan = start_ai_request_span($model, $messages, [
+                        'temperature' => $temperature,
+                        'max_completion_tokens' => $maxCompletionTokens,
+                    ]);
 
-                // Finish AI request span with token usage
-                $usage = $response->usage ? $response->usage->toArray() : [];
-                $finishReason = $response->choices[0]->finishReason ?? null;
-                finish_ai_request_span($aiSpan, $usage, $finishReason);
+                    $payload = [
+                        'model' => $model,
+                        'messages' => $messages,
+                        'temperature' => $temperature,
+                        'max_completion_tokens' => $maxCompletionTokens,
+                    ];
 
-                if ($userId) {
-                    log_integration_api_response(
-                        'flint',
-                        'chat.completions',
-                        'openai/chat/completions',
-                        200,
-                        json_encode($response->toArray()),
-                        [
-                            'prompt_type' => $promptType,
-                            'domain' => $domain,
-                            'mode' => $mode,
-                            'model' => $model,
-                            'tokens' => [
-                                'prompt' => $usage['promptTokens'] ?? 0,
-                                'completion' => $usage['completionTokens'] ?? 0,
-                                'total' => $usage['totalTokens'] ?? 0,
+                    if ($tools !== null) {
+                        $payload['tools'] = $tools;
+                    }
+
+                    $response = OpenAI::chat()->create($payload);
+                    $message = $response->choices[0]->message;
+
+                    // Finish AI request span with token usage
+                    $usage = $response->usage ? $response->usage->toArray() : [];
+                    $finishReason = $response->choices[0]->finishReason ?? null;
+                    finish_ai_request_span($aiSpan, $usage, $finishReason);
+
+                    if ($userId) {
+                        log_integration_api_response(
+                            'flint',
+                            'chat.completions',
+                            'openai/chat/completions',
+                            200,
+                            json_encode($response->toArray()),
+                            [
+                                'prompt_type' => $promptType,
+                                'domain' => $domain,
+                                'mode' => $mode,
+                                'model' => $model,
+                                'tool_round' => $toolRounds,
+                                'tokens' => [
+                                    'prompt' => $usage['promptTokens'] ?? 0,
+                                    'completion' => $usage['completionTokens'] ?? 0,
+                                    'total' => $usage['totalTokens'] ?? 0,
+                                ],
+                                'finish_reason' => $finishReason,
                             ],
-                            'finish_reason' => $finishReason,
-                        ],
-                        $userId
-                    );
+                            $userId
+                        );
+                    }
+
+                    if (empty($message->toolCalls) || $toolExecutor === null || $toolRounds >= $maxToolRounds) {
+                        $result = $message->content ?? '';
+
+                        break;
+                    }
+
+                    $messages[] = $message->toArray();
+
+                    foreach ($message->toolCalls as $toolCall) {
+                        $arguments = json_decode($toolCall->function->arguments, true) ?? [];
+                        $toolResult = ($toolExecutor)($toolCall->function->name, $arguments);
+
+                        $messages[] = [
+                            'role' => 'tool',
+                            'tool_call_id' => $toolCall->id,
+                            'content' => is_string($toolResult) ? $toolResult : json_encode($toolResult),
+                        ];
+                    }
+
+                    $toolRounds++;
                 }
 
-                return $response->choices[0]->message->content;
+                return $result;
 
             } catch (Exception $e) {
                 $lastException = $e;
