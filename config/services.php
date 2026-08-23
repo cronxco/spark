@@ -130,6 +130,7 @@ return [
         'chrome_vnc_password' => env('CHROME_VNC_PASSWORD', 'spark-dev-vnc'),
         'timeout' => env('PLAYWRIGHT_TIMEOUT', 30000), // 30 seconds
         'screenshot_enabled' => env('PLAYWRIGHT_SCREENSHOT_ENABLED', true),
+        'mcp_max_html_bytes' => env('MCP_PLAYWRIGHT_MAX_HTML_BYTES', 1048576),
         'auto_escalate' => env('PLAYWRIGHT_AUTO_ESCALATE', true), // Auto-use Playwright on HTTP failures
         'js_required_domains' => env('PLAYWRIGHT_JS_DOMAINS', 'twitter.com,x.com,instagram.com,facebook.com'),
 

@@ -5,6 +5,7 @@ namespace App\Mcp\Servers;
 use App\Mcp\Resources\DayContextResource;
 use App\Mcp\Tools\AcknowledgeAnomalyTool;
 use App\Mcp\Tools\CreateFlintDigestTool;
+use App\Mcp\Tools\FetchWebpageHtmlTool;
 use App\Mcp\Tools\GetBaselinesTool;
 use App\Mcp\Tools\GetBlockTool;
 use App\Mcp\Tools\GetDayContextTool;
@@ -86,6 +87,9 @@ class SparkServer extends Server
         - `create-flint-digest`: Create a Flint digest event with an optional array of blocks. Supports `flint_user_question` (questions for the user with optional multiple-choice), `flint_editorial_note` (AI commentary), and any other `flint_*` block type. Returns event_id and block_ids.
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
 
+        ### Web Fetching
+        - `fetch-webpage-html`: Render a URL with Playwright and return its raw HTML. Uses saved Fetch cookies for the target domain when available and persists refreshed cookies. HTML is capped at 1 MB.
+
         ## Workflow Tips
         - Start with `get-day-summary` for daily briefings — it replaces multiple get-day-context + parsing calls.
         - Use `get-baselines` to discover available metrics, then `get-metric-trend` for analysis.
@@ -119,6 +123,7 @@ class SparkServer extends Server
         TriggerIntegrationUpdateTool::class,
         CreateFlintDigestTool::class,
         GetLatestFlintDigestTool::class,
+        FetchWebpageHtmlTool::class,
     ];
 
     /**
