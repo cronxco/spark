@@ -56,7 +56,7 @@ class HomeAssistantMediaEnrichmentPullTest extends TestCase
     }
 
     #[Test]
-    public function does_not_dispatch_the_data_job_when_tmdb_returns_no_media_results(): void
+    public function still_dispatches_the_data_job_when_tmdb_returns_no_media_results_so_the_llm_can_retry(): void
     {
         config(['services.tmdb.api_key' => 'test-key']);
         Queue::fake([HomeAssistantMediaEnrichmentData::class]);
@@ -69,7 +69,7 @@ class HomeAssistantMediaEnrichmentPullTest extends TestCase
 
         HomeAssistantMediaEnrichmentPull::dispatchSync($integration, 'event-id', 'Sky Sports Formula 1');
 
-        Queue::assertNotPushed(HomeAssistantMediaEnrichmentData::class);
+        Queue::assertPushed(HomeAssistantMediaEnrichmentData::class, 1);
     }
 
     #[Test]

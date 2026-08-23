@@ -44,7 +44,7 @@ class HomeAssistantMediaEnrichmentPull extends BaseFetchJob
                 'event_id' => $this->eventId,
             ]);
 
-            return ['event_id' => $this->eventId, 'title' => $this->title, 'candidates' => []];
+            return ['event_id' => $this->eventId, 'title' => $this->title, 'candidates' => [], 'skip' => true];
         }
 
         $response = Http::get(config('services.tmdb.base_url') . '/search/multi', [
@@ -59,7 +59,7 @@ class HomeAssistantMediaEnrichmentPull extends BaseFetchJob
                 'status' => $response->status(),
             ]);
 
-            return ['event_id' => $this->eventId, 'title' => $this->title, 'candidates' => []];
+            return ['event_id' => $this->eventId, 'title' => $this->title, 'candidates' => [], 'skip' => true];
         }
 
         $candidates = collect($response->json('results') ?? [])
@@ -67,12 +67,16 @@ class HomeAssistantMediaEnrichmentPull extends BaseFetchJob
             ->values()
             ->all();
 
-        return ['event_id' => $this->eventId, 'title' => $this->title, 'candidates' => $candidates];
+        // Zero results here isn't a dead end: the Data job can still ask the
+        // LLM to retry the search itself with a cleaned-up title via the
+        // search_tmdb tool, so it's dispatched the same as an ambiguous
+        // (2+) result set rather than being dropped.
+        return ['event_id' => $this->eventId, 'title' => $this->title, 'candidates' => $candidates, 'skip' => false];
     }
 
     protected function dispatchProcessingJobs(array $rawData): void
     {
-        if (empty($rawData['candidates'])) {
+        if ($rawData['skip'] ?? false) {
             return;
         }
 
