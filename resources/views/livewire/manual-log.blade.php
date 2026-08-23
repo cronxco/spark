@@ -1,6 +1,7 @@
 <?php
 
 use App\Integrations\ManualLog\ManualLogPlugin;
+use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 
@@ -57,7 +58,7 @@ $recentEntries = computed(function () {
         return collect();
     }
 
-    return \App\Models\Event::where('integration_id', $this->integration->id)
+    return Event::where('integration_id', $this->integration->id)
         ->with('target')
         ->orderByDesc('time')
         ->limit(10)

@@ -13,6 +13,22 @@ class HomeAssistantPluginTest extends TestCase
 {
     use RefreshDatabase;
 
+    public static function triStatePresenceValues(): array
+    {
+        return [
+            'boolean true' => [true, true],
+            'boolean false' => [false, false],
+            'string true' => ['true', true],
+            'string False' => ['False', false],
+            'home' => ['home', true],
+            'not_home' => ['not_home', false],
+            'on' => ['on', true],
+            'off' => ['off', false],
+            'null' => [null, null],
+            'garbage' => ['garbage', null],
+        ];
+    }
+
     #[Test]
     public function converts_a_watch_payload_into_the_standard_event_shape(): void
     {
@@ -80,21 +96,5 @@ class HomeAssistantPluginTest extends TestCase
         ], $integration);
 
         $this->assertSame($expected, $result['events'][0]['event_metadata']['will_home']);
-    }
-
-    public static function triStatePresenceValues(): array
-    {
-        return [
-            'boolean true' => [true, true],
-            'boolean false' => [false, false],
-            'string true' => ['true', true],
-            'string False' => ['False', false],
-            'home' => ['home', true],
-            'not_home' => ['not_home', false],
-            'on' => ['on', true],
-            'off' => ['off', false],
-            'null' => [null, null],
-            'garbage' => ['garbage', null],
-        ];
     }
 }
