@@ -16,16 +16,27 @@ abstract class SparkNotification extends Notification implements ShouldQueue
     use Queueable;
 
     /**
-     * Dedicated queue so delivery is handled by a monitored Horizon supervisor
-     * (see config/horizon.php) instead of falling onto an unmonitored default
-     * queue.
-     */
-    public $queue = 'notifications';
-
-    /**
      * Get the notification type identifier for preferences
      */
     abstract public function getNotificationType(): string;
+
+    /**
+     * Per-channel queue names, keyed by the exact channel identifiers `via()`
+     * returns below. Routes delivery to a monitored Horizon supervisor (see
+     * config/horizon.php) instead of falling onto an unmonitored default
+     * queue. Can't use the Queueable trait's own `$queue` property for this:
+     * declaring it here too, with a different default, is a fatal PHP
+     * trait/class property composition conflict.
+     */
+    public function viaQueues(): array
+    {
+        return [
+            'database' => 'notifications',
+            'mail' => 'notifications',
+            ApnsChannel::class => 'notifications',
+            WebPushChannel::class => 'notifications',
+        ];
+    }
 
     /**
      * Get the notification priority

@@ -130,4 +130,17 @@ class SparkNotificationFanoutTest extends TestCase
         $this->assertCount(1, $subscriptions);
         $this->assertTrue($subscriptions->first()->is($valid));
     }
+
+    #[Test]
+    public function it_routes_every_channel_to_the_notifications_queue(): void
+    {
+        $notification = new TestFanoutNotification;
+
+        $queues = $notification->viaQueues();
+
+        $this->assertSame('notifications', $queues['database']);
+        $this->assertSame('notifications', $queues['mail']);
+        $this->assertSame('notifications', $queues[ApnsChannel::class]);
+        $this->assertSame('notifications', $queues[WebPushChannel::class]);
+    }
 }
