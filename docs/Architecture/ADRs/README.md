@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-These records separate observed implementation from future design. Current-state records are reconstructed, so they do not assert historical intent, adequacy, or a complete guarantee.
+These records retain the implementation evidence that informed each decision. Product Owner decisions recorded in the ADRs establish the current policy; accepted implementation is not implied where an ADR explicitly defers it.
 
 ## Current state
 
@@ -22,18 +22,18 @@ These records separate observed implementation from future design. Current-state
 | [0015](0015-media-library-and-content-addressed-deduplication.md) | Media deduplication |
 | [0016](0016-observability-with-sentry-horizon-and-structured-logs.md) | Observability |
 | [0017](0017-task-pipeline-for-derived-analysis.md) | Derived task pipeline |
+| [0018](0018-proposed-credential-security-hardening.md) | Credential-security hardening (implementation deferred) |
 
-## Future proposals
+## Deferred hardening
 
 | ADR | Record |
 | --- | --- |
 | [0004](0004-proposed-tenant-integrity-hardening.md) | Tenant-integrity hardening |
-| [0018](0018-proposed-credential-security-hardening.md) | Credential-security hardening |
 
 ## Open-decision register
 
 - **Privacy risk:** current tenant integrity is application-enforced and incomplete at the relational layer; an event can reference another tenant's object.
-- **Security risk:** credential encryption-at-rest, rotation, access audit, and ownership policy are not evidenced.
+- **Security risk:** credential encryption is accepted at the `APP_KEY` boundary; rotation, automated revocation/lifecycle controls, and access audit remain deferred Product Owner-managed risks.
 - Define retention/deletion SLA, backup/restore RPO/RTO, API deprecation, extension/migration compatibility, queue retry/replay/DLQ, and web/mobile/MCP contract ownership.
 - Define a tenancy authorization test matrix, migration/data-audit approach, and review cadence for these reconstructed records.
 - Flint architecture is not accepted here; its boundary remains an evidence gap pending owner decision.
