@@ -143,9 +143,14 @@ class HomeAssistantAttributionService
             ]
         );
 
+        // Event::createBlock() dedupes on (event_id, title, block_type), and
+        // multiple ambiguous watches can land on the same reused digest
+        // event in one day — so the title must be unique per watch, not a
+        // static string, or a later question would silently overwrite an
+        // earlier unanswered one.
         $digestEvent->createBlock([
             'block_type' => 'flint_user_question',
-            'title' => 'Who was watching?',
+            'title' => "Who was watching \"{$mediaTitle}\"? (" . $event->time->format('g:ia') . ')',
             'time' => now(),
             'metadata' => [
                 'question' => "Was this you watching \"{$mediaTitle}\", or was it {$householdMemberName}?",
