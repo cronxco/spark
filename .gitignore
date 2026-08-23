@@ -37,7 +37,10 @@ auth.json
 
 # Claude Code
 .agents/
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/**
 skills-lock.json
 **/caddy
 frankenphp
