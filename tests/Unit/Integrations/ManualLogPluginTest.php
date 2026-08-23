@@ -3,8 +3,10 @@
 namespace Tests\Unit\Integrations;
 
 use App\Integrations\ManualLog\ManualLogPlugin;
+use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -12,6 +14,17 @@ use Tests\TestCase;
 class ManualLogPluginTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // played_board_game entries dispatch BoardGameGeekEnrichmentPull,
+        // which makes a real outbound HTTP call - fake it so these tests
+        // don't depend on network access, the same way UntappdRssDataTest
+        // fakes UntappdCheckinDetailPull.
+        Queue::fake([BoardGameGeekEnrichmentPull::class]);
+    }
 
     #[Test]
     public function creates_an_event_with_target_and_actor(): void

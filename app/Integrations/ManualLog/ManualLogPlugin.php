@@ -3,6 +3,7 @@
 namespace App\Integrations\ManualLog;
 
 use App\Integrations\Base\ManualPlugin;
+use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -107,7 +108,16 @@ class ManualLogPlugin extends ManualPlugin
 
     public static function getBlockTypes(): array
     {
-        return [];
+        return [
+            'board_game_details' => [
+                'icon' => 'fas.dice',
+                'display_name' => 'Board Game Details',
+                'description' => 'Player count, playing time, and rating from BoardGameGeek',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getObjectTypes(): array
@@ -188,7 +198,7 @@ class ManualLogPlugin extends ManualPlugin
         // Event::getFormattedValueAttribute(): value / value_multiplier).
         $valueMultiplier = 10;
 
-        return Event::create([
+        $event = Event::create([
             'source_id' => 'manual_log_' . $actionType . '_' . Str::uuid(),
             'time' => now(),
             'integration_id' => $integration->id,
@@ -204,5 +214,11 @@ class ManualLogPlugin extends ManualPlugin
                 'notes' => $notes,
             ], fn ($value) => $value !== null),
         ]);
+
+        if ($actionType === 'played_board_game') {
+            BoardGameGeekEnrichmentPull::dispatch($integration, $event->id, $title);
+        }
+
+        return $event;
     }
 }
