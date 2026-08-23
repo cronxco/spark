@@ -121,8 +121,11 @@ class HomeAssistantAttributionServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'home_assistant']);
-        $eventOne = Event::factory()->create(['integration_id' => $integration->id]);
-        $eventTwo = Event::factory()->create(['integration_id' => $integration->id]);
+        // Distinct times (and thus distinct question-block titles, which
+        // include the formatted time) so this can't collide even if the
+        // factory-generated target titles ever happened to match.
+        $eventOne = Event::factory()->create(['integration_id' => $integration->id, 'time' => today()->setTime(10, 0)]);
+        $eventTwo = Event::factory()->create(['integration_id' => $integration->id, 'time' => today()->setTime(20, 0)]);
 
         $this->service->askWhoWasWatching($eventOne, $integration);
         $this->service->askWhoWasWatching($eventTwo, $integration);

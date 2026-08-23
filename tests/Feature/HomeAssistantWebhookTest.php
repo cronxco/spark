@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\Person;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -113,7 +115,7 @@ class HomeAssistantWebhookTest extends TestCase
         // Still attributed to Will until answered.
         $this->assertSame('Will', $event->actor->title);
 
-        $questionBlock = \App\Models\Block::where('block_type', 'flint_user_question')->first();
+        $questionBlock = Block::where('block_type', 'flint_user_question')->first();
         $this->assertNotNull($questionBlock);
         $this->assertSame($event->id, $questionBlock->metadata['related_event_id']);
         $this->assertSame('home_assistant', $questionBlock->metadata['related_service']);
@@ -136,6 +138,56 @@ class HomeAssistantWebhookTest extends TestCase
 
         $this->assertSame(
             1,
+            Event::where('integration_id', $this->integration->id)->count()
+        );
+    }
+
+    #[Test]
+    public function does_not_duplicate_a_replay_that_lands_in_a_different_minute(): void
+    {
+        $payload = [
+            'title' => 'Loki',
+            'entity_id' => 'media_player.living_room_atv',
+            'will_home' => true,
+            'dan_home' => false,
+        ];
+
+        Carbon::setTestNow(Carbon::parse('2026-01-01 20:00:00'));
+        $this->postJson('/webhook/home_assistant/test_webhook_secret_123', $payload)->assertSuccessful();
+
+        // A retry a few minutes later (e.g. a rest_command retry, or the
+        // automation re-triggering) is still the same watch, not a new one.
+        Carbon::setTestNow(Carbon::parse('2026-01-01 20:04:00'));
+        $this->postJson('/webhook/home_assistant/test_webhook_secret_123', $payload)->assertSuccessful();
+
+        Carbon::setTestNow();
+
+        $this->assertSame(
+            1,
+            Event::where('integration_id', $this->integration->id)->count()
+        );
+    }
+
+    #[Test]
+    public function creates_a_second_event_for_a_genuine_rewatch_outside_the_dedup_window(): void
+    {
+        $payload = [
+            'title' => 'Loki',
+            'entity_id' => 'media_player.living_room_atv',
+            'will_home' => true,
+            'dan_home' => false,
+        ];
+
+        Carbon::setTestNow(Carbon::parse('2026-01-01 20:00:00'));
+        $this->postJson('/webhook/home_assistant/test_webhook_secret_123', $payload)->assertSuccessful();
+
+        Carbon::setTestNow(Carbon::parse('2026-01-01 21:00:00'));
+        $this->postJson('/webhook/home_assistant/test_webhook_secret_123', $payload)->assertSuccessful();
+
+        Carbon::setTestNow();
+
+        $this->assertSame(
+            2,
             Event::where('integration_id', $this->integration->id)->count()
         );
     }

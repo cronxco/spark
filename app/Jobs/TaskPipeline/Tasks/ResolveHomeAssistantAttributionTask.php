@@ -62,9 +62,22 @@ class ResolveHomeAssistantAttributionTask extends BaseTaskJob
         } elseif (! $isMe) {
             // Anything else (typically the household member's name)
             // reassigns the event's actor.
+            $integration = $event->integration;
+
+            if (! $integration) {
+                Log::warning('Home Assistant attribution: integration missing for event', [
+                    'block_id' => $block->id,
+                    'event_id' => $event->id,
+                ]);
+
+                $this->markResolved($block);
+
+                return;
+            }
+
             app(HomeAssistantAttributionService::class)->reassignToHouseholdMember(
                 $event,
-                $event->integration,
+                $integration,
                 'user_confirmed'
             );
         } else {

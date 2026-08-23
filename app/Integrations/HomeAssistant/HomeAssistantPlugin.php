@@ -12,6 +12,7 @@ use App\Models\Integration;
 use App\Services\HomeAssistant\HomeAssistantAttributionService;
 use App\Services\TaskPipeline\TaskDefinition;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
 {
@@ -164,13 +165,13 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
      */
     public function handleWebhook(Request $request, Integration $integration): void
     {
-        $payload = $request->all();
-        $headers = $request->headers->all();
-        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $payload, $headers);
-
         if (! $this->verifyWebhookSignature($request, $integration)) {
             abort(401, 'Invalid webhook signature');
         }
+
+        $payload = $request->all();
+        $headers = $request->headers->all();
+        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $payload, $headers);
 
         $converted = $this->convertData($payload, $integration);
 
@@ -199,7 +200,7 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
 
         return [
             'events' => [[
-                'source_id' => 'home_assistant_watch_' . md5($entityId . '|' . $title . '|' . $time->format('Y-m-d_H-i')),
+                'source_id' => 'home_assistant_watch_' . (string) Str::uuid(),
                 'time' => $time,
                 'actor' => [
                     'concept' => 'user',
@@ -233,8 +234,18 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
 
     protected function createWatchedEvent(array $eventData, Integration $integration): Event
     {
+        // Dedupe on entity + title within a short window rather than an
+        // exact source_id match, so a rest_command retry or a repeated
+        // automation trigger that lands in a different minute doesn't
+        // produce a duplicate event (and a duplicate attribution question).
+        $entityId = $eventData['event_metadata']['entity_id'] ?? null;
+        $title = $eventData['target']['title'] ?? null;
+
         $existing = Event::where('integration_id', $integration->id)
-            ->where('source_id', $eventData['source_id'])
+            ->where('action', 'watched')
+            ->where('event_metadata->entity_id', $entityId)
+            ->where('time', '>=', $eventData['time']->copy()->subMinutes(30))
+            ->whereHas('target', fn ($query) => $query->where('title', $title))
             ->first();
 
         if ($existing) {
