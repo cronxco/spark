@@ -68,7 +68,7 @@ class HomeAssistantAttributionServiceTest extends TestCase
 
         $this->assertSame(1, Person::where('user_id', $integration->user_id)->where('title', 'Dan')->count());
         $event->refresh();
-        $this->assertSame($existingDan->id, $event->actor_id);
+        $this->assertSame((string) $existingDan->id, (string) $event->actor_id);
     }
 
     #[Test]

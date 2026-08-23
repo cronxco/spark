@@ -44,9 +44,12 @@ class HomeAssistantWebhookTest extends TestCase
     #[Test]
     public function rejects_an_invalid_secret(): void
     {
+        // WebhookController looks up the Integration by (service, account_id)
+        // before ever reaching plugin signature verification, so a secret
+        // that matches no integration 404s rather than 401ing.
         $this->postJson('/webhook/home_assistant/wrong_secret', [
             'title' => 'Loki',
-        ])->assertStatus(401);
+        ])->assertStatus(404);
 
         $this->assertDatabaseCount('events', 0);
     }
