@@ -37,6 +37,7 @@ use App\Jobs\OAuth\Oura\OuraWorkoutsPull;
 use App\Jobs\OAuth\Reddit\RedditSavedPull;
 use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
 use App\Jobs\OAuth\Untappd\UntappdRssPull;
+use App\Jobs\OAuth\Vivino\VivinoActivityPull;
 use App\Jobs\Outline\OutlinePull;
 use App\Jobs\Outline\OutlinePullRecentDayNotes;
 use App\Jobs\Outline\OutlinePullRecentDocuments;
@@ -85,6 +86,7 @@ class DispatchIntegrationFetchJobs
             'goodreads' => $this->getGoodreadsFetchJobs($integration),
             'untappd' => $this->getUntappdFetchJobs($integration),
             'immich' => $this->getImmichFetchJobs($integration),
+            'vivino' => $this->getVivinoFetchJobs($integration),
             default => [],
         };
     }
@@ -214,6 +216,14 @@ class DispatchIntegrationFetchJobs
     {
         return match ($integration->instance_type ?: 'rss_feed') {
             'rss_feed' => [UntappdRssPull::class],
+            default => [],
+        };
+    }
+
+    private function getVivinoFetchJobs(Integration $integration): array
+    {
+        return match ($integration->instance_type ?: 'activity') {
+            'activity' => [VivinoActivityPull::class],
             default => [],
         };
     }
