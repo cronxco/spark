@@ -84,6 +84,14 @@ return [
                 'tries' => 1,
                 'timeout' => 900,
             ],
+            'supervisor-6' => [
+                'connection' => 'redis',
+                'queue' => ['notifications'],
+                'balance' => 'auto',
+                'maxProcesses' => 2,
+                'memory' => 256,
+                'tries' => 1,
+            ],
         ],
 
         'staging' => [
@@ -128,6 +136,14 @@ return [
                 'tries' => 1,
                 'timeout' => 900,
             ],
+            'supervisor-6' => [
+                'connection' => 'redis',
+                'queue' => ['notifications'],
+                'balance' => 'auto',
+                'maxProcesses' => 2,
+                'memory' => 256,
+                'tries' => 1,
+            ],
         ],
 
         'local' => [
@@ -171,6 +187,14 @@ return [
                 'memory' => 512,
                 'tries' => 1,
                 'timeout' => 900,
+            ],
+            'supervisor-6' => [
+                'connection' => 'redis',
+                'queue' => ['notifications'],
+                'balance' => 'auto',
+                'maxProcesses' => 2,
+                'memory' => 256,
+                'tries' => 1,
             ],
         ],
     ],
