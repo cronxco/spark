@@ -15,6 +15,7 @@ docs/
 ├── Guides/           # Setup and operational guides
 ├── Integrations/     # Service-specific documentation
 ├── mobile/           # iOS companion app API
+├── product/          # Product discovery and current product scope
 └── UI and UX/        # User interface patterns
 ```
 
@@ -121,6 +122,12 @@ docs/
 | [DESIGN_PATTERNS.md](UI%20and%20UX/DESIGN_PATTERNS.md)     | UI consistency and visual hierarchy           |
 | [EVENTS_INTERFACE.md](UI%20and%20UX/EVENTS_INTERFACE.md)   | Event data model and interface                |
 | [UPDATES_INTERFACE.md](UI%20and%20UX/UPDATES_INTERFACE.md) | Integration update system                     |
+
+### Product
+
+| Document                                                             | Description                                                   |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [PRODUCT_DISCOVERY_2026-08.md](product/PRODUCT_DISCOVERY_2026-08.md) | Evidence-led product thesis, jobs, journeys and opportunities |
 
 ### Guides
 
