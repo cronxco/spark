@@ -88,6 +88,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
     Volt::route('notifications', 'notifications.index')->name('notifications.index');
+    Volt::route('log', 'manual-log')->name('manual-log.index');
 
     // Media routes
     Route::get('media', Index::class)->name('media.index');
