@@ -26,6 +26,7 @@ host('prod')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
+    ->set('port', getenv('DEPLOYER_PORT'))
     ->set('bin/php', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark php')
     ->set('bin/composer', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer');
 
@@ -33,6 +34,7 @@ host('dev')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('branch', 'dev')
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
+    ->set('port', getenv('DEPLOYER_PORT'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
     ->set('bin/php', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark php')
     ->set('bin/composer', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer');
