@@ -10,6 +10,7 @@
 namespace WireElements\Pro\Components\Spotlight;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class SpotlightServiceProvider extends ServiceProvider
 {
@@ -20,6 +21,9 @@ class SpotlightServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        // The real package registers its Livewire component under this
+        // alias; resources/views/components/layouts/app.blade.php renders
+        // it on every page via `@livewire('spotlight-pro')`.
+        Livewire::component('spotlight-pro', SpotlightLivewireComponent::class);
     }
 }
