@@ -16,6 +16,7 @@ use App\Integrations\Hevy\HevyPlugin;
 use App\Integrations\HomeAssistant\HomeAssistantPlugin;
 use App\Integrations\Immich\ImmichPlugin;
 use App\Integrations\Karakeep\KarakeepPlugin;
+use App\Integrations\ManualLog\ManualLogPlugin;
 use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\Newsletter\NewsletterPlugin;
 use App\Integrations\Oura\OuraPlugin;
@@ -63,6 +64,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(GoodreadsPlugin::class);
         PluginRegistry::register(UntappdPlugin::class);
         PluginRegistry::register(HomeAssistantPlugin::class);
+        PluginRegistry::register(ManualLogPlugin::class);
     }
 
     /**
