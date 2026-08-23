@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -13,6 +15,16 @@ use Tests\TestCase;
 class ManualLogComponentTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // played_board_game entries dispatch BoardGameGeekEnrichmentPull,
+        // which makes a real outbound HTTP call - fake it so these tests
+        // don't depend on network access.
+        Queue::fake([BoardGameGeekEnrichmentPull::class]);
+    }
 
     #[Test]
     public function logs_a_new_activity(): void

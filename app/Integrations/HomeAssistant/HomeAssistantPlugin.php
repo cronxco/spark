@@ -4,6 +4,7 @@ namespace App\Integrations\HomeAssistant;
 
 use App\Integrations\Base\WebhookPlugin;
 use App\Integrations\Contracts\SupportsTaskPipeline;
+use App\Jobs\OAuth\HomeAssistant\HomeAssistantMediaEnrichmentPull;
 use App\Jobs\TaskPipeline\Tasks\ResolveHomeAssistantAttributionTask;
 use App\Models\Block;
 use App\Models\Event;
@@ -84,7 +85,16 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
 
     public static function getBlockTypes(): array
     {
-        return [];
+        return [
+            'media_details' => [
+                'icon' => 'fas.tv',
+                'display_name' => 'Media Details',
+                'description' => 'Enriched title, overview, and rating from TMDB',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+        ];
     }
 
     public static function getObjectTypes(): array
@@ -93,9 +103,55 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
             'tv_watch' => [
                 'icon' => 'fas.tv',
                 'display_name' => 'TV/Film Watch',
-                'description' => 'Something watched on a Home Assistant media player',
+                'description' => 'Something watched on a Home Assistant media player, before enrichment resolves it',
                 'hidden' => false,
             ],
+            'movie' => [
+                'icon' => 'fas.film',
+                'display_name' => 'Movie',
+                'description' => 'A watch resolved to a specific film via TMDB enrichment',
+                'hidden' => false,
+            ],
+            'tv_episode' => [
+                'icon' => 'fas.tv',
+                'display_name' => 'TV Episode',
+                'description' => 'A watch resolved to a specific TV show via TMDB enrichment',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Reactive task definitions this plugin needs — auto-discovered by
+     * TaskPipelineServiceProvider via the SupportsTaskPipeline interface.
+     */
+    public static function getTaskDefinitions(): array
+    {
+        return [
+            new TaskDefinition(
+                key: 'home_assistant_resolve_attribution',
+                name: 'Resolve Home Assistant Watch Attribution',
+                description: 'Reassigns or discards a Home Assistant "watched" event once the "who was watching" question has been answered.',
+                jobClass: ResolveHomeAssistantAttributionTask::class,
+                appliesTo: ['block'],
+                conditions: ['block_type' => 'flint_user_question'],
+                dependencies: [],
+                queue: 'tasks',
+                priority: 50,
+                runOnCreate: false,
+                runOnUpdate: true,
+                shouldRun: function ($model) {
+                    if (! $model instanceof Block) {
+                        return false;
+                    }
+
+                    $metadata = $model->metadata ?? [];
+
+                    return ($metadata['related_service'] ?? null) === self::getIdentifier()
+                        && ! empty($metadata['answer'])
+                        && empty($metadata['attribution_resolved_at']);
+                },
+            ),
         ];
     }
 
@@ -175,40 +231,6 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
         ];
     }
 
-    /**
-     * Reactive task definitions this plugin needs — auto-discovered by
-     * TaskPipelineServiceProvider via the SupportsTaskPipeline interface.
-     */
-    public static function getTaskDefinitions(): array
-    {
-        return [
-            new TaskDefinition(
-                key: 'home_assistant_resolve_attribution',
-                name: 'Resolve Home Assistant Watch Attribution',
-                description: 'Reassigns or discards a Home Assistant "watched" event once the "who was watching" question has been answered.',
-                jobClass: ResolveHomeAssistantAttributionTask::class,
-                appliesTo: ['block'],
-                conditions: ['block_type' => 'flint_user_question'],
-                dependencies: [],
-                queue: 'tasks',
-                priority: 50,
-                runOnCreate: false,
-                runOnUpdate: true,
-                shouldRun: function ($model) {
-                    if (! $model instanceof Block) {
-                        return false;
-                    }
-
-                    $metadata = $model->metadata ?? [];
-
-                    return ($metadata['related_service'] ?? null) === self::getIdentifier()
-                        && ! empty($metadata['answer'])
-                        && empty($metadata['attribution_resolved_at']);
-                },
-            ),
-        ];
-    }
-
     protected function createWatchedEvent(array $eventData, Integration $integration): Event
     {
         $existing = Event::where('integration_id', $integration->id)
@@ -238,6 +260,8 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
         ]);
 
         app(HomeAssistantAttributionService::class)->attribute($event, $integration);
+
+        HomeAssistantMediaEnrichmentPull::dispatch($integration, $event->id, $target->title);
 
         return $event;
     }

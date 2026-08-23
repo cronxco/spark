@@ -173,6 +173,16 @@ return [
         ],
     ],
 
+    'tmdb' => [
+        'api_key' => env('TMDB_API_KEY'),
+        'base_url' => env('TMDB_BASE_URL', 'https://api.themoviedb.org/3'),
+        'image_base_url' => env('TMDB_IMAGE_BASE_URL', 'https://image.tmdb.org/t/p/w500'),
+    ],
+
+    'boardgamegeek' => [
+        'base_url' => env('BOARDGAMEGEEK_BASE_URL', 'https://boardgamegeek.com/xmlapi2'),
+    ],
+
     'receipt' => [
         'domain' => env('RECEIPT_DOMAIN', 'spark.cronx.co'),
         'email_address' => env('RECEIPT_EMAIL_ADDRESS', 'receipts@spark.cronx.co'),
