@@ -95,12 +95,26 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'flint_user_question' => [
+                'icon' => 'fas.circle-question',
+                'display_name' => 'Attribution Question',
+                'description' => 'Flint-owned block type this plugin reacts to (not creates) to ask who was watching',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => true,
+            ],
         ];
     }
 
     public static function getObjectTypes(): array
     {
         return [
+            'home_assistant_user' => [
+                'icon' => 'fas.user',
+                'display_name' => 'User',
+                'description' => 'The household member attributed with a watch',
+                'hidden' => false,
+            ],
             'tv_watch' => [
                 'icon' => 'fas.tv',
                 'display_name' => 'TV/Film Watch',
