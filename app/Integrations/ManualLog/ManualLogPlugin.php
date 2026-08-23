@@ -123,6 +123,12 @@ class ManualLogPlugin extends ManualPlugin
     public static function getObjectTypes(): array
     {
         return [
+            'manual_log_user' => [
+                'icon' => 'fas.user',
+                'display_name' => 'User',
+                'description' => 'The user logging the activity',
+                'hidden' => false,
+            ],
             'wine' => [
                 'icon' => 'fas.wine-glass',
                 'display_name' => 'Wine',
