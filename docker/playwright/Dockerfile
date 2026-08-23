@@ -12,7 +12,7 @@ COPY package.json package-lock.json* ./
 RUN npm install
 
 # Copy application code
-COPY index.js ./
+COPY index.js url-safety.js ./
 
 # Create storage directory
 RUN mkdir -p /app/storage
