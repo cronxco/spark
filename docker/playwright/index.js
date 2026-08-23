@@ -1,6 +1,11 @@
 const express = require("express");
 const { chromium } = require("playwright-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const {
+    configuredAllowedHosts,
+    truncateHtml,
+    validateUrl,
+} = require("./url-safety");
 
 // Enable stealth mode if configured
 const STEALTH_ENABLED = process.env.STEALTH_ENABLED !== "false"; // Default: true
@@ -261,6 +266,7 @@ app.post("/fetch", requireBrowser, async (req, res) => {
         userAgent,
         usePersistence,
         useDefaultContext,
+        maxHtmlBytes,
     } = req.body;
 
     if (!url) {
@@ -275,6 +281,7 @@ app.post("/fetch", requireBrowser, async (req, res) => {
     let contextWasCached = false;
     let isDefaultContext = false;
     let shouldCloseContext = true;
+    let blockedRequestError = null;
 
     try {
         log("info", "Starting fetch", {
@@ -284,6 +291,9 @@ app.post("/fetch", requireBrowser, async (req, res) => {
             useDefaultContext,
             stealthEnabled: STEALTH_ENABLED,
         });
+
+        const allowedHosts = configuredAllowedHosts();
+        await validateUrl(url, allowedHosts);
 
         // Extract domain from URL for caching
         const domain = new URL(url).hostname.replace(/^www\./, "");
@@ -314,12 +324,43 @@ app.post("/fetch", requireBrowser, async (req, res) => {
         // Create new page
         page = await context.newPage();
 
+        // Keep request validation scoped to this fetch. Persistent/default
+        // contexts are shared by legacy Fetch calls and must not retain a
+        // previous request's route handler or error state.
+        await page.route("**/*", async (route) => {
+            const requestUrl = route.request().url();
+
+            if (
+                !requestUrl.startsWith("http://") &&
+                !requestUrl.startsWith("https://")
+            ) {
+                await route.continue();
+                return;
+            }
+
+            try {
+                await validateUrl(requestUrl, allowedHosts);
+                await route.continue();
+            } catch (error) {
+                blockedRequestError ??= error;
+                log("warn", "Blocked unsafe browser request", {
+                    url: requestUrl,
+                    error: error.message,
+                });
+                await route.abort("blockedbyclient");
+            }
+        });
+
         // Navigate to URL
         const navigationTimeout = timeout || 30000;
-        await page.goto(url, {
+        const navigationResponse = await page.goto(url, {
             timeout: navigationTimeout,
             waitUntil: "domcontentloaded",
         });
+
+        if (blockedRequestError) {
+            throw blockedRequestError;
+        }
 
         // Wait for network idle (optional, with timeout)
         if (waitFor === "networkidle") {
@@ -333,8 +374,12 @@ app.post("/fetch", requireBrowser, async (req, res) => {
         // Additional delay to allow dynamic content to render
         await page.waitForTimeout(3000);
 
+        if (blockedRequestError) {
+            throw blockedRequestError;
+        }
+
         // Extract content
-        const html = await page.content();
+        const htmlResult = truncateHtml(await page.content(), maxHtmlBytes);
         const title = await page.title();
         const finalUrl = page.url(); // In case of redirects
 
@@ -353,13 +398,14 @@ app.post("/fetch", requireBrowser, async (req, res) => {
         log("info", "Fetch completed successfully", {
             url,
             finalUrl,
-            htmlLength: html.length,
+            htmlLength: htmlResult.htmlBytes,
+            htmlTruncated: htmlResult.htmlTruncated,
             screenshotSize: screenshotBuffer ? screenshotBuffer.length : 0,
         });
 
         res.json({
             success: true,
-            html,
+            html: htmlResult.html,
             title,
             url: finalUrl,
             screenshot: screenshotBuffer
@@ -370,6 +416,10 @@ app.post("/fetch", requireBrowser, async (req, res) => {
                 stealthEnabled: STEALTH_ENABLED,
                 contextCached: contextWasCached,
                 isDefaultContext: isDefaultContext,
+                status: navigationResponse?.status() ?? null,
+                htmlBytes: htmlResult.htmlBytes,
+                returnedHtmlBytes: htmlResult.returnedHtmlBytes,
+                htmlTruncated: htmlResult.htmlTruncated,
             },
         });
     } catch (error) {

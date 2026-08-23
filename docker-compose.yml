@@ -149,6 +149,7 @@ services:
             - NODE_ENV=production
             - STEALTH_ENABLED=${PLAYWRIGHT_STEALTH_ENABLED:-true}
             - CONTEXT_TTL=${PLAYWRIGHT_CONTEXT_TTL:-1800000}
+            - FETCH_URL_SAFETY_ALLOWED_HOSTS=${FETCH_URL_SAFETY_ALLOWED_HOSTS:-}
         ports:
             - "${PLAYWRIGHT_WORKER_PORT:-3000}:3000"
         volumes:
