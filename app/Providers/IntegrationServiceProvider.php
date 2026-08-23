@@ -29,6 +29,7 @@ use App\Integrations\Slack\SlackPlugin;
 use App\Integrations\Spotify\SpotifyPlugin;
 use App\Integrations\Task\TaskPlugin;
 use App\Integrations\Untappd\UntappdPlugin;
+use App\Integrations\Vivino\VivinoPlugin;
 use Illuminate\Support\ServiceProvider;
 
 class IntegrationServiceProvider extends ServiceProvider
@@ -65,6 +66,7 @@ class IntegrationServiceProvider extends ServiceProvider
         PluginRegistry::register(UntappdPlugin::class);
         PluginRegistry::register(HomeAssistantPlugin::class);
         PluginRegistry::register(ManualLogPlugin::class);
+        PluginRegistry::register(VivinoPlugin::class);
     }
 
     /**
