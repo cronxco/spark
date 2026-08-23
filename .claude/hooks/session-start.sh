@@ -1,17 +1,20 @@
 #!/bin/bash
 # SessionStart hook for Claude Code on the web.
 #
-# Sets up this Laravel app (composer deps, a local Postgres test DB, .env)
-# so `composer install`, `php artisan test`, and linting work in a fresh
-# session. Only runs remotely (see CLAUDE_CODE_REMOTE check below) — local
-# development already uses Sail/Docker and doesn't need this.
+# Sets up this Laravel app (composer + npm deps, a local Postgres test DB,
+# built frontend assets, .env) so `composer install`, `php artisan test`
+# (including page-rendering tests that need a real Vite manifest), and
+# linting work in a fresh session. Only runs remotely (see CLAUDE_CODE_REMOTE
+# check below) — local development already uses Sail/Docker and doesn't need
+# this.
 #
 # The one wrinkle: composer.json requires wire-elements/pro, a licensed
 # package whose credentials (WIRE_SECRET, normally injected by deploy.php
 # during a real deploy) aren't available to this sandbox. That package is
-# woven through app/Spotlight/*, app/Icons/FontAwesome/*, and
-# bootstrap/providers.php for the Spotlight command palette feature, so it
-# can't just be dropped — the real app keeps requiring it in git.
+# woven through app/Spotlight/*, app/Icons/FontAwesome/*,
+# bootstrap/providers.php, and resources/js/app.js for the Spotlight command
+# palette feature, so it can't just be dropped — the real app keeps
+# requiring it in git.
 #
 # The workaround: for the duration of `composer install` only, this script
 # swaps in a working copy of composer.json/composer.lock with
@@ -23,7 +26,9 @@
 # generated vendor/composer/autoload_*.php files keep pointing at the stub,
 # but composer.json and composer.lock are restored byte-for-byte to the
 # real, git-committed versions — so `git status` stays clean and nothing
-# about the real dependency is ever altered or committed.
+# about the real dependency is ever altered or committed. The same idea
+# covers the package's JS component further down, via
+# .claude/hooks/wire-elements-pro-stub/resources/js — see the comment there.
 
 set -euo pipefail
 
@@ -48,7 +53,6 @@ fi
 su postgres -c "psql -d laravel -c \"CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pgcrypto;\"" >/dev/null
 
 echo "==> Installing composer dependencies (wire-elements/pro swapped for a local stub)"
-STUB_DIR="$CLAUDE_PROJECT_DIR/.claude/hooks/wire-elements-pro-stub/src"
 cp composer.json /tmp/composer.json.real-backup
 cp composer.lock /tmp/composer.lock.real-backup
 
@@ -92,5 +96,25 @@ php artisan key:generate --force >/dev/null
 
 echo "==> Running migrations against the local test database"
 DB_DATABASE=laravel php artisan migrate --graceful --force >/dev/null
+
+echo "==> Building frontend assets (wire-elements/pro JS swapped for a local stub too)"
+# resources/js/app.js imports the real package's JS component by relative
+# path straight into vendor/ (not through composer), purely for its side
+# effects. Same idea as the PHP stub above: drop in a no-op file at that
+# exact path so `vite build` resolves it and produces a real manifest —
+# without it, every test that renders a page (anything using the
+# components.layouts.app @vite directive) fails on a missing manifest.
+mkdir -p vendor/wire-elements/pro/resources/js
+cp .claude/hooks/wire-elements-pro-stub/resources/js/spotlight-component.js \
+  vendor/wire-elements/pro/resources/js/spotlight-component.js
+
+# `npm install` tends to rewrite package-lock.json with harmless npm-version
+# metadata noise (libc/dev flags on optional platform binaries) even when no
+# dependency actually changed — restore it after, same reasoning as the
+# composer.json/lock restore above.
+cp package-lock.json /tmp/package-lock.json.real-backup
+npm install
+cp /tmp/package-lock.json.real-backup package-lock.json
+npm run build >/dev/null
 
 echo "==> Session start hook complete"
