@@ -38,7 +38,9 @@ class HomeAssistantPluginTest extends TestCase
         $result = $plugin->convertData([
             'title' => 'Loki',
             'app_name' => 'Disney+',
+            'app_id' => 'com.disney.disneyplus',
             'media_content_type' => 'tvshow',
+            'media_content_id' => 'episode_abc123',
             'entity_id' => 'media_player.living_room_atv',
             'minutes_watched' => 15,
             'will_home' => 'true',
@@ -55,10 +57,34 @@ class HomeAssistantPluginTest extends TestCase
         $this->assertSame('Loki', $event['target']['title']);
         $this->assertSame('tv_watch', $event['target']['type']);
         $this->assertSame('media', $event['target']['concept']);
+        $this->assertSame('com.disney.disneyplus', $event['target']['metadata']['app_id']);
+        $this->assertSame('episode_abc123', $event['target']['metadata']['media_content_id']);
         $this->assertSame('home_assistant_user', $event['actor']['type']);
         $this->assertTrue($event['event_metadata']['will_home']);
         $this->assertFalse($event['event_metadata']['dan_home']);
         $this->assertSame('media_player.living_room_atv', $event['event_metadata']['entity_id']);
+        $this->assertSame('com.disney.disneyplus', $event['event_metadata']['app_id']);
+        $this->assertSame('episode_abc123', $event['event_metadata']['media_content_id']);
+    }
+
+    #[Test]
+    public function normalizes_a_blank_media_content_id_to_null(): void
+    {
+        $integration = Integration::factory()->create(['service' => 'home_assistant']);
+        $plugin = new HomeAssistantPlugin;
+
+        $result = $plugin->convertData([
+            'title' => 'Sky Sports Formula 1',
+            'app_name' => 'NOW',
+            'app_id' => 'com.bskyb.nowtv',
+            'media_content_type' => 'video',
+            'media_content_id' => '',
+            'entity_id' => 'media_player.living_room_atv',
+        ], $integration);
+
+        $event = $result['events'][0];
+        $this->assertNull($event['target']['metadata']['media_content_id']);
+        $this->assertNull($event['event_metadata']['media_content_id']);
     }
 
     #[Test]
