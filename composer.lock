@@ -4473,16 +4473,16 @@
         },
         {
             "name": "livewire/volt",
-            "version": "v1.10.5",
+            "version": "v1.11.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/livewire/volt.git",
-                "reference": "32a111951779f9dcf2a08a5704acb940ac9a146c"
+                "reference": "1e46197d615bcd395ae87784fd8d25077782043d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/livewire/volt/zipball/32a111951779f9dcf2a08a5704acb940ac9a146c",
-                "reference": "32a111951779f9dcf2a08a5704acb940ac9a146c",
+                "url": "https://api.github.com/repos/livewire/volt/zipball/1e46197d615bcd395ae87784fd8d25077782043d",
+                "reference": "1e46197d615bcd395ae87784fd8d25077782043d",
                 "shasum": ""
             },
             "require": {
@@ -4540,7 +4540,7 @@
                 "issues": "https://github.com/livewire/volt/issues",
                 "source": "https://github.com/livewire/volt"
             },
-            "time": "2026-03-18T14:16:30+00:00"
+            "time": "2026-07-31T16:13:54+00:00"
         },
         {
             "name": "maennchen/zipstream-php",
