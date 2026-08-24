@@ -2661,16 +2661,16 @@
         },
         {
             "name": "laravel-notification-channels/apn",
-            "version": "v6.4.0",
+            "version": "v6.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel-notification-channels/apn.git",
-                "reference": "2caf55a0d12e27fb3a33084a4bac31c9d65605ee"
+                "reference": "b792e056452311b279a6ad8395b05711a9ebedf4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel-notification-channels/apn/zipball/2caf55a0d12e27fb3a33084a4bac31c9d65605ee",
-                "reference": "2caf55a0d12e27fb3a33084a4bac31c9d65605ee",
+                "url": "https://api.github.com/repos/laravel-notification-channels/apn/zipball/b792e056452311b279a6ad8395b05711a9ebedf4",
+                "reference": "b792e056452311b279a6ad8395b05711a9ebedf4",
                 "shasum": ""
             },
             "require": {
@@ -2715,9 +2715,9 @@
             "homepage": "https://github.com/laravel-notification-channels/apn",
             "support": {
                 "issues": "https://github.com/laravel-notification-channels/apn/issues",
-                "source": "https://github.com/laravel-notification-channels/apn/tree/v6.4.0"
+                "source": "https://github.com/laravel-notification-channels/apn/tree/v6.5.0"
             },
-            "time": "2026-05-05T08:32:11+00:00"
+            "time": "2026-08-05T22:48:08+00:00"
         },
         {
             "name": "laravel-notification-channels/webpush",
