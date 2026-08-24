@@ -184,6 +184,10 @@ return [
         'base_url' => env('BOARDGAMEGEEK_BASE_URL', 'https://boardgamegeek.com/xmlapi2'),
     ],
 
+    'vivino' => [
+        'search_url' => env('VIVINO_SEARCH_URL', 'https://www.vivino.com/search/wines'),
+    ],
+
     'receipt' => [
         'domain' => env('RECEIPT_DOMAIN', 'spark.cronx.co'),
         'email_address' => env('RECEIPT_EMAIL_ADDRESS', 'receipts@spark.cronx.co'),

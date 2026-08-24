@@ -4,6 +4,7 @@ namespace Tests\Unit\Integrations;
 
 use App\Integrations\ManualLog\ManualLogPlugin;
 use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
+use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -19,11 +20,12 @@ class ManualLogPluginTest extends TestCase
     {
         parent::setUp();
 
-        // played_board_game entries dispatch BoardGameGeekEnrichmentPull,
-        // which makes a real outbound HTTP call - fake it so these tests
-        // don't depend on network access, the same way UntappdRssDataTest
-        // fakes UntappdCheckinDetailPull.
-        Queue::fake([BoardGameGeekEnrichmentPull::class]);
+        // played_board_game/drank_wine entries dispatch enrichment jobs
+        // that make real outbound calls (BGG's HTTP API, Vivino via
+        // Playwright) - fake them so these tests don't depend on network
+        // access, the same way UntappdRssDataTest fakes
+        // UntappdCheckinDetailPull.
+        Queue::fake([BoardGameGeekEnrichmentPull::class, VivinoEnrichmentPull::class]);
     }
 
     #[Test]

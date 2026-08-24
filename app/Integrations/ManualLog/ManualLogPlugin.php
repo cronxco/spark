@@ -4,6 +4,7 @@ namespace App\Integrations\ManualLog;
 
 use App\Integrations\Base\ManualPlugin;
 use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
+use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -117,6 +118,14 @@ class ManualLogPlugin extends ManualPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'wine_details' => [
+                'icon' => 'fas.wine-glass',
+                'display_name' => 'Wine Details',
+                'description' => 'Winery, vintage, region, and Vivino community rating',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -223,6 +232,10 @@ class ManualLogPlugin extends ManualPlugin
 
         if ($actionType === 'played_board_game') {
             BoardGameGeekEnrichmentPull::dispatch($integration, $event->id, $title);
+        }
+
+        if ($actionType === 'drank_wine') {
+            VivinoEnrichmentPull::dispatch($integration, $event->id, $title);
         }
 
         return $event;
