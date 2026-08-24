@@ -10,7 +10,7 @@ require 'contrib/sentry.php';
 
 // Config
 set('application', getenv('DEPLOYER_APP'));
-set('repository', getenv('DEPLPOYER_REPO'));
+set('repository', getenv('DEPLOYER_REPO'));
 set('cleanup_use_sudo', true);
 set('keep_releases', 3);
 set('writable_mode', 'chmod');
@@ -26,6 +26,7 @@ host('prod')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
+    ->set('port', (int) (getenv('DEPLOYER_PORT') ?: 22))
     ->set('bin/php', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark php')
     ->set('bin/composer', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer');
 
@@ -33,6 +34,7 @@ host('dev')
     ->set('remote_user', getenv('DEPLOYER_USER'))
     ->set('branch', 'dev')
     ->set('hostname', getenv('DEPLOYER_HOSTNAME'))
+    ->set('port', (int) (getenv('DEPLOYER_PORT') ?: 22))
     ->set('deploy_path', getenv('DEPLOYER_PATH'))
     ->set('bin/php', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark php')
     ->set('bin/composer', 'sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark composer');

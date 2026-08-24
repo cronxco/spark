@@ -48,7 +48,8 @@ Fetch a URL using Playwright browser automation.
     "waitFor": "networkidle",
     "timeout": 30000,
     "screenshot": true,
-    "userAgent": "Mozilla/5.0..."
+    "userAgent": "Mozilla/5.0...",
+    "maxHtmlBytes": 1048576
 }
 ```
 
@@ -61,9 +62,19 @@ Fetch a URL using Playwright browser automation.
   "title": "Page Title",
   "url": "https://example.com",
   "screenshot": "base64-encoded-png",
-  "cookies": [...]
+  "cookies": [...],
+  "meta": {
+    "status": 200,
+    "htmlBytes": 12345,
+    "returnedHtmlBytes": 12345,
+    "htmlTruncated": false
+  }
 }
 ```
+
+`maxHtmlBytes` is optional. When supplied, the worker truncates the returned
+HTML at a UTF-8 character boundary and reports the original and returned sizes
+in `meta`.
 
 ### GET /cookies/:domain
 
@@ -197,6 +208,9 @@ The worker includes:
 - **CDP access**: Chrome CDP endpoint (9222) should NOT be exposed publicly
 - **No authentication**: The worker has no built-in auth (relies on Docker network isolation)
 - **Cookie storage**: Cookies are temporarily stored in browser contexts
+- **URL safety**: Every HTTP(S) browser request is checked against private,
+  loopback, link-local, and reserved targets. Set `FETCH_URL_SAFETY_ALLOWED_HOSTS`
+  only for explicitly trusted internal hosts.
 - **VNC password**: Set a strong VNC password in production
 
 ## Troubleshooting

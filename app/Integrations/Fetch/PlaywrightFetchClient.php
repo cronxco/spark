@@ -3,6 +3,7 @@
 namespace App\Integrations\Fetch;
 
 use App\Models\IntegrationGroup;
+use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -124,6 +125,83 @@ class PlaywrightFetchClient
                 'error' => $e->getMessage(),
                 'reached_worker' => ! str_contains($e->getMessage(), 'worker is not available'),
                 'worker_health' => $this->getHealthData(),
+            ];
+        }
+    }
+
+    /**
+     * Render a URL for an MCP caller without using shared browser contexts.
+     *
+     * Saved Fetch cookies are used only when the authenticated caller has a
+     * matching Fetch integration group. Returned cookies are persisted back to
+     * that same group's target-domain cookie store.
+     *
+     * @return array{success: bool, html: string, title: string, url: string, status: ?int, html_bytes: int, returned_html_bytes: int, html_truncated: bool, used_saved_cookies: bool, cookie_store_updated: bool, error: ?string}
+     */
+    public function fetchForMcp(string $url, ?IntegrationGroup $group): array
+    {
+        try {
+            app(UrlSafetyValidator::class)->validate($url);
+            $this->ensureWorkerAvailable();
+
+            $domain = FetchHttpClient::getDomainFromUrl($url);
+            $domainConfig = $group ? FetchHttpClient::getCookiesForDomain($domain, $group) : [];
+            $cookies = $this->convertCookiesToPlaywrightFormat($domain, $domainConfig['cookies'] ?? []);
+
+            $response = Http::timeout(($this->timeout / 1000) + 10)
+                ->post("{$this->workerUrl}/fetch", [
+                    'url' => $url,
+                    'cookies' => $cookies,
+                    'waitFor' => 'networkidle',
+                    'timeout' => $this->timeout,
+                    'screenshot' => false,
+                    'userAgent' => $domainConfig['headers']['User-Agent'] ?? null,
+                    'usePersistence' => false,
+                    'useDefaultContext' => false,
+                    'maxHtmlBytes' => (int) config('services.playwright.mcp_max_html_bytes', 1048576),
+                ]);
+
+            if (! $response->successful()) {
+                $errorData = $response->json();
+                throw new Exception($errorData['error'] ?? 'Unknown Playwright error', $response->status());
+            }
+
+            $data = $response->json();
+            $cookieStoreUpdated = $group && ! empty($data['cookies'])
+                ? $this->updateCookiesIfChanged($domain, $group, $data['cookies'])
+                : false;
+
+            return [
+                'success' => true,
+                'html' => $data['html'] ?? '',
+                'title' => $data['title'] ?? '',
+                'url' => $data['url'] ?? $url,
+                'status' => $data['meta']['status'] ?? null,
+                'html_bytes' => $data['meta']['htmlBytes'] ?? strlen($data['html'] ?? ''),
+                'returned_html_bytes' => $data['meta']['returnedHtmlBytes'] ?? strlen($data['html'] ?? ''),
+                'html_truncated' => (bool) ($data['meta']['htmlTruncated'] ?? false),
+                'used_saved_cookies' => ! empty($cookies),
+                'cookie_store_updated' => $cookieStoreUpdated,
+                'error' => null,
+            ];
+        } catch (Exception $e) {
+            Log::error('Fetch: MCP Playwright request failed', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'html' => '',
+                'title' => '',
+                'url' => $url,
+                'status' => null,
+                'html_bytes' => 0,
+                'returned_html_bytes' => 0,
+                'html_truncated' => false,
+                'used_saved_cookies' => false,
+                'cookie_store_updated' => false,
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -338,7 +416,7 @@ class PlaywrightFetchClient
     /**
      * Update stored cookies if they changed during the fetch
      */
-    protected function updateCookiesIfChanged(string $domain, IntegrationGroup $group, array $newCookies): void
+    protected function updateCookiesIfChanged(string $domain, IntegrationGroup $group, array $newCookies): bool
     {
         // Preserve full cookie attributes (expiry, SameSite, Secure, HttpOnly, path, domain)
         $incoming = [];
@@ -359,7 +437,7 @@ class PlaywrightFetchClient
         }
 
         if (empty($incoming)) {
-            return;
+            return false;
         }
 
         // Merge with existing cookies by (name, domain, path) — don't blindly overwrite the set
@@ -391,7 +469,11 @@ class PlaywrightFetchClient
                 'domain' => $domain,
                 'cookie_count' => count($merged),
             ]);
+
+            return true;
         }
+
+        return false;
     }
 
     /**

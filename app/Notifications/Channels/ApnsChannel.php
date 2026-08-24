@@ -113,7 +113,10 @@ class ApnsChannel
 
         $existing = $message->custom['spark'] ?? [];
 
-        $message->custom('spark', array_merge($envelope, $existing));
+        $message->custom([
+            ...$message->custom,
+            'spark' => array_merge($envelope, $existing),
+        ]);
     }
 
     /**
@@ -124,12 +127,14 @@ class ApnsChannel
         $silent = (new ApnMessage)
             ->contentAvailable(1)
             ->pushType(ApnMessagePushType::Background)
-            ->custom('spark', array_filter([
-                'type' => method_exists($notification, 'getNotificationType')
-                    ? $notification->getNotificationType()
-                    : null,
-                'sync_cursor' => $notification->sparkSyncCursor ?? null,
-            ], fn ($value) => $value !== null));
+            ->custom([
+                'spark' => array_filter([
+                    'type' => method_exists($notification, 'getNotificationType')
+                        ? $notification->getNotificationType()
+                        : null,
+                    'sync_cursor' => $notification->sparkSyncCursor ?? null,
+                ], fn ($value) => $value !== null),
+            ]);
 
         foreach ($tokens as $token) {
             $client->addNotification($this->adapter->adapt($silent, $token));
