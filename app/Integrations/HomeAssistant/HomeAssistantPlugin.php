@@ -209,7 +209,9 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
         $minutesWatched = (int) ($externalData['minutes_watched'] ?? 15);
         $entityId = (string) ($externalData['entity_id'] ?? 'unknown');
         $appName = $externalData['app_name'] ?? null;
+        $appId = $externalData['app_id'] ?? null;
         $mediaContentType = $externalData['media_content_type'] ?? null;
+        $mediaContentId = trim((string) ($externalData['media_content_id'] ?? '')) ?: null;
         $time = now();
 
         return [
@@ -228,7 +230,9 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
                     'title' => $title,
                     'metadata' => [
                         'app_name' => $appName,
+                        'app_id' => $appId,
                         'media_content_type' => $mediaContentType,
+                        'media_content_id' => $mediaContentId,
                     ],
                 ],
                 'domain' => self::getDomain(),
@@ -238,7 +242,9 @@ class HomeAssistantPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 'event_metadata' => [
                     'entity_id' => $entityId,
                     'app_name' => $appName,
+                    'app_id' => $appId,
                     'media_content_type' => $mediaContentType,
+                    'media_content_id' => $mediaContentId,
                     'will_home' => $this->parseTriState($externalData['will_home'] ?? null),
                     'dan_home' => $this->parseTriState($externalData['dan_home'] ?? null),
                 ],
