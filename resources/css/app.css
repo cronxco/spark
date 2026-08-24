@@ -107,6 +107,23 @@
     display: none;
 }
 
+/*
+ * daisyUI hides .tab-content by default and only reveals it via a CSS
+ * adjacent-sibling selector matching an active .tab label right before it.
+ * mary-ui's <x-tabs>/<x-tab> teleport the labels elsewhere in the DOM
+ * (into a shared wire:ignore container) so that sibling relationship never
+ * exists, and instead toggle visibility purely through Alpine's x-show.
+ * Because daisyUI's plugin CSS layer is registered after Tailwind's
+ * `utilities` layer, its `display: none` always wins over the `block`
+ * utility class mary-ui also applies, so tab content stays hidden no
+ * matter which tab is selected. Restoring the default here (outside any
+ * @layer, so it wins over all of the above) leaves x-show's own inline
+ * `display: none` as the only thing that hides an inactive tab's content.
+ */
+.tab-content {
+    display: block;
+}
+
 pretty-json {
     --key-color: #b02411;
     --arrow-color: #011627;
