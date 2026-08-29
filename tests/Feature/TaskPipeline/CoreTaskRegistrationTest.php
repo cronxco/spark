@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\TaskPipeline;
 
+use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
+use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
+use App\Jobs\TaskPipeline\Tasks\RunIntegrationUpdateTask;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -39,7 +42,7 @@ class CoreTaskRegistrationTest extends TestCase
 
         $this->assertNotNull($task);
         $this->assertSame(
-            \App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask::class,
+            DispatchMorningDigestOnSleepScoreTask::class,
             $task->jobClass
         );
     }
@@ -51,7 +54,7 @@ class CoreTaskRegistrationTest extends TestCase
 
         $this->assertNotNull($task);
         $this->assertSame(
-            \App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask::class,
+            NotifyOnDigestReadyTask::class,
             $task->jobClass
         );
         $this->assertSame(['event'], $task->appliesTo);
@@ -65,7 +68,7 @@ class CoreTaskRegistrationTest extends TestCase
 
         $this->assertNotNull($task);
         $this->assertSame(
-            \App\Jobs\TaskPipeline\Tasks\RunIntegrationUpdateTask::class,
+            RunIntegrationUpdateTask::class,
             $task->jobClass
         );
         $this->assertSame(['integration'], $task->appliesTo);
