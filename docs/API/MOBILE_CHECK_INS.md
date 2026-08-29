@@ -79,7 +79,7 @@ All check-in endpoints sit under `/api/v1/mobile/` and require a valid Sanctum B
 | Read status (`GET`)  | `ios:read`       |
 | Read history (`GET`) | `ios:read`       |
 
-See [MOBILE_API.md](./MOBILE_API.md) for how to obtain tokens via OAuth PKCE.
+See [mobile_API.md](./mobile_API.md) for how to obtain tokens via OAuth PKCE.
 
 ---
 

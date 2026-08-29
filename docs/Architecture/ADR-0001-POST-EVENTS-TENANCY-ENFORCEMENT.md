@@ -36,4 +36,4 @@ ownership.
 
 - `app/Http/Controllers/EventApiController.php`
 - `tests/Feature/EventApiTest.php`
-- `docs/Architecture/API.md`
+- `docs/API/API_v1.md`
