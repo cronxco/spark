@@ -51,13 +51,17 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        Volt::test('admin.task-pipeline-overview')
-            ->assertSee('Generate Embedding')
-            ->set('taskSearch', 'generate_embedding')
-            ->assertSee('Generate Embedding')
-            ->set('taskSearch', 'no-task-matches-this-search')
-            ->assertDontSee('Generate Embedding')
-            ->assertSee('No tasks found');
+        $component = Volt::test('admin.task-pipeline-overview');
+        $hasGenerateEmbedding = fn () => $component->instance()->filteredTasks->contains(fn ($task) => $task->key === 'generate_embedding');
+
+        $this->assertTrue($hasGenerateEmbedding());
+
+        $component->set('taskSearch', 'generate_embedding');
+        $this->assertTrue($hasGenerateEmbedding());
+
+        $component->set('taskSearch', 'no-task-matches-this-search');
+        $this->assertFalse($hasGenerateEmbedding());
+        $component->assertSee('No tasks found');
     }
 
     #[Test]
@@ -65,11 +69,14 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        Volt::test('admin.task-pipeline-overview')
-            ->set('appliesToFilter', 'integration')
-            ->assertDontSee('Generate Embedding')
-            ->set('appliesToFilter', 'event')
-            ->assertSee('Generate Embedding');
+        $component = Volt::test('admin.task-pipeline-overview')
+            ->set('appliesToFilter', 'integration');
+        $hasGenerateEmbedding = fn () => $component->instance()->filteredTasks->contains(fn ($task) => $task->key === 'generate_embedding');
+
+        $this->assertFalse($hasGenerateEmbedding());
+
+        $component->set('appliesToFilter', 'event');
+        $this->assertTrue($hasGenerateEmbedding());
     }
 
     #[Test]

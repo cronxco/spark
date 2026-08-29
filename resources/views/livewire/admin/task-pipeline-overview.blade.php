@@ -404,7 +404,7 @@ new class extends Component
             <div class="stat">
                 <div class="stat-title">Stuck</div>
                 <div class="stat-value {{ $this->stats['stuck'] > 0 ? 'text-error' : '' }}">{{ $this->stats['stuck'] }}</div>
-                <div class="stat-desc">Running/pending &gt;{{ $stuckAfterMinutes }}m</div>
+                <div class="stat-desc">Running/pending &gt;{{ $this->stuckAfterMinutes }}m</div>
             </div>
 
             <div class="stat">
@@ -555,7 +555,7 @@ new class extends Component
                                 <div class="flex items-center gap-2">
                                     <x-task-status-badge :status="$execution->status" />
                                     @if ($this->isStuck($execution))
-                                        <span class="badge badge-error badge-outline badge-xs gap-1" title="No update in over {{ $stuckAfterMinutes }} minutes">
+                                        <span class="badge badge-error badge-outline badge-xs gap-1" title="No update in over {{ $this->stuckAfterMinutes }} minutes">
                                             <x-icon name="fas.triangle-exclamation" class="w-3 h-3" />
                                             Stuck
                                         </span>
