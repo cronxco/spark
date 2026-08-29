@@ -91,6 +91,7 @@ class CheckIntegrationUpdates implements ShouldQueue
                     model: $integration,
                     trigger: 'scheduled',
                     taskFilter: ['run_integration_update'],
+                    force: true,
                 )->onQueue('tasks');
 
                 Log::info("Dispatched integration update task for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
