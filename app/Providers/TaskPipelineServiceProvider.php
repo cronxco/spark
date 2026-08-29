@@ -6,11 +6,14 @@ use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\TaskPipeline\Tasks\CalculateMetricStatsTask;
 use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
 use App\Jobs\TaskPipeline\Tasks\DetectTrendsTask;
+use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
 use App\Jobs\TaskPipeline\Tasks\DownloadImagesToMediaLibraryTask;
 use App\Jobs\TaskPipeline\Tasks\FindReceiptForTransactionTask;
 use App\Jobs\TaskPipeline\Tasks\GenerateEmbeddingTask;
 use App\Jobs\TaskPipeline\Tasks\LinkTransactionsTask;
 use App\Jobs\TaskPipeline\Tasks\MatchReceiptToTransactionTask;
+use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
+use App\Jobs\TaskPipeline\Tasks\RunIntegrationUpdateTask;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -275,6 +278,43 @@ class TaskPipelineServiceProvider extends ServiceProvider
             priority: 40,
             runOnCreate: true,
             runOnUpdate: false,
+        ));
+
+        // Digest-ready notification - sends the push notification when a Flint
+        // digest summary event is created, rather than on a fixed clock.
+        TaskRegistry::register(new TaskDefinition(
+            key: 'notify_on_digest_ready',
+            name: 'Notify on Digest Ready',
+            description: 'Send the digest-ready push notification when a Flint digest summary event is created',
+            jobClass: NotifyOnDigestReadyTask::class,
+            appliesTo: ['event'],
+            conditions: [
+                'service' => 'flint',
+                'action' => 'had_summary',
+            ],
+            dependencies: [],
+            queue: 'tasks',
+            priority: 40,
+            runOnCreate: true,
+            runOnUpdate: false,
+        ));
+
+        // Integration update - runs a single due integration's scheduled fetch
+        TaskRegistry::register(new TaskDefinition(
+            key: 'run_integration_update',
+            name: 'Run Integration Update',
+            description: 'Dispatch the fetch jobs for a due integration',
+            jobClass: RunIntegrationUpdateTask::class,
+            appliesTo: ['integration'],
+            conditions: [],
+            dependencies: [],
+            queue: 'tasks',
+            priority: 40,
+            runOnCreate: false,
+            runOnUpdate: false,
+            shouldRun: function ($integration) {
+                return ! $integration->isPaused() && ! $integration->isProcessing() && ! $integration->shouldThrottle();
+            },
         ));
 
     }

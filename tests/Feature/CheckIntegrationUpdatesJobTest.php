@@ -3,8 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\CheckIntegrationUpdates;
-use App\Jobs\OAuth\GitHub\GitHubActivityPull;
-use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
@@ -19,7 +18,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function job_dispatches_processing_jobs_for_integrations_that_need_updating()
+    public function job_dispatches_pipeline_task_for_integrations_that_need_updating()
     {
         Queue::fake();
 
@@ -58,7 +57,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'service' => 'slack',
             'access_token' => 'test-token',
         ]);
-        $integration3 = Integration::factory()->create([
+        Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'slack',
             'integration_group_id' => $group3->id,
@@ -72,7 +71,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'service' => 'github',
             'access_token' => null,
         ]);
-        $integration4 = Integration::factory()->create([
+        Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
             'integration_group_id' => $group4->id,
@@ -82,27 +81,27 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         $job = new CheckIntegrationUpdates;
         $job->handle();
 
-        // Should dispatch service-specific jobs for integrations 1 and 2
-        Queue::assertPushed(GitHubActivityPull::class, 1);
-        Queue::assertPushed(SpotifyListeningPull::class, 1);
+        // Should dispatch the pipeline for integrations 1 and 2 only
+        Queue::assertPushed(ProcessTaskPipelineJob::class, 2);
 
-        // Verify that the jobs were dispatched with the correct integrations
-        Queue::assertPushed(GitHubActivityPull::class, function ($job) use ($integration1) {
-            return $job->getIntegration()->id === $integration1->id;
+        Queue::assertPushed(ProcessTaskPipelineJob::class, function ($job) use ($integration1) {
+            return $job->model->is($integration1) && $job->taskFilter === ['run_integration_update'];
         });
-        Queue::assertPushed(SpotifyListeningPull::class, function ($job) use ($integration2) {
-            return $job->getIntegration()->id === $integration2->id;
+        Queue::assertPushed(ProcessTaskPipelineJob::class, function ($job) use ($integration2) {
+            return $job->model->is($integration2) && $job->taskFilter === ['run_integration_update'];
         });
     }
 
     #[Test]
-    public function job_skips_integrations_that_are_currently_processing()
+    public function job_dispatches_pipeline_task_even_for_integrations_currently_processing()
     {
+        // Pause/processing/throttle are now evaluated by the pipeline task's
+        // shouldRun condition (see RunIntegrationUpdateTaskTest), not by this
+        // scheduler job - it only filters on isDue().
         Queue::fake();
 
         $user = User::factory()->create();
 
-        // Integration that is currently processing
         $group = IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => 'github',
@@ -119,37 +118,35 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         $job = new CheckIntegrationUpdates;
         $job->handle();
 
-        // Should not dispatch any jobs
-        Queue::assertNotPushed(ProcessIntegrationData::class);
+        Queue::assertPushed(ProcessTaskPipelineJob::class, function ($job) use ($integration) {
+            return $job->model->is($integration);
+        });
     }
 
     #[Test]
-    public function job_skips_integrations_that_were_recently_triggered()
+    public function job_does_not_dispatch_for_paused_integrations()
     {
         Queue::fake();
 
         $user = User::factory()->create();
 
-        // Integration that was recently triggered (within frequency window)
         $group = IntegrationGroup::create([
             'user_id' => $user->id,
             'service' => 'github',
             'access_token' => 'test-token',
         ]);
-        $integration = Integration::factory()->create([
+        Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
             'integration_group_id' => $group->id,
-            'configuration' => ['update_frequency_minutes' => 15],
-            'last_successful_update_at' => Carbon::now()->subMinutes(20),
-            'last_triggered_at' => Carbon::now()->subMinutes(5), // Recently triggered
+            'configuration' => ['paused' => true],
+            'last_successful_update_at' => null,
         ]);
 
         $job = new CheckIntegrationUpdates;
         $job->handle();
 
-        // Should not dispatch any jobs
-        Queue::assertNotPushed(ProcessIntegrationData::class);
+        Queue::assertNotPushed(ProcessTaskPipelineJob::class);
     }
 
     #[Test]
@@ -165,7 +162,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
             'service' => 'github',
             'access_token' => null,
         ]);
-        $integration = Integration::factory()->create([
+        Integration::factory()->create([
             'user_id' => $user->id,
             'service' => 'github',
             'integration_group_id' => $group->id,
@@ -175,8 +172,7 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         $job = new CheckIntegrationUpdates;
         $job->handle();
 
-        // Should not dispatch any jobs
-        Queue::assertNotPushed(ProcessIntegrationData::class);
+        Queue::assertNotPushed(ProcessTaskPipelineJob::class);
     }
 
     #[Test]
@@ -187,7 +183,6 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         $job = new CheckIntegrationUpdates;
         $job->handle();
 
-        // Should not dispatch any jobs
-        Queue::assertNotPushed(ProcessIntegrationData::class);
+        Queue::assertNotPushed(ProcessTaskPipelineJob::class);
     }
 }

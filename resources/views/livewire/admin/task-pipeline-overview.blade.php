@@ -96,10 +96,6 @@ new class extends Component {
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <flux:heading size="xl">Task Pipeline</flux:heading>
-
-        <flux:button href="{{ route('admin.task-pipeline.registry') }}" variant="ghost">
-            View Registry
-        </flux:button>
     </div>
 
     @if (session('message'))

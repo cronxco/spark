@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Flint;
 
+use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
+use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
@@ -149,9 +151,57 @@ class FlintDigestSchedulingTest extends TestCase
     }
 
     #[Test]
-    public function digest_notification_is_not_dispatched_from_summary_event_creation(): void
+    public function digest_notification_task_dispatches_send_digest_notification_job(): void
     {
-        $this->assertNull(TaskRegistry::getTask('notify_on_digest_ready'));
+        Bus::fake();
+        $user = $this->newYorkUser();
+
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'flint',
+        ]);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'event_metadata' => ['period' => 'morning'],
+        ]);
+
+        $task = TaskRegistry::getTask('notify_on_digest_ready');
+        $this->assertNotNull($task);
+
+        (new NotifyOnDigestReadyTask($event, $task))->handle();
+
+        Bus::assertDispatched(SendDigestNotificationJob::class, function ($job) use ($user) {
+            return $job->user->id === $user->id;
+        });
+    }
+
+    #[Test]
+    public function creating_a_digest_summary_event_dispatches_exactly_one_notification(): void
+    {
+        Bus::fake([SendDigestNotificationJob::class]);
+        $user = $this->newYorkUser();
+
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'flint',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'flint',
+            'domain' => 'knowledge',
+            'action' => 'had_summary',
+            'time' => now(),
+            'value' => null,
+            'value_unit' => null,
+            'event_metadata' => ['period' => 'morning'],
+        ]);
+
+        // Exactly one - the task pipeline path is now the sole trigger, so
+        // there is no risk of a duplicate direct dispatch alongside it.
+        Bus::assertDispatchedTimes(SendDigestNotificationJob::class, 1);
     }
 
     #[Test]

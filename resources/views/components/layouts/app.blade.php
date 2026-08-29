@@ -197,6 +197,7 @@
                     <x-menu-item title="Search Analytics" icon="fas.magnifying-glass-chart" link="{{ route('admin.search.index') }}" :active="request()->routeIs('admin.search.*')" />
                     <x-menu-item title="Duplicates" icon="fas.copy" link="{{ route('admin.duplicates.index') }}" :active="request()->routeIs('admin.duplicates.*')" />
                     <x-menu-item title="Activity" icon="fas.history" link="{{ route('admin.activity.index') }}" :active="request()->routeIs('admin.activity.*')" />
+                    <x-menu-item title="Task Pipeline" icon="fas.diagram-project" link="{{ route('admin.task-pipeline.index') }}" :active="request()->routeIs('admin.task-pipeline.*')" />
                     <x-menu-item title="Events" icon="fas.list" link="{{ route('admin.events.index') }}" :active="request()->routeIs('admin.events.*')" />
                     <x-menu-item title="Objects" icon="fas.cube" link="{{ route('admin.objects.index') }}" :active="request()->routeIs('admin.objects.*')" />
                     <x-menu-item title="Blocks" icon="fas.cubes" link="{{ route('admin.blocks.index') }}" :active="request()->routeIs('admin.blocks.*')" />

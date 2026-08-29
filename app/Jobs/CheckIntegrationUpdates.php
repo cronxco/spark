@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Actions\DispatchIntegrationFetchJobs;
 use App\Integrations\PluginRegistry;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Integration;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -86,59 +86,21 @@ class CheckIntegrationUpdates implements ShouldQueue
 
             Log::info("Found {$integrations->count()} integration(s) that need updating");
 
-            $scheduledCount = 0;
-            $skippedCount = 0;
-
             foreach ($integrations as $integration) {
-                try {
-                    // Skip if paused or currently processing
-                    if ($integration->isPaused()) {
-                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - paused");
-                        $skippedCount++;
+                ProcessTaskPipelineJob::dispatch(
+                    model: $integration,
+                    trigger: 'scheduled',
+                    taskFilter: ['run_integration_update'],
+                )->onQueue('tasks');
 
-                        continue;
-                    }
-
-                    // Skip if currently processing
-                    if ($integration->isProcessing()) {
-                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - currently processing");
-                        $skippedCount++;
-
-                        continue;
-                    }
-
-                    // Throttle immediate re-runs
-                    if ($integration->shouldThrottle()) {
-                        Log::info("Skipping integration {$integration->id} ({$integration->service}) - throttled");
-                        $skippedCount++;
-
-                        continue;
-                    }
-
-                    (new DispatchIntegrationFetchJobs)->dispatch($integration);
-
-                    // Mark the integration as triggered to prevent immediate re-triggering
-                    $integration->markAsTriggered();
-
-                    Log::info("Scheduled fetch jobs for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
-                    $scheduledCount++;
-
-                } catch (Exception $e) {
-                    Log::error("Failed to schedule job for integration {$integration->id} ({$integration->service})", [
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    \Sentry\captureException($e);
-                }
+                Log::info("Dispatched integration update task for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
             }
 
             \Sentry\captureMessage('CheckIntegrationUpdates summary', Severity::info(), EventHint::fromArray(['extra' => [
-                'scheduled' => $scheduledCount,
-                'skipped' => $skippedCount,
-                'total_due' => $integrations->count(),
+                'dispatched' => $integrations->count(),
             ]]));
 
-            Log::info("Integration update check completed: {$scheduledCount} scheduled, {$skippedCount} skipped");
+            Log::info("Integration update check completed: {$integrations->count()} dispatched");
             $transaction->setStatus(SpanStatus::ok());
 
         } catch (Exception $e) {
