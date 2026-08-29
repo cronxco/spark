@@ -27,24 +27,25 @@ class TypedSearchController extends Controller
         ]);
         $semantic = $request->boolean('semantic', true);
         $results = $this->search->search($request->user(), $type, $data['query'], $semantic, $data['limit'] ?? 20, $data);
-        $resource = match ($type) {
-            'events' => EventResource::collection($results)->resolve($request),
-            'objects' => EventObjectResource::collection($results)->resolve($request),
-            'blocks' => BlockResource::collection($results)->resolve($request),
-        };
         if ($semantic) {
             $resource = $results->map(function ($model) use ($type, $request): array {
-                $data = match ($type) {
+                $payload = match ($type) {
                     'events' => (new EventResource($model))->resolve($request),
                     'objects' => (new EventObjectResource($model))->resolve($request),
                     'blocks' => (new BlockResource($model))->resolve($request),
                 };
                 if (isset($model->similarity)) {
-                    $data['similarity'] = round(1 - $model->similarity, 4);
+                    $payload['similarity'] = round(1 - $model->similarity, 4);
                 }
 
-                return $data;
+                return $payload;
             })->values()->all();
+        } else {
+            $resource = match ($type) {
+                'events' => EventResource::collection($results)->resolve($request),
+                'objects' => EventObjectResource::collection($results)->resolve($request),
+                'blocks' => BlockResource::collection($results)->resolve($request),
+            };
         }
 
         return response()->json([$type => $resource, 'meta' => ['query' => $data['query'], 'semantic' => $semantic, 'count' => $results->count(), 'limit' => $data['limit'] ?? 20]]);
