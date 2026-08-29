@@ -31,7 +31,7 @@ class EntityMutationsController extends Controller
             'block' => $this->mutations->updateBlock($request->user(), $id, $attributes),
         };
         if (! $entity) {
-            return response()->json(['message' => ucfirst($kind).' not found.'], 404);
+            return response()->json(['message' => ucfirst($kind) . ' not found.'], 404);
         }
 
         return response()->json($this->resource($kind, $entity, $request))
@@ -43,7 +43,7 @@ class EntityMutationsController extends Controller
         $kind = rtrim($kind, 's');
         $relationships = $this->mutations->relationships($request->user(), $kind, $id);
         if ($relationships === null) {
-            return response()->json(['message' => ucfirst($kind).' not found.'], 404);
+            return response()->json(['message' => ucfirst($kind) . ' not found.'], 404);
         }
 
         return response()->json(['data' => $relationships]);
