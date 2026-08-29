@@ -10,7 +10,6 @@ use Illuminate\Validation\Rule;
 
 class NotificationPreferencesController extends Controller
 {
-    public function __construct(private ResourceVersion $versions) {}
     private const CATEGORIES = [
         'anomaly',
         'digest',
@@ -18,6 +17,8 @@ class NotificationPreferencesController extends Controller
         'new_bookmark',
         'calendar_event',
     ];
+
+    public function __construct(private ResourceVersion $versions) {}
 
     /**
      * GET /api/v1/mobile/settings/notifications
