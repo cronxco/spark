@@ -20,6 +20,15 @@ note, tag assignment, or a manual finance account/balance. Missing preconditions
 and both include the current `ETag`. Digest creation remains deliberately
 non-idempotent and does not use `If-Match`.
 
+### Command retry semantics
+
+Not every safe write has a single resource representation to version. Daily
+check-ins are naturally idempotent by user, period, and date; bookmarks dedupe
+by user and URL; Up-to-Speed read receipts are idempotent; and knowledge
+reprocessing is guarded by the target event ETag. A service-wide integration
+sync and Flint digest creation intentionally remain non-idempotent commands:
+clients must not automatically retry them after an unknown outcome.
+
 The initial v1 surface exposes event/object/block/feed/search/tag/map/place
 data; day summaries, metrics, check-ins, health dashboard, anomalies, and Up
 to Speed; integration inspection and sync; Flint digest/question workflows;
