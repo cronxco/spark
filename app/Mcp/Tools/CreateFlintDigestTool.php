@@ -46,7 +46,12 @@ class CreateFlintDigestTool extends Tool
         }
 
         try {
-            return Response::json($this->digests->create($user, $request->all()));
+            $payload = $request->all();
+            if (($payload['date'] ?? null) === 'today') {
+                $payload['date'] = now()->toDateString();
+            }
+
+            return Response::json($this->digests->create($user, $payload));
         } catch (ValidationException $exception) {
             return Response::error($exception->validator->errors()->first());
         }

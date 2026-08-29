@@ -19,7 +19,7 @@ class ListIntegrationsTool extends Tool
 {
     use RequiresSparkAbility;
 
-    protected string $description = 'List the authenticated user\'s integrations, including their service, state, and sync metadata.';
+    protected string $description = 'List the authenticated user\'s integrations, including their service, status, and identifying details.';
 
     public function handle(Request $request): Response
     {
