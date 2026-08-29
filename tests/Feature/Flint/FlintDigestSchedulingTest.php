@@ -7,6 +7,7 @@ use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
 use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Services\TaskPipeline\TaskRegistry;
@@ -188,8 +189,27 @@ class FlintDigestSchedulingTest extends TestCase
             'service' => 'flint',
         ]);
 
+        // Explicit media_url: null - the default factory value is a fake
+        // image URL, which would make download_images_to_media_library
+        // applicable and attempt a real HTTP download, throwing and aborting
+        // the rest of the pipeline before notify_on_digest_ready runs.
+        $actor = EventObject::factory()->create(['user_id' => $user->id, 'media_url' => null]);
+        $target = EventObject::factory()->create(['user_id' => $user->id, 'media_url' => null]);
+
+        // Task pipeline dispatch is disabled by default in tests (phpunit.xml
+        // sets ENABLE_TASK_PIPELINE=false); enable it right before the action
+        // under test, matching TaskPipelineModelObserverTest's convention.
+        // Also disable the (demo) OpenAI key from .env.example so
+        // generate_embedding doesn't attempt a real HTTP call.
+        config([
+            'app.enable_task_pipeline' => true,
+            'services.openai.api_key' => null,
+        ]);
+
         Event::factory()->create([
             'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
             'service' => 'flint',
             'domain' => 'knowledge',
             'action' => 'had_summary',
