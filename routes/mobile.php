@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Mobile\PlacesController;
 use App\Http\Controllers\Api\V1\Mobile\SearchController;
 use App\Http\Controllers\Api\V1\Mobile\SyncController;
 use App\Http\Controllers\Api\V1\Mobile\TagsController;
+use App\Http\Controllers\Api\V1\Mobile\TypedSearchController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController;
 use App\Http\Controllers\Api\V1\Mobile\WidgetsController;
@@ -87,6 +88,9 @@ Route::get('widgets/metrics/{metric}', [WidgetsController::class, 'metric'])->na
 Route::get('widgets/spend', [WidgetsController::class, 'spend'])->name('widgets.spend');
 
 Route::get('search', [SearchController::class, 'index'])->name('search.index');
+Route::get('search/{type}', [TypedSearchController::class, 'index'])
+    ->whereIn('type', ['events', 'objects', 'blocks'])
+    ->name('search.typed');
 
 Route::get('tags', [TagsController::class, 'index'])->name('tags.index');
 Route::get('tags/suggest', [TagsController::class, 'suggest'])->name('tags.suggest');

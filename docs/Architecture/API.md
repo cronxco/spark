@@ -70,7 +70,8 @@ Flint digest creation command. REST additionally exposes client-oriented tag,
 bookmark, map/place, finance-account, check-in, and Up to Speed endpoints.
 MCP additionally exposes semantic per-entity search and browser HTML fetching.
 The mobile adapter additionally exposes day context, service status, exact
-event filtering, and explicit location operations. Service-wide integration
+event filtering, typed event/object/block semantic or keyword search, and
+explicit location operations. Service-wide integration
 sync is available through both MCP and `POST /api/v1/integrations/sync`.
 
 MCP resources enforce the same capability as their equivalent tools. MCP
