@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController;
+use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
 use App\Http\Controllers\Api\V1\Mobile\BookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\BriefingController;
@@ -224,6 +225,17 @@ Route::post('bookmarks', [BookmarksController::class, 'store'])
 | API token management
 |--------------------------------------------------------------------------
 */
+
+Route::get('api-tokens', [ApiTokensController::class, 'index'])
+    ->name('api-tokens.index');
+
+Route::post('api-tokens', [ApiTokensController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('api-tokens.store');
+
+Route::delete('api-tokens/{id}', [ApiTokensController::class, 'destroy'])
+    ->middleware('ability:ios:write')
+    ->name('api-tokens.destroy');
 
 /*
 |--------------------------------------------------------------------------

@@ -81,8 +81,12 @@ class NotificationsController extends Controller
             return response()->json(['message' => 'Notification not found.'], 404);
         }
 
+        // Computed before delete(): the row is gone afterward, and
+        // ResourceVersion::etag() falls back to a live query for any model
+        // that doesn't already have `xmin` loaded.
+        $etag = $this->versions->etag($notification);
         $notification->delete();
 
-        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification));
+        return response()->json(null, 204)->header('ETag', $etag);
     }
 }

@@ -103,7 +103,7 @@ class TagsControllerTest extends TestCase
 
         $created = $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'new tag',
-        ])->assertCreated()
+        ], $this->ifMatchEvent($event))->assertCreated()
             ->assertJsonPath('tag.name', 'new tag')
             ->assertJsonPath('tag.type', 'spark');
 
@@ -119,7 +119,7 @@ class TagsControllerTest extends TestCase
             'event' => 'tag_added',
         ]);
 
-        $this->deleteJson("/api/v1/mobile/events/{$event->id}/tags/{$tagId}")
+        $this->deleteJson("/api/v1/mobile/events/{$event->id}/tags/{$tagId}", [], $this->ifMatchEvent($event))
             ->assertOk()
             ->assertJsonCount(0, 'tags');
 
@@ -140,7 +140,7 @@ class TagsControllerTest extends TestCase
 
         $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", [
             'tag_id' => (string) $tag->id,
-        ])->assertCreated()
+        ], $this->ifMatchObject($object))->assertCreated()
             ->assertJsonPath('tags.0.id', (string) $tag->id);
 
         $this->getJson("/api/v1/mobile/objects/{$object->id}")
@@ -160,7 +160,7 @@ class TagsControllerTest extends TestCase
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'tag_id' => $hidden->id,
-        ])->assertNotFound();
+        ], $this->ifMatchEvent($event))->assertNotFound();
     }
 
     #[Test]
@@ -194,6 +194,18 @@ class TagsControllerTest extends TestCase
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'nope',
         ])->assertNotFound();
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatchEvent(Event $event): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag')];
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatchObject(EventObject $object): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/objects/{$object->id}")->headers->get('ETag')];
     }
 
     private function createEvent(string $title): Event

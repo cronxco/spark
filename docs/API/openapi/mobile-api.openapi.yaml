@@ -632,6 +632,48 @@ paths:
       responses:
         "200": { description: OK }
 
+  /api-tokens:
+    get:
+      operationId: listApiTokens
+      tags: [profile]
+      summary: List the user's personal access tokens (mobile-only; excludes the app's own session tokens)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ApiToken' } } } } }
+    post:
+      operationId: createApiToken
+      tags: [profile]
+      summary: Create a personal access token and return its one-time plaintext secret
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 255 }
+                abilities: { type: array, maxItems: 20, items: { type: string } }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  plaintext: { type: string, description: "Shown only in this response" }
+
+  /api-tokens/{id}:
+    delete:
+      operationId: deleteApiToken
+      tags: [profile]
+      summary: Revoke a personal access token
+      parameters: [{ $ref: '#/components/parameters/NumericId' }]
+      responses:
+        "204": { description: No content }
+        "404": { description: "Not found, or one of the app's own session tokens" }
+
   /devices/{id}:
     delete:
       operationId: deleteDevice
@@ -1224,6 +1266,16 @@ components:
         is_read: { type: boolean }
         received_at: { type: string, format: date-time }
         entity: { type: [object, "null"], properties: { kind: { type: string }, id: { type: string } } }
+
+    ApiToken:
+      type: object
+      description: App\Http\Resources\Compact\ApiTokenResource — never includes the plaintext secret
+      properties:
+        id: { type: string }
+        name: { type: string }
+        abilities: { type: array, items: { type: string } }
+        last_used_at: { type: [string, "null"], format: date-time }
+        created_at: { type: [string, "null"], format: date-time }
 
     LiveActivityToken:
       type: object

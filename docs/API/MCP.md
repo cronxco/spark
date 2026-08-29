@@ -230,7 +230,7 @@ caller — a cross-user ID is treated as not found.
 
 *Class*: `ListIntegrationsTool` · *Ability*: `integrations:read` · *Read-only, idempotent*
 
-Lists the user's integrations — service, state, sync metadata. No
+Lists the user's integrations — service, status, and identifying details. No
 parameters.
 
 ### Actions

@@ -69,21 +69,22 @@ weak representation ETag on GET responses, 304 short-circuit on
 
 Detail reads and writes to mutable entities emit a strong, opaque resource
 ETag via `App\Services\Api\ResourceVersion::etag()` — the same class the
-mobile adapter uses. Where the two surfaces diverge is enforcement:
+mobile adapter uses, backed by Postgres's `xmin` system column so two
+writes inside the same second never collide on a stale version. `/api/v1`
+and `/api/v1/mobile` enforce the identical `if-match:<target>` middleware on
+the same set of entity-mutation routes: missing the header returns `428`;
+a stale value returns `412`; both responses include the current `ETag`. The
+version check and the write happen inside one row-locked transaction, so a
+second writer can't slip a stale check in underneath the first.
 
-- **`/api/v1/mobile`** stacks `if-match:<target>` middleware on nearly every
-  write route. Missing the header returns `428`; a stale value returns
-  `412`; both responses include the current `ETag`.
-- **`/api/v1`** (this surface) does **not** apply the `if-match` middleware
-  to any route — verified by grepping `routes/api.php` for `if-match`, which
-  returns zero matches. Every `/api/v1` write below still emits an `ETag`
-  header for caching and polling, but a client can currently overwrite a
-  stale read without the server rejecting it.
-
-Treat this as the current, verified behavior rather than an intentional
-design goal — if you're building a client against `/api/v1` that needs
-optimistic-concurrency safety today, poll or diff before writing rather than
-relying on a server-side precondition check.
+`If-Match` is required on: `PATCH {kind}/{id}`, `PATCH events/{id}/note`,
+event/object tag store and destroy, `POST knowledge/events/{id}/reprocess`,
+relationship create and destroy, and the finance account update/destroy/
+add-balance routes. It is **not** required on routes that create a new
+resource or don't have a single entity to version — `POST bookmarks`,
+`POST finance/accounts`, `POST check-ins`, `POST anomalies/{id}/acknowledge`,
+`POST up-to-speed/read`, `POST flint/digests`, `POST flint/questions/{block}/answer`,
+and `POST integrations{,/{id}}/sync` — same as the mobile adapter.
 
 ---
 
@@ -459,19 +460,19 @@ Creates a manual account.
 
 ### `PATCH /api/v1/finance/accounts/{id}`
 
-Updates a manual account. All fields `sometimes` (partial update); the
-same allow-list as `POST`. Fields under `metadata.integration_id` /
-`account_id` / `pot_id` / `raw` are always preserved regardless of what's
-sent.
+Updates a manual account. Requires `If-Match`. All fields `sometimes`
+(partial update); the same allow-list as `POST`. Fields under
+`metadata.integration_id` / `account_id` / `pot_id` / `raw` are always
+preserved regardless of what's sent.
 
 **Response `422`** — Account is not `manual_account` (synced accounts can't
-be edited here).
+be edited here). **Response `428`/`412`** — Missing/stale `If-Match`.
 
 ### `DELETE /api/v1/finance/accounts/{id}`
 
 Archives (never hard-deletes) a manual account: writes a final zero-balance
 event with a note, then sets `metadata.deleted = true` and
-`metadata.archived_at`.
+`metadata.archived_at`. Requires `If-Match`.
 
 **Response `200`**: `{"message": "Account archived."}`
 
@@ -479,7 +480,8 @@ event with a note, then sets `metadata.deleted = true` and
 
 ### `POST /api/v1/finance/accounts/{id}/balances`
 
-Adds a balance entry and touches the account (advancing its ETag).
+Adds a balance entry and touches the account (advancing its ETag). Requires
+`If-Match`.
 
 **Request body**: `{"balance": 1500.00, "date": "2026-05-10", "notes": "optional, max 1000 chars"}`
 
@@ -492,25 +494,26 @@ Adds a balance entry and touches the account (advancing its ETag).
 ### `PATCH /api/v1/{kind}/{id}`
 
 Non-destructive update of an owned event, object, or block. `{kind}` ∈
-`events`, `objects`, `blocks`. Same `EntityMutationService` and allow-list
-MCP's `update-entity` tool uses — see
-[MCP.md](MCP.md#update-entity) for the exact allowed fields per kind.
+`events`, `objects`, `blocks`. Requires `If-Match`. Same
+`EntityMutationService` and allow-list MCP's `update-entity` tool uses —
+see [MCP.md](MCP.md#update-entity) for the exact allowed fields per kind.
 
 **Response `200`**: the updated entity in its Compact resource shape.
 
 **Response `404`** — Not found or not owned.
 
 **Response `422`** — Disallowed field or invalid value (from
-`EntityMutationService::validateUpdate`).
+`EntityMutationService::validateUpdate`). **Response `428`/`412`** —
+Missing/stale `If-Match`.
 
 ### `PATCH /api/v1/events/{id}/note`
 
 Sets or clears the user-authored note block on an event (`note` block
-type). Same behavior as MCP's `set-event-note`.
+type). Requires `If-Match`. Same behavior as MCP's `set-event-note`.
 
 ### `POST /api/v1/events/{id}/tags` / `DELETE /api/v1/events/{id}/tags/{tagId}`
 
-Attach or detach a tag on an owned event.
+Attach or detach a tag on an owned event. Requires `If-Match`.
 
 **Request body (`POST`)**: either `{"tag_id": 12}` to attach an existing tag,
 or `{"name": "running", "type": "spark"}` to find-or-create one. `type` is
@@ -543,17 +546,17 @@ the mobile share-extension endpoint).
 
 ### `POST /api/v1/knowledge/events/{id}/reprocess`
 
-Queues AI reprocessing for a Fetch or Newsletter knowledge event. Identical
-to `POST /api/v1/mobile/knowledge/events/{id}/reprocess` — see
-[mobile_API.md](mobile_API.md#post-knowledgeeventsidreprocess) for the
+Queues AI reprocessing for a Fetch or Newsletter knowledge event. Requires
+`If-Match`. Identical to `POST /api/v1/mobile/knowledge/events/{id}/reprocess`
+— see [mobile_API.md](mobile_API.md#post-knowledgeeventsidreprocess) for the
 `mode` options and response shape.
 
 ### `POST /api/v1/{kind}/{id}/relationships`
 
 Creates a relationship from an owned event/object/block to another entity.
-Prevents self-links and enforces the registered relationship-type
-directionality — same rules as MCP's `manage-relationship` create
-operation.
+Requires `If-Match`. Prevents self-links and enforces the registered
+relationship-type directionality — same rules as MCP's
+`manage-relationship` create operation.
 
 **Request body**: `{"to_kind": "objects", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
 
@@ -564,7 +567,7 @@ mismatch.
 
 ### `DELETE /api/v1/relationships/{relationship}`
 
-Deletes an owned relationship by its UUID.
+Deletes an owned relationship by its UUID. Requires `If-Match`.
 
 **Response `204`** — No content.
 

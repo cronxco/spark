@@ -35,14 +35,16 @@ in-process test helper ergonomic).
 
 Collection reads use a weak representation ETag for cache revalidation.
 Detail reads of mutable entities emit a strong opaque resource ETag
-(`ResourceVersion::etag()`). **This precondition is enforced asymmetrically
-today**: `/api/v1/mobile` requires clients to send it in `If-Match` when
-changing an event, object, block, its relationships, an event note, tag
-assignment, integration, notification, or a manual finance account/balance —
-missing preconditions receive `428`, stale tokens receive `412`, and both
-include the current `ETag`. `/api/v1` (the general REST surface) emits the
-same `ETag` header on these resources but does **not** currently apply the
-`if-match` middleware to any of its write routes — see
+(`ResourceVersion::etag()`), backed by Postgres's `xmin` system column
+rather than a timestamp — `updated_at` is whole-second precision, so two
+writes inside one second would otherwise hash to the same "version" and
+silently defeat the check. Both `/api/v1` and `/api/v1/mobile` require
+clients to send this in `If-Match` when changing an event, object, block,
+its relationships, an event note, tag assignment, integration, notification,
+or a manual finance account/balance — missing preconditions receive `428`,
+stale tokens receive `412`, and both include the current `ETag`. The
+version check and the write happen inside one row-locked transaction, so a
+second writer can't slip a stale check in underneath the first. See
 [API_v1.md](API_v1.md#etag-and-if-match) for the verified route-by-route
 detail. Digest creation remains deliberately non-idempotent and does not use
 `If-Match` on either surface.
@@ -68,7 +70,7 @@ and manual finance account/balance management, including archival.
 | User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available |
 | Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
 | Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
-| API-token administration                                         | No                         | No                            | No                            | Web settings only               |
+| API-token administration                                         | No                         | Yes                           | No                            | Web settings and mobile only    |
 | Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
 | Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
 
@@ -125,14 +127,16 @@ available through REST or mobile because it can use saved browser cookies.
 The `/api/v1/mobile` adapter retains `ios:read` and `ios:write` scopes for
 iOS-client compatibility. It includes the shared event/object/block edits,
 relationship management, Flint digest creation, integration sync by instance
-or service, and metric baseline discovery, alongside its existing user
-profile, feed, widgets, notifications, check-ins, finance, map, and
-delta-sync APIs.
+or service, and metric baseline discovery, alongside its existing user profile,
+feed, widgets, notifications, check-ins, finance, map, delta-sync, and
+personal API-token management APIs.
 
 Device registration, APNs/Live Activities, HealthKit ingestion, and OAuth
 handoff are deliberately mobile-only: they remain necessary for the iOS app
-but are not general REST or MCP capabilities. API-token management is web
-settings-only. Browser HTML fetching stays MCP-only under `web:fetch`.
+but are not general REST or MCP capabilities. API-token management is
+available in web settings and on the mobile adapter, but not through the
+general REST API or MCP. Browser HTML fetching stays MCP-only under
+`web:fetch`.
 
 ## Standards this documentation follows
 

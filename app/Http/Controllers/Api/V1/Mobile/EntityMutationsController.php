@@ -7,12 +7,16 @@ use App\Http\Resources\Compact\CompactBlockResource;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Http\Resources\Compact\CompactObjectResource;
 use App\Services\Api\EntityMutationService;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EntityMutationsController extends Controller
 {
-    public function __construct(private EntityMutationService $mutations) {}
+    public function __construct(
+        private EntityMutationService $mutations,
+        private ResourceVersion $versions,
+    ) {}
 
     public function update(Request $request, string $kind, string $id): JsonResponse
     {
@@ -30,7 +34,8 @@ class EntityMutationsController extends Controller
             return response()->json(['message' => ucfirst($kind) . ' not found.'], 404);
         }
 
-        return response()->json($this->resource($kind, $entity, $request));
+        return response()->json($this->resource($kind, $entity, $request))
+            ->header('ETag', $this->versions->etag($entity));
     }
 
     public function relationships(Request $request, string $kind, string $id): JsonResponse

@@ -575,7 +575,7 @@
         {
             "name": "list-integrations",
             "ability": "integrations:read",
-            "description": "List the authenticated user's integrations, including their service, state, and sync metadata.",
+            "description": "List the authenticated user's integrations, including their service, status, and identifying details.",
             "inputSchema": {
                 "type": "object",
                 "properties": []

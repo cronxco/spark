@@ -204,6 +204,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/EntityKind' }
         - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: '#/components/parameters/IfMatch' }
       requestBody:
         content:
           application/json:
@@ -221,6 +222,8 @@ paths:
       responses:
         "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Relationship' } } } }
         "422": { $ref: '#/components/responses/ValidationError' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /relationships/{relationship}:
     delete:
@@ -230,9 +233,12 @@ paths:
       summary: Delete an owned relationship
       parameters:
         - { name: relationship, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/IfMatch' }
       responses:
         "204": { description: No content }
         "404": { $ref: '#/components/responses/NotFound' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /{kind}/{id}:
     patch:
@@ -243,6 +249,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/EntityKind' }
         - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: '#/components/parameters/IfMatch' }
       requestBody:
         content:
           application/json:
@@ -251,6 +258,8 @@ paths:
         "200": { description: OK }
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationError' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /events/{id}/note:
     patch:
@@ -258,13 +267,15 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Set or clear an event's user-authored note
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       requestBody:
         content:
           application/json:
             schema: { type: object, properties: { note: { type: [string, "null"] } } }
       responses:
         "200": { description: OK }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /events/{id}/tags:
     post:
@@ -272,7 +283,7 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Attach a tag to an owned event
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       requestBody:
         content:
           application/json:
@@ -286,6 +297,8 @@ paths:
         "201": { description: Created }
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationError' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /events/{id}/tags/{tagId}:
     delete:
@@ -296,9 +309,12 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/EntityId' }
         - { name: tagId, in: path, required: true, schema: { type: integer } }
+        - { $ref: '#/components/parameters/IfMatch' }
       responses:
         "200": { description: OK }
         "404": { $ref: '#/components/responses/NotFound' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /objects/{id}/tags:
     post:
@@ -306,7 +322,7 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Attach a tag to an owned object
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       requestBody:
         content:
           application/json:
@@ -315,6 +331,8 @@ paths:
         "201": { description: Created }
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationError' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /objects/{id}/tags/{tagId}:
     delete:
@@ -325,9 +343,12 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/EntityId' }
         - { name: tagId, in: path, required: true, schema: { type: integer } }
+        - { $ref: '#/components/parameters/IfMatch' }
       responses:
         "200": { description: OK }
         "404": { $ref: '#/components/responses/NotFound' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /bookmarks:
     post:
@@ -350,7 +371,7 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Queue AI reprocessing for a Fetch or Newsletter knowledge event
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       requestBody:
         content:
           application/json:
@@ -359,6 +380,8 @@ paths:
         "202": { description: Queued }
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationError' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /day-summary:
     get:
@@ -648,7 +671,7 @@ paths:
       tags: [finance]
       x-spark-ability: finance:write
       summary: Update a manual finance account
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       requestBody:
         content:
           application/json:
@@ -656,15 +679,19 @@ paths:
       responses:
         "200": { description: OK }
         "422": { description: Account is not manual_account }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
     delete:
       operationId: archiveFinanceAccount
       tags: [finance]
       x-spark-ability: finance:write
       summary: Archive a manual finance account (writes a final zero balance, never hard-deletes)
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       responses:
         "200": { description: Archived }
         "422": { description: Account is not manual_account }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
   /finance/accounts/{id}/balances:
     get:
@@ -683,13 +710,15 @@ paths:
       tags: [finance]
       x-spark-ability: finance:write
       summary: Add a balance entry
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
       requestBody:
         content:
           application/json:
             schema: { type: object, required: [balance, date], properties: { balance: { type: number }, date: { type: string, format: date }, notes: { type: string, maxLength: 1000 } } }
       responses:
         "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BalanceEntry' } } } }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
 
 components:
   securitySchemes:
@@ -713,6 +742,12 @@ components:
       in: path
       required: true
       schema: { type: string, enum: [events, objects, blocks] }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: { type: string }
+      description: "The entity's current ETag (Postgres xmin-backed). Missing returns 428; stale returns 412 — both surfacing the current ETag."
 
   responses:
     NotFound:
@@ -722,6 +757,16 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     ValidationError:
       description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PreconditionRequired:
+      description: Missing If-Match header
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PreconditionFailed:
+      description: Stale If-Match value
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

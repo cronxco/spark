@@ -2,26 +2,26 @@
 
 namespace App\Services\Api;
 
-use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Strong, opaque resource versions for optimistic concurrency control.
  *
- * The version deliberately describes the persisted model rather than a JSON
- * representation: fields and eager-loaded relations may change without
- * making a client-held mutation token ambiguous.
+ * Backed by Postgres's built-in `xmin` system column rather than a
+ * timestamp. `updated_at` columns in this app are whole-second precision,
+ * so two writes to the same row inside one second would otherwise hash to
+ * an identical "version" and silently defeat the If-Match conflict check.
+ * `xmin` changes on every row write regardless of timing.
+ *
+ * Callers don't need to remember to select `xmin` themselves: when it
+ * isn't already loaded on the model, it's fetched with one extra
+ * indexed-by-key query.
  */
 class ResourceVersion
 {
     public function etag(Model $model): string
     {
-        $timestamp = $model->getAttribute('updated_at');
-        $version = $timestamp instanceof DateTimeInterface
-            ? $timestamp->format('Y-m-d\\TH:i:s.uP')
-            : (string) $timestamp;
-
-        return '"' . hash('sha256', $model::class . '|' . $model->getKey() . '|' . $version) . '"';
+        return '"' . hash('sha256', $model::class . '|' . $model->getKey() . '|' . $this->version($model)) . '"';
     }
 
     public function matches(Model $model, string $ifMatch): bool
@@ -29,5 +29,17 @@ class ResourceVersion
         return collect(explode(',', $ifMatch))
             ->map(fn (string $value) => trim($value))
             ->contains($this->etag($model));
+    }
+
+    private function version(Model $model): string
+    {
+        $xmin = $model->getAttribute('xmin');
+        if ($xmin !== null) {
+            return (string) $xmin;
+        }
+
+        return (string) $model->newQuery()
+            ->whereKey($model->getKey())
+            ->value($model->qualifyColumn('xmin'));
     }
 }

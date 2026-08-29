@@ -40,8 +40,8 @@ class CreateFlintDigestToolTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertSee('"period": "morning"');
-        $response->assertSee('"block_count": 1');
+        $response->assertSee('"period":"morning"');
+        $response->assertSee('"block_count":1');
 
         $this->assertDatabaseHas('events', [
             'service' => 'flint',
@@ -63,7 +63,7 @@ class CreateFlintDigestToolTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertSee('"block_count": 0');
+        $response->assertSee('"block_count":0');
 
         $this->assertDatabaseHas('events', [
             'service' => 'flint',
@@ -163,6 +163,6 @@ class CreateFlintDigestToolTest extends TestCase
             'period' => 'morning',
         ]);
 
-        $response->assertHasErrors(['title is required']);
+        $response->assertHasErrors(['title field is required']);
     }
 }

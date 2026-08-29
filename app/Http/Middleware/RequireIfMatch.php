@@ -9,6 +9,7 @@ use App\Services\Mobile\EventLookup;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Require a current strong model ETag before an owned resource is changed. */
@@ -38,17 +39,25 @@ class RequireIfMatch
             return $next($request);
         }
 
-        $etag = $this->versions->etag($model);
         $ifMatch = $request->header('If-Match');
         if (! $ifMatch) {
-            return $this->preconditionResponse('An If-Match header is required.', 428, $etag);
+            return $this->preconditionResponse('An If-Match header is required.', 428, $this->versions->etag($model));
         }
 
-        if (! $this->versions->matches($model, $ifMatch)) {
-            return $this->preconditionResponse('The resource has changed. Refresh it and retry.', 412, $etag);
-        }
+        // Keep the version check and mutation in one transaction. A second
+        // writer cannot pass a stale check while this request holds the row.
+        return DB::transaction(function () use ($model, $ifMatch, $next, $request): Response {
+            $current = $model->newQuery()->lockForUpdate()->find($model->getKey());
+            if (! $current || ! $this->versions->matches($current, $ifMatch)) {
+                return $this->preconditionResponse(
+                    'The resource has changed. Refresh it and retry.',
+                    412,
+                    $this->versions->etag($current ?? $model),
+                );
+            }
 
-        return $next($request);
+            return $next($request);
+        });
     }
 
     private function preconditionResponse(string $message, int $status, string $etag): JsonResponse

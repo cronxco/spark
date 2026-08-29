@@ -190,6 +190,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | `GET`  | `/money/accounts/{id}`      | A single finance account                               |
 | `GET`  | `/money/accounts/{id}/balances` | Cursor-paginated balance history                   |
 | `GET`  | `/devices`                   | List registered push subscriptions                     |
+| `GET`  | `/api-tokens`                | List the user's personal access tokens (excluding the app's own session tokens) |
 
 ---
 
@@ -1217,6 +1218,8 @@ All write endpoints require `ios:write` ability.
 | `DELETE` | `/money/accounts/{id}`             | Archive a manual finance account     |
 | `POST`   | `/money/accounts/{id}/balances`    | Add a balance entry                  |
 | `POST`   | `/devices/test`                     | Send a test push notification        |
+| `POST`   | `/api-tokens`                        | Create a personal access token         |
+| `DELETE` | `/api-tokens/{id}`                   | Revoke a personal access token         |
 
 ---
 
@@ -1621,6 +1624,75 @@ authenticated user.
 **Response `204`** — No content.
 
 **Response `400`** — No iOS push subscriptions registered.
+
+---
+
+### `GET /api-tokens`
+
+Lists the user's personal access tokens for use outside the app (e.g.
+against the general REST API or MCP). Never returns plaintext secrets, and
+never includes the app's own `ios:read`/`ios:write` session tokens — this
+endpoint can't be used to inspect or revoke the mobile app's own session.
+**Mobile-only** — API-token administration is otherwise web-settings-only
+(see [README.md](README.md)); it is not exposed on `/api/v1` or MCP.
+
+**Response `200`**
+
+```json
+[
+    {
+        "id": "3",
+        "name": "Zapier integration",
+        "abilities": ["data:read", "insights:read"],
+        "last_used_at": "2026-05-09T12:00:00+00:00",
+        "created_at": "2026-04-01T09:00:00+00:00"
+    }
+]
+```
+
+---
+
+### `POST /api-tokens`
+
+Creates a personal access token and returns its one-time plaintext secret.
+
+**Request Body**
+
+```json
+{
+    "name": "Zapier integration",
+    "abilities": ["data:read", "insights:read"]
+}
+```
+
+`name` is required (max 255 chars). `abilities` is optional (up to 20
+distinct strings); omit it for a full-access (`*`) token. Any
+`ios:read`/`ios:write` ability in the request is silently dropped — a
+mobile-managed token can never grant itself the app's own session scopes.
+If dropping those leaves the list empty, the token falls back to `*`.
+
+**Response `201`**
+
+```json
+{
+    "id": "3",
+    "name": "Zapier integration",
+    "plaintext": "1|abc123def456..."
+}
+```
+
+`plaintext` is shown only in this response — it cannot be retrieved again.
+
+---
+
+### `DELETE /api-tokens/{id}`
+
+Revokes a personal access token.
+
+**Response `204`** — No content.
+
+**Response `404`** — Token not found, or it's one of the app's own
+`ios:read`/`ios:write` session tokens (not revocable through this endpoint).
 
 ---
 
