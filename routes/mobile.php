@@ -113,7 +113,7 @@ Route::delete('objects/{id}/tags/{tagId}', [TagsController::class, 'destroyObjec
 Route::get('integrations', [IntegrationsController::class, 'index'])->name('integrations.index');
 Route::get('integrations/{id}', [IntegrationsController::class, 'show'])->name('integrations.show');
 Route::post('integrations/{id}/sync', [IntegrationsController::class, 'sync'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:integration'])
     ->name('integrations.sync');
 Route::post('integrations/sync', [IntegrationsController::class, 'syncService'])
     ->middleware('ability:ios:write')
@@ -212,7 +212,7 @@ Route::post('anomalies/{id}/acknowledge', [AnomaliesController::class, 'acknowle
     ->name('anomalies.acknowledge');
 
 Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController::class, 'store'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:event'])
     ->name('knowledge.events.reprocess');
 
 Route::post('bookmarks', [BookmarksController::class, 'store'])

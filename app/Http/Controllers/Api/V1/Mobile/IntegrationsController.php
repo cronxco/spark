@@ -7,12 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactIntegrationResource;
 use App\Integrations\Contracts\OAuthIntegrationPlugin;
 use App\Integrations\PluginRegistry;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
 
 class IntegrationsController extends Controller
 {
+    public function __construct(private ResourceVersion $versions) {}
     /**
      * GET /api/v1/mobile/integrations
      */
@@ -41,7 +43,7 @@ class IntegrationsController extends Controller
 
         return response()->json(
             (new CompactIntegrationResource($integration))->resolve($request),
-        );
+        )->header('ETag', $this->versions->etag($integration));
     }
 
     /**
@@ -63,11 +65,12 @@ class IntegrationsController extends Controller
         }
 
         $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($integration);
+        $integration->touch();
 
         return response()->json([
             'message' => 'Integration update triggered.',
             'jobs_dispatched' => $jobsDispatched,
-        ]);
+        ])->header('ETag', $this->versions->etag($integration->fresh()));
     }
 
     /** Trigger all non-paused integrations for one service, matching MCP. */
