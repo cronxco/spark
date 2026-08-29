@@ -15,6 +15,7 @@ use Throwable;
 class IntegrationsController extends Controller
 {
     public function __construct(private ResourceVersion $versions) {}
+
     /**
      * GET /api/v1/mobile/integrations
      */
