@@ -9,6 +9,7 @@ use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class TagsController extends Controller
     public function __construct(
         protected EventLookup $eventLookup,
         protected ObjectLookup $objectLookup,
+        protected ResourceVersion $versions,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -186,12 +188,13 @@ class TagsController extends Controller
         }
 
         $entity->attachTags([$tag]);
+        $entity->touch();
         $entity->load('tags');
 
         return response()->json([
             'tag' => $this->tagPayload($tag),
             'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
-        ], 201);
+        ], 201)->header('ETag', $this->versions->etag($entity->fresh()));
     }
 
     private function detach(Event|EventObject $entity, string $tagId): JsonResponse
@@ -202,11 +205,12 @@ class TagsController extends Controller
         }
 
         $entity->detachTags([$tag]);
+        $entity->touch();
         $entity->load('tags');
 
         return response()->json([
             'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
-        ]);
+        ])->header('ETag', $this->versions->etag($entity->fresh()));
     }
 
     private function tagQuery(User $user, ?string $search = null): Builder

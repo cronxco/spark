@@ -96,18 +96,18 @@ Route::get('tags', [TagsController::class, 'index'])->name('tags.index');
 Route::get('tags/suggest', [TagsController::class, 'suggest'])->name('tags.suggest');
 Route::get('tags/{id}', [TagsController::class, 'show'])->whereNumber('id')->name('tags.show');
 Route::post('events/{id}/tags', [TagsController::class, 'storeEventTag'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:event'])
     ->name('events.tags.store');
 Route::delete('events/{id}/tags/{tagId}', [TagsController::class, 'destroyEventTag'])
     ->whereNumber('tagId')
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:event'])
     ->name('events.tags.destroy');
 Route::post('objects/{id}/tags', [TagsController::class, 'storeObjectTag'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:object'])
     ->name('objects.tags.store');
 Route::delete('objects/{id}/tags/{tagId}', [TagsController::class, 'destroyObjectTag'])
     ->whereNumber('tagId')
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:object'])
     ->name('objects.tags.destroy');
 
 Route::get('integrations', [IntegrationsController::class, 'index'])->name('integrations.index');

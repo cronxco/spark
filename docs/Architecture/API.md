@@ -16,7 +16,7 @@ token; cookie sessions are not capability credentials. Collection reads use a
 weak representation ETag for cache revalidation. Detail reads of mutable
 entities emit a strong opaque resource ETag: clients must send it in
 `If-Match` when changing an event, object, block, its relationships, an event
-note, or a manual finance account/balance. Missing preconditions receive `428`, stale tokens receive `412`,
+note, tag assignment, or a manual finance account/balance. Missing preconditions receive `428`, stale tokens receive `412`,
 and both include the current `ETag`. Digest creation remains deliberately
 non-idempotent and does not use `If-Match`.
 
