@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventObjectResource;
 use App\Http\Resources\EventResource;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class GetObjectTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -30,6 +32,9 @@ class GetObjectTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'data:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

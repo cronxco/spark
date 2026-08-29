@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Mcp\Helpers\DateParser;
 use App\Services\DaySummaryService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -16,6 +17,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 class GetDaySummaryTool extends Tool
 {
     use DateParser;
+    use RequiresSparkAbility;
 
     /**
      * The tool's description.
@@ -36,6 +38,9 @@ class GetDaySummaryTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'insights:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

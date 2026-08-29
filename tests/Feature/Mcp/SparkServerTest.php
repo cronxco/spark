@@ -4,9 +4,11 @@ namespace Tests\Feature\Mcp;
 
 use App\Mcp\Servers\SparkServer;
 use App\Mcp\Tools\GetBlockTool;
+use App\Mcp\Tools\GetCheckInsTool;
 use App\Mcp\Tools\GetDayContextTool;
 use App\Mcp\Tools\GetEventTool;
 use App\Mcp\Tools\GetObjectTool;
+use App\Mcp\Tools\ListIntegrationsTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
 use App\Mcp\Tools\SearchObjectsTool;
@@ -116,6 +118,25 @@ class SparkServerTest extends TestCase
         ]);
 
         $response->assertHasErrors(['Authentication required.']);
+    }
+
+    #[Test]
+    public function list_integrations_tool_returns_the_users_integrations(): void
+    {
+        $response = SparkServer::actingAs($this->user)->tool(ListIntegrationsTool::class, []);
+
+        $response->assertOk();
+        $response->assertSee((string) $this->integration->id);
+    }
+
+    #[Test]
+    public function get_check_ins_tool_returns_empty_periods_when_none_exist(): void
+    {
+        $response = SparkServer::actingAs($this->user)->tool(GetCheckInsTool::class, ['date' => 'today']);
+
+        $response->assertOk();
+        $response->assertSee('"morning"');
+        $response->assertSee('"completed":false');
     }
 
     #[Test]

@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventResource;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Services\Mobile\EventFeed;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -15,6 +16,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class GetEventsByFilterTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -29,6 +31,9 @@ class GetEventsByFilterTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'data:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

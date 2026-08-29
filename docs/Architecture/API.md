@@ -1,5 +1,95 @@
 # Spark API
 
+## Canonical v1 API
+
+`/api/v1` is Spark's client-neutral, capability-scoped API. It is the REST
+counterpart to the Spark MCP server; `/api` remains supported as a legacy
+surface and `/api/v1/mobile` remains an iOS-specific adapter.
+
+Use least-privilege Sanctum abilities per operation: `data:read`,
+`data:write`, `insights:read`, `insights:write`, `integrations:read`,
+`integrations:sync`, `flint:read`, `flint:write`, `finance:read`, and
+`finance:write`. `web:fetch` is a separate, MCP-only capability because it can
+use saved browser cookies. Existing `mcp:read` tokens are accepted for read
+operations during migration. Public API and MCP calls require a Sanctum bearer
+token; cookie sessions are not capability credentials. Collection reads use a
+weak representation ETag for cache revalidation. Detail reads of mutable
+entities emit a strong opaque resource ETag: clients must send it in
+`If-Match` when changing an event, object, block, its relationships, an event
+note, or a manual finance account/balance. Missing preconditions receive `428`, stale tokens receive `412`,
+and both include the current `ETag`. Digest creation remains deliberately
+non-idempotent and does not use `If-Match`.
+
+The initial v1 surface exposes event/object/block/feed/search/tag/map/place
+data; day summaries, metrics, check-ins, health dashboard, anomalies, and Up
+to Speed; integration inspection and sync; Flint digest/question workflows;
+and manual finance account/balance management, including archival.
+
+### Surface matrix
+
+| Feature                                                          | General REST               | Mobile adapter                | MCP                           | Boundary                        |
+| ---------------------------------------------------------------- | -------------------------- | ----------------------------- | ----------------------------- | ------------------------------- |
+| User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available |
+| Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
+| Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
+| API-token administration                                         | No                         | No                            | No                            | Web settings only               |
+| Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
+| Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
+
+### MCP capability mapping
+
+The MCP transport only authenticates the caller. Each tool independently
+enforces its capability, so a narrowly scoped integration token cannot read
+events or metrics. Existing `mcp:read` tokens remain a read-only compatibility
+alias while clients migrate.
+
+| Capability          | MCP tools                                                                              |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `data:read`         | event/object/block reads, exact filtering, semantic search                             |
+| `insights:read`     | day summaries/context, baselines, metric trends, service status, check-ins             |
+| `integrations:read` | list integrations                                                                      |
+| `flint:read`        | retrieve Flint digests                                                                 |
+| `insights:write`    | acknowledge anomaly                                                                    |
+| `integrations:sync` | trigger integration update                                                             |
+| `flint:write`       | create digest and answer Flint question                                                |
+| `data:write`        | set an event note, update owned events/objects/blocks, and create/delete relationships |
+| `web:fetch`         | fetch webpage HTML using saved Fetch cookies (MCP only)                                |
+
+`PATCH /api/v1/events/{id}`, `/objects/{id}`, and `/blocks/{id}` provide the
+same non-destructive edits as MCP's `update-entity`. Relationship list/create/
+delete is available at the corresponding entity `/relationships` routes and
+through `manage-relationship`. Both surfaces scope every entity through the
+caller before loading it; cross-user identifiers are therefore treated as
+missing. Deletion of events, objects, and blocks is intentionally not exposed.
+Manual finance accounts may be archived with `DELETE /api/v1/finance/accounts/{id}`.
+
+### Transport parity and intentional boundaries
+
+The REST API and MCP share the same ownership-scoped entity mutations and
+Flint digest creation command. REST additionally exposes client-oriented tag,
+bookmark, map/place, finance-account, check-in, and Up to Speed endpoints.
+MCP additionally exposes semantic per-entity search and browser HTML fetching.
+The mobile adapter additionally exposes day context, service status, exact
+event filtering, and explicit location operations. Service-wide integration
+sync is available through both MCP and `POST /api/v1/integrations/sync`.
+
+MCP resources enforce the same capability as their equivalent tools. MCP
+browser fetching is intentionally MCP-only under `web:fetch`; it is never
+available through REST or mobile because it can use saved browser cookies.
+
+### Mobile API parity
+
+The `/api/v1/mobile` adapter retains `ios:read` and `ios:write` scopes for
+iOS-client compatibility. It includes the shared event/object/block edits,
+relationship management, Flint digest creation, integration sync by instance
+or service, and metric baseline discovery, alongside its existing user profile,
+feed, widgets, notifications, check-ins, finance, map, and delta-sync APIs.
+
+Device registration, APNs/Live Activities, HealthKit ingestion, and OAuth
+handoff are deliberately mobile-only: they remain necessary for the iOS app
+but are not general REST or MCP capabilities. API-token management is web
+settings-only. Browser HTML fetching stays MCP-only under `web:fetch`.
+
 REST API for managing events, objects, and blocks with secure authentication using Laravel Sanctum.
 
 ---

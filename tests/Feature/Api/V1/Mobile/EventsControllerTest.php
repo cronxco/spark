@@ -110,7 +110,7 @@ class EventsControllerTest extends TestCase
         $event = $this->createEvent();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Remember this one'])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Remember this one'], $this->ifMatch($event))
             ->assertOk()
             ->assertJsonPath('id', $event->id)
             ->assertJsonPath('note', 'Remember this one');
@@ -134,8 +134,8 @@ class EventsControllerTest extends TestCase
         $event = $this->createEvent();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'First'])->assertOk();
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Second'])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'First'], $this->ifMatch($event))->assertOk();
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Second'], $this->ifMatch($event))
             ->assertOk()
             ->assertJsonPath('note', 'Second');
 
@@ -148,8 +148,8 @@ class EventsControllerTest extends TestCase
         $event = $this->createEvent();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Temp'])->assertOk();
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => null])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Temp'], $this->ifMatch($event))->assertOk();
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => null], $this->ifMatch($event))
             ->assertOk()
             ->assertJsonMissingPath('note');
 
@@ -184,7 +184,7 @@ class EventsControllerTest extends TestCase
         $event = $this->createEvent();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => str_repeat('a', 10001)])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => str_repeat('a', 10001)], $this->ifMatch($event))
             ->assertStatus(422);
     }
 
@@ -205,5 +205,11 @@ class EventsControllerTest extends TestCase
             'actor_id' => $actor->id,
             'target_id' => $target->id,
         ]);
+    }
+
+    /** @return array{If-Match: string} */
+    protected function ifMatch(Event $event): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag')];
     }
 }

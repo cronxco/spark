@@ -70,6 +70,27 @@ class IntegrationsController extends Controller
         ]);
     }
 
+    /** Trigger all non-paused integrations for one service, matching MCP. */
+    public function syncService(Request $request): JsonResponse
+    {
+        $data = $request->validate(['service' => ['required', 'string', 'max:100']]);
+        $integrations = $request->user()->integrations()->where('service', $data['service'])->get();
+        if ($integrations->isEmpty()) {
+            return response()->json(['message' => 'No integrations found for service.'], 404);
+        }
+
+        $dispatcher = new DispatchIntegrationFetchJobs;
+        $results = $integrations->map(function ($integration) use ($dispatcher): array {
+            if ($integration->isPaused()) {
+                return ['integration_id' => $integration->id, 'status' => 'skipped', 'reason' => 'paused', 'jobs_dispatched' => 0];
+            }
+
+            return ['integration_id' => $integration->id, 'status' => 'triggered', 'jobs_dispatched' => $dispatcher->dispatch($integration)];
+        });
+
+        return response()->json(['service' => $data['service'], 'integrations' => $results, 'total_jobs_dispatched' => $results->sum('jobs_dispatched')]);
+    }
+
     /**
      * POST /api/v1/mobile/integrations/{id}/oauth/start
      *

@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventObjectResource;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\EventObject;
 use App\Services\EmbeddingService;
 use Exception;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class SearchObjectsTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -35,6 +37,9 @@ class SearchObjectsTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'data:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {
