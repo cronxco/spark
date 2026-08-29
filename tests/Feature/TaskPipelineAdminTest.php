@@ -78,7 +78,7 @@ class TaskPipelineAdminTest extends TestCase
         Queue::fake();
 
         $user = $this->admin();
-        $event = Event::factory()->create(['user_id' => $user->id]);
+        $event = Event::factory()->create();
         $execution = TaskExecution::factory()->create([
             'user_id' => $user->id,
             'entity_type' => 'event',
