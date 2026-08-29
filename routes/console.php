@@ -53,6 +53,12 @@ if (class_exists(Horizon::class) && class_exists(SnapshotCommand::class)) {
         ->sentryMonitor();
 }
 
+// Prune failed_jobs older than 30 days to prevent unbounded growth
+Schedule::command('queue:prune-failed --hours=720')
+    ->daily()
+    ->onOneServer()
+    ->withoutOverlapping();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')
