@@ -1,6 +1,6 @@
 services:
     nginx:
-        image: "nginx:latest@sha256:ec4ed8b5299e5e90694af7750eb6dffd2627317d30544d056b0371f8082f7bce"
+        image: "nginx:latest@sha256:0d4374c710a9649200e84f8ef8dbdd4fa76c0c107839cd50f1e42a63916b0f2e"
         ports:
             - "${HTTP_PORT:-8000}:80"
             - "${SSL_PORT:-443}:443"
@@ -69,7 +69,7 @@ services:
             retries: 3
             timeout: 5s
     redis:
-        image: "redis:alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005"
+        image: "redis:alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576"
         ports:
             - "${FORWARD_REDIS_PORT:-6379}:6379"
         volumes:
@@ -149,6 +149,7 @@ services:
             - NODE_ENV=production
             - STEALTH_ENABLED=${PLAYWRIGHT_STEALTH_ENABLED:-true}
             - CONTEXT_TTL=${PLAYWRIGHT_CONTEXT_TTL:-1800000}
+            - FETCH_URL_SAFETY_ALLOWED_HOSTS=${FETCH_URL_SAFETY_ALLOWED_HOSTS:-}
         ports:
             - "${PLAYWRIGHT_WORKER_PORT:-3000}:3000"
         volumes:

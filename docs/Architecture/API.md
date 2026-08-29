@@ -122,7 +122,6 @@ Creating an event allows you to submit a complete activity consisting of:
 {
     "actor": {
         "time": "2025-07-27T17:00:00.000000Z",
-        "integration_id": "integration-uuid",
         "concept": "user",
         "type": "github_user",
         "title": "John Doe",
@@ -133,7 +132,6 @@ Creating an event allows you to submit a complete activity consisting of:
     },
     "target": {
         "time": "2025-07-27T17:00:00.000000Z",
-        "integration_id": "integration-uuid",
         "concept": "pull_request",
         "type": "github_pr",
         "title": "Add new feature",
@@ -156,7 +154,6 @@ Creating an event allows you to submit a complete activity consisting of:
     "blocks": [
         {
             "time": "2025-07-27T17:00:00.000000Z",
-            "integration_id": "integration-uuid",
             "title": "Code Changes",
             "content": "+100 lines added",
             "value": 100,
@@ -165,6 +162,19 @@ Creating an event allows you to submit a complete activity consisting of:
     ]
 }
 ```
+
+### Ownership and linkage
+
+`event.integration_id` is the only client-supplied field that selects an
+integration. It must belong to the authenticated user; unknown or unowned IDs
+return `404`.
+
+The server derives `actor.user_id` and `target.user_id` from the authenticated
+user, derives the event's actor and target IDs from the newly created objects,
+and derives each block's event ID from the newly created event. Supplied values
+for those fields cannot override these bindings. Actor, target, and block
+`integration_id` values are ignored for backward compatibility and do not
+select or link an integration.
 
 ---
 

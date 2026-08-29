@@ -130,6 +130,7 @@ return [
         'chrome_vnc_password' => env('CHROME_VNC_PASSWORD', 'spark-dev-vnc'),
         'timeout' => env('PLAYWRIGHT_TIMEOUT', 30000), // 30 seconds
         'screenshot_enabled' => env('PLAYWRIGHT_SCREENSHOT_ENABLED', true),
+        'mcp_max_html_bytes' => env('MCP_PLAYWRIGHT_MAX_HTML_BYTES', 1048576),
         'auto_escalate' => env('PLAYWRIGHT_AUTO_ESCALATE', true), // Auto-use Playwright on HTTP failures
         'js_required_domains' => env('PLAYWRIGHT_JS_DOMAINS', 'twitter.com,x.com,instagram.com,facebook.com'),
 
@@ -168,9 +169,23 @@ return [
         'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
         'models' => [
             'gpt5_mini' => env('OPENAI_GPT5_MINI_MODEL', 'gpt-4o-mini'),
-            'gpt4o' => 'gpt-4o',
-            'gpt5_nano' => 'gpt-5-nano',
+            'gpt4o' => env('OPENAI_GPT4O_MODEL', 'gpt-4o'),
+            'gpt5_nano' => env('OPENAI_GPT5_NANO_MODEL', 'gpt-5-nano'),
         ],
+    ],
+
+    'tmdb' => [
+        'api_key' => env('TMDB_API_KEY'),
+        'base_url' => env('TMDB_BASE_URL', 'https://api.themoviedb.org/3'),
+        'image_base_url' => env('TMDB_IMAGE_BASE_URL', 'https://image.tmdb.org/t/p/w500'),
+    ],
+
+    'boardgamegeek' => [
+        'base_url' => env('BOARDGAMEGEEK_BASE_URL', 'https://boardgamegeek.com/xmlapi2'),
+    ],
+
+    'vivino' => [
+        'search_url' => env('VIVINO_SEARCH_URL', 'https://www.vivino.com/search/wines'),
     ],
 
     'receipt' => [

@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -164,7 +164,7 @@ jobs:
       hash: ${{ steps.get_hash.outputs.hash }}
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
       - name: Setup Node.js
@@ -213,7 +213,7 @@ jobs:
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
@@ -245,9 +245,10 @@ jobs:
         env:
           DEPLOYER_USER: ${{ vars.DEPLOYER_USER }}
           DEPLOYER_HOSTNAME: ${{ vars.DEPLOYER_HOSTNAME }}
+          DEPLOYER_PORT: ${{ vars.DEPLOYER_PORT }}
           DEPLOYER_PATH: ${{ vars.DEPLOYER_PATH }}
           DEPLOYER_APP: ${{ vars.DEPLOYER_APP }}
-          DEPLPOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          DEPLOYER_REPO: ${{ vars.DEPLOYER_REPO }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
           SENTRY_PREFIX: ${{ vars.SENTRY_PREFIX }}
@@ -298,7 +299,7 @@ jobs:
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
@@ -330,9 +331,10 @@ jobs:
         env:
           DEPLOYER_USER: ${{ vars.DEV_DEPLOYER_USER }}
           DEPLOYER_HOSTNAME: ${{ vars.DEV_DEPLOYER_HOSTNAME }}
+          DEPLOYER_PORT: ${{ vars.DEV_DEPLOYER_PORT }}
           DEPLOYER_PATH: ${{ vars.DEV_DEPLOYER_PATH }}
           DEPLOYER_APP: ${{ vars.DEV_DEPLOYER_APP }}
-          DEPLPOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          DEPLOYER_REPO: ${{ vars.DEPLOYER_REPO }}
           WIRE_SECRET: ${{ secrets.WIRE_SECRET }}
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
@@ -374,7 +376,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
       - name: Create Sentry release
@@ -418,7 +420,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
       - name: Create Sentry release
@@ -467,7 +469,7 @@ jobs:
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
       - name: Sync Branch
