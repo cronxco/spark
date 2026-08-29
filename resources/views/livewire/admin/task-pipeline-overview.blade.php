@@ -1,243 +1,376 @@
 <?php
 
-use App\Services\TaskPipeline\TaskRegistry;
-use App\Models\TaskExecution;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
+use App\Models\TaskExecution;
+use App\Services\TaskPipeline\TaskRegistry;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
+use Livewire\WithPagination;
+use Mary\Traits\Toast;
 
-new class extends Component {
-    public function with(): array
+use function Livewire\Volt\layout;
+
+layout('components.layouts.app');
+
+new class extends Component
+{
+    use Toast, WithPagination;
+
+    public string $taskSearch = '';
+    public string $appliesToFilter = '';
+    public string $sourceFilter = '';
+    public string $failureWindow = '24h';
+    public int $perPage = 25;
+
+    protected $queryString = [
+        'taskSearch' => ['except' => ''],
+        'appliesToFilter' => ['except' => ''],
+        'sourceFilter' => ['except' => ''],
+        'failureWindow' => ['except' => '24h'],
+        'perPage' => ['except' => 25],
+        'page' => ['except' => 1],
+    ];
+
+    public function updatedFailureWindow(): void
     {
-        $tasks = TaskRegistry::getAllTasks();
-        $pluginTasks = collect($tasks)->filter(fn($task) => $task->registeredBy !== null);
+        $this->resetPage();
+    }
 
-        // Get recent failures from the last 24 hours
-        $recentFailures = $this->getRecentFailures();
+    public function clearTaskFilters(): void
+    {
+        $this->reset(['taskSearch', 'appliesToFilter', 'sourceFilter']);
+    }
 
-        // Get task statistics
-        [$pendingTasks, $failedTasks, $successTasks] = $this->getTaskStatistics();
-
+    public function taskHeaders(): array
+    {
         return [
-            'totalTasks' => count($tasks),
-            'pluginTasks' => $pluginTasks->count(),
-            'tasks' => $tasks,
-            'recentFailures' => $recentFailures,
-            'pendingTasks' => $pendingTasks,
-            'failedTasks' => $failedTasks,
-            'successTasks' => $successTasks,
-            'failureRate' => $successTasks + $failedTasks > 0
-                ? round(($failedTasks / ($successTasks + $failedTasks)) * 100, 1)
-                : 0,
-            'successRate' => $successTasks + $failedTasks > 0
-                ? round(($successTasks / ($successTasks + $failedTasks)) * 100, 1)
-                : 0,
+            ['key' => 'name', 'label' => 'Task', 'sortable' => false],
+            ['key' => 'applies_to', 'label' => 'Applies To', 'sortable' => false],
+            ['key' => 'dependencies', 'label' => 'Dependencies', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'source', 'label' => 'Source', 'sortable' => false],
         ];
     }
 
-    protected function getRecentFailures(): array
+    public function failureHeaders(): array
+    {
+        return [
+            ['key' => 'task_name', 'label' => 'Task', 'sortable' => false],
+            ['key' => 'model', 'label' => 'Model', 'sortable' => false],
+            ['key' => 'error', 'label' => 'Error', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'failed_at', 'label' => 'When', 'sortable' => false],
+            ['key' => 'actions', 'label' => 'Actions', 'sortable' => false],
+        ];
+    }
+
+    public function getAllTasksProperty(): Collection
+    {
+        return collect(TaskRegistry::getAllTasks());
+    }
+
+    public function getFilteredTasksProperty(): Collection
+    {
+        return $this->allTasks
+            ->filter(function ($task) {
+                if ($this->taskSearch) {
+                    $needle = strtolower($this->taskSearch);
+                    if (! str_contains(strtolower($task->name), $needle) && ! str_contains(strtolower($task->key), $needle)) {
+                        return false;
+                    }
+                }
+
+                if ($this->appliesToFilter && ! in_array($this->appliesToFilter, $task->appliesTo)) {
+                    return false;
+                }
+
+                if ($this->sourceFilter === 'core' && $task->registeredBy) {
+                    return false;
+                }
+
+                if ($this->sourceFilter === 'plugin' && ! $task->registeredBy) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values();
+    }
+
+    public function getUniqueAppliesToProperty(): array
+    {
+        return $this->allTasks->pluck('appliesTo')->flatten()->unique()->sort()->values()->toArray();
+    }
+
+    protected function failureWindowStart(): \Carbon\Carbon
+    {
+        return match ($this->failureWindow) {
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            default => now()->subDay(),
+        };
+    }
+
+    public function getRecentFailuresProperty()
     {
         return TaskExecution::query()
             ->where('status', 'failed')
-            ->where('updated_at', '>=', now()->subDay())
+            ->where('updated_at', '>=', $this->failureWindowStart())
             ->latest('updated_at')
-            ->take(10)
-            ->get()
-            ->map(fn(TaskExecution $execution) => [
-                'id' => $execution->id,
-                'task_name' => $execution->task_name ?? TaskRegistry::getTask($execution->task_key)?->name ?? $execution->task_key,
-                'model_type' => ucfirst($execution->entity_type),
-                'model_id' => $execution->entity_id,
-                'model_url' => $execution->entity_type === 'event' ? route('events.show', $execution->entity_id) : '#',
-                'error' => $execution->error ?? 'Unknown error',
-                'failed_at' => $execution->completed_at?->toIso8601String(),
-            ])
-            ->values()
-            ->toArray();
+            ->paginate($this->perPage);
     }
 
-    protected function getTaskStatistics(): array
+    public function getStatsProperty(): array
     {
-        $since = now()->subDay();
-
         $counts = TaskExecution::query()
-            ->where('updated_at', '>=', $since)
+            ->where('updated_at', '>=', $this->failureWindowStart())
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
+        $pending = (int) ($counts['pending'] ?? 0) + (int) ($counts['running'] ?? 0);
+        $failed = (int) ($counts['failed'] ?? 0);
+        $success = (int) ($counts['success'] ?? 0);
+        $total = $failed + $success;
+
         return [
-            (int) ($counts['pending'] ?? 0) + (int) ($counts['running'] ?? 0),
-            (int) ($counts['failed'] ?? 0),
-            (int) ($counts['success'] ?? 0),
+            'totalTasks' => $this->allTasks->count(),
+            'pluginTasks' => $this->allTasks->filter(fn ($task) => $task->registeredBy !== null)->count(),
+            'pending' => $pending,
+            'failed' => $failed,
+            'success' => $success,
+            'failureRate' => $total > 0 ? round($failed / $total * 100, 1) : 0,
+            'successRate' => $total > 0 ? round($success / $total * 100, 1) : 0,
         ];
+    }
+
+    public function taskName(string $key): string
+    {
+        return TaskRegistry::getTask($key)?->name ?? $key;
+    }
+
+    public function failureModelUrl(TaskExecution $execution): ?string
+    {
+        return $execution->entity_type === 'event' ? route('events.show', $execution->entity_id) : null;
     }
 
     public function retryFailure(string $failureId): void
     {
         $execution = TaskExecution::find($failureId);
-        if (! $execution || $execution->entity_type !== 'event') {
+
+        if (! $execution) {
+            $this->error('That task execution could not be found.');
+
+            return;
+        }
+
+        if ($execution->entity_type !== 'event') {
+            $this->error('Only event-backed tasks can be retried from here.');
+
             return;
         }
 
         $event = Event::find($execution->entity_id);
-        if ($event) {
-            App\Jobs\TaskPipeline\ProcessTaskPipelineJob::dispatch(
-                model: $event,
-                trigger: 'manual',
-                taskFilter: [$execution->task_key],
-                force: true,
-            )->onQueue('tasks');
 
-            session()->flash('message', 'Task queued for retry');
+        if (! $event) {
+            $this->error('The underlying event no longer exists.');
+
+            return;
         }
+
+        ProcessTaskPipelineJob::dispatch(
+            model: $event,
+            trigger: 'manual',
+            taskFilter: [$execution->task_key],
+            force: true,
+        )->onQueue('tasks');
+
+        $this->success('Task queued for retry.');
     }
 }; ?>
 
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <flux:heading size="xl">Task Pipeline</flux:heading>
+<div>
+    <x-header title="Task Pipeline" subtitle="Registered tasks and recent execution failures" separator />
+
+    <div class="space-y-4 lg:space-y-6">
+        {{-- Stats Overview --}}
+        <div class="stats stats-vertical lg:stats-horizontal shadow w-full">
+            <div class="stat">
+                <div class="stat-title">Registered Tasks</div>
+                <div class="stat-value">{{ $this->stats['totalTasks'] }}</div>
+                <div class="stat-desc">{{ $this->stats['pluginTasks'] }} from plugins</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Pending</div>
+                <div class="stat-value text-primary">{{ $this->stats['pending'] }}</div>
+                <div class="stat-desc">In queue</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Failed</div>
+                <div class="stat-value text-error">{{ $this->stats['failed'] }}</div>
+                <div class="stat-desc">{{ $this->stats['failureRate'] }}% failure rate</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Success</div>
+                <div class="stat-value text-success">{{ $this->stats['success'] }}</div>
+                <div class="stat-desc">{{ $this->stats['successRate'] }}% success rate</div>
+            </div>
+        </div>
+
+        {{-- Registered Tasks --}}
+        <div class="card bg-base-200 shadow">
+            <div class="card-body">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                    <h3 class="card-title">Registered Tasks</h3>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input
+                            type="text"
+                            class="input input-bordered input-sm"
+                            placeholder="Search tasks..."
+                            wire:model.live.debounce.300ms="taskSearch" />
+
+                        <select class="select select-bordered select-sm" wire:model.live="appliesToFilter">
+                            <option value="">All Types</option>
+                            @foreach ($this->uniqueAppliesTo as $type)
+                                <option value="{{ $type }}">{{ ucfirst($type) }}</option>
+                            @endforeach
+                        </select>
+
+                        <select class="select select-bordered select-sm" wire:model.live="sourceFilter">
+                            <option value="">Core &amp; Plugins</option>
+                            <option value="core">Core Only</option>
+                            <option value="plugin">Plugins Only</option>
+                        </select>
+
+                        @if ($taskSearch || $appliesToFilter || $sourceFilter)
+                            <button class="btn btn-outline btn-sm" wire:click="clearTaskFilters">
+                                <x-icon name="fas.xmark" class="w-4 h-4" />
+                                Clear
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+                <x-table
+                    :headers="$this->taskHeaders()"
+                    :rows="$this->filteredTasks"
+                    striped
+                    class="[&_table]:!static [&_td]:!static">
+                    <x-slot:empty>
+                        <div class="text-center py-12">
+                            <x-icon name="fas.diagram-project" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <h3 class="text-lg font-medium text-base-content mb-2">No tasks found</h3>
+                            <p class="text-base-content/70">
+                                @if ($taskSearch || $appliesToFilter || $sourceFilter)
+                                    Try adjusting your filters or search terms
+                                @else
+                                    No tasks are registered yet
+                                @endif
+                            </p>
+                        </div>
+                    </x-slot:empty>
+
+                    @scope('cell_name', $task)
+                        <div class="font-semibold">{{ $task->name }}</div>
+                        <div class="text-xs text-base-content/70">{{ $task->description }}</div>
+                    @endscope
+
+                    @scope('cell_applies_to', $task)
+                        <div class="flex flex-wrap gap-1">
+                            @foreach ($task->appliesTo as $type)
+                                <span class="badge badge-sm">{{ $type }}</span>
+                            @endforeach
+                        </div>
+                    @endscope
+
+                    @scope('cell_dependencies', $task)
+                        @if (! empty($task->dependencies))
+                            <span class="text-xs">{{ count($task->dependencies) }} dependencies</span>
+                        @else
+                            <span class="text-base-content/50">None</span>
+                        @endif
+                    @endscope
+
+                    @scope('cell_source', $task)
+                        @if ($task->registeredBy)
+                            <x-badge value="Plugin" class="badge-outline badge-sm" />
+                        @else
+                            <span class="text-base-content/70">Core</span>
+                        @endif
+                    @endscope
+                </x-table>
+            </div>
+        </div>
+
+        {{-- Recent Failures --}}
+        <div class="card bg-base-200 shadow">
+            <div class="card-body">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                    <h3 class="card-title">Recent Failures</h3>
+
+                    <select class="select select-bordered select-sm" wire:model.live="failureWindow">
+                        <option value="24h">Last 24 hours</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                    </select>
+                </div>
+
+                <x-table
+                    :headers="$this->failureHeaders()"
+                    :rows="$this->recentFailures"
+                    with-pagination
+                    per-page="perPage"
+                    :per-page-values="[10, 25, 50, 100]"
+                    striped
+                    class="[&_table]:!static [&_td]:!static">
+                    <x-slot:empty>
+                        <div class="text-center py-12">
+                            <x-icon name="fas.circle-check" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <h3 class="text-lg font-medium text-base-content mb-2">No failures</h3>
+                            <p class="text-base-content/70">Nothing has failed in this window.</p>
+                        </div>
+                    </x-slot:empty>
+
+                    @scope('cell_task_name', $failure)
+                        <span class="text-sm">{{ $this->taskName($failure->task_key) }}</span>
+                    @endscope
+
+                    @scope('cell_model', $failure)
+                        @if ($url = $this->failureModelUrl($failure))
+                            <a href="{{ $url }}" class="link link-primary text-sm">
+                                {{ ucfirst($failure->entity_type) }} #{{ Str::limit($failure->entity_id, 8, '') }}
+                            </a>
+                        @else
+                            <span class="text-sm">{{ ucfirst($failure->entity_type) }} #{{ Str::limit($failure->entity_id, 8, '') }}</span>
+                        @endif
+                    @endscope
+
+                    @scope('cell_error', $failure)
+                        <div class="text-xs max-w-xs truncate" title="{{ $failure->error }}">
+                            {{ $failure->error ?? 'Unknown error' }}
+                        </div>
+                    @endscope
+
+                    @scope('cell_failed_at', $failure)
+                        <span class="text-sm">{{ $failure->completed_at?->diffForHumans() ?? 'Unknown' }}</span>
+                    @endscope
+
+                    @scope('cell_actions', $failure)
+                        <button
+                            wire:click="retryFailure('{{ $failure->id }}')"
+                            wire:loading.attr="disabled"
+                            wire:target="retryFailure('{{ $failure->id }}')"
+                            class="btn btn-ghost btn-sm">
+                            <span wire:loading wire:target="retryFailure('{{ $failure->id }}')" class="loading loading-spinner loading-xs"></span>
+                            Retry
+                        </button>
+                    @endscope
+                </x-table>
+            </div>
+        </div>
     </div>
-
-    @if (session('message'))
-        <flux:banner variant="success">
-            {{ session('message') }}
-        </flux:banner>
-    @endif
-
-    {{-- Stats Overview --}}
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <flux:card>
-            <div class="space-y-2">
-                <flux:subheading>Registered Tasks</flux:subheading>
-                <div class="text-3xl font-bold">{{ $totalTasks }}</div>
-                <div class="text-sm text-zinc-500">{{ $pluginTasks }} from plugins</div>
-            </div>
-        </flux:card>
-
-        <flux:card>
-            <div class="space-y-2">
-                <flux:subheading>Tasks Pending</flux:subheading>
-                <div class="text-3xl font-bold text-blue-600">{{ $pendingTasks }}</div>
-                <div class="text-sm text-zinc-500">In queue</div>
-            </div>
-        </flux:card>
-
-        <flux:card>
-            <div class="space-y-2">
-                <flux:subheading>Failed (24h)</flux:subheading>
-                <div class="text-3xl font-bold text-red-600">{{ $failedTasks }}</div>
-                <div class="text-sm text-zinc-500">{{ $failureRate }}% failure rate</div>
-            </div>
-        </flux:card>
-
-        <flux:card>
-            <div class="space-y-2">
-                <flux:subheading>Success (24h)</flux:subheading>
-                <div class="text-3xl font-bold text-green-600">{{ $successTasks }}</div>
-                <div class="text-sm text-zinc-500">{{ $successRate }}% success rate</div>
-            </div>
-        </flux:card>
-    </div>
-
-    {{-- Task Registry Table --}}
-    <flux:card>
-        <flux:heading size="lg">Registered Tasks</flux:heading>
-
-        <flux:table class="mt-4">
-            <flux:columns>
-                <flux:column>Task</flux:column>
-                <flux:column>Applies To</flux:column>
-                <flux:column>Dependencies</flux:column>
-                <flux:column>Source</flux:column>
-            </flux:columns>
-
-            <flux:rows>
-                @foreach ($tasks as $task)
-                    <flux:row>
-                        <flux:cell>
-                            <div>
-                                <div class="font-semibold">{{ $task->name }}</div>
-                                <div class="text-xs text-zinc-500">{{ $task->description }}</div>
-                            </div>
-                        </flux:cell>
-
-                        <flux:cell>
-                            <div class="flex flex-wrap gap-1">
-                                @foreach ($task->appliesTo as $type)
-                                    <flux:badge size="sm">{{ $type }}</flux:badge>
-                                @endforeach
-                            </div>
-                        </flux:cell>
-
-                        <flux:cell>
-                            @if (!empty($task->dependencies))
-                                <div class="text-xs">{{ count($task->dependencies) }} dependencies</div>
-                            @else
-                                <span class="text-zinc-400">None</span>
-                            @endif
-                        </flux:cell>
-
-                        <flux:cell>
-                            @if ($task->registeredBy)
-                                <flux:badge variant="outline" size="sm">Plugin</flux:badge>
-                            @else
-                                <span class="text-zinc-500">Core</span>
-                            @endif
-                        </flux:cell>
-                    </flux:row>
-                @endforeach
-            </flux:rows>
-        </flux:table>
-    </flux:card>
-
-    {{-- Recent Failures --}}
-    @if (!empty($recentFailures))
-        <flux:card>
-            <flux:heading size="lg">Recent Failures</flux:heading>
-
-            <flux:table class="mt-4">
-                <flux:columns>
-                    <flux:column>Task</flux:column>
-                    <flux:column>Model</flux:column>
-                    <flux:column>Error</flux:column>
-                    <flux:column>When</flux:column>
-                    <flux:column>Actions</flux:column>
-                </flux:columns>
-
-                <flux:rows>
-                    @foreach ($recentFailures as $failure)
-                        <flux:row>
-                            <flux:cell>{{ $failure['task_name'] }}</flux:cell>
-
-                            <flux:cell>
-                                <a href="{{ $failure['model_url'] }}" class="text-blue-600 hover:underline">
-                                    {{ $failure['model_type'] }} #{{ substr($failure['model_id'], 0, 8) }}
-                                </a>
-                            </flux:cell>
-
-                            <flux:cell>
-                                <div class="text-xs max-w-xs truncate" title="{{ $failure['error'] }}">
-                                    {{ $failure['error'] }}
-                                </div>
-                            </flux:cell>
-
-                            <flux:cell>
-                                {{ $failure['failed_at'] ? \Carbon\Carbon::parse($failure['failed_at'])->diffForHumans() : 'Unknown' }}
-                            </flux:cell>
-
-                            <flux:cell>
-                                <flux:button
-                                    wire:click="retryFailure('{{ $failure['id'] }}')"
-                                    size="sm"
-                                    variant="ghost"
-                                >
-                                    Retry
-                                </flux:button>
-                            </flux:cell>
-                        </flux:row>
-                    @endforeach
-                </flux:rows>
-            </flux:table>
-        </flux:card>
-    @endif
 </div>
