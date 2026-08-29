@@ -160,15 +160,15 @@ Route::post('devices/test', [DevicesController::class, 'test'])->middleware('abi
 Route::delete('devices/{id}', [DevicesController::class, 'destroy'])->middleware('ability:ios:write')->name('devices.destroy');
 
 Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:user'])
     ->name('notifications.read-all');
 
 Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:notification'])
     ->name('notifications.read');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:notification'])
     ->name('notifications.destroy');
 
 Route::post('health/samples', [HealthController::class, 'samples'])
@@ -204,7 +204,7 @@ Route::post('check-ins/media', [CheckInsController::class, 'media'])
 // The read payload is owned by NotificationPreferences; this remains the
 // established write handler for the iOS client.
 Route::patch('settings/notifications', [NotificationSettingsController::class, 'update'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:user'])
     ->name('settings.notifications.update');
 
 Route::post('anomalies/{id}/acknowledge', [AnomaliesController::class, 'acknowledge'])

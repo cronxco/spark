@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class NotificationSettingsController extends Controller
 {
+    public function __construct(private ResourceVersion $versions) {}
     private const CATEGORIES = [
         'anomaly',
         'digest',
@@ -56,10 +58,11 @@ class NotificationSettingsController extends Controller
         ]);
 
         if ($validated['delivery_mode'] === 'work_hours') {
-            return response()->json(null, 204);
+            return response()->json(null, 204)->header('ETag', $this->versions->etag($request->user()->fresh()));
         }
 
-        return response()->json($this->mobilePreferences($request));
+        return response()->json($this->mobilePreferences($request))
+            ->header('ETag', $this->versions->etag($request->user()->fresh()));
     }
 
     private function mobilePreferences(Request $request): array

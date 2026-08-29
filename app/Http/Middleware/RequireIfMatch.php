@@ -26,6 +26,8 @@ class RequireIfMatch
             'entity' => $this->entities->find($request->user(), rtrim((string) $request->route('kind'), 's'), (string) $request->route('id')),
             'event' => $this->events->find($request->user(), (string) $request->route('id')),
             'object' => $this->entities->find($request->user(), 'object', (string) $request->route('id')),
+            'user' => $request->user(),
+            'notification' => $request->user()->notifications()->find($request->route('id')),
             'relationship' => Relationship::query()->where('user_id', $request->user()->id)->find($request->route('relationship')),
             default => null,
         };
