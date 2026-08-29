@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use App\Services\Api\ResourceVersion;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
@@ -66,7 +67,7 @@ class NotificationsControllerTest extends TestCase
         $first = $this->getJson('/api/v1/mobile/notifications?limit=1')->assertOk();
         $cursor = $first->json('next_cursor');
 
-        $this->getJson('/api/v1/mobile/notifications?limit=1&cursor=' . urlencode($cursor))
+        $this->getJson('/api/v1/mobile/notifications?limit=1&cursor='.urlencode($cursor))
             ->assertOk()
             ->assertJsonPath('data.0.title', 'Second')
             ->assertJsonPath('has_more', false)
@@ -110,7 +111,7 @@ class NotificationsControllerTest extends TestCase
         $notification = $this->notification(['title' => 'Unread'], Carbon::now());
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/read")
+        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/read", [], $this->ifMatch($notification))
             ->assertNoContent();
 
         $this->assertNotNull($notification->fresh()->read_at);
@@ -124,7 +125,7 @@ class NotificationsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/notifications/read-all')
+        $this->postJson('/api/v1/mobile/notifications/read-all', [], $this->ifMatchUser())
             ->assertNoContent();
 
         $this->assertSame(0, $this->user->fresh()->unreadNotifications()->count());
@@ -136,7 +137,7 @@ class NotificationsControllerTest extends TestCase
         $notification = $this->notification(['title' => 'Remove me'], Carbon::now());
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->deleteJson("/api/v1/mobile/notifications/{$notification->id}")
+        $this->deleteJson("/api/v1/mobile/notifications/{$notification->id}", [], $this->ifMatch($notification))
             ->assertNoContent();
 
         $this->assertDatabaseMissing('notifications', ['id' => $notification->id]);
@@ -150,6 +151,18 @@ class NotificationsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/not-a-route')
             ->assertStatus(404)
             ->assertExactJson(['message' => 'Not found.']);
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatch(DatabaseNotification $notification): array
+    {
+        return ['If-Match' => app(ResourceVersion::class)->etag($notification->fresh())];
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatchUser(): array
+    {
+        return ['If-Match' => $this->getJson('/api/v1/mobile/settings/notifications')->headers->get('ETag')];
     }
 
     /**

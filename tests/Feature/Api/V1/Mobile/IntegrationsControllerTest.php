@@ -97,7 +97,7 @@ class IntegrationsControllerTest extends TestCase
         Queue::fake();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync")
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync", [], $this->ifMatch($this->integration))
             ->assertOk()
             ->assertJsonStructure(['message', 'jobs_dispatched']);
     }
@@ -118,7 +118,7 @@ class IntegrationsControllerTest extends TestCase
         $this->integration->update(['configuration' => ['paused' => true]]);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync")
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync", [], $this->ifMatch($this->integration))
             ->assertStatus(422);
     }
 
@@ -176,5 +176,11 @@ class IntegrationsControllerTest extends TestCase
 
         $this->postJson("/api/v1/mobile/integrations/{$manual->id}/oauth/start")
             ->assertStatus(422);
+    }
+
+    /** @return array{If-Match: string} */
+    protected function ifMatch(Integration $integration): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/integrations/{$integration->id}")->headers->get('ETag')];
     }
 }

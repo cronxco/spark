@@ -60,7 +60,7 @@ class NotificationPreferencesControllerTest extends TestCase
     {
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->patchJson('/api/v1/mobile/settings/notifications', $this->payload())
+        $this->patchJson('/api/v1/mobile/settings/notifications', $this->payload(), $this->ifMatchUser())
             ->assertStatus(204);
 
         $this->user->refresh();
@@ -82,5 +82,11 @@ class NotificationPreferencesControllerTest extends TestCase
             'delivery_mode' => 'work_hours',
             'digest_time' => '10:15',
         ];
+    }
+
+    /** @return array{If-Match: string} */
+    protected function ifMatchUser(): array
+    {
+        return ['If-Match' => $this->getJson('/api/v1/mobile/settings/notifications')->headers->get('ETag')];
     }
 }

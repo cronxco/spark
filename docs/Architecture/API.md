@@ -41,7 +41,7 @@ and manual finance account/balance management, including archival.
 | User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available |
 | Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
 | Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
-| API-token administration                                         | No                         | No                            | No                            | Web settings only               |
+| API-token administration                                         | No                         | Yes                           | No                            | Web settings and mobile only    |
 | Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
 | Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
 
@@ -93,12 +93,15 @@ The `/api/v1/mobile` adapter retains `ios:read` and `ios:write` scopes for
 iOS-client compatibility. It includes the shared event/object/block edits,
 relationship management, Flint digest creation, integration sync by instance
 or service, and metric baseline discovery, alongside its existing user profile,
-feed, widgets, notifications, check-ins, finance, map, and delta-sync APIs.
+feed, widgets, notifications, check-ins, finance, map, delta-sync, and
+personal API-token management APIs.
 
 Device registration, APNs/Live Activities, HealthKit ingestion, and OAuth
 handoff are deliberately mobile-only: they remain necessary for the iOS app
-but are not general REST or MCP capabilities. API-token management is web
-settings-only. Browser HTML fetching stays MCP-only under `web:fetch`.
+but are not general REST or MCP capabilities. API-token management is
+available in web settings and on the mobile adapter, but not through the
+general REST API or MCP. Browser HTML fetching stays MCP-only under
+`web:fetch`.
 
 REST API for managing events, objects, and blocks with secure authentication using Laravel Sanctum.
 
