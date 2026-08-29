@@ -188,7 +188,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
             'user_id' => $user->id,
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
-            'title' => 'Example Article '.$this->nextKnowledgeObjectSequence(),
+            'title' => 'Example Article ' . $this->nextKnowledgeObjectSequence(),
             'url' => 'https://example.com/article',
             'content' => $webpageContent,
         ]);
@@ -212,7 +212,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
             'user_id' => $this->user->id,
             'concept' => 'publication',
             'type' => 'newsletter_publication',
-            'title' => 'Example Newsletter '.$this->nextKnowledgeObjectSequence(),
+            'title' => 'Example Newsletter ' . $this->nextKnowledgeObjectSequence(),
             'content' => $publicationContent,
         ]);
 
