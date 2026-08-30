@@ -4,6 +4,9 @@ namespace App\Jobs\Flint;
 
 use App\Models\Event;
 use App\Models\User;
+use App\Services\FlintDigestService;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -89,6 +92,19 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             return;
         }
 
+        $digest = app(FlintDigestService::class)->resolveDigestObject(
+            $this->user,
+            $this->period,
+            Carbon::parse($this->localDate, $this->timezone),
+        );
+        $task = $this->taskDefinition();
+        $store = app(TaskExecutionStore::class);
+
+        $store->recordStatus($digest, $task, 'pending', [
+            'triggered_by' => $this->triggerReason,
+            'error' => null,
+        ]);
+
         $payload = [
             'user_id' => (string) $this->user->id,
             'period' => $this->period,
@@ -109,6 +125,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             $response = $request->post($url, $payload);
         } catch (Throwable $exception) {
             Cache::forget($markerKey);
+            $store->recordStatus($digest, $task, 'failed', ['triggered_by' => $this->triggerReason, 'error' => $exception->getMessage()]);
 
             throw $exception;
         }
@@ -121,8 +138,11 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             ]);
 
             Cache::forget($markerKey);
+            $store->recordStatus($digest, $task, 'failed', ['triggered_by' => $this->triggerReason, 'error' => "HTTP {$response->status()}: {$response->body()}"]);
             $response->throw();
         }
+
+        $store->recordStatus($digest, $task, 'success', ['triggered_by' => $this->triggerReason]);
 
         Log::info('Flint routine webhook triggered', [
             'user_id' => $this->user->id,
@@ -131,6 +151,18 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'timezone' => $this->timezone,
             'trigger_reason' => $this->triggerReason,
         ]);
+    }
+
+    private function taskDefinition(): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: "flint_digest_{$this->period}",
+            name: 'Flint ' . ucfirst($this->period) . ' Digest',
+            description: 'Outbound trigger for the Flint digest routine.',
+            jobClass: self::class,
+            appliesTo: ['object'],
+            queue: 'flint',
+        );
     }
 
     /**

@@ -6,6 +6,9 @@ use App\Models\Event;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\FlintDigestService;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -26,6 +29,12 @@ use Sentry\Tracing\TransactionContext;
  * event, so it reads that event directly: the title and summary prose live in
  * `event_metadata`, written by the routine through the create-flint-digest
  * MCP tool.
+ *
+ * Records TaskExecution rows against the user's Flint integration, alongside the
+ * dispatch side's rows, so /admin/task-pipeline shows whether a digest was
+ * actually announced. The "no digest found" case is recorded as not_applicable
+ * rather than returning silently — that was the failure mode that hid this job
+ * looking for block types the routine never writes.
  */
 class SendDigestNotificationJob implements ShouldQueue
 {
@@ -42,8 +51,12 @@ class SendDigestNotificationJob implements ShouldQueue
         public ?string $digestEventId = null,
     ) {}
 
-    public function handle(): void
+    public function handle(FlintDigestService $digests, TaskExecutionStore $store): void
     {
+        $integration = $digests->resolveIntegration($this->user);
+        $task = $this->taskDefinition();
+        $period = $this->period ?? $this->getDigestPeriod($this->scheduleTime);
+
         $transactionContext = new TransactionContext;
         $transactionContext->setName('flint.send_digest_notification');
         $transactionContext->setOp('job');
@@ -61,7 +74,6 @@ class SendDigestNotificationJob implements ShouldQueue
         });
 
         try {
-            $period = $this->period ?? $this->getDigestPeriod($this->scheduleTime);
             $digest = $this->findDigest($period);
 
             if (! $digest) {
@@ -69,6 +81,12 @@ class SendDigestNotificationJob implements ShouldQueue
                     'user_id' => $this->user->id,
                     'schedule_time' => $this->scheduleTime,
                     'period' => $period,
+                ]);
+
+                $store->recordStatus($integration, $task, 'not_applicable', [
+                    'period' => $period,
+                    'reason' => 'No digest event found for this period.',
+                    'error' => null,
                 ]);
 
                 $transaction->setData([
@@ -113,6 +131,12 @@ class SendDigestNotificationJob implements ShouldQueue
 
             $transaction->finish();
 
+            $store->recordStatus($integration, $task, 'success', [
+                'period' => $period,
+                'digest_event_id' => $digest->id,
+                'error' => null,
+            ]);
+
             Log::info('Digest notification sent', [
                 'user_id' => $this->user->id,
                 'schedule_time' => $this->scheduleTime,
@@ -125,6 +149,11 @@ class SendDigestNotificationJob implements ShouldQueue
 
             \Sentry\captureException($e);
 
+            $store->recordStatus($integration, $task, 'failed', [
+                'period' => $period,
+                'error' => $e->getMessage(),
+            ]);
+
             Log::error('Failed to send digest notification', [
                 'user_id' => $this->user->id,
                 'schedule_time' => $this->scheduleTime,
@@ -133,6 +162,22 @@ class SendDigestNotificationJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Built inline rather than registered in TaskRegistry, matching the dispatch
+     * side. See docs/Architecture/TASK_PIPELINE.md.
+     */
+    private function taskDefinition(): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: 'flint_digest_notification',
+            name: 'Flint Digest Notification',
+            description: 'Announces a Flint digest once the routine has written it.',
+            jobClass: self::class,
+            appliesTo: ['integration'],
+            queue: 'flint',
+        );
     }
 
     /**

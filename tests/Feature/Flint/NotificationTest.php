@@ -6,8 +6,11 @@ use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\TaskExecution;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use App\Services\FlintDigestService;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -42,6 +45,12 @@ class NotificationTest extends TestCase
         Carbon::setTestNow();
 
         parent::tearDown();
+    }
+
+    private function runJob(User $user, string $scheduleTime, ?string $period = null, ?string $eventId = null): void
+    {
+        (new SendDigestNotificationJob($user, $scheduleTime, $period, $eventId))
+            ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
     }
 
     /**
@@ -83,7 +92,7 @@ class NotificationTest extends TestCase
 
         $digest = $this->createDigest('morning');
 
-        (new SendDigestNotificationJob($this->user, '06:00'))->handle();
+        $this->runJob($this->user, '06:00');
 
         Notification::assertSentTo(
             [$this->user],
@@ -99,9 +108,34 @@ class NotificationTest extends TestCase
     {
         Notification::fake();
 
-        (new SendDigestNotificationJob($this->user, '06:00'))->handle();
+        $this->runJob($this->user, '06:00');
 
         Notification::assertNothingSent();
+
+        // Silently doing nothing is what hid this job for weeks — it now leaves
+        // a row saying why.
+        $execution = TaskExecution::where('task_key', 'flint_digest_notification')->firstOrFail();
+        $this->assertSame('not_applicable', $execution->status);
+    }
+
+    #[Test]
+    public function it_records_a_task_execution_when_it_announces_a_digest(): void
+    {
+        Notification::fake();
+
+        $this->createDigest('morning');
+
+        $this->runJob($this->user, '06:00');
+
+        $integration = app(FlintDigestService::class)->resolveIntegration($this->user);
+
+        $execution = TaskExecution::where('entity_type', 'integration')
+            ->where('entity_id', $integration->id)
+            ->where('task_key', 'flint_digest_notification')
+            ->firstOrFail();
+
+        $this->assertSame('success', $execution->status);
+        $this->assertSame($this->user->id, $execution->user_id);
     }
 
     #[Test]
@@ -114,7 +148,7 @@ class NotificationTest extends TestCase
             'summary' => 'Your evening summary.',
         ]);
 
-        (new SendDigestNotificationJob($this->user, '18:00'))->handle();
+        $this->runJob($this->user, '18:00');
 
         Notification::assertSentTo(
             [$this->user],
@@ -145,7 +179,7 @@ class NotificationTest extends TestCase
             'metadata' => ['question' => 'Why the late night?', 'answer' => null],
         ]);
 
-        (new SendDigestNotificationJob($this->user, '18:00'))->handle();
+        $this->runJob($this->user, '18:00');
 
         Notification::assertSentTo(
             [$this->user],
@@ -163,7 +197,7 @@ class NotificationTest extends TestCase
         $evening = $this->createDigest('evening', ['title' => 'Evening Digest']);
 
         // The schedule time says morning, but an explicit event id wins.
-        (new SendDigestNotificationJob($this->user, '06:00', 'evening', $evening->id))->handle();
+        $this->runJob($this->user, '06:00', 'evening', $evening->id);
 
         Notification::assertSentTo(
             [$this->user],
@@ -192,7 +226,7 @@ class NotificationTest extends TestCase
             'event_metadata' => ['period' => 'morning', 'title' => 'Not yours'],
         ]);
 
-        (new SendDigestNotificationJob($this->user, '06:00'))->handle();
+        $this->runJob($this->user, '06:00');
 
         Notification::assertNothingSent();
     }
@@ -219,7 +253,7 @@ class NotificationTest extends TestCase
         // 2026-06-14 00:00 UTC — BEFORE now()->startOfDay() (= 2026-06-15 00:00 UTC).
         $digest = $this->createDigest('evening', [], Carbon::parse($localDate, 'UTC'));
 
-        (new SendDigestNotificationJob($this->user, '18:00'))->handle();
+        $this->runJob($this->user, '18:00');
 
         Notification::assertSentTo(
             [$this->user],

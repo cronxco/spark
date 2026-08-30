@@ -36,16 +36,8 @@ class FlintDigestService
 
         $date = Carbon::parse($data['date'] ?? now()->toDateString())->startOfDay();
         $period = $data['period'] ?? $this->inferPeriod();
-        $integration = Integration::firstOrCreate(
-            ['user_id' => $user->id, 'service' => 'flint', 'instance_type' => 'digest'],
-            ['name' => 'Flint Digest', 'active' => true],
-        );
-        $digest = EventObject::firstOrCreate(
-            ['user_id' => $user->id, 'concept' => 'digest', 'type' => $period . '_digest', 'title' => $date->format('Y-m-d') . ' ' . match ($period) {
-                'morning' => 'AM', 'afternoon' => 'PM', default => 'EVE'
-            }],
-            ['time' => now(), 'metadata' => ['service' => 'flint', 'period' => $period, 'generated_at' => now()->toIso8601String()]],
-        );
+        $integration = $this->resolveIntegration($user);
+        $digest = $this->resolveDigestObject($user, $period, $date);
         $actor = EventObject::firstOrCreate(
             ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
             ['time' => now()],
@@ -68,6 +60,37 @@ class FlintDigestService
         }
 
         return ['event_id' => $event->id, 'digest_object_id' => $digest->id, 'date' => $date->toDateString(), 'period' => $period, 'title' => $data['title'], 'block_count' => count($ids), 'block_ids' => $ids];
+    }
+
+    /**
+     * Resolves (or creates) the user's Flint digest Integration.
+     *
+     * Shared between digest creation and the routine trigger jobs so both sides
+     * resolve to the exact same row via firstOrCreate — the trigger jobs anchor
+     * their TaskExecution rows here, and an anchor that only exists once a
+     * digest has landed would go dark on exactly the runs worth seeing.
+     */
+    public function resolveIntegration(User $user): Integration
+    {
+        return Integration::firstOrCreate(
+            ['user_id' => $user->id, 'service' => 'flint', 'instance_type' => 'digest'],
+            ['name' => 'Flint Digest', 'active' => true],
+        );
+    }
+
+    /**
+     * Resolves (or creates) the digest EventObject for a given user/period/date.
+     * Shared between digest creation and pre-dispatch anchoring so both sides
+     * resolve to the exact same row via firstOrCreate.
+     */
+    public function resolveDigestObject(User $user, string $period, Carbon $date): EventObject
+    {
+        return EventObject::firstOrCreate(
+            ['user_id' => $user->id, 'concept' => 'digest', 'type' => $period . '_digest', 'title' => $date->format('Y-m-d') . ' ' . match ($period) {
+                'morning' => 'AM', 'afternoon' => 'PM', default => 'EVE'
+            }],
+            ['time' => now(), 'metadata' => ['service' => 'flint', 'period' => $period, 'generated_at' => now()->toIso8601String()]],
+        );
     }
 
     private function inferPeriod(): string

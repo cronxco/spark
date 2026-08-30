@@ -3,6 +3,9 @@
 namespace App\Jobs\Flint;
 
 use App\Models\User;
+use App\Services\FlintDigestService;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,6 +25,11 @@ use Throwable;
  * the timing (resolved in the user's effective timezone), the routine owns the
  * work and calls back through the Spark MCP tools. Idempotent per
  * (user, local date, routine) via a Redis marker that expires with the local day.
+ *
+ * Like the digest job, this records TaskExecution rows against the user's Flint
+ * integration so /admin/task-pipeline can show whether each routine fired today,
+ * when, and whether it succeeded — including the routines that are not
+ * configured yet, which record as `not_applicable` rather than going dark.
  */
 class TriggerFlintRoutineJob implements ShouldQueue
 {
@@ -57,7 +65,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         return "flint:routine-triggered:{$routine}:{$userId}:{$localDate}";
     }
 
-    public function handle(): void
+    public function handle(FlintDigestService $digests, TaskExecutionStore $store): void
     {
         if (! array_key_exists($this->routine, self::ROUTINES)) {
             Log::warning('Unknown Flint routine; skipping trigger', [
@@ -68,12 +76,20 @@ class TriggerFlintRoutineJob implements ShouldQueue
             return;
         }
 
+        $integration = $digests->resolveIntegration($this->user);
+        $task = $this->taskDefinition();
         $url = config(self::ROUTINES[$this->routine]);
 
         if (empty($url)) {
             Log::info('Flint routine webhook URL not configured; skipping trigger', [
                 'user_id' => $this->user->id,
                 'routine' => $this->routine,
+            ]);
+
+            $store->recordStatus($integration, $task, 'not_applicable', [
+                'local_date' => $this->localDate,
+                'reason' => 'Webhook URL is not configured.',
+                'error' => null,
             ]);
 
             return;
@@ -90,6 +106,11 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
             return;
         }
+
+        $store->recordStatus($integration, $task, 'pending', [
+            'local_date' => $this->localDate,
+            'error' => null,
+        ]);
 
         $payload = [
             'user_id' => (string) $this->user->id,
@@ -109,6 +130,10 @@ class TriggerFlintRoutineJob implements ShouldQueue
             $response = $request->post($url, $payload);
         } catch (Throwable $exception) {
             Cache::forget($markerKey);
+            $store->recordStatus($integration, $task, 'failed', [
+                'local_date' => $this->localDate,
+                'error' => $exception->getMessage(),
+            ]);
 
             throw $exception;
         }
@@ -121,8 +146,16 @@ class TriggerFlintRoutineJob implements ShouldQueue
             ]);
 
             Cache::forget($markerKey);
+            $store->recordStatus($integration, $task, 'failed', [
+                'local_date' => $this->localDate,
+                'error' => "HTTP {$response->status()}: {$response->body()}",
+            ]);
             $response->throw();
         }
+
+        $store->recordStatus($integration, $task, 'success', [
+            'local_date' => $this->localDate,
+        ]);
 
         Log::info('Flint routine webhook triggered', [
             'user_id' => $this->user->id,
@@ -130,6 +163,25 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'local_date' => $this->localDate,
             'timezone' => $this->timezone,
         ]);
+    }
+
+    /**
+     * Built inline rather than registered in TaskRegistry: this is a cron job
+     * outside the event/block/object dependency pipeline, so it only needs the
+     * shape TaskExecutionStore records against. See docs/Architecture/TASK_PIPELINE.md.
+     */
+    private function taskDefinition(): TaskDefinition
+    {
+        $name = ucwords(str_replace('_', ' ', $this->routine));
+
+        return new TaskDefinition(
+            key: "flint_routine_{$this->routine}",
+            name: "Flint {$name} Routine",
+            description: "Outbound trigger for the Flint {$name} routine.",
+            jobClass: self::class,
+            appliesTo: ['integration'],
+            queue: 'flint',
+        );
     }
 
     /**

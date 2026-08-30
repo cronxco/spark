@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\TaskExecution;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -184,6 +185,7 @@ class TaskExecutionStore
         return match (true) {
             $model instanceof Event => 'event_metadata',
             $model instanceof Integration => 'configuration',
+            $model instanceof IntegrationGroup => 'auth_metadata',
             $model instanceof Block, $model instanceof EventObject => 'metadata',
             default => throw new InvalidArgumentException('Unsupported task execution model: ' . get_class($model)),
         };
@@ -195,6 +197,7 @@ class TaskExecutionStore
             $model instanceof Event => 'event',
             $model instanceof Block => 'block',
             $model instanceof EventObject => 'object',
+            $model instanceof IntegrationGroup => 'integration_group',
             $model instanceof Integration => 'integration',
             default => throw new InvalidArgumentException('Unsupported task execution model: ' . get_class($model)),
         };
@@ -202,7 +205,7 @@ class TaskExecutionStore
 
     public function resolveUserId(Model $model): ?string
     {
-        if ($model instanceof Integration || $model instanceof EventObject) {
+        if ($model instanceof Integration || $model instanceof EventObject || $model instanceof IntegrationGroup) {
             return $model->user_id;
         }
 
