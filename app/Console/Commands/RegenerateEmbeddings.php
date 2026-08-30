@@ -9,8 +9,9 @@ use App\Models\ActionProgress;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\User;
 use App\Services\Ai\AiModel;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Illuminate\Console\Command;
 
 class RegenerateEmbeddings extends Command
@@ -172,21 +173,15 @@ class RegenerateEmbeddings extends Command
 
         $this->line("Found {$total} {$modelName} records to process");
 
-        // Create progress tracker
-        $progressId = 'regenerate-embeddings-' . strtolower($modelName) . '-' . now()->timestamp;
-        $progress = ActionProgress::create([
-            'user_id' => 1, // System user
-            'action_id' => $progressId,
-            'total_items' => $total,
-            'processed_items' => 0,
-            'status' => 'in_progress',
-            'metadata' => [
-                'model' => $modelName,
-                'force' => $force,
-                'filter_type' => $filterType,
-                'filter_value' => $filterValue,
-                'stale_model' => $staleModel,
-            ],
+        // Progress tracking is a convenience, not the job. action_progress.user_id
+        // is a UUID foreign key, so there is no "system user" to attribute a
+        // backfill to; when no user exists the run proceeds untracked rather
+        // than failing on the foreign key.
+        $progress = $this->createProgressRecord($modelName, $total, [
+            'force' => $force,
+            'filter_type' => $filterType,
+            'filter_value' => $filterValue,
+            'stale_model' => $staleModel,
         ]);
 
         // Process in chunks
@@ -199,7 +194,7 @@ class RegenerateEmbeddings extends Command
                 if ($sync) {
                     // Run synchronously
                     $job = new $jobClass($record);
-                    $job->handle(app(EmbeddingService::class));
+                    $job->handle(app(EmbeddingClient::class));
                 } else {
                     // Queue job
                     $jobClass::dispatch($record)->onQueue('embeddings');
@@ -210,7 +205,7 @@ class RegenerateEmbeddings extends Command
 
                 // Update progress every 10 records
                 if ($processed % 10 === 0) {
-                    $progress->update(['processed_items' => $processed]);
+                    $progress?->update(['progress' => $processed]);
                 }
             }
         });
@@ -219,13 +214,36 @@ class RegenerateEmbeddings extends Command
         $this->newLine();
 
         // Mark progress as complete
-        $progress->update([
-            'processed_items' => $total,
-            'status' => 'completed',
+        $progress?->update([
+            'progress' => $total,
+            'step' => 'completed',
         ]);
 
         $this->info("✅ Queued {$processed} {$modelName} embedding jobs");
 
         return $processed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    private function createProgressRecord(string $modelName, int $total, array $metadata): ?ActionProgress
+    {
+        $user = User::query()->where('is_admin', true)->first() ?? User::query()->first();
+
+        if (! $user) {
+            return null;
+        }
+
+        return ActionProgress::createProgress(
+            userId: $user->id,
+            actionType: 'embeddings',
+            actionId: 'regenerate-embeddings-' . strtolower($modelName) . '-' . now()->timestamp,
+            step: 'processing',
+            message: "Regenerating {$total} {$modelName} embeddings",
+            progress: 0,
+            total: $total,
+            details: array_merge(['model' => $modelName], $metadata),
+        );
     }
 }

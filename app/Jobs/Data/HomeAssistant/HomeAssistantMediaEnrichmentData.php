@@ -5,7 +5,7 @@ namespace App\Jobs\Data\HomeAssistant;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Services\Ai\AiModel;
-use App\Services\AssistantPromptingService;
+use App\Services\Ai\ChatClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -92,15 +92,16 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
         };
 
         try {
-            $response = app(AssistantPromptingService::class)->generateResponse(
-                $this->buildDisambiguationPrompt($title, $candidates),
+            $response = app(ChatClient::class)->text(
+                AiModel::Reasoning,
+                [['role' => 'user', 'content' => $this->buildDisambiguationPrompt($title, $candidates)]],
                 [
-                    'model' => AiModel::Reasoning->model(),
                     'integration_id' => $this->integration->id,
                     'service' => $this->getServiceName(),
                     'context' => ['prompt_type' => 'home_assistant_media_disambiguation'],
                     'max_completion_tokens' => 300,
                     'temperature' => 0,
+                    'retries' => 3,
                     'tools' => $this->searchTmdbToolDefinition(),
                     'tool_executor' => $toolExecutor,
                 ]

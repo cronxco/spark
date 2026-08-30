@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Block;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -45,7 +45,7 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(EmbeddingService $embeddingService): void
+    public function handle(EmbeddingClient $embeddingService): void
     {
         try {
             // Get searchable text from block
@@ -74,7 +74,7 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
             // This prevents a circular dependency where updating metadata triggers re-embedding
             $this->block->withoutEvents(function () use ($embedding, $metadata) {
                 $this->block->update([
-                    'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                    'embeddings' => EmbeddingClient::formatForPostgres($embedding),
                     'metadata' => $metadata,
                 ]);
             });

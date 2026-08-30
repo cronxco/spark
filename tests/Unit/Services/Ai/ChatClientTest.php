@@ -1,15 +1,16 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\Ai;
 
-use App\Services\AssistantPromptingService;
+use App\Services\Ai\AiModel;
+use App\Services\Ai\ChatClient;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Resources\Chat;
 use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class AssistantPromptingServiceToolCallingTest extends TestCase
+class ChatClientTest extends TestCase
 {
     #[Test]
     public function without_tools_it_makes_a_single_call_and_returns_the_content(): void
@@ -18,7 +19,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
             $this->response('Hello there'),
         ]);
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Say hi');
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Say hi']]);
 
         $this->assertSame('Hello there', $result);
         $fake->assertSent(Chat::class, 1);
@@ -49,7 +50,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
             return ['id' => 42, 'title' => 'Loki'];
         };
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Find the right match', [
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find the right match']], [
             'tools' => [
                 [
                     'type' => 'function',
@@ -98,7 +99,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
 
         $executions = 0;
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Find it', [
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find it']], [
             'tools' => [['type' => 'function', 'function' => ['name' => 'search_thing', 'parameters' => []]]],
             'tool_executor' => function (string $name, array $arguments) use (&$executions) {
                 $executions++;
@@ -123,7 +124,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
             $this->response(null, [$this->toolCall('call_1', 'search_thing', ['query' => 'a'])]),
         ]);
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Find it', [
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find it']], [
             'tools' => [['type' => 'function', 'function' => ['name' => 'search_thing', 'parameters' => []]]],
         ]);
 

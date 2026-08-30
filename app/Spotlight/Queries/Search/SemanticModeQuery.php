@@ -6,7 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
@@ -38,7 +38,7 @@ class SemanticModeQuery
             }
 
             try {
-                $embeddingService = app(EmbeddingService::class);
+                $embeddingService = app(EmbeddingClient::class);
 
                 // Generate embedding for the query
                 $embedding = $embeddingService->embed($query);

@@ -6,13 +6,13 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Illuminate\Database\Eloquent\Collection;
 
 /** Ownership-scoped typed search shared by API transports. */
 class TypedSearchService
 {
-    public function __construct(private EmbeddingService $embeddings) {}
+    public function __construct(private EmbeddingClient $embeddings) {}
 
     /** @return Collection<int, Event|EventObject|Block> */
     public function search(User $user, string $type, string $query, bool $semantic, int $limit, array $filters = []): Collection

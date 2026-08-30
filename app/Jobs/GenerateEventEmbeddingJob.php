@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Event;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -45,7 +45,7 @@ class GenerateEventEmbeddingJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(EmbeddingService $embeddingService): void
+    public function handle(EmbeddingClient $embeddingService): void
     {
         try {
             // Get searchable text from event
@@ -74,7 +74,7 @@ class GenerateEventEmbeddingJob implements ShouldQueue
             // Use withoutEvents() to prevent observers from triggering on this internal update
             $this->event->withoutEvents(function () use ($embedding, $metadata) {
                 $this->event->update([
-                    'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                    'embeddings' => EmbeddingClient::formatForPostgres($embedding),
                     'event_metadata' => $metadata,
                 ]);
             });

@@ -4,13 +4,12 @@ namespace Tests\Unit\Services\Ai;
 
 use App\Services\Ai\AiModel;
 use RuntimeException;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AiModelTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function each_role_resolves_its_configured_model(): void
     {
         config([
@@ -24,9 +23,7 @@ class AiModelTest extends TestCase
         $this->assertSame('gpt-4o-mini', AiModel::Reasoning->model());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function a_role_follows_its_env_backed_config_key(): void
     {
         config(['services.openai.models.extraction' => 'some-other-model']);
@@ -34,9 +31,7 @@ class AiModelTest extends TestCase
         $this->assertSame('some-other-model', AiModel::Extraction->model());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function an_unconfigured_role_fails_loudly(): void
     {
         config(['services.openai.models.reasoning' => null]);
@@ -47,9 +42,7 @@ class AiModelTest extends TestCase
         AiModel::Reasoning->model();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function a_blank_role_is_treated_as_unconfigured(): void
     {
         config(['services.openai.models.extraction' => '   ']);

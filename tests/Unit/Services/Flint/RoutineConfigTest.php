@@ -3,13 +3,12 @@
 namespace Tests\Unit\Services\Flint;
 
 use App\Services\Flint\RoutineConfig;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class RoutineConfigTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function a_routine_uses_its_own_secret_when_it_has_one(): void
     {
         config([
@@ -20,9 +19,7 @@ class RoutineConfigTest extends TestCase
         $this->assertSame('topics-only', RoutineConfig::secret('topics'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function a_routine_without_its_own_secret_falls_back_to_the_shared_one(): void
     {
         config([
@@ -33,9 +30,7 @@ class RoutineConfigTest extends TestCase
         $this->assertSame('shared', RoutineConfig::secret('topics'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function routines_do_not_share_a_secret_once_each_sets_its_own(): void
     {
         config([
@@ -48,9 +43,7 @@ class RoutineConfigTest extends TestCase
         $this->assertSame('digest-only', RoutineConfig::secret('digest'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function an_unset_secret_resolves_to_null_rather_than_an_empty_string(): void
     {
         config([
@@ -61,9 +54,7 @@ class RoutineConfigTest extends TestCase
         $this->assertNull(RoutineConfig::secret('news_roundup'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function an_unset_url_resolves_to_null(): void
     {
         config(['services.flint_routine.routines.news_roundup.url' => null]);
@@ -71,9 +62,7 @@ class RoutineConfigTest extends TestCase
         $this->assertNull(RoutineConfig::url('news_roundup'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function only_known_routines_are_recognised(): void
     {
         $this->assertTrue(RoutineConfig::isKnown('digest'));

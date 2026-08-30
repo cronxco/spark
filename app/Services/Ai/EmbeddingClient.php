@@ -1,14 +1,13 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Ai;
 
-use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class EmbeddingService
+class EmbeddingClient
 {
     private ?string $apiKey;
 
@@ -194,6 +193,11 @@ class EmbeddingService
                 $headers['OpenAI-Organization'] = $this->organization;
             }
 
+            $span = start_ai_request_span($this->model, array_map(
+                fn (string $text) => ['role' => 'user', 'content' => $text],
+                array_values($truncatedTexts)
+            ), []);
+
             $response = Http::withHeaders($headers)
                 ->timeout(30)
                 ->retry(3, 1000)
@@ -202,6 +206,8 @@ class EmbeddingService
                     'model' => $this->model,
                     'dimensions' => $this->dimensions,
                 ]);
+
+            finish_ai_request_span($span, $response->json('usage') ?? []);
 
             if (! $response->successful()) {
                 Log::error('OpenAI API error', [
