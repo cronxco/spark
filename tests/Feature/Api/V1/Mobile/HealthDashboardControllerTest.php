@@ -229,6 +229,32 @@ class HealthDashboardControllerTest extends TestCase
             ->assertJsonPath('insights.0.content', 'Health insight 1');
     }
 
+    #[Test]
+    public function insights_are_returned_chronologically_regardless_of_insert_order(): void
+    {
+        $flint = $this->event('flint', 'had_summary', null, null, '2026-05-18 12:00:00');
+
+        // Inserted newest first, so row order and chronological order differ.
+        foreach ([4, 3, 2, 1] as $i) {
+            Block::factory()->create([
+                'event_id' => $flint->id,
+                'block_type' => 'flint_health_insight',
+                'title' => "Insight {$i}",
+                'metadata' => ['content' => "Health insight {$i}"],
+                'time' => Carbon::parse("2026-05-18 12:0{$i}:00"),
+            ]);
+        }
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
+            ->assertOk()
+            ->assertJsonCount(3, 'insights')
+            ->assertJsonPath('insights.0.title', 'Insight 1')
+            ->assertJsonPath('insights.1.title', 'Insight 2')
+            ->assertJsonPath('insights.2.title', 'Insight 3');
+    }
+
     private function integration(string $service): Integration
     {
         $group = IntegrationGroup::factory()->create([
