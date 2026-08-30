@@ -100,9 +100,20 @@ class DailyDigestReady extends Notification implements ShouldQueue
         }
 
         $firstLine = trim(Str::before(trim($this->summary), "\n"));
+
+        // `before('. ')` returns the whole line when there is no sentence break,
+        // so the result may already carry its own terminal punctuation.
         $firstSentence = Str::of($firstLine)->before('. ')->trim()->toString();
 
-        return Str::limit($firstSentence !== '' ? $firstSentence . '.' : $firstLine, 160);
+        if ($firstSentence === '') {
+            return Str::limit($firstLine, 160);
+        }
+
+        if (! Str::endsWith($firstSentence, ['.', '!', '?'])) {
+            $firstSentence .= '.';
+        }
+
+        return Str::limit($firstSentence, 160);
     }
 
     private function digestUrl(): string

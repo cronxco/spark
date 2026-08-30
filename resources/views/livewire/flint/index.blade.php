@@ -353,7 +353,7 @@ new class extends Component {
 
                                 @if ($summary = $digest->event_metadata['summary'] ?? null)
                                     <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90">
-                                        {!! Str::markdown($summary) !!}
+                                        {!! Str::markdown($summary, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
                                     </div>
                                 @endif
 
@@ -597,7 +597,7 @@ new class extends Component {
 
                                 @if ($topic->content)
                                     <div class="prose prose-sm max-w-none text-base-content/80 {{ $expandedTopicId === $topic->id ? '' : 'line-clamp-3' }}">
-                                        {!! Str::markdown($topic->content) !!}
+                                        {!! Str::markdown($topic->content, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
                                     </div>
                                 @endif
 

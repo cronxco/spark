@@ -122,6 +122,56 @@ class NotificationTest extends TestCase
     }
 
     #[Test]
+    public function the_push_headline_does_not_double_up_terminal_punctuation(): void
+    {
+        Notification::fake();
+
+        // `Str::before('. ')` hands back the whole line when the summary is a
+        // single sentence, so it already carries its own full stop.
+        $this->createDigest('evening', ['summary' => 'Your evening summary.']);
+
+        $this->runJob($this->user, '18:00');
+
+        Notification::assertSentTo(
+            [$this->user],
+            DailyDigestReady::class,
+            fn (DailyDigestReady $notification) => $notification->toArray($this->user)['headline'] === 'Your evening summary.',
+        );
+    }
+
+    #[Test]
+    public function the_push_headline_takes_the_first_sentence_of_a_longer_summary(): void
+    {
+        Notification::fake();
+
+        $this->createDigest('evening', ['summary' => 'You ran 5k. Then you slept badly. Tomorrow is quieter.']);
+
+        $this->runJob($this->user, '18:00');
+
+        Notification::assertSentTo(
+            [$this->user],
+            DailyDigestReady::class,
+            fn (DailyDigestReady $notification) => $notification->toArray($this->user)['headline'] === 'You ran 5k.',
+        );
+    }
+
+    #[Test]
+    public function the_push_headline_leaves_other_terminal_punctuation_alone(): void
+    {
+        Notification::fake();
+
+        $this->createDigest('evening', ['summary' => 'You hit a new 5k PB!']);
+
+        $this->runJob($this->user, '18:00');
+
+        Notification::assertSentTo(
+            [$this->user],
+            DailyDigestReady::class,
+            fn (DailyDigestReady $notification) => $notification->toArray($this->user)['headline'] === 'You hit a new 5k PB!',
+        );
+    }
+
+    #[Test]
     public function it_counts_unanswered_questions_for_the_notification(): void
     {
         Notification::fake();

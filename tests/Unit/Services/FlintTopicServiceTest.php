@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\FlintTopicService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Feature\Mcp\ManageFlintTopicToolTest;
 use Tests\TestCase;
@@ -184,6 +185,33 @@ class FlintTopicServiceTest extends TestCase
         $this->assertSame('strategic', $topic->metadata['kind']);
         $this->assertSame('dormant', $topic->metadata['status']);
         $this->assertNotNull($topic->metadata['last_touched_at']);
+    }
+
+    #[Test]
+    public function update_refuses_to_blank_the_title(): void
+    {
+        $topic = $this->topic('Canada trip 2027');
+
+        foreach (['', '   '] as $blank) {
+            try {
+                $this->service->update($this->user, $topic->id, ['title' => $blank]);
+                $this->fail('Expected a blank title to be rejected.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('title', $exception->errors());
+            }
+        }
+
+        $this->assertSame('Canada trip 2027', $topic->refresh()->title);
+    }
+
+    #[Test]
+    public function update_may_still_omit_the_title_entirely(): void
+    {
+        $topic = $this->topic('Canada trip 2027');
+
+        $this->service->update($this->user, $topic->id, ['status' => 'dormant']);
+
+        $this->assertSame('Canada trip 2027', $topic->refresh()->title);
     }
 
     private function topic(string $title, array $metadata = []): EventObject

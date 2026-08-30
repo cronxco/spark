@@ -108,6 +108,25 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
+    public function it_strips_raw_html_from_rendered_digest_and_topic_markdown(): void
+    {
+        // The digest summary is written from newsletters, bookmarks and fetched
+        // pages, so raw HTML reaching it is attacker-influenced.
+        $this->createDigest([
+            'title' => 'Scripted digest',
+            'summary' => 'Morning. <script>alert(1)</script> [click](javascript:alert(2))',
+        ]);
+        $this->createTopic(['status' => 'active'], 'Scripted topic');
+
+        $rendered = Volt::test('flint.index')
+            ->set('activeTab', 'today')
+            ->html();
+
+        $this->assertStringNotContainsString('<script>', $rendered);
+        $this->assertStringNotContainsString('javascript:alert', $rendered);
+    }
+
+    #[Test]
     public function it_can_switch_to_an_older_digest(): void
     {
         $this->createDigest(

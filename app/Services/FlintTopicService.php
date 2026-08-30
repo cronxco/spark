@@ -228,7 +228,9 @@ class FlintTopicService
     private function rules(bool $creating = false): array
     {
         return [
-            'title' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
+            // `sometimes` + `required` so an update may omit the title, but may not
+            // blank it — the title is the topic's only identifier in the UI.
+            'title' => $creating ? ['required', 'string', 'max:255'] : ['sometimes', 'required', 'string', 'max:255'],
             'content' => ['sometimes', 'nullable', 'string', 'max:20000'],
             'kind' => [$creating ? 'required' : 'sometimes', Rule::in(['strategic', 'thematic', 'tactical'])],
             'status' => ['sometimes', Rule::in(['active', 'dormant', 'resolved', 'expired'])],

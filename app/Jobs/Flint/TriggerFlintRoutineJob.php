@@ -192,6 +192,8 @@ class TriggerFlintRoutineJob implements ShouldQueue
     {
         $endOfDay = Carbon::parse($this->localDate, $this->timezone)->endOfDay();
 
-        return max(60, now()->diffInSeconds($endOfDay, false));
+        // Carbon 3 returns a signed float here, which max() propagates into this
+        // method's int return type — cast rather than rely on implicit conversion.
+        return max(60, (int) now()->diffInSeconds($endOfDay, false));
     }
 }
