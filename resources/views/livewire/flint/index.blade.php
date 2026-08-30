@@ -6,7 +6,13 @@ use App\Services\AgentWorkingMemoryService;
 use App\Services\FlintTopicService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
+use App\Jobs\Flint\TriggerFlintRoutineJob;
+use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\Routines\RoutineDriverManager;
+use App\Services\Flint\RoutineConfig;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -267,6 +273,38 @@ new class extends Component {
     public function feedbackStats(): array
     {
         return app(AgentWorkingMemoryService::class)->getFeedbackStatistics(Auth::id());
+    }
+
+    /**
+     * Run one routine now rather than waiting for its daily slot. Goes through
+     * the same job the scheduler uses, so the driver, idempotency marker and
+     * TaskExecution recording are identical — only the slot gate is bypassed.
+     */
+    #[On('run-flint-routine')]
+    public function runRoutine(string $routine, string $period = 'morning'): void
+    {
+        if (! RoutineConfig::isKnown($routine)) {
+            $this->error(__('Unknown Flint routine.'));
+
+            return;
+        }
+
+        $user = Auth::user();
+        $timezones = app(EffectiveTimezoneResolver::class);
+        $timezone = $timezones->timezoneFor($user);
+        $date = $timezones->today($user)->toDateString();
+
+        $job = $routine === 'digest'
+            ? new TriggerFlintDigestRoutineJob($user, $period, $date, $timezone, 'manual', null, true)
+            : new TriggerFlintRoutineJob($user, $routine, $date, $timezone, true);
+
+        dispatch($job)->onQueue('flint');
+
+        $driver = app(RoutineDriverManager::class)->driverName($routine);
+        $this->success(__('Queued the :routine routine via the :driver driver.', [
+            'routine' => str_replace('_', ' ', $routine),
+            'driver' => $driver,
+        ]));
     }
 
     public function save(): void
@@ -892,6 +930,31 @@ new class extends Component {
                         </div>
                     </div>
                 @endif
+
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold">{{ __('Run now') }}</h3>
+                        <p class="text-sm opacity-70 mb-4">
+                            {{ __('Runs a routine immediately instead of waiting for its slot. It goes through the same path as a scheduled run, so results appear exactly as they normally would.') }}
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ([
+                                'digest' => __('Digest'),
+                                'topics' => __('Topics'),
+                                'reading_list' => __('Reading list'),
+                                'news_roundup' => __('News roundup'),
+                            ] as $routineKey => $routineLabel)
+                                <x-button
+                                    wire:key="run-{{ $routineKey }}"
+                                    wire:click="runRoutine('{{ $routineKey }}')"
+                                    spinner="runRoutine('{{ $routineKey }}')"
+                                    class="btn-outline btn-sm"
+                                    icon="fas.play"
+                                    label="{{ $routineLabel }}" />
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
 
                 <div class="flex justify-end">
                     <x-button label="{{ __('Save Settings') }}" wire:click="save" class="btn-primary" spinner="save" />

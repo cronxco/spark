@@ -45,6 +45,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         public string $timezone,
         public string $triggerReason,
         public ?string $sleepScoreEventId = null,
+        public bool $force = false,
     ) {}
 
     /**
@@ -60,7 +61,9 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     {
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->period);
 
-        if (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
+        if ($this->force) {
+            Cache::put($markerKey, true, $this->markerTtlSeconds());
+        } elseif (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
             Log::info('Flint routine trigger skipped (already triggered)', [
                 'user_id' => $this->user->id,
                 'period' => $this->period,
@@ -70,7 +73,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             return;
         }
 
-        if ($this->digestAlreadyExists()) {
+        if (! $this->force && $this->digestAlreadyExists()) {
             Log::info('Flint routine trigger skipped (digest already exists)', [
                 'user_id' => $this->user->id,
                 'period' => $this->period,

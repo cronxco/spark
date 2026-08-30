@@ -48,6 +48,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         public string $routine,
         public string $localDate,
         public string $timezone,
+        public bool $force = false,
     ) {}
 
     /**
@@ -75,7 +76,11 @@ class TriggerFlintRoutineJob implements ShouldQueue
         $driver = app(RoutineDriverManager::class);
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
 
-        if (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
+        // A forced run is someone asking for this routine now, so it claims the
+        // day's marker rather than deferring to it.
+        if ($this->force) {
+            Cache::put($markerKey, true, $this->markerTtlSeconds());
+        } elseif (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
             Log::info('Flint routine trigger skipped (already triggered)', [
                 'user_id' => $this->user->id,
                 'routine' => $this->routine,
@@ -91,7 +96,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         // local date it was for.
         $lastSuccess = $store->getTaskExecutions($integration)[$task->key]['last_success'] ?? null;
 
-        if (is_array($lastSuccess) && ($lastSuccess['local_date'] ?? null) === $this->localDate) {
+        if (! $this->force && is_array($lastSuccess) && ($lastSuccess['local_date'] ?? null) === $this->localDate) {
             Log::info('Flint routine trigger skipped (already succeeded for this local date)', [
                 'user_id' => $this->user->id,
                 'routine' => $this->routine,
@@ -103,6 +108,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
         $store->recordStatus($integration, $task, 'pending', [
             'local_date' => $this->localDate,
+            'triggered_by' => $this->force ? 'manual' : 'scheduled',
             'error' => null,
         ]);
 
@@ -138,6 +144,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
         $store->recordStatus($integration, $task, 'success', [
             'local_date' => $this->localDate,
+            'triggered_by' => $this->force ? 'manual' : 'scheduled',
         ] + $result->details);
 
         Log::info('Flint routine triggered', [
