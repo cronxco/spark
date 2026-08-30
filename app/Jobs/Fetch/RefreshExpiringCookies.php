@@ -9,13 +9,13 @@ use App\Notifications\CookiesAutoRefreshed;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
-use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class RefreshExpiringCookies implements ShouldQueue
 {
@@ -160,7 +160,7 @@ class RefreshExpiringCookies implements ShouldQueue
                             'error' => $result['error'] ?? 'Unknown error',
                         ]);
                     }
-                } catch (Exception $e) {
+                } catch (Throwable $e) {
                     $store->recordStatus($webpage, $task, 'failed', [
                         'domain' => $domain,
                         'error' => $e->getMessage(),
@@ -171,6 +171,8 @@ class RefreshExpiringCookies implements ShouldQueue
                         'url' => $webpage->url,
                         'error' => $e->getMessage(),
                     ]);
+
+                    throw $e;
                 }
             }
         }

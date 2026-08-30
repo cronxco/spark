@@ -11,7 +11,9 @@ use App\Models\User;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class SlackEventsHookTest extends TestCase
@@ -319,5 +321,52 @@ class SlackEventsHookTest extends TestCase
 
         $this->assertSame('success', $execution->status);
         $this->assertSame($this->user->id, $execution->user_id);
+    }
+
+    #[Test]
+    public function successful_status_persistence_failure_does_not_redispatch_child_jobs(): void
+    {
+        Queue::fake();
+
+        $payload = [
+            'type' => 'event_callback',
+            'team_id' => 'T123456',
+            'event_id' => 'Ev123456',
+            'event' => [
+                'type' => 'message',
+                'user' => 'U123456',
+                'text' => 'Hello world',
+                'ts' => 1609459200.000100,
+                'channel' => 'C123456',
+            ],
+        ];
+
+        $timestamp = time();
+        $signature = 'v0='.hash_hmac(
+            'sha256',
+            "v0:{$timestamp}:".json_encode($payload),
+            $this->integration->account_id,
+        );
+
+        $store = Mockery::mock(TaskExecutionStore::class);
+        $calls = 0;
+        $store->shouldReceive('recordStatus')
+            ->twice()
+            ->andReturnUsing(function () use (&$calls): array {
+                $calls++;
+
+                if ($calls === 2) {
+                    throw new RuntimeException('Status storage unavailable');
+                }
+
+                return [];
+            });
+
+        (new SlackEventsHook($payload, [
+            'x-slack-signature' => [$signature],
+            'x-slack-request-timestamp' => [$timestamp],
+        ], $this->integration))->handle($store);
+
+        Queue::assertPushed(SlackEventsData::class, 1);
     }
 }
