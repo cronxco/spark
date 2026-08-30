@@ -19,6 +19,7 @@ use App\Mcp\Tools\GetMetricTrendTool;
 use App\Mcp\Tools\GetObjectTool;
 use App\Mcp\Tools\GetServiceStatusTool;
 use App\Mcp\Tools\ListIntegrationsTool;
+use App\Mcp\Tools\ManageFlintTopicTool;
 use App\Mcp\Tools\ManageRelationshipTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
@@ -94,10 +95,11 @@ class SparkServer extends Server
         - `update-entity`: Safely make non-destructive edits to an owned event, object, or block.
         - `manage-relationship`: List, create, or delete an owned relationship.
 
-        ### Flint Digest
+        ### Flint
         - `create-flint-digest`: Create a Flint digest event with an optional array of blocks. Requires `flint:write`. Supports `flint_user_question` (questions for the user with optional multiple-choice), `flint_editorial_note` (AI commentary), and any other `flint_*` block type. Returns event_id and block_ids.
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
         - `answer-flint-question`: Record the user's answer to a Flint question.
+        - `manage-flint-topic`: Create, update, or list persistent Flint Topics. Topics track strategic, thematic, and tactical threads, and may link digest events or blocks that discussed them.
 
         ### Web Fetching
         - `fetch-webpage-html`: Render a URL with Playwright and return its raw HTML. Uses saved Fetch cookies for the target domain when available and persists refreshed cookies. HTML is capped at 1 MB.
@@ -142,6 +144,7 @@ class SparkServer extends Server
         CreateFlintDigestTool::class,
         GetLatestFlintDigestTool::class,
         AnswerFlintQuestionTool::class,
+        ManageFlintTopicTool::class,
         FetchWebpageHtmlTool::class,
     ];
 

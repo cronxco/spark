@@ -344,9 +344,15 @@ class FlintPlugin extends ManualPlugin
         ];
     }
 
-    // No object types needed (assistant doesn't create objects)
     public static function getObjectTypes(): array
     {
-        return [];
+        return [
+            'topic' => [
+                'icon' => 'fas.compass',
+                'display_name' => 'Topic',
+                'description' => 'A long-lived thing Flint is tracking — strategic, thematic, or tactical',
+                'hidden' => false,
+            ],
+        ];
     }
 }
