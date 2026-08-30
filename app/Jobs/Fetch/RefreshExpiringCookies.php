@@ -6,6 +6,8 @@ use App\Integrations\Fetch\PlaywrightFetchClient;
 use App\Models\EventObject;
 use App\Models\IntegrationGroup;
 use App\Notifications\CookiesAutoRefreshed;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -21,7 +23,7 @@ class RefreshExpiringCookies implements ShouldQueue
 
     public $tries = 1;
 
-    public function handle(): void
+    public function handle(TaskExecutionStore $store): void
     {
         $thresholdDays = config('services.playwright.cookie_refresh_threshold_days', 7);
 
@@ -94,6 +96,13 @@ class RefreshExpiringCookies implements ShouldQueue
                     continue;
                 }
 
+                $task = $this->taskDefinition($group);
+
+                $store->recordStatus($webpage, $task, 'pending', [
+                    'domain' => $domain,
+                    'days_until_expiry' => $daysUntilExpiry,
+                ], $this);
+
                 // Attempt to refresh cookies using Playwright
                 try {
                     $client = new PlaywrightFetchClient;
@@ -130,18 +139,33 @@ class RefreshExpiringCookies implements ShouldQueue
 
                         $refreshedCount++;
 
+                        $store->recordStatus($webpage, $task, 'success', [
+                            'domain' => $domain,
+                            'cookie_count' => count($result['cookies'] ?? []),
+                        ], $this);
+
                         Log::info('Fetch: Successfully refreshed cookies', [
                             'domain' => $domain,
                             'cookie_count' => count($result['cookies'] ?? []),
                             'user_id' => $group->user_id,
                         ]);
                     } else {
+                        $store->recordStatus($webpage, $task, 'failed', [
+                            'domain' => $domain,
+                            'error' => $result['error'] ?? 'Unknown error',
+                        ], $this);
+
                         Log::warning('Fetch: Failed to refresh cookies', [
                             'domain' => $domain,
                             'error' => $result['error'] ?? 'Unknown error',
                         ]);
                     }
                 } catch (Exception $e) {
+                    $store->recordStatus($webpage, $task, 'failed', [
+                        'domain' => $domain,
+                        'error' => $e->getMessage(),
+                    ], $this);
+
                     Log::error('Fetch: Exception during cookie refresh', [
                         'domain' => $domain,
                         'url' => $webpage->url,
@@ -154,5 +178,17 @@ class RefreshExpiringCookies implements ShouldQueue
         Log::info('Fetch: Cookie auto-refresh job completed', [
             'refreshed_count' => $refreshedCount,
         ]);
+    }
+
+    private function taskDefinition(IntegrationGroup $group): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: "refresh_expiring_cookies_group_{$group->id}",
+            name: 'Refresh Expiring Cookies',
+            description: 'Automatically refreshes fetch cookies before they expire.',
+            jobClass: self::class,
+            appliesTo: ['object'],
+            queue: 'fetch',
+        );
     }
 }

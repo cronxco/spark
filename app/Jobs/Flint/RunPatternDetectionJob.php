@@ -2,8 +2,11 @@
 
 namespace App\Jobs\Flint;
 
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\AgentOrchestrationService;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,8 +29,20 @@ class RunPatternDetectionJob implements ShouldQueue
 
     public function __construct(public User $user) {}
 
-    public function handle(AgentOrchestrationService $orchestration): void
+    public function handle(AgentOrchestrationService $orchestration, TaskExecutionStore $store): void
     {
+        $integration = Integration::where('user_id', $this->user->id)
+            ->where('service', 'flint')
+            ->first();
+
+        if (! $integration) {
+            Log::warning('Pattern detection: no Flint integration found for user, skipping task execution tracking', [
+                'user_id' => $this->user->id,
+            ]);
+        }
+
+        $task = $this->taskDefinition();
+
         $transactionContext = new TransactionContext;
         $transactionContext->setName('flint.pattern_detection');
         $transactionContext->setOp('job');
@@ -49,6 +64,10 @@ class RunPatternDetectionJob implements ShouldQueue
                 'user_id' => $this->user->id,
             ]);
 
+            if ($integration) {
+                $store->recordStatus($integration, $task, 'pending');
+            }
+
             $patterns = $orchestration->runPatternDetection($this->user);
 
             $transaction->setData([
@@ -58,6 +77,12 @@ class RunPatternDetectionJob implements ShouldQueue
             ]);
 
             $transaction->finish();
+
+            if ($integration) {
+                $store->recordStatus($integration, $task, 'success', [
+                    'patterns_detected' => count($patterns),
+                ]);
+            }
 
             Log::info('Pattern detection completed', [
                 'user_id' => $this->user->id,
@@ -69,6 +94,12 @@ class RunPatternDetectionJob implements ShouldQueue
 
             \Sentry\captureException($e);
 
+            if ($integration) {
+                $store->recordStatus($integration, $task, 'failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             Log::error('Pattern detection failed', [
                 'user_id' => $this->user->id,
                 'error' => $e->getMessage(),
@@ -76,5 +107,17 @@ class RunPatternDetectionJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    private function taskDefinition(): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: 'flint_pattern_detection',
+            name: 'Flint Pattern Detection',
+            description: 'Weekly pattern detection across the user\'s Flint data.',
+            jobClass: self::class,
+            appliesTo: ['integration'],
+            queue: 'flint',
+        );
     }
 }

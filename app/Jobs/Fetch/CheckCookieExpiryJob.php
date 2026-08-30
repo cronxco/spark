@@ -4,6 +4,8 @@ namespace App\Jobs\Fetch;
 
 use App\Models\IntegrationGroup;
 use App\Notifications\CookieExpiryWarning;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -21,7 +23,7 @@ class CheckCookieExpiryJob implements ShouldQueue
 
     public $timeout = 300; // 5 minutes
 
-    public function handle(): void
+    public function handle(TaskExecutionStore $store): void
     {
         Log::info('CheckCookieExpiryJob: Starting cookie expiry check');
 
@@ -66,6 +68,11 @@ class CheckCookieExpiryJob implements ShouldQueue
                 try {
                     $expiresAt = Carbon::parse($domainConfig['expires_at']);
                 } catch (Exception $e) {
+                    $store->recordStatus($group, $this->taskDefinition($domain), 'failed', [
+                        'domain' => $domain,
+                        'error' => 'Invalid expiry date: ' . $e->getMessage(),
+                    ]);
+
                     Log::warning('CheckCookieExpiryJob: Invalid expiry date', [
                         'domain' => $domain,
                         'expires_at' => $domainConfig['expires_at'],
@@ -95,6 +102,14 @@ class CheckCookieExpiryJob implements ShouldQueue
                     continue;
                 }
 
+                $task = $this->taskDefinition($domain);
+
+                $store->recordStatus($group, $task, 'pending', [
+                    'domain' => $domain,
+                    'threshold' => $threshold,
+                    'days_until_expiry' => $daysUntilExpiry,
+                ]);
+
                 // Initialize tracking for this domain if needed
                 if (! isset($authMetadata['cookie_notifications_sent'][$domain])) {
                     $authMetadata['cookie_notifications_sent'][$domain] = [];
@@ -103,6 +118,13 @@ class CheckCookieExpiryJob implements ShouldQueue
                 // Check if we've already sent this threshold notification today
                 $lastSent = $authMetadata['cookie_notifications_sent'][$domain][$threshold] ?? null;
                 if ($lastSent && Carbon::parse($lastSent)->isToday()) {
+                    $store->recordStatus($group, $task, 'success', [
+                        'domain' => $domain,
+                        'threshold' => $threshold,
+                        'days_until_expiry' => $daysUntilExpiry,
+                        'notification_sent' => false,
+                    ]);
+
                     Log::debug('CheckCookieExpiryJob: Already sent notification today', [
                         'domain' => $domain,
                         'threshold' => $threshold,
@@ -113,13 +135,20 @@ class CheckCookieExpiryJob implements ShouldQueue
 
                 // Send notification
                 $group->user->notify(
-                    new CookieExpiryWarning($domain, $expiresAt, $daysUntilExpiry)
+                    new CookieExpiryWarning($group, $domain, $expiresAt->toIso8601String(), $daysUntilExpiry)
                 );
 
                 // Record that we sent this notification
                 $authMetadata['cookie_notifications_sent'][$domain][$threshold] = $now->toIso8601String();
                 $updatedMetadata = true;
                 $notificationsSent++;
+
+                $store->recordStatus($group, $task, 'success', [
+                    'domain' => $domain,
+                    'threshold' => $threshold,
+                    'days_until_expiry' => $daysUntilExpiry,
+                    'notification_sent' => true,
+                ]);
 
                 Log::info('CheckCookieExpiryJob: Sent cookie expiry notification', [
                     'domain' => $domain,
@@ -140,5 +169,17 @@ class CheckCookieExpiryJob implements ShouldQueue
             'groups_checked' => $groups->count(),
             'notifications_sent' => $notificationsSent,
         ]);
+    }
+
+    private function taskDefinition(string $domain): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: 'check_cookie_expiry_' . str_replace('.', '_', $domain),
+            name: "Check Cookie Expiry: {$domain}",
+            description: 'Warns the user before fetch cookies for a domain expire.',
+            jobClass: self::class,
+            appliesTo: ['integration_group'],
+            queue: 'fetch',
+        );
     }
 }

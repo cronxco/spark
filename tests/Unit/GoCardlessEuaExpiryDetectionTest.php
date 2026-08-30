@@ -9,11 +9,14 @@ use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
 use App\Jobs\OAuth\GoCardless\GoCardlessTransactionPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\TaskExecution;
 use App\Models\User;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GoCardlessEuaExpiryDetectionTest extends TestCase
@@ -201,9 +204,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         $this->assertArrayHasKey('summary', $exception->getErrorResponse());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function handle_expired_eua_job_marks_group_as_expired(): void
     {
         $job = new HandleExpiredEuaJob(
@@ -215,7 +216,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
             ]
         );
 
-        $job->handle();
+        $job->handle(app(TaskExecutionStore::class));
 
         $this->group->refresh();
         $this->assertTrue($this->group->auth_metadata['eua_expired'] ?? false);
@@ -223,9 +224,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         $this->assertNotNull($this->group->auth_metadata['eua_expired_at'] ?? null);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function handle_expired_eua_job_pauses_integrations(): void
     {
         $job = new HandleExpiredEuaJob(
@@ -234,9 +233,30 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
             ['summary' => 'End User Agreement (EUA) has expired']
         );
 
-        $job->handle();
+        $job->handle(app(TaskExecutionStore::class));
 
         $this->integration->refresh();
         $this->assertTrue($this->integration->configuration['paused'] ?? false);
+    }
+
+    #[Test]
+    public function handle_expired_eua_job_records_a_successful_task_execution_anchored_to_the_group(): void
+    {
+        $job = new HandleExpiredEuaJob(
+            $this->group->id,
+            '7df396d0-844e-41cd-bc32-e62b7f65b154',
+            ['summary' => 'End User Agreement (EUA) has expired']
+        );
+
+        $job->handle(app(TaskExecutionStore::class));
+
+        $execution = TaskExecution::where('entity_type', 'integration_group')
+            ->where('entity_id', $this->group->id)
+            ->where('task_key', 'handle_expired_eua')
+            ->firstOrFail();
+
+        $this->assertSame('success', $execution->status);
+        $this->assertSame(1, $execution->last_success['paused_count']);
+        $this->assertSame($this->user->id, $execution->user_id);
     }
 }
