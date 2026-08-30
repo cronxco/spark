@@ -36,10 +36,7 @@ class FlintDigestService
 
         $date = Carbon::parse($data['date'] ?? now()->toDateString())->startOfDay();
         $period = $data['period'] ?? $this->inferPeriod();
-        $integration = Integration::firstOrCreate(
-            ['user_id' => $user->id, 'service' => 'flint', 'instance_type' => 'digest'],
-            ['name' => 'Flint Digest', 'active' => true],
-        );
+        $integration = $this->resolveIntegration($user);
         $digest = $this->resolveDigestObject($user, $period, $date);
         $actor = EventObject::firstOrCreate(
             ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
@@ -63,6 +60,22 @@ class FlintDigestService
         }
 
         return ['event_id' => $event->id, 'digest_object_id' => $digest->id, 'date' => $date->toDateString(), 'period' => $period, 'title' => $data['title'], 'block_count' => count($ids), 'block_ids' => $ids];
+    }
+
+    /**
+     * Resolves (or creates) the user's Flint digest Integration.
+     *
+     * Shared between digest creation and the routine trigger jobs so both sides
+     * resolve to the exact same row via firstOrCreate — the trigger jobs anchor
+     * their TaskExecution rows here, and an anchor that only exists once a
+     * digest has landed would go dark on exactly the runs worth seeing.
+     */
+    public function resolveIntegration(User $user): Integration
+    {
+        return Integration::firstOrCreate(
+            ['user_id' => $user->id, 'service' => 'flint', 'instance_type' => 'digest'],
+            ['name' => 'Flint Digest', 'active' => true],
+        );
     }
 
     /**

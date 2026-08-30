@@ -239,6 +239,17 @@ return [
         'morning_time_weekend' => env('FLINT_MORNING_WEEKEND', '09:30'),
         'evening_time' => env('FLINT_EVENING_TIME', '19:30'),
         'morning_fallback' => env('FLINT_MORNING_FALLBACK', '11:00'),
+
+        // The once-daily Flint routines beyond the digest. Each has its own
+        // webhook so it can be a separate Claude Code Routine; leaving a URL
+        // unset simply means Spark never fires that routine. Default slot times
+        // are user-overridable from the Flint settings tab.
+        'topics_url' => env('FLINT_TOPICS_WEBHOOK_URL'),
+        'topics_time' => env('FLINT_TOPICS_TIME', '21:00'),
+        'reading_list_url' => env('FLINT_READING_LIST_WEBHOOK_URL'),
+        'reading_list_time' => env('FLINT_READING_LIST_TIME', '20:00'),
+        'news_roundup_url' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_URL'),
+        'news_roundup_time' => env('FLINT_NEWS_ROUNDUP_TIME', '07:00'),
     ],
 
 ];

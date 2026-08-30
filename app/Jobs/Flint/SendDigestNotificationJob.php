@@ -2,11 +2,13 @@
 
 namespace App\Jobs\Flint;
 
-use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\FlintDigestService;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -20,6 +22,20 @@ use Sentry\State\Scope;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 
+/**
+ * Notifies the user that a Flint digest has landed.
+ *
+ * Dispatched by NotifyOnDigestReadyTask on creation of a `flint/had_summary`
+ * event, so it reads that event directly: the title and summary prose live in
+ * `event_metadata`, written by the routine through the create-flint-digest
+ * MCP tool.
+ *
+ * Records TaskExecution rows against the user's Flint integration, alongside the
+ * dispatch side's rows, so /admin/task-pipeline shows whether a digest was
+ * actually announced. The "no digest found" case is recorded as not_applicable
+ * rather than returning silently — that was the failure mode that hid this job
+ * looking for block types the routine never writes.
+ */
 class SendDigestNotificationJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -35,8 +51,12 @@ class SendDigestNotificationJob implements ShouldQueue
         public ?string $digestEventId = null,
     ) {}
 
-    public function handle(): void
+    public function handle(FlintDigestService $digests, TaskExecutionStore $store): void
     {
+        $integration = $digests->resolveIntegration($this->user);
+        $task = $this->taskDefinition();
+        $period = $this->period ?? $this->getDigestPeriod($this->scheduleTime);
+
         $transactionContext = new TransactionContext;
         $transactionContext->setName('flint.send_digest_notification');
         $transactionContext->setOp('job');
@@ -54,53 +74,19 @@ class SendDigestNotificationJob implements ShouldQueue
         });
 
         try {
-            $period = $this->period ?? $this->getDigestPeriod($this->scheduleTime);
+            $digest = $this->findDigest($period);
 
-            Log::info('Sending digest notification', [
-                'user_id' => $this->user->id,
-                'schedule_time' => $this->scheduleTime,
-                'period' => $period,
-            ]);
-
-            // Find the most recent digest block for this user's *effective-timezone*
-            // local day, not the server (UTC) day. The digest `had_summary` event is
-            // stored with `time` anchored at the local date's 00:00 UTC marker (see
-            // CreateFlintDigestTool), so we bound the query by that same local date in
-            // UTC. Using a server-tz day boundary would wrongly drop a far-west user's
-            // digest once UTC rolls past midnight. If that storage ever moves to a real
-            // `now()` instant, these bounds must be revisited.
-            $localDate = app(EffectiveTimezoneResolver::class)->today($this->user)->toDateString();
-            $dayStartUtc = Carbon::parse($localDate, 'UTC')->startOfDay();
-            $dayEndUtc = Carbon::parse($localDate, 'UTC')->endOfDay();
-            $analysisStartUtc = Carbon::parse($localDate, app(EffectiveTimezoneResolver::class)->timezoneFor($this->user))->startOfDay()->utc();
-            $analysisEndUtc = Carbon::parse($localDate, app(EffectiveTimezoneResolver::class)->timezoneFor($this->user))->endOfDay()->utc();
-
-            $digestBlock = Block::whereIn('block_type', ['flint_summarised_headline', 'flint_digest'])
-                ->when($this->digestEventId, fn ($query) => $query->where('event_id', $this->digestEventId))
-                ->whereHas('event', function ($query) use ($dayStartUtc, $dayEndUtc, $analysisStartUtc, $analysisEndUtc) {
-                    $query->where('service', 'flint')
-                        ->whereHas('integration', function ($q) {
-                            $q->where('user_id', $this->user->id);
-                        })
-                        ->where(function ($query) use ($dayStartUtc, $dayEndUtc, $analysisStartUtc, $analysisEndUtc) {
-                            $query->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
-                                $query->where('action', 'had_summary')
-                                    ->whereBetween('time', [$dayStartUtc, $dayEndUtc]);
-                            })->orWhere(function ($query) use ($analysisStartUtc, $analysisEndUtc) {
-                                $query->where('action', 'had_analysis')
-                                    ->whereBetween('time', [$analysisStartUtc, $analysisEndUtc]);
-                            });
-                        });
-                })
-                ->with(['event.target'])
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if (! $digestBlock) {
-                Log::warning('No digest block found for notification', [
+            if (! $digest) {
+                Log::warning('No digest event found for notification', [
                     'user_id' => $this->user->id,
                     'schedule_time' => $this->scheduleTime,
                     'period' => $period,
+                ]);
+
+                $store->recordStatus($integration, $task, 'not_applicable', [
+                    'period' => $period,
+                    'reason' => 'No digest event found for this period.',
+                    'error' => null,
                 ]);
 
                 $transaction->setData([
@@ -114,45 +100,59 @@ class SendDigestNotificationJob implements ShouldQueue
                 return;
             }
 
-            // Get all blocks for this event (insights, actions, etc.)
-            $allBlocks = Block::where('event_id', $digestBlock->event_id)->get();
+            $metadata = $digest->event_metadata ?? [];
 
-            // Send notification (target is the day object)
             $this->user->notify(new DailyDigestReady(
-                digestObject: $digestBlock->event->target,
-                period: $period,
-                blocks: $allBlocks->toArray()
+                digestObject: $digest->target,
+                period: $metadata['period'] ?? $period,
+                title: $metadata['title'] ?? null,
+                summary: $metadata['summary'] ?? null,
+                unansweredQuestionCount: $digest->blocks
+                    ->where('block_type', 'flint_user_question')
+                    ->filter(fn ($block) => is_null($block->metadata['answer'] ?? null))
+                    ->count(),
             ));
 
-            // Mark digest as sent in metadata
-            $digestBlock->metadata = array_merge($digestBlock->metadata ?? [], [
+            // Record that the digest has been announced, so a re-run doesn't
+            // silently notify twice without a trace.
+            $digest->event_metadata = array_merge($metadata, [
                 'notification_sent_at' => now()->toIso8601String(),
-                'notification_period' => $period,
             ]);
-            $digestBlock->save();
+            $digest->save();
 
             $transaction->setData([
                 'user_id' => $this->user->id,
                 'schedule_time' => $this->scheduleTime,
                 'period' => $period,
-                'digest_block_id' => $digestBlock->id,
+                'digest_event_id' => $digest->id,
                 'digest_found' => true,
                 'notification_sent' => true,
             ]);
 
             $transaction->finish();
 
+            $store->recordStatus($integration, $task, 'success', [
+                'period' => $period,
+                'digest_event_id' => $digest->id,
+                'error' => null,
+            ]);
+
             Log::info('Digest notification sent', [
                 'user_id' => $this->user->id,
                 'schedule_time' => $this->scheduleTime,
                 'period' => $period,
-                'digest_block_id' => $digestBlock->id,
+                'digest_event_id' => $digest->id,
             ]);
         } catch (Exception $e) {
             $transaction->setStatus(SpanStatus::internalError());
             $transaction->finish();
 
             \Sentry\captureException($e);
+
+            $store->recordStatus($integration, $task, 'failed', [
+                'period' => $period,
+                'error' => $e->getMessage(),
+            ]);
 
             Log::error('Failed to send digest notification', [
                 'user_id' => $this->user->id,
@@ -175,5 +175,52 @@ class SendDigestNotificationJob implements ShouldQueue
         } else {
             return 'evening';
         }
+    }
+
+    /**
+     * Built inline rather than registered in TaskRegistry, matching the dispatch
+     * side. See docs/Architecture/TASK_PIPELINE.md.
+     */
+    private function taskDefinition(): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: 'flint_digest_notification',
+            name: 'Flint Digest Notification',
+            description: 'Announces a Flint digest once the routine has written it.',
+            jobClass: self::class,
+            appliesTo: ['integration'],
+            queue: 'flint',
+        );
+    }
+
+    /**
+     * The digest to announce: the event we were handed, else the most recent
+     * one for this period on the user's effective-local day.
+     *
+     * The `had_summary` event's `time` is anchored at the local date's 00:00
+     * UTC marker (see FlintDigestService), so the day is bounded in UTC against
+     * that same local date rather than a server-tz day.
+     */
+    private function findDigest(string $period): ?Event
+    {
+        $localDate = app(EffectiveTimezoneResolver::class)->today($this->user)->toDateString();
+
+        return Event::query()
+            ->whereIn('integration_id', $this->user->integrations()->pluck('id'))
+            ->where('service', 'flint')
+            ->where('action', 'had_summary')
+            ->when(
+                $this->digestEventId,
+                fn ($query) => $query->whereKey($this->digestEventId),
+                fn ($query) => $query
+                    ->whereJsonContains('event_metadata->period', $period)
+                    ->whereBetween('time', [
+                        Carbon::parse($localDate, 'UTC')->startOfDay(),
+                        Carbon::parse($localDate, 'UTC')->endOfDay(),
+                    ]),
+            )
+            ->with(['blocks', 'target'])
+            ->orderByDesc('created_at')
+            ->first();
     }
 }
