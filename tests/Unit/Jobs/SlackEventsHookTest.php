@@ -342,9 +342,9 @@ class SlackEventsHookTest extends TestCase
         ];
 
         $timestamp = time();
-        $signature = 'v0='.hash_hmac(
+        $signature = 'v0=' . hash_hmac(
             'sha256',
-            "v0:{$timestamp}:".json_encode($payload),
+            "v0:{$timestamp}:" . json_encode($payload),
             $this->integration->account_id,
         );
 
