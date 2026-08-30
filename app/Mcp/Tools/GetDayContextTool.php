@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Integration;
 use App\Services\AssistantContextService;
 use Carbon\Carbon;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class GetDayContextTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -35,6 +37,9 @@ class GetDayContextTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'insights:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

@@ -127,7 +127,7 @@ Available variables: `$value` (after value_multiplier), `$unit`
 - [Integration Plugins](docs/Architecture/INTEGRATION_PLUGINS.md) - Plugin system and implementation
 - [Jobs](docs/Architecture/JOBS.md) - Fetch and processing job architecture
 - [Scheduled Updates](docs/Architecture/SCHEDULED_INTEGRATION_UPDATES.md) - Automatic update system
-- [REST API](docs/Architecture/API.md) - External programmatic access
+- [REST API, Mobile API, and MCP](docs/API/README.md) - External programmatic access
 
 ### Advanced Features
 

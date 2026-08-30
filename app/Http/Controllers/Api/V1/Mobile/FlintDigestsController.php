@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
+use App\Services\FlintDigestService;
 use App\Support\EntityReferenceResolver;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -12,6 +13,13 @@ use Illuminate\Http\Request;
 
 class FlintDigestsController extends Controller
 {
+    public function __construct(private FlintDigestService $digests) {}
+
+    public function store(Request $request): JsonResponse
+    {
+        return response()->json($this->digests->create($request->user(), $request->all()), 201);
+    }
+
     /**
      * GET /api/v1/mobile/flint/digests?date=YYYY-MM-DD&period=morning&all=true
      *

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,12 +18,15 @@ class NotificationPreferencesController extends Controller
         'calendar_event',
     ];
 
+    public function __construct(private ResourceVersion $versions) {}
+
     /**
      * GET /api/v1/mobile/settings/notifications
      */
     public function show(Request $request): JsonResponse
     {
-        return response()->json($this->mobilePayload($request->user()->settings['notifications'] ?? []));
+        return response()->json($this->mobilePayload($request->user()->settings['notifications'] ?? []))
+            ->header('ETag', $this->versions->etag($request->user()));
     }
 
     /**

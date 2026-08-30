@@ -1,0 +1,750 @@
+{
+    "generated_from": "Laravel MCP Tool::toArray() output, verified live via php artisan tinker against app/Mcp/Tools/*.php on branch feature/api-mobile-mcp-parity",
+    "server": "/mcp/spark",
+    "tools": [
+        {
+            "name": "get-day-summary-tool",
+            "ability": "insights:read",
+            "description": "Get a compact, pre-aggregated summary for one or more dates.\n    Returns structured domain sections (health, activity, money, media, knowledge)\n    with baseline comparisons and anomaly detection.\n    Much more compact than get-day-context — use this for daily briefings.",
+            "inputSchema": {
+                "properties": {
+                    "dates": {
+                        "description": "Array of dates to summarize. ISO format (YYYY-MM-DD) or relative: \"today\", \"yesterday\", \"tomorrow\". Defaults to [\"today\"].",
+                        "default": [
+                            "today"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "domains": {
+                        "description": "Filter by domains. Omit to include all domains.",
+                        "items": {
+                            "enum": [
+                                "health",
+                                "activity",
+                                "money",
+                                "media",
+                                "knowledge"
+                            ],
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-day-context-tool",
+            "ability": "insights:read",
+            "description": "Retrieve structured day context including events, metrics, and relationships for a specific date.\n    Returns grouped events by service/action/hour, service breakdown, and relationship data.\n    Supports filtering by domains (health, money, media, knowledge, online).",
+            "inputSchema": {
+                "properties": {
+                    "date": {
+                        "description": "Date to retrieve context for. ISO format (YYYY-MM-DD) or relative: \"today\", \"yesterday\", \"tomorrow\".",
+                        "default": "today",
+                        "type": "string"
+                    },
+                    "domains": {
+                        "description": "Filter by domains. Omit to include all domains.",
+                        "items": {
+                            "enum": [
+                                "health",
+                                "money",
+                                "media",
+                                "knowledge",
+                                "online"
+                            ],
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-metric-trend-tool",
+            "ability": "insights:read",
+            "description": "Retrieve daily metric values over a date range with baseline comparison.\n    Returns per-day values, vs_baseline_pct, anomaly flags, and summary statistics.\n    Accepts flexible identifiers: \"oura.had_sleep_score.percent\", \"oura.sleep_score\", etc.\n    The \"had_\" prefix and value_unit can be omitted when unambiguous.\n    Use get-baselines to discover available metrics.",
+            "inputSchema": {
+                "properties": {
+                    "metric": {
+                        "description": "Metric identifier in dot notation (e.g. \"oura.sleep_score\", \"oura.had_sleep_score.percent\"). The \"had_\" prefix and value_unit can be omitted when unambiguous. Use get-baselines to discover available metrics.",
+                        "type": "string"
+                    },
+                    "from": {
+                        "description": "Start date. ISO format, relative (\"yesterday\", \"7_days_ago\"), or range keyword (\"last_7_days\", \"this_week\", \"last_month\"). Defaults to \"30_days_ago\".",
+                        "default": "30_days_ago",
+                        "type": "string"
+                    },
+                    "to": {
+                        "description": "End date. ISO format or relative. Defaults to \"today\".",
+                        "default": "today",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "metric"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-events-by-filter-tool",
+            "ability": "data:read",
+            "description": "Filter events precisely by service, action, and date range.\n    Unlike semantic search, this returns exact matches — use for specific queries\n    like \"all Monzo transactions this week\" or \"Oura sleep scores last 7 days\".",
+            "inputSchema": {
+                "properties": {
+                    "service": {
+                        "description": "Service to filter by (e.g. \"oura\", \"apple_health\", \"monzo\", \"spotify\").",
+                        "type": "string"
+                    },
+                    "action": {
+                        "description": "Action type to filter by (e.g. \"had_sleep_score\", \"listened_to\"). Optional — omit to get all actions for the service.",
+                        "type": "string"
+                    },
+                    "from_date": {
+                        "description": "Start date. ISO format, relative, or range keyword. Defaults to last 30 days if omitted.",
+                        "type": "string"
+                    },
+                    "to_date": {
+                        "description": "End date. ISO format or relative. Defaults to today.",
+                        "type": "string"
+                    },
+                    "limit": {
+                        "description": "Maximum events to return (1-100). Defaults to 50.",
+                        "default": 50,
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "service"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-service-status-tool",
+            "ability": "insights:read",
+            "description": "Check sync status and data coverage for all services on a given date.\n    Shows event count, last event time, distinct actions, and coverage notes\n    for services with known sync lag (e.g. Apple Health).",
+            "inputSchema": {
+                "properties": {
+                    "date": {
+                        "description": "Date to check. ISO format (YYYY-MM-DD) or relative: \"today\", \"yesterday\", \"tomorrow\". Defaults to \"today\".",
+                        "default": "today",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-baselines-tool",
+            "ability": "insights:read",
+            "description": "Retrieve baseline statistics for one or more metrics.\n    Returns mean, stddev, min, max, normal bounds, and sample size.\n    Accepts flexible identifiers: \"oura.sleep_score\", \"oura.had_sleep_score.percent\", etc.\n    Omit metrics to get all available baselines — useful for discovering what metrics exist.",
+            "inputSchema": {
+                "properties": {
+                    "metrics": {
+                        "description": "Array of metric identifiers (e.g. [\"oura.sleep_score\", \"apple_health.step_count\"]). The \"had_\" prefix and value_unit can be omitted. Omit entirely to get all available baselines.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-check-ins",
+            "ability": "insights:read",
+            "description": "Return the morning and afternoon daily check-in records for a date, including completion and recorded energy values.",
+            "inputSchema": {
+                "properties": {
+                    "date": {
+                        "description": "Date to inspect: YYYY-MM-DD, today, or yesterday.",
+                        "default": "today",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "acknowledge-anomaly-tool",
+            "ability": "insights:write",
+            "description": "Acknowledge a metric anomaly so it no longer appears in day summaries.\n    Optionally add a note explaining why, and suppress future alerts for this metric\n    until a specified date. This is the only write operation — all other tools are read-only.",
+            "inputSchema": {
+                "properties": {
+                    "metric": {
+                        "description": "Metric identifier (e.g. \"oura.sleep_score\", \"oura.had_sleep_score.percent\"). The \"had_\" prefix and value_unit can be omitted.",
+                        "type": "string"
+                    },
+                    "date": {
+                        "description": "Date of the anomaly to acknowledge. ISO format or relative. Defaults to \"today\".",
+                        "default": "today",
+                        "type": "string"
+                    },
+                    "note": {
+                        "description": "Optional note explaining why this anomaly is being acknowledged (e.g. \"Was sick\", \"Travel day\").",
+                        "type": "string"
+                    },
+                    "suppress_until": {
+                        "description": "Optional date until which future anomalies for this metric should be suppressed. ISO format or relative.",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "metric"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true
+            }
+        },
+        {
+            "name": "search-events-tool",
+            "ability": "data:read",
+            "description": "Search for events using semantic (vector similarity) or keyword search.\n    Events represent timestamped activities like transactions, workouts, media plays, etc.\n    Returns matching events with similarity scores when using semantic search.",
+            "inputSchema": {
+                "properties": {
+                    "query": {
+                        "description": "Search query text.",
+                        "type": "string"
+                    },
+                    "semantic": {
+                        "description": "Enable semantic (vector similarity) search. Default: true.",
+                        "default": true,
+                        "type": "boolean"
+                    },
+                    "service": {
+                        "description": "Filter by service (e.g., monzo, oura, spotify, github).",
+                        "type": "string"
+                    },
+                    "domain": {
+                        "description": "Filter by domain.",
+                        "enum": [
+                            "health",
+                            "money",
+                            "media",
+                            "knowledge",
+                            "online"
+                        ],
+                        "type": "string"
+                    },
+                    "from_date": {
+                        "description": "Filter events from this date (ISO format: YYYY-MM-DD).",
+                        "type": "string"
+                    },
+                    "to_date": {
+                        "description": "Filter events until this date (ISO format: YYYY-MM-DD).",
+                        "type": "string"
+                    },
+                    "limit": {
+                        "description": "Maximum number of results (default: 20, max: 50).",
+                        "default": 20,
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "query"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "search-blocks-tool",
+            "ability": "data:read",
+            "description": "Search for blocks using semantic (vector similarity) or keyword search.\n    Blocks are data units attached to events containing content like summaries, metrics, details, or media.\n    Returns matching blocks with similarity scores when using semantic search.",
+            "inputSchema": {
+                "properties": {
+                    "query": {
+                        "description": "Search query text.",
+                        "type": "string"
+                    },
+                    "semantic": {
+                        "description": "Enable semantic (vector similarity) search. Default: true.",
+                        "default": true,
+                        "type": "boolean"
+                    },
+                    "block_type": {
+                        "description": "Filter by block type (e.g., fetch_summary_paragraph, heart_rate, track_details).",
+                        "type": "string"
+                    },
+                    "from_date": {
+                        "description": "Filter blocks from this date (ISO format: YYYY-MM-DD).",
+                        "type": "string"
+                    },
+                    "to_date": {
+                        "description": "Filter blocks until this date (ISO format: YYYY-MM-DD).",
+                        "type": "string"
+                    },
+                    "limit": {
+                        "description": "Maximum number of results (default: 20, max: 50).",
+                        "default": 20,
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "query"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "search-objects-tool",
+            "ability": "data:read",
+            "description": "Search for objects (entities) using semantic (vector similarity) or keyword search.\n    Objects represent entities like users, accounts, tracks, playlists, merchants, etc.\n    Returns matching objects with similarity scores when using semantic search.",
+            "inputSchema": {
+                "properties": {
+                    "query": {
+                        "description": "Search query text.",
+                        "type": "string"
+                    },
+                    "semantic": {
+                        "description": "Enable semantic (vector similarity) search. Default: true.",
+                        "default": true,
+                        "type": "boolean"
+                    },
+                    "concept": {
+                        "description": "Filter by concept (e.g., user, track, account, merchant, place).",
+                        "type": "string"
+                    },
+                    "type": {
+                        "description": "Filter by type (e.g., spotify_track, monzo_merchant, oura_user).",
+                        "type": "string"
+                    },
+                    "limit": {
+                        "description": "Maximum number of results (default: 20, max: 50).",
+                        "default": 20,
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "query"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-event-tool",
+            "ability": "data:read",
+            "description": "Retrieve full details for a specific event by its UUID.\n    Returns the complete event with actor, target, blocks, tags, and integration context.",
+            "inputSchema": {
+                "properties": {
+                    "id": {
+                        "description": "The UUID of the event to retrieve.",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-object-tool",
+            "ability": "data:read",
+            "description": "Retrieve full details for a specific object (entity) by its UUID.\n    Returns the object with its metadata, and optionally recent events where it appears as actor or target.",
+            "inputSchema": {
+                "properties": {
+                    "id": {
+                        "description": "The UUID of the object to retrieve.",
+                        "type": "string"
+                    },
+                    "include_events": {
+                        "description": "Include recent events where this object appears as actor or target. Default: true.",
+                        "default": true,
+                        "type": "boolean"
+                    },
+                    "event_limit": {
+                        "description": "Maximum number of recent events to include (default: 10, max: 25).",
+                        "default": 10,
+                        "minimum": 1,
+                        "maximum": 25,
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "get-block-tool",
+            "ability": "data:read",
+            "description": "Retrieve full details for a specific block by its UUID.\n    Returns the complete block with its content, metadata, and parent event context.",
+            "inputSchema": {
+                "properties": {
+                    "id": {
+                        "description": "The UUID of the block to retrieve.",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id"
+                ]
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "set-event-note",
+            "ability": "data:write",
+            "description": "Set or clear the user-authored note attached to an event. Pass null or an empty string to clear it.",
+            "inputSchema": {
+                "properties": {
+                    "event_id": {
+                        "description": "UUID of the event.",
+                        "type": "string"
+                    },
+                    "note": {
+                        "description": "Note content. Omit or provide an empty value to clear it.",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "event_id"
+                ]
+            },
+            "annotations": []
+        },
+        {
+            "name": "update-entity",
+            "ability": "data:write",
+            "description": "Safely update an event, object, or block you own. This tool never deletes records or changes integration ownership.",
+            "inputSchema": {
+                "properties": {
+                    "kind": {
+                        "description": "event, object, or block.",
+                        "type": "string"
+                    },
+                    "id": {
+                        "description": "Entity UUID.",
+                        "type": "string"
+                    },
+                    "attributes": {
+                        "description": "Allowed fields: event action/value/value_multiplier/value_unit/time; object title/type/concept/url; block title/block_type/value/value_multiplier/value_unit/time/url.",
+                        "type": "object"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "kind",
+                    "id",
+                    "attributes"
+                ]
+            },
+            "annotations": []
+        },
+        {
+            "name": "manage-relationship",
+            "ability": "data:read (list) / data:write (create, delete)",
+            "description": "List, create, or delete an owned relationship between events, objects, and blocks. Creation prevents self-links and respects relationship directionality.",
+            "inputSchema": {
+                "properties": {
+                    "operation": {
+                        "description": "list, create, or delete.",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "description": "Source kind for list/create.",
+                        "type": "string"
+                    },
+                    "id": {
+                        "description": "Source UUID for list/create.",
+                        "type": "string"
+                    },
+                    "relationship_id": {
+                        "description": "Relationship UUID for delete.",
+                        "type": "string"
+                    },
+                    "to_kind": {
+                        "description": "Target kind for create.",
+                        "type": "string"
+                    },
+                    "to_id": {
+                        "description": "Target UUID for create.",
+                        "type": "string"
+                    },
+                    "type": {
+                        "description": "Registered relationship type for create.",
+                        "type": "string"
+                    },
+                    "value": {
+                        "description": "Optional value.",
+                        "type": "number"
+                    },
+                    "value_multiplier": {
+                        "description": "Optional value multiplier.",
+                        "type": "number"
+                    },
+                    "value_unit": {
+                        "description": "Optional unit.",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "description": "Optional metadata.",
+                        "type": "object"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "operation"
+                ]
+            },
+            "annotations": []
+        },
+        {
+            "name": "trigger-integration-update-tool",
+            "ability": "integrations:sync",
+            "description": "Trigger an immediate update for one or more integrations, without waiting for the next scheduled pull.\n\n    Provide either `integration_id` (for a specific instance) or `service` (to trigger all non-paused integrations for that service).\n    The scheduled pull cycle is not affected — this is an extra, on-demand fetch.",
+            "inputSchema": {
+                "properties": {
+                    "integration_id": {
+                        "description": "UUID of a specific integration instance to trigger. Takes precedence over service.",
+                        "type": "string"
+                    },
+                    "service": {
+                        "description": "Service name (e.g. \"oura\", \"spotify\", \"monzo\") to trigger all matching non-paused integrations.",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": []
+        },
+        {
+            "name": "list-integrations",
+            "ability": "integrations:read",
+            "description": "List the authenticated user's integrations, including their service, status, and identifying details.",
+            "inputSchema": {
+                "type": "object",
+                "properties": []
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "create-flint-digest",
+            "ability": "flint:write",
+            "description": "Create a Flint digest event with attached blocks.\n    Use this to record an AI-generated digest, including user questions (flint_user_question)\n    and editorial notes (flint_editorial_note) alongside standard content blocks.\n\n    Block types:\n    - `flint_user_question`: A question for the user. Provide `question`, optional `topic`,\n      `priority` (low/medium/high), and optional `answer_options` array.\n    - `flint_editorial_note`: Freeform AI commentary. Provide `content` (markdown).\n    - Any `flint_*` type: Provide `content` (markdown) for the block body.\n\n    Calls create a new digest. Do not retry after an unknown outcome without\n    checking get-latest-flint-digest first.",
+            "inputSchema": {
+                "properties": {
+                    "title": {
+                        "description": "Title for the digest (e.g. \"Morning Digest — May 10\").",
+                        "type": "string"
+                    },
+                    "period": {
+                        "description": "Time period: morning, afternoon, or evening. Inferred from current time if omitted.",
+                        "type": "string"
+                    },
+                    "date": {
+                        "description": "ISO date for the digest (e.g. \"2026-05-10\"). Defaults to today.",
+                        "default": "today",
+                        "type": "string"
+                    },
+                    "summary": {
+                        "description": "Optional headline summary content for the digest.",
+                        "type": "string"
+                    },
+                    "blocks": {
+                        "description": "Blocks to attach to this digest.",
+                        "items": {
+                            "properties": {
+                                "block_type": {
+                                    "description": "Block type (e.g. flint_user_question, flint_editorial_note, flint_insight).",
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "description": "Block title.",
+                                    "type": "string"
+                                },
+                                "content": {
+                                    "description": "Markdown content — for flint_editorial_note and other content blocks.",
+                                    "type": "string"
+                                },
+                                "referenced_event_ids": {
+                                    "description": "Event UUIDs this block draws on. Surfaced to the client as tappable reference chips and linkified inline in the content.",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "question": {
+                                    "description": "For flint_user_question: the question text to display to the user.",
+                                    "type": "string"
+                                },
+                                "topic": {
+                                    "description": "For flint_user_question: category (e.g. health, money, routine).",
+                                    "type": "string"
+                                },
+                                "priority": {
+                                    "description": "For flint_user_question: low, medium, or high.",
+                                    "type": "string"
+                                },
+                                "answer_options": {
+                                    "description": "For flint_user_question: optional multiple-choice answers. Omit for freeform.",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object",
+                            "required": [
+                                "block_type",
+                                "title"
+                            ]
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title"
+                ]
+            },
+            "annotations": []
+        },
+        {
+            "name": "get-latest-flint-digest",
+            "ability": "flint:read",
+            "description": "Retrieve Flint digest(s) for a given date, including all attached blocks.\n    Defaults to today's most recent digest.\n\n    Pass `all: true` to get every digest created on that date (e.g. morning + afternoon + agent-created).\n\n    For flint_user_question blocks, the full metadata is returned including the user's\n    answer, answer_note, and answered_at timestamp (null until the user responds).\n\n    Use this to check whether the user has answered questions from a previously created digest.",
+            "inputSchema": {
+                "properties": {
+                    "date": {
+                        "description": "ISO date to retrieve the digest for (e.g. \"2026-05-10\"). Defaults to today.",
+                        "default": "today",
+                        "type": "string"
+                    },
+                    "period": {
+                        "description": "Filter by period: morning, afternoon, or evening. Returns the latest if omitted.",
+                        "type": "string"
+                    },
+                    "all": {
+                        "description": "Return all digests for the date instead of just the most recent. Useful when multiple digests were created in a day.",
+                        "default": false,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+            }
+        },
+        {
+            "name": "answer-flint-question",
+            "ability": "flint:write",
+            "description": "Answer a Flint user-question block, optionally with a note. Use after retrieving a digest with get-latest-flint-digest.",
+            "inputSchema": {
+                "properties": {
+                    "block_id": {
+                        "description": "UUID of a flint_user_question block.",
+                        "type": "string"
+                    },
+                    "answer": {
+                        "description": "The user answer.",
+                        "type": "string"
+                    },
+                    "answer_note": {
+                        "description": "Optional supporting note.",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "block_id",
+                    "answer"
+                ]
+            },
+            "annotations": []
+        },
+        {
+            "name": "fetch-webpage-html",
+            "ability": "web:fetch",
+            "description": "Render a website in Spark's Playwright browser and return its current raw HTML.\n\n    Saved Fetch cookies for the target domain are used automatically when available, and\n    any refreshed cookies from the page are saved back to the caller's Fetch cookie store.\n    The response is limited to 1 MB of HTML and says explicitly if it was truncated.",
+            "inputSchema": {
+                "properties": {
+                    "url": {
+                        "description": "Public HTTP or HTTPS URL to render in Playwright.",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "annotations": []
+        }
+    ],
+    "resources": [
+        {
+            "name": "day-context-resource",
+            "ability": "insights:read",
+            "uriTemplate": "spark://context/day/{date}",
+            "mimeType": "application/json",
+            "description": "Structured day context including events, metrics, and relationships for a specific date. The date parameter can be an ISO date (YYYY-MM-DD) or relative keywords: today, yesterday, tomorrow."
+        }
+    ]
+}

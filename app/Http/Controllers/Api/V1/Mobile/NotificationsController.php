@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactNotificationResource;
+use App\Services\Api\ResourceVersion;
 use App\Support\CursorPaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationsController extends Controller
 {
+    public function __construct(private ResourceVersion $versions) {}
+
     /**
      * GET /api/v1/mobile/notifications
      */
@@ -53,7 +56,7 @@ class NotificationsController extends Controller
 
         $notification->markAsRead();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification->fresh()));
     }
 
     /**
@@ -62,8 +65,9 @@ class NotificationsController extends Controller
     public function markAllRead(Request $request): JsonResponse
     {
         $request->user()->unreadNotifications()->update(['read_at' => now()]);
+        $request->user()->touch();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($request->user()->fresh()));
     }
 
     /**
@@ -77,8 +81,12 @@ class NotificationsController extends Controller
             return response()->json(['message' => 'Notification not found.'], 404);
         }
 
+        // Computed before delete(): the row is gone afterward, and
+        // ResourceVersion::etag() falls back to a live query for any model
+        // that doesn't already have `xmin` loaded.
+        $etag = $this->versions->etag($notification);
         $notification->delete();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204)->header('ETag', $etag);
     }
 }

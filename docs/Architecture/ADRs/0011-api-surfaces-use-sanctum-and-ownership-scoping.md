@@ -17,7 +17,7 @@ Correct controller use remains security-critical until the policy is implemented
 Controller-by-controller ownership as the durable boundary and broad trusted-client access were rejected.
 
 ## Related repository paths
-`routes/web.php`, `routes/api.php`, `app/Traits/AuthorizesOwnership.php`, `docs/Architecture/API.md`.
+`routes/web.php`, `routes/api.php`, `app/Traits/AuthorizesOwnership.php`, `docs/API/README.md`.
 
 ## Evidence gaps / open questions
 Define rollout ownership, endpoint inventory, negative tests, and API deprecation separately.

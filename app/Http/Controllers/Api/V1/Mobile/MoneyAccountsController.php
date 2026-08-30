@@ -10,6 +10,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\Api\ResourceVersion;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
 
 class MoneyAccountsController extends Controller
 {
-    public function __construct(protected FinancialPlugin $financial) {}
+    public function __construct(protected FinancialPlugin $financial, protected ResourceVersion $versions) {}
 
     /**
      * GET /api/v1/mobile/money/accounts
@@ -65,7 +66,8 @@ class MoneyAccountsController extends Controller
         $resource = (new MoneyAccountResource($account))->withBalance($latestBalance);
 
         return response()->json(['data' => $resource->toArray($request)])
-            ->header('Last-Modified', $account->updated_at->toRfc7231String());
+            ->header('Last-Modified', $account->updated_at->toRfc7231String())
+            ->header('ETag', $this->versions->etag($account));
     }
 
     /**
@@ -185,7 +187,8 @@ class MoneyAccountsController extends Controller
         $latestBalance = $this->financial->getLatestBalance($account);
         $resource = (new MoneyAccountResource($account->fresh()))->withBalance($latestBalance);
 
-        return response()->json(['data' => $resource->toArray($request)]);
+        return response()->json(['data' => $resource->toArray($request)])
+            ->header('ETag', $this->versions->etag($account->fresh()));
     }
 
     /**
@@ -220,7 +223,8 @@ class MoneyAccountsController extends Controller
         $meta['archived_at'] = now()->toIso8601String();
         $account->update(['metadata' => $meta]);
 
-        return response()->json(['message' => 'Account archived.']);
+        return response()->json(['message' => 'Account archived.'])
+            ->header('ETag', $this->versions->etag($account->fresh()));
     }
 
     /**
@@ -246,11 +250,14 @@ class MoneyAccountsController extends Controller
         $integration = $this->resolveManualAccountIntegration($user);
 
         $event = $this->financial->createBalanceEvent($integration, $account, $validated);
+        // Balance history is part of the account's mutation surface, so move
+        // the account version forward for clients retrying with If-Match.
+        $account->touch();
 
         return response()->json(
             ['data' => (new BalanceEntryResource($event))->toArray($request)],
             201,
-        );
+        )->header('ETag', $this->versions->etag($account->fresh()));
     }
 
     /**

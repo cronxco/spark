@@ -97,7 +97,7 @@ class NotificationSettingsControllerTest extends TestCase
             'digest_time' => '06:45',
         ]);
 
-        $this->patchJson('/api/v1/mobile/settings/notifications', $payload)
+        $this->patchJson('/api/v1/mobile/settings/notifications', $payload, $this->ifMatchUser())
             ->assertOk()
             ->assertExactJson($payload);
 
@@ -117,7 +117,7 @@ class NotificationSettingsControllerTest extends TestCase
             'categories' => ['anomaly' => true],
             'delivery_mode' => 'later',
             'digest_time' => '25:00',
-        ])->assertStatus(422)
+        ], $this->ifMatchUser())->assertStatus(422)
             ->assertJsonValidationErrors([
                 'categories.digest',
                 'categories.integration_failed',
@@ -141,5 +141,11 @@ class NotificationSettingsControllerTest extends TestCase
             'delivery_mode' => 'immediate',
             'digest_time' => '08:00',
         ], $overrides);
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatchUser(): array
+    {
+        return ['If-Match' => $this->getJson('/api/v1/mobile/settings/notifications')->headers->get('ETag')];
     }
 }

@@ -4,9 +4,11 @@ namespace Tests\Feature\Mcp;
 
 use App\Mcp\Servers\SparkServer;
 use App\Mcp\Tools\GetBlockTool;
+use App\Mcp\Tools\GetCheckInsTool;
 use App\Mcp\Tools\GetDayContextTool;
 use App\Mcp\Tools\GetEventTool;
 use App\Mcp\Tools\GetObjectTool;
+use App\Mcp\Tools\ListIntegrationsTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
 use App\Mcp\Tools\SearchObjectsTool;
@@ -17,6 +19,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Mcp\Server\Testing\PendingTestResponse;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -116,6 +119,41 @@ class SparkServerTest extends TestCase
         ]);
 
         $response->assertHasErrors(['Authentication required.']);
+    }
+
+    #[Test]
+    public function list_integrations_tool_returns_the_users_integrations(): void
+    {
+        $response = $this->actingAsWithAbilities(['integrations:read'])->tool(ListIntegrationsTool::class, []);
+
+        $response->assertOk();
+        $response->assertSee((string) $this->integration->id);
+    }
+
+    #[Test]
+    public function list_integrations_tool_requires_the_integrations_read_capability(): void
+    {
+        $response = $this->actingAsWithAbilities(['insights:read'])->tool(ListIntegrationsTool::class, []);
+
+        $response->assertHasErrors(['Token lacks required capability: integrations:read.']);
+    }
+
+    #[Test]
+    public function get_check_ins_tool_returns_empty_periods_when_none_exist(): void
+    {
+        $response = $this->actingAsWithAbilities(['insights:read'])->tool(GetCheckInsTool::class, ['date' => 'today']);
+
+        $response->assertOk();
+        $response->assertSee('"morning"');
+        $response->assertSee('"completed":false');
+    }
+
+    #[Test]
+    public function get_check_ins_tool_requires_the_insights_read_capability(): void
+    {
+        $response = $this->actingAsWithAbilities(['integrations:read'])->tool(GetCheckInsTool::class, ['date' => 'today']);
+
+        $response->assertHasErrors(['Token lacks required capability: insights:read.']);
     }
 
     #[Test]
@@ -488,5 +526,14 @@ class SparkServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('"count": 1');
         $response->assertSee('"service": "monzo"');
+    }
+
+    /** @param array<int, string> $abilities */
+    private function actingAsWithAbilities(array $abilities): PendingTestResponse
+    {
+        $token = $this->user->createToken('MCP test token', $abilities)->accessToken;
+        $this->user->withAccessToken($token);
+
+        return SparkServer::actingAs($this->user);
     }
 }

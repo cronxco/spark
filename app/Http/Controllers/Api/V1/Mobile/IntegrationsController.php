@@ -7,12 +7,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactIntegrationResource;
 use App\Integrations\Contracts\OAuthIntegrationPlugin;
 use App\Integrations\PluginRegistry;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
 
 class IntegrationsController extends Controller
 {
+    public function __construct(private ResourceVersion $versions) {}
+
     /**
      * GET /api/v1/mobile/integrations
      */
@@ -41,7 +44,7 @@ class IntegrationsController extends Controller
 
         return response()->json(
             (new CompactIntegrationResource($integration))->resolve($request),
-        );
+        )->header('ETag', $this->versions->etag($integration));
     }
 
     /**
@@ -63,11 +66,33 @@ class IntegrationsController extends Controller
         }
 
         $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($integration);
+        $integration->touch();
 
         return response()->json([
             'message' => 'Integration update triggered.',
             'jobs_dispatched' => $jobsDispatched,
-        ]);
+        ])->header('ETag', $this->versions->etag($integration->fresh()));
+    }
+
+    /** Trigger all non-paused integrations for one service, matching MCP. */
+    public function syncService(Request $request): JsonResponse
+    {
+        $data = $request->validate(['service' => ['required', 'string', 'max:100']]);
+        $integrations = $request->user()->integrations()->where('service', $data['service'])->get();
+        if ($integrations->isEmpty()) {
+            return response()->json(['message' => 'No integrations found for service.'], 404);
+        }
+
+        $dispatcher = new DispatchIntegrationFetchJobs;
+        $results = $integrations->map(function ($integration) use ($dispatcher): array {
+            if ($integration->isPaused()) {
+                return ['integration_id' => $integration->id, 'status' => 'skipped', 'reason' => 'paused', 'jobs_dispatched' => 0];
+            }
+
+            return ['integration_id' => $integration->id, 'status' => 'triggered', 'jobs_dispatched' => $dispatcher->dispatch($integration)];
+        });
+
+        return response()->json(['service' => $data['service'], 'integrations' => $results, 'total_jobs_dispatched' => $results->sum('jobs_dispatched')]);
     }
 
     /**

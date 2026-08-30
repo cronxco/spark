@@ -11,11 +11,11 @@ Welcome to the Spark documentation. This directory contains comprehensive docume
 
 ```
 docs/
+├── API/               # Main API, mobile API, and MCP reference (+ OpenAPI specs)
 ├── Architecture/      # Core system and feature documentation
 ├── Architecture/ADRs/ # Reconstructed architecture decision records
 ├── Guides/           # Setup and operational guides
 ├── Integrations/     # Service-specific documentation
-├── mobile/           # iOS companion app API
 └── UI and UX/        # User interface patterns
 ```
 
@@ -48,8 +48,10 @@ docs/
 | ------------------------------------------------------------- | -------------------------------------------------------------- |
 | [INTEGRATION_PLUGINS.md](Architecture/INTEGRATION_PLUGINS.md) | Plugin architecture, base classes, and implementation patterns |
 | [JOBS.md](Architecture/JOBS.md)                               | Job system overview and base job classes                       |
-| [API.md](Architecture/API.md)                                 | REST API endpoints and authentication                          |
-| [MOBILE_API.md](mobile/MOBILE_API.md)                         | iOS companion app API — all 25 endpoints with schemas          |
+| [API/README.md](API/README.md)                                | Cross-surface capability model and parity matrix (start here)  |
+| [API/API_v1.md](API/API_v1.md)                                | General REST API (`/api/v1`) full endpoint reference           |
+| [API/mobile_API.md](API/mobile_API.md)                        | iOS companion app API (`/api/v1/mobile`) full endpoint reference |
+| [API/MCP.md](API/MCP.md)                                      | Spark MCP server — tools, resources, and authorization          |
 | [MEDIA.md](Architecture/MEDIA.md)                             | Media attachment system with MD5-based deduplication           |
 | [PLAYWRIGHT.md](Architecture/PLAYWRIGHT.md)                   | Browser automation for Fetch integration                       |
 

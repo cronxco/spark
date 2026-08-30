@@ -75,4 +75,26 @@ class FeedController extends Controller
 
         return $response;
     }
+
+    /** Exact service/action/date-range filtering, matching MCP's event filter. */
+    public function filter(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'service' => ['required', 'string', 'max:100'],
+            'action' => ['nullable', 'string', 'max:255'],
+            'from_date' => ['nullable', 'string', 'max:50'],
+            'to_date' => ['nullable', 'string', 'max:50'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $result = $this->eventFeed->filter(
+            $request->user(), $data['service'], $data['action'] ?? null,
+            $data['from_date'] ?? null, $data['to_date'] ?? null, $data['limit'] ?? EventFeed::LIMIT_DEFAULT,
+        );
+
+        return response()->json([
+            'service' => $result['service'], 'action' => $result['action'],
+            'total_count' => $result['total_count'], 'returned_count' => $result['returned_count'],
+            'events' => CompactEventResource::collection($result['events'])->resolve($request),
+        ]);
+    }
 }

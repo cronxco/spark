@@ -2,22 +2,20 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\Event;
-use App\Models\EventObject;
-use App\Models\Integration;
-use App\Models\Relationship;
-use Carbon\Carbon;
+use App\Mcp\Concerns\RequiresSparkAbility;
+use App\Services\FlintDigestService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 
 #[Name('create-flint-digest')]
-#[IsIdempotent]
 class CreateFlintDigestTool extends Tool
 {
+    use RequiresSparkAbility;
+
     protected string $description = <<<'MARKDOWN'
         Create a Flint digest event with attached blocks.
         Use this to record an AI-generated digest, including user questions (flint_user_question)
@@ -29,142 +27,34 @@ class CreateFlintDigestTool extends Tool
         - `flint_editorial_note`: Freeform AI commentary. Provide `content` (markdown).
         - Any `flint_*` type: Provide `content` (markdown) for the block body.
 
-        Returns the created event ID and block IDs for future reference.
+        Calls create a new digest. Do not retry after an unknown outcome without
+        checking get-latest-flint-digest first.
     MARKDOWN;
+
+    public function __construct(private FlintDigestService $digests) {}
 
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'flint:write')) {
+            return $error;
+        }
+
         $user = $request->user();
 
         if (! $user) {
             return Response::error('Authentication required.');
         }
 
-        $title = $request->get('title');
-        if (! $title) {
-            return Response::error('title is required.');
-        }
-
-        $date = $request->get('date', 'today');
-        $parsedDate = $date === 'today' ? Carbon::today() : Carbon::parse($date);
-
-        $period = $request->get('period') ?? $this->inferPeriod();
-        $summary = $request->get('summary');
-        $blocksInput = $request->get('blocks') ?? [];
-
-        // Get or create the Flint integration
-        $integration = Integration::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'service' => 'flint',
-                'instance_type' => 'digest',
-            ],
-            [
-                'name' => 'Flint Digest',
-                'active' => true,
-            ]
-        );
-
-        // Get or create the digest EventObject
-        $digestTitle = $parsedDate->format('Y-m-d') . ' ' . match ($period) {
-            'morning' => 'AM',
-            'afternoon' => 'PM',
-            default => 'EVE',
-        };
-
-        $digestObject = EventObject::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'concept' => 'digest',
-                'type' => $period . '_digest',
-                'title' => $digestTitle,
-            ],
-            [
-                'time' => now(),
-                'metadata' => [
-                    'service' => 'flint',
-                    'period' => $period,
-                    'generated_at' => now()->toIso8601String(),
-                ],
-            ]
-        );
-
-        // Get or create the user actor EventObject
-        $actorObject = EventObject::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'concept' => 'user',
-                'type' => 'user_profile',
-                'title' => $user->name,
-            ],
-            [
-                'time' => now(),
-            ]
-        );
-
-        // Create the summary event
-        $event = Event::create([
-            'source_id' => $digestObject->id,
-            'integration_id' => $integration->id,
-            'actor_id' => $actorObject->id,
-            'service' => 'flint',
-            'domain' => 'knowledge',
-            'action' => 'had_summary',
-            'time' => $parsedDate,
-            'value' => count($blocksInput),
-            'target_id' => $digestObject->id,
-            'event_metadata' => [
-                'period' => $period,
-                'digest_object_id' => $digestObject->id,
-                'title' => $title,
-                'summary' => $summary,
-            ],
-        ]);
-
-        // Relate event to digest object
-        Relationship::createRelationship([
-            'user_id' => $user->id,
-            'from_type' => Event::class,
-            'from_id' => $event->id,
-            'to_type' => EventObject::class,
-            'to_id' => $digestObject->id,
-            'type' => 'part_of',
-        ]);
-
-        // Create blocks
-        $blockIds = [];
-        foreach ($blocksInput as $blockData) {
-            $blockType = $blockData['block_type'] ?? null;
-            $blockTitle = $blockData['title'] ?? null;
-
-            if (! $blockType || ! $blockTitle) {
-                continue;
+        try {
+            $payload = $request->all();
+            if (($payload['date'] ?? null) === 'today') {
+                $payload['date'] = now()->toDateString();
             }
 
-            $metadata = $this->buildBlockMetadata($blockType, $blockData);
-
-            $block = $event->createBlock([
-                'block_type' => $blockType,
-                'title' => $blockTitle,
-                'time' => $parsedDate,
-                'metadata' => $metadata,
-            ]);
-
-            $blockIds[] = $block->id;
+            return Response::json($this->digests->create($user, $payload));
+        } catch (ValidationException $exception) {
+            return Response::error($exception->validator->errors()->first());
         }
-
-        // Notification dispatch is handled by the NotifyOnDigestReadyTask task
-        // pipeline task, triggered off this event's creation below.
-
-        return Response::text(json_encode([
-            'event_id' => $event->id,
-            'digest_object_id' => $digestObject->id,
-            'date' => $parsedDate->toDateString(),
-            'period' => $period,
-            'title' => $title,
-            'block_count' => count($blockIds),
-            'block_ids' => $blockIds,
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
     public function schema(JsonSchema $schema): array
@@ -208,44 +98,6 @@ class CreateFlintDigestTool extends Tool
                         ->description('For flint_user_question: optional multiple-choice answers. Omit for freeform.'),
                 ]))
                 ->description('Blocks to attach to this digest.'),
-        ];
-    }
-
-    private function inferPeriod(): string
-    {
-        $hour = (int) now()->format('G');
-
-        if ($hour >= 5 && $hour <= 11) {
-            return 'morning';
-        }
-
-        if ($hour >= 12 && $hour <= 16) {
-            return 'afternoon';
-        }
-
-        return 'evening';
-    }
-
-    /**
-     * Build the metadata array for a block based on its type and input data.
-     */
-    private function buildBlockMetadata(string $blockType, array $blockData): array
-    {
-        if ($blockType === 'flint_user_question') {
-            return [
-                'question' => $blockData['question'] ?? $blockData['title'],
-                'topic' => $blockData['topic'] ?? null,
-                'priority' => $blockData['priority'] ?? 'medium',
-                'answer_options' => $blockData['answer_options'] ?? null,
-                'answer' => null,
-                'answer_note' => null,
-                'answered_at' => null,
-            ];
-        }
-
-        return [
-            'content' => $blockData['content'] ?? '',
-            'referenced_event_ids' => $blockData['referenced_event_ids'] ?? [],
         ];
     }
 }

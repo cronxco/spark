@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Event;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class GetLatestFlintDigestTool extends Tool
 {
+    use RequiresSparkAbility;
     protected string $description = <<<'MARKDOWN'
         Retrieve Flint digest(s) for a given date, including all attached blocks.
         Defaults to today's most recent digest.
@@ -31,6 +33,9 @@ class GetLatestFlintDigestTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'flint:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {
