@@ -80,6 +80,7 @@ class FlintPageTest extends TestCase
         $this->createDigest();
 
         Volt::test('flint.index')
+            ->set('activeTab', 'today')
             ->assertSee('Tuesday, in brief')
             ->assertSee('You ran 5k and slept badly.');
     }
@@ -87,7 +88,9 @@ class FlintPageTest extends TestCase
     #[Test]
     public function it_shows_an_empty_state_when_there_are_no_digests(): void
     {
-        Volt::test('flint.index')->assertSee('No digests yet');
+        Volt::test('flint.index')
+            ->set('activeTab', 'today')
+            ->assertSee('No digests yet');
     }
 
     #[Test]
@@ -109,6 +112,7 @@ class FlintPageTest extends TestCase
         ]);
 
         Volt::test('flint.index')
+            ->set('activeTab', 'today')
             ->assertDontSee('Someone elses digest')
             ->assertSee('No digests yet');
     }
@@ -132,6 +136,7 @@ class FlintPageTest extends TestCase
         ]);
 
         Volt::test('flint.index')
+            ->set('activeTab', 'today')
             ->assertSee('Why were you up so late?')
             ->assertSee('Sleep debt is building');
     }
@@ -139,12 +144,24 @@ class FlintPageTest extends TestCase
     #[Test]
     public function it_can_switch_to_an_older_digest(): void
     {
-        $this->createDigest(['title' => 'Today'], Carbon::parse(now()->toDateString(), 'UTC'));
-        $older = $this->createDigest(['title' => 'Yesterday'], Carbon::parse(now()->subDay()->toDateString(), 'UTC'));
+        $this->createDigest(
+            ['title' => 'Today', 'summary' => 'Todays prose.'],
+            Carbon::parse(now()->toDateString(), 'UTC'),
+        );
+        $older = $this->createDigest(
+            ['title' => 'Yesterday', 'summary' => 'Yesterdays prose.'],
+            Carbon::parse(now()->subDay()->toDateString(), 'UTC'),
+        );
 
+        // Both titles sit in the recent-digests list either way, so assert on the
+        // summary — only the selected digest's prose is rendered.
         Volt::test('flint.index')
+            ->set('activeTab', 'today')
+            ->assertSee('Todays prose.')
+            ->assertDontSee('Yesterdays prose.')
             ->call('selectDigest', $older->id)
-            ->assertSee('Yesterday');
+            ->assertSee('Yesterdays prose.')
+            ->assertDontSee('Todays prose.');
     }
 
     #[Test]
@@ -162,7 +179,10 @@ class FlintPageTest extends TestCase
             'type' => 'discussed_in',
         ]);
 
-        Volt::test('flint.index')->assertSee('Canada trip 2027');
+        Volt::test('flint.index')
+            ->set('activeTab', 'today')
+            ->set('topicStatusFilter', 'resolved')
+            ->assertSee('Canada trip 2027');
     }
 
     #[Test]
@@ -172,6 +192,7 @@ class FlintPageTest extends TestCase
         $this->createTopic(['status' => 'resolved', 'kind' => 'tactical'], 'Boiler replacement');
 
         Volt::test('flint.index')
+            ->set('activeTab', 'topics')
             ->assertSee('Canada trip 2027')
             ->assertDontSee('Boiler replacement')
             ->set('topicStatusFilter', 'resolved')
@@ -186,6 +207,7 @@ class FlintPageTest extends TestCase
         $this->createTopic(['kind' => 'thematic'], 'Getting back to running');
 
         Volt::test('flint.index')
+            ->set('activeTab', 'topics')
             ->set('topicKindFilter', 'thematic')
             ->assertSee('Getting back to running')
             ->assertDontSee('Canada trip 2027');
@@ -197,6 +219,7 @@ class FlintPageTest extends TestCase
         $topic = $this->createTopic();
 
         Volt::test('flint.index')
+            ->set('activeTab', 'topics')
             ->call('editTopic', $topic->id)
             ->assertSet('editTitle', 'Canada trip 2027')
             ->set('editTitle', 'Canada trip 2028')

@@ -77,12 +77,20 @@ new class extends Component {
     // ------------------------------------------------------------------
 
     /**
+     * Memo for the digest list. Private, so Livewire never hydrates it: it lives
+     * for one request, which is exactly as long as the memo should be valid.
+     *
+     * @var \Illuminate\Support\Collection<int, Event>|null
+     */
+    private ?\Illuminate\Support\Collection $digestCache = null;
+
+    /**
      * Digest events, newest first. These are written by the Flint routine via
      * the create-flint-digest MCP tool — the same rows the mobile app reads.
      */
     public function digests(int $limit = 30)
     {
-        return Event::query()
+        return $this->digestCache ??= Event::query()
             ->whereIn('integration_id', Auth::user()->integrations()->pluck('id'))
             ->where('service', 'flint')
             ->where('action', 'had_summary')
@@ -101,7 +109,9 @@ new class extends Component {
             ? $digests->firstWhere('id', $this->selectedDigestId)
             : $digests->first();
 
-        return $digest?->loadMissing('blocks');
+        // block-card and the question view both reach through to the block's event
+        // for its plugin styling, so pull that in rather than paying it per block.
+        return $digest?->loadMissing(['blocks.event.integration']);
     }
 
     public function selectDigest(string $eventId): void
