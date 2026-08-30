@@ -5,6 +5,7 @@ namespace App\Jobs\Flint;
 use App\Models\User;
 use App\Services\FlintDigestService;
 use App\Services\Flint\RoutineConfig;
+use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
@@ -14,7 +15,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -72,27 +72,27 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
         $integration = $digests->resolveIntegration($this->user);
         $task = $this->taskDefinition();
-        $url = RoutineConfig::url($this->routine);
+        $driver = app(RoutineDriverManager::class);
+        $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
 
-        if (empty($url)) {
-            Log::info('Flint routine webhook URL not configured; skipping trigger', [
+        if (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
+            Log::info('Flint routine trigger skipped (already triggered)', [
                 'user_id' => $this->user->id,
                 'routine' => $this->routine,
-            ]);
-
-            $store->recordStatus($integration, $task, 'not_applicable', [
                 'local_date' => $this->localDate,
-                'reason' => 'Webhook URL is not configured.',
-                'error' => null,
             ]);
 
             return;
         }
 
-        $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
+        // Second-line guard. The Redis marker is cleared when a run fails, so a
+        // retry after a run that already did its work — wrote a digest, touched
+        // topics — would otherwise repeat it. The recorded success carries the
+        // local date it was for.
+        $lastSuccess = $store->getTaskExecutions($integration)[$task->key]['last_success'] ?? null;
 
-        if (! Cache::add($markerKey, true, $this->markerTtlSeconds())) {
-            Log::info('Flint routine trigger skipped (already triggered)', [
+        if (is_array($lastSuccess) && ($lastSuccess['local_date'] ?? null) === $this->localDate) {
+            Log::info('Flint routine trigger skipped (already succeeded for this local date)', [
                 'user_id' => $this->user->id,
                 'routine' => $this->routine,
                 'local_date' => $this->localDate,
@@ -114,48 +114,38 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'idempotency_key' => $markerKey,
         ];
 
-        $request = Http::withSentryTracing()->asJson()->timeout(20)->connectTimeout(5);
-
-        if ($secret = RoutineConfig::secret($this->routine)) {
-            $request = $request->withToken($secret);
-        }
-
         try {
-            $response = $request->post($url, $payload);
+            $result = $driver->for($this->routine)->run($this->user, $this->routine, $payload);
         } catch (Throwable $exception) {
             Cache::forget($markerKey);
             $store->recordStatus($integration, $task, 'failed', [
                 'local_date' => $this->localDate,
-                'error' => $exception->getMessage(),
+                'error' => redact_sensitive_urls($exception->getMessage()),
             ]);
 
             throw $exception;
         }
 
-        if (! $response->successful()) {
-            Log::error('Flint routine webhook returned a non-2xx response', [
-                'user_id' => $this->user->id,
-                'routine' => $this->routine,
-                'status' => $response->status(),
-            ]);
-
+        if ($result->status === 'not_applicable') {
             Cache::forget($markerKey);
-            $store->recordStatus($integration, $task, 'failed', [
+            $store->recordStatus($integration, $task, 'not_applicable', [
                 'local_date' => $this->localDate,
-                'error' => "HTTP {$response->status()}: {$response->body()}",
-            ]);
-            $response->throw();
+                'error' => null,
+            ] + $result->details);
+
+            return;
         }
 
         $store->recordStatus($integration, $task, 'success', [
             'local_date' => $this->localDate,
-        ]);
+        ] + $result->details);
 
-        Log::info('Flint routine webhook triggered', [
+        Log::info('Flint routine triggered', [
             'user_id' => $this->user->id,
             'routine' => $this->routine,
             'local_date' => $this->localDate,
             'timezone' => $this->timezone,
+            'driver' => $driver->driverName($this->routine),
         ]);
     }
 

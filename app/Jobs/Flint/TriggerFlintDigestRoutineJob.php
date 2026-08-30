@@ -5,7 +5,7 @@ namespace App\Jobs\Flint;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\FlintDigestService;
-use App\Services\Flint\RoutineConfig;
+use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
@@ -15,7 +15,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -81,18 +80,6 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             return;
         }
 
-        $url = RoutineConfig::url('digest');
-
-        if (empty($url)) {
-            Log::warning('Flint routine webhook URL not configured; skipping trigger', [
-                'user_id' => $this->user->id,
-                'period' => $this->period,
-            ]);
-            Cache::forget($markerKey);
-
-            return;
-        }
-
         $digest = app(FlintDigestService::class)->resolveDigestObject(
             $this->user,
             $this->period,
@@ -116,34 +103,31 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'idempotency_key' => $markerKey,
         ];
 
-        $request = Http::withSentryTracing()->asJson()->timeout(20)->connectTimeout(5);
-
-        if ($secret = RoutineConfig::secret('digest')) {
-            $request = $request->withToken($secret);
-        }
+        $driver = app(RoutineDriverManager::class);
 
         try {
-            $response = $request->post($url, $payload);
+            $result = $driver->for('digest')->run($this->user, 'digest', $payload);
         } catch (Throwable $exception) {
             Cache::forget($markerKey);
-            $store->recordStatus($digest, $task, 'failed', ['triggered_by' => $this->triggerReason, 'error' => $exception->getMessage()]);
+            $store->recordStatus($digest, $task, 'failed', [
+                'triggered_by' => $this->triggerReason,
+                'error' => redact_sensitive_urls($exception->getMessage()),
+            ]);
 
             throw $exception;
         }
 
-        if (! $response->successful()) {
-            Log::error('Flint routine webhook returned a non-2xx response', [
-                'user_id' => $this->user->id,
-                'period' => $this->period,
-                'status' => $response->status(),
-            ]);
-
+        if ($result->status === 'not_applicable') {
             Cache::forget($markerKey);
-            $store->recordStatus($digest, $task, 'failed', ['triggered_by' => $this->triggerReason, 'error' => "HTTP {$response->status()}: {$response->body()}"]);
-            $response->throw();
+            $store->recordStatus($digest, $task, 'not_applicable', [
+                'triggered_by' => $this->triggerReason,
+                'error' => null,
+            ] + $result->details);
+
+            return;
         }
 
-        $store->recordStatus($digest, $task, 'success', ['triggered_by' => $this->triggerReason]);
+        $store->recordStatus($digest, $task, 'success', ['triggered_by' => $this->triggerReason] + $result->details);
 
         Log::info('Flint routine webhook triggered', [
             'user_id' => $this->user->id,

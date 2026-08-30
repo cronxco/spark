@@ -432,7 +432,7 @@ if (! function_exists('sanitizeHeaders')) {
 if (! function_exists('sanitizeData')) {
     function sanitizeData(array $data): array
     {
-        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key', 'access_token', 'refresh_token', 'authorization', 'webhook_secret'];
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key', 'access_token', 'refresh_token', 'authorization', 'webhook_secret', 'server_url', 'cronxtools_url'];
         $sanitized = [];
 
         foreach ($data as $key => $value) {
@@ -441,12 +441,35 @@ if (! function_exists('sanitizeData')) {
                 $sanitized[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $sanitized[$key] = sanitizeData($value);
+            } elseif (is_string($value)) {
+                $sanitized[$key] = redact_sensitive_urls($value);
             } else {
                 $sanitized[$key] = $value;
             }
         }
 
         return $sanitized;
+    }
+}
+
+/**
+ * Redact credentials that live inside a URL rather than a header.
+ */
+if (! function_exists('redact_sensitive_urls')) {
+    /**
+     * The CronxTools MCP URL carries its bearer token in the URL itself, so it
+     * is a credential wherever it appears — including embedded in a longer
+     * string such as a serialised request body.
+     */
+    function redact_sensitive_urls(string $value): string
+    {
+        $url = config('services.flint_routine.cronxtools_url');
+
+        if (is_string($url) && $url !== '' && str_contains($value, $url)) {
+            return str_replace($url, '[REDACTED_MCP_URL]', $value);
+        }
+
+        return $value;
     }
 }
 

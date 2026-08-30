@@ -236,6 +236,17 @@ return [
     // Spark owns the timing (in the user's effective timezone) and POSTs to the
     // routine, which calls back via the create-flint-digest MCP tool.
     'flint_routine' => [
+        // The CronxTools MCP endpoint OpenAI connects to when running a Flint
+        // skill. The bearer token is embedded in the URL, so this value is a
+        // credential: it must never reach a log, a span or a stored payload.
+        // See redact_sensitive_urls() in app/Support/helpers.php.
+        'cronxtools_url' => env('FLINT_CRONXTOOLS_URL'),
+
+        // How a routine is run: 'webhook' hands it to a Claude Code Routine,
+        // 'openai' runs the vendored skill in-process. Individual routines may
+        // override this, so the two can be compared on the same input.
+        'driver' => env('FLINT_ROUTINE_DRIVER', 'webhook'),
+
         // Shared fallback bearer secret. Per-routine secrets below take
         // precedence; this exists so they can be rolled out one routine at a
         // time rather than on a flag day.
@@ -248,18 +259,22 @@ return [
             'digest' => [
                 'url' => env('FLINT_ROUTINE_WEBHOOK_URL'),
                 'secret' => env('FLINT_DIGEST_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_DIGEST_DRIVER'),
             ],
             'topics' => [
                 'url' => env('FLINT_TOPICS_WEBHOOK_URL'),
                 'secret' => env('FLINT_TOPICS_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_TOPICS_DRIVER'),
             ],
             'reading_list' => [
                 'url' => env('FLINT_READING_LIST_WEBHOOK_URL'),
                 'secret' => env('FLINT_READING_LIST_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_READING_LIST_DRIVER'),
             ],
             'news_roundup' => [
                 'url' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_URL'),
                 'secret' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_NEWS_ROUNDUP_DRIVER'),
             ],
         ],
 
