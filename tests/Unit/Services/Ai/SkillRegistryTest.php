@@ -11,15 +11,6 @@ use Tests\TestCase;
 
 class SkillRegistryTest extends TestCase
 {
-    private function writeSkill(string $name, string $frontmatter, string $body = "Do the thing."): string
-    {
-        $dir = resource_path('ai/skills');
-        $path = "{$dir}/{$name}.md";
-        File::put($path, "---\n{$frontmatter}\n---\n\n{$body}\n");
-
-        return $path;
-    }
-
     #[Test]
     public function it_loads_the_four_vendored_async_skills(): void
     {
@@ -110,5 +101,14 @@ class SkillRegistryTest extends TestCase
         $this->expectExceptionMessage('Unknown Flint skill: not-a-skill');
 
         (new SkillRegistry)->get('not-a-skill');
+    }
+
+    private function writeSkill(string $name, string $frontmatter, string $body = 'Do the thing.'): string
+    {
+        $dir = resource_path('ai/skills');
+        $path = "{$dir}/{$name}.md";
+        File::put($path, "---\n{$frontmatter}\n---\n\n{$body}\n");
+
+        return $path;
     }
 }

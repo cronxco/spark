@@ -3,17 +3,11 @@
 namespace Tests\Unit\Services\Ai\Knowledge;
 
 use App\Services\Ai\Knowledge\SummaryGenerator;
-use App\Services\Ai\PromptRepository;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SummaryGeneratorTest extends TestCase
 {
-    private function generator(): SummaryGenerator
-    {
-        return new SummaryGenerator(new PromptRepository);
-    }
-
     #[Test]
     public function it_repairs_missing_summary_tweet_from_summary_short(): void
     {
@@ -59,5 +53,10 @@ class SummaryGeneratorTest extends TestCase
         $summaries = $this->generator()->normalise(['emoji' => 'x']);
 
         $this->assertArrayNotHasKey('summary_tweet', $summaries);
+    }
+
+    private function generator(): SummaryGenerator
+    {
+        return app(SummaryGenerator::class);
     }
 }

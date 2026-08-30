@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Ai;
 
+use App\Services\Ai\Knowledge\SummaryGenerator;
 use App\Services\Ai\PromptRepository;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
@@ -24,7 +25,7 @@ class PromptRepositoryTest extends TestCase
     {
         $prompt = (new PromptRepository)->get('knowledge/generate-summaries');
 
-        foreach (\App\Services\Ai\Knowledge\SummaryGenerator::REQUIRED_KEYS as $key) {
+        foreach (SummaryGenerator::REQUIRED_KEYS as $key) {
             $this->assertStringContainsString($key, $prompt, "Prompt no longer mentions {$key}");
         }
     }

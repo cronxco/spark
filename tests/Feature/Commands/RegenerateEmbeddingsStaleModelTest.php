@@ -12,17 +12,6 @@ use Tests\TestCase;
 
 class RegenerateEmbeddingsStaleModelTest extends TestCase
 {
-    private function eventEmbeddedWith(?string $model): Event
-    {
-        $integration = Integration::factory()->create(['service' => 'fetch']);
-
-        return Event::factory()->create([
-            'integration_id' => $integration->id,
-            'event_metadata' => $model === null ? [] : ['embedding_model' => $model],
-            'embeddings' => EmbeddingClient::formatForPostgres(array_fill(0, 1536, 0.1)),
-        ]);
-    }
-
     #[Test]
     public function it_only_requeues_rows_embedded_with_a_different_model(): void
     {
@@ -80,5 +69,16 @@ class RegenerateEmbeddingsStaleModelTest extends TestCase
             ->assertSuccessful();
 
         Queue::assertNothingPushed();
+    }
+
+    private function eventEmbeddedWith(?string $model): Event
+    {
+        $integration = Integration::factory()->create(['service' => 'fetch']);
+
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'event_metadata' => $model === null ? [] : ['embedding_model' => $model],
+            'embeddings' => EmbeddingClient::formatForPostgres(array_fill(0, 1536, 0.1)),
+        ]);
     }
 }

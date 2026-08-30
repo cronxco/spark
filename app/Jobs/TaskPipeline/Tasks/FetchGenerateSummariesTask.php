@@ -80,7 +80,6 @@ class FetchGenerateSummariesTask extends BaseTaskJob
         return app(SummaryGenerator::class)->generate($title, $articleText, ['event_id' => $this->model->id]);
     }
 
-
     private function createSummaryBlocks(Event $event, $webpage, array $extracted, array $summaries): void
     {
         $model = AiModel::Extraction->model();

@@ -3,8 +3,8 @@
 namespace Tests\Unit\Services\Ai;
 
 use App\Services\Ai\AiModel;
-use RuntimeException;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class AiModelTest extends TestCase

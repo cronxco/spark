@@ -6,6 +6,8 @@ use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use Sentry\SentrySdk;
+use Sentry\Tracing\TransactionContext;
 use Tests\TestCase;
 
 class EmbeddingClientTest extends TestCase
@@ -70,14 +72,6 @@ class EmbeddingClientTest extends TestCase
         (new EmbeddingClient)->embed('searchable text', useCache: false);
     }
 
-    private function validEmbedding(): array
-    {
-        $embedding = array_fill(0, 1536, 0.0);
-        $embedding[0] = 0.25;
-
-        return $embedding;
-    }
-
     #[Test]
     public function it_opens_a_gen_ai_span_so_the_highest_volume_ai_call_is_traced(): void
     {
@@ -91,9 +85,9 @@ class EmbeddingClientTest extends TestCase
         ]);
 
         $transaction = \Sentry\startTransaction(
-            new \Sentry\Tracing\TransactionContext('embedding-test')
+            new TransactionContext('embedding-test')
         );
-        \Sentry\SentrySdk::getCurrentHub()->setSpan($transaction);
+        SentrySdk::getCurrentHub()->setSpan($transaction);
 
         (new EmbeddingClient)->embed('some text', useCache: false);
 
@@ -109,5 +103,13 @@ class EmbeddingClientTest extends TestCase
             $genAiSpans[0]->getData()['gen_ai.usage.input_tokens'] ?? null,
             'Embedding span did not record token usage'
         );
+    }
+
+    private function validEmbedding(): array
+    {
+        $embedding = array_fill(0, 1536, 0.0);
+        $embedding[0] = 0.25;
+
+        return $embedding;
     }
 }

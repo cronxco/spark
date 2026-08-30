@@ -104,7 +104,6 @@ class GenerateSummariesJob implements ShouldQueue
         return app(SummaryGenerator::class)->generate($title, $articleText, ['url' => $this->webpage->url]);
     }
 
-
     private function createSummaryBlocks(array $summaries): void
     {
         $model = AiModel::Extraction->model();

@@ -4,8 +4,8 @@ namespace App\Jobs\Flint;
 
 use App\Models\Event;
 use App\Models\User;
-use App\Services\FlintDigestService;
 use App\Services\Flint\Routines\RoutineDriverManager;
+use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;

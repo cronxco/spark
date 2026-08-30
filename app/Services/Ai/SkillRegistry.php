@@ -120,7 +120,6 @@ class SkillRegistry
     }
 
     /**
-     * @param  mixed  $tools
      * @return array<int, string>
      */
     private function validateTools(string $file, mixed $tools): array
