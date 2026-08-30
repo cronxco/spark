@@ -171,6 +171,35 @@ new class extends Component
         return $this->allTasks->pluck('appliesTo')->flatten()->unique()->sort()->values()->toArray();
     }
 
+    /**
+     * Task filter options: registry-defined tasks plus any task_key observed
+     * in task_executions (e.g. Flint digest dispatches, which are anchored to
+     * a real entity but deliberately not registered in the TaskRegistry).
+     */
+    public function getTaskFilterOptionsProperty(): Collection
+    {
+        $fromRegistry = $this->allTasks->map(fn ($task) => ['key' => $task->key, 'name' => $task->name]);
+
+        $fromExecutions = TaskExecution::query()
+            ->select('task_key', 'task_name')
+            ->distinct()
+            ->get()
+            ->map(fn (TaskExecution $execution) => ['key' => $execution->task_key, 'name' => $execution->task_name ?? $execution->task_key]);
+
+        return $fromRegistry->concat($fromExecutions)->unique('key')->sortBy('name')->values();
+    }
+
+    /**
+     * Entity-type filter options: registry-declared appliesTo values plus any
+     * entity_type observed in task_executions.
+     */
+    public function getEntityTypeFilterOptionsProperty(): Collection
+    {
+        $fromExecutions = TaskExecution::query()->distinct()->pluck('entity_type');
+
+        return collect($this->uniqueAppliesTo)->concat($fromExecutions)->unique()->sort()->values();
+    }
+
     protected function windowStart(): \Carbon\Carbon
     {
         return match ($this->window) {
@@ -606,14 +635,14 @@ new class extends Component
 
                                 <select class="select select-bordered select-sm" wire:model.live="execTaskFilter">
                                     <option value="">All Tasks</option>
-                                    @foreach ($this->allTasks->sortBy('name') as $task)
-                                        <option value="{{ $task->key }}">{{ $task->name }}</option>
+                                    @foreach ($this->taskFilterOptions as $task)
+                                        <option value="{{ $task['key'] }}">{{ $task['name'] }}</option>
                                     @endforeach
                                 </select>
 
                                 <select class="select select-bordered select-sm" wire:model.live="execEntityTypeFilter">
                                     <option value="">All Types</option>
-                                    @foreach ($this->uniqueAppliesTo as $type)
+                                    @foreach ($this->entityTypeFilterOptions as $type)
                                         <option value="{{ $type }}">{{ ucfirst($type) }}</option>
                                     @endforeach
                                 </select>
