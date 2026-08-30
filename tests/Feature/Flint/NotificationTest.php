@@ -3,7 +3,6 @@
 namespace Tests\Feature\Flint;
 
 use App\Jobs\Flint\SendDigestNotificationJob;
-use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -45,61 +44,53 @@ class NotificationTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * Create a digest the way the Flint routine does through
+     * create-flint-digest: a `had_summary` event carrying the title and summary
+     * prose in `event_metadata`, targeting the digest object.
+     */
+    private function createDigest(string $period, array $metadata = [], ?Carbon $time = null): Event
+    {
+        $time ??= Carbon::parse(now()->toDateString(), 'UTC');
+
+        $digestObject = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'digest',
+            'type' => $period . '_digest',
+            'title' => $time->format('Y-m-d') . ' ' . strtoupper(substr($period, 0, 3)),
+            'time' => $time,
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'target_id' => $digestObject->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => $time,
+            'event_metadata' => array_merge([
+                'period' => $period,
+                'digest_object_id' => $digestObject->id,
+                'title' => 'Your ' . ucfirst($period) . ' Digest',
+                'summary' => 'You slept well and ran 5k. Tomorrow looks quieter.',
+            ], $metadata),
+        ]);
+    }
+
     #[Test]
     public function sends_digest_notification_when_digest_exists(): void
     {
         Notification::fake();
 
-        // Create a day object to be the target
-        $dayObject = EventObject::factory()->create([
-            'concept' => 'day',
-            'type' => 'day',
-            'title' => now()->format('Y-m-d'),
-            'time' => now()->startOfDay(),
-        ]);
+        $digest = $this->createDigest('morning');
 
-        // Create a flint event
-        $flintEvent = Event::factory()->create([
-            'integration_id' => $this->flintIntegration->id,
-            'target_id' => $dayObject->id,
-            'service' => 'flint',
-            'action' => 'had_analysis',
-            'time' => now(),
-        ]);
+        (new SendDigestNotificationJob($this->user, '06:00'))->handle();
 
-        // Create a digest block
-        $digestBlock = Block::create([
-            'event_id' => $flintEvent->id,
-            'block_type' => 'flint_digest',
-            'time' => now(),
-            'metadata' => [
-                'headline' => 'Your Morning Digest',
-                'summary' => 'Here is what happened today.',
-                'top_insights' => [
-                    [
-                        'icon' => '💡',
-                        'title' => 'Great sleep',
-                        'description' => 'You got 8 hours of sleep.',
-                    ],
-                ],
-                'wins' => ['Completed morning workout'],
-                'watch_points' => [],
-                'tomorrow_focus' => ['Focus on hydration'],
-            ],
-        ]);
-
-        // Run the notification job (06:00 is morning)
-        $job = new SendDigestNotificationJob($this->user, '06:00');
-        $job->handle();
-
-        // Assert notification was sent
         Notification::assertSentTo(
             [$this->user],
             DailyDigestReady::class,
-            function ($notification) use ($dayObject) {
-                return $notification->digestObject->id === $dayObject->id
-                    && $notification->period === 'morning';
-            }
+            fn (DailyDigestReady $notification) => $notification->digestObject->id === $digest->target_id
+                && $notification->period === 'morning'
+                && $notification->title === 'Your Morning Digest',
         );
     }
 
@@ -108,77 +99,108 @@ class NotificationTest extends TestCase
     {
         Notification::fake();
 
-        // Run the notification job without creating a digest
-        $job = new SendDigestNotificationJob($this->user, '06:00');
-        $job->handle();
+        (new SendDigestNotificationJob($this->user, '06:00'))->handle();
 
-        // Assert no notification was sent
         Notification::assertNothingSent();
     }
 
     #[Test]
-    public function notification_contains_correct_digest_data(): void
+    public function notification_carries_the_digest_summary(): void
     {
         Notification::fake();
 
-        // Create a day object to be the target
-        $dayObject = EventObject::factory()->create([
-            'concept' => 'day',
-            'type' => 'day',
-            'title' => now()->format('Y-m-d'),
-            'time' => now()->startOfDay(),
+        $this->createDigest('evening', [
+            'title' => 'Evening Digest',
+            'summary' => 'Your evening summary.',
         ]);
 
-        // Create a flint event
-        $flintEvent = Event::factory()->create([
-            'integration_id' => $this->flintIntegration->id,
-            'target_id' => $dayObject->id,
-            'service' => 'flint',
-            'action' => 'had_analysis',
-            'time' => now(),
-        ]);
+        (new SendDigestNotificationJob($this->user, '18:00'))->handle();
 
-        // Create a digest with specific data
-        $digestBlock = Block::create([
-            'event_id' => $flintEvent->id,
-            'block_type' => 'flint_digest',
-            'time' => now(),
-            'metadata' => [
-                'headline' => 'Evening Digest',
-                'summary' => 'Your evening summary.',
-                'top_insights' => [
-                    [
-                        'icon' => '🏃',
-                        'title' => 'Active day',
-                        'description' => 'You walked 10,000 steps.',
-                    ],
-                ],
-                'wins' => ['Hit step goal'],
-                'watch_points' => ['Missed workout'],
-                'tomorrow_focus' => ['Morning run'],
-            ],
-        ]);
-
-        // Run the notification job (18:00 is evening)
-        $job = new SendDigestNotificationJob($this->user, '18:00');
-        $job->handle();
-
-        // Assert notification was sent with correct data
         Notification::assertSentTo(
             [$this->user],
             DailyDigestReady::class,
-            function ($notification) use ($dayObject) {
-                return $notification->digestObject->id === $dayObject->id
-                    && $notification->period === 'evening'
-                    && count($notification->blocks) > 0;
-            }
+            fn (DailyDigestReady $notification) => $notification->period === 'evening'
+                && $notification->title === 'Evening Digest'
+                && $notification->summary === 'Your evening summary.',
         );
     }
 
+    #[Test]
+    public function it_counts_unanswered_questions_for_the_notification(): void
+    {
+        Notification::fake();
+
+        $digest = $this->createDigest('evening');
+
+        $digest->createBlock([
+            'block_type' => 'flint_user_question',
+            'title' => 'Answered already',
+            'time' => $digest->time,
+            'metadata' => ['question' => 'How was the run?', 'answer' => 'Good'],
+        ]);
+        $digest->createBlock([
+            'block_type' => 'flint_user_question',
+            'title' => 'Still open',
+            'time' => $digest->time,
+            'metadata' => ['question' => 'Why the late night?', 'answer' => null],
+        ]);
+
+        (new SendDigestNotificationJob($this->user, '18:00'))->handle();
+
+        Notification::assertSentTo(
+            [$this->user],
+            DailyDigestReady::class,
+            fn (DailyDigestReady $notification) => $notification->unansweredQuestionCount === 1,
+        );
+    }
+
+    #[Test]
+    public function it_announces_the_digest_it_was_handed_by_id(): void
+    {
+        Notification::fake();
+
+        $this->createDigest('morning', ['title' => 'Morning Digest']);
+        $evening = $this->createDigest('evening', ['title' => 'Evening Digest']);
+
+        // The schedule time says morning, but an explicit event id wins.
+        (new SendDigestNotificationJob($this->user, '06:00', 'evening', $evening->id))->handle();
+
+        Notification::assertSentTo(
+            [$this->user],
+            DailyDigestReady::class,
+            fn (DailyDigestReady $notification) => $notification->title === 'Evening Digest',
+        );
+    }
+
+    #[Test]
+    public function it_does_not_notify_about_another_users_digest(): void
+    {
+        Notification::fake();
+
+        $other = User::factory()->create();
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'service' => 'flint',
+            'instance_type' => 'digest',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => Carbon::parse(now()->toDateString(), 'UTC'),
+            'event_metadata' => ['period' => 'morning', 'title' => 'Not yours'],
+        ]);
+
+        (new SendDigestNotificationJob($this->user, '06:00'))->handle();
+
+        Notification::assertNothingSent();
+    }
+
     /**
-     * The digest block lookup must use the user's effective-timezone local day,
-     * not the server (UTC) day. A far-west user's digest is dated for their local
-     * day but stored at that date's 00:00 UTC marker (see CreateFlintDigestTool);
+     * The digest lookup must use the user's effective-timezone local day, not
+     * the server (UTC) day. A far-west user's digest is dated for their local
+     * day but stored at that date's 00:00 UTC marker (see FlintDigestService);
      * once UTC has rolled past midnight, a server-tz `startOfDay()` bound would
      * wrongly exclude it. Reproduces and guards the far-west day-boundary bug.
      */
@@ -194,42 +216,16 @@ class NotificationTest extends TestCase
         // The user is late in their local day; UTC has already rolled to the 15th.
         Carbon::setTestNow(Carbon::parse("{$localDate} 22:00", 'Pacific/Honolulu')); // = 2026-06-15 08:00 UTC
 
-        $dayObject = EventObject::factory()->create([
-            'concept' => 'day',
-            'type' => 'day',
-            'title' => $localDate,
-            'time' => Carbon::parse($localDate, 'UTC'),
-        ]);
+        // 2026-06-14 00:00 UTC — BEFORE now()->startOfDay() (= 2026-06-15 00:00 UTC).
+        $digest = $this->createDigest('evening', [], Carbon::parse($localDate, 'UTC'));
 
-        // Mirror production storage: the had_summary event's `time` is the
-        // local_date anchored at 00:00 UTC (CreateFlintDigestTool:113), which is
-        // BEFORE now()->startOfDay() (= 2026-06-15 00:00 UTC) at this moment.
-        $flintEvent = Event::factory()->create([
-            'integration_id' => $this->flintIntegration->id,
-            'target_id' => $dayObject->id,
-            'service' => 'flint',
-            'action' => 'had_summary',
-            'time' => Carbon::parse($localDate, 'UTC'), // 2026-06-14 00:00 UTC
-        ]);
-
-        Block::create([
-            'event_id' => $flintEvent->id,
-            'block_type' => 'flint_digest',
-            'time' => Carbon::parse($localDate, 'UTC'),
-            'metadata' => [
-                'headline' => 'Evening Digest',
-                'summary' => 'Far-west summary.',
-            ],
-        ]);
-
-        $job = new SendDigestNotificationJob($this->user, '18:00');
-        $job->handle();
+        (new SendDigestNotificationJob($this->user, '18:00'))->handle();
 
         Notification::assertSentTo(
             [$this->user],
             DailyDigestReady::class,
-            fn ($notification) => $notification->digestObject->id === $dayObject->id
-                && $notification->period === 'evening'
+            fn (DailyDigestReady $notification) => $notification->digestObject->id === $digest->target_id
+                && $notification->period === 'evening',
         );
     }
 }

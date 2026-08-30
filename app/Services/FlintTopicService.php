@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Api\EntityMutationService;
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -83,7 +86,87 @@ class FlintTopicService
         return ['data' => $topics->map(fn (EventObject $topic) => $this->payload($topic))->all()];
     }
 
-    private function topics(User $user)
+    /**
+     * Delete a topic the user owns. Its `discussed_in` links go with it.
+     */
+    public function delete(User $user, string $id): bool
+    {
+        $topic = $this->topics($user)->find($id);
+
+        if (! $topic) {
+            return false;
+        }
+
+        $topic->delete();
+
+        return true;
+    }
+
+    /**
+     * Every topic the user owns, optionally narrowed by status and kind.
+     *
+     * Exposed for the Flint web UI, which renders the models directly rather
+     * than the flattened MCP payload.
+     */
+    public function query(User $user, ?string $status = null, ?string $kind = null): Builder
+    {
+        return $this->topics($user)
+            ->when($status, fn (Builder $query) => $query->where('metadata->status', $status))
+            ->when($kind, fn (Builder $query) => $query->where('metadata->kind', $kind));
+    }
+
+    /**
+     * How many topics the user has in each status, for the filter chips.
+     *
+     * @return array<string, int>
+     */
+    public function statusCounts(User $user): array
+    {
+        return $this->topics($user)
+            ->get(['id', 'metadata'])
+            ->countBy(fn (EventObject $topic) => $topic->metadata['status'] ?? 'active')
+            ->all();
+    }
+
+    /**
+     * The digest events and blocks that have discussed a topic, newest first.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function mentions(EventObject $topic, int $limit = 20): Collection
+    {
+        $events = $topic->relatedEvents('discussed_in')
+            ->latest('time')
+            ->limit($limit)
+            ->get()
+            ->map(fn (Event $event) => [
+                'kind' => 'event',
+                'id' => $event->id,
+                'time' => $event->time,
+                'title' => $event->event_metadata['title'] ?? $event->action,
+                'detail' => $event->event_metadata['period'] ?? null,
+            ]);
+
+        $blocks = $topic->relatedBlocks('discussed_in')
+            ->latest('time')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($block) => [
+                'kind' => 'block',
+                'id' => $block->id,
+                'time' => $block->time,
+                'title' => $block->title,
+                'detail' => $block->block_type,
+            ]);
+
+        return $events->concat($blocks)
+            ->sortByDesc(fn (array $mention) => $mention['time'])
+            ->take($limit)
+            ->values();
+    }
+
+    /** @return Builder<EventObject> */
+    private function topics(User $user): Builder
     {
         return EventObject::query()
             ->where('user_id', $user->id)

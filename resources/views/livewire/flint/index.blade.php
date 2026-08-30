@@ -1,663 +1,646 @@
 <?php
 
-use App\Models\Block;
+use App\Models\Event;
 use App\Models\EventObject;
-use App\Services\PatternLearningService;
+use App\Services\AgentWorkingMemoryService;
+use App\Services\FlintTopicService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
 new class extends Component {
     use Toast;
 
+    public string $activeTab = 'today';
+
+    // --- Settings (mirrors the keys the flint-digest-dispatcher actually reads) ---
     public bool $digestsEnabled = true;
-    public string $scheduleTimezone = 'Europe/London';
-    public array $scheduleTimesWeekday = ['06:00', '18:00'];
-    public array $scheduleTimesWeekend = ['08:00', '19:00'];
-    public array $enabledDomains = ['health', 'knowledge', 'online'];
+    public string $morningTimeWeekday = '07:30';
+    public string $morningTimeWeekend = '09:30';
+    public string $morningFallback = '11:00';
+    public string $eveningTime = '19:30';
+    public string $topicsTime = '21:00';
+    public string $readingListTime = '20:00';
+    public string $newsRoundupTime = '07:00';
 
-    // UI state
-    public string $activeTab = 'newspaper';
-    public string $newWeekdayTime = '09:00';
-    public string $newWeekendTime = '09:00';
-    public bool $loadingTab = false;
+    // --- Today ---
+    public ?string $selectedDigestId = null;
 
-    // Memory data
-    public array $workingMemory = [];
-    public array $feedbackStats = [];
-    public array $patterns = [];
-    public array $learnedPatterns = [];
-    public array $recentInsights = [];
-    public int $patternsPerPage = 10;
-    public int $patternsPage = 1;
-    public int $totalPatterns = 0;
-
-    // Digest/Newspaper data
-    public ?array $latestDigest = null;
-    public ?array $newsBriefing = null;
-    public ?array $articlesWaiting = null;
-    public array $digestArchive = [];
-    public bool $showArchive = false;
-    public ?string $expandedArchiveDigestId = null;
-    public array $readArticles = [];
-
-    public array $availableDomains = [
-        'health' => [
-            'label' => 'Health & Fitness',
-            'description' => 'Sleep, exercise, heart rate, and wellness metrics',
-        ],
-        'knowledge' => [
-            'label' => 'Knowledge & Learning',
-            'description' => 'Articles, notes, and learning patterns',
-        ],
-        'online' => [
-            'label' => 'Online & Productivity',
-            'description' => 'Tasks, projects, and digital productivity',
-        ],
-    ];
-
-    public array $timezones = [
-        'UTC' => 'UTC',
-        'Europe/London' => 'London',
-        'Europe/Paris' => 'Paris',
-        'America/New_York' => 'New York',
-        'America/Chicago' => 'Chicago',
-        'America/Los_Angeles' => 'Los Angeles',
-        'America/Toronto' => 'Toronto',
-        'Australia/Sydney' => 'Sydney',
-        'Asia/Tokyo' => 'Tokyo',
-    ];
+    // --- Topics ---
+    public string $topicKindFilter = '';
+    public string $topicStatusFilter = 'active';
+    public ?string $expandedTopicId = null;
+    public ?string $editingTopicId = null;
+    public string $editTitle = '';
+    public string $editContent = '';
+    public string $editKind = 'thematic';
+    public string $editStatus = 'active';
+    public ?string $editNextReviewAt = null;
 
     public array $timeOptions = [];
 
+    public array $topicKinds = [
+        'strategic' => 'Strategic — a long horizon outcome',
+        'thematic' => 'Thematic — an ongoing thread with no end date',
+        'tactical' => 'Tactical — time-bound, expires when it resolves',
+    ];
+
+    public array $topicStatuses = ['active', 'dormant', 'resolved', 'expired'];
+
     public function mount(): void
     {
-        $user = Auth::user();
-        $settings = $user->settings['flint'] ?? [];
+        $settings = Auth::user()->settings['flint'] ?? [];
 
         $this->digestsEnabled = $settings['digests_enabled'] ?? true;
-        $this->scheduleTimezone = $settings['schedule_timezone'] ?? 'Europe/London';
-        $this->scheduleTimesWeekday = $settings['schedule_times_weekday'] ?? ['06:00', '18:00'];
-        $this->scheduleTimesWeekend = $settings['schedule_times_weekend'] ?? ['08:00', '19:00'];
-        $this->enabledDomains = $settings['enabled_domains'] ?? ['health', 'knowledge', 'online'];
+        $this->morningTimeWeekday = $settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday');
+        $this->morningTimeWeekend = $settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend');
+        $this->morningFallback = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
+        $this->eveningTime = $settings['evening_time'] ?? config('services.flint_routine.evening_time');
+        $this->topicsTime = $settings['topics_time'] ?? config('services.flint_routine.topics_time');
+        $this->readingListTime = $settings['reading_list_time'] ?? config('services.flint_routine.reading_list_time');
+        $this->newsRoundupTime = $settings['news_roundup_time'] ?? config('services.flint_routine.news_roundup_time');
 
-        // Generate time options (every 15 minutes from 00:00 to 23:45)
+        // Every quarter hour — the dispatcher only wakes up on that cadence, so
+        // finer-grained times would be misleading.
         $this->timeOptions = collect(range(0, 23))
-            ->flatMap(function ($hour) {
-                return collect([0, 15, 30, 45])
-                    ->mapWithKeys(function ($minute) use ($hour) {
-                        $time = sprintf('%02d:%02d', $hour, $minute);
-                        return [$time => $time];
-                    });
-            })
-            ->toArray();
+            ->flatMap(fn ($hour) => collect([0, 15, 30, 45])->mapWithKeys(function ($minute) use ($hour) {
+                $time = sprintf('%02d:%02d', $hour, $minute);
 
-        // Load data based on active tab
-        $this->loadNewspaperData();
-    }
-
-    public function loadNewspaperData(): void
-    {
-        $user = Auth::user();
-
-        // Load latest digest
-        $latestDigestBlock = Block::where('block_type', 'flint_digest')
-            ->whereHas('event.integration', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->whereHas('event', function ($query) {
-                $query->where('service', 'flint');
-            })
-            ->with(['event'])
-            ->latest('time')
-            ->first();
-
-        if ($latestDigestBlock) {
-            $this->latestDigest = [
-                'id' => $latestDigestBlock->id,
-                'time' => $latestDigestBlock->time,
-                'metadata' => $latestDigestBlock->metadata,
-            ];
-        }
-
-        // Load latest news briefing
-        $newsBriefingBlock = Block::where('block_type', 'flint_news_briefing')
-            ->whereHas('event.integration', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->where('time', '>=', now()->subHours(24))
-            ->latest('time')
-            ->first();
-
-        if ($newsBriefingBlock) {
-            $this->newsBriefing = [
-                'id' => $newsBriefingBlock->id,
-                'time' => $newsBriefingBlock->time,
-                'metadata' => $newsBriefingBlock->metadata,
-            ];
-        }
-
-        // Load articles waiting
-        $articlesBlock = Block::where('block_type', 'flint_articles_waiting')
-            ->whereHas('event.integration', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->where('time', '>=', now()->subHours(24))
-            ->latest('time')
-            ->first();
-
-        if ($articlesBlock) {
-            $this->articlesWaiting = [
-                'id' => $articlesBlock->id,
-                'time' => $articlesBlock->time,
-                'metadata' => $articlesBlock->metadata,
-            ];
-        }
-
-        // Load archive (past 30 days, excluding latest)
-        $this->digestArchive = Block::where('block_type', 'flint_digest')
-            ->whereHas('event.integration', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->whereHas('event', function ($query) {
-                $query->where('service', 'flint');
-            })
-            ->when($latestDigestBlock, fn($query) => $query->where('id', '!=', $latestDigestBlock->id))
-            ->where('time', '>=', now()->subDays(30))
-            ->with(['event'])
-            ->latest('time')
-            ->get()
-            ->map(function ($block) {
-                return [
-                    'id' => $block->id,
-                    'time' => $block->time,
-                    'metadata' => $block->metadata,
-                ];
-            })
+                return [$time => $time];
+            }))
             ->toArray();
     }
 
-    public function loadPatternsData(): void
+    // ------------------------------------------------------------------
+    // Today
+    // ------------------------------------------------------------------
+
+    /**
+     * Digest events, newest first. These are written by the Flint routine via
+     * the create-flint-digest MCP tool — the same rows the mobile app reads.
+     */
+    public function digests(int $limit = 30)
     {
-        $user = Auth::user();
-        $patternLearning = app(PatternLearningService::class);
-
-        $allPatterns = $patternLearning->getLearnedPatterns($user);
-        $this->totalPatterns = $allPatterns->count();
-
-        $this->learnedPatterns = $allPatterns
-            ->take($this->patternsPage * $this->patternsPerPage)
-            ->map(function ($pattern) {
-                return [
-                    'id' => $pattern->id,
-                    'title' => $pattern->title,
-                    'metadata' => $pattern->metadata,
-                    'time' => $pattern->time,
-                ];
-            })
-            ->toArray();
+        return Event::query()
+            ->whereIn('integration_id', Auth::user()->integrations()->pluck('id'))
+            ->where('service', 'flint')
+            ->where('action', 'had_summary')
+            ->orderByDesc('time')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
     }
 
-    public function loadMorePatterns(): void
+    /** The digest currently on screen: the one picked from the list, else the newest. */
+    public function currentDigest(): ?Event
     {
-        $this->patternsPage++;
-        $this->loadPatternsData();
+        $digests = $this->digests();
+
+        $digest = $this->selectedDigestId
+            ? $digests->firstWhere('id', $this->selectedDigestId)
+            : $digests->first();
+
+        return $digest?->loadMissing('blocks');
     }
 
-    public function loadMemoryData(): void
+    public function selectDigest(string $eventId): void
     {
-        $user = Auth::user();
-        $workingMemoryService = app(\App\Services\AgentWorkingMemoryService::class);
-        $memoryService = app(\App\Services\AgentMemoryService::class);
+        $this->selectedDigestId = $eventId;
+    }
 
-        // Load working memory data
-        $this->feedbackStats = $workingMemoryService->getFeedbackStatistics($user->id);
-        $this->workingMemory = [
-            'domain_insights' => $workingMemoryService->getAllDomainInsights($user->id),
-            'cross_domain' => $workingMemoryService->getCrossDomainObservations($user->id, 10),
-            'urgent_flags' => $workingMemoryService->getUnresolvedUrgentFlags($user->id),
-            'actions' => $workingMemoryService->getPrioritizedActions($user->id),
-            'last_execution' => [
-                'pre_digest' => $workingMemoryService->getLastExecutionTime($user->id, 'pre_digest_refresh'),
-                'digest' => $workingMemoryService->getLastExecutionTime($user->id, 'digest_generation'),
-                'patterns' => $workingMemoryService->getLastExecutionTime($user->id, 'pattern_detection'),
-            ],
+    /**
+     * The digest's blocks, split so the view can lead with anything awaiting an
+     * answer rather than burying it under commentary.
+     *
+     * @return array{questions: \Illuminate\Support\Collection, notes: \Illuminate\Support\Collection}
+     */
+    public function digestBlocks(?Event $digest): array
+    {
+        $blocks = $digest?->blocks ?? collect();
+
+        return [
+            'questions' => $blocks->where('block_type', 'flint_user_question')
+                ->sortBy(fn ($block) => is_null($block->metadata['answer'] ?? null) ? 0 : 1)
+                ->values(),
+            'notes' => $blocks->whereNotIn('block_type', ['flint_user_question'])
+                ->sortBy('time')
+                ->values(),
         ];
-
-        // Load long-term memory data
-        $this->patterns = $memoryService->getPatterns($user->id, 90);
-        $this->recentInsights = $memoryService->getAllInsightBlocks($user->id, 7);
     }
 
-    public function updatedActiveTab(): void
+    /** Topics this digest touched, via the `discussed_in` relationship. */
+    public function topicsTouchedBy(?Event $digest)
     {
-        if ($this->activeTab === 'memory') {
-            $this->loadMemoryData();
-        } elseif ($this->activeTab === 'newspaper') {
-            $this->loadNewspaperData();
-        } elseif ($this->activeTab === 'patterns') {
-            $this->loadPatternsData();
+        if (! $digest) {
+            return collect();
         }
+
+        return $digest->relatedObjects('discussed_in')
+            ->where('concept', 'flint')
+            ->where('type', 'topic')
+            ->get();
     }
 
-    public function toggleArchive(): void
+    // ------------------------------------------------------------------
+    // Topics
+    // ------------------------------------------------------------------
+
+    public function topics()
     {
-        $this->showArchive = !$this->showArchive;
-        if ($this->showArchive && empty($this->digestArchive) && empty($this->latestDigest)) {
-            $this->loadNewspaperData();
+        return app(FlintTopicService::class)
+            ->query(Auth::user(), $this->topicStatusFilter ?: null, $this->topicKindFilter ?: null)
+            ->orderByDesc('updated_at')
+            ->get();
+    }
+
+    public function topicStatusCounts(): array
+    {
+        return app(FlintTopicService::class)->statusCounts(Auth::user());
+    }
+
+    public function topicMentions(EventObject $topic)
+    {
+        return app(FlintTopicService::class)->mentions($topic);
+    }
+
+    public function expandTopic(string $topicId): void
+    {
+        $this->expandedTopicId = $this->expandedTopicId === $topicId ? null : $topicId;
+    }
+
+    public function editTopic(string $topicId): void
+    {
+        $topic = app(FlintTopicService::class)->query(Auth::user())->find($topicId);
+
+        if (! $topic) {
+            $this->error('Topic not found.');
+
+            return;
         }
+
+        $this->editingTopicId = $topic->id;
+        $this->editTitle = $topic->title ?? '';
+        $this->editContent = $topic->content ?? '';
+        $this->editKind = $topic->metadata['kind'] ?? 'thematic';
+        $this->editStatus = $topic->metadata['status'] ?? 'active';
+        $this->editNextReviewAt = $topic->metadata['next_review_at'] ?? null;
     }
 
-    public function expandArchiveDigest(string $digestId): void
+    public function cancelEdit(): void
     {
-        $this->expandedArchiveDigestId = $this->expandedArchiveDigestId === $digestId ? null : $digestId;
+        $this->reset(['editingTopicId', 'editTitle', 'editContent', 'editKind', 'editStatus', 'editNextReviewAt']);
     }
 
-    public function markArticleAsRead(string $articleId): void
+    public function saveTopic(): void
     {
-        $article = EventObject::find($articleId);
-
-        if ($article && $article->user_id === Auth::id()) {
-            $metadata = $article->metadata ?? [];
-            $metadata['read_at'] = now()->toIso8601String();
-            $article->metadata = $metadata;
-            $article->save();
-
-            // Add to read articles array for visual feedback
-            $this->readArticles[] = $articleId;
-
-            $this->success('Article marked as read');
-            $this->loadNewspaperData();
+        if (! $this->editingTopicId) {
+            return;
         }
-    }
 
-    public function addWeekdayTime(): void
-    {
-        if (!in_array($this->newWeekdayTime, $this->scheduleTimesWeekday)) {
-            $this->scheduleTimesWeekday[] = $this->newWeekdayTime;
-            sort($this->scheduleTimesWeekday);
+        try {
+            $updated = app(FlintTopicService::class)->update(Auth::user(), $this->editingTopicId, [
+                'title' => $this->editTitle,
+                'content' => $this->editContent,
+                'kind' => $this->editKind,
+                'status' => $this->editStatus,
+                'next_review_at' => $this->editNextReviewAt ?: null,
+            ]);
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
+
+            return;
         }
-    }
 
-    public function removeWeekdayTime(string $time): void
-    {
-        $this->scheduleTimesWeekday = array_values(
-            array_filter($this->scheduleTimesWeekday, fn($t) => $t !== $time)
-        );
-    }
+        if (! $updated) {
+            $this->error('Topic not found.');
 
-    public function addWeekendTime(): void
-    {
-        if (!in_array($this->newWeekendTime, $this->scheduleTimesWeekend)) {
-            $this->scheduleTimesWeekend[] = $this->newWeekendTime;
-            sort($this->scheduleTimesWeekend);
+            return;
         }
+
+        $this->cancelEdit();
+        $this->success('Topic updated.');
     }
 
-    public function removeWeekendTime(string $time): void
+    /** Quick status change from the card, without opening the editor. */
+    public function setTopicStatus(string $topicId, string $status): void
     {
-        $this->scheduleTimesWeekend = array_values(
-            array_filter($this->scheduleTimesWeekend, fn($t) => $t !== $time)
-        );
-    }
+        try {
+            $updated = app(FlintTopicService::class)->update(Auth::user(), $topicId, ['status' => $status]);
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
 
-    public function toggleDomain(string $domain): void
-    {
-        if (in_array($domain, $this->enabledDomains)) {
-            $this->enabledDomains = array_values(
-                array_filter($this->enabledDomains, fn($d) => $d !== $domain)
-            );
-        } else {
-            $this->enabledDomains[] = $domain;
+            return;
         }
+
+        $updated
+            ? $this->success("Topic marked {$status}.")
+            : $this->error('Topic not found.');
+    }
+
+    public function deleteTopic(string $topicId): void
+    {
+        if (! app(FlintTopicService::class)->delete(Auth::user(), $topicId)) {
+            $this->error('Topic not found.');
+
+            return;
+        }
+
+        if ($this->expandedTopicId === $topicId) {
+            $this->expandedTopicId = null;
+        }
+
+        $this->cancelEdit();
+        $this->success('Topic deleted.');
+    }
+
+    // ------------------------------------------------------------------
+    // Settings
+    // ------------------------------------------------------------------
+
+    public function feedbackStats(): array
+    {
+        return app(AgentWorkingMemoryService::class)->getFeedbackStatistics(Auth::id());
     }
 
     public function save(): void
     {
-        try {
-            $user = Auth::user();
+        $this->validate([
+            'morningTimeWeekday' => ['required', 'date_format:H:i'],
+            'morningTimeWeekend' => ['required', 'date_format:H:i'],
+            'morningFallback' => ['required', 'date_format:H:i'],
+            'eveningTime' => ['required', 'date_format:H:i'],
+            'topicsTime' => ['required', 'date_format:H:i'],
+            'readingListTime' => ['required', 'date_format:H:i'],
+            'newsRoundupTime' => ['required', 'date_format:H:i'],
+        ]);
 
-            $settings = $user->settings;
-            $settings['flint'] = [
-                'digests_enabled' => $this->digestsEnabled,
-                'schedule_timezone' => $this->scheduleTimezone,
-                'schedule_times_weekday' => $this->scheduleTimesWeekday,
-                'schedule_times_weekend' => $this->scheduleTimesWeekend,
-                'enabled_domains' => $this->enabledDomains,
-            ];
+        $user = Auth::user();
+        $settings = $user->settings;
 
-            $user->settings = $settings;
-            $user->save();
+        // Merge rather than replace: the scheduler and the routine both read out
+        // of this bag, and a blind overwrite would drop keys set elsewhere.
+        $settings['flint'] = array_merge($settings['flint'] ?? [], [
+            'digests_enabled' => $this->digestsEnabled,
+            'morning_time_weekday' => $this->morningTimeWeekday,
+            'morning_time_weekend' => $this->morningTimeWeekend,
+            'morning_fallback' => $this->morningFallback,
+            'evening_time' => $this->eveningTime,
+            'topics_time' => $this->topicsTime,
+            'reading_list_time' => $this->readingListTime,
+            'news_roundup_time' => $this->newsRoundupTime,
+        ]);
 
-            $this->success('Flint settings saved successfully!');
-        } catch (\Exception $e) {
-            $this->error('Failed to save settings. Please try again.');
-        }
+        $user->settings = $settings;
+        $user->save();
+
+        $this->success('Flint settings saved.');
     }
 }; ?>
 
 <div>
     <x-header title="{{ __('Flint') }}" subtitle="{{ __('Your personal AI assistant') }}" separator />
 
-    {{-- Tabs --}}
     <x-tabs wire:model="activeTab">
-        {{-- Newspaper Tab --}}
-        <x-tab name="newspaper" label="Today" icon="fas.newspaper">
-            <div class="space-y-6">
-                {{-- Newspaper Header --}}
-                <div class="text-center border-b-4 border-double border-base-300 pb-4">
-                    <h1 class="text-4xl font-serif font-bold tracking-tight">THE DAILY SPARK</h1>
-                    <p class="text-sm text-base-content/60 mt-1">
-                        {{ now()->format('l, F j, Y') }} • Vol. {{ now()->format('Y') }}, No. {{ now()->dayOfYear }}
-                    </p>
-                </div>
+        {{-- ============================== Today ============================== --}}
+        <x-tab name="today" label="Today" icon="fas.newspaper">
+            @php
+                $digests = $this->digests();
+                $digest = $this->currentDigest();
+                $grouped = $this->digestBlocks($digest);
+                $touchedTopics = $this->topicsTouchedBy($digest);
+            @endphp
 
-                {{-- Two Column Layout --}}
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {{-- Main Column (2/3) --}}
-                    <div class="lg:col-span-2 space-y-6">
-                        {{-- News Briefing --}}
-                        @if ($newsBriefing)
-                            <div class="card bg-base-200 shadow">
-                                <div class="card-body p-5">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <x-icon name="fas.rss" class="w-4 h-4 text-primary" />
-                                        <span class="text-xs font-semibold uppercase tracking-wider text-primary">News Briefing</span>
-                                    </div>
-                                    <h2 class="text-xl font-serif font-bold mb-2">
-                                        {{ $newsBriefing['metadata']['title'] ?? 'Today\'s News' }}
-                                    </h2>
-                                    <p class="text-sm text-base-content/80 leading-relaxed mb-4">
-                                        {{ $newsBriefing['metadata']['summary'] ?? '' }}
-                                    </p>
-
-                                    {{-- Key Stories --}}
-                                    @if (!empty($newsBriefing['metadata']['key_stories']) && is_array($newsBriefing['metadata']['key_stories']))
-                                        <div class="space-y-3">
-                                            @foreach ($newsBriefing['metadata']['key_stories'] as $story)
-                                                <div class="border-l-2 border-primary pl-3">
-                                                    <h3 class="font-semibold text-sm">{{ $story['headline'] }}</h3>
-                                                    <p class="text-xs text-base-content/70 mt-1">{{ $story['summary'] }}</p>
-                                                    @if (!empty($story['action_needed']))
-                                                        <p class="text-xs text-warning mt-1">
-                                                            <x-icon name="fas.arrow-right" class="w-3 h-3 inline" />
-                                                            {{ $story['action_needed'] }}
-                                                        </p>
-                                                    @endif
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
-
-                                    {{-- Themes --}}
-                                    @if (!empty($newsBriefing['metadata']['themes']) && is_array($newsBriefing['metadata']['themes']))
-                                        <div class="mt-4 flex flex-wrap gap-2">
-                                            @foreach ($newsBriefing['metadata']['themes'] as $theme)
-                                                <span class="badge badge-ghost badge-sm">{{ $theme['theme'] }}</span>
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        @endif
-
-                        {{-- Latest Digest Insights --}}
-                        @if ($latestDigest && !empty($latestDigest['metadata']['top_insights']) && is_array($latestDigest['metadata']['top_insights']))
-                            <div class="card bg-base-200 shadow">
-                                <div class="card-body p-5">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <x-icon name="fas.lightbulb" class="w-4 h-4 text-warning" />
-                                        <span class="text-xs font-semibold uppercase tracking-wider text-warning">Key Insights</span>
-                                    </div>
-
-                                    <div class="space-y-4">
-                                        @foreach (array_slice($latestDigest['metadata']['top_insights'], 0, 3) as $insight)
-                                            <div class="flex items-start gap-3">
-                                                <div class="text-2xl">{{ $insight['icon'] ?? '💡' }}</div>
-                                                <div class="flex-1">
-                                                    <h3 class="font-semibold text-sm">{{ $insight['title'] ?? 'Insight' }}</h3>
-                                                    <p class="text-xs text-base-content/70 mt-1">{{ $insight['description'] ?? '' }}</p>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-
-                        {{-- Wins & Watch Points --}}
-                        @if ($latestDigest && ((!empty($latestDigest['metadata']['wins']) && is_array($latestDigest['metadata']['wins'])) || (!empty($latestDigest['metadata']['watch_points']) && is_array($latestDigest['metadata']['watch_points']))))
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                @if (!empty($latestDigest['metadata']['wins']) && is_array($latestDigest['metadata']['wins']))
-                                    <div class="card bg-success/10 shadow-sm">
-                                        <div class="card-body p-4">
-                                            <h3 class="text-sm font-semibold text-success flex items-center gap-2 mb-3">
-                                                <x-icon name="fas.check-circle" class="w-4 h-4" />
-                                                {{ __('Wins') }}
-                                            </h3>
-                                            <ul class="space-y-2">
-                                                @foreach ($latestDigest['metadata']['wins'] as $win)
-                                                    <li class="text-xs text-base-content/80 flex items-start gap-2">
-                                                        <x-icon name="fas.check" class="w-3 h-3 text-success mt-0.5 flex-shrink-0" />
-                                                        {{ $win }}
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    </div>
-                                @endif
-
-                                @if (!empty($latestDigest['metadata']['watch_points']) && is_array($latestDigest['metadata']['watch_points']))
-                                    <div class="card bg-warning/10 shadow-sm">
-                                        <div class="card-body p-4">
-                                            <h3 class="text-sm font-semibold text-warning flex items-center gap-2 mb-3">
-                                                <x-icon name="fas.exclamation-triangle" class="w-4 h-4" />
-                                                {{ __('Watch Points') }}
-                                            </h3>
-                                            <ul class="space-y-2">
-                                                @foreach ($latestDigest['metadata']['watch_points'] as $watchPoint)
-                                                    <li class="text-xs text-base-content/80 flex items-start gap-2">
-                                                        <x-icon name="fas.exclamation-circle" class="w-3 h-3 text-warning mt-0.5 flex-shrink-0" />
-                                                        {{ $watchPoint }}
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
+            @if (! $digest)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body text-center py-12">
+                        <x-icon name="fas.newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                        <h3 class="text-lg font-semibold mb-2">{{ __('No digests yet') }}</h3>
+                        <p class="text-sm text-base-content/60">
+                            {{ __('Flint writes a digest at each scheduled slot. The next one will appear here.') }}
+                        </p>
                     </div>
+                </div>
+            @else
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-6">
+                        {{-- The digest itself: prose first, because that is the digest --}}
+                        <div class="card bg-base-200 shadow">
+                            <div class="card-body p-5 lg:p-6 gap-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="badge badge-primary badge-sm">
+                                        {{ ucfirst($digest->event_metadata['period'] ?? 'digest') }}
+                                    </span>
+                                    <span class="text-xs text-base-content/60">
+                                        <x-user-time :time="$digest->time" format="l j F Y" />
+                                    </span>
+                                    @if ($grouped['questions']->whereNull('metadata.answer')->isNotEmpty())
+                                        <span class="badge badge-warning badge-sm">
+                                            {{ $grouped['questions']->whereNull('metadata.answer')->count() }} {{ __('awaiting you') }}
+                                        </span>
+                                    @endif
+                                </div>
 
-                    {{-- Sidebar (1/3) --}}
-                    <div class="space-y-6">
-                        {{-- Health Coach Section --}}
-                        <div>
-                            <div class="flex items-center gap-2 mb-3">
-                                <x-icon name="fas.heart-pulse" class="w-4 h-4 text-error" />
-                                <span class="text-xs font-semibold uppercase tracking-wider">Health Coach</span>
+                                <h2 class="text-2xl font-serif font-bold leading-tight">
+                                    {{ $digest->event_metadata['title'] ?? __('Daily digest') }}
+                                </h2>
+
+                                @if ($summary = $digest->event_metadata['summary'] ?? null)
+                                    <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90">
+                                        {!! Str::markdown($summary) !!}
+                                    </div>
+                                @endif
+
+                                <div class="pt-2 border-t border-base-300">
+                                    <a href="{{ route('events.show', $digest->id) }}" class="btn btn-ghost btn-xs">
+                                        <x-icon name="fas.arrow-up-right-from-square" class="w-3 h-3" />
+                                        {{ __('Open full event') }}
+                                    </a>
+                                </div>
                             </div>
-                            <livewire:flint.coach-section />
                         </div>
 
-                        {{-- Articles Waiting --}}
-                        @if ($articlesWaiting && !empty($articlesWaiting['metadata']['articles']))
-                            <div class="card bg-base-200 shadow">
-                                <div class="card-body p-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <div class="flex items-center gap-2">
-                                            <x-icon name="fas.bookmark" class="w-4 h-4 text-info" />
-                                            <span class="text-xs font-semibold uppercase tracking-wider text-info">Reading List</span>
-                                        </div>
-                                        <span class="badge badge-info badge-sm">{{ count($articlesWaiting['metadata']['articles']) }}</span>
+                        {{-- Questions Flint asked, unanswered first --}}
+                        @if ($grouped['questions']->isNotEmpty())
+                            <div class="space-y-3">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
+                                    {{ __('Flint asked') }}
+                                </h3>
+                                @foreach ($grouped['questions'] as $block)
+                                    <div wire:key="question-{{ $block->id }}">
+                                        <x-block-card :block="$block" />
                                     </div>
-
-                                    <div class="space-y-3">
-                                        @foreach ($articlesWaiting['metadata']['articles'] as $article)
-                                            @php
-                                                $isRead = in_array($article['id'], $readArticles);
-                                            @endphp
-                                            <div
-                                                class="border-b border-base-300 pb-3 last:border-0 last:pb-0 transition-all duration-300 {{ $isRead ? 'opacity-50' : 'opacity-100' }}"
-                                                wire:key="article-{{ $article['id'] }}"
-                                            >
-                                                <div class="flex items-start justify-between gap-2">
-                                                    <div class="flex-1 min-w-0">
-                                                        <a
-                                                            href="{{ $article['url'] }}"
-                                                            target="_blank"
-                                                            class="text-sm font-medium hover:text-primary line-clamp-2 {{ $isRead ? 'line-through' : '' }}"
-                                                        >
-                                                            {{ $article['title'] }}
-                                                        </a>
-                                                        <p class="text-xs text-base-content/60 mt-1">
-                                                            {{ $article['domain'] }}
-                                                            @if (!empty($article['reading_time']))
-                                                                • {{ $article['reading_time'] }}
-                                                            @endif
-                                                            @if ($isRead)
-                                                                • <span class="text-success">✓ Read</span>
-                                                            @endif
-                                                        </p>
-                                                    </div>
-                                                    @if (!$isRead)
-                                                        <button
-                                                            wire:click="markArticleAsRead('{{ $article['id'] }}')"
-                                                            class="btn btn-ghost btn-xs hover:btn-success transition-colors"
-                                                            title="Mark as read"
-                                                            wire:loading.attr="disabled"
-                                                            wire:target="markArticleAsRead"
-                                                        >
-                                                            <x-icon name="fas.check" class="w-3 h-3" />
-                                                        </button>
-                                                    @else
-                                                        <span class="text-success">
-                                                            <x-icon name="fas.check-circle" class="w-4 h-4" />
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                                @if (!empty($article['pitch']))
-                                                    <p class="text-xs text-base-content/70 mt-2 italic {{ $isRead ? 'opacity-70' : '' }}">
-                                                        "{{ $article['pitch'] }}"
-                                                    </p>
-                                                @endif
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
+                                @endforeach
                             </div>
                         @endif
 
-                        {{-- Tomorrow's Focus --}}
-                        @if ($latestDigest && !empty($latestDigest['metadata']['tomorrow_focus']) && is_array($latestDigest['metadata']['tomorrow_focus']))
-                            <div class="card bg-base-200 shadow">
-                                <div class="card-body p-4">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <x-icon name="fas.calendar" class="w-4 h-4 text-primary" />
-                                        <span class="text-xs font-semibold uppercase tracking-wider">Tomorrow's Focus</span>
-                                    </div>
-                                    <ul class="space-y-2">
-                                        @foreach ($latestDigest['metadata']['tomorrow_focus'] as $focus)
-                                            <li class="text-xs text-base-content/80 flex items-start gap-2">
-                                                <x-icon name="fas.arrow-right" class="w-3 h-3 text-primary mt-0.5" />
-                                                {{ $focus }}
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                        {{-- Insights and editorial notes --}}
+                        @if ($grouped['notes']->isNotEmpty())
+                            <div class="space-y-3">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
+                                    {{ __('In this digest') }}
+                                </h3>
+                                <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                    @foreach ($grouped['notes'] as $block)
+                                        <div wire:key="block-{{ $block->id }}">
+                                            <x-block-card :block="$block" />
+                                        </div>
+                                    @endforeach
                                 </div>
                             </div>
                         @endif
                     </div>
+
+                    {{-- Sidebar --}}
+                    <div class="space-y-6">
+                        {{-- Topics this digest touched --}}
+                        <div class="card bg-base-200 shadow">
+                            <div class="card-body p-4 gap-3">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="fas.compass" class="w-4 h-4 text-primary" />
+                                    <span class="text-xs font-semibold uppercase tracking-wider">{{ __('Topics touched') }}</span>
+                                </div>
+
+                                @forelse ($touchedTopics as $topic)
+                                    <a
+                                        href="{{ route('objects.show', $topic->id) }}"
+                                        class="block p-2 rounded-lg bg-base-100 hover:bg-base-300 transition-colors"
+                                        wire:key="touched-{{ $topic->id }}"
+                                    >
+                                        <div class="text-sm font-medium">{{ $topic->title }}</div>
+                                        <div class="text-xs text-base-content/60">
+                                            {{ ucfirst($topic->metadata['kind'] ?? 'thematic') }}
+                                            &middot; {{ ucfirst($topic->metadata['status'] ?? 'active') }}
+                                        </div>
+                                    </a>
+                                @empty
+                                    <p class="text-xs text-base-content/60">
+                                        {{ __('This digest is not linked to any topic yet.') }}
+                                    </p>
+                                @endforelse
+
+                                <button wire:click="$set('activeTab', 'topics')" class="btn btn-ghost btn-xs justify-start">
+                                    {{ __('Browse all topics') }}
+                                    <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Recent digests --}}
+                        <div class="card bg-base-200 shadow">
+                            <div class="card-body p-4 gap-2">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <x-icon name="fas.clock-rotate-left" class="w-4 h-4 text-base-content/60" />
+                                    <span class="text-xs font-semibold uppercase tracking-wider">{{ __('Recent digests') }}</span>
+                                </div>
+
+                                @foreach ($digests as $item)
+                                    <button
+                                        wire:click="selectDigest('{{ $item->id }}')"
+                                        wire:key="digest-{{ $item->id }}"
+                                        class="text-left p-2 rounded-lg transition-colors {{ $item->id === $digest->id ? 'bg-primary/10 ring-1 ring-primary/30' : 'bg-base-100 hover:bg-base-300' }}"
+                                    >
+                                        <div class="text-sm font-medium line-clamp-1">
+                                            {{ $item->event_metadata['title'] ?? __('Daily digest') }}
+                                        </div>
+                                        <div class="text-xs text-base-content/60">
+                                            <x-user-time :time="$item->time" format="j M" />
+                                            &middot; {{ ucfirst($item->event_metadata['period'] ?? '') }}
+                                        </div>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </x-tab>
+
+        {{-- ============================== Topics ============================== --}}
+        <x-tab name="topics" label="Topics" icon="fas.compass">
+            @php
+                $topics = $this->topics();
+                $statusCounts = $this->topicStatusCounts();
+            @endphp
+
+            <div class="space-y-4 lg:space-y-6">
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">{{ __('Topics') }}</h3>
+                            <p class="text-sm text-base-content/70">
+                                {{ __('The long-lived threads Flint tracks across digests and coaching sessions. Flint proposes and updates these; you have the final say on all of them.') }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-3">
+                            <select wire:model.live="topicStatusFilter" class="select select-bordered select-sm">
+                                <option value="">{{ __('All statuses') }} ({{ array_sum($statusCounts) }})</option>
+                                @foreach ($topicStatuses as $status)
+                                    <option value="{{ $status }}">
+                                        {{ ucfirst($status) }} ({{ $statusCounts[$status] ?? 0 }})
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            <select wire:model.live="topicKindFilter" class="select select-bordered select-sm">
+                                <option value="">{{ __('All kinds') }}</option>
+                                @foreach ($topicKinds as $kind => $description)
+                                    <option value="{{ $kind }}">{{ ucfirst($kind) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
-                {{-- Archive Toggle --}}
-                <div class="flex justify-center pt-4">
-                    <button
-                        wire:click="toggleArchive"
-                        class="btn btn-outline btn-sm"
-                    >
-                        <x-icon name="fas.clock" class="w-4 h-4" />
-                        {{ $showArchive ? 'Hide Archive' : 'View Past Editions' }}
-                        @if (!empty($digestArchive))
-                            <span class="badge badge-sm">{{ count($digestArchive) }}</span>
-                        @endif
-                    </button>
-                </div>
+                @forelse ($topics as $topic)
+                    @php
+                        $kind = $topic->metadata['kind'] ?? 'thematic';
+                        $status = $topic->metadata['status'] ?? 'active';
+                        $statusBadge = match ($status) {
+                            'active' => 'badge-success',
+                            'dormant' => 'badge-ghost',
+                            'resolved' => 'badge-info',
+                            default => 'badge-neutral',
+                        };
+                    @endphp
 
-                {{-- Archive --}}
-                @if ($showArchive)
-                    <div class="space-y-3">
-                        <h3 class="text-lg font-semibold">Past 30 Days</h3>
-                        @forelse ($digestArchive as $digest)
-                            <div class="card bg-base-200 shadow">
-                                <div class="card-body p-4">
-                                    <div class="flex items-start justify-between gap-4">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <span class="text-xs font-medium text-base-content/60">
-                                                    {{ $digest['time']->format('M j, Y g:i A') }}
-                                                </span>
-                                                <span class="badge badge-xs badge-ghost">
-                                                    {{ $digest['metadata']['metrics']['total_insights'] ?? 0 }} insights
-                                                </span>
-                                            </div>
-                                            <h4 class="font-medium text-sm">{{ $digest['metadata']['headline'] ?? 'Daily Digest' }}</h4>
+                    <div class="card bg-base-200 shadow" wire:key="topic-{{ $topic->id }}">
+                        <div class="card-body p-4 gap-3">
+                            @if ($editingTopicId === $topic->id)
+                                {{-- Inline editor --}}
+                                <div class="space-y-3">
+                                    <x-input label="{{ __('Title') }}" wire:model="editTitle" />
+                                    <x-textarea label="{{ __('Summary') }}" wire:model="editContent" rows="6"
+                                        hint="{{ __('Markdown. This is the current understanding, not a log.') }}" />
 
-                                            {{-- Expandable content --}}
-                                            @if ($expandedArchiveDigestId === $digest['id'])
-                                                <div class="mt-3 space-y-3 text-sm">
-                                                    @if (!empty($digest['metadata']['top_insights']) && is_array($digest['metadata']['top_insights']))
-                                                        <div class="space-y-2">
-                                                            @foreach (array_slice($digest['metadata']['top_insights'], 0, 2) as $insight)
-                                                                <div class="flex items-start gap-2">
-                                                                    <span>{{ $insight['icon'] ?? '💡' }}</span>
-                                                                    <span class="text-base-content/80">{{ $insight['title'] ?? '' }}</span>
-                                                                </div>
-                                                            @endforeach
-                                                        </div>
-                                                    @endif
-                                                </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div class="form-control">
+                                            <label class="label"><span class="label-text">{{ __('Kind') }}</span></label>
+                                            <select wire:model="editKind" class="select select-bordered">
+                                                @foreach ($topicKinds as $value => $description)
+                                                    <option value="{{ $value }}">{{ ucfirst($value) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-control">
+                                            <label class="label"><span class="label-text">{{ __('Status') }}</span></label>
+                                            <select wire:model="editStatus" class="select select-bordered">
+                                                @foreach ($topicStatuses as $value)
+                                                    <option value="{{ $value }}">{{ ucfirst($value) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <x-input type="date" label="{{ __('Review on') }}" wire:model="editNextReviewAt" />
+                                    </div>
+
+                                    <div class="flex justify-end gap-2">
+                                        <x-button label="{{ __('Cancel') }}" wire:click="cancelEdit" class="btn-ghost btn-sm" />
+                                        <x-button label="{{ __('Save') }}" wire:click="saveTopic" class="btn-primary btn-sm" spinner="saveTopic" />
+                                    </div>
+                                </div>
+                            @else
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <a href="{{ route('objects.show', $topic->id) }}" class="font-semibold hover:text-primary">
+                                            {{ $topic->title }}
+                                        </a>
+                                        <div class="flex flex-wrap items-center gap-2 mt-1">
+                                            <span class="badge badge-outline badge-sm">{{ ucfirst($kind) }}</span>
+                                            <span class="badge {{ $statusBadge }} badge-sm">{{ ucfirst($status) }}</span>
+                                            @if ($touched = $topic->metadata['last_touched_at'] ?? null)
+                                                <span class="text-xs text-base-content/60">
+                                                    {{ __('Touched') }} {{ \Carbon\Carbon::parse($touched)->diffForHumans() }}
+                                                </span>
+                                            @endif
+                                            @if ($review = $topic->metadata['next_review_at'] ?? null)
+                                                <span class="text-xs text-base-content/60">
+                                                    &middot; {{ __('Review') }} {{ \Carbon\Carbon::parse($review)->format('j M Y') }}
+                                                </span>
                                             @endif
                                         </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-1 flex-shrink-0">
+                                        <button wire:click="editTopic('{{ $topic->id }}')" class="btn btn-ghost btn-xs" title="{{ __('Edit') }}">
+                                            <x-icon name="fas.pen" class="w-3 h-3" />
+                                        </button>
+                                        @if ($status !== 'dormant')
+                                            <button wire:click="setTopicStatus('{{ $topic->id }}', 'dormant')" class="btn btn-ghost btn-xs" title="{{ __('Mark dormant') }}">
+                                                <x-icon name="fas.moon" class="w-3 h-3" />
+                                            </button>
+                                        @endif
+                                        @if ($status !== 'resolved')
+                                            <button wire:click="setTopicStatus('{{ $topic->id }}', 'resolved')" class="btn btn-ghost btn-xs" title="{{ __('Mark resolved') }}">
+                                                <x-icon name="fas.check" class="w-3 h-3" />
+                                            </button>
+                                        @endif
                                         <button
-                                            wire:click="expandArchiveDigest('{{ $digest['id'] }}')"
-                                            class="btn btn-ghost btn-xs"
+                                            wire:click="deleteTopic('{{ $topic->id }}')"
+                                            wire:confirm="{{ __('Delete this topic? Its mention history goes with it.') }}"
+                                            class="btn btn-ghost btn-xs hover:text-error"
+                                            title="{{ __('Delete') }}"
                                         >
-                                            <x-icon name="fas.chevron-{{ $expandedArchiveDigestId === $digest['id'] ? 'up' : 'down' }}" class="w-4 h-4" />
+                                            <x-icon name="fas.trash" class="w-3 h-3" />
+                                        </button>
+                                        <button wire:click="expandTopic('{{ $topic->id }}')" class="btn btn-ghost btn-xs">
+                                            <x-icon name="fas.chevron-{{ $expandedTopicId === $topic->id ? 'up' : 'down' }}" class="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        @empty
-                            <div class="text-center py-8 text-base-content/50 text-sm">
-                                No archive editions found
-                            </div>
-                        @endforelse
-                    </div>
-                @endif
 
-                {{-- Empty State --}}
-                @if (!$latestDigest && !$newsBriefing && !$articlesWaiting)
+                                @if ($topic->content)
+                                    <div class="prose prose-sm max-w-none text-base-content/80 {{ $expandedTopicId === $topic->id ? '' : 'line-clamp-3' }}">
+                                        {!! Str::markdown($topic->content) !!}
+                                    </div>
+                                @endif
+
+                                @if ($expandedTopicId === $topic->id)
+                                    @php $mentions = $this->topicMentions($topic); @endphp
+                                    <div class="pt-3 border-t border-base-300">
+                                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-2">
+                                            {{ __('Mentioned in') }}
+                                        </div>
+                                        @forelse ($mentions as $mention)
+                                            <a
+                                                href="{{ $mention['kind'] === 'event' ? route('events.show', $mention['id']) : route('blocks.show', $mention['id']) }}"
+                                                class="flex items-center justify-between gap-3 py-1.5 text-sm hover:text-primary"
+                                                wire:key="mention-{{ $mention['id'] }}"
+                                            >
+                                                <span class="line-clamp-1">{{ $mention['title'] }}</span>
+                                                <span class="text-xs text-base-content/50 flex-shrink-0">
+                                                    <x-user-time :time="$mention['time']" format="j M" />
+                                                </span>
+                                            </a>
+                                        @empty
+                                            <p class="text-xs text-base-content/60">
+                                                {{ __('Nothing has linked to this topic yet.') }}
+                                            </p>
+                                        @endforelse
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+                @empty
                     <div class="card bg-base-200 shadow">
                         <div class="card-body text-center py-12">
-                            <x-icon name="fas.newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
-                            <h3 class="text-lg font-semibold mb-2">{{ __('No Content Yet') }}</h3>
-                            <p class="text-sm text-base-content/60 mb-4">
-                                {{ __('Your personalized newspaper will appear here once Flint starts analyzing your data.') }}
-                            </p>
-                            <p class="text-xs text-base-content/50">
-                                {{ __('Digests are generated based on your schedule in Settings.') }}
+                            <x-icon name="fas.compass" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                            <h3 class="text-lg font-semibold mb-2">{{ __('No topics here') }}</h3>
+                            <p class="text-sm text-base-content/60">
+                                {{ $topicStatusFilter || $topicKindFilter
+                                    ? __('No topics match these filters.')
+                                    : __('Flint proposes topics as recurring threads show up in your digests and coaching sessions.') }}
                             </p>
                         </div>
                     </div>
-                @endif
+                @endforelse
             </div>
         </x-tab>
 
-        {{-- Coach Tab (Hevy) --}}
+        {{-- ============================== Fitness Coach ============================== --}}
         <x-tab name="coach" label="Fitness Coach" icon="fas.dumbbell">
             <div class="space-y-4 lg:space-y-6">
-                {{-- Coach Status Card --}}
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
                         <h3 class="text-lg font-semibold mb-4">{{ __('Hevy Fitness Coach') }}</h3>
@@ -775,276 +758,137 @@ new class extends Component {
             </div>
         </x-tab>
 
-        {{-- Patterns Tab --}}
-        <x-tab name="patterns" label="Patterns" icon="fas.brain" wire:click="loadPatternsData">
+        {{-- ============================== Settings ============================== --}}
+        <x-tab name="settings" label="Settings" icon="o-cog-6-tooth">
+            @php $feedback = $this->feedbackStats(); @endphp
+
             <div class="space-y-4 lg:space-y-6">
-                {{-- Loading State --}}
-                <div wire:loading wire:target="loadPatternsData" class="card bg-base-200 shadow">
-                    <div class="card-body text-center py-12">
-                        <div class="loading loading-spinner loading-lg mx-auto mb-4"></div>
-                        <p class="text-sm text-base-content/60">Loading patterns...</p>
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">{{ __('Digests') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            {{ __('Spark owns the timing and asks the Flint routine to write the digest. Times are read in your effective timezone and checked every fifteen minutes.') }}
+                        </p>
+
+                        <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
+                            <div>
+                                <div class="font-medium text-sm">{{ __('Enable digests') }}</div>
+                                <div class="text-xs text-base-content/60">{{ __('Turn off to stop Flint being asked for digests entirely') }}</div>
+                            </div>
+                            <input type="checkbox" class="toggle toggle-primary" wire:model.live="digestsEnabled" />
+                        </div>
                     </div>
                 </div>
 
-                <div wire:loading.remove wire:target="loadPatternsData">
-                @if (empty($learnedPatterns))
-                    <div class="card bg-base-200 shadow">
-                        <div class="card-body text-center py-12">
-                            <x-icon name="fas.brain" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
-                            <h3 class="text-lg font-semibold mb-2">{{ __('No Patterns Yet') }}</h3>
-                            <p class="text-sm text-base-content/60 mb-4">
-                                {{ __('Flint learns patterns from your health check-in responses.') }}
-                            </p>
-                            <p class="text-xs text-base-content/50">
-                                {{ __('When health anomalies are detected, answer the coaching questions to help Flint learn your patterns.') }}
-                            </p>
-                        </div>
-                    </div>
-                @else
+                @if ($digestsEnabled)
                     <div class="card bg-base-200 shadow">
                         <div class="card-body">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold">{{ __('Learned Patterns') }}</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs text-base-content/60">
-                                        Showing {{ count($learnedPatterns) }} of {{ $totalPatterns }}
-                                    </span>
-                                    <span class="badge badge-primary">{{ $totalPatterns }}</span>
+                            <h3 class="text-lg font-semibold mb-1">{{ __('Digest schedule') }}</h3>
+                            <p class="text-sm text-base-content/70 mb-4">
+                                {{ __('The morning digest waits for your Oura sleep score, so it fires at the later of the morning slot and that reading — the fallback is the cutoff if sleep never lands.') }}
+                            </p>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">{{ __('Morning (Mon–Fri)') }}</span></label>
+                                    <select wire:model="morningTimeWeekday" class="select select-bordered">
+                                        @foreach ($timeOptions as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">{{ __('Morning (Sat–Sun)') }}</span></label>
+                                    <select wire:model="morningTimeWeekend" class="select select-bordered">
+                                        @foreach ($timeOptions as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">{{ __('Morning fallback') }}</span></label>
+                                    <select wire:model="morningFallback" class="select select-bordered">
+                                        @foreach ($timeOptions as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">{{ __('Evening') }}</span></label>
+                                    <select wire:model="eveningTime" class="select select-bordered">
+                                        @foreach ($timeOptions as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                             </div>
-
-                            <div class="space-y-4">
-                                @foreach ($learnedPatterns as $pattern)
-                                    <div class="card bg-base-100 shadow-sm">
-                                        <div class="card-body p-4">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="flex-1">
-                                                    <h4 class="font-semibold text-sm">{{ $pattern['title'] }}</h4>
-                                                    @if (!empty($pattern['metadata']['user_explanation']))
-                                                        <p class="text-xs text-base-content/70 mt-1 italic">
-                                                            "{{ $pattern['metadata']['user_explanation'] }}"
-                                                        </p>
-                                                    @endif
-                                                </div>
-                                                <div class="flex items-center gap-2">
-                                                    <div class="badge badge-outline badge-sm">
-                                                        {{ round(($pattern['metadata']['confidence_score'] ?? 0.3) * 100) }}% confidence
-                                                    </div>
-                                                    <div class="badge badge-ghost badge-sm">
-                                                        {{ $pattern['metadata']['confirmation_count'] ?? 1 }}x confirmed
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {{-- Trigger Conditions --}}
-                                            @if (!empty($pattern['metadata']['trigger_conditions']))
-                                                <div class="mt-3 p-2 bg-base-200 rounded text-xs">
-                                                    <span class="font-medium">Triggers:</span>
-                                                    @foreach ($pattern['metadata']['trigger_conditions'] as $key => $value)
-                                                        <span class="text-base-content/70 ml-1">{{ $key }}: {{ is_string($value) ? $value : json_encode($value) }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-
-                                            {{-- Consequences --}}
-                                            @if (!empty($pattern['metadata']['consequences']))
-                                                <div class="mt-2 p-2 bg-warning/10 rounded text-xs">
-                                                    <span class="font-medium text-warning">Effects:</span>
-                                                    @foreach ($pattern['metadata']['consequences'] as $key => $value)
-                                                        <span class="text-base-content/70 ml-1">{{ $key }}: {{ is_string($value) ? $value : json_encode($value) }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-
-                                            <div class="mt-2 text-xs text-base-content/50">
-                                                Last confirmed: {{ $pattern['metadata']['last_confirmed_at'] ? \Carbon\Carbon::parse($pattern['metadata']['last_confirmed_at'])->diffForHumans() : 'Never' }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-
-                            {{-- Load More Button --}}
-                            @if (count($learnedPatterns) < $totalPatterns)
-                                <div class="flex justify-center mt-6">
-                                    <button
-                                        wire:click="loadMorePatterns"
-                                        class="btn btn-outline btn-sm"
-                                        wire:loading.attr="disabled"
-                                        wire:target="loadMorePatterns"
-                                    >
-                                        <span wire:loading.remove wire:target="loadMorePatterns">
-                                            Load More Patterns
-                                        </span>
-                                        <span wire:loading wire:target="loadMorePatterns">
-                                            <span class="loading loading-spinner loading-sm"></span>
-                                            Loading...
-                                        </span>
-                                    </button>
-                                </div>
-                            @endif
                         </div>
                     </div>
                 @endif
-                </div>
-            </div>
-        </x-tab>
 
-        {{-- Memory Tab --}}
-        <x-tab name="memory" label="Memory" icon="o-cpu-chip">
-            @include('livewire.flint.memory')
-        </x-tab>
-
-        {{-- Settings Tab --}}
-        <x-tab name="settings" label="Settings" icon="o-cog-6-tooth">
-            <div class="space-y-4 lg:space-y-6">
-                {{-- General Settings --}}
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">{{ __('General Settings') }}</h3>
+                        <h3 class="text-lg font-semibold mb-1">{{ __('Other Flint routines') }}</h3>
                         <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Configure how Flint analyzes your data and delivers insights. Agents run 15 minutes before each scheduled digest.') }}
+                            {{ __('Each of these runs once a day on its own slot. A routine stays idle until its webhook is configured on the server.') }}
                         </p>
 
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                                <div>
-                                    <div class="font-medium text-sm">{{ __('Enable Daily Digests') }}</div>
-                                    <div class="text-xs text-base-content/60">{{ __('Receive scheduled digest notifications with AI-generated insights') }}</div>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    class="toggle toggle-primary"
-                                    wire:model.live="digestsEnabled"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Digest Schedule --}}
-                @if ($digestsEnabled)
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">{{ __('Digest Schedule') }}</h3>
-                        <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Choose when you want to receive daily digests') }}
-                        </p>
-
-                        <div class="space-y-4">
-                            {{-- Timezone --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div class="form-control">
-                                <label class="label">
-                                    <span class="label-text">{{ __('Timezone') }}</span>
-                                </label>
-                                <select wire:model.live="scheduleTimezone" class="select select-bordered w-full">
-                                    @foreach ($timezones as $value => $label)
+                                <label class="label"><span class="label-text">{{ __('Topic review') }}</span></label>
+                                <select wire:model="topicsTime" class="select select-bordered">
+                                    @foreach ($timeOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <label class="label"><span class="label-text-alt">{{ __('After the evening digest') }}</span></label>
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">{{ __('Reading list') }}</span></label>
+                                <select wire:model="readingListTime" class="select select-bordered">
+                                    @foreach ($timeOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
                             </div>
-
-                            {{-- Weekday Times --}}
-                            <div>
-                                <label class="label">
-                                    <span class="label-text">{{ __('Weekday Times (Mon-Fri)') }}</span>
-                                </label>
-                                <div class="space-y-2 mb-3">
-                                    @foreach ($scheduleTimesWeekday as $time)
-                                        <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
-                                            <span class="text-sm">{{ $time }}</span>
-                                            <button
-                                                type="button"
-                                                wire:click="removeWeekdayTime('{{ $time }}')"
-                                                class="btn btn-ghost btn-xs"
-                                            >
-                                                <x-icon name="fas.trash" class="w-3 h-3" />
-                                            </button>
-                                        </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">{{ __('News roundup') }}</span></label>
+                                <select wire:model="newsRoundupTime" class="select select-bordered">
+                                    @foreach ($timeOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
-                                </div>
-                                <div class="flex gap-2">
-                                    <select wire:model="newWeekdayTime" class="select select-bordered flex-1">
-                                        @foreach ($timeOptions as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                    <button wire:click="addWeekdayTime" class="btn btn-outline btn-sm">
-                                        {{ __('Add') }}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {{-- Weekend Times --}}
-                            <div>
-                                <label class="label">
-                                    <span class="label-text">{{ __('Weekend Times (Sat-Sun)') }}</span>
-                                </label>
-                                <div class="space-y-2 mb-3">
-                                    @foreach ($scheduleTimesWeekend as $time)
-                                        <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
-                                            <span class="text-sm">{{ $time }}</span>
-                                            <button
-                                                type="button"
-                                                wire:click="removeWeekendTime('{{ $time }}')"
-                                                class="btn btn-ghost btn-xs"
-                                            >
-                                                <x-icon name="fas.trash" class="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    @endforeach
-                                </div>
-                                <div class="flex gap-2">
-                                    <select wire:model="newWeekendTime" class="select select-bordered flex-1">
-                                        @foreach ($timeOptions as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                    <button wire:click="addWeekendTime" class="btn btn-outline btn-sm">
-                                        {{ __('Add') }}
-                                    </button>
-                                </div>
+                                </select>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                @if (($feedback['total_feedback_count'] ?? 0) > 0)
+                    <div class="card bg-base-200 shadow">
+                        <div class="card-body">
+                            <h3 class="text-lg font-semibold mb-4">{{ __('Your feedback') }}</h3>
+                            <div class="stats stats-vertical sm:stats-horizontal shadow">
+                                <div class="stat bg-base-100">
+                                    <div class="stat-title">{{ __('Rated or dismissed') }}</div>
+                                    <div class="stat-value text-lg">{{ $feedback['total_feedback_count'] }}</div>
+                                </div>
+                                @if (($feedback['rating_average'] ?? 0) > 0)
+                                    <div class="stat bg-base-100">
+                                        <div class="stat-title">{{ __('Average rating') }}</div>
+                                        <div class="stat-value text-lg">{{ number_format($feedback['rating_average'], 1) }}/5</div>
+                                    </div>
+                                @endif
+                                <div class="stat bg-base-100">
+                                    <div class="stat-title">{{ __('Acted on') }}</div>
+                                    <div class="stat-value text-lg">{{ $feedback['acted_count'] ?? 0 }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 @endif
 
-                {{-- Analysis Domains --}}
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">{{ __('Analysis Domains') }}</h3>
-                        <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Choose which domains Flint should analyze') }}
-                        </p>
-
-                        <div class="space-y-3">
-                            @foreach ($availableDomains as $key => $domain)
-                                <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                                    <div>
-                                        <div class="font-medium text-sm">{{ $domain['label'] }}</div>
-                                        <div class="text-xs text-base-content/60">{{ $domain['description'] }}</div>
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        class="toggle toggle-primary"
-                                        wire:model="enabledDomains"
-                                        value="{{ $key }}"
-                                    />
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Save Button --}}
                 <div class="flex justify-end">
-                    <x-button
-                        label="{{ __('Save Settings') }}"
-                        wire:click="save"
-                        class="btn-primary"
-                        spinner="save"
-                    />
+                    <x-button label="{{ __('Save Settings') }}" wire:click="save" class="btn-primary" spinner="save" />
                 </div>
             </div>
         </x-tab>

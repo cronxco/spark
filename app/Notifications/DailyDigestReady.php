@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
@@ -15,9 +16,11 @@ class DailyDigestReady extends Notification implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public EventObject $digestObject,
+        public ?EventObject $digestObject,
         public string $period,
-        public array $blocks
+        public ?string $title = null,
+        public ?string $summary = null,
+        public int $unansweredQuestionCount = 0,
     ) {}
 
     public function via($notifiable): array
@@ -37,22 +40,20 @@ class DailyDigestReady extends Notification implements ShouldQueue
 
     public function toMail($notifiable): MailMessage
     {
-        $headline = $this->findBlockContent('flint_summarised_headline');
-        $keyPoints = $this->findBlockMetadata('flint_five_key_points', 'points') ?? [];
-
         $message = (new MailMessage)
-            ->subject('Your ' . ucfirst($this->period) . ' Digest is Ready')
+            ->subject($this->title ?? 'Your ' . ucfirst($this->period) . ' Digest is Ready')
             ->greeting('Hello!')
-            ->line($headline ?? 'Your daily digest is ready to review.');
+            ->line($this->summary ?? 'Your daily digest is ready to review.');
 
-        if (! empty($keyPoints)) {
-            $message->line('**Key Points:**');
-            foreach (array_slice($keyPoints, 0, 3) as $point) {
-                $message->line('• ' . $point);
-            }
+        if ($this->unansweredQuestionCount > 0) {
+            $message->line(sprintf(
+                '**%d question%s waiting for you.**',
+                $this->unansweredQuestionCount,
+                $this->unansweredQuestionCount === 1 ? '' : 's',
+            ));
         }
 
-        $message->action('View Full Digest', route('objects.show', $this->digestObject->id));
+        $message->action('View Full Digest', $this->digestUrl());
 
         return $message;
     }
@@ -60,35 +61,55 @@ class DailyDigestReady extends Notification implements ShouldQueue
     public function toArray($notifiable): array
     {
         return [
-            'digest_object_id' => $this->digestObject->id,
+            'digest_object_id' => $this->digestObject?->id,
             'period' => $this->period,
-            'title' => $this->digestObject->title,
-            'headline' => $this->findBlockContent('flint_summarised_headline'),
+            'title' => $this->title ?? $this->digestObject?->title,
+            'headline' => $this->headline(),
+            'unanswered_question_count' => $this->unansweredQuestionCount,
         ];
     }
 
     public function toWebPush($notifiable, $notification): WebPushMessage
     {
-        $headline = $this->findBlockContent('flint_summarised_headline');
-        $greeting = $this->getTimeBasedGreeting();
-        $body = $headline ? $this->toSentenceCase($headline) : 'Your daily digest is ready to review.';
-
         return (new WebPushMessage)
-            ->title($greeting)
+            ->title($this->title ?? $this->getTimeBasedGreeting())
             ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
-            ->body($body)
+            ->body($this->headline() ?? 'Your daily digest is ready to review.')
             ->badge('/favicon.ico')
             ->tag('daily-digest-' . $this->period)
             ->data([
-                'url' => route('objects.show', $this->digestObject->id),
+                'url' => $this->digestUrl(),
                 'type' => 'daily_digest',
-                'digest_object_id' => $this->digestObject->id,
+                'digest_object_id' => $this->digestObject?->id,
                 'period' => $this->period,
             ])
             ->options([
                 'TTL' => 86400, // 24 hours
                 'urgency' => 'normal',
             ]);
+    }
+
+    /**
+     * A one-line teaser: the opening sentence of the digest summary, short
+     * enough to survive a push notification.
+     */
+    private function headline(): ?string
+    {
+        if (blank($this->summary)) {
+            return null;
+        }
+
+        $firstLine = trim(Str::before(trim($this->summary), "\n"));
+        $firstSentence = Str::of($firstLine)->before('. ')->trim()->toString();
+
+        return Str::limit($firstSentence !== '' ? $firstSentence . '.' : $firstLine, 160);
+    }
+
+    private function digestUrl(): string
+    {
+        return $this->digestObject
+            ? route('objects.show', $this->digestObject->id)
+            : route('flint.index');
     }
 
     private function getTimeBasedGreeting(): string
@@ -104,26 +125,5 @@ class DailyDigestReady extends Notification implements ShouldQueue
         }
 
         return 'Good Evening';
-    }
-
-    private function toSentenceCase(string $text): string
-    {
-        $text = mb_strtolower($text);
-
-        return mb_strtoupper(mb_substr($text, 0, 1)) . mb_substr($text, 1);
-    }
-
-    private function findBlockContent(string $blockType): ?string
-    {
-        $block = collect($this->blocks)->firstWhere('block_type', $blockType);
-
-        return $block?->metadata['content'] ?? null;
-    }
-
-    private function findBlockMetadata(string $blockType, string $key): mixed
-    {
-        $block = collect($this->blocks)->firstWhere('block_type', $blockType);
-
-        return $block?->metadata[$key] ?? null;
     }
 }
