@@ -5,7 +5,6 @@ namespace App\Jobs\Base;
 use App\Models\Integration;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
-use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -84,14 +83,20 @@ abstract class BaseWebhookHookJob implements ShouldQueue
             // Dispatch processing jobs for each chunk
             $this->dispatchProcessingJobs($processingData);
 
-            $store->recordStatus($this->integration, $task, 'success', [
-                'chunks' => is_array($processingData) ? count($processingData) : 0,
-            ]);
+            try {
+                $store->recordStatus($this->integration, $task, 'success', [
+                    'chunks' => is_array($processingData) ? count($processingData) : 0,
+                ]);
+            } catch (Throwable $exception) {
+                Log::warning("Failed to record successful {$this->getJobType()} webhook processing for integration {$this->integration->id} ({$this->serviceName})", [
+                    'error' => $exception->getMessage(),
+                ]);
+            }
 
             Log::info("Completed {$this->getJobType()} webhook processing for integration {$this->integration->id} ({$this->serviceName})");
             $transaction->setStatus(SpanStatus::ok());
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $store->recordStatus($this->integration, $task, 'failed', [
                 'error' => $e->getMessage(),
             ]);

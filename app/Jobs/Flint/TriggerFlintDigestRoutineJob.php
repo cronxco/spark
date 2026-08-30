@@ -100,7 +100,10 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         $task = $this->taskDefinition();
         $store = app(TaskExecutionStore::class);
 
-        $store->recordStatus($digest, $task, 'pending', ['triggered_by' => $this->triggerReason]);
+        $store->recordStatus($digest, $task, 'pending', [
+            'triggered_by' => $this->triggerReason,
+            'error' => null,
+        ]);
 
         $payload = [
             'user_id' => (string) $this->user->id,

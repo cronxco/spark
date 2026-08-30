@@ -65,7 +65,7 @@ class RunPatternDetectionJob implements ShouldQueue
             ]);
 
             if ($integration) {
-                $store->recordStatus($integration, $task, 'pending');
+                $store->recordStatus($integration, $task, 'pending', ['error' => null]);
             }
 
             $patterns = $orchestration->runPatternDetection($this->user);

@@ -14,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class CheckCookieExpiryJob implements ShouldQueue
 {
@@ -134,9 +135,20 @@ class CheckCookieExpiryJob implements ShouldQueue
                 }
 
                 // Send notification
-                $group->user->notify(
-                    new CookieExpiryWarning($group, $domain, $expiresAt->toIso8601String(), $daysUntilExpiry)
-                );
+                try {
+                    $group->user->notify(
+                        new CookieExpiryWarning($group, $domain, $expiresAt->toIso8601String(), $daysUntilExpiry)
+                    );
+                } catch (Throwable $exception) {
+                    $store->recordStatus($group, $task, 'failed', [
+                        'domain' => $domain,
+                        'threshold' => $threshold,
+                        'days_until_expiry' => $daysUntilExpiry,
+                        'error' => $exception->getMessage(),
+                    ]);
+
+                    throw $exception;
+                }
 
                 // Record that we sent this notification
                 $authMetadata['cookie_notifications_sent'][$domain][$threshold] = $now->toIso8601String();
@@ -161,7 +173,9 @@ class CheckCookieExpiryJob implements ShouldQueue
 
             // Update group metadata if we sent any notifications
             if ($updatedMetadata) {
-                $group->update(['auth_metadata' => $authMetadata]);
+                $currentAuthMetadata = $group->fresh()->auth_metadata ?? [];
+                $currentAuthMetadata['cookie_notifications_sent'] = $authMetadata['cookie_notifications_sent'];
+                $group->update(['auth_metadata' => $currentAuthMetadata]);
             }
         }
 

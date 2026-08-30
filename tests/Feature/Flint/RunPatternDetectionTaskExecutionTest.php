@@ -72,6 +72,43 @@ class RunPatternDetectionTaskExecutionTest extends TestCase
         $this->assertSame('LLM exploded', $execution->error);
     }
 
+    #[Test]
+    public function retry_clears_the_previous_detection_error(): void
+    {
+        $user = User::factory()->create();
+        $integration = $this->createFlintIntegration($user);
+        $orchestration = Mockery::mock(AgentOrchestrationService::class);
+        $orchestration->shouldReceive('runPatternDetection')
+            ->once()
+            ->andThrow(new Exception('LLM exploded'));
+
+        $job = new RunPatternDetectionJob($user);
+        $firstAttemptFailed = false;
+
+        try {
+            $job->handle($orchestration, app(TaskExecutionStore::class));
+        } catch (Exception) {
+            $firstAttemptFailed = true;
+        }
+
+        $this->assertTrue($firstAttemptFailed, 'Expected the first pattern detection attempt to fail.');
+
+        $successfulOrchestration = Mockery::mock(AgentOrchestrationService::class);
+        $successfulOrchestration->shouldReceive('runPatternDetection')
+            ->once()
+            ->andReturn([]);
+
+        $job->handle($successfulOrchestration, app(TaskExecutionStore::class));
+
+        $execution = TaskExecution::where('entity_type', 'integration')
+            ->where('entity_id', $integration->id)
+            ->where('task_key', 'flint_pattern_detection')
+            ->firstOrFail();
+
+        $this->assertSame('success', $execution->status);
+        $this->assertNull($execution->error);
+    }
+
     protected function createFlintIntegration(User $user): Integration
     {
         $group = IntegrationGroup::factory()->create([

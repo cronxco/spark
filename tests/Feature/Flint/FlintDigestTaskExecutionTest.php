@@ -96,6 +96,30 @@ class FlintDigestTaskExecutionTest extends TestCase
     }
 
     #[Test]
+    public function retry_clears_the_previous_webhook_error(): void
+    {
+        Http::fakeSequence()
+            ->push('server exploded', 500)
+            ->push(['ok' => true], 200);
+        $user = User::factory()->create();
+        $job = new TriggerFlintDigestRoutineJob($user, 'evening', '2026-06-15', 'America/New_York', 'scheduled');
+
+        try {
+            $job->handle();
+            $this->fail('Expected the first webhook response to fail.');
+        } catch (RequestException) {
+            // Expected: the released marker allows the retry below.
+        }
+
+        $job->handle();
+
+        $execution = TaskExecution::where('task_key', 'flint_digest_evening')->firstOrFail();
+
+        $this->assertSame('success', $execution->status);
+        $this->assertNull($execution->error);
+    }
+
+    #[Test]
     public function pre_created_digest_object_is_reused_by_the_mcp_creation_flow(): void
     {
         Http::fake(['routine.test/*' => Http::response(['ok' => true], 200)]);
