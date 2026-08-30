@@ -80,6 +80,64 @@ class TaskPipelineAdminTest extends TestCase
     }
 
     #[Test]
+    public function task_filter_options_include_unregistered_task_keys_observed_in_executions(): void
+    {
+        $this->actingAs($this->admin());
+
+        TaskExecution::factory()->create([
+            'task_key' => 'flint_digest_morning',
+            'task_name' => 'Flint Morning Digest',
+        ]);
+
+        $options = Volt::test('admin.task-pipeline-overview')
+            ->instance()
+            ->taskFilterOptions;
+
+        $this->assertTrue($options->contains(fn ($task) => $task['key'] === 'flint_digest_morning' && $task['name'] === 'Flint Morning Digest'));
+        $this->assertTrue($options->contains(fn ($task) => $task['key'] === 'generate_embedding'));
+    }
+
+    #[Test]
+    public function entity_type_filter_options_include_types_observed_in_executions(): void
+    {
+        $this->actingAs($this->admin());
+
+        TaskExecution::factory()->create([
+            'entity_type' => 'object',
+            'task_key' => 'flint_digest_morning',
+        ]);
+
+        $options = Volt::test('admin.task-pipeline-overview')
+            ->instance()
+            ->entityTypeFilterOptions;
+
+        $this->assertTrue($options->contains('object'));
+    }
+
+    #[Test]
+    public function unregistered_task_rows_still_appear_and_filter_correctly_in_recent_executions(): void
+    {
+        $this->actingAs($this->admin());
+
+        $digestExecution = TaskExecution::factory()->create([
+            'entity_type' => 'object',
+            'task_key' => 'flint_digest_morning',
+            'status' => 'success',
+        ]);
+        $unrelated = TaskExecution::factory()->create(['task_key' => 'generate_embedding', 'status' => 'success']);
+
+        $ids = Volt::test('admin.task-pipeline-overview')
+            ->set('execTaskFilter', 'flint_digest_morning')
+            ->instance()
+            ->recentExecutions
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($digestExecution->id, $ids);
+        $this->assertNotContains($unrelated->id, $ids);
+    }
+
+    #[Test]
     public function retry_failure_dispatches_the_task_pipeline_job_for_an_event_backed_failure(): void
     {
         Queue::fake();
