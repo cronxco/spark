@@ -34,12 +34,6 @@ class TriggerFlintRoutineJobTest extends TestCase
         ]);
     }
 
-    private function runJob(string $routine = 'topics'): void
-    {
-        (new TriggerFlintRoutineJob($this->user, $routine, '2026-06-14', 'America/New_York'))
-            ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
-    }
-
     #[Test]
     public function posts_to_the_routine_webhook_with_a_signed_payload(): void
     {
@@ -163,5 +157,11 @@ class TriggerFlintRoutineJobTest extends TestCase
             'failed',
             TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail()->status,
         );
+    }
+
+    private function runJob(string $routine = 'topics'): void
+    {
+        (new TriggerFlintRoutineJob($this->user, $routine, '2026-06-14', 'America/New_York'))
+            ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
     }
 }

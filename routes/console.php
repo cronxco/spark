@@ -171,5 +171,3 @@ Schedule::call(function () {
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();
-
-

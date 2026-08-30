@@ -40,40 +40,6 @@ class FlintPageTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    private function createDigest(array $metadata = [], ?Carbon $time = null): Event
-    {
-        return Event::factory()->create([
-            'integration_id' => $this->integration->id,
-            'service' => 'flint',
-            'action' => 'had_summary',
-            'time' => $time ?? Carbon::parse(now()->toDateString(), 'UTC'),
-            'event_metadata' => array_merge([
-                'period' => 'evening',
-                'title' => 'Tuesday, in brief',
-                'summary' => 'You ran 5k and slept badly.',
-            ], $metadata),
-        ]);
-    }
-
-    private function createTopic(array $metadata = [], string $title = 'Canada trip 2027'): EventObject
-    {
-        return EventObject::factory()->create([
-            'user_id' => $this->user->id,
-            'concept' => 'flint',
-            'type' => 'topic',
-            'title' => $title,
-            'content' => 'Aiming for a three week trip in spring 2027.',
-            'metadata' => array_merge([
-                'kind' => 'strategic',
-                'status' => 'active',
-                'first_seen_at' => now()->toIso8601String(),
-                'last_touched_at' => now()->toIso8601String(),
-                'next_review_at' => null,
-                'origin' => 'conversation',
-            ], $metadata),
-        ]);
-    }
-
     #[Test]
     public function it_shows_the_latest_digest_summary(): void
     {
@@ -310,5 +276,39 @@ class FlintPageTest extends TestCase
         Volt::test('flint.index')->call('save');
 
         $this->assertSame('keep me', $this->user->refresh()->settings['flint']['some_other_key']);
+    }
+
+    private function createDigest(array $metadata = [], ?Carbon $time = null): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => $time ?? Carbon::parse(now()->toDateString(), 'UTC'),
+            'event_metadata' => array_merge([
+                'period' => 'evening',
+                'title' => 'Tuesday, in brief',
+                'summary' => 'You ran 5k and slept badly.',
+            ], $metadata),
+        ]);
+    }
+
+    private function createTopic(array $metadata = [], string $title = 'Canada trip 2027'): EventObject
+    {
+        return EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+            'title' => $title,
+            'content' => 'Aiming for a three week trip in spring 2027.',
+            'metadata' => array_merge([
+                'kind' => 'strategic',
+                'status' => 'active',
+                'first_seen_at' => now()->toIso8601String(),
+                'last_touched_at' => now()->toIso8601String(),
+                'next_review_at' => null,
+                'origin' => 'conversation',
+            ], $metadata),
+        ]);
     }
 }

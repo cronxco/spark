@@ -47,44 +47,6 @@ class NotificationTest extends TestCase
         parent::tearDown();
     }
 
-    private function runJob(User $user, string $scheduleTime, ?string $period = null, ?string $eventId = null): void
-    {
-        (new SendDigestNotificationJob($user, $scheduleTime, $period, $eventId))
-            ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
-    }
-
-    /**
-     * Create a digest the way the Flint routine does through
-     * create-flint-digest: a `had_summary` event carrying the title and summary
-     * prose in `event_metadata`, targeting the digest object.
-     */
-    private function createDigest(string $period, array $metadata = [], ?Carbon $time = null): Event
-    {
-        $time ??= Carbon::parse(now()->toDateString(), 'UTC');
-
-        $digestObject = EventObject::factory()->create([
-            'user_id' => $this->user->id,
-            'concept' => 'digest',
-            'type' => $period . '_digest',
-            'title' => $time->format('Y-m-d') . ' ' . strtoupper(substr($period, 0, 3)),
-            'time' => $time,
-        ]);
-
-        return Event::factory()->create([
-            'integration_id' => $this->flintIntegration->id,
-            'target_id' => $digestObject->id,
-            'service' => 'flint',
-            'action' => 'had_summary',
-            'time' => $time,
-            'event_metadata' => array_merge([
-                'period' => $period,
-                'digest_object_id' => $digestObject->id,
-                'title' => 'Your ' . ucfirst($period) . ' Digest',
-                'summary' => 'You slept well and ran 5k. Tomorrow looks quieter.',
-            ], $metadata),
-        ]);
-    }
-
     #[Test]
     public function sends_digest_notification_when_digest_exists(): void
     {
@@ -261,5 +223,43 @@ class NotificationTest extends TestCase
             fn (DailyDigestReady $notification) => $notification->digestObject->id === $digest->target_id
                 && $notification->period === 'evening',
         );
+    }
+
+    private function runJob(User $user, string $scheduleTime, ?string $period = null, ?string $eventId = null): void
+    {
+        (new SendDigestNotificationJob($user, $scheduleTime, $period, $eventId))
+            ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+    }
+
+    /**
+     * Create a digest the way the Flint routine does through
+     * create-flint-digest: a `had_summary` event carrying the title and summary
+     * prose in `event_metadata`, targeting the digest object.
+     */
+    private function createDigest(string $period, array $metadata = [], ?Carbon $time = null): Event
+    {
+        $time ??= Carbon::parse(now()->toDateString(), 'UTC');
+
+        $digestObject = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'digest',
+            'type' => $period . '_digest',
+            'title' => $time->format('Y-m-d') . ' ' . strtoupper(substr($period, 0, 3)),
+            'time' => $time,
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'target_id' => $digestObject->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => $time,
+            'event_metadata' => array_merge([
+                'period' => $period,
+                'digest_object_id' => $digestObject->id,
+                'title' => 'Your ' . ucfirst($period) . ' Digest',
+                'summary' => 'You slept well and ran 5k. Tomorrow looks quieter.',
+            ], $metadata),
+        ]);
     }
 }

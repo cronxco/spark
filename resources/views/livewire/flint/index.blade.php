@@ -6,6 +6,7 @@ use App\Services\AgentWorkingMemoryService;
 use App\Services\FlintTopicService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -77,33 +78,28 @@ new class extends Component {
     // ------------------------------------------------------------------
 
     /**
-     * Memo for the digest list. Private, so Livewire never hydrates it: it lives
-     * for one request, which is exactly as long as the memo should be valid.
-     *
-     * @var \Illuminate\Support\Collection<int, Event>|null
-     */
-    private ?\Illuminate\Support\Collection $digestCache = null;
-
-    /**
      * Digest events, newest first. These are written by the Flint routine via
      * the create-flint-digest MCP tool — the same rows the mobile app reads.
+     *
+     * Computed, so one render queries this once however many times it is read.
      */
-    public function digests(int $limit = 30)
+    #[Computed]
+    public function digests()
     {
-        return $this->digestCache ??= Event::query()
+        return Event::query()
             ->whereIn('integration_id', Auth::user()->integrations()->pluck('id'))
             ->where('service', 'flint')
             ->where('action', 'had_summary')
             ->orderByDesc('time')
             ->orderByDesc('created_at')
-            ->limit($limit)
+            ->limit(30)
             ->get();
     }
 
     /** The digest currently on screen: the one picked from the list, else the newest. */
     public function currentDigest(): ?Event
     {
-        $digests = $this->digests();
+        $digests = $this->digests;
 
         $digest = $this->selectedDigestId
             ? $digests->firstWhere('id', $this->selectedDigestId)
@@ -315,7 +311,7 @@ new class extends Component {
         {{-- ============================== Today ============================== --}}
         <x-tab name="today" label="Today" icon="fas.newspaper">
             @php
-                $digests = $this->digests();
+                $digests = $this->digests;
                 $digest = $this->currentDigest();
                 $grouped = $this->digestBlocks($digest);
                 $touchedTopics = $this->topicsTouchedBy($digest);

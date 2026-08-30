@@ -164,6 +164,19 @@ class SendDigestNotificationJob implements ShouldQueue
         }
     }
 
+    protected function getDigestPeriod(string $scheduleTime): string
+    {
+        $hour = (int) substr($scheduleTime, 0, 2);
+
+        if ($hour < 12) {
+            return 'morning';
+        } elseif ($hour < 17) {
+            return 'afternoon';
+        } else {
+            return 'evening';
+        }
+    }
+
     /**
      * Built inline rather than registered in TaskRegistry, matching the dispatch
      * side. See docs/Architecture/TASK_PIPELINE.md.
@@ -209,18 +222,5 @@ class SendDigestNotificationJob implements ShouldQueue
             ->with(['blocks', 'target'])
             ->orderByDesc('created_at')
             ->first();
-    }
-
-    protected function getDigestPeriod(string $scheduleTime): string
-    {
-        $hour = (int) substr($scheduleTime, 0, 2);
-
-        if ($hour < 12) {
-            return 'morning';
-        } elseif ($hour < 17) {
-            return 'afternoon';
-        } else {
-            return 'evening';
-        }
     }
 }

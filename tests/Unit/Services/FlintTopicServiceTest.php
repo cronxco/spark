@@ -11,11 +11,12 @@ use App\Services\FlintTopicService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Feature\Mcp\ManageFlintTopicToolTest;
 use Tests\TestCase;
 
 /**
  * The read/write surface the Flint web UI uses directly, alongside the MCP tool
- * covered by {@see \Tests\Feature\Mcp\ManageFlintTopicToolTest}.
+ * covered by {@see ManageFlintTopicToolTest}.
  */
 class FlintTopicServiceTest extends TestCase
 {
@@ -31,17 +32,6 @@ class FlintTopicServiceTest extends TestCase
 
         $this->service = app(FlintTopicService::class);
         $this->user = User::factory()->create();
-    }
-
-    private function topic(string $title, array $metadata = []): EventObject
-    {
-        return EventObject::factory()->create([
-            'user_id' => $this->user->id,
-            'concept' => 'flint',
-            'type' => 'topic',
-            'title' => $title,
-            'metadata' => array_merge(['kind' => 'thematic', 'status' => 'active'], $metadata),
-        ]);
     }
 
     #[Test]
@@ -194,5 +184,16 @@ class FlintTopicServiceTest extends TestCase
         $this->assertSame('strategic', $topic->metadata['kind']);
         $this->assertSame('dormant', $topic->metadata['status']);
         $this->assertNotNull($topic->metadata['last_touched_at']);
+    }
+
+    private function topic(string $title, array $metadata = []): EventObject
+    {
+        return EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+            'title' => $title,
+            'metadata' => array_merge(['kind' => 'thematic', 'status' => 'active'], $metadata),
+        ]);
     }
 }
