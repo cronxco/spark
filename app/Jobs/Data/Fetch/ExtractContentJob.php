@@ -6,6 +6,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -181,7 +182,7 @@ PROMPT;
 
         try {
             // Start Sentry AI request span
-            $model = 'gpt-5-nano';
+            $model = AiModel::Extraction->model();
             $messages = [
                 [
                     'role' => 'system',

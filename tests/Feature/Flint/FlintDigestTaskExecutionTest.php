@@ -22,7 +22,7 @@ class FlintDigestTaskExecutionTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.flint_routine.url' => 'https://routine.test/webhook']);
+        config(['services.flint_routine.routines.digest.url' => 'https://routine.test/webhook']);
     }
 
     #[Test]

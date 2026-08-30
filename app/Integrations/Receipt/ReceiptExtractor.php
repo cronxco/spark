@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Receipt;
 
+use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -74,7 +75,7 @@ PROMPT;
             ]);
 
             // Start Sentry AI request span
-            $model = 'gpt-5-nano';
+            $model = AiModel::Extraction->model();
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userPrompt],
@@ -151,7 +152,7 @@ PROMPT;
                 'email_from' => 'string',
                 'email_received_at' => '2025-01-15T14:32:00Z',
                 'confidence_score' => 0.95,
-                'extraction_model' => 'gpt-5-nano',
+                'extraction_model' => AiModel::Extraction->model(),
                 'raw_text_preview' => 'string (first 200 chars)',
             ],
             'merchant' => [

@@ -15,7 +15,7 @@ class EmbeddingServiceTest extends TestCase
 
         config([
             'services.openai.api_key' => 'test-api-key',
-            'services.openai.embedding_model' => 'text-embedding-3-small',
+            'services.openai.models.embedding' => 'text-embedding-3-small',
         ]);
     }
 

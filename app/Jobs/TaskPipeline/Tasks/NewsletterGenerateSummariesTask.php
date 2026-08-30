@@ -4,6 +4,7 @@ namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\Event;
+use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -102,7 +103,7 @@ Return ONLY valid JSON in this exact format:
 }
 PROMPT;
 
-        $model = 'gpt-5-nano';
+        $model = AiModel::Extraction->model();
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             [
@@ -141,6 +142,8 @@ PROMPT;
 
     private function createSummaryBlocks(Event $event, array $summaries): void
     {
+        $model = AiModel::Extraction->model();
+
         $eventTime = $event->time;
 
         $event->createBlock([
@@ -151,7 +154,7 @@ PROMPT;
                 'content' => $summaries['summary_tweet'],
                 'char_count' => strlen($summaries['summary_tweet']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -163,7 +166,7 @@ PROMPT;
                 'content' => $summaries['summary_short'],
                 'word_count' => str_word_count($summaries['summary_short']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -175,7 +178,7 @@ PROMPT;
                 'content' => $summaries['summary_paragraph'],
                 'word_count' => str_word_count($summaries['summary_paragraph']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -187,7 +190,7 @@ PROMPT;
                 'content' => $summaries['key_takeaways'],
                 'count' => count($summaries['key_takeaways']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -199,7 +202,7 @@ PROMPT;
                 'content' => $summaries['tldr'],
                 'word_count' => str_word_count($summaries['tldr']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
     }

@@ -6,6 +6,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -157,7 +158,7 @@ PROMPT;
 
         try {
             // Start Sentry AI request span
-            $model = 'gpt-5-nano';
+            $model = AiModel::Extraction->model();
             $messages = [
                 [
                     'role' => 'system',
@@ -233,6 +234,8 @@ PROMPT;
 
     private function createSummaryBlocks(array $summaries): void
     {
+        $model = AiModel::Extraction->model();
+
         $eventTime = $this->event->time;
 
         // Store metadata on webpage EventObject instead of as block
@@ -253,7 +256,7 @@ PROMPT;
                 'content' => $tweetContent,
                 'char_count' => strlen($tweetContent),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -266,7 +269,7 @@ PROMPT;
                 'content' => $summaries['summary_short'],
                 'word_count' => str_word_count($summaries['summary_short']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -279,7 +282,7 @@ PROMPT;
                 'content' => $summaries['summary_paragraph'],
                 'word_count' => str_word_count($summaries['summary_paragraph']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -292,7 +295,7 @@ PROMPT;
                 'content' => $summaries['key_takeaways'],
                 'count' => count($summaries['key_takeaways']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -305,7 +308,7 @@ PROMPT;
                 'content' => $summaries['tldr'],
                 'word_count' => str_word_count($summaries['tldr']),
                 'generated_at' => now()->toIso8601String(),
-                'model' => 'gpt-5-nano',
+                'model' => $model,
             ],
         ]);
 
@@ -385,6 +388,8 @@ PROMPT;
 
     private function attachBlocksToSourceEvents(array $summaries): void
     {
+        $model = AiModel::Extraction->model();
+
         // Get all relevant events to attach blocks to
         $events = $this->getSourceEvents();
 
@@ -423,7 +428,7 @@ PROMPT;
                     'content' => $summaries['summary_tweet'],
                     'char_count' => strlen($summaries['summary_tweet']),
                     'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
+                    'model' => $model,
                 ],
             ]);
 
@@ -436,7 +441,7 @@ PROMPT;
                     'content' => $summaries['summary_short'],
                     'word_count' => str_word_count($summaries['summary_short']),
                     'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
+                    'model' => $model,
                 ],
             ]);
 
@@ -449,7 +454,7 @@ PROMPT;
                     'content' => $summaries['summary_paragraph'],
                     'word_count' => str_word_count($summaries['summary_paragraph']),
                     'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
+                    'model' => $model,
                 ],
             ]);
 
@@ -462,7 +467,7 @@ PROMPT;
                     'content' => $summaries['key_takeaways'],
                     'count' => count($summaries['key_takeaways']),
                     'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
+                    'model' => $model,
                 ],
             ]);
 
@@ -475,7 +480,7 @@ PROMPT;
                     'content' => $summaries['tldr'],
                     'word_count' => str_word_count($summaries['tldr']),
                     'generated_at' => now()->toIso8601String(),
-                    'model' => 'gpt-5-nano',
+                    'model' => $model,
                 ],
             ]);
 

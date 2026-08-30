@@ -26,7 +26,7 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
         $this->user = User::factory()->create();
 
         config([
-            'services.flint_routine.url' => 'https://routine.example.test/hook',
+            'services.flint_routine.routines.digest.url' => 'https://routine.example.test/hook',
             'services.flint_routine.secret' => 'shh',
         ]);
     }
@@ -99,7 +99,7 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
     #[Test]
     public function no_op_when_webhook_url_missing(): void
     {
-        config(['services.flint_routine.url' => null]);
+        config(['services.flint_routine.routines.digest.url' => null]);
         Http::fake();
 
         $this->runJob('evening');

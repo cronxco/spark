@@ -4,6 +4,7 @@ namespace App\Jobs\Data\HomeAssistant;
 
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
+use App\Services\Ai\AiModel;
 use App\Services\AssistantPromptingService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -94,7 +95,9 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
             $response = app(AssistantPromptingService::class)->generateResponse(
                 $this->buildDisambiguationPrompt($title, $candidates),
                 [
-                    'model' => config('services.openai.models.gpt5_mini'),
+                    'model' => AiModel::Reasoning->model(),
+                    'integration_id' => $this->integration->id,
+                    'service' => $this->getServiceName(),
                     'context' => ['prompt_type' => 'home_assistant_media_disambiguation'],
                     'max_completion_tokens' => 300,
                     'temperature' => 0,

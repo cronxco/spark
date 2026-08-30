@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -23,7 +24,7 @@ class EmbeddingService
     {
         $this->apiKey = config('services.openai.api_key');
         $this->organization = config('services.openai.organization');
-        $this->model = config('services.openai.embedding_model', 'text-embedding-3-small');
+        $this->model = AiModel::Embedding->model();
 
         if (empty($this->apiKey)) {
             throw new Exception('OpenAI API key is not configured');

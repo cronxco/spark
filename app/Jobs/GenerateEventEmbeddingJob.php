@@ -65,16 +65,17 @@ class GenerateEventEmbeddingJob implements ShouldQueue
             // Get embedding metadata
             $embeddingMetadata = $embeddingService->getEmbeddingMetadata();
 
-            // Merge embedding metadata into event metadata
-            $metadata = $this->event->metadata ?? [];
-            $metadata = array_merge($metadata, $embeddingMetadata);
+            // Events store their metadata in event_metadata; there is no `metadata`
+            // column, so writing one is silently dropped by mass assignment and the
+            // model stamp never lands. GenerateEmbeddingTask picks the same field.
+            $metadata = array_merge($this->event->event_metadata ?? [], $embeddingMetadata);
 
             // Store embedding and metadata in database
             // Use withoutEvents() to prevent observers from triggering on this internal update
             $this->event->withoutEvents(function () use ($embedding, $metadata) {
                 $this->event->update([
                     'embeddings' => EmbeddingService::formatForPostgres($embedding),
-                    'metadata' => $metadata,
+                    'event_metadata' => $metadata,
                 ]);
             });
 

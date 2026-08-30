@@ -5,6 +5,7 @@ namespace App\Jobs\Flint;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\FlintDigestService;
+use App\Services\Flint\RoutineConfig;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
@@ -80,7 +81,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             return;
         }
 
-        $url = config('services.flint_routine.url');
+        $url = RoutineConfig::url('digest');
 
         if (empty($url)) {
             Log::warning('Flint routine webhook URL not configured; skipping trigger', [
@@ -117,7 +118,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
 
         $request = Http::withSentryTracing()->asJson()->timeout(20)->connectTimeout(5);
 
-        if ($secret = config('services.flint_routine.secret')) {
+        if ($secret = RoutineConfig::secret('digest')) {
             $request = $request->withToken($secret);
         }
 

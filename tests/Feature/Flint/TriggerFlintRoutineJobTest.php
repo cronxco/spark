@@ -27,9 +27,9 @@ class TriggerFlintRoutineJobTest extends TestCase
         $this->user = User::factory()->create();
 
         config([
-            'services.flint_routine.topics_url' => 'https://routine.example.test/topics',
-            'services.flint_routine.reading_list_url' => 'https://routine.example.test/reading',
-            'services.flint_routine.news_roundup_url' => null,
+            'services.flint_routine.routines.topics.url' => 'https://routine.example.test/topics',
+            'services.flint_routine.routines.reading_list.url' => 'https://routine.example.test/reading',
+            'services.flint_routine.routines.news_roundup.url' => null,
             'services.flint_routine.secret' => 'shh',
         ]);
     }

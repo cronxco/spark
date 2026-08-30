@@ -5,6 +5,7 @@ namespace App\Jobs\TaskPipeline\Tasks;
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
+use App\Services\Ai\AiModel;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -112,7 +113,7 @@ Requirements:
 The output should be the full, clean article text in Markdown format that a reader would want to read.
 PROMPT;
 
-        $model = 'gpt-5-nano';
+        $model = AiModel::Extraction->model();
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             [
