@@ -2,11 +2,16 @@
 
 namespace Tests\Unit\Jobs;
 
+use App\Jobs\Data\Slack\SlackEventsData;
 use App\Jobs\Webhook\Slack\SlackEventsHook;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\TaskExecution;
 use App\Models\User;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SlackEventsHookTest extends TestCase
@@ -261,5 +266,58 @@ class SlackEventsHookTest extends TestCase
         $this->assertEquals(60, $job->timeout);
         $this->assertEquals(3, $job->tries);
         $this->assertEquals([30, 120, 300], $job->backoff);
+    }
+
+    #[Test]
+    public function successful_run_records_a_task_execution_anchored_to_the_integration(): void
+    {
+        Queue::fake();
+
+        $signingSecret = 'test_signing_secret';
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $this->group->id,
+            'service' => 'slack',
+            'instance_type' => 'events',
+            'account_id' => $signingSecret,
+            'configuration' => [
+                'events' => ['message'],
+            ],
+        ]);
+
+        $payload = [
+            'type' => 'event_callback',
+            'team_id' => 'T123456',
+            'event_id' => 'Ev123456',
+            'event' => [
+                'type' => 'message',
+                'user' => 'U123456',
+                'text' => 'Hello world',
+                'ts' => 1609459200.000100,
+                'channel' => 'C123456',
+            ],
+        ];
+
+        $timestamp = time();
+        $body = json_encode($payload);
+        $baseString = "v0:{$timestamp}:{$body}";
+        $signature = 'v0=' . hash_hmac('sha256', $baseString, $signingSecret);
+
+        $headers = [
+            'x-slack-signature' => [$signature],
+            'x-slack-request-timestamp' => [$timestamp],
+        ];
+
+        (new SlackEventsHook($payload, $headers, $integration))->handle(app(TaskExecutionStore::class));
+
+        Queue::assertPushed(SlackEventsData::class);
+
+        $execution = TaskExecution::where('entity_type', 'integration')
+            ->where('entity_id', $integration->id)
+            ->where('task_key', 'webhook_slack_events')
+            ->firstOrFail();
+
+        $this->assertSame('success', $execution->status);
+        $this->assertSame($this->user->id, $execution->user_id);
     }
 }

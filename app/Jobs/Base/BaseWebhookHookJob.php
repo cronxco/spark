@@ -3,6 +3,8 @@
 namespace App\Jobs\Base;
 
 use App\Models\Integration;
+use App\Services\TaskPipeline\TaskDefinition;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -47,7 +49,7 @@ abstract class BaseWebhookHookJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(TaskExecutionStore $store): void
     {
         $hub = SentrySdk::getCurrentHub();
         $txContext = new TransactionContext;
@@ -56,8 +58,12 @@ abstract class BaseWebhookHookJob implements ShouldQueue
         $transaction = $hub->startTransaction($txContext);
         $hub->setSpan($transaction);
 
+        $task = $this->taskDefinition();
+
         try {
             Log::info("Processing {$this->getJobType()} webhook for integration {$this->integration->id} ({$this->serviceName})");
+
+            $store->recordStatus($this->integration, $task, 'pending');
 
             // Log webhook payload for debugging/traceability
             $this->logWebhookPayload();
@@ -78,10 +84,18 @@ abstract class BaseWebhookHookJob implements ShouldQueue
             // Dispatch processing jobs for each chunk
             $this->dispatchProcessingJobs($processingData);
 
+            $store->recordStatus($this->integration, $task, 'success', [
+                'chunks' => is_array($processingData) ? count($processingData) : 0,
+            ]);
+
             Log::info("Completed {$this->getJobType()} webhook processing for integration {$this->integration->id} ({$this->serviceName})");
             $transaction->setStatus(SpanStatus::ok());
 
         } catch (Exception $e) {
+            $store->recordStatus($this->integration, $task, 'failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             Log::error("Failed {$this->getJobType()} webhook processing for integration {$this->integration->id} ({$this->serviceName})", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -195,5 +209,16 @@ abstract class BaseWebhookHookJob implements ShouldQueue
         }
 
         return $sanitized;
+    }
+
+    private function taskDefinition(): TaskDefinition
+    {
+        return new TaskDefinition(
+            key: "webhook_{$this->serviceName}_{$this->getJobType()}",
+            name: "Webhook: {$this->serviceName} ({$this->getJobType()})",
+            description: 'Inbound webhook processing for an integration.',
+            jobClass: static::class,
+            appliesTo: ['integration'],
+        );
     }
 }
