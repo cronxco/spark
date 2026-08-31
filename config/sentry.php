@@ -5,7 +5,13 @@ return [
 
     'environment' => env('APP_ENV', 'production'),
 
-    'release' => file_exists(base_path('VERSION')) ? env('SENTRY_PROJECT_NAME') . '@' . file_get_contents(base_path('VERSION')) : null,
+    'release' => file_exists(base_path('VERSION'))
+        ? trim(file_get_contents(base_path('VERSION')))
+        : (env('SENTRY_RELEASE') ?: null),
+
+    'js' => [
+        'dsn' => env('VITE_SENTRY_DSN'),
+    ],
 
     'traces_sample_rate' => (float) env('SENTRY_TRACES_SAMPLE_RATE', 0.2),
 

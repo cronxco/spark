@@ -60,13 +60,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-    @if (env('VITE_SENTRY_DSN'))
+    @if (config('sentry.js.dsn'))
     <script>
-        window.SENTRY_DSN = "{{ env('VITE_SENTRY_DSN') }}";
+        window.SENTRY_DSN = "{{ config('sentry.js.dsn') }}";
     </script>
     @endif
     <script>
-        window.SENTRY_RELEASE = "{{ env('SENTRY_RELEASE') }}";
+        window.SENTRY_RELEASE = "{{ config('sentry.release') }}";
         window.SENTRY_ENVIRONMENT = "{{ app()->environment() }}";
     </script>
 </head>
