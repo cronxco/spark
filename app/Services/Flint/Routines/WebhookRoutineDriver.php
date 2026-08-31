@@ -27,7 +27,11 @@ class WebhookRoutineDriver implements RoutineDriver
             return RoutineResult::notApplicable('Webhook URL is not configured.');
         }
 
-        $request = Http::withSentryTracing()->asJson()->timeout(20)->connectTimeout(5);
+        $request = Http::withSentryTracing()
+            ->asJson()
+            ->withHeaders(['anthropic-version' => '2023-06-01'])
+            ->timeout(20)
+            ->connectTimeout(5);
 
         if ($secret = RoutineConfig::secret($routine)) {
             $request = $request->withToken($secret);

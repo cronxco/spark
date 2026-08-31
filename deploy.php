@@ -3,10 +3,10 @@
 namespace Deployer;
 
 use Closure;
+use RuntimeException;
 
 require 'recipe/laravel.php';
 require 'contrib/npm.php';
-require 'contrib/sentry.php';
 
 // Config
 set('application', getenv('DEPLOYER_APP'));
@@ -91,24 +91,27 @@ task('npm:install', function () {
 });
 
 task('npm:run:prod', function () {
-    run('sudo docker exec -t -w {{container_deploy_path}}/releases/{{release_name}} spark npm run build');
+    run(
+        'sudo docker exec -t '
+        . '-e SENTRY_AUTH_TOKEN=%secret% '
+        . '-e SENTRY_ORG=' . escapeshellarg(getenv('SENTRY_ORG') ?: '') . ' '
+        . '-e SENTRY_PROJECT=' . escapeshellarg(getenv('SENTRY_PROJECT_ARRAY') ?: '') . ' '
+        . '-e SENTRY_RELEASE=' . escapeshellarg(get('version')) . ' '
+        . '-w {{container_deploy_path}}/releases/{{release_name}} spark npm run build',
+        secret: getenv('SENTRY_TOKEN') ?: ''
+    );
 });
 
 // Version tasks
 task('version:prepare', function () {
-    $absorb = runLocally('php artisan version:absorb');
+    runLocally('php artisan version:absorb');
     $ver = runLocally('php artisan version:show --format=version-only --suppress-app-name');
     $commit = substr(runLocally('git rev-parse --verify HEAD'), 0, 6);
-    set('sentry', [
-        'organization' => getenv('SENTRY_ORG'),
-        'projects' => getenv('SENTRY_PROJECT_ARRAY'),
-        'token' => getenv('SENTRY_TOKEN'),
-        'environment' => 'production',
-        'version' => $ver . '+' . $commit,
-        'version_prefix' => getenv('SENTRY_PREFIX'),
-        'sentry_server' => getenv('SENTRY_SERVER'),
-    ]);
-    set('version', getenv('SENTRY_PREFIX') . $ver . '+' . $commit);
+    $prefix = getenv('SENTRY_PREFIX');
+    if ($prefix === false || $prefix === '') {
+        throw new RuntimeException('SENTRY_PREFIX is required for a consistent Sentry release name');
+    }
+    set('version', $prefix . $ver . '+' . $commit);
     writeln('<info>' . get('version') . '</info>');
 });
 

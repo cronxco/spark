@@ -92,14 +92,6 @@ return [
         'api_key' => env('HEVY_API_KEY'),
     ],
 
-    'sentry' => [
-        'dsn' => env('SENTRY_LARAVEL_DSN'),
-        'traces_sample_rate' => (float) env('SENTRY_TRACES_SAMPLE_RATE', 0.2),
-        'profiles_sample_rate' => (float) env('SENTRY_PROFILES_SAMPLE_RATE', 0.0),
-        'environment' => env('APP_ENV', 'production'),
-        'release' => env('SENTRY_RELEASE'),
-    ],
-
     'outline' => [
         'url' => env('OUTLINE_URL'),
         'access_token' => env('OUTLINE_ACCESS_TOKEN'),

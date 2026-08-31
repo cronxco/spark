@@ -18,10 +18,9 @@ Sentry.init({
         Sentry.browserTracingIntegration({
             traceFetch: true,
             traceXHR: true,
-            // Adjust targets to your domains and API paths
             tracePropagationTargets: [
                 /^https?:\/\/[\w.-]*localhost(?::\d+)?\/?/,
-                /^https?:\/\/[^/]*your-domain\.com\/?/,
+                /^https?:\/\/(?:[\w.-]+\.)?cronx\.co\/?/,
                 /^\//,
             ],
         }),

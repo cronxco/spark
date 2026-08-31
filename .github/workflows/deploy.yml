@@ -5,6 +5,11 @@ on:
     branches:
       - main
       - dev
+    # The prod deploy commits ":pushpin: Update version" back to the branch.
+    # Ignore version-only commits so they can never trigger another deploy.
+    paths-ignore:
+      - VERSION.txt
+      - config/version.yml
   workflow_dispatch:
 
 concurrency:
@@ -291,14 +296,8 @@ jobs:
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     permissions:
-      contents: write
+      contents: read
     steps:
-      - name: App Token
-        id: app_token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
@@ -335,27 +334,22 @@ jobs:
           DEPLOYER_PATH: ${{ vars.DEV_DEPLOYER_PATH }}
           DEPLOYER_APP: ${{ vars.DEV_DEPLOYER_APP }}
           DEPLOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_PREFIX: ${{ vars.SENTRY_PREFIX }}
+          SENTRY_SERVER: ${{ vars.SENTRY_SERVER }}
+          SENTRY_PROJECT_ARRAY: ${{ vars.SENTRY_PROJECT_ARRAY }}
           WIRE_SECRET: ${{ secrets.WIRE_SECRET }}
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
           dep: deploy dev
 
+      # Expose the deployed release identifier for the Sentry release job.
+      # Dev does NOT commit the version back to the branch (prod does).
       - name: Get version
         if: github.ref == 'refs/heads/dev' && needs.version.outputs.version != ''
         id: get_version
-        run: |
-          echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
-          php artisan version:absorb
-          git add .
-
-      - name: Commit Changes
-        if: github.ref == 'refs/heads/main'
-        id: auto_commit_action
-        uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
-        with:
-          message: ":pushpin: Update version"
-          token: ${{ steps.app_token.outputs.token }}
-          fail-on-no-changes: false
+        run: echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Add Deployment Info to Summary
         run: |
@@ -388,14 +382,13 @@ jobs:
         with:
           environment: production
           release: ${{ needs.deploy-prod.outputs.version }}
-          release_prefix: ${{ vars.SENTRY_PREFIX }}
           projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
           disable_telemetry: true
           ignore_missing: true
       - name: Add Monitoring Info to Summary
         run: |
           echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       - name: Add Related Changes to Summary
         env:
@@ -432,14 +425,13 @@ jobs:
         with:
           environment: dev
           release: ${{ needs.deploy-dev.outputs.version }}
-          release_prefix: ${{ vars.SENTRY_PREFIX }}
           projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
           disable_telemetry: true
           ignore_missing: true
       - name: Add Monitoring Info to Summary
         run: |
           echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       - name: Add Related Changes to Summary
         env:

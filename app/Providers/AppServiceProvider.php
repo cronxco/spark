@@ -147,7 +147,7 @@ class AppServiceProvider extends ServiceProvider
                 if ($parentSpan) {
                     $spanContext = new SpanContext;
                     $spanContext->setOp('http.client');
-                    $spanContext->setDescription($request->getMethod() . ' ' . $request->getUri());
+                    $spanContext->setDescription($request->method() . ' ' . $request->url());
                     $span = $parentSpan->startChild($spanContext);
 
                     // finish span after response

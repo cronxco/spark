@@ -25,6 +25,11 @@ Homestead.json
 /.vagrant
 .phpunit.result.cache
 
+# Deploy-time artifacts written by deploy.php (version:set) / read by config/sentry.php;
+# also created transiently by SentryReleaseConfigTest. Must not be committed.
+/VERSION
+/VERSION.txt
+
 /public/build
 /storage/pail
 .env.backup

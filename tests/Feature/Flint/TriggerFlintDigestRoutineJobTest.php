@@ -41,6 +41,7 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
         Http::assertSent(function ($request) {
             return $request->url() === 'https://routine.example.test/hook'
                 && $request->hasHeader('Authorization', 'Bearer shh')
+                && $request->hasHeader('anthropic-version', '2023-06-01')
                 && $request['period'] === 'evening'
                 && $request['local_date'] === '2026-06-14'
                 && $request['timezone'] === 'America/New_York'
