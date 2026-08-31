@@ -120,7 +120,11 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'idempotency_key' => $markerKey,
         ];
 
-        $request = Http::withSentryTracing()->asJson()->timeout(20)->connectTimeout(5);
+        $request = Http::withSentryTracing()
+            ->asJson()
+            ->withHeaders(['anthropic-version' => '2023-06-01'])
+            ->timeout(20)
+            ->connectTimeout(5);
 
         if ($secret = config('services.flint_routine.secret')) {
             $request = $request->withToken($secret);
