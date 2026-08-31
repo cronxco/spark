@@ -35,17 +35,28 @@ class SentryReleaseConfigTest extends TestCase
     }
 
     #[Test]
-    public function release_falls_back_to_the_env_var_when_no_version_file_exists(): void
+    public function release_is_trimmed_of_all_surrounding_whitespace(): void
     {
-        putenv('SENTRY_RELEASE=sparkapp@1.2.3+local');
+        File::put($this->versionPath, "  sparkapp@3.1.4+abc123 \n\n");
 
         $this->refreshApplication();
 
-        $this->assertSame('sparkapp@1.2.3+local', config('sentry.release'));
+        $this->assertSame('sparkapp@3.1.4+abc123', config('sentry.release'));
     }
 
     #[Test]
-    public function release_is_null_when_neither_version_file_nor_env_var_is_set(): void
+    public function the_version_file_takes_precedence_over_the_env_var(): void
+    {
+        File::put($this->versionPath, "sparkapp@2.0.0+deadbee\n");
+        putenv('SENTRY_RELEASE=should-not-be-used');
+
+        $this->refreshApplication();
+
+        $this->assertSame('sparkapp@2.0.0+deadbee', config('sentry.release'));
+    }
+
+    #[Test]
+    public function release_is_null_when_no_version_file_and_no_release_env_var(): void
     {
         putenv('SENTRY_RELEASE');
 
