@@ -335,6 +335,11 @@ jobs:
           DEPLOYER_PATH: ${{ vars.DEV_DEPLOYER_PATH }}
           DEPLOYER_APP: ${{ vars.DEV_DEPLOYER_APP }}
           DEPLOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_PREFIX: ${{ vars.SENTRY_PREFIX }}
+          SENTRY_SERVER: ${{ vars.SENTRY_SERVER }}
+          SENTRY_PROJECT_ARRAY: ${{ vars.SENTRY_PROJECT_ARRAY }}
           WIRE_SECRET: ${{ secrets.WIRE_SECRET }}
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
@@ -349,7 +354,7 @@ jobs:
           git add .
 
       - name: Commit Changes
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/dev' && needs.version.outputs.version != ''
         id: auto_commit_action
         uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
         with:
@@ -388,14 +393,13 @@ jobs:
         with:
           environment: production
           release: ${{ needs.deploy-prod.outputs.version }}
-          release_prefix: ${{ vars.SENTRY_PREFIX }}
           projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
           disable_telemetry: true
           ignore_missing: true
       - name: Add Monitoring Info to Summary
         run: |
           echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       - name: Add Related Changes to Summary
         env:
@@ -432,14 +436,13 @@ jobs:
         with:
           environment: dev
           release: ${{ needs.deploy-dev.outputs.version }}
-          release_prefix: ${{ vars.SENTRY_PREFIX }}
           projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
           disable_telemetry: true
           ignore_missing: true
       - name: Add Monitoring Info to Summary
         run: |
           echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       - name: Add Related Changes to Summary
         env:
