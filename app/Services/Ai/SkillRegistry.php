@@ -7,11 +7,12 @@ use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Loads the vendored Flint skills from resources/ai/skills.
+ * Loads the vendored Flint skills from resources/ai/skills/{name}/SKILL.md.
  *
- * The skill files are shared verbatim with the Claude Code Routines in
- * cronxco/claude; the extra manifest keys are ignored there, so one file
- * serves both runtimes.
+ * The layout mirrors cronxco/claude's .claude/skills/{name}/SKILL.md so a skill
+ * copies across as a directory. The files are shared verbatim with the Claude
+ * Code Routines there; the extra manifest keys are ignored by Claude Code, so
+ * one file serves both runtimes.
  *
  * `allowed_tools` is a security boundary, not an optimisation. A skill run is
  * unattended, so `require_approval` is "never" and nothing sits between a
@@ -65,7 +66,7 @@ class SkillRegistry
         if ($this->skills === null) {
             $this->skills = [];
 
-            foreach (File::glob($this->directory() . '/*.md') as $path) {
+            foreach (File::glob($this->directory() . '/*/SKILL.md') as $path) {
                 $skill = $this->parse($path);
                 $this->skills[$skill->name] = $skill;
             }
@@ -100,7 +101,7 @@ class SkillRegistry
     private function parse(string $path): SkillDefinition
     {
         $contents = File::get($path);
-        $file = basename($path, '.md');
+        $file = basename(dirname($path));
 
         if (! preg_match("/\A---\n(.*?)\n---\n(.*)\z/s", $contents, $matches)) {
             throw new RuntimeException("Skill {$file} has no YAML frontmatter.");

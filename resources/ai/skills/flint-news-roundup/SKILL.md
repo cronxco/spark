@@ -1,24 +1,24 @@
 ---
 name: flint-news-roundup
 description: >
-    Synthesises the recurring newsletter and fetch sources that landed overnight
-    into a small themed roundup, and maintains tactical Spark Topics for the
-    stories that are still unfolding. Runs in the morning so it is fresh for the
-    day.
+  Synthesises the recurring newsletter and fetch sources that landed overnight
+  into a small themed roundup, and maintains tactical Spark Topics for the
+  stories that are still unfolding. Runs in the morning so it is fresh for the
+  day.
 
-    Use this skill ONLY when invoked by the Flint news Routine (webhook payload
-    with `routine: "news_roundup"`). For conversational news questions — "what
-    did my newsletters say?" — use `spark-day-briefing`.
+  Use this skill ONLY when invoked by the Flint news Routine (webhook payload
+  with `routine: "news_roundup"`). For conversational news questions — "what
+  did my newsletters say?" — use `spark-day-briefing`.
 model: reasoning
 allowed_tools:
-    - spark__get-events-by-filter-tool
-    - spark__get-event-tool
-    - spark__get-block-tool
-    - karakeep__get-bookmark-content
-    - spark__create-flint-digest
-    - spark__manage-flint-topic
+  - spark__get-events-by-filter-tool
+  - spark__get-event-tool
+  - spark__get-block-tool
+  - karakeep__get-bookmark-content
+  - spark__create-flint-digest
+  - spark__manage-flint-topic
 required_success_tools:
-    - spark__create-flint-digest
+  - spark__create-flint-digest
 max_tool_calls: 40
 timeout_seconds: 300
 ---
@@ -44,13 +44,7 @@ happened in the world he follows.
 ## Step 1: Read the payload
 
 ```json
-{
-    "user_id": "...",
-    "routine": "news_roundup",
-    "local_date": "YYYY-MM-DD",
-    "timezone": "Europe/London",
-    "run_token": "<opaque>"
-}
+{ "user_id": "...", "routine": "news_roundup", "local_date": "YYYY-MM-DD", "timezone": "Europe/London", "run_token": "<opaque>" }
 ```
 
 ## Step 2: Load the sources

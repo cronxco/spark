@@ -60,7 +60,7 @@ class SkillRegistryTest extends TestCase
 
             (new SkillRegistry)->all();
         } finally {
-            File::delete($path);
+            File::deleteDirectory($path);
         }
     }
 
@@ -75,7 +75,7 @@ class SkillRegistryTest extends TestCase
 
             (new SkillRegistry)->all();
         } finally {
-            File::delete($path);
+            File::deleteDirectory($path);
         }
     }
 
@@ -90,7 +90,7 @@ class SkillRegistryTest extends TestCase
 
             (new SkillRegistry)->all();
         } finally {
-            File::delete($path);
+            File::deleteDirectory($path);
         }
     }
 
@@ -105,10 +105,10 @@ class SkillRegistryTest extends TestCase
 
     private function writeSkill(string $name, string $frontmatter, string $body = 'Do the thing.'): string
     {
-        $dir = resource_path('ai/skills');
-        $path = "{$dir}/{$name}.md";
-        File::put($path, "---\n{$frontmatter}\n---\n\n{$body}\n");
+        $dir = resource_path("ai/skills/{$name}");
+        File::ensureDirectoryExists($dir);
+        File::put("{$dir}/SKILL.md", "---\n{$frontmatter}\n---\n\n{$body}\n");
 
-        return $path;
+        return $dir;
     }
 }

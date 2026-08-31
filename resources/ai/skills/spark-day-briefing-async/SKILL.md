@@ -1,32 +1,32 @@
 ---
 name: spark-day-briefing-async
 description: >
-    Generates Flint's Routine-triggered morning, afternoon, and evening daily
-    briefing from Spark, Flint Topics, recent digest history, calendar, day-note,
-    weather, mail, and optional contextual sources. Writes the briefing as a Flint
-    digest in Spark and closes the previous day's answered questions into Outline
-    Reflections.
+  Generates Flint's Routine-triggered morning, afternoon, and evening daily
+  briefing from Spark, Flint Topics, recent digest history, calendar, day-note,
+  weather, mail, and optional contextual sources. Writes the briefing as a Flint
+  digest in Spark and closes the previous day's answered questions into Outline
+  Reflections.
 model: reasoning
 allowed_tools:
-    - spark__get-day-summary-tool
-    - spark__get-service-status-tool
-    - spark__get-metric-trend-tool
-    - spark__get-baselines-tool
-    - spark__get-events-by-filter-tool
-    - spark__get-event-tool
-    - spark__get-block-tool
-    - spark__get-latest-flint-digest
-    - spark__create-flint-digest
-    - spark__manage-flint-topic
-    - fastmail__search_events
-    - weather__get_forecast
-    - weather__get_weather_summary
-    - docs__fetch
-    - docs__list_collection_documents
-    - docs__list_documents
-    - docs__update_document
+  - spark__get-day-summary-tool
+  - spark__get-service-status-tool
+  - spark__get-metric-trend-tool
+  - spark__get-baselines-tool
+  - spark__get-events-by-filter-tool
+  - spark__get-event-tool
+  - spark__get-block-tool
+  - spark__get-latest-flint-digest
+  - spark__create-flint-digest
+  - spark__manage-flint-topic
+  - fastmail__search_events
+  - weather__get_forecast
+  - weather__get_weather_summary
+  - docs__fetch
+  - docs__list_collection_documents
+  - docs__list_documents
+  - docs__update_document
 required_success_tools:
-    - spark__create-flint-digest
+  - spark__create-flint-digest
 max_tool_calls: 60
 timeout_seconds: 600
 ---
@@ -75,11 +75,11 @@ structure. Fetch it fresh before writing.
    and explicit day-note plans outrank Topics, prior digests, and Flint inference.
 
 5. **Recent digests and Topics do different jobs.**
-    - Topics provide durable continuity across weeks or months.
-    - Recent digests provide short-term editorial history: what Flint recently said,
-      what changed, what questions were asked, what Will answered, and what should not
-      be repeated.
-      Use both.
+   - Topics provide durable continuity across weeks or months.
+   - Recent digests provide short-term editorial history: what Flint recently said,
+     what changed, what questions were asked, what Will answered, and what should not
+     be repeated.
+   Use both.
 
 6. **Silence is feedback, not an invitation to escalate.** Repeatedly unanswered
    questions reduce a thread's question priority. A Topic may remain important while
@@ -117,13 +117,14 @@ The digest Routine is expected to receive a payload shaped like:
 
 ```json
 {
-    "user_id": "...",
-    "period": "morning",
-    "local_date": "YYYY-MM-DD",
-    "timezone": "Europe/London",
-    "trigger_reason": "scheduled",
-    "sleep_score_event_id": "...",
-    "idempotency_key": "..."
+  "user_id": "...",
+  "period": "morning",
+  "local_date": "YYYY-MM-DD",
+  "timezone": "Europe/London",
+  "trigger_reason": "scheduled",
+  "sleep_score_event_id": "...",
+  "idempotency_key": "...",
+  "run_token": "<opaque>"
 }
 ```
 
@@ -149,11 +150,11 @@ Derive `yesterday` and `tomorrow` relative to `local_date` in `timezone`.
 
 ### Pass Two date window
 
-| Period      | Dates                        |
-| ----------- | ---------------------------- |
-| `morning`   | yesterday + today            |
+| Period | Dates |
+|---|---|
+| `morning` | yesterday + today |
 | `afternoon` | yesterday + today + tomorrow |
-| `evening`   | today + tomorrow             |
+| `evening` | today + tomorrow |
 
 Always pass the supplied `period` and `local_date` unchanged to
 `spark__create-flint-digest`.
@@ -272,34 +273,30 @@ Suggested shape:
 
 ## Reflections
 
-_[Day, date]_
+*[Day, date]*
 
 [1–2 sentence supported narrative.]
 
 ### 🌤️ Weather
-
 [Actual conditions if available and useful.]
 
 ### 🫀 Health & Activity
+| Metric | Value | vs Baseline |
+|---|---:|---:|
+| Sleep score | ... | ... |
+| Readiness | ... | ... |
+| HRV | ... | ... |
+| Resting HR | ... | ... |
+| Steps | ... | ... |
+| Distance | ... | ... |
+| Exercise | ... | ... |
 
-| Metric      | Value | vs Baseline |
-| ----------- | ----: | ----------: |
-| Sleep score |   ... |         ... |
-| Readiness   |   ... |         ... |
-| HRV         |   ... |         ... |
-| Resting HR  |   ... |         ... |
-| Steps       |   ... |         ... |
-| Distance    |   ... |         ... |
-| Exercise    |   ... |         ... |
-
-_Flags: [meaningful supported anomalies, or none]_
+*Flags: [meaningful supported anomalies, or none]*
 
 ### 💷 Money
-
 [Only notable context; otherwise "Nothing unusual".]
 
 ### 🗒️ Notes
-
 [Will's answered context, lightly edited. Omit if none.]
 ```
 
@@ -797,27 +794,27 @@ thirty seconds.
 Look deliberately for a candidate in this order:
 
 1. **Material ambiguity in today's lede**
-    - There is a consequential fact but one missing piece changes its meaning.
+   - There is a consequential fact but one missing piece changes its meaning.
 
 2. **Active Topic + genuinely new evidence**
-    - Today's evidence advances a durable thread but Flint needs Will's context to
-      understand how.
+   - Today's evidence advances a durable thread but Flint needs Will's context to
+     understand how.
 
 3. **Plan vs actual**
-    - Calendar/day note says one thing; supported actual data says another; Will can
-      explain the meaningful difference.
+   - Calendar/day note says one thing; supported actual data says another; Will can
+     explain the meaningful difference.
 
 4. **Tomorrow/near-term decision**
-    - There is a real choice, preparation need, or uncertainty already grounded in
-      Will's plans.
+   - There is a real choice, preparation need, or uncertainty already grounded in
+     Will's plans.
 
 5. **Correction/calibration**
-    - Flint's recent interpretation may have been wrong or incomplete, and one answer
-      would improve future calibration.
+   - Flint's recent interpretation may have been wrong or incomplete, and one answer
+     would improve future calibration.
 
 6. **Meaningful lived context missing from sensors**
-    - The day's data is clear, but the important human context is unknowable without
-      asking.
+   - The day's data is clear, but the important human context is unknowable without
+     asking.
 
 Do not default to health simply because health produces convenient numbers.
 
@@ -826,31 +823,25 @@ Do not default to health simply because health produces convenient numbers.
 Before approving a question, check:
 
 **Specific**
-
 - Anchored to an actual event, change, Topic development, or plan.
 - Not “How are you feeling?” or “Anything to add?”
 
 **Useful**
-
 - The answer would change future understanding, not merely satisfy curiosity.
 
 **Fresh**
-
 - Not the same substantive question Flint asked recently.
 
 **Non-leading**
-
 - Does not smuggle Flint's explanation into the question.
 - Bad: “Was your low readiness because of the late night?”
 - Better: “Readiness fell to 64 after yesterday's late evening — was there anything
   about the night that would be useful context for Flint to remember?”
 
 **Proportionate**
-
 - Does not turn a minor metric into homework.
 
 **Answerable**
-
 - Will can reasonably answer it from lived experience or intent.
 
 #### Question fatigue still wins
@@ -962,11 +953,11 @@ For each approved question:
 
 ```json
 {
-    "block_type": "flint_user_question",
-    "title": "<short label>",
-    "question": "<specific question>",
-    "topic": "<domain or stable subject>",
-    "priority": "<low|medium|high>"
+  "block_type": "flint_user_question",
+  "title": "<short label>",
+  "question": "<specific question>",
+  "topic": "<domain or stable subject>",
+  "priority": "<low|medium|high>"
 }
 ```
 
@@ -995,9 +986,9 @@ Do not make a question `high` simply because it relates to an active Topic.
 
 ```json
 {
-    "block_type": "flint_editorial_note",
-    "title": "Editorial note",
-    "content": "<markdown>"
+  "block_type": "flint_editorial_note",
+  "title": "Editorial note",
+  "content": "<markdown>"
 }
 ```
 

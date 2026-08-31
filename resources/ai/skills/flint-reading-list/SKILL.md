@@ -1,24 +1,24 @@
 ---
 name: flint-reading-list
 description: >
-    Reviews the Karakeep bookmark backlog once a day and surfaces a small number
-    of things genuinely worth reading now, each with a reason it earned the slot.
-    Writes the picks to Spark as a Flint digest and links any Topics they bear on.
+  Reviews the Karakeep bookmark backlog once a day and surfaces a small number
+  of things genuinely worth reading now, each with a reason it earned the slot.
+  Writes the picks to Spark as a Flint digest and links any Topics they bear on.
 
-    Use this skill ONLY when invoked by the Flint reading-list Routine (webhook
-    payload with `routine: "reading_list"`). For conversational reading questions
-    — "what should I read?", "what's in my backlog?" — answer directly.
+  Use this skill ONLY when invoked by the Flint reading-list Routine (webhook
+  payload with `routine: "reading_list"`). For conversational reading questions
+  — "what should I read?", "what's in my backlog?" — answer directly.
 model: reasoning
 allowed_tools:
-    - karakeep__get-lists
-    - karakeep__search-bookmarks
-    - karakeep__get-list-bookmarks
-    - karakeep__get-bookmark-content
-    - spark__get-latest-flint-digest
-    - spark__create-flint-digest
-    - spark__manage-flint-topic
+  - karakeep__get-lists
+  - karakeep__search-bookmarks
+  - karakeep__get-list-bookmarks
+  - karakeep__get-bookmark-content
+  - spark__get-latest-flint-digest
+  - spark__create-flint-digest
+  - spark__manage-flint-topic
 required_success_tools:
-    - spark__create-flint-digest
+  - spark__create-flint-digest
 max_tool_calls: 40
 timeout_seconds: 300
 ---
@@ -57,13 +57,7 @@ being the top of the list.
 ## Step 1: Read the payload
 
 ```json
-{
-    "user_id": "...",
-    "routine": "reading_list",
-    "local_date": "YYYY-MM-DD",
-    "timezone": "Europe/London",
-    "run_token": "<opaque>"
-}
+{ "user_id": "...", "routine": "reading_list", "local_date": "YYYY-MM-DD", "timezone": "Europe/London", "run_token": "<opaque>" }
 ```
 
 ## Step 2: Ground in what is live
