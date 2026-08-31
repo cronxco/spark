@@ -191,6 +191,7 @@ class DetectTrendsTask extends BaseTaskJob
         $events = Event::whereHas('integration', function ($q) use ($metric) {
             $q->where('user_id', $metric->user_id)->whereNull('deleted_at');
         })
+            ->withoutInternal()
             ->where('service', $metric->service)
             ->where('action', $metric->action)
             ->where('value_unit', $metric->value_unit)

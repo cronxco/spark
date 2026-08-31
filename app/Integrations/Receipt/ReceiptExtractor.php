@@ -3,6 +3,7 @@
 namespace App\Integrations\Receipt;
 
 use App\Services\Ai\AiModel;
+use App\Services\Ai\AiUsageContext;
 use App\Services\Ai\ChatClient;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,7 @@ class ReceiptExtractor
     /**
      * Extract structured receipt data from raw text
      */
-    public function extract(string $receiptText, string $emailSubject = '', string $emailFrom = ''): array
+    public function extract(string $receiptText, string $emailSubject = '', string $emailFrom = '', ?AiUsageContext $usageContext = null): array
     {
         $schemaExample = $this->getSchemaExample();
 
@@ -77,7 +78,10 @@ PROMPT;
             $extracted = app(ChatClient::class)->json(AiModel::Extraction, [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userPrompt],
-            ], ['temperature' => 1]);
+            ], array_filter([
+                'temperature' => 1,
+                'usage_context' => $usageContext,
+            ]));
 
             if (! $extracted) {
                 throw new Exception('Invalid response from the extraction model: could not parse JSON');

@@ -27,7 +27,7 @@ class RegenerateEmbeddingsStaleModelTest extends TestCase
         Queue::assertPushed(GenerateEventEmbeddingJob::class, 1);
         Queue::assertPushed(
             GenerateEventEmbeddingJob::class,
-            fn (GenerateEventEmbeddingJob $job) => $job->event->is($stale)
+            fn (GenerateEventEmbeddingJob $job) => $job->event->is($stale) && $job->bypassCache
         );
         Queue::assertNotPushed(
             GenerateEventEmbeddingJob::class,

@@ -18,8 +18,8 @@ class FlintRunNowTest extends TestCase
         Queue::fake();
 
         Volt::actingAs(User::factory()->create())
-            ->test('flint.index')
-            ->call('runRoutine', 'reading_list')
+            ->test('global-progress-indicator')
+            ->dispatch('run-flint-routine', skill: 'flint-reading-list')
             ->assertHasNoErrors();
 
         Queue::assertPushed(
@@ -34,8 +34,8 @@ class FlintRunNowTest extends TestCase
         Queue::fake();
 
         Volt::actingAs(User::factory()->create())
-            ->test('flint.index')
-            ->call('runRoutine', 'digest', 'evening');
+            ->test('global-progress-indicator')
+            ->dispatch('run-flint-routine', skill: 'spark-day-briefing-async', period: 'evening');
 
         Queue::assertPushed(
             TriggerFlintDigestRoutineJob::class,
@@ -49,8 +49,8 @@ class FlintRunNowTest extends TestCase
         Queue::fake();
 
         Volt::actingAs(User::factory()->create())
-            ->test('flint.index')
-            ->call('runRoutine', 'not_a_routine');
+            ->test('global-progress-indicator')
+            ->dispatch('run-flint-routine', skill: 'not_a_routine');
 
         Queue::assertNothingPushed();
     }
@@ -61,7 +61,7 @@ class FlintRunNowTest extends TestCase
         Queue::fake();
 
         Volt::actingAs(User::factory()->create())
-            ->test('flint.index')
+            ->test('global-progress-indicator')
             ->dispatch('run-flint-routine', routine: 'topics');
 
         Queue::assertPushed(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'topics');

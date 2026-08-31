@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\File;
 class CheckFlintSkills extends Command
 {
     protected $signature = 'flint:skills-check
-                            {--claude-repo= : Path to a cronxco/claude checkout (default: sibling ../claude)}';
+                            {--claude-repo= : Path to a cronxco/claude checkout (default: sibling ../claude)}
+                            {--allow-missing : Permit a missing Claude checkout for explicit local-only work}';
 
     protected $description = 'Verify the vendored Flint skills still match the Claude Code Routine copies';
 
@@ -23,7 +24,14 @@ class CheckFlintSkills extends Command
         $repo = $this->option('claude-repo') ?: base_path('../claude');
 
         if (! File::isDirectory($repo . '/.claude/skills')) {
-            $this->warn("No cronxco/claude checkout at {$repo}; skipping drift check.");
+            $message = "No cronxco/claude checkout at {$repo}.";
+            if (! $this->option('allow-missing')) {
+                $this->error($message . ' Pass --allow-missing only for an explicit local-only check.');
+
+                return Command::FAILURE;
+            }
+
+            $this->warn($message . ' Drift check explicitly skipped.');
 
             return Command::SUCCESS;
         }
@@ -39,8 +47,9 @@ class CheckFlintSkills extends Command
                 continue;
             }
 
-            if ($this->body(File::get($theirs)) !== $skill->body) {
-                $drifted[] = "{$skill->name}: prompt body differs";
+            $ours = resource_path("ai/skills/{$skill->name}.md");
+            if ($this->normalise(File::get($theirs)) !== $this->normalise(File::get($ours))) {
+                $drifted[] = "{$skill->name}: complete skill file differs";
             }
         }
 
@@ -58,15 +67,11 @@ class CheckFlintSkills extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * The prose after the frontmatter, which is the part that must match.
-     */
-    private function body(string $contents): string
+    private function normalise(string $contents): string
     {
-        if (preg_match("/\A---\n.*?\n---\n(.*)\z/s", $contents, $matches)) {
-            return trim($matches[1]);
-        }
+        $contents = str_replace(["\r\n", "\r"], "\n", $contents);
+        $lines = array_map('rtrim', explode("\n", $contents));
 
-        return trim($contents);
+        return trim(implode("\n", $lines)) . "\n";
     }
 }

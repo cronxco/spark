@@ -101,7 +101,10 @@ class GenerateSummariesJob implements ShouldQueue
 
     private function generateSummaries(string $title, string $articleText): array
     {
-        return app(SummaryGenerator::class)->generate($title, $articleText, ['url' => $this->webpage->url]);
+        return app(SummaryGenerator::class)->generate($title, $articleText, [
+            'url' => $this->webpage->url,
+            'integration_id' => $this->integration->id,
+        ]);
     }
 
     private function createSummaryBlocks(array $summaries): void

@@ -4,6 +4,7 @@ namespace Tests\Feature\Flint;
 
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\TaskExecution;
 use App\Models\User;
 use App\Services\FlintDigestService;
@@ -26,21 +27,20 @@ class FlintDigestTaskExecutionTest extends TestCase
     }
 
     #[Test]
-    public function successful_dispatch_records_a_task_execution_anchored_to_the_digest_object(): void
+    public function successful_dispatch_records_a_task_execution_anchored_to_the_flint_integration(): void
     {
         Http::fake(['routine.test/*' => Http::response(['ok' => true], 200)]);
         $user = User::factory()->create();
 
         (new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'scheduled'))->handle();
 
-        $digest = EventObject::where('user_id', $user->id)
-            ->where('concept', 'digest')
-            ->where('type', 'morning_digest')
+        $integration = Integration::where('user_id', $user->id)
+            ->where('service', 'flint')
             ->firstOrFail();
 
-        $execution = TaskExecution::where('entity_type', 'object')
-            ->where('entity_id', $digest->id)
-            ->where('task_key', 'flint_digest_morning')
+        $execution = TaskExecution::where('entity_type', 'integration')
+            ->where('entity_id', $integration->id)
+            ->where('task_key', 'flint_routine_digest')
             ->firstOrFail();
 
         $this->assertSame('success', $execution->status);
@@ -56,7 +56,7 @@ class FlintDigestTaskExecutionTest extends TestCase
 
         (new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'fallback'))->handle();
 
-        $execution = TaskExecution::where('task_key', 'flint_digest_morning')->firstOrFail();
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
 
         $this->assertSame('fallback', $execution->triggered_by);
     }
@@ -69,7 +69,7 @@ class FlintDigestTaskExecutionTest extends TestCase
 
         (new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'sleep_score', (string) Str::uuid()))->handle();
 
-        $execution = TaskExecution::where('task_key', 'flint_digest_morning')->firstOrFail();
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
 
         $this->assertSame('sleep_score', $execution->triggered_by);
     }
@@ -85,11 +85,11 @@ class FlintDigestTaskExecutionTest extends TestCase
         try {
             $job->handle();
             $this->fail('Expected the job to throw on a non-2xx webhook response.');
-        } catch (RequestException) {
-            // Expected: the job re-throws so the queue worker retries.
+        } catch (RequestException $exception) {
+            $job->failed($exception);
         }
 
-        $execution = TaskExecution::where('task_key', 'flint_digest_evening')->firstOrFail();
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
 
         $this->assertSame('failed', $execution->status);
         $this->assertStringContainsString('500', $execution->error);
@@ -108,29 +108,26 @@ class FlintDigestTaskExecutionTest extends TestCase
             $job->handle();
             $this->fail('Expected the first webhook response to fail.');
         } catch (RequestException) {
-            // Expected: the released marker allows the retry below.
+            // Expected: the same run owns the marker and may retry below.
         }
 
         $job->handle();
 
-        $execution = TaskExecution::where('task_key', 'flint_digest_evening')->firstOrFail();
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
 
         $this->assertSame('success', $execution->status);
         $this->assertNull($execution->error);
     }
 
     #[Test]
-    public function pre_created_digest_object_is_reused_by_the_mcp_creation_flow(): void
+    public function the_digest_object_is_created_only_by_the_mcp_write_flow(): void
     {
         Http::fake(['routine.test/*' => Http::response(['ok' => true], 200)]);
         $user = User::factory()->create();
 
         (new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'scheduled'))->handle();
 
-        $preCreated = EventObject::where('user_id', $user->id)
-            ->where('concept', 'digest')
-            ->where('type', 'morning_digest')
-            ->firstOrFail();
+        $this->assertSame(0, EventObject::where('user_id', $user->id)->where('concept', 'digest')->count());
 
         $result = app(FlintDigestService::class)->create($user, [
             'title' => 'Morning Digest',
@@ -138,7 +135,7 @@ class FlintDigestTaskExecutionTest extends TestCase
             'date' => '2026-06-15',
         ]);
 
-        $this->assertSame($preCreated->id, $result['digest_object_id']);
         $this->assertSame(1, EventObject::where('user_id', $user->id)->where('concept', 'digest')->count());
+        $this->assertNotNull($result['digest_object_id']);
     }
 }

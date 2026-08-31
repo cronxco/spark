@@ -2,6 +2,7 @@
 
 namespace App\Services\Flint\Routines;
 
+use App\Models\ActionProgress;
 use App\Models\User;
 use App\Services\Flint\RoutineConfig;
 use Illuminate\Support\Facades\Http;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Log;
  */
 class WebhookRoutineDriver implements RoutineDriver
 {
-    public function run(User $user, string $routine, array $payload): RoutineResult
+    public function run(User $user, string $routine, array $payload, ?ActionProgress $progress = null): RoutineResult
     {
         $url = RoutineConfig::url($routine);
 

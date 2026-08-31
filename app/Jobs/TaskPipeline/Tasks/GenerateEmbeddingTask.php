@@ -4,6 +4,7 @@ namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\Event;
+use App\Services\Ai\AiUsageContext;
 use App\Services\Ai\EmbeddingClient;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -30,7 +31,7 @@ class GenerateEmbeddingTask extends BaseTaskJob
         }
 
         // Generate embedding
-        $embedding = $embeddingService->embed($searchableText);
+        $embedding = $embeddingService->embed($searchableText, usageContext: AiUsageContext::forModel($this->model));
 
         if (EmbeddingClient::isZeroVector($embedding)) {
             throw new RuntimeException('Embedding provider returned a zero vector');

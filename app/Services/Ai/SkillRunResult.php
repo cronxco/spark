@@ -19,6 +19,9 @@ class SkillRunResult
         public readonly array $toolsCalled,
         public readonly int $inputTokens,
         public readonly int $outputTokens,
+        public readonly ?string $responseId = null,
+        public readonly ?SkillContinuation $continuation = null,
+        public readonly ?string $eventId = null,
     ) {}
 
     /**
@@ -32,6 +35,9 @@ class SkillRunResult
             'tools_called' => array_values(array_unique($this->toolsCalled)),
             'input_tokens' => $this->inputTokens,
             'output_tokens' => $this->outputTokens,
+            'total_tokens' => $this->inputTokens + $this->outputTokens,
+            'response_id' => $this->responseId,
+            'event_id' => $this->eventId,
         ];
     }
 }

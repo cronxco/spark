@@ -166,6 +166,7 @@ return [
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),
+        'daily_token_cap' => (int) env('OPENAI_DAILY_TOKEN_CAP', 0),
 
         // One model per role, resolved through App\Services\Ai\AiModel. Nothing
         // in the application names a model inline, so switching one is an env

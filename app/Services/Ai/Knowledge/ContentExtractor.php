@@ -45,7 +45,7 @@ class ContentExtractor
                     'content' => $contentToSend,
                 ]),
             ],
-        ], ['context' => $logContext]));
+        ], ['context' => ['operation' => 'knowledge_extract'] + $logContext]));
 
         if ($articleText === '') {
             throw new Exception('Empty article text returned from AI');

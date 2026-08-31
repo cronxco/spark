@@ -36,6 +36,7 @@ class DispatchTrendDetectionTasksJob implements ShouldQueue
         // or aggregated), and the set of distinct metric combinations is small
         // enough not to need chunking anyway.
         $metricGroups = Event::query()
+            ->withoutInternal()
             ->select('service', 'action', 'value_unit')
             ->whereNotNull('value')
             ->whereNotNull('value_unit')
@@ -46,6 +47,7 @@ class DispatchTrendDetectionTasksJob implements ShouldQueue
         foreach ($metricGroups as $group) {
             // Get the most recent event for this metric to trigger trend detection
             $event = Event::query()
+                ->withoutInternal()
                 ->where('service', $group->service)
                 ->where('action', $group->action)
                 ->where('value_unit', $group->value_unit)

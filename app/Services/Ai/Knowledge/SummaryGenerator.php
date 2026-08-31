@@ -51,7 +51,7 @@ class SummaryGenerator
                     'article_text' => $contentToSend,
                 ]),
             ],
-        ], ['context' => $logContext]));
+        ], ['context' => ['operation' => 'knowledge_summarize'] + $logContext]));
 
         foreach (self::REQUIRED_KEYS as $key) {
             if (! isset($summaries[$key])) {

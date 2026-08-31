@@ -10,12 +10,14 @@ class SkillDefinition
 {
     /**
      * @param  array<int, string>  $allowedTools
+     * @param  array<int, string>  $requiredSuccessTools
      */
     public function __construct(
         public readonly string $name,
         public readonly string $description,
         public readonly AiModel $model,
         public readonly array $allowedTools,
+        public readonly array $requiredSuccessTools,
         public readonly int $maxToolCalls,
         public readonly int $timeoutSeconds,
         public readonly string $body,

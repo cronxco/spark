@@ -141,7 +141,7 @@ class ExtractContentJob implements ShouldQueue
             'title',
             $title,
             $content,
-            ['url' => $this->webpage->url],
+            ['url' => $this->webpage->url, 'integration_id' => $this->integration->id],
         );
     }
 }

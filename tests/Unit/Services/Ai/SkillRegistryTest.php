@@ -80,13 +80,13 @@ class SkillRegistryTest extends TestCase
     }
 
     #[Test]
-    public function a_skill_with_an_unrecognised_namespace_refuses_to_load(): void
+    public function a_skill_with_an_unknown_exact_tool_refuses_to_load(): void
     {
         $path = $this->writeSkill('temp-unknown', "name: temp-unknown\nmodel: reasoning\nallowed_tools:\n  - github__delete_repo");
 
         try {
             $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage("unrecognised tool namespace 'github'");
+            $this->expectExceptionMessage("declares the unapproved tool 'github__delete_repo'");
 
             (new SkillRegistry)->all();
         } finally {

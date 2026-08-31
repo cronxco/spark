@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Sentry\Breadcrumb;
+use Sentry\Event;
+use Sentry\Logs\Log as SentryLog;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -465,11 +468,116 @@ if (! function_exists('redact_sensitive_urls')) {
     {
         $url = config('services.flint_routine.cronxtools_url');
 
-        if (is_string($url) && $url !== '' && str_contains($value, $url)) {
+        if (! is_string($url) || $url === '') {
+            return $value;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
             return str_replace($url, '[REDACTED_MCP_URL]', $value);
         }
 
+        $authority = preg_quote($parts['host'], '~')
+            . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+        $encodedAuthority = preg_quote($parts['host'], '~')
+            . (isset($parts['port']) ? '%3A' . (int) $parts['port'] : '');
+        $scheme = preg_quote($parts['scheme'], '~');
+        $patterns = [
+            '~' . $scheme . '://' . $authority . '(?:/[^\s"\'<>]*)?~i',
+            '~' . $scheme . ':\\\\/\\\\/' . $authority . '(?:\\\\/[^\s"\'<>]*)?~i',
+            '~' . $scheme . '%3A%2F%2F' . $encodedAuthority . '(?:%2F[^\s&"\'<>]*)?~i',
+        ];
+
+        return preg_replace($patterns, '[REDACTED_MCP_URL]', $value) ?? $value;
+    }
+}
+
+if (! function_exists('redact_sensitive_data')) {
+    function redact_sensitive_data(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return redact_sensitive_urls($value);
+        }
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = redact_sensitive_data($item);
+            }
+        }
+
         return $value;
+    }
+}
+
+if (! function_exists('redact_sentry_event')) {
+    function redact_sentry_event(Event $event): Event
+    {
+        $event->setRequest(redact_sensitive_data($event->getRequest()));
+        $event->setExtra(redact_sensitive_data($event->getExtra()));
+        foreach ($event->getContexts() as $name => $context) {
+            $event->setContext($name, redact_sensitive_data($context));
+        }
+        if ($event->getMessage() !== null) {
+            $event->setMessage(
+                redact_sensitive_urls($event->getMessage()),
+                redact_sensitive_data($event->getMessageParams()),
+                $event->getMessageFormatted() ? redact_sensitive_urls($event->getMessageFormatted()) : null,
+            );
+        }
+        if ($event->getTransaction() !== null) {
+            $event->setTransaction(redact_sensitive_urls($event->getTransaction()));
+        }
+        foreach ($event->getExceptions() as $exception) {
+            $exception->setValue(redact_sensitive_urls($exception->getValue()));
+        }
+
+        $breadcrumbs = array_map(function (Breadcrumb $breadcrumb): Breadcrumb {
+            $copy = $breadcrumb;
+            if ($breadcrumb->getMessage() !== null) {
+                $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
+            }
+            foreach ($breadcrumb->getMetadata() as $key => $metadata) {
+                $copy = $copy->withMetadata($key, redact_sensitive_data($metadata));
+            }
+
+            return $copy;
+        }, $event->getBreadcrumbs());
+        $event->setBreadcrumb($breadcrumbs);
+
+        foreach ($event->getSpans() as $span) {
+            if ($span->getDescription() !== null) {
+                $span->setDescription(redact_sensitive_urls($span->getDescription()));
+            }
+            $span->setData(redact_sensitive_data($span->getData()));
+        }
+
+        return $event;
+    }
+}
+
+if (! function_exists('redact_sentry_log')) {
+    function redact_sentry_log(SentryLog $log): SentryLog
+    {
+        $log->setBody(redact_sensitive_urls($log->getBody()));
+        foreach ($log->attributes()->all() as $key => $value) {
+            $log->setAttribute($key, redact_sensitive_data($value));
+        }
+
+        return $log;
+    }
+}
+
+if (! function_exists('redact_sentry_breadcrumb')) {
+    function redact_sentry_breadcrumb(Breadcrumb $breadcrumb): Breadcrumb
+    {
+        $copy = $breadcrumb;
+        if ($breadcrumb->getMessage() !== null) {
+            $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
+        }
+        foreach ($breadcrumb->getMetadata() as $key => $value) {
+            $copy = $copy->withMetadata($key, redact_sensitive_data($value));
+        }
+
+        return $copy;
     }
 }
 

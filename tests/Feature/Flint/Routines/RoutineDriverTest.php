@@ -78,6 +78,10 @@ class RoutineDriverTest extends TestCase
         ]);
 
         Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'id' => 'resp_test',
+            'status' => 'completed',
+            'error' => null,
+            'incomplete_details' => null,
             'output' => [
                 ['type' => 'mcp_call', 'name' => 'spark__manage-flint-topic', 'output' => 'ok'],
                 ['type' => 'message', 'content' => [['text' => 'Done.']]],
@@ -99,6 +103,9 @@ class RoutineDriverTest extends TestCase
             $this->assertSame('never', $tool['require_approval']);
             $this->assertSame('https://mcp.example.test/secret-token/sse', $tool['server_url']);
             $this->assertStringContainsString('Flint Topics', $request['instructions']);
+            $this->assertTrue($request['stream']);
+            $this->assertSame(40, $request['max_tool_calls']);
+            $this->assertArrayNotHasKey('max_tool_calls', $tool);
 
             // The topics skill must not be handed anything beyond its manifest.
             $this->assertSame([

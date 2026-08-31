@@ -2,13 +2,10 @@
 
 namespace App\Mcp\Tools;
 
-use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
-use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Mcp\Concerns\RequiresSparkAbility;
-use App\Services\EffectiveTimezoneResolver;
-use App\Services\Flint\RoutineConfig;
-use App\Services\Flint\Routines\RoutineDriverManager;
+use App\Services\Flint\FlintRunDispatcher;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -20,8 +17,8 @@ class RunFlintSkillTool extends Tool
     use RequiresSparkAbility;
 
     protected string $description = <<<'MARKDOWN'
-        Run a Flint routine now rather than waiting for its daily slot: `digest`,
-        `topics`, `reading_list` or `news_roundup`. The routine runs through whichever
+        Run a canonical Flint skill now rather than waiting for its daily slot. Deprecated
+        routine aliases remain accepted. The skill runs through whichever
         driver it is configured for and writes its results back the usual way, so the
         digest or topics appear exactly as a scheduled run would leave them.
 
@@ -40,34 +37,19 @@ class RunFlintSkillTool extends Tool
             return Response::error('Authentication required.');
         }
 
-        $routine = (string) $request->get('routine');
-
-        if (! RoutineConfig::isKnown($routine)) {
-            return Response::error(
-                "Unknown routine '{$routine}'. Known routines: " . implode(', ', RoutineConfig::ROUTINES) . '.'
+        try {
+            $result = app(FlintRunDispatcher::class)->dispatch(
+                $user,
+                skill: $request->get('skill'),
+                routine: $request->get('routine'),
+                date: $request->get('date'),
+                period: $request->get('period', 'morning'),
             );
+
+            return Response::json($result->toArray());
+        } catch (InvalidArgumentException $exception) {
+            return Response::error($exception->getMessage());
         }
-
-        $timezones = app(EffectiveTimezoneResolver::class);
-        $timezone = $timezones->timezoneFor($user);
-        $date = $request->get('date') ?: $timezones->today($user)->toDateString();
-        $period = (string) $request->get('period', 'morning');
-
-        $job = $routine === 'digest'
-            ? new TriggerFlintDigestRoutineJob($user, $period, $date, $timezone, 'manual', null, true)
-            : new TriggerFlintRoutineJob($user, $routine, $date, $timezone, true);
-
-        dispatch($job)->onQueue('flint');
-
-        $driver = app(RoutineDriverManager::class)->driverName($routine);
-
-        return Response::json([
-            'routine' => $routine,
-            'local_date' => $date,
-            'driver' => $driver,
-            'queued' => true,
-            'message' => "Queued the {$routine} routine for {$date} via the {$driver} driver.",
-        ]);
     }
 
     /**
@@ -76,9 +58,11 @@ class RunFlintSkillTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
+            'skill' => $schema->string()
+                ->description('Canonical skill: spark-day-briefing-async, flint-topics, flint-reading-list, or flint-news-roundup.'),
+
             'routine' => $schema->string()
-                ->description('Which routine to run: digest, topics, reading_list or news_roundup.')
-                ->required(),
+                ->description('Deprecated routine alias: digest, topics, reading_list, or news_roundup.'),
 
             'date' => $schema->string()
                 ->description('Local date to run for (YYYY-MM-DD). Defaults to today in the user\'s effective timezone.'),

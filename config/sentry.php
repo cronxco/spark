@@ -13,6 +13,12 @@ return [
 
     'send_default_pii' => false,
 
+    // Named callables keep this configuration serialisable by `config:cache`.
+    'before_send' => 'redact_sentry_event',
+    'before_send_transaction' => 'redact_sentry_event',
+    'before_send_log' => 'redact_sentry_log',
+    'before_breadcrumb' => 'redact_sentry_breadcrumb',
+
     'breadcrumbs' => [
         'sql_queries' => true,
         'sql_bindings' => false,

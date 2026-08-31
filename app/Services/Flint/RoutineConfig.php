@@ -19,9 +19,32 @@ class RoutineConfig
      */
     public const ROUTINES = ['digest', 'topics', 'reading_list', 'news_roundup'];
 
+    public const SKILLS = [
+        'digest' => 'spark-day-briefing-async',
+        'topics' => 'flint-topics',
+        'reading_list' => 'flint-reading-list',
+        'news_roundup' => 'flint-news-roundup',
+    ];
+
     public static function isKnown(string $routine): bool
     {
         return in_array($routine, self::ROUTINES, true);
+    }
+
+    public static function canonicalSkill(string $name): ?string
+    {
+        if (isset(self::SKILLS[$name])) {
+            return self::SKILLS[$name];
+        }
+
+        return in_array($name, self::SKILLS, true) ? $name : null;
+    }
+
+    public static function routineFor(string $name): ?string
+    {
+        $skill = self::canonicalSkill($name);
+
+        return $skill ? array_search($skill, self::SKILLS, true) ?: null : null;
     }
 
     /**

@@ -82,6 +82,22 @@ jobs:
           # Use the commit SHA from duster to ensure we test the code after any duster fixes
           ref: ${{ needs.duster.outputs.commit_sha }}
 
+      - name: Create organization GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cronxco
+          repositories: claude
+
+      - name: Checkout Claude skills
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: cronxco/claude
+          token: ${{ steps.app-token.outputs.token }}
+          path: claude
+
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
@@ -130,6 +146,9 @@ jobs:
 
       - name: Run Migrations
         run: php artisan migrate --force
+
+      - name: Check Flint skill synchronization
+        run: php artisan flint:skills-check --claude-repo=claude
 
       - name: Build Assets
         run: npm run build

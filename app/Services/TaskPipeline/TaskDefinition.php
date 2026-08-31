@@ -37,6 +37,10 @@ class TaskDefinition
      */
     public function isApplicableTo(Model $model): bool
     {
+        if ($model instanceof Event && $model->isInternal()) {
+            return false;
+        }
+
         // Check model type
         if (! in_array($this->getModelType($model), $this->appliesTo)) {
             return false;

@@ -2,6 +2,7 @@
 
 namespace App\Services\Flint\Routines;
 
+use App\Models\ActionProgress;
 use App\Models\User;
 use App\Services\Ai\SkillRegistry;
 use App\Services\Ai\SkillRunner;
@@ -27,7 +28,7 @@ class OpenAiRoutineDriver implements RoutineDriver
         private SkillRunner $runner,
     ) {}
 
-    public function run(User $user, string $routine, array $payload): RoutineResult
+    public function run(User $user, string $routine, array $payload, ?ActionProgress $progress = null): RoutineResult
     {
         $skillName = self::SKILLS[$routine] ?? null;
 
@@ -39,7 +40,7 @@ class OpenAiRoutineDriver implements RoutineDriver
             return RoutineResult::notApplicable('No CronxTools MCP URL is configured.');
         }
 
-        $result = $this->runner->run($this->skills->get($skillName), $payload);
+        $result = $this->runner->run($user, $this->skills->get($skillName), $payload, $progress);
 
         Log::info('Flint routine ran via OpenAI', [
             'user_id' => $user->id,

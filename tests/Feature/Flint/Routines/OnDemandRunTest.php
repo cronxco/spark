@@ -20,7 +20,7 @@ class OnDemandRunTest extends TestCase
         Queue::fake();
         $user = User::factory()->create();
 
-        $this->artisan('flint:run-skill', ['routine' => 'topics', '--user' => $user->email, '--date' => '2026-03-04'])
+        $this->artisan('flint:run-skill', ['skill' => 'flint-topics', '--user' => $user->email, '--date' => '2026-03-04'])
             ->assertSuccessful();
     }
 
@@ -29,7 +29,7 @@ class OnDemandRunTest extends TestCase
     {
         User::factory()->create();
 
-        $this->artisan('flint:run-skill', ['routine' => 'not_a_routine'])->assertFailed();
+        $this->artisan('flint:run-skill', ['skill' => 'not_a_routine'])->assertFailed();
     }
 
     #[Test]
@@ -98,7 +98,7 @@ class OnDemandRunTest extends TestCase
         ]);
 
         $response->assertSuccessful();
-        $this->assertStringContainsString('Unknown routine', json_encode($response->json()));
+        $this->assertStringContainsString('Unknown Flint skill', json_encode($response->json()));
     }
 
     #[Test]

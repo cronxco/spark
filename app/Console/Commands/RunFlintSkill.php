@@ -2,13 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
-use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Models\User;
-use App\Services\EffectiveTimezoneResolver;
-use App\Services\Flint\RoutineConfig;
-use App\Services\Flint\Routines\RoutineDriverManager;
+use App\Services\Flint\FlintRunDispatcher;
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 
 /**
  * Runs one Flint routine now, bypassing its daily slot.
@@ -19,41 +16,36 @@ use Illuminate\Console\Command;
 class RunFlintSkill extends Command
 {
     protected $signature = 'flint:run-skill
-                            {routine : digest, topics, reading_list or news_roundup}
+                            {skill : Canonical skill name or deprecated routine alias}
                             {--user= : User id or email (defaults to the only user)}
                             {--date= : Local date to run for (Y-m-d, defaults to today)}
                             {--period=morning : Digest period when routine is digest}';
 
     protected $description = 'Run a Flint routine on demand through its configured driver';
 
-    public function handle(EffectiveTimezoneResolver $timezones, RoutineDriverManager $drivers): int
+    public function handle(FlintRunDispatcher $dispatcher): int
     {
-        $routine = $this->argument('routine');
-
-        if (! RoutineConfig::isKnown($routine)) {
-            $this->error("Unknown routine '{$routine}'. Known: " . implode(', ', RoutineConfig::ROUTINES));
-
-            return Command::FAILURE;
-        }
-
         $user = $this->resolveUser();
 
         if (! $user) {
             return Command::FAILURE;
         }
 
-        $timezone = $timezones->timezoneFor($user);
-        $date = $this->option('date') ?: $timezones->today($user)->toDateString();
+        try {
+            $result = $dispatcher->dispatch(
+                $user,
+                skill: $this->argument('skill'),
+                date: $this->option('date'),
+                period: $this->option('period'),
+                sync: true,
+            );
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
 
-        $this->info("Running {$routine} for {$user->email} on {$date} via the {$drivers->driverName($routine)} driver...");
+            return Command::FAILURE;
+        }
 
-        $job = $routine === 'digest'
-            ? new TriggerFlintDigestRoutineJob($user, $this->option('period'), $date, $timezone, 'manual', null, true)
-            : new TriggerFlintRoutineJob($user, $routine, $date, $timezone, true);
-
-        dispatch_sync($job);
-
-        $this->info('Done. Check /admin/task-pipeline for the recorded execution.');
+        $this->info("Completed {$result->skill} run {$result->runUuid} via {$result->driver}.");
 
         return Command::SUCCESS;
     }

@@ -2,6 +2,8 @@
 
 namespace App\Services\Ai;
 
+use App\Models\Event;
+use App\Models\Integration;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -23,7 +25,7 @@ class ChatClient
      * Run a completion and return the assistant's text.
      *
      * @param  array<int, array<string, mixed>>  $messages
-     * @param  array{temperature?: float, max_completion_tokens?: int, json?: bool, tools?: array, tool_executor?: callable(string, array): mixed, max_tool_rounds?: int, retries?: int, service?: string, integration_id?: string, context?: array<string, mixed>}  $options
+     * @param  array{temperature?: float, max_completion_tokens?: int, json?: bool, tools?: array, tool_executor?: callable(string, array): mixed, max_tool_rounds?: int, retries?: int, service?: string, integration_id?: string, context?: array<string, mixed>, usage_context?: AiUsageContext}  $options
      */
     public function text(AiModel $role, array $messages, array $options = []): string
     {
@@ -95,6 +97,12 @@ class ChatClient
 
         while (true) {
             $payload = $this->payload($model, $messages, $options);
+            $usageContext = $this->usageContext($options);
+            $reservation = $usageContext ? app(AiUsageRecorder::class)->reserve(
+                $usageContext,
+                $model,
+                $this->estimatedReservation($messages, $options),
+            ) : null;
 
             $span = start_ai_request_span($model, $messages, [
                 'temperature' => $options['temperature'] ?? null,
@@ -103,12 +111,29 @@ class ChatClient
 
             $this->logRequest($model, $options, $toolRounds);
 
-            $response = OpenAI::chat()->create($payload);
-            $message = $response->choices[0]->message;
+            $usage = [];
+            $finishReason = null;
+            $requestSucceeded = false;
 
-            $usage = $response->usage ? $response->usage->toArray() : [];
-            $finishReason = $response->choices[0]->finishReason ?? null;
-            finish_ai_request_span($span, $usage, $finishReason);
+            try {
+                $response = OpenAI::chat()->create($payload);
+                $message = $response->choices[0]->message;
+                $usage = $response->usage ? $response->usage->toArray() : [];
+                $finishReason = $response->choices[0]->finishReason ?? null;
+                $requestSucceeded = true;
+            } catch (Exception $exception) {
+                if ($reservation) {
+                    $this->failAccountingSafely($reservation);
+                }
+
+                throw $exception;
+            } finally {
+                finish_ai_request_span($span, $usage, $finishReason, $requestSucceeded);
+            }
+
+            if ($reservation) {
+                $this->completeAccountingSafely($reservation, $usage, $response->id ?? null);
+            }
 
             $this->logResponse($model, $options, $response, $usage, $finishReason, $toolRounds);
 
@@ -120,9 +145,14 @@ class ChatClient
 
             foreach ($message->toolCalls as $toolCall) {
                 $arguments = json_decode($toolCall->function->arguments, true) ?? [];
-                $toolSpan = start_ai_tool_span($toolCall->function->name, $arguments);
-                $toolResult = ($toolExecutor)($toolCall->function->name, $arguments);
-                finish_ai_tool_span($toolSpan, $toolResult);
+                $toolSpan = start_ai_tool_span($toolCall->function->name);
+                $toolSucceeded = false;
+                try {
+                    $toolResult = ($toolExecutor)($toolCall->function->name, $arguments);
+                    $toolSucceeded = true;
+                } finally {
+                    finish_ai_tool_span($toolSpan, $toolSucceeded);
+                }
 
                 $messages[] = [
                     'role' => 'tool',
@@ -167,7 +197,82 @@ class ChatClient
 
     private function isReasoningModel(string $model): bool
     {
-        return (bool) preg_match('/^(gpt-5|o1|o3|o4)(-|$)/', $model);
+        return (bool) preg_match('/^(?:gpt-5(?:[.-].+)?|o(?:1|3|4)(?:[.-].+)?)$/i', $model);
+    }
+
+    /** @param array<string, mixed> $options */
+    private function usageContext(array $options): ?AiUsageContext
+    {
+        if (($options['usage_context'] ?? null) instanceof AiUsageContext) {
+            return $options['usage_context'];
+        }
+
+        $integrationId = $options['integration_id'] ?? data_get($options, 'context.integration_id');
+        if (! empty($integrationId)) {
+            $integration = Integration::query()->with('user')->find($integrationId);
+            if ($integration?->user) {
+                return new AiUsageContext(
+                    user: $integration->user,
+                    operation: (string) data_get($options, 'context.operation', 'chat'),
+                    service: (string) ($options['service'] ?? $integration->service ?? 'openai'),
+                    integration: $integration,
+                );
+            }
+        }
+
+        $eventId = data_get($options, 'context.event_id');
+        if (is_string($eventId) && $eventId !== '') {
+            $event = Event::query()->with('integration.user')->find($eventId);
+            if ($event?->integration?->user) {
+                return new AiUsageContext(
+                    user: $event->integration->user,
+                    operation: (string) data_get($options, 'context.operation', 'chat'),
+                    service: $event->service,
+                    integration: $event->integration,
+                );
+            }
+        }
+
+        $user = auth()->user();
+
+        return $user ? new AiUsageContext(
+            user: $user,
+            operation: (string) data_get($options, 'context.operation', 'chat'),
+            service: (string) ($options['service'] ?? 'openai'),
+        ) : null;
+    }
+
+    /** @param array<int, array<string, mixed>> $messages @param array<string, mixed> $options */
+    private function estimatedReservation(array $messages, array $options): ?int
+    {
+        $input = max(1, (int) ceil(strlen(json_encode($messages) ?: '') / 4));
+
+        return isset($options['max_completion_tokens'])
+            ? $input + max(0, (int) $options['max_completion_tokens'])
+            : null;
+    }
+
+    /** @param array<string, mixed> $usage */
+    private function completeAccountingSafely(AiUsageReservation $reservation, array $usage, ?string $requestId): void
+    {
+        try {
+            app(AiUsageRecorder::class)->complete($reservation, AiTokenUsage::fromArray($usage), $requestId);
+        } catch (Exception $exception) {
+            report($exception);
+            Log::error('AI usage accounting failed after a completed chat request', [
+                'operation' => $reservation->context->operation,
+                'error' => redact_sensitive_urls($exception->getMessage()),
+            ]);
+        }
+    }
+
+    private function failAccountingSafely(AiUsageReservation $reservation): void
+    {
+        try {
+            app(AiUsageRecorder::class)->fail($reservation);
+        } catch (Exception $exception) {
+            report($exception);
+        }
     }
 
     /**
@@ -209,9 +314,9 @@ class ChatClient
                 'model' => $model,
                 'tool_round' => $toolRound,
                 'tokens' => [
-                    'prompt' => $usage['promptTokens'] ?? 0,
-                    'completion' => $usage['completionTokens'] ?? 0,
-                    'total' => $usage['totalTokens'] ?? 0,
+                    'prompt' => $usage['prompt_tokens'] ?? 0,
+                    'completion' => $usage['completion_tokens'] ?? 0,
+                    'total' => $usage['total_tokens'] ?? 0,
                 ],
                 'finish_reason' => $finishReason,
             ]),

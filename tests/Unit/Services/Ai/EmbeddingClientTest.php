@@ -84,9 +84,9 @@ class EmbeddingClientTest extends TestCase
             ]),
         ]);
 
-        $transaction = \Sentry\startTransaction(
-            new TransactionContext('embedding-test')
-        );
+        $context = new TransactionContext('embedding-test');
+        $context->setSampled(true);
+        $transaction = \Sentry\startTransaction($context);
         SentrySdk::getCurrentHub()->setSpan($transaction);
 
         (new EmbeddingClient)->embed('some text', useCache: false);
@@ -103,6 +103,25 @@ class EmbeddingClientTest extends TestCase
             $genAiSpans[0]->getData()['gen_ai.usage.input_tokens'] ?? null,
             'Embedding span did not record token usage'
         );
+    }
+
+    #[Test]
+    public function cache_entries_are_versioned_by_model_and_dimensions(): void
+    {
+        Http::fake([
+            'api.openai.com/v1/embeddings' => Http::response([
+                'data' => [['embedding' => $this->validEmbedding()]],
+            ]),
+        ]);
+
+        config(['services.openai.models.embedding' => 'text-embedding-3-small']);
+        (new EmbeddingClient)->embed('same text');
+        config(['services.openai.models.embedding' => 'text-embedding-3-large']);
+        (new EmbeddingClient)->embed('same text');
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($request) => $request['model'] === 'text-embedding-3-small');
+        Http::assertSent(fn ($request) => $request['model'] === 'text-embedding-3-large');
     }
 
     private function validEmbedding(): array

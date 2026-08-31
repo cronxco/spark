@@ -2,6 +2,7 @@
 
 namespace App\Services\Flint\Routines;
 
+use App\Models\ActionProgress;
 use App\Models\User;
 
 /**
@@ -16,5 +17,5 @@ interface RoutineDriver
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function run(User $user, string $routine, array $payload): RoutineResult;
+    public function run(User $user, string $routine, array $payload, ?ActionProgress $progress = null): RoutineResult;
 }

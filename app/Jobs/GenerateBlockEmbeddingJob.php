@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Block;
+use App\Services\Ai\AiUsageContext;
 use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,7 +40,8 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public Block $block
+        public Block $block,
+        public bool $bypassCache = false,
     ) {}
 
     /**
@@ -60,7 +62,7 @@ class GenerateBlockEmbeddingJob implements ShouldQueue
             }
 
             // Generate embedding
-            $embedding = $embeddingService->embed($searchableText);
+            $embedding = $embeddingService->embed($searchableText, ! $this->bypassCache, AiUsageContext::forModel($this->block));
 
             // Get embedding metadata
             $embeddingMetadata = $embeddingService->getEmbeddingMetadata();

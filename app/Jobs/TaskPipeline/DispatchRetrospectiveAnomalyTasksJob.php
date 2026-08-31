@@ -36,6 +36,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
         // 1. Integrations with anomaly_detection_mode='retrospective'
         // 2. Events that didn't get real-time anomaly detection
         Event::query()
+            ->withoutInternal()
             ->whereNotNull('value')
             ->whereNotNull('value_unit')
             ->whereBetween('time', [

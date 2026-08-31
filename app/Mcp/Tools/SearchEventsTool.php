@@ -88,12 +88,14 @@ class SearchEventsTool extends Tool
 
                 // Perform hybrid search with semantic + filters
                 $events = Event::hybridSearch($embedding, $filters, threshold: 1.2, limit: $limit)
+                    ->withoutInternal()
                     ->whereIn('integration_id', $userIntegrationIds)
                     ->with(['integration', 'actor', 'target', 'blocks', 'tags'])
                     ->get();
             } else {
                 // Keyword search (basic LIKE search)
                 $events = Event::query()
+                    ->withoutInternal()
                     ->whereIn('integration_id', $userIntegrationIds)
                     ->where(function ($q) use ($query) {
                         $q->where('action', 'ILIKE', "%{$query}%")

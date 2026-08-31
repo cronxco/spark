@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EmbeddingClient
 {
@@ -125,15 +126,18 @@ class EmbeddingClient
      *
      * @throws Exception
      */
-    public function embed(string $text, bool $useCache = true): array
+    public function embed(string $text, bool $useCache = true, ?AiUsageContext $usageContext = null): array
     {
         if (empty(trim($text))) {
             throw new Exception('Cannot generate embedding for empty text');
         }
 
+        $usageContext ??= auth()->user() ? new AiUsageContext(auth()->user(), 'embedding', 'search') : null;
+        $truncatedText = $this->truncateText($text);
+        $cacheKey = $this->cacheKey($truncatedText);
+
         // Use cache to avoid redundant API calls for the same text
         if ($useCache) {
-            $cacheKey = 'embedding:' . md5($text);
             $cached = Cache::get($cacheKey);
 
             if ($cached !== null) {
@@ -145,7 +149,7 @@ class EmbeddingClient
             }
         }
 
-        $embeddings = $this->embedBatch([$text]);
+        $embeddings = $this->embedBatch([$truncatedText], $usageContext);
 
         if (! isset($embeddings[0])) {
             throw new Exception('OpenAI API returned no embedding data');
@@ -154,7 +158,7 @@ class EmbeddingClient
         $embedding = $this->validateEmbedding($embeddings[0]);
 
         if ($useCache) {
-            Cache::put('embedding:' . md5($text), $embedding, now()->addDays(30));
+            Cache::put($cacheKey, $embedding, now()->addDays(30));
         }
 
         return $embedding;
@@ -168,7 +172,7 @@ class EmbeddingClient
      *
      * @throws Exception
      */
-    public function embedBatch(array $texts): array
+    public function embedBatch(array $texts, ?AiUsageContext $usageContext = null): array
     {
         if (empty($texts)) {
             return [];
@@ -182,11 +186,22 @@ class EmbeddingClient
 
         // Truncate texts to avoid token limits (8191 tokens for text-embedding-3-small)
         $truncatedTexts = array_map(fn ($text) => $this->truncateText($text), $texts);
+        $clientRequestId = (string) Str::uuid();
+        $reservation = $usageContext ? app(AiUsageRecorder::class)->reserve(
+            $usageContext,
+            $this->model,
+            max(1, (int) ceil(array_sum(array_map('strlen', $truncatedTexts)) / 4)),
+            $clientRequestId,
+        ) : null;
+        $span = null;
+        $usage = [];
+        $requestSucceeded = false;
 
         try {
             $headers = [
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
+                'X-Client-Request-Id' => $clientRequestId,
             ];
 
             if ($this->organization) {
@@ -207,8 +222,6 @@ class EmbeddingClient
                     'dimensions' => $this->dimensions,
                 ]);
 
-            finish_ai_request_span($span, $response->json('usage') ?? []);
-
             if (! $response->successful()) {
                 Log::error('OpenAI API error', [
                     'status' => $response->status(),
@@ -218,6 +231,7 @@ class EmbeddingClient
             }
 
             $data = $response->json();
+            $usage = $data['usage'] ?? [];
 
             if (! isset($data['data']) || ! is_array($data['data'])) {
                 throw new Exception('Invalid response from OpenAI API');
@@ -227,20 +241,60 @@ class EmbeddingClient
                 throw new Exception('OpenAI API returned an unexpected number of embeddings');
             }
 
-            return array_map(function ($item, $index) {
+            $embeddings = array_map(function ($item, $index) {
                 if (! isset($item['embedding']) || ! is_array($item['embedding'])) {
                     throw new Exception("OpenAI API response missing embedding at index {$index}");
                 }
 
                 return $this->validateEmbedding($item['embedding']);
             }, $data['data'], array_keys($data['data']));
+
+            $requestSucceeded = true;
+            if ($reservation) {
+                $this->completeAccountingSafely($reservation, $usage, $clientRequestId);
+            }
+
+            return $embeddings;
         } catch (Exception $e) {
+            if ($reservation && ! $requestSucceeded) {
+                $this->failAccountingSafely($reservation);
+            }
+
             Log::error('Failed to generate embeddings', [
                 'error' => $e->getMessage(),
                 'texts_count' => count($texts),
             ]);
 
             throw $e;
+        } finally {
+            finish_ai_request_span($span, $usage, null, $requestSucceeded);
+        }
+    }
+
+    private function cacheKey(string $truncatedText): string
+    {
+        return "embedding:v2:{$this->model}:{$this->dimensions}:" . hash('sha256', $truncatedText);
+    }
+
+    /** @param array<string, mixed> $usage */
+    private function completeAccountingSafely(AiUsageReservation $reservation, array $usage, ?string $requestId): void
+    {
+        try {
+            app(AiUsageRecorder::class)->complete($reservation, AiTokenUsage::fromArray($usage), $requestId);
+        } catch (Exception $exception) {
+            report($exception);
+            Log::error('AI usage accounting failed after a completed embedding request', [
+                'error' => redact_sensitive_urls($exception->getMessage()),
+            ]);
+        }
+    }
+
+    private function failAccountingSafely(AiUsageReservation $reservation): void
+    {
+        try {
+            app(AiUsageRecorder::class)->fail($reservation);
+        } catch (Exception $exception) {
+            report($exception);
         }
     }
 

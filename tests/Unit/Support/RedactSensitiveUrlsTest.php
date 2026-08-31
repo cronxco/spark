@@ -3,11 +3,15 @@
 namespace Tests\Unit\Support;
 
 use PHPUnit\Framework\Attributes\Test;
+use Sentry\Breadcrumb;
+use Sentry\Event;
+use Sentry\Options;
+use Sentry\Serializer\PayloadSerializer;
 use Tests\TestCase;
 
 class RedactSensitiveUrlsTest extends TestCase
 {
-    private const URL = 'https://mcp.example.test/tok_abc123secret/sse';
+    private const URL = 'https://mcp.example.test:8443/tok_abc123secret/sse';
 
     protected function setUp(): void
     {
@@ -54,5 +58,32 @@ class RedactSensitiveUrlsTest extends TestCase
 
         $this->assertStringNotContainsString('tok_abc123secret', $encoded);
         $this->assertSame('keep me', $sanitised['safe']);
+    }
+
+    #[Test]
+    public function it_redacts_json_escaped_and_url_encoded_credential_urls(): void
+    {
+        $escaped = str_replace('/', '\\/', self::URL);
+        $encoded = rawurlencode(self::URL);
+
+        $redacted = redact_sensitive_urls("{$escaped} {$encoded}");
+
+        $this->assertStringNotContainsString('tok_abc123secret', $redacted);
+        $this->assertSame(2, substr_count($redacted, '[REDACTED_MCP_URL]'));
+    }
+
+    #[Test]
+    public function complete_sentry_events_are_scrubbed_recursively(): void
+    {
+        $event = Event::createEvent();
+        $event->setRequest(['url' => self::URL, 'data' => ['escaped' => str_replace('/', '\\/', self::URL)]]);
+        $event->setExtra(['encoded' => rawurlencode(self::URL)]);
+        $event->setBreadcrumb([new Breadcrumb(Breadcrumb::LEVEL_INFO, Breadcrumb::TYPE_HTTP, 'mcp', self::URL, ['url' => self::URL])]);
+
+        $encoded = (new PayloadSerializer(new Options(['dsn' => 'https://public@example.test/1'])))
+            ->serialize(redact_sentry_event($event));
+
+        $this->assertStringNotContainsString('tok_abc123secret', $encoded);
+        $this->assertStringContainsString('REDACTED_MCP_URL', $encoded);
     }
 }

@@ -10,6 +10,7 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use RuntimeException;
 
 #[Name('create-flint-digest')]
 class CreateFlintDigestTool extends Tool
@@ -28,7 +29,9 @@ class CreateFlintDigestTool extends Tool
         - Any `flint_*` type: Provide `content` (markdown) for the block body.
 
         Calls create a new digest. Do not retry after an unknown outcome without
-        checking get-latest-flint-digest first.
+        checking get-latest-flint-digest first. Routine callers must pass the
+        encrypted `run_token` supplied in their trigger payload; retries with
+        that token return the original digest.
     MARKDOWN;
 
     public function __construct(private FlintDigestService $digests) {}
@@ -54,6 +57,8 @@ class CreateFlintDigestTool extends Tool
             return Response::json($this->digests->create($user, $payload));
         } catch (ValidationException $exception) {
             return Response::error($exception->validator->errors()->first());
+        } catch (RuntimeException $exception) {
+            return Response::error($exception->getMessage());
         }
     }
 
@@ -73,6 +78,9 @@ class CreateFlintDigestTool extends Tool
 
             'summary' => $schema->string()
                 ->description('Optional headline summary content for the digest.'),
+
+            'run_token' => $schema->string()
+                ->description('Opaque run token from a scheduled or manual Flint trigger. Pass through unchanged.'),
 
             'blocks' => $schema->array()
                 ->items($schema->object([

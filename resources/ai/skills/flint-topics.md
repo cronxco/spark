@@ -1,20 +1,21 @@
 ---
 name: flint-topics
 description: >
-  Reviews the day's Flint digests and coaching activity and maintains Spark
-  Topics — the long-lived strategic, thematic, and tactical threads Flint
-  tracks over time. Touches, retires, and occasionally proposes topics, and
-  links the digests that discussed them.
+    Reviews the day's Flint digests and coaching activity and maintains Spark
+    Topics — the long-lived strategic, thematic, and tactical threads Flint
+    tracks over time. Touches, retires, and occasionally proposes topics, and
+    links the digests that discussed them.
 
-  Use this skill ONLY when invoked by the Flint topics Routine (webhook payload
-  with `routine: "topics"`). For conversational topic work — Will asking what
-  Flint is tracking, or asking it to start or drop a topic — use `flint-coach`,
-  which reads and writes the same topics.
+    Use this skill ONLY when invoked by the Flint topics Routine (webhook payload
+    with `routine: "topics"`). For conversational topic work — Will asking what
+    Flint is tracking, or asking it to start or drop a topic — use `flint-coach`,
+    which reads and writes the same topics.
 model: reasoning
 allowed_tools:
-  - spark__get-events-by-filter-tool
-  - spark__get-latest-flint-digest
-  - spark__manage-flint-topic
+    - spark__get-events-by-filter-tool
+    - spark__get-latest-flint-digest
+    - spark__manage-flint-topic
+required_success_tools: []
 max_tool_calls: 40
 timeout_seconds: 300
 ---
@@ -33,20 +34,20 @@ writing unless a person would recognise it as something they have going on.
 
 ## The three kinds
 
-| Kind | Horizon | Example | Ends when |
-|---|---|---|---|
-| `strategic` | Months to years | A 2027 Canada trip; moving house | It happens, or Will drops it |
-| `thematic` | Ongoing, no end date | Getting back to running; managing sleep debt | It stops being live for months |
-| `tactical` | Days to weeks | A boiler replacement; an unfolding news story | It resolves |
+| Kind        | Horizon              | Example                                       | Ends when                      |
+| ----------- | -------------------- | --------------------------------------------- | ------------------------------ |
+| `strategic` | Months to years      | A 2027 Canada trip; moving house              | It happens, or Will drops it   |
+| `thematic`  | Ongoing, no end date | Getting back to running; managing sleep debt  | It stops being live for months |
+| `tactical`  | Days to weeks        | A boiler replacement; an unfolding news story | It resolves                    |
 
 ## Statuses
 
-| Status | Meaning |
-|---|---|
-| `active` | Live now. Flint should notice new evidence about it. |
-| `dormant` | Real, but nothing to say right now. Wakes at `next_review_at`. |
-| `resolved` | It happened, or the question was answered. |
-| `expired` | It went nowhere and is no longer worth watching. |
+| Status     | Meaning                                                        |
+| ---------- | -------------------------------------------------------------- |
+| `active`   | Live now. Flint should notice new evidence about it.           |
+| `dormant`  | Real, but nothing to say right now. Wakes at `next_review_at`. |
+| `resolved` | It happened, or the question was answered.                     |
+| `expired`  | It went nowhere and is no longer worth watching.               |
 
 `resolved` and `expired` are both endings — the difference is whether it
 concluded or fizzled. Neither is a failure state; a topic list that only ever
@@ -61,7 +62,12 @@ grows is a broken topic list.
 The Routine fires with:
 
 ```json
-{ "user_id": "...", "routine": "topics", "local_date": "YYYY-MM-DD", "timezone": "Europe/London" }
+{
+    "user_id": "...",
+    "routine": "topics",
+    "local_date": "YYYY-MM-DD",
+    "timezone": "Europe/London"
+}
 ```
 
 Work in `local_date`, in `timezone`.

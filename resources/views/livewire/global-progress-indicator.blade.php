@@ -4,6 +4,8 @@ use App\Models\ActionProgress;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Collection;
 use Illuminate\Notifications\DatabaseNotification;
+use App\Services\Flint\FlintRunDispatcher;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
 new class extends Component {
@@ -20,6 +22,22 @@ new class extends Component {
     {
         $this->checkProgress();
         $this->loadNotifications();
+    }
+
+    #[On('run-flint-routine')]
+    public function runFlintRoutine(?string $skill = null, ?string $routine = null, string $period = 'morning'): void
+    {
+        try {
+            app(FlintRunDispatcher::class)->dispatch(
+                Auth::user(),
+                skill: $skill,
+                routine: $routine,
+                period: $period,
+            );
+        } catch (\InvalidArgumentException) {
+            return;
+        }
+        $this->checkProgress();
     }
 
     public function toggleUpdates(string $progressId): void

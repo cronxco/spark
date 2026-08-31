@@ -29,12 +29,30 @@ class SkillRegistry
      */
     public const FORBIDDEN_NAMESPACES = ['komodo', 'supabase', 'tailscale'];
 
-    /**
-     * Namespaces a skill may reach.
-     *
-     * @var array<int, string>
-     */
-    public const ALLOWED_NAMESPACES = ['spark', 'karakeep', 'fastmail', 'docs', 'weather'];
+    /** @var array<int, string> Exact tools available to unattended skills. */
+    public const APPROVED_TOOLS = [
+        'docs__fetch',
+        'docs__list_collection_documents',
+        'docs__list_documents',
+        'docs__update_document',
+        'fastmail__search_events',
+        'karakeep__get-bookmark-content',
+        'karakeep__get-list-bookmarks',
+        'karakeep__get-lists',
+        'karakeep__search-bookmarks',
+        'spark__create-flint-digest',
+        'spark__get-baselines-tool',
+        'spark__get-block-tool',
+        'spark__get-day-summary-tool',
+        'spark__get-event-tool',
+        'spark__get-events-by-filter-tool',
+        'spark__get-latest-flint-digest',
+        'spark__get-metric-trend-tool',
+        'spark__get-service-status-tool',
+        'spark__manage-flint-topic',
+        'weather__get_forecast',
+        'weather__get_weather_summary',
+    ];
 
     /** @var array<string, SkillDefinition>|null */
     private ?array $skills = null;
@@ -108,11 +126,15 @@ class SkillRegistry
             throw new RuntimeException("Skill {$file} declares an unknown model role.");
         }
 
+        $allowedTools = $this->validateTools($file, $meta['allowed_tools'] ?? []);
+        $requiredTools = $this->validateRequiredTools($file, $meta['required_success_tools'] ?? [], $allowedTools);
+
         return new SkillDefinition(
             name: $name,
             description: trim((string) ($meta['description'] ?? '')),
             model: $model,
-            allowedTools: $this->validateTools($file, $meta['allowed_tools'] ?? []),
+            allowedTools: $allowedTools,
+            requiredSuccessTools: $requiredTools,
             maxToolCalls: (int) ($meta['max_tool_calls'] ?? 0) ?: 40,
             timeoutSeconds: (int) ($meta['timeout_seconds'] ?? 0) ?: 300,
             body: $body,
@@ -128,6 +150,10 @@ class SkillRegistry
             throw new RuntimeException("Skill {$file} must declare at least one allowed tool.");
         }
 
+        if (count($tools) !== count(array_unique($tools, SORT_REGULAR))) {
+            throw new RuntimeException("Skill {$file} declares duplicate allowed tools.");
+        }
+
         foreach ($tools as $tool) {
             if (! is_string($tool) || ! str_contains($tool, '__')) {
                 throw new RuntimeException("Skill {$file} declares a malformed tool name.");
@@ -141,8 +167,28 @@ class SkillRegistry
                 );
             }
 
-            if (! in_array($namespace, self::ALLOWED_NAMESPACES, true)) {
-                throw new RuntimeException("Skill {$file} declares the unrecognised tool namespace '{$namespace}'.");
+            if (! in_array($tool, self::APPROVED_TOOLS, true)) {
+                throw new RuntimeException("Skill {$file} declares the unapproved tool '{$tool}'.");
+            }
+        }
+
+        return array_values($tools);
+    }
+
+    /** @param array<int, string> $allowedTools @return array<int, string> */
+    private function validateRequiredTools(string $file, mixed $tools, array $allowedTools): array
+    {
+        if (! is_array($tools)) {
+            throw new RuntimeException("Skill {$file} must declare required_success_tools as a list.");
+        }
+
+        if (count($tools) !== count(array_unique($tools, SORT_REGULAR))) {
+            throw new RuntimeException("Skill {$file} declares duplicate required success tools.");
+        }
+
+        foreach ($tools as $tool) {
+            if (! is_string($tool) || ! in_array($tool, $allowedTools, true)) {
+                throw new RuntimeException("Skill {$file} requires '{$tool}' but does not allow it.");
             }
         }
 

@@ -111,6 +111,12 @@ class RegenerateEmbeddings extends Command
         // Build query
         $query = $modelClass::query();
 
+        if ($modelName === 'Event') {
+            $query->withoutInternal();
+        } elseif ($modelName === 'Block') {
+            $query->whereHas('event', fn ($eventQuery) => $eventQuery->withoutInternal());
+        }
+
         // Apply filter
         if ($filterType === 'service') {
             if ($modelName === 'EventObject') {
@@ -189,15 +195,15 @@ class RegenerateEmbeddings extends Command
         $bar->start();
 
         $processed = 0;
-        $query->chunkById(100, function ($records) use ($jobClass, $sync, $bar, &$processed, $progress) {
+        $query->chunkById(100, function ($records) use ($jobClass, $sync, $bar, &$processed, $progress, $staleModel) {
             foreach ($records as $record) {
                 if ($sync) {
                     // Run synchronously
-                    $job = new $jobClass($record);
+                    $job = new $jobClass($record, $staleModel);
                     $job->handle(app(EmbeddingClient::class));
                 } else {
                     // Queue job
-                    $jobClass::dispatch($record)->onQueue('embeddings');
+                    $jobClass::dispatch($record, $staleModel)->onQueue('embeddings');
                 }
 
                 $processed++;

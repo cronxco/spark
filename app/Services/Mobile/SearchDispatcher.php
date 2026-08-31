@@ -154,6 +154,7 @@ class SearchDispatcher
         $like = '%' . $query . '%';
 
         $result['integrations'] = Integration::query()
+            ->external()
             ->where('user_id', $user->id)
             ->where(fn ($q) => $q->where('service', 'like', $like)->orWhere('name', 'like', $like))
             ->orderBy('service')

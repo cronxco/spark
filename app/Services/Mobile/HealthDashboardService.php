@@ -97,6 +97,7 @@ class HealthDashboardService
     private function eventsForDate(User $user, Carbon $date): Collection
     {
         return Event::query()
+            ->withoutInternal()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->whereBetween('time', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
             ->with(['integration', 'actor', 'target', 'blocks', 'tags'])

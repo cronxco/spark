@@ -75,6 +75,12 @@ class User extends Authenticatable
      */
     public function integrations()
     {
+        return $this->hasMany(Integration::class)->external();
+    }
+
+    /** Includes bookkeeping-only integrations for internal services. */
+    public function allIntegrations()
+    {
         return $this->hasMany(Integration::class);
     }
 
