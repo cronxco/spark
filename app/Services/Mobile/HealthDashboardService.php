@@ -97,6 +97,7 @@ class HealthDashboardService
     private function eventsForDate(User $user, Carbon $date): Collection
     {
         return Event::query()
+            ->withoutInternal()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->whereBetween('time', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
             ->with(['integration', 'actor', 'target', 'blocks', 'tags'])
@@ -406,6 +407,13 @@ class HealthDashboardService
 
                 return Str::contains($content, ['health', 'readiness', 'workout', 'sleep', 'recovery']);
             })
+            // The blocks relation is unordered, so without this the three
+            // insights surfaced are whichever three the database happened to
+            // return. Read them chronologically, with the id breaking ties.
+            ->sortBy(fn (array $pair) => [
+                ($pair[1]->time ?? $pair[0]->time)?->getTimestamp() ?? 0,
+                (string) $pair[1]->id,
+            ])
             ->take(3)
             ->map(function (array $pair) {
                 /** @var Event $event */

@@ -6,13 +6,13 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Illuminate\Database\Eloquent\Collection;
 
 /** Ownership-scoped typed search shared by API transports. */
 class TypedSearchService
 {
-    public function __construct(private EmbeddingService $embeddings) {}
+    public function __construct(private EmbeddingClient $embeddings) {}
 
     /** @return Collection<int, Event|EventObject|Block> */
     public function search(User $user, string $type, string $query, bool $semantic, int $limit, array $filters = []): Collection
@@ -31,10 +31,10 @@ class TypedSearchService
     {
         if ($semantic) {
             return Event::hybridSearch($this->embeddings->embed($query), array_filter(['service' => $filters['service'] ?? null, 'domain' => $filters['domain'] ?? null, 'from_date' => $filters['from_date'] ?? null, 'to_date' => $filters['to_date'] ?? null]), threshold: 1.2, limit: $limit)
-                ->whereIn('integration_id', $ids)->with(['integration', 'actor', 'target', 'blocks', 'tags'])->get();
+                ->withoutInternal()->whereIn('integration_id', $ids)->with(['integration', 'actor', 'target', 'blocks', 'tags'])->get();
         }
 
-        return Event::query()->whereIn('integration_id', $ids)->where(function ($builder) use ($query) {
+        return Event::query()->withoutInternal()->whereIn('integration_id', $ids)->where(function ($builder) use ($query) {
             $builder->where('action', 'ILIKE', "%{$query}%")->orWhere('service', 'ILIKE', "%{$query}%")->orWhereHas('actor', fn ($q) => $q->where('title', 'ILIKE', "%{$query}%"))->orWhereHas('target', fn ($q) => $q->where('title', 'ILIKE', "%{$query}%"));
         })->when($filters['service'] ?? null, fn ($q, $value) => $q->where('service', $value))->when($filters['domain'] ?? null, fn ($q, $value) => $q->where('domain', $value))->when($filters['from_date'] ?? null, fn ($q, $value) => $q->where('time', '>=', $value))->when($filters['to_date'] ?? null, fn ($q, $value) => $q->where('time', '<=', $value))->with(['integration', 'actor', 'target', 'blocks', 'tags'])->latest('time')->limit($limit)->get();
     }

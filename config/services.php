@@ -158,11 +158,15 @@ return [
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),
-        'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+        'daily_token_cap' => (int) env('OPENAI_DAILY_TOKEN_CAP', 0),
+
+        // One model per role, resolved through App\Services\Ai\AiModel. Nothing
+        // in the application names a model inline, so switching one is an env
+        // change rather than a code change. Keep this list short.
         'models' => [
-            'gpt5_mini' => env('OPENAI_GPT5_MINI_MODEL', 'gpt-4o-mini'),
-            'gpt4o' => env('OPENAI_GPT4O_MODEL', 'gpt-4o'),
-            'gpt5_nano' => env('OPENAI_GPT5_NANO_MODEL', 'gpt-5-nano'),
+            'embedding' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+            'extraction' => env('OPENAI_EXTRACTION_MODEL', 'gpt-5-nano'),
+            'reasoning' => env('OPENAI_REASONING_MODEL', 'gpt-4o-mini'),
         ],
     ],
 
@@ -225,22 +229,57 @@ return [
     // Spark owns the timing (in the user's effective timezone) and POSTs to the
     // routine, which calls back via the create-flint-digest MCP tool.
     'flint_routine' => [
-        'url' => env('FLINT_ROUTINE_WEBHOOK_URL'),
+        // The CronxTools MCP endpoint OpenAI connects to when running a Flint
+        // skill. The bearer token is embedded in the URL, so this value is a
+        // credential: it must never reach a log, a span or a stored payload.
+        // See redact_sensitive_urls() in app/Support/helpers.php.
+        'cronxtools_url' => env('FLINT_CRONXTOOLS_URL'),
+
+        // How a routine is run: 'webhook' hands it to a Claude Code Routine,
+        // 'openai' runs the vendored skill in-process. Individual routines may
+        // override this, so the two can be compared on the same input.
+        'driver' => env('FLINT_ROUTINE_DRIVER', 'webhook'),
+
+        // Shared fallback bearer secret. Per-routine secrets below take
+        // precedence; this exists so they can be rolled out one routine at a
+        // time rather than on a flag day.
         'secret' => env('FLINT_ROUTINE_WEBHOOK_SECRET'),
+
+        // Each routine owns its endpoint and its own secret, so one leaked
+        // secret does not authenticate against the other three and rotation is
+        // per-routine. Resolved by App\Services\Flint\RoutineConfig.
+        'routines' => [
+            'digest' => [
+                'url' => env('FLINT_ROUTINE_WEBHOOK_URL'),
+                'secret' => env('FLINT_DIGEST_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_DIGEST_DRIVER'),
+            ],
+            'topics' => [
+                'url' => env('FLINT_TOPICS_WEBHOOK_URL'),
+                'secret' => env('FLINT_TOPICS_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_TOPICS_DRIVER'),
+            ],
+            'reading_list' => [
+                'url' => env('FLINT_READING_LIST_WEBHOOK_URL'),
+                'secret' => env('FLINT_READING_LIST_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_READING_LIST_DRIVER'),
+            ],
+            'news_roundup' => [
+                'url' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_URL'),
+                'secret' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_NEWS_ROUNDUP_DRIVER'),
+            ],
+        ],
+
         'morning_time_weekday' => env('FLINT_MORNING_WEEKDAY', '07:30'),
         'morning_time_weekend' => env('FLINT_MORNING_WEEKEND', '09:30'),
         'evening_time' => env('FLINT_EVENING_TIME', '19:30'),
         'morning_fallback' => env('FLINT_MORNING_FALLBACK', '11:00'),
 
-        // The once-daily Flint routines beyond the digest. Each has its own
-        // webhook so it can be a separate Claude Code Routine; leaving a URL
-        // unset simply means Spark never fires that routine. Default slot times
-        // are user-overridable from the Flint settings tab.
-        'topics_url' => env('FLINT_TOPICS_WEBHOOK_URL'),
+        // Slot times for the once-daily routines beyond the digest. These are
+        // defaults; each is user-overridable from the Flint settings tab.
         'topics_time' => env('FLINT_TOPICS_TIME', '21:00'),
-        'reading_list_url' => env('FLINT_READING_LIST_WEBHOOK_URL'),
         'reading_list_time' => env('FLINT_READING_LIST_TIME', '20:00'),
-        'news_roundup_url' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_URL'),
         'news_roundup_time' => env('FLINT_NEWS_ROUNDUP_TIME', '07:00'),
     ],
 

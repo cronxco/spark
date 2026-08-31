@@ -1,15 +1,22 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\Ai;
 
-use App\Services\AssistantPromptingService;
+use App\Models\User;
+use App\Services\Ai\AiModel;
+use App\Services\Ai\AiUsageContext;
+use App\Services\Ai\AiUsageRecorder;
+use App\Services\Ai\AiUsageReservation;
+use App\Services\Ai\ChatClient;
+use Mockery;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Resources\Chat;
 use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
-class AssistantPromptingServiceToolCallingTest extends TestCase
+class ChatClientTest extends TestCase
 {
     #[Test]
     public function without_tools_it_makes_a_single_call_and_returns_the_content(): void
@@ -18,7 +25,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
             $this->response('Hello there'),
         ]);
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Say hi');
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Say hi']]);
 
         $this->assertSame('Hello there', $result);
         $fake->assertSent(Chat::class, 1);
@@ -49,7 +56,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
             return ['id' => 42, 'title' => 'Loki'];
         };
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Find the right match', [
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find the right match']], [
             'tools' => [
                 [
                     'type' => 'function',
@@ -98,7 +105,7 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
 
         $executions = 0;
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Find it', [
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find it']], [
             'tools' => [['type' => 'function', 'function' => ['name' => 'search_thing', 'parameters' => []]]],
             'tool_executor' => function (string $name, array $arguments) use (&$executions) {
                 $executions++;
@@ -123,11 +130,58 @@ class AssistantPromptingServiceToolCallingTest extends TestCase
             $this->response(null, [$this->toolCall('call_1', 'search_thing', ['query' => 'a'])]),
         ]);
 
-        $result = app(AssistantPromptingService::class)->generateResponse('Find it', [
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find it']], [
             'tools' => [['type' => 'function', 'function' => ['name' => 'search_thing', 'parameters' => []]]],
         ]);
 
         $this->assertSame('', $result);
+        $fake->assertSent(Chat::class, 1);
+    }
+
+    #[Test]
+    public function dotted_hyphenated_and_dated_reasoning_models_do_not_send_temperature(): void
+    {
+        foreach (['gpt-5.1', 'gpt-5-mini-2026-08-01', 'o3-mini', 'o4-pro-2026-05-10'] as $model) {
+            config(['services.openai.models.reasoning' => $model]);
+            $fake = OpenAI::fake([$this->response('ok')]);
+
+            app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Hi']], ['temperature' => 0.2]);
+
+            $fake->assertSent(Chat::class, fn ($method, $args) => ! array_key_exists('temperature', $args));
+        }
+    }
+
+    #[Test]
+    public function non_reasoning_models_keep_explicit_temperature(): void
+    {
+        config(['services.openai.models.reasoning' => 'gpt-4.1-mini']);
+        $fake = OpenAI::fake([$this->response('ok')]);
+
+        app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Hi']], ['temperature' => 0.2]);
+
+        $fake->assertSent(Chat::class, fn ($method, $args) => $args['temperature'] === 0.2);
+    }
+
+    #[Test]
+    public function accounting_failure_after_a_provider_response_never_retries_the_provider(): void
+    {
+        $user = User::factory()->create();
+        $context = new AiUsageContext($user, 'chat');
+        $reservation = new AiUsageReservation('reservation', 'event', 'gpt-5.1', today()->toDateString(), $context);
+        $recorder = Mockery::mock(AiUsageRecorder::class);
+        $recorder->shouldReceive('reserve')->once()->andReturn($reservation);
+        $recorder->shouldReceive('complete')->once()->andThrow(new RuntimeException('accounting unavailable'));
+        $recorder->shouldNotReceive('fail');
+        $this->app->instance(AiUsageRecorder::class, $recorder);
+        $fake = OpenAI::fake([$this->response('still succeeds')]);
+
+        $result = app(ChatClient::class)->text(
+            AiModel::Reasoning,
+            [['role' => 'user', 'content' => 'Hi']],
+            ['usage_context' => $context, 'retries' => 3],
+        );
+
+        $this->assertSame('still succeeds', $result);
         $fake->assertSent(Chat::class, 1);
     }
 

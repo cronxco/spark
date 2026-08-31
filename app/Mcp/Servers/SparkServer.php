@@ -21,6 +21,7 @@ use App\Mcp\Tools\GetServiceStatusTool;
 use App\Mcp\Tools\ListIntegrationsTool;
 use App\Mcp\Tools\ManageFlintTopicTool;
 use App\Mcp\Tools\ManageRelationshipTool;
+use App\Mcp\Tools\RunFlintSkillTool;
 use App\Mcp\Tools\SearchBlocksTool;
 use App\Mcp\Tools\SearchEventsTool;
 use App\Mcp\Tools\SearchObjectsTool;
@@ -100,6 +101,7 @@ class SparkServer extends Server
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
         - `answer-flint-question`: Record the user's answer to a Flint question.
         - `manage-flint-topic`: Create, update, or list persistent Flint Topics. Topics track strategic, thematic, and tactical threads, and may link digest events or blocks that discussed them.
+        - `run-flint-skill`: Run a Flint routine now rather than waiting for its daily slot (digest, topics, reading_list, news_roundup). Queued; results are written back the usual way. Requires `flint:run`.
 
         ### Web Fetching
         - `fetch-webpage-html`: Render a URL with Playwright and return its raw HTML. Uses saved Fetch cookies for the target domain when available and persists refreshed cookies. HTML is capped at 1 MB.
@@ -145,6 +147,7 @@ class SparkServer extends Server
         GetLatestFlintDigestTool::class,
         AnswerFlintQuestionTool::class,
         ManageFlintTopicTool::class,
+        RunFlintSkillTool::class,
         FetchWebpageHtmlTool::class,
     ];
 

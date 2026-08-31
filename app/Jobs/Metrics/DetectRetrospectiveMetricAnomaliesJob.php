@@ -45,6 +45,7 @@ class DetectRetrospectiveMetricAnomaliesJob implements ShouldQueue
 
         // Get all events from yesterday with value and value_unit
         $events = Event::whereDate('time', $yesterday)
+            ->withoutInternal()
             ->whereNotNull('value')
             ->whereNotNull('value_unit')
             ->with(['integration'])

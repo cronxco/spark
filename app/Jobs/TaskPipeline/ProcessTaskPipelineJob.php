@@ -3,6 +3,7 @@
 namespace App\Jobs\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
+use App\Models\Event;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
@@ -33,6 +34,10 @@ class ProcessTaskPipelineJob implements ShouldQueue
 
     public function handle(): void
     {
+        if ($this->model instanceof Event && $this->model->isInternal()) {
+            return;
+        }
+
         $applicableTasks = TaskRegistry::getTasksForModel($this->model, $this->trigger);
         $tasks = $applicableTasks;
 

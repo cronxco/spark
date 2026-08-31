@@ -7,7 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\User;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -27,7 +27,7 @@ class SearchDispatcher
 
     public const MODES = ['default', 'semantic', 'tag', 'metric', 'integration'];
 
-    public function __construct(protected ?EmbeddingService $embeddingService = null) {}
+    public function __construct(protected ?EmbeddingClient $embeddingService = null) {}
 
     /**
      * @return array{mode: string, query: string, events: Collection, objects: Collection, integrations: Collection, metrics: Collection}
@@ -154,6 +154,7 @@ class SearchDispatcher
         $like = '%' . $query . '%';
 
         $result['integrations'] = Integration::query()
+            ->external()
             ->where('user_id', $user->id)
             ->where(fn ($q) => $q->where('service', 'like', $like)->orWhere('name', 'like', $like))
             ->orderBy('service')

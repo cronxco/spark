@@ -13,6 +13,6 @@ return [
 
     'sentry' => [
         'enabled' => env('SENTRY_MCP_TRACING_ENABLED', true),
-        'sample_rate' => (float) env('SENTRY_MCP_SAMPLE_RATE', 0.1),
+        'sample_rate' => (float) env('SENTRY_MCP_SAMPLE_RATE', 1.0),
     ],
 ];

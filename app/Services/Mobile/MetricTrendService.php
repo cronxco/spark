@@ -48,6 +48,7 @@ class MetricTrendService
         // 1536-dim embeddings vector and JSON metadata, and pulling them is
         // pure egress waste.
         $events = Event::query()
+            ->withoutInternal()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->where('service', $statistic->service)
             ->where('action', $statistic->action)

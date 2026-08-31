@@ -36,7 +36,7 @@ class FetchIntegrationData extends Command
         if ($service) {
             $this->info("Fetching data for {$service} integrations...");
             $services = PluginRegistry::getOAuthPlugins()->keys()->merge(PluginRegistry::getApiKeyPlugins()->keys());
-            $query = Integration::where('service', $service)
+            $query = Integration::external()->where('service', $service)
                 ->whereIn('service', $services);
 
             $allIntegrations = $query->get();
@@ -51,7 +51,7 @@ class FetchIntegrationData extends Command
         } else {
             $this->info('Fetching data from integrations that need updating...');
             $services = PluginRegistry::getOAuthPlugins()->keys()->merge(PluginRegistry::getApiKeyPlugins()->keys());
-            $query = Integration::whereHas('user')
+            $query = Integration::external()->whereHas('user')
                 ->whereIn('service', $services);
 
             $allIntegrations = $query->get();

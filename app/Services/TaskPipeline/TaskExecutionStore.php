@@ -11,6 +11,7 @@ use App\Models\TaskExecution;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -77,7 +78,33 @@ class TaskExecutionStore
         array $data = [],
         ?object $jobContext = null,
         bool $mergeLastAttempt = true,
+        bool $promoteSuccess = true,
     ): array {
+        if (DB::transactionLevel() === 0) {
+            return DB::transaction(fn () => $this->recordStatus(
+                $model,
+                $task,
+                $status,
+                $data,
+                $jobContext,
+                $mergeLastAttempt,
+                $promoteSuccess,
+            ));
+        }
+
+        if ($model->exists && Schema::hasTable('task_executions')) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                    'task-execution:' . $this->entityType($model) . ':' . $model->getKey() . ':' . $task->key,
+                ]);
+            }
+            TaskExecution::query()
+                ->forEntity($this->entityType($model), (string) $model->getKey())
+                ->where('task_key', $task->key)
+                ->lockForUpdate()
+                ->first();
+        }
+
         $executions = $this->getTaskExecutions($model);
 
         $executionData = array_merge($data, [
@@ -90,7 +117,7 @@ class TaskExecutionStore
 
         $executions[$task->key]['last_attempt'] = $lastAttempt;
 
-        if ($status === 'success') {
+        if ($status === 'success' && $promoteSuccess) {
             $executions[$task->key]['last_success'] = $lastAttempt;
         }
 
@@ -117,11 +144,13 @@ class TaskExecutionStore
             return null;
         }
 
-        $execution = TaskExecution::firstOrNew([
+        $identity = [
             'entity_type' => $this->entityType($model),
             'entity_id' => (string) $model->getKey(),
             'task_key' => $taskKey,
-        ]);
+        ];
+        $execution = TaskExecution::query()->where($identity)->lockForUpdate()->first()
+            ?? new TaskExecution($identity);
 
         if ($execution->exists && ! $force) {
             return $execution;
@@ -264,7 +293,7 @@ class TaskExecutionStore
 
     protected function historySnapshot(string $taskKey, array $lastAttempt): array
     {
-        return [
+        return array_filter([
             'task_key' => $taskKey,
             'status' => $lastAttempt['status'] ?? null,
             'attempts' => $lastAttempt['attempts'] ?? null,
@@ -274,7 +303,19 @@ class TaskExecutionStore
             'error' => Arr::get($lastAttempt, 'error'),
             'waiting_for' => Arr::get($lastAttempt, 'waiting_for'),
             'blocked_by' => Arr::get($lastAttempt, 'blocked_by'),
-        ];
+            'run_uuid' => Arr::get($lastAttempt, 'run_uuid'),
+            'local_date' => Arr::get($lastAttempt, 'local_date'),
+            'period' => Arr::get($lastAttempt, 'period'),
+            'trigger_source' => Arr::get($lastAttempt, 'trigger_source'),
+            'driver' => Arr::get($lastAttempt, 'driver'),
+            'response_id' => Arr::get($lastAttempt, 'response_id'),
+            'tools_called' => Arr::get($lastAttempt, 'tools_called'),
+            'tool_calls' => Arr::get($lastAttempt, 'tool_calls'),
+            'input_tokens' => Arr::get($lastAttempt, 'input_tokens'),
+            'output_tokens' => Arr::get($lastAttempt, 'output_tokens'),
+            'total_tokens' => Arr::get($lastAttempt, 'total_tokens'),
+            'event_id' => Arr::get($lastAttempt, 'event_id'),
+        ], fn (mixed $value) => $value !== null);
     }
 
     protected function isTerminalStatus(string $status): bool

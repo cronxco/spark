@@ -76,6 +76,7 @@ class DaySummaryService
         ?array $domains = null
     ): Collection {
         $query = Event::query()
+            ->withoutInternal()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->whereBetween('time', [$startDate, $endDate])
             ->with(['actor', 'target', 'blocks', 'tags']);

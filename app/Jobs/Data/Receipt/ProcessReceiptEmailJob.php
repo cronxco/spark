@@ -7,6 +7,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Ai\AiUsageContext;
 use App\Services\CurrencyConversionService;
 use Carbon\Carbon;
 use Exception;
@@ -64,7 +65,13 @@ class ProcessReceiptEmailJob implements ShouldQueue
             $receiptData = $extractor->extract(
                 $parsedEmail['combined_text'],
                 $parsedEmail['subject'],
-                $parsedEmail['from']
+                $parsedEmail['from'],
+                new AiUsageContext(
+                    $this->integration->user,
+                    'receipt_extract',
+                    'receipt',
+                    $this->integration,
+                ),
             );
 
             // Check if this was identified as not a valid receipt

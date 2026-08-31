@@ -893,6 +893,30 @@ new class extends Component {
                     </div>
                 @endif
 
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold">{{ __('Run now') }}</h3>
+                        <p class="text-sm opacity-70 mb-4">
+                            {{ __('Runs a routine immediately instead of waiting for its slot. It goes through the same path as a scheduled run, so results appear exactly as they normally would.') }}
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ([
+                                'spark-day-briefing-async' => __('Digest'),
+                                'flint-topics' => __('Topics'),
+                                'flint-reading-list' => __('Reading list'),
+                                'flint-news-roundup' => __('News roundup'),
+                            ] as $skillName => $skillLabel)
+                                <x-button
+                                    wire:key="run-{{ $skillName }}"
+                                    wire:click="$dispatch('run-flint-routine', { skill: '{{ $skillName }}' })"
+                                    class="btn-outline btn-sm"
+                                    icon="fas.play"
+                                    label="{{ $skillLabel }}" />
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex justify-end">
                     <x-button label="{{ __('Save Settings') }}" wire:click="save" class="btn-primary" spinner="save" />
                 </div>

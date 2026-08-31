@@ -88,6 +88,9 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             ->select('integrations.user_id as user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
             ->whereNull($eventsTable . '.deleted_at')
             ->whereNull('integrations.deleted_at')
+            ->where(fn ($query) => $query
+                ->whereNull($eventsTable . '.event_metadata->internal')
+                ->orWhere($eventsTable . '.event_metadata->internal', false))
             ->whereNotNull($eventsTable . '.value')
             ->whereNotNull($eventsTable . '.value_unit')
             ->groupBy('integrations.user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
@@ -168,6 +171,9 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             ->where('e.value_unit', $valueUnit)
             ->whereNotNull('e.value')
             ->whereNull('e.deleted_at')
+            ->where(fn ($query) => $query
+                ->whereNull('e.event_metadata->internal')
+                ->orWhere('e.event_metadata->internal', false))
             ->where('e.time', '>=', now()->subDays($windowDays))
             ->selectRaw(<<<SQL
                 COUNT(*) AS total_count,

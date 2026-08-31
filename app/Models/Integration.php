@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Integrations\PluginRegistry;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -51,7 +52,7 @@ class Integration extends Model
      */
     public static function scopeNeedsUpdate($query)
     {
-        return $query->where(function ($q) {
+        return $query->external()->where(function ($q) {
             $q->whereNull('last_successful_update_at')
                 ->orWhereRaw('last_successful_update_at + INTERVAL \'1 minute\' * 15 < NOW()');
         });
@@ -62,7 +63,7 @@ class Integration extends Model
      */
     public static function scopeOAuthNeedsUpdate($query)
     {
-        return $query->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
+        return $query->external()->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
             ->needsUpdate();
     }
 
@@ -109,6 +110,23 @@ class Integration extends Model
 
             $group->delete();
         });
+    }
+
+    public function scopeExternal(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('instance_type')->orWhere('instance_type', '!=', 'internal');
+        });
+    }
+
+    public function scopeInternal(Builder $query): Builder
+    {
+        return $query->where('instance_type', 'internal');
+    }
+
+    public function isInternal(): bool
+    {
+        return $this->instance_type === 'internal';
     }
 
     /**

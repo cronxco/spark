@@ -7,7 +7,9 @@ use App\Mcp\Tools\CreateFlintDigestTool;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
+use App\Services\Flint\FlintRunToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -164,5 +166,79 @@ class CreateFlintDigestToolTest extends TestCase
         ]);
 
         $response->assertHasErrors(['title field is required']);
+    }
+
+    #[Test]
+    public function a_run_token_makes_callback_retries_durably_idempotent(): void
+    {
+        $runUuid = (string) Str::uuid();
+        $token = $this->runToken($runUuid, 'digest', 'spark-day-briefing-async');
+        $payload = [
+            'title' => 'Run-bound digest',
+            'period' => 'morning',
+            'date' => today()->toDateString(),
+            'run_token' => $token,
+            'blocks' => [[
+                'block_type' => 'flint_editorial_note',
+                'title' => 'One block',
+                'content' => 'Written once.',
+            ]],
+        ];
+
+        SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, $payload)->assertOk();
+        $retry = SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, $payload);
+
+        $retry->assertOk()->assertSee('"deduplicated":true');
+        $this->assertSame(1, Event::where('source_id', "flint_digest_run:{$runUuid}")->count());
+        $this->assertSame(1, Block::where('title', 'One block')->count());
+    }
+
+    #[Test]
+    public function different_routines_can_write_distinct_digests_in_the_same_period(): void
+    {
+        foreach ([
+            ['digest', 'spark-day-briefing-async'],
+            ['news_roundup', 'flint-news-roundup'],
+        ] as [$routine, $skill]) {
+            SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, [
+                'title' => $skill,
+                'period' => 'morning',
+                'date' => today()->toDateString(),
+                'run_token' => $this->runToken((string) Str::uuid(), $routine, $skill),
+            ])->assertOk();
+        }
+
+        $this->assertSame(2, Event::where('service', 'flint')->where('action', 'had_summary')->count());
+        $this->assertSame(
+            ['digest', 'news_roundup'],
+            Event::where('service', 'flint')->get()->pluck('event_metadata.routine')->sort()->values()->all(),
+        );
+    }
+
+    #[Test]
+    public function a_run_token_is_bound_to_its_user_date_and_period(): void
+    {
+        $other = User::factory()->create();
+        $token = $this->runToken((string) Str::uuid(), 'digest', 'spark-day-briefing-async');
+
+        SparkServer::actingAs($other)->tool(CreateFlintDigestTool::class, [
+            'title' => 'Wrong owner',
+            'period' => 'morning',
+            'date' => today()->toDateString(),
+            'run_token' => $token,
+        ])->assertHasErrors(['does not match']);
+    }
+
+    private function runToken(string $runUuid, string $routine, string $skill): string
+    {
+        return app(FlintRunToken::class)->issue([
+            'run_uuid' => $runUuid,
+            'user_id' => (string) $this->user->id,
+            'routine' => $routine,
+            'skill' => $skill,
+            'local_date' => today()->toDateString(),
+            'period' => 'morning',
+            'trigger_source' => 'scheduled',
+        ]);
     }
 }

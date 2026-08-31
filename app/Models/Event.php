@@ -86,6 +86,10 @@ class Event extends Model
         });
 
         static::created(function ($model): void {
+            if ($model->isInternal()) {
+                return;
+            }
+
             // Dispatch Task Pipeline to run applicable tasks
             // This includes: embedding generation, anomaly detection, receipt matching, etc.
             if (config('app.enable_task_pipeline', true)) {
@@ -105,6 +109,19 @@ class Event extends Model
                 ->performedOn($model)
                 ->event('restored')
                 ->log('restored');
+        });
+    }
+
+    public function isInternal(): bool
+    {
+        return data_get($this->event_metadata, 'internal') === true;
+    }
+
+    public function scopeWithoutInternal(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('event_metadata->internal')
+                ->orWhere('event_metadata->internal', false);
         });
     }
 
@@ -481,6 +498,7 @@ class Event extends Model
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
+        $query->withoutInternal();
         $embeddingString = '[' . implode(',', $embedding) . ']';
 
         if ($temporalWeight > 0) {
@@ -520,6 +538,7 @@ class Event extends Model
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
+        $query->withoutInternal();
         $embeddingString = '[' . implode(',', $embedding) . ']';
 
         if ($temporalWeight > 0) {

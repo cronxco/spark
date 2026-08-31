@@ -27,11 +27,16 @@ class TriggerFlintRoutineJobTest extends TestCase
         $this->user = User::factory()->create();
 
         config([
-            'services.flint_routine.topics_url' => 'https://routine.example.test/topics',
-            'services.flint_routine.reading_list_url' => 'https://routine.example.test/reading',
-            'services.flint_routine.news_roundup_url' => null,
+            'services.flint_routine.routines.topics.url' => 'https://routine.example.test/topics',
+            'services.flint_routine.routines.reading_list.url' => 'https://routine.example.test/reading',
+            'services.flint_routine.routines.news_roundup.url' => null,
             'services.flint_routine.secret' => 'shh',
         ]);
+    }
+
+    private static function marker(string $userId, string $routine): string
+    {
+        return TriggerFlintRoutineJob::markerKey($userId, '2026-06-14', $routine);
     }
 
     #[Test]
@@ -139,25 +144,56 @@ class TriggerFlintRoutineJobTest extends TestCase
     }
 
     #[Test]
-    public function it_clears_the_marker_so_a_failed_call_can_be_retried(): void
+    public function an_attempt_failure_stays_retryable_until_the_terminal_failure_callback(): void
     {
         Http::fake(['*' => Http::response(['error' => 'nope'], 500)]);
 
+        $job = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
+        $exception = null;
         try {
-            $this->runJob('topics');
+            $job->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
             $this->fail('Expected the failed webhook call to throw.');
-        } catch (RequestException) {
-            // expected
+        } catch (RequestException $caught) {
+            $exception = $caught;
         }
+
+        $this->assertTrue(Cache::has(
+            TriggerFlintRoutineJob::markerKey($this->user->id, '2026-06-14', 'topics')
+        ));
+        $this->assertSame(
+            'retrying',
+            TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail()->status,
+        );
+
+        $job->failed($exception);
 
         $this->assertFalse(Cache::has(
             TriggerFlintRoutineJob::markerKey($this->user->id, '2026-06-14', 'topics')
         ));
-
         $this->assertSame(
             'failed',
             TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail()->status,
         );
+    }
+
+    #[Test]
+    public function manual_runs_leave_scheduled_markers_and_last_success_untouched(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true], 200)]);
+        $scheduled = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
+        $scheduled->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+        $marker = self::marker($this->user->id, 'topics');
+        $scheduledMarker = Cache::get($marker);
+
+        $manual = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York', true);
+        $manual->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+
+        $execution = TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail();
+        $this->assertSame($scheduledMarker, Cache::get($marker));
+        $this->assertSame('scheduled', $execution->last_success['trigger_source']);
+        $this->assertSame('manual', collect($execution->history)->last()['trigger_source']);
+        $this->assertCount(2, $execution->history);
+        Http::assertSentCount(2);
     }
 
     private function runJob(string $routine = 'topics'): void

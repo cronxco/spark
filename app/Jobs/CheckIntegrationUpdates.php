@@ -57,7 +57,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             $apiKeyServices = PluginRegistry::getApiKeyPlugins()->keys();
 
             // Get all integrations that could potentially need updating
-            $allIntegrations = Integration::with(['user', 'group'])
+            $allIntegrations = Integration::external()->with(['user', 'group'])
                 ->whereHas('user')
                 ->where(function ($query) use ($oauthServices, $apiKeyServices) {
                     $query->where(function ($q) use ($oauthServices) {
