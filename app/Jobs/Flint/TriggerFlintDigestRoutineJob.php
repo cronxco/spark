@@ -161,7 +161,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     {
         return new TaskDefinition(
             key: "flint_digest_{$this->period}",
-            name: 'Flint '.ucfirst($this->period).' Digest',
+            name: 'Flint ' . ucfirst($this->period) . ' Digest',
             description: 'Outbound trigger for the Flint digest routine.',
             jobClass: self::class,
             appliesTo: ['object'],
