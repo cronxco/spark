@@ -300,7 +300,7 @@ class SkillRunner
                 return true;
             }
 
-            foreach ($output['content'] ?? [] as $content) {
+            foreach (is_array($output['content'] ?? null) ? $output['content'] : [] as $content) {
                 if ($this->isApplicationError(is_array($content) ? ($content['text'] ?? $content) : $content)) {
                     return true;
                 }

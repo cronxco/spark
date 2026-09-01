@@ -71,6 +71,25 @@ class SkillRunnerTest extends TestCase
     }
 
     #[Test]
+    public function it_does_not_crash_when_tool_output_content_is_a_string(): void
+    {
+        $user = User::factory()->create();
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+        $body = $this->completedBody([
+            [
+                'type' => 'mcp_call',
+                'name' => 'spark__create-flint-digest',
+                'output' => json_encode(['content' => 'plain string content', 'event_id' => 'evt-created']),
+            ],
+        ]);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($body)]);
+
+        $result = app(SkillRunner::class)->run($user, $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame(['spark__create-flint-digest'], $result->toolsCalled);
+    }
+
+    #[Test]
     public function streamed_tool_progress_and_continuation_are_forwarded_without_persisting_schemas(): void
     {
         $terminal = $this->completedBody();
