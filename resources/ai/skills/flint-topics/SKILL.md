@@ -90,7 +90,7 @@ Then the previous six days, so a thread is visible rather than a single day's
 noise:
 
 ```text
-spark__get-events-by-filter-tool(service: "flint", action: "had_summary", from: "<local_date - 6d>", to: "<local_date>")
+spark__get-events-by-filter-tool(service: "flint", action: "had_summary", from_date: "<local_date - 6d>", to_date: "<local_date>")
 ```
 
 Read each digest's `summary`, its `flint_insight` and `flint_editorial_note`
