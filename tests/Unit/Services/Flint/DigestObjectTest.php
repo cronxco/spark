@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Flint;
 
+use App\Models\EventObject;
 use App\Models\User;
 use App\Services\FlintDigestService;
 use Carbon\Carbon;
@@ -36,8 +37,10 @@ class DigestObjectTest extends TestCase
         $date = Carbon::parse('2026-09-02');
         $service = app(FlintDigestService::class);
 
-        $this->assertTrue($service->resolveDigestObject($user, 'evening', $date, 'digest')
-            ->is($service->resolveDigestObject($user, 'evening', $date)));
+        $this->assertSame(
+            $this->key($service->resolveDigestObject($user, 'evening', $date, 'digest')),
+            $this->key($service->resolveDigestObject($user, 'evening', $date)),
+        );
     }
 
     /**
@@ -55,7 +58,7 @@ class DigestObjectTest extends TestCase
         $briefing = $service->resolveDigestObject($user, 'morning', $date);
         $roundup = $service->resolveDigestObject($user, 'morning', $date, 'news_roundup');
 
-        $this->assertFalse($roundup->is($briefing));
+        $this->assertNotSame($this->key($briefing), $this->key($roundup));
         $this->assertSame('news_roundup_digest', $roundup->type);
         $this->assertSame('2026-09-02 NEWS ROUNDUP', $roundup->title);
         $this->assertSame('news_roundup', $roundup->metadata['routine']);
@@ -72,8 +75,11 @@ class DigestObjectTest extends TestCase
         $reading = $service->resolveDigestObject($user, 'evening', $date, 'reading_list');
         $topics = $service->resolveDigestObject($user, 'evening', $date, 'topics');
 
-        $this->assertFalse($reading->is($topics));
-        $this->assertFalse($reading->is($service->resolveDigestObject($user, 'evening', $date)));
+        $this->assertNotSame($this->key($reading), $this->key($topics));
+        $this->assertNotSame(
+            $this->key($reading),
+            $this->key($service->resolveDigestObject($user, 'evening', $date)),
+        );
         $this->assertSame('2026-09-02 READING LIST', $reading->title);
     }
 
@@ -84,9 +90,21 @@ class DigestObjectTest extends TestCase
         $date = Carbon::parse('2026-09-02');
         $service = app(FlintDigestService::class);
 
-        $this->assertTrue(
-            $service->resolveDigestObject($user, 'morning', $date, 'news_roundup')
-                ->is($service->resolveDigestObject($user, 'morning', $date, 'news_roundup')),
+        $this->assertSame(
+            $this->key($service->resolveDigestObject($user, 'morning', $date, 'news_roundup')),
+            $this->key($service->resolveDigestObject($user, 'morning', $date, 'news_roundup')),
         );
+    }
+
+    /**
+     * An EventObject's key, as a string.
+     *
+     * `Model::is()` compares keys with `===`, and EventObject::booted() assigns
+     * `Str::uuid()` — a Uuid object, not a string. A freshly created instance
+     * therefore never matches the same row loaded back from the database.
+     */
+    private function key(EventObject $object): string
+    {
+        return (string) $object->getKey();
     }
 }
