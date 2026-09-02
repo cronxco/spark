@@ -68,7 +68,7 @@ class SkillToolLinter
             if ($unknown !== []) {
                 sort($unknown);
                 $problems[] = sprintf(
-                    "calls %s with unknown argument%s %s (it accepts: %s)",
+                    'calls %s with unknown argument%s %s (it accepts: %s)',
                     $tool,
                     count($unknown) === 1 ? '' : 's',
                     implode(', ', $unknown),

@@ -30,6 +30,23 @@ class WebhookRoutineDriver implements RoutineDriver
      */
     private const BETA = 'experimental-cc-routine-2026-04-01';
 
+    /**
+     * The extra turn appended to the Routine's own prompt.
+     *
+     * The skills document this exact JSON shape in their "Read the payload"
+     * step, so it is sent verbatim under a one-line label rather than being
+     * reworded into prose.
+     *
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws JsonException
+     */
+    private static function turn(array $payload): string
+    {
+        return "Flint routine trigger payload. Use these values rather than inferring them:\n\n"
+            . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
     public function run(User $user, string $routine, array $payload, ?ActionProgress $progress = null): RoutineResult
     {
         $url = RoutineConfig::url($routine);
@@ -69,22 +86,5 @@ class WebhookRoutineDriver implements RoutineDriver
         }
 
         return RoutineResult::success(['driver' => 'webhook']);
-    }
-
-    /**
-     * The extra turn appended to the Routine's own prompt.
-     *
-     * The skills document this exact JSON shape in their "Read the payload"
-     * step, so it is sent verbatim under a one-line label rather than being
-     * reworded into prose.
-     *
-     * @param  array<string, mixed>  $payload
-     *
-     * @throws JsonException
-     */
-    private static function turn(array $payload): string
-    {
-        return "Flint routine trigger payload. Use these values rather than inferring them:\n\n"
-            . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 }
