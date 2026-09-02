@@ -39,15 +39,19 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
         $this->runJob('evening');
 
         Http::assertSent(function ($request) {
+            $payload = $this->firedPayload($request);
+
             return $request->url() === 'https://routine.example.test/hook'
                 && $request->hasHeader('Authorization', 'Bearer shh')
                 && $request->hasHeader('anthropic-version', '2023-06-01')
-                && $request['period'] === 'evening'
-                && $request['local_date'] === '2026-06-14'
-                && $request['timezone'] === 'America/New_York'
-                && $request['trigger_reason'] === 'scheduled'
-                && $request['user_id'] === (string) $this->user->id
-                && $request['idempotency_key'] === TriggerFlintDigestRoutineJob::markerKey(
+                && $request->hasHeader('anthropic-beta', 'experimental-cc-routine-2026-04-01')
+                && $payload['period'] === 'evening'
+                && $payload['local_date'] === '2026-06-14'
+                && $payload['timezone'] === 'America/New_York'
+                && $payload['trigger_reason'] === 'scheduled'
+                && is_string($payload['run_token'] ?? null)
+                && $payload['user_id'] === (string) $this->user->id
+                && $payload['idempotency_key'] === TriggerFlintDigestRoutineJob::markerKey(
                     $this->user->id,
                     '2026-06-14',
                     'evening',
@@ -155,5 +159,21 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
             'America/New_York',
             $reason,
         ))->handle();
+    }
+
+    /**
+     * The trigger payload, dug back out of the extra turn the fire endpoint
+     * appends to the run. A Routine does not read the request body as
+     * instructions, so `text` is the only channel into the session.
+     *
+     * @return array<string, mixed>
+     */
+    private function firedPayload(mixed $request): array
+    {
+        $this->assertSame(['text'], array_keys($request->data()));
+        $text = $request['text'];
+        $json = substr($text, (int) strpos($text, '{'));
+
+        return json_decode($json, true, flags: JSON_THROW_ON_ERROR);
     }
 }
