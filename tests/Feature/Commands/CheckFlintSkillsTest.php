@@ -71,6 +71,61 @@ class CheckFlintSkillsTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
     }
 
+    #[Test]
+    public function it_reports_that_the_skills_call_tools_that_exist(): void
+    {
+        $this->mirrorAllSkills();
+
+        $this->artisan('flint:skills-check', ['--claude-repo' => $this->repo])
+            ->expectsOutputToContain('vendored Flint skills call tools that exist')
+            ->assertExitCode(Command::SUCCESS);
+    }
+
+    /**
+     * The two copies being byte-identical says nothing about either being
+     * correct: the `domain:` argument that left flint-news-roundup reporting
+     * empty coverage over six newsletters a day was identical in both places.
+     */
+    #[Test]
+    public function it_fails_when_a_skill_calls_a_tool_with_an_argument_it_does_not_accept(): void
+    {
+        $vendored = resource_path('ai/skills/flint-topics/SKILL.md');
+        $original = File::get($vendored);
+
+        File::put($vendored, str_replace(
+            'from_date: "<local_date - 6d>"',
+            'domain: "knowledge"',
+            $original,
+        ));
+        $this->mirrorAllSkills();
+
+        try {
+            $this->artisan('flint:skills-check', ['--claude-repo' => $this->repo])
+                ->expectsOutputToContain('flint-topics calls tools that do not exist as written')
+                ->expectsOutputToContain('unknown argument domain')
+                ->assertExitCode(Command::FAILURE);
+        } finally {
+            File::put($vendored, $original);
+        }
+    }
+
+    #[Test]
+    public function the_tool_check_can_be_skipped(): void
+    {
+        $vendored = resource_path('ai/skills/flint-topics/SKILL.md');
+        $original = File::get($vendored);
+
+        File::put($vendored, str_replace('from_date: "<local_date - 6d>"', 'domain: "knowledge"', $original));
+        $this->mirrorAllSkills();
+
+        try {
+            $this->artisan('flint:skills-check', ['--claude-repo' => $this->repo, '--skip-tools' => true])
+                ->assertExitCode(Command::SUCCESS);
+        } finally {
+            File::put($vendored, $original);
+        }
+    }
+
     private function mirrorAllSkills(): void
     {
         foreach (app(SkillRegistry::class)->all() as $skill) {

@@ -1,17 +1,19 @@
 ---
 name: flint-news-roundup
 description: >
-  Synthesises the recurring newsletter and fetch sources that landed overnight
-  into a small themed roundup, and maintains tactical Spark Topics for the
-  stories that are still unfolding. Runs in the morning so it is fresh for the
-  day.
+  Takes the three stories out of Will's own newsletter and fetch sources that
+  are actually worth his attention, and writes each one up properly — what
+  happened, where his sources disagree, and what to watch next. Deeper on the
+  news than the day briefing has room to be. Maintains tactical Spark Topics for
+  the stories still unfolding.
 
   Use this skill ONLY when invoked by the Flint news Routine (webhook payload
   with `routine: "news_roundup"`). For conversational news questions — "what
   did my newsletters say?" — use `spark-day-briefing`.
 model: reasoning
 allowed_tools:
-  - spark__get-events-by-filter-tool
+  - spark__get-day-summary-tool
+  - spark__get-latest-flint-digest
   - spark__get-event-tool
   - spark__get-block-tool
   - karakeep__get-bookmark-content
@@ -19,23 +21,31 @@ allowed_tools:
   - spark__manage-flint-topic
 required_success_tools:
   - spark__create-flint-digest
-max_tool_calls: 40
-timeout_seconds: 300
+max_tool_calls: 60
+timeout_seconds: 600
 ---
 
 # Flint News Roundup — Routine Skill
 
-Runs once a day in the morning, before or around the morning digest. Reads the
-newsletters and fetch sources that arrived overnight and turns them into a few
-themes worth knowing about, rather than a list of what arrived.
+Runs once a day in the morning. Reads the newsletters and fetch sources that
+arrived since the last run and writes up **three stories worth caring about**,
+in enough depth to be worth reading on their own.
 
-**Themes, not items.** Five newsletters that all cover the same story are one
-theme. One newsletter covering four unrelated things is four candidate items, of
-which probably none survive. If the day's sources produce two themes, write two.
+This is not the day briefing, and it is not a shorter version of it. The day
+briefing's news section answers *"what happened in the world, briefly"* in a
+paragraph. This answers a different question: **of everything Will's sources
+carried, which three matter, and what is actually going on with them.** If this
+run produces something the morning digest could have said in one line, it has
+failed.
 
-This roundup is **not** the day briefing. It does not cover health, money,
-calendar, or tasks, and it does not tell Will what to do. It covers what
-happened in the world he follows.
+It does not cover health, money, calendar or tasks, and it does not tell Will
+what to do.
+
+**Everything comes from Will's own sources.** Spark holds the newsletters and
+fetches; that is the whole evidence base. Do not browse for material, do not
+reach for the open web, and do not supplement from memory — including for
+background you are confident about. A story you cannot support from his sources
+is a story you do not run.
 
 ---
 
@@ -43,72 +53,117 @@ happened in the world he follows.
 
 ## Step 1: Read the payload
 
+The trigger sends this as an extra turn on the run:
+
 ```json
-{ "user_id": "...", "routine": "news_roundup", "local_date": "YYYY-MM-DD", "timezone": "Europe/London", "run_token": "<opaque>" }
+{ "user_id": "...", "routine": "news_roundup", "local_date": "YYYY-MM-DD", "timezone": "Europe/London", "period": "morning", "idempotency_key": "...", "run_token": "<opaque>" }
 ```
+
+Use `local_date` and `timezone` as given. If — and only if — no payload arrived,
+say so in the editorial note in Step 6 and fall back to the current date in
+Europe/London; do not silently paper over it.
 
 ## Step 2: Load the sources
 
-Everything in the knowledge/news domain since the previous run:
-
 ```text
-spark__get-events-by-filter-tool(domain: "knowledge", from: "<local_date - 1d>", to: "<local_date>")
+spark__get-day-summary-tool(dates: ["<local_date - 1d>", "<local_date>"], domains: ["knowledge"])
 ```
 
-Newsletters and fetch sources belong to Spark, so this is the ground truth for
-what actually arrived. Use `spark__get-event-tool` and `spark__get-block-tool`
-to open a specific source when a theme depends on what it actually said.
+This is the whole load. It returns, per date, a `knowledge` section holding
+`newsletters[]`, `fetched_content[]` and `bookmarks[]` — each already carrying
+`tldr`, `summary`, `key_takeaways` and an `event_id` — plus a `sync_status`
+block with per-service `event_count` and `last_event_time`.
 
-Use `karakeep__get-bookmark-content` only to read the captured content of a
-source a theme genuinely rests on. Do not browse for material.
+Two days rather than one, because the roundup runs in the morning and a source
+that landed yesterday afternoon has not been covered by any previous run.
 
-**Coverage check.** If the overnight window is empty or clearly partial, that is
-"unknown", not "nothing happened". Do not fill the gap from memory or from the
-open web. Continue to Step 5 and persist an honest roundup saying that source
-coverage was empty or incomplete. This skill reports what Will's own sources
-said, including when those sources were unavailable.
+**Work from these summaries.** They are what the depth in Step 5 is built from,
+and they are the reason this fits in one call. Do not load raw events to get
+started.
 
-## Step 3: Check what is already being tracked
+**Opening an original.** `spark__get-event-tool(id: "<event_id>")` returns the
+full cleaned text of a source — tens of thousands of characters for a long
+newsletter, enough to crowd out the rest of the run. Use it **at most twice**,
+and only when a story's framing genuinely turns on the original wording rather
+than on what the summary says about it. `spark__get-block-tool` fetches a single
+block from an event you have already opened.
+
+`karakeep__get-bookmark-content` reads the captured content of something Will
+saved, when a story rests on it.
+
+## Step 3: Establish coverage from the data, not from impression
+
+Read the numbers before forming any view of whether it was a quiet news day.
+
+| What you observe | What it means | What to do |
+|---|---|---|
+| The call errors, or returns no `knowledge` section | **Flint is broken, not the news** | Stop. Go to Step 6 and report the failure, naming the tool and the error. Never describe this as a quiet day. |
+| `newsletters`, `fetched_content` and `bookmarks` all empty, and `sync_status` shows zero `newsletter` and `fetch` events | A genuinely empty window | Go to Step 6 and say so in one line. |
+| Sources present | Normal | Continue. |
+| Some present, but a service's `last_event_time` is well before the window's end | Partial coverage | Continue, and name the gap in the roundup. |
+
+Record the counts you actually saw — they go into the editorial note in Step 6.
+
+**A failed load must never render as "nothing happened."** The two are
+indistinguishable in the finished prose and only one of them is your fault, so
+the distinction has to be made here, from the data, while you can still see it.
+
+## Step 4: Check what is already being tracked
 
 ```text
-spark__manage-flint-topic(operation: "list", kind: "tactical")
 spark__manage-flint-topic(operation: "list", status: "active")
+spark__get-latest-flint-digest(date: "<local_date - 1d>")
 ```
 
-An unfolding story Flint is already tracking is a continuing thread. Say what
-moved since yesterday rather than reintroducing it from scratch — and if nothing
-moved, leave it out entirely rather than restating it.
+The Topics list says which threads are live. Yesterday's digest says what has
+already been told to Will — a story you covered yesterday needs *what moved*,
+not a reintroduction.
 
-## Step 4: Build the themes
+## Step 5: Choose three stories, and go deep
 
-Group the day's sources by what they are actually about. For each candidate
-theme ask:
+Group what arrived by what it is actually about. Five newsletters covering the
+same story are one candidate; one newsletter covering four things is four.
 
-**Does Will need to know this, or is it just news?**
+**Rank the candidates** by these, strongest first:
 
-A theme survives if at least one holds:
+1. **His sources disagree about it.** Two of his publications reaching different
+   conclusions from the same events is the richest thing available and the thing
+   the day briefing structurally cannot fit. Rank it first whenever it is real.
+2. **It moves a story Flint already tracks** as a Topic.
+3. **Several of his sources independently thought it mattered** — coverage
+   across the feed is genuine signal about significance within it.
+4. **It is a real development in a field he works in or cares about.**
+5. **It bears on something he is planning or deciding.**
 
-- it changes something he is planning or deciding;
-- it moves a story he is already following;
-- it is a genuine development in a field he works in or cares about;
-- several of his sources independently thought it mattered.
+Take the top three. **Aim for three every run** — this is a selection job, not a
+survival test, and the interesting judgement is *which three*, not *how many
+clear the bar*. Do not pad a third slot with something that only got in because
+it was a lead item, was dramatic, or filled space; if the day genuinely only
+carried two stories worth reading, run two and say why in one line. Fewer than
+two means saying plainly that the day was thin, not stretching what there was.
 
-A theme does not survive because it was the lead item, because it is dramatic,
-or because it fills space. Two solid themes beat six thin ones. Zero is a
-legitimate outcome on a quiet day — write one honest line saying so.
+**Write each of the three like this.** Roughly 150–250 words each — long enough
+to be a real read, short enough to be read.
 
-For each surviving theme write:
+- **What happened**, in plain terms, assuming he has not read any of it.
+- **Who said what.** Attribute by publication. Where his sources diverge, say so
+  explicitly and say what the disagreement is actually about — different
+  evidence, different time horizon, or different politics. This is the section
+  that earns the skill its existence; do not flatten four sources into one
+  consensus voice.
+- **What is new** since yesterday's roundup, if it ran, or since the story last
+  appeared.
+- **Why it matters to him**, if it does. A story can be worth knowing without
+  being actionable — say that rather than manufacturing an implication. Never
+  invent a connection to his work or plans.
+- **What to watch next** — the specific thing that would change the picture,
+  with a date if his sources gave one.
 
-- what happened, in plain terms;
-- what is actually new about it versus yesterday;
-- why it matters to Will specifically, if it does — and nothing if it doesn't.
-  A theme can be worth knowing without being actionable; do not manufacture an
-  implication.
+Keep the line between reporting and inference visible throughout. "Playbook
+reported X" and "which suggests Y" are different claims and must read
+differently.
 
-Attribute where it came from. Separate what a source reported from what you are
-inferring.
-
-## Step 5: Write it to Spark
+## Step 6: Write it to Spark
 
 ```text
 spark__create-flint-digest(
@@ -116,25 +171,44 @@ spark__create-flint-digest(
   title: "News roundup — <weekday>",
   date: "<local_date>",
   period: "morning",
-  summary: "<the themes, as prose>",
-  blocks: [ <optional insight blocks> ]
+  summary: "<the three stories, as prose, one section each>",
+  blocks: [ <editorial note, plus any insight blocks> ]
 )
 ```
 
-Prose, a short section per theme. Add a `flint_insight` block only for something
-that stands on its own beyond the roundup — a development that changes a plan or
-bears on a Topic. Most runs need none.
+Pass `run_token` unchanged. It makes a retry return the original digest instead
+of writing a second one, and it is what attributes the digest to this routine so
+it gets its own place in the app rather than being folded into the morning
+briefing.
 
-Always call this write tool, including when there are no qualifying themes or
-source coverage is incomplete. In those cases the summary should plainly state
-the coverage limitation and must not imply that nothing happened.
+Cite what you used: put the `event_id`s a story draws on in that block's
+`referenced_event_ids` so Will can open the sources.
+
+**Always include a `flint_editorial_note` block** recording, in a few lines:
+
+- the source counts from Step 3 — newsletters, fetches, bookmarks;
+- any coverage gap, and the service it was in;
+- the candidates considered and why the three chosen beat the rest;
+- whether a trigger payload arrived;
+- anything you opened in full, and why it was worth the budget.
+
+This block is the only way a bad run is diagnosable after the fact. A roundup
+that reports empty or partial coverage **must** carry it.
+
+Add a `flint_insight` block only for something that stands on its own beyond the
+roundup — a development that changes a plan or bears on a Topic. Most runs need
+none.
 
 Do not write `flint_user_question` blocks; the day briefing owns the question
 budget.
 
-## Step 6: Maintain tactical Topics for unfolding stories
+Call this tool on every run, including a failed load or an empty window. In
+those cases the summary states the limitation plainly and must not imply that
+nothing happened.
 
-This is the part that makes the roundup cumulative rather than disposable.
+## Step 7: Maintain tactical Topics for unfolding stories
+
+This is what makes the roundup cumulative rather than disposable.
 
 **For a story already tracked as a Topic** that moved today:
 
@@ -178,13 +252,19 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 
 # Checklist
 
-- [ ] sources read from Spark, and a thin overnight window reported as unknown
-      rather than filled in;
-- [ ] nothing sourced from outside Will's own feeds;
-- [ ] themes, not an item list; a repeated story appears once;
-- [ ] every theme survives the "does he need to know this" test, and zero themes
-      was available as an answer;
-- [ ] no manufactured implication for a theme that is simply worth knowing;
+- [ ] coverage established from `sync_status` counts and section contents, not
+      from impression;
+- [ ] a failed load reported as a failure naming the tool — never as a quiet day;
+- [ ] three stories, or a stated reason for fewer;
+- [ ] each one written at depth, with sources attributed by publication and any
+      disagreement between them made explicit;
+- [ ] nothing sourced from outside Will's own feeds, including background;
+- [ ] no manufactured implication for a story that is simply worth knowing;
+- [ ] `what to watch next` on every story;
+- [ ] `referenced_event_ids` set on the blocks that draw on sources;
+- [ ] editorial note written, with source counts and the selection reasoning;
+- [ ] at most two originals opened in full;
+- [ ] `run_token` passed through to `create-flint-digest`;
 - [ ] tracked stories that moved were updated and linked; ones that did not move
       were left out;
 - [ ] any new tactical Topic clears all three bars;

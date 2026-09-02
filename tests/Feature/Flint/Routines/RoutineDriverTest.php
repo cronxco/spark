@@ -49,6 +49,38 @@ class RoutineDriverTest extends TestCase
     }
 
     #[Test]
+    public function the_webhook_driver_sends_the_payload_as_the_appended_turn(): void
+    {
+        config([
+            'services.flint_routine.routines.news_roundup.url' => 'https://api.anthropic.test/v1/claude_code/routines/trig_abc/fire',
+            'services.flint_routine.routines.news_roundup.secret' => 'shh',
+        ]);
+        Http::fake(['*' => Http::response(['ok' => true], 200)]);
+
+        $payload = ['routine' => 'news_roundup', 'local_date' => '2026-06-14', 'run_token' => 'tok'];
+        $result = (new WebhookRoutineDriver)->run(User::factory()->create(), 'news_roundup', $payload);
+
+        $this->assertSame('success', $result->status);
+
+        Http::assertSent(function ($request) use ($payload) {
+            // A Routine runs its own configured prompt and ignores the request
+            // body, so the payload has to travel in `text` to reach the session.
+            $this->assertSame(['text'], array_keys($request->data()));
+            $text = $request['text'];
+
+            $this->assertStringContainsString('Flint routine trigger payload', $text);
+            $this->assertSame(
+                $payload,
+                json_decode(substr($text, (int) strpos($text, '{')), true, flags: JSON_THROW_ON_ERROR),
+            );
+
+            return $request->hasHeader('anthropic-version', '2023-06-01')
+                && $request->hasHeader('anthropic-beta', 'experimental-cc-routine-2026-04-01')
+                && $request->hasHeader('Authorization', 'Bearer shh');
+        });
+    }
+
+    #[Test]
     public function the_openai_driver_is_not_applicable_without_a_cronxtools_url(): void
     {
         config(['services.flint_routine.cronxtools_url' => null]);

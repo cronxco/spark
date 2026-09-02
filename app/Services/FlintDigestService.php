@@ -85,20 +85,40 @@ class FlintDigestService
         );
     }
 
-    public function resolveDigestObject(User $user, string $period, Carbon $date): EventObject
+    /**
+     * The EventObject a digest hangs off.
+     *
+     * Keyed on the routine as well as the period, because the once-daily
+     * routines each declare a fixed period ('morning' for the news roundup,
+     * 'evening' for the reading list and topic review) and would otherwise
+     * collapse onto the day briefing's own object — rendering as a second,
+     * competing section of that briefing rather than as their own artefact.
+     * A conversational digest, or the day briefing itself, keeps the original
+     * period-only key.
+     */
+    public function resolveDigestObject(User $user, string $period, Carbon $date, ?string $routine = null): EventObject
     {
+        $ownObject = $routine !== null && $routine !== '' && $routine !== 'digest';
+
         return EventObject::firstOrCreate(
             [
                 'user_id' => $user->id,
                 'concept' => 'digest',
-                'type' => $period . '_digest',
-                'title' => $date->format('Y-m-d') . ' ' . match ($period) {
-                    'morning' => 'AM',
-                    'afternoon' => 'PM',
-                    default => 'EVE',
-                },
+                'type' => ($ownObject ? $routine : $period) . '_digest',
+                'title' => $date->format('Y-m-d') . ' ' . ($ownObject
+                    ? strtoupper(str_replace('_', ' ', $routine))
+                    : match ($period) {
+                        'morning' => 'AM',
+                        'afternoon' => 'PM',
+                        default => 'EVE',
+                    }),
             ],
-            ['time' => now(), 'metadata' => ['service' => 'flint', 'period' => $period, 'generated_at' => now()->toIso8601String()]],
+            ['time' => now(), 'metadata' => array_filter([
+                'service' => 'flint',
+                'period' => $period,
+                'routine' => $ownObject ? $routine : null,
+                'generated_at' => now()->toIso8601String(),
+            ], fn (mixed $value) => $value !== null)],
         );
     }
 
@@ -122,7 +142,7 @@ class FlintDigestService
             return $this->result($existing, $period, true);
         }
 
-        $digest = $this->resolveDigestObject($user, $period, $date);
+        $digest = $this->resolveDigestObject($user, $period, $date, $run['routine'] ?? null);
         $actor = EventObject::firstOrCreate(
             ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
             ['time' => now()],
