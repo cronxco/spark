@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedJsonSecrets;
 use App\Traits\RedactsLoggedProperties;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,13 +38,16 @@ class IntegrationGroup extends Model
      * application boundary per ADR 0018, so a database or backup disclosure does
      * not yield reusable provider credentials. All three are `text` columns and
      * appear in no `where()` clause anywhere in the application, so the cast
-     * needs no schema change and breaks no lookup. Run
-     * `integrations:encrypt-credentials` to convert existing plaintext rows.
+     * needs no schema change and breaks no lookup.
      *
-     * `auth_metadata` stays a plain array: it is `jsonb` and is read through SQL
-     * JSON paths (e.g. `auth_metadata->gocardless_reference`), which whole-column
-     * encryption would break. The API keys some plugins keep inside it are
-     * tracked separately as INT-01 phase 2.
+     * `auth_metadata` is `jsonb` and is read through SQL JSON paths (notably
+     * `auth_metadata->gocardless_reference`), so encrypting the whole column
+     * would break those lookups. EncryptedJsonSecrets encrypts only the secret
+     * leaves — API keys, tokens and Fetch session cookies — and leaves the JSON
+     * structurally valid, so the paths keep working.
+     *
+     * Run `integrations:encrypt-credentials` to convert existing plaintext rows;
+     * both casts read plaintext transparently until then.
      */
     protected $casts = [
         'expiry' => 'datetime',
@@ -51,7 +55,7 @@ class IntegrationGroup extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
-        'auth_metadata' => 'array',
+        'auth_metadata' => EncryptedJsonSecrets::class,
         'access_token' => 'encrypted',
         'refresh_token' => 'encrypted',
         'webhook_secret' => 'encrypted',
