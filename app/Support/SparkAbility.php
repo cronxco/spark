@@ -49,6 +49,7 @@ final class SparkAbility
      * @var array<int, string>
      */
     public const NON_DELEGABLE = ['ios:read', 'ios:write', 'mcp:read'];
+
     /** @var array<string, array<int, string>> */
     private const LEGACY_ALIASES = [
         'data:read' => ['mcp:read'],

@@ -24,6 +24,7 @@ class EncryptIntegrationCredentials extends Command
 {
     /** @var array<int, string> */
     private const ENCRYPTED_COLUMNS = ['access_token', 'refresh_token', 'webhook_secret'];
+
     protected $signature = 'integrations:encrypt-credentials
                             {--batch-size=200 : Number of credential groups to process per batch}
                             {--dry-run : Report what would change without writing}';
