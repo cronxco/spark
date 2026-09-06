@@ -213,6 +213,42 @@ class OAuthController extends Controller
     }
 
     /**
+     * POST /api/v1/mobile/logout
+     *
+     * Ends the calling session server-side: revokes the paired refresh token
+     * and deletes the access token presenting the request.
+     *
+     * Sign-out previously only deleted the client's device registration, so the
+     * access and refresh pair stayed valid until natural expiry — a stolen
+     * device kept working after the user had signed out. Deliberately scoped to
+     * the current credential only: other devices and independently created
+     * personal access tokens are untouched.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $accessToken = $user->currentAccessToken();
+
+        if ($accessToken === null) {
+            return response()->json([], 204);
+        }
+
+        $accessTokenId = $accessToken->getKey();
+
+        DB::transaction(function () use ($user, $accessTokenId) {
+            OAuthRefreshToken::query()
+                ->where('user_id', $user->getKey())
+                ->where('access_token_id', $accessTokenId)
+                ->whereNull('revoked_at')
+                ->update(['revoked_at' => now()]);
+
+            $user->tokens()->whereKey($accessTokenId)->delete();
+        });
+
+        return response()->json([], 204);
+    }
+
+    /**
      * Issue a Sanctum personal access token + paired refresh token.
      *
      * @return array{access_token:string,token_type:string,expires_in:int,refresh_token:string,scope:string}

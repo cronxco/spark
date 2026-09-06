@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
+use App\Support\OwnedTagQuery;
 use App\Services\Api\ResourceVersion;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
@@ -215,59 +216,7 @@ class TagsController extends Controller
 
     private function tagQuery(User $user, ?string $search = null): Builder
     {
-        $integrationIds = $user->integrations()->pluck('id');
-
-        $query = Tag::query()
-            ->select('tags.*')
-            ->selectSub(
-                Event::query()
-                    ->selectRaw('COUNT(*)')
-                    ->join('taggables', function ($join) {
-                        $join->on('taggables.taggable_id', '=', 'events.id')
-                            ->where('taggables.taggable_type', Event::class);
-                    })
-                    ->whereColumn('taggables.tag_id', 'tags.id')
-                    ->whereIn('events.integration_id', $integrationIds),
-                'events_count',
-            )
-            ->selectSub(
-                EventObject::query()
-                    ->selectRaw('COUNT(*)')
-                    ->join('taggables', function ($join) {
-                        $join->on('taggables.taggable_id', '=', 'objects.id')
-                            ->where('taggables.taggable_type', EventObject::class);
-                    })
-                    ->whereColumn('taggables.tag_id', 'tags.id')
-                    ->where('objects.user_id', $user->id),
-                'objects_count',
-            )
-            ->where(function (Builder $query) use ($user, $integrationIds) {
-                $query->whereExists(function ($events) use ($integrationIds) {
-                    $events->selectRaw('1')
-                        ->from('taggables')
-                        ->join('events', 'events.id', '=', 'taggables.taggable_id')
-                        ->whereColumn('taggables.tag_id', 'tags.id')
-                        ->where('taggables.taggable_type', Event::class)
-                        ->whereIn('events.integration_id', $integrationIds);
-                })->orWhereExists(function ($objects) use ($user) {
-                    $objects->selectRaw('1')
-                        ->from('taggables')
-                        ->join('objects', 'objects.id', '=', 'taggables.taggable_id')
-                        ->whereColumn('taggables.tag_id', 'tags.id')
-                        ->where('taggables.taggable_type', EventObject::class)
-                        ->where('objects.user_id', $user->id);
-                });
-            });
-
-        $search = trim((string) $search);
-        if ($search !== '') {
-            $query->where(function (Builder $query) use ($search) {
-                $query->where('name->en', 'ilike', '%' . $search . '%')
-                    ->orWhere('type', 'ilike', '%' . $search . '%');
-            });
-        }
-
-        return $query;
+        return OwnedTagQuery::for($user, $search);
     }
 
     private function withTotals(Collection $tags): Collection

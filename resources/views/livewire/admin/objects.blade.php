@@ -81,7 +81,11 @@ new class extends Component
         try {
             DB::transaction(function () {
                 // Delete objects (soft delete)
-                EventObject::whereIn('id', $this->selectedObjects)->delete();
+                // $selectedObjects is a public Livewire property; re-resolve it
+                // through the owning-user predicate before mutating.
+                EventObject::where('user_id', Auth::id())
+                    ->whereIn('id', $this->selectedObjects)
+                    ->delete();
             });
 
             $count = count($this->selectedObjects);

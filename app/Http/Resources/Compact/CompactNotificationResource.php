@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Compact;
 
+use App\Services\Api\ResourceVersion;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Notifications\DatabaseNotification;
@@ -26,6 +27,11 @@ class CompactNotificationResource extends JsonResource
             'is_read' => $this->read_at !== null,
             'received_at' => $this->created_at?->toJSON(),
             'entity' => $this->entity($data),
+            // The conditional-write version for DELETE /notifications/{id},
+            // which is guarded by `if-match:notification`. Without it on the
+            // list payload a client has no way to satisfy that precondition —
+            // there is no per-notification GET to read the ETag from.
+            'version' => app(ResourceVersion::class)->etag($this->resource),
         ];
     }
 

@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\V1\Mobile\TypedSearchController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController;
 use App\Http\Controllers\Api\V1\Mobile\WidgetsController;
+use App\Http\Controllers\Auth\OAuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -54,6 +55,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('ping', PingController::class)->name('ping');
 
 Route::get('me', MeController::class)->name('me');
+
+/*
+ * Ends the calling session server-side. Gated on ios:read rather than ios:write
+ * so a read-only session can still sign itself out, and deliberately not behind
+ * if-match: signing out must never be blocked by a precondition.
+ */
+Route::post('logout', [OAuthController::class, 'logout'])->name('logout');
 
 Route::get('briefing/today', [BriefingController::class, 'today'])->name('briefing.today');
 
@@ -160,12 +168,22 @@ Route::post('devices', [DevicesController::class, 'register'])->middleware('abil
 Route::post('devices/test', [DevicesController::class, 'test'])->middleware('ability:ios:write')->name('devices.test');
 Route::delete('devices/{id}', [DevicesController::class, 'destroy'])->middleware('ability:ios:write')->name('devices.destroy');
 
+/*
+ * Marking read is an idempotent state transition — replaying it cannot lose an
+ * update — so it carries no If-Match precondition. It previously required one,
+ * which returned 428 for every shipped client: `GET /notifications` exposes no
+ * per-notification version and there is no `GET /notifications/{id}`, so no
+ * client could obtain the strong ETag the middleware demanded.
+ *
+ * Deletion is destructive and keeps its precondition; CompactNotificationResource
+ * now emits `version` so a client can satisfy it.
+ */
 Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
-    ->middleware(['ability:ios:write', 'if-match:user'])
+    ->middleware('ability:ios:write')
     ->name('notifications.read-all');
 
 Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
-    ->middleware(['ability:ios:write', 'if-match:notification'])
+    ->middleware('ability:ios:write')
     ->name('notifications.read');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
@@ -229,8 +247,13 @@ Route::post('bookmarks', [BookmarksController::class, 'store'])
 Route::get('api-tokens', [ApiTokensController::class, 'index'])
     ->name('api-tokens.index');
 
+/*
+ * Token creation requires `tokens:manage`, which OAuthController::scopeToAbilities
+ * never issues to an iOS session. A compromised app session therefore cannot mint
+ * a longer-lived credential for itself.
+ */
 Route::post('api-tokens', [ApiTokensController::class, 'store'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:tokens:manage')
     ->name('api-tokens.store');
 
 Route::delete('api-tokens/{id}', [ApiTokensController::class, 'destroy'])

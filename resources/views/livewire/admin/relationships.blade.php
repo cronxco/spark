@@ -91,7 +91,11 @@ new class extends Component
 
         try {
             DB::transaction(function () {
-                Relationship::whereIn('id', $this->selectedRelationships)->delete();
+                // $selectedRelationships is a public Livewire property; re-resolve
+                // it through the same ownership predicate the listing uses.
+                Relationship::where('user_id', Auth::id())
+                    ->whereIn('id', $this->selectedRelationships)
+                    ->delete();
             });
 
             $count = count($this->selectedRelationships);

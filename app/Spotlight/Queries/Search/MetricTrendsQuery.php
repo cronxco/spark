@@ -3,6 +3,7 @@
 namespace App\Spotlight\Queries\Search;
 
 use App\Models\MetricTrend;
+use Illuminate\Support\Facades\Auth;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -16,7 +17,10 @@ class MetricTrendsQuery
         return SpotlightQuery::forToken('metric', function (string $query, $metricToken) {
             $metricId = $metricToken->getParameter('id');
 
-            $trendsQuery = MetricTrend::where('metric_statistic_id', $metricId);
+            // $metricId arrives from a client-supplied Spotlight token, so the
+            // parent metric's ownership has to be proved rather than assumed.
+            $trendsQuery = MetricTrend::where('metric_statistic_id', $metricId)
+                ->whereHas('metricStatistic', fn ($q) => $q->where('user_id', Auth::id()));
 
             if (! blank($query)) {
                 $trendsQuery->where('type', 'ilike', "%{$query}%");

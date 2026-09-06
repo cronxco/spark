@@ -87,11 +87,18 @@ new class extends Component {
 
         try {
             DB::transaction(function () {
+                // Re-resolve the client-supplied selection through the same
+                // ownership predicate the listing uses. $selectedEvents is a
+                // public Livewire property and cannot be trusted as an authority.
+                $ownedIds = Event::forUser(Auth::id())
+                    ->whereIn('id', $this->selectedEvents)
+                    ->pluck('id');
+
                 // Delete blocks first (cascade)
-                Block::whereIn('event_id', $this->selectedEvents)->delete();
+                Block::whereIn('event_id', $ownedIds)->delete();
 
                 // Delete events
-                Event::whereIn('id', $this->selectedEvents)->delete();
+                Event::whereIn('id', $ownedIds)->delete();
             });
 
             $count = count($this->selectedEvents);

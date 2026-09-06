@@ -31,6 +31,19 @@ class IntegrationGroup extends Model
         'auth_metadata',
     ];
 
+    /**
+     * `access_token`, `refresh_token` and `webhook_secret` are encrypted at the
+     * application boundary per ADR 0018, so a database or backup disclosure does
+     * not yield reusable provider credentials. All three are `text` columns and
+     * appear in no `where()` clause anywhere in the application, so the cast
+     * needs no schema change and breaks no lookup. Run
+     * `integrations:encrypt-credentials` to convert existing plaintext rows.
+     *
+     * `auth_metadata` stays a plain array: it is `jsonb` and is read through SQL
+     * JSON paths (e.g. `auth_metadata->gocardless_reference`), which whole-column
+     * encryption would break. The API keys some plugins keep inside it are
+     * tracked separately as INT-01 phase 2.
+     */
     protected $casts = [
         'expiry' => 'datetime',
         'refresh_expiry' => 'datetime',
@@ -38,6 +51,9 @@ class IntegrationGroup extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
         'auth_metadata' => 'array',
+        'access_token' => 'encrypted',
+        'refresh_token' => 'encrypted',
+        'webhook_secret' => 'encrypted',
     ];
 
     protected static function booted(): void
@@ -112,6 +128,12 @@ class IntegrationGroup extends Model
         return LogOptions::defaults()
             ->useLogName('changelog')
             ->logFillable()
+            // logFillable() reads attributes through their casts, so without
+            // logExcept() the activity log would record decrypted credentials in
+            // its diffs whenever any other fillable attribute changed.
+            // dontLogIfAttributesChangedOnly() does not redact — it only skips
+            // the log when nothing else changed.
+            ->logExcept(['access_token', 'refresh_token', 'webhook_secret', 'auth_metadata'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at', 'access_token', 'refresh_token', 'expiry']);

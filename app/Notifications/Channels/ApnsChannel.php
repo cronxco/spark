@@ -83,6 +83,27 @@ class ApnsChannel
     }
 
     /**
+     * Notification type -> UNNotificationCategory identifier registered by the
+     * iOS client.
+     *
+     * Only failure-shaped notifications currently map: INTEGRATION_FAILED is the
+     * one registered category with matching actions (VIEW, REAUTH). Types absent
+     * from this map are sent without a category, which is a plain notification —
+     * the honest outcome until either the client registers a matching category
+     * or the type is retired. The client's other registered categories (ANOMALY,
+     * DIGEST, NEW_BOOKMARK, CALENDAR_EVENT) have no server-side producer.
+     *
+     * @var array<string, string>
+     */
+    private const CLIENT_CATEGORIES = [
+        'integration_failed' => 'INTEGRATION_FAILED',
+        'integration_authentication_failed' => 'INTEGRATION_FAILED',
+        'fetch_multiple_failures' => 'INTEGRATION_FAILED',
+        'cookie_expiry_warning' => 'INTEGRATION_FAILED',
+        'migration_failed' => 'INTEGRATION_FAILED',
+    ];
+
+    /**
      * Apply the Spark envelope defaults to an outgoing message.
      */
     protected function applySparkEnvelope(ApnMessage $message, Notification $notification): void
@@ -91,8 +112,16 @@ class ApnsChannel
             ? $notification->getNotificationType()
             : null;
 
-        if ($message->category === null && $type !== null) {
-            $message->category($type);
+        // The category identifier selects which UNNotificationCategory — and so
+        // which action buttons — the client shows. It must be one the client
+        // registered, and matching is case-sensitive. Sending the raw snake_case
+        // notification type meant no category ever matched, leaving every
+        // action button inert. threadId is a grouping key only, so the raw type
+        // remains correct there.
+        $category = $type === null ? null : (self::CLIENT_CATEGORIES[$type] ?? null);
+
+        if ($message->category === null && $category !== null) {
+            $message->category($category);
         }
 
         if ($message->threadId === null && $type !== null) {

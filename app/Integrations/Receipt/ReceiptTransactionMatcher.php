@@ -46,8 +46,21 @@ class ReceiptTransactionMatcher
             'time_range' => [$startTime->toIso8601String(), $endTime->toIso8601String()],
         ]);
 
-        // Query BOTH Monzo and GoCardless transactions
-        $candidates = Event::whereIn('service', ['monzo', 'gocardless'])
+        // Query BOTH Monzo and GoCardless transactions, restricted to the user
+        // who owns the receipt. Without this a receipt can be matched to — and
+        // have a relationship written against — another tenant's transaction.
+        $ownerId = $receiptEvent->integration?->user_id;
+
+        if ($ownerId === null) {
+            Log::warning('Receipt: Cannot resolve owning user for receipt', [
+                'receipt_id' => $receiptEvent->id,
+            ]);
+
+            return collect();
+        }
+
+        $candidates = Event::forUser($ownerId)
+            ->whereIn('service', ['monzo', 'gocardless'])
             ->where('domain', 'money')
             ->where(function ($query) {
                 // Monzo payment actions

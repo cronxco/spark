@@ -432,15 +432,37 @@ if (! function_exists('sanitizeHeaders')) {
 /**
  * Sanitize data for logging (remove sensitive data)
  */
+if (! function_exists('sensitive_log_keys')) {
+    /**
+     * Field names whose value is a credential or secret wherever it appears.
+     *
+     * Shared by sanitizeData() and the Sentry redaction hooks so there is one
+     * list to maintain rather than two that drift apart.
+     *
+     * @return array<int, string>
+     */
+    function sensitive_log_keys(): array
+    {
+        return [
+            'password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key',
+            'access_token', 'refresh_token', 'authorization', 'webhook_secret',
+            'server_url', 'cronxtools_url',
+            // `plaintext` is the one-time Sanctum bearer token returned by
+            // ApiTokensController::store.
+            'plaintext', 'plain_text_token', 'bearer',
+        ];
+    }
+}
+
 if (! function_exists('sanitizeData')) {
     function sanitizeData(array $data): array
     {
-        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key', 'access_token', 'refresh_token', 'authorization', 'webhook_secret', 'server_url', 'cronxtools_url'];
+        $sensitiveKeys = sensitive_log_keys();
         $sanitized = [];
 
         foreach ($data as $key => $value) {
-            $lowerKey = strtolower($key);
-            if (in_array($lowerKey, $sensitiveKeys)) {
+            $lowerKey = strtolower((string) $key);
+            if (in_array($lowerKey, $sensitiveKeys, true)) {
                 $sanitized[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $sanitized[$key] = sanitizeData($value);
@@ -493,14 +515,26 @@ if (! function_exists('redact_sensitive_urls')) {
 }
 
 if (! function_exists('redact_sensitive_data')) {
+    /**
+     * Redact secrets from anything on its way to Sentry.
+     *
+     * Two passes: values under a credential-named key are replaced outright,
+     * and every remaining string is scanned for credential-bearing URLs. The
+     * key-based pass matters because the URL scan alone is blind to a bearer
+     * token sitting in a field called `plaintext`.
+     */
     function redact_sensitive_data(mixed $value): mixed
     {
         if (is_string($value)) {
             return redact_sensitive_urls($value);
         }
         if (is_array($value)) {
+            $sensitiveKeys = sensitive_log_keys();
+
             foreach ($value as $key => $item) {
-                $value[$key] = redact_sensitive_data($item);
+                $value[$key] = in_array(strtolower((string) $key), $sensitiveKeys, true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($item);
             }
         }
 
@@ -536,7 +570,9 @@ if (! function_exists('redact_sentry_event')) {
                 $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
             }
             foreach ($breadcrumb->getMetadata() as $key => $metadata) {
-                $copy = $copy->withMetadata($key, redact_sensitive_data($metadata));
+                $copy = $copy->withMetadata($key, in_array(strtolower((string) $key), sensitive_log_keys(), true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($metadata));
             }
 
             return $copy;
@@ -558,8 +594,14 @@ if (! function_exists('redact_sentry_log')) {
     function redact_sentry_log(SentryLog $log): SentryLog
     {
         $log->setBody(redact_sensitive_urls($log->getBody()));
+        $sensitiveKeys = sensitive_log_keys();
         foreach ($log->attributes()->all() as $key => $value) {
-            $log->setAttribute($key, redact_sensitive_data($value));
+            $log->setAttribute(
+                $key,
+                in_array(strtolower((string) $key), $sensitiveKeys, true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($value),
+            );
         }
 
         return $log;
@@ -574,7 +616,9 @@ if (! function_exists('redact_sentry_breadcrumb')) {
             $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
         }
         foreach ($breadcrumb->getMetadata() as $key => $value) {
-            $copy = $copy->withMetadata($key, redact_sensitive_data($value));
+            $copy = $copy->withMetadata($key, in_array(strtolower((string) $key), sensitive_log_keys(), true)
+                ? '[REDACTED]'
+                : redact_sensitive_data($value));
         }
 
         return $copy;

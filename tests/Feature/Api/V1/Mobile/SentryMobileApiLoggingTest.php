@@ -47,18 +47,20 @@ class SentryMobileApiLoggingTest extends TestCase
         $entry = $this->findMobileApiLog($logs);
         $this->assertNotNull($entry);
         $this->assertArrayHasKey('item_count', $entry['context']);
-        $this->assertArrayNotHasKey('data', $entry['context']['response_body'] ?? []);
+        $this->assertArrayNotHasKey('response_body', $entry['context']);
     }
 
     #[Test]
-    public function post_devices_redacts_apns_token_in_request_summary(): void
+    public function post_devices_logs_no_request_body_content(): void
     {
         $logs = $this->collectLogs();
 
         Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
 
+        $canary = str_repeat('a', 64);
+
         $this->postJson('/api/v1/mobile/devices', [
-            'apns_token' => str_repeat('a', 64),
+            'apns_token' => $canary,
             'app_environment' => 'sandbox',
             'bundle_id' => 'co.cronx.spark',
             'app_version' => '1.0.0',
@@ -67,8 +69,9 @@ class SentryMobileApiLoggingTest extends TestCase
 
         $entry = $this->findMobileApiLog($logs);
         $this->assertNotNull($entry);
-        $summary = $entry['context']['request_summary'] ?? [];
-        $this->assertSame('[REDACTED]', $summary['apns_token'] ?? null);
+        $this->assertArrayNotHasKey('request_summary', $entry['context']);
+        $this->assertSame(5, $entry['context']['request_field_count'] ?? null);
+        $this->assertCanaryAbsent($canary, $entry);
     }
 
     #[Test]
@@ -90,9 +93,9 @@ class SentryMobileApiLoggingTest extends TestCase
 
         $entry = $this->findMobileApiLog($logs);
         $this->assertNotNull($entry);
-        $summary = $entry['context']['request_summary'] ?? [];
-        $this->assertSame(3, $summary['sample_count'] ?? null);
-        $this->assertArrayNotHasKey('samples', $summary);
+        $this->assertSame(3, $entry['context']['sample_count'] ?? null);
+        $this->assertArrayNotHasKey('request_summary', $entry['context']);
+        $this->assertCanaryAbsent('HKQuantityTypeIdentifierHeartRate', $entry);
     }
 
     #[Test]
@@ -129,17 +132,66 @@ class SentryMobileApiLoggingTest extends TestCase
     }
 
     #[Test]
-    public function query_parameters_are_captured_in_log_context(): void
+    public function query_parameters_are_not_captured_in_log_context(): void
     {
         $logs = $this->collectLogs();
 
         Sanctum::actingAs(User::factory()->create(), ['ios:read']);
-        // briefing/today accepts a date param and returns a valid response without needing integrations
         $this->getJson('/api/v1/mobile/briefing/today?date=2025-01-01')->assertOk();
 
         $entry = $this->findMobileApiLog($logs);
         $this->assertNotNull($entry);
-        $this->assertSame('2025-01-01', ($entry['context']['query'] ?? [])['date'] ?? null);
+        // A query value can be a search term, a note fragment or an identifier.
+        // Telemetry records the route template, never what the user typed.
+        $this->assertArrayNotHasKey('query', $entry['context']);
+        $this->assertCanaryAbsent('2025-01-01', $entry);
+    }
+
+    #[Test]
+    public function a_minted_token_plaintext_never_reaches_the_log(): void
+    {
+        $logs = $this->collectLogs();
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['ios:read', 'tokens:manage', 'data:read']);
+
+        $response = $this->postJson('/api/v1/mobile/api-tokens', [
+            'name' => 'Canary',
+            'abilities' => ['data:read'],
+        ])->assertStatus(201);
+
+        $plaintext = $response->json('plaintext');
+        $this->assertNotEmpty($plaintext);
+
+        $entry = $this->findMobileApiLog($logs);
+        $this->assertNotNull($entry);
+        // The api-tokens response has no `data` key and is well under the old
+        // 4 KB body limit, so it used to be logged whole — bearer token included.
+        $this->assertCanaryAbsent($plaintext, $entry);
+        $this->assertArrayNotHasKey('response_body', $entry['context']);
+    }
+
+    #[Test]
+    public function log_context_is_limited_to_the_metadata_allowlist(): void
+    {
+        $logs = $this->collectLogs();
+
+        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        $this->getJson('/api/v1/mobile/ping')->assertOk();
+
+        $entry = $this->findMobileApiLog($logs);
+        $this->assertNotNull($entry);
+
+        $permitted = [
+            'route', 'method', 'response_status', 'response_size_bytes', 'duration_ms',
+            'request_field_count', 'sample_count', 'item_count', 'has_more', 'next_cursor',
+        ];
+
+        $this->assertSame(
+            [],
+            array_diff(array_keys($entry['context']), $permitted),
+            'Unexpected key in mobile API telemetry — every logged field must be a bounded, non-identifying enumeration.',
+        );
     }
 
     /** Collects MessageLogged events fired during the test. */
@@ -152,6 +204,16 @@ class SentryMobileApiLoggingTest extends TestCase
         });
 
         return $logs;
+    }
+
+    /** Fails if the canary string appears anywhere in the log entry. */
+    private function assertCanaryAbsent(string $canary, array $entry): void
+    {
+        $this->assertStringNotContainsString(
+            $canary,
+            json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'Sensitive value leaked into mobile API telemetry.',
+        );
     }
 
     /** Returns the first log entry whose message contains 'Mobile API:'. */
