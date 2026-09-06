@@ -216,6 +216,40 @@ Returns the authenticated user's profile. The `id` field is used as the Reverb W
 
 **Response `200`** — [UserProfile](#userprofile)
 
+Carries a strong `ETag` for the user resource. This is the value to echo as
+`If-Match` on routes guarded by `if-match:user`, currently
+`PATCH /settings/notifications`.
+
+> **Changed.** This endpoint previously emitted no explicit `ETag`, so the
+> generic middleware supplied a weak `W/"md5(body)"` that could never equal the
+> strong version the `if-match:user` guard compares against — a client echoing
+> what it read got `412` rather than success.
+
+---
+
+### `POST /logout`
+
+Ends the calling session server-side: revokes the paired OAuth refresh token
+and deletes the access token presenting the request.
+
+Requires only `ios:read`, so a read-only session can still sign itself out, and
+carries **no `If-Match`** — signing out must never be blocked by a
+precondition.
+
+Scoped to the current credential alone. Other devices and any personal access
+tokens the user created separately are untouched.
+
+**Response `204`** — No content. The bearer token used for this request is now
+invalid and will return `401`.
+
+> **New.** There was previously no logout or revocation endpoint on the mobile
+> surface at all. Sign-out revoked the client's device registration only, so the
+> access and refresh pair stayed valid until natural expiry.
+
+The client is responsible for the local half of sign-out — Keychain, SwiftData,
+App Group defaults, Core Spotlight, widgets and delivered notifications. See
+`docs/P0_CONTAINMENT_PROPOSALS.md` in `spark-ios`.
+
 ---
 
 ### `GET /briefing/today`
@@ -474,7 +508,8 @@ Cursor-paginated reverse-chronological inbox of the user's database notification
             "entity": {
                 "kind": "integration",
                 "id": "uuid"
-            }
+            },
+            "version": "\"9f2c…\""
         }
     ],
     "next_cursor": "opaque-cursor",
@@ -1218,7 +1253,8 @@ All write endpoints require `ios:write` ability.
 | `DELETE` | `/money/accounts/{id}`             | Archive a manual finance account     |
 | `POST`   | `/money/accounts/{id}/balances`    | Add a balance entry                  |
 | `POST`   | `/devices/test`                     | Send a test push notification        |
-| `POST`   | `/api-tokens`                        | Create a personal access token         |
+| `POST`   | `/logout`                            | End the calling session (revokes this token and its refresh token) |
+| `POST`   | `/api-tokens`                        | Create a personal access token (requires `tokens:manage`; unreachable from an iOS session) |
 | `DELETE` | `/api-tokens/{id}`                   | Revoke a personal access token         |
 
 ---
@@ -1656,6 +1692,12 @@ endpoint can't be used to inspect or revoke the mobile app's own session.
 
 Creates a personal access token and returns its one-time plaintext secret.
 
+> **Requires `tokens:manage`.** An iOS OAuth session is only ever issued
+> `ios:read`/`ios:write` (see `OAuthController::scopeToAbilities`), so this
+> endpoint is **not reachable from the app** and returns `403`. Token
+> administration is a web-settings journey. The route remains registered so a
+> non-mobile credential holding `tokens:manage` can use it.
+
 **Request Body**
 
 ```json
@@ -1665,11 +1707,18 @@ Creates a personal access token and returns its one-time plaintext secret.
 }
 ```
 
-`name` is required (max 255 chars). `abilities` is optional (up to 20
-distinct strings); omit it for a full-access (`*`) token. Any
-`ios:read`/`ios:write` ability in the request is silently dropped — a
-mobile-managed token can never grant itself the app's own session scopes.
-If dropping those leaves the list empty, the token falls back to `*`.
+`name` is required (max 255 chars). `abilities` is **required** — between 1
+and 20 distinct strings, each of which must appear in
+`SparkAbility::DELEGABLE`:
+
+`bookmark:write`, `data:image`, `data:read`, `data:write`, `finance:read`,
+`finance:write`, `flint:read`, `flint:run`, `flint:write`, `insights:read`,
+`insights:write`, `integrations:read`, `integrations:sync`, `tokens:manage`
+
+Authority attenuates: a token-authenticated caller may only request
+capabilities its own credential already holds. `ios:read`, `ios:write` and
+`mcp:read` are never delegable — `mcp:read` remains accepted on existing
+tokens as a legacy alias, but new tokens must name the capability they need.
 
 **Response `201`**
 
@@ -1681,7 +1730,23 @@ If dropping those leaves the list empty, the token falls back to `*`.
 }
 ```
 
-`plaintext` is shown only in this response — it cannot be retrieved again.
+`plaintext` is shown only in this response — it cannot be retrieved again. It
+is a bearer credential: it is excluded from application telemetry and must
+never be logged.
+
+**Response `403`** — The requested capabilities exceed those of the credential
+making the request.
+
+**Response `422`** — `abilities` omitted, empty, or containing an unknown or
+non-delegable value (including `*` and `ios:*`).
+
+> **Changed.** This endpoint previously accepted arbitrary ability strings,
+> defaulted a missing `abilities` to `["*"]`, and — because it stripped
+> `ios:*` scopes before checking emptiness — also returned `["*"]` when the
+> request asked for *only* those scopes. A `["*"]` token satisfies every
+> capability check in the application, so an iOS session could mint itself
+> full authority. Callers that relied on the wildcard default must now name
+> their capabilities.
 
 ---
 
@@ -1892,9 +1957,10 @@ Acknowledges a metric anomaly, optionally suppressing future alerts until a date
 
 ### `POST /notifications/{id}/read`
 
-Marks a single notification as read.
+Marks a single notification as read. **No `If-Match` required** — marking read
+is idempotent, so there is no update to lose.
 
-**Response `204`** — No content.
+**Response `204`** — No content. Carries the notification's refreshed `ETag`.
 
 **Response `404`** — Notification not found or belongs to another user.
 
@@ -1902,9 +1968,20 @@ Marks a single notification as read.
 
 ### `POST /notifications/read-all`
 
-Marks all unread notifications for the authenticated user as read.
+Marks all unread notifications for the authenticated user as read. **No
+`If-Match` required.**
 
-**Response `204`** — No content.
+**Response `204`** — No content. Carries the user's refreshed `ETag`.
+
+---
+
+> **Changed.** Both routes above previously required `If-Match` and returned
+> `428` without one. That precondition was unsatisfiable: the list payload
+> exposed no per-notification version and there is no per-notification `GET`,
+> so no client could obtain the strong ETag the guard compared against. Every
+> shipped inbox control therefore failed. The precondition has been removed
+> from these two idempotent transitions and retained on `DELETE`, which now
+> has a version to compare against.
 
 ---
 
@@ -1912,9 +1989,17 @@ Marks all unread notifications for the authenticated user as read.
 
 Deletes a single notification from the authenticated user's inbox.
 
+**Requires `If-Match`** with the notification's current version — the `version`
+field on each item in `GET /notifications`.
+
 **Response `204`** — No content.
 
 **Response `404`** — Notification not found or belongs to another user.
+
+**Response `428`** — `If-Match` header missing.
+
+**Response `412`** — `If-Match` does not match the notification's current
+version; re-read the list and retry.
 
 ### `POST /knowledge/events/{id}/reprocess`
 
@@ -2119,7 +2204,8 @@ shapes.
     "entity": {
         "kind": "integration",
         "id": "uuid"
-    }
+    },
+    "version": "\"9f2c…\""
 }
 ```
 
@@ -2132,6 +2218,7 @@ shapes.
 | `is_read`     | boolean | `true` when `read_at` is set                               |
 | `received_at` | string  | ISO timestamp for notification creation                    |
 | `entity`      | object  | Optional deep-link target with `kind` and `id`             |
+| `version`     | string  | Strong entity tag; send as `If-Match` on `DELETE /notifications/{id}` |
 
 `body`, `domain`, and `entity` are `null` when not present. `entity.kind` is one of `event`, `object`, `metric`, `place`, `anomaly`, or `integration`.
 
