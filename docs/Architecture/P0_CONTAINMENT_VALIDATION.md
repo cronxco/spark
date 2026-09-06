@@ -14,15 +14,15 @@ exists rather than introducing new infrastructure.
 
 **Constraint honoured throughout:** no database migration is proposed. ADR 0003/0004 already record a Product Owner
 decision to keep tenancy application-enforced and to defer retrospective schema hardening, so staying application-layer
-is both the cautious choice and the one already ratified. Where a finding *cannot* be fixed without a migration
+is both the cautious choice and the one already ratified. Where a finding _cannot_ be fixed without a migration
 (PSEC-08 phase 2), the plan says so explicitly and stops rather than proposing one.
 
 ### Drift since the audit
 
-| Repo | Audit SHA | Current | Drift |
-|---|---|---|---|
-| `spark` | `08b54853` | `32d94f6` | 4 commits, all unrelated bugfixes. Findings carry over intact. |
-| `spark-ios` | `1dc11161` | `74f595a` (main) | **The audit SHA is not on `main`.** It is `origin/feature/mobile-api-implementation`, 4 commits *ahead* of main. |
+| Repo        | Audit SHA  | Current          | Drift                                                                                                            |
+| ----------- | ---------- | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `spark`     | `08b54853` | `32d94f6`        | 4 commits, all unrelated bugfixes. Findings carry over intact.                                                   |
+| `spark-ios` | `1dc11161` | `74f595a` (main) | **The audit SHA is not on `main`.** It is `origin/feature/mobile-api-implementation`, 4 commits _ahead_ of main. |
 
 The iOS drift is material and is treated as a first-class finding below.
 
@@ -35,17 +35,17 @@ Will, so every mobile-surface finding below is real shipped exposure rather than
 
 ## Validation summary
 
-| ID | Package | Audit status | **Validated status** | Migration needed |
-|---|---|---|---|---|
-| PSEC-01 | Token & telemetry containment (APO-01) | P0 Shipped | **Confirmed — worse than recorded** | No |
-| PSEC-02a | Telemetry payloads (APO-02) | P0 Shipped | **Confirmed** | No |
-| PSEC-02b | Tenant-seal read/write paths | P0 Shipped | **Mostly confirmed; 1 item already fixed, 2 broader** | No |
-| PSEC-03 | Global cache flush (APO-04) | P0 Shipped | **Confirmed** | No |
-| PSEC-04 | Logout / account-switch purge (TA-01) | P0 Partial | **Confirmed — worse than recorded** | No |
-| PSEC-05 | Raw presentation (TA-02) | P0 Shipped | **Confirmed, different mechanism** | No |
-| PSEC-06 | Share capture (CC-05) | P0 Shipped | **Confirmed; audit wrong on the cause** | No |
-| PSEC-07 | Native notification contract (NOTIF-01/02) | P0 Shipped | **Confirmed — contract is unsatisfiable** | No |
-| PSEC-08 | Connector credential encryption (INT-01) | P0 Planned | **Confirmed; partly fixable, partly blocked** | Phase 1 no / phase 2 yes |
+| ID       | Package                                    | Audit status | **Validated status**                                  | Migration needed         |
+| -------- | ------------------------------------------ | ------------ | ----------------------------------------------------- | ------------------------ |
+| PSEC-01  | Token & telemetry containment (APO-01)     | P0 Shipped   | **Confirmed — worse than recorded**                   | No                       |
+| PSEC-02a | Telemetry payloads (APO-02)                | P0 Shipped   | **Confirmed**                                         | No                       |
+| PSEC-02b | Tenant-seal read/write paths               | P0 Shipped   | **Mostly confirmed; 1 item already fixed, 2 broader** | No                       |
+| PSEC-03  | Global cache flush (APO-04)                | P0 Shipped   | **Confirmed**                                         | No                       |
+| PSEC-04  | Logout / account-switch purge (TA-01)      | P0 Partial   | **Confirmed — worse than recorded**                   | No                       |
+| PSEC-05  | Raw presentation (TA-02)                   | P0 Shipped   | **Confirmed, different mechanism**                    | No                       |
+| PSEC-06  | Share capture (CC-05)                      | P0 Shipped   | **Confirmed; audit wrong on the cause**               | No                       |
+| PSEC-07  | Native notification contract (NOTIF-01/02) | P0 Shipped   | **Confirmed — contract is unsatisfiable**             | No                       |
+| PSEC-08  | Connector credential encryption (INT-01)   | P0 Planned   | **Confirmed; partly fixable, partly blocked**         | Phase 1 no / phase 2 yes |
 
 ### Corrections to the audit record
 
@@ -56,7 +56,7 @@ Will, so every mobile-surface finding below is real shipped exposure rather than
    belongs under CC-01.
 2. **EOB-01 (tags) is half fixed.** `Api/V1/Mobile/TagsController::tagQuery()` (line 216) is a correct
    ownership-derived implementation. The leak survives only on the **web** catalogue.
-3. **APO-03 is broader than recorded.** The audit said admin *listings* were scoped. For
+3. **APO-03 is broader than recorded.** The audit said admin _listings_ were scoped. For
    `task-pipeline-overview.blade.php` they are not — six unscoped read queries including
    `getRecentFailuresProperty` (line 253), which exposes other users' error text. Two components the audit never
    named (`pending-links.blade.php`, admin `search.blade.php`) have the same defect;
@@ -79,12 +79,12 @@ Will, so every mobile-surface finding below is real shipped exposure rather than
 
 **Validated: confirmed, and the escalation path is live.** Four independent wildcard vectors:
 
-| Site | Behaviour |
-|---|---|
-| `app/Http/Controllers/Api/V1/Mobile/ApiTokensController.php:51` | `$abilities = array_values($validated['abilities'] ?? ['*']);` |
-| same, `:54-58` | strips `ios:read`/`ios:write`, then `if (empty($abilities)) { $abilities = ['*']; }` — so requesting *only* iOS scopes yields a wildcard token |
-| `routes/api.php:69` | legacy `POST /api/tokens/create` calls `createToken($name)` with abilities omitted → `['*']` |
-| `resources/views/livewire/settings/api-tokens.blade.php:68` | web settings, same omission → `['*']` |
+| Site                                                            | Behaviour                                                                                                                                      |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/Http/Controllers/Api/V1/Mobile/ApiTokensController.php:51` | `$abilities = array_values($validated['abilities'] ?? ['*']);`                                                                                 |
+| same, `:54-58`                                                  | strips `ios:read`/`ios:write`, then `if (empty($abilities)) { $abilities = ['*']; }` — so requesting _only_ iOS scopes yields a wildcard token |
+| `routes/api.php:69`                                             | legacy `POST /api/tokens/create` calls `createToken($name)` with abilities omitted → `['*']`                                                   |
+| `resources/views/livewire/settings/api-tokens.blade.php:68`     | web settings, same omission → `['*']`                                                                                                          |
 
 The route is gated on `ability:ios:write` (`routes/mobile.php:233`), which an ordinary iOS OAuth session holds. Because
 `SparkAbility::allows()` (`app/Support/SparkAbility.php:32`) delegates to `tokenCan()`, and `tokenCan()` returns true
@@ -153,7 +153,7 @@ retention/deletion response — again the user's call, not code.
 ## PSEC-02b — Tenant-seal shipped read/write paths
 
 **Validated per component.** No policy layer and no global scopes exist on `Event`/`Block`/`EventObject`, so every fix
-is an explicit call-site change. Four *correct* patterns already exist in-repo and should be copied rather than
+is an explicit call-site change. Four _correct_ patterns already exist in-repo and should be copied rather than
 replaced: `app/Traits/AuthorizesOwnership.php`, `app/Services/Mobile/SearchDispatcher.php` (correct in all five modes),
 `TagsController::tagQuery()`, and `MetricIdentifierMap::resolve()`. `TaskExecution::scopeForUser()`
 (`app/Models/TaskExecution.php:51`) exists and sits unused beside the code that needs it.
@@ -164,7 +164,7 @@ Listings are scoped; mutations are not. Unscoped `whereIn` deletes in
 `resources/views/livewire/admin/{events:91,events:94,objects:84,blocks:85,relationships:94}.blade.php`, all driven by a
 public Livewire `$selected*` array. `bin.blade.php:310` resolves IDs through an unscoped `findDeletedItem()` feeding
 both `bulkRestore` and `bulkDelete`, and cascades to an unscoped **hard** delete at lines 181-197.
-`task-pipeline-overview.blade.php` is unscoped in six read properties *and* at `:358`/`:363` (`TaskExecution::find`) and
+`task-pipeline-overview.blade.php` is unscoped in six read properties _and_ at `:358`/`:363` (`TaskExecution::find`) and
 `:377` (`Event::find`), the last feeding a `ProcessTaskPipelineJob` write against another user's event. Not in the
 audit: `pending-links.blade.php` (4 unscoped `Relationship` mutations) and `search.blade.php:88` (every user's raw
 search strings). `sense-check.blade.php` contains no ownership reference at all and needs its own pass.
@@ -178,7 +178,7 @@ and the roadmap's own recommendation, and defers the separate global-operator ro
 
 Eight unscoped query classes registered at `app/Providers/SpotlightServiceProvider.php:314-318`:
 `EventSearchQuery:23`, `ObjectSearchQuery:23`, `BlockSearchQuery:23`, `TagSearchQuery:18`, `MetricSearchQuery:17`,
-`MetricTrendsQuery:19`, `FinancialAccountSearchQuery:22` (leaks other users' account names *and* balances),
+`MetricTrendsQuery:19`, `FinancialAccountSearchQuery:22` (leaks other users' account names _and_ balances),
 `IntegrationEventsQuery:19`. Semantic search, mobile and the legacy `/api` search routes are all correctly scoped —
 `SemanticSearchQuery.php:58,67` is the in-file reference implementation. Exposure is palette metadata: the `jump_to`
 targets do enforce `authorizeOwner`.
@@ -269,9 +269,9 @@ The codebase already knows how: `app/Models/LiveActivityToken.php:42` uses `'pus
    decrypts, and re-saves through the cast. A command, not a migration — it is re-runnable, interruptible, and
    reversible, none of which a migration gives you here.
 3. **Fix the activity-log leak this exposes.** `IntegrationGroup` uses `LogsActivity` with `->logFillable()`
-   (line 114), and `dontLogIfAttributesChangedOnly([...])` (line 117) only suppresses the log when *nothing else*
+   (line 114), and `dontLogIfAttributesChangedOnly([...])` (line 117) only suppresses the log when _nothing else_
    changed — it does not redact. Because Spatie reads attributes through casts, adding the encrypted cast would log the
-   *decrypted* value. Add `->logExcept(['access_token','refresh_token','webhook_secret','auth_metadata'])`.
+   _decrypted_ value. Add `->logExcept(['access_token','refresh_token','webhook_secret','auth_metadata'])`.
    **This is a new finding the audit did not record**, and existing `activity_log` rows already hold plaintext
    credentials — a data-remediation item for the user to decide.
 4. Correct the false "stored encrypted" copy in `HevyPlugin::getConfigurationSchema()`.
@@ -293,8 +293,8 @@ The audit read `1dc11161` = `origin/feature/mobile-api-implementation`, four com
 itself a revert of `0179382` "Complete mobile API foundations and tags", −1148 lines).
 
 **All four iOS findings are present identically on both.** `git diff 74f595a origin/feature/mobile-api-implementation`
-is *empty* for `AppModel.swift`, `AuthenticationService.swift`, `KeychainTokenStore.swift`, `Extensions/SparkShare/`,
-`SparkApp.swift` and `Project.swift`. So the branch question does not change *what* is broken — but it does change one
+is _empty_ for `AppModel.swift`, `AuthenticationService.swift`, `KeychainTokenStore.swift`, `Extensions/SparkShare/`,
+`SparkApp.swift` and `Project.swift`. So the branch question does not change _what_ is broken — but it does change one
 fix's cost, noted under PSEC-07.
 
 CI is green on both (`ios.yml` runs #29 and #32). Relevant coverage gap: **`SparkShare` is never built by CI** — it is
@@ -329,7 +329,7 @@ and the server device row (best effort).
   to retry**, and nothing is enqueued.
 
 **Backend: there is no logout endpoint at all.** `routes/mobile.php` (302 lines) has no `logout` and no `oauth/revoke`;
-`OAuthController` has only `authorize/approve/deny/token/refresh`. `routes/auth.php:35` is the *web session* logout.
+`OAuthController` has only `authorize/approve/deny/token/refresh`. `routes/auth.php:35` is the _web session_ logout.
 So **the Sanctum access and refresh tokens stay valid until natural expiry after every sign-out.** Only the push
 subscription is revoked (`routes/mobile.php:161`).
 
@@ -401,7 +401,7 @@ The problem is `ShareViewController.syncAccessToken()`
 
 Consequences: `scheduleBackgroundImageUpload` (lines 106-135) opens with
 `guard let token = syncAccessToken() else { return }` and therefore **never creates the upload task at all** — while
-`shareImage`/`shareImageData` (lines 86-104) have *already* shown "Photo saved to Spark." and called `complete()`
+`shareImage`/`shareImageData` (lines 86-104) have _already_ shown "Photo saved to Spark." and called `complete()`
 unconditionally, before any network call. The JPEG is written to `group.co.cronx.sparkapp/ShareUploads/<uuid>.jpg` and
 nothing ever picks it up. The telemetry event even reports `outcome: .success` before `resume()`, on the path that
 never runs.
@@ -466,7 +466,7 @@ categories (`SparkApp.swift:197-226`): `ANOMALY`, `DIGEST`, `INTEGRATION_FAILED`
 Deep links are broken independently: the server nests everything under `userInfo["spark"]["deep_link"]`
 (`ApnsChannel.php:102-119`); the client reads a flat `userInfo["spark.url"]` (`SparkApp.swift:138-152`) that is never
 emitted, then routes via `UIApplication.shared.open` rather than the in-app `pendingRoute`. **Tapping any notification
-does nothing.** (The silent companion push *is* aligned and works.)
+does nothing.** (The silent companion push _is_ aligned and works.)
 
 A third vocabulary exists: `NotificationPreferencesController::CATEGORIES` is the lowercase form of the client's five,
 but only `integration_failed` corresponds to a real notification class — so **four of the five preference toggles gate
@@ -499,16 +499,16 @@ No migration. Item 1 is a **product decision** as much as a code change — see 
 Commit `f6562fd` on `claude/spark-product-priorities-b49ppr` implements the backend subset. No migration was
 introduced.
 
-| Item | Landed |
-|---|---|
-| PSEC-01 | `SparkAbility::DELEGABLE` + `canDelegate()`; `ApiTokensController::store` rewritten; `tokens:manage` gate on `routes/mobile.php`; explicit abilities at `routes/api.php` and the web settings form (now with a capability picker) |
-| PSEC-02a | `SentryMobileApiLogging` inverted to a metadata allowlist; `sensitive_log_keys()` extracted and wired into every Sentry hook; `plaintext` added to the key list |
-| PSEC-02b | Ownership re-resolved at 20+ call sites across admin, Spotlight, receipts and tags; `OwnedTagQuery` extracted and shared with the mobile controller |
-| PSEC-03 | `POST /api/clear-card-cache` deleted |
-| PSEC-04 (server) | `POST /api/v1/mobile/logout` |
-| PSEC-05 (web) | malformed Blade in `objects/show.blade.php` repaired |
-| PSEC-07 (server) | If-Match dropped from the two idempotent notification routes; `version` on `CompactNotificationResource`; strong ETag from `MeController`; `ApnsChannel::CLIENT_CATEGORIES` |
-| PSEC-08 phase 1 | three `encrypted` casts; `integrations:encrypt-credentials` backfill command; `logExcept()`; Hevy copy corrected |
+| Item             | Landed                                                                                                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PSEC-01          | `SparkAbility::DELEGABLE` + `canDelegate()`; `ApiTokensController::store` rewritten; `tokens:manage` gate on `routes/mobile.php`; explicit abilities at `routes/api.php` and the web settings form (now with a capability picker) |
+| PSEC-02a         | `SentryMobileApiLogging` inverted to a metadata allowlist; `sensitive_log_keys()` extracted and wired into every Sentry hook; `plaintext` added to the key list                                                                   |
+| PSEC-02b         | Ownership re-resolved at 20+ call sites across admin, Spotlight, receipts and tags; `OwnedTagQuery` extracted and shared with the mobile controller                                                                               |
+| PSEC-03          | `POST /api/clear-card-cache` deleted                                                                                                                                                                                              |
+| PSEC-04 (server) | `POST /api/v1/mobile/logout`                                                                                                                                                                                                      |
+| PSEC-05 (web)    | malformed Blade in `objects/show.blade.php` repaired                                                                                                                                                                              |
+| PSEC-07 (server) | If-Match dropped from the two idempotent notification routes; `version` on `CompactNotificationResource`; strong ETag from `MeController`; `ApnsChannel::CLIENT_CATEGORIES`                                                       |
+| PSEC-08 phase 1  | three `encrypted` casts; `integrations:encrypt-credentials` backfill command; `logExcept()`; Hevy copy corrected                                                                                                                  |
 
 Nine test files added or rewritten, all using `#[Test]`.
 
@@ -550,9 +550,26 @@ zero-test run. Until that is fixed, "the regression tests pass" means less than 
 
 ## Verification
 
-**Nothing here has been executed.** `composer install` cannot complete in this container: `wire-elements/pro` is a
-licensed package served from a private repository and no `auth.json` is present, so there is no vendor tree and
-therefore no PHPUnit, Pint or Duster. Verification below is what needs running in Sail.
+**The suite has been run.** `composer install` initially failed — `wire-elements/pro` is a licensed package served
+from a private repository with no `auth.json` present — so a minimal local stub of the nine classes Spark actually
+uses (plus the icon shims `config/wire-elements-pro.php` references) was built in a scratch directory,
+`composer.lock`'s `dist` pointed at it, and Postgres 16 installed with PostGIS and pgvector.
+**`composer.json` and `composer.lock` are unmodified in git** — the stub never enters the repository.
+
+Results: **1805 tests, 8 errors, 34 failures — the same error and failure counts as `dev`, with 57 more tests
+passing.** The failure _set_ is identical: no regressions. All 73 assertions across the ten containment test files
+pass, and three canary checks (Spotlight scoping, admin bulk delete, telemetry token leak) confirmed those tests
+go red against the pre-fix code. `duster fix` is clean.
+
+Two caveats from the stub: `Unable to find component: [spotlight-pro]` fails on both branches, and the Spotlight
+assertions exercise a stubbed palette API — the Eloquent queries under test are real, but the palette wiring is
+not. Re-run under Sail with the real package before treating those two as settled.
+
+Twelve pre-existing tests needed updating because they encoded the old behaviour; see the commit for detail. The
+`TaskPipelineAdminTest` group is the notable one — its factory gave each execution a different owner from the
+acting admin, so every assertion depended on the console showing another tenant's rows.
+
+The commands below are what to run in Sail.
 
 **Backend** — per CLAUDE.md, everything through Sail, minimum tests by filter:
 
