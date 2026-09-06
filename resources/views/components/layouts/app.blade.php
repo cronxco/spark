@@ -127,15 +127,13 @@
                                 }
                                 keysToRemove.forEach(key => localStorage.removeItem(key));
 
-                                // Clear server-side cache via API
-                                fetch('/api/clear-card-cache', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-                                    }
-                                }).catch(err => console.error('Failed to clear cache:', err));
-
+                                /*
+                                 * The server-side call this used to make hit
+                                 * /api/clear-card-cache, which flushed every
+                                 * tenant's cache and has been removed. Card view
+                                 * history lives in localStorage, cleared above, so
+                                 * the control still does what it says.
+                                 */
                                 alert('Card view history cleared! All cards will show again on your next visit.');
                                 window.location.reload();
                             }
