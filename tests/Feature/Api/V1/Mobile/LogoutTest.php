@@ -6,6 +6,7 @@ use App\Models\OAuthRefreshToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\NewAccessToken;
+use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -24,23 +25,6 @@ class LogoutTest extends TestCase
     {
         parent::setUp();
         config(['ios.mobile_api_enabled' => true]);
-    }
-
-    /**
-     * Issue a real iOS session token and return [plaintext, model].
-     *
-     * This endpoint acts on the identity of the calling token, and Sanctum's
-     * actingAs() helper installs a mock with no usable key — so these tests
-     * authenticate over the wire like the app does.
-     *
-     * @return array{0: string, 1: \Laravel\Sanctum\PersonalAccessToken}
-     */
-    private function issueSession(User $user): array
-    {
-        /** @var NewAccessToken $issued */
-        $issued = $user->createToken('iPhone', ['ios:read', 'ios:write']);
-
-        return [$issued->plainTextToken, $issued->accessToken];
     }
 
     #[Test]
@@ -141,5 +125,22 @@ class LogoutTest extends TestCase
         $this->withToken($issued->plainTextToken)
             ->postJson('/api/v1/mobile/logout')
             ->assertStatus(204);
+    }
+
+    /**
+     * Issue a real iOS session token and return [plaintext, model].
+     *
+     * This endpoint acts on the identity of the calling token, and Sanctum's
+     * actingAs() helper installs a mock with no usable key — so these tests
+     * authenticate over the wire like the app does.
+     *
+     * @return array{0: string, 1: PersonalAccessToken}
+     */
+    private function issueSession(User $user): array
+    {
+        /** @var NewAccessToken $issued */
+        $issued = $user->createToken('iPhone', ['ios:read', 'ios:write']);
+
+        return [$issued->plainTextToken, $issued->accessToken];
     }
 }

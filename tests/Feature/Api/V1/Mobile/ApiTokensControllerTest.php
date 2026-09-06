@@ -12,8 +12,6 @@ class ApiTokensControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $user;
-
     /**
      * The abilities a credential needs to reach the creation endpoint at all.
      * An iOS OAuth session never holds `tokens:manage`.
@@ -21,6 +19,8 @@ class ApiTokensControllerTest extends TestCase
      * @var array<int, string>
      */
     private const MANAGER = ['ios:read', 'tokens:manage', 'data:read', 'insights:read'];
+
+    protected User $user;
 
     protected function setUp(): void
     {

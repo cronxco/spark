@@ -22,6 +22,27 @@ class ApnsChannel
         'Unregistered',
     ];
 
+    /**
+     * Notification type -> UNNotificationCategory identifier registered by the
+     * iOS client.
+     *
+     * Only failure-shaped notifications currently map: INTEGRATION_FAILED is the
+     * one registered category with matching actions (VIEW, REAUTH). Types absent
+     * from this map are sent without a category, which is a plain notification —
+     * the honest outcome until either the client registers a matching category
+     * or the type is retired. The client's other registered categories (ANOMALY,
+     * DIGEST, NEW_BOOKMARK, CALENDAR_EVENT) have no server-side producer.
+     *
+     * @var array<string, string>
+     */
+    private const CLIENT_CATEGORIES = [
+        'integration_failed' => 'INTEGRATION_FAILED',
+        'integration_authentication_failed' => 'INTEGRATION_FAILED',
+        'fetch_multiple_failures' => 'INTEGRATION_FAILED',
+        'cookie_expiry_warning' => 'INTEGRATION_FAILED',
+        'migration_failed' => 'INTEGRATION_FAILED',
+    ];
+
     public function __construct(
         protected Client $client,
         protected Dispatcher $events,
@@ -81,27 +102,6 @@ class ApnsChannel
 
         return $responses;
     }
-
-    /**
-     * Notification type -> UNNotificationCategory identifier registered by the
-     * iOS client.
-     *
-     * Only failure-shaped notifications currently map: INTEGRATION_FAILED is the
-     * one registered category with matching actions (VIEW, REAUTH). Types absent
-     * from this map are sent without a category, which is a plain notification —
-     * the honest outcome until either the client registers a matching category
-     * or the type is retired. The client's other registered categories (ANOMALY,
-     * DIGEST, NEW_BOOKMARK, CALENDAR_EVENT) have no server-side producer.
-     *
-     * @var array<string, string>
-     */
-    private const CLIENT_CATEGORIES = [
-        'integration_failed' => 'INTEGRATION_FAILED',
-        'integration_authentication_failed' => 'INTEGRATION_FAILED',
-        'fetch_multiple_failures' => 'INTEGRATION_FAILED',
-        'cookie_expiry_warning' => 'INTEGRATION_FAILED',
-        'migration_failed' => 'INTEGRATION_FAILED',
-    ];
 
     /**
      * Apply the Spark envelope defaults to an outgoing message.

@@ -13,8 +13,10 @@ use App\Spotlight\Queries\Search\EventSearchQuery;
 use App\Spotlight\Queries\Search\FinancialAccountSearchQuery;
 use App\Spotlight\Queries\Search\MetricSearchQuery;
 use App\Spotlight\Queries\Search\ObjectSearchQuery;
+use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionObject;
 use Tests\TestCase;
 
 /**
@@ -40,11 +42,6 @@ class SpotlightSearchTenancyTest extends TestCase
 
         $this->alice = User::factory()->create();
         $this->bob = User::factory()->create();
-    }
-
-    private function integrationFor(User $user): Integration
-    {
-        return Integration::factory()->create(['user_id' => $user->id]);
     }
 
     #[Test]
@@ -146,6 +143,11 @@ class SpotlightSearchTenancyTest extends TestCase
         $this->assertCount(0, $results);
     }
 
+    private function integrationFor(User $user): Integration
+    {
+        return Integration::factory()->create(['user_id' => $user->id]);
+    }
+
     /**
      * Extract the closure a SpotlightQuery wraps so it can be invoked directly
      * without booting the palette component.
@@ -158,13 +160,13 @@ class SpotlightSearchTenancyTest extends TestCase
             }
         }
 
-        $reflection = new \ReflectionObject($spotlightQuery);
+        $reflection = new ReflectionObject($spotlightQuery);
 
         foreach ($reflection->getProperties() as $property) {
             $property->setAccessible(true);
             $value = $property->getValue($spotlightQuery);
 
-            if ($value instanceof \Closure) {
+            if ($value instanceof Closure) {
                 return $value;
             }
         }

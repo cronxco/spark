@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Converts plaintext connector credentials to application-encrypted values.
@@ -21,14 +22,13 @@ use Illuminate\Support\Facades\DB;
  */
 class EncryptIntegrationCredentials extends Command
 {
+    /** @var array<int, string> */
+    private const ENCRYPTED_COLUMNS = ['access_token', 'refresh_token', 'webhook_secret'];
     protected $signature = 'integrations:encrypt-credentials
                             {--batch-size=200 : Number of credential groups to process per batch}
                             {--dry-run : Report what would change without writing}';
 
     protected $description = 'Encrypt plaintext access tokens, refresh tokens and webhook secrets on integration groups';
-
-    /** @var array<int, string> */
-    private const ENCRYPTED_COLUMNS = ['access_token', 'refresh_token', 'webhook_secret'];
 
     public function handle(): int
     {
@@ -94,7 +94,7 @@ class EncryptIntegrationCredentials extends Command
                     try {
                         DB::table('integration_groups')->where('id', $group->id)->update($updates);
                         $converted += count($updates);
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         $failed++;
                         $this->newLine();
                         $this->error("Failed to encrypt credentials for group {$group->id}: {$e->getMessage()}");

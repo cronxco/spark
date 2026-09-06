@@ -34,14 +34,6 @@ class TagCatalogueTenancyTest extends TestCase
         $this->bob = User::factory()->create();
     }
 
-    private function taggedObject(User $user, string $tag): EventObject
-    {
-        $object = EventObject::factory()->create(['user_id' => $user->id]);
-        $object->attachTag($tag);
-
-        return $object;
-    }
-
     #[Test]
     public function the_catalogue_excludes_tags_only_another_user_has(): void
     {
@@ -89,5 +81,13 @@ class TagCatalogueTenancyTest extends TestCase
         $this->actingAs($this->alice)
             ->get("/tags/{$tag->type}/{$tag->slug}/{$tag->id}")
             ->assertNotFound();
+    }
+
+    private function taggedObject(User $user, string $tag): EventObject
+    {
+        $object = EventObject::factory()->create(['user_id' => $user->id]);
+        $object->attachTag($tag);
+
+        return $object;
     }
 }

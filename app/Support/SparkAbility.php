@@ -12,14 +12,6 @@ use App\Models\User;
  */
 final class SparkAbility
 {
-    /** @var array<string, array<int, string>> */
-    private const LEGACY_ALIASES = [
-        'data:read' => ['mcp:read'],
-        'insights:read' => ['mcp:read'],
-        'integrations:read' => ['mcp:read'],
-        'flint:read' => ['mcp:read'],
-    ];
-
     /**
      * Every capability a personal access token may be issued with.
      *
@@ -57,6 +49,13 @@ final class SparkAbility
      * @var array<int, string>
      */
     public const NON_DELEGABLE = ['ios:read', 'ios:write', 'mcp:read'];
+    /** @var array<string, array<int, string>> */
+    private const LEGACY_ALIASES = [
+        'data:read' => ['mcp:read'],
+        'insights:read' => ['mcp:read'],
+        'integrations:read' => ['mcp:read'],
+        'flint:read' => ['mcp:read'],
+    ];
 
     public static function allows(User $user, string $ability): bool
     {

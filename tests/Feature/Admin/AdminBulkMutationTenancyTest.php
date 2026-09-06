@@ -38,13 +38,6 @@ class AdminBulkMutationTenancyTest extends TestCase
         $this->victim = User::factory()->create();
     }
 
-    private function eventFor(User $user): Event
-    {
-        return Event::factory()->create([
-            'integration_id' => Integration::factory()->create(['user_id' => $user->id])->id,
-        ]);
-    }
-
     #[Test]
     public function bulk_deleting_events_cannot_reach_another_users_event(): void
     {
@@ -108,21 +101,6 @@ class AdminBulkMutationTenancyTest extends TestCase
         $this->assertSoftDeleted($ownBlock);
     }
 
-    private function relationshipFor(User $user): Relationship
-    {
-        $from = EventObject::factory()->create(['user_id' => $user->id]);
-        $to = EventObject::factory()->create(['user_id' => $user->id]);
-
-        return Relationship::create([
-            'user_id' => $user->id,
-            'from_type' => EventObject::class,
-            'from_id' => $from->id,
-            'to_type' => EventObject::class,
-            'to_id' => $to->id,
-            'type' => 'linked_to',
-        ]);
-    }
-
     #[Test]
     public function bulk_deleting_relationships_cannot_reach_another_users_relationship(): void
     {
@@ -167,5 +145,27 @@ class AdminBulkMutationTenancyTest extends TestCase
             EventObject::withTrashed()->find($victimObject->id),
             'Another tenant\'s soft-deleted record must survive an admin purge.',
         );
+    }
+
+    private function eventFor(User $user): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => Integration::factory()->create(['user_id' => $user->id])->id,
+        ]);
+    }
+
+    private function relationshipFor(User $user): Relationship
+    {
+        $from = EventObject::factory()->create(['user_id' => $user->id]);
+        $to = EventObject::factory()->create(['user_id' => $user->id]);
+
+        return Relationship::create([
+            'user_id' => $user->id,
+            'from_type' => EventObject::class,
+            'from_id' => $from->id,
+            'to_type' => EventObject::class,
+            'to_id' => $to->id,
+            'type' => 'linked_to',
+        ]);
     }
 }

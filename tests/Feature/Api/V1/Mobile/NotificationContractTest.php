@@ -8,6 +8,7 @@ use App\Notifications\SystemMaintenance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionClass;
 use Tests\TestCase;
 
 /**
@@ -31,13 +32,6 @@ class NotificationContractTest extends TestCase
         config(['ios.mobile_api_enabled' => true]);
 
         $this->user = User::factory()->create();
-    }
-
-    private function notifyUser(): string
-    {
-        $this->user->notify(new SystemMaintenance('Scheduled maintenance', 'Back shortly.'));
-
-        return (string) $this->user->notifications()->latest()->firstOrFail()->id;
     }
 
     #[Test]
@@ -126,8 +120,23 @@ class NotificationContractTest extends TestCase
         $etag = $this->getJson('/api/v1/mobile/settings/notifications')->assertOk()->headers->get('ETag');
 
         $this->withHeader('If-Match', $etag)
-            ->patchJson('/api/v1/mobile/settings/notifications', ['delivery_mode' => 'always'])
+            ->patchJson('/api/v1/mobile/settings/notifications', [
+                'delivery_mode' => 'work_hours',
+            ])
             ->assertSuccessful();
+    }
+
+    #[Test]
+    public function updating_notification_preferences_without_a_precondition_is_still_refused(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        // Preferences are a genuine last-write-wins surface, so this one keeps
+        // its precondition — the fix was making the ETag obtainable, not
+        // dropping the guard.
+        $this->patchJson('/api/v1/mobile/settings/notifications', [
+            'delivery_mode' => 'work_hours',
+        ])->assertStatus(428);
     }
 
     /*
@@ -171,10 +180,17 @@ class NotificationContractTest extends TestCase
         $this->assertNull($this->categoryFor('system_maintenance'));
     }
 
+    private function notifyUser(): string
+    {
+        $this->user->notify(new SystemMaintenance('Scheduled maintenance', 'Back shortly.'));
+
+        return (string) $this->user->notifications()->latest()->firstOrFail()->id;
+    }
+
     /** @return array<string, string> */
     private function clientCategories(): array
     {
-        $reflection = new \ReflectionClass(ApnsChannel::class);
+        $reflection = new ReflectionClass(ApnsChannel::class);
 
         return $reflection->getConstant('CLIENT_CATEGORIES');
     }

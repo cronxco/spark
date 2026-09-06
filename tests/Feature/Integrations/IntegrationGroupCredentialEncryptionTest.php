@@ -23,16 +23,6 @@ class IntegrationGroupCredentialEncryptionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeGroup(array $attributes = []): IntegrationGroup
-    {
-        return IntegrationGroup::factory()->create(array_merge([
-            'user_id' => User::factory()->create()->id,
-            'access_token' => 'plain-access-token',
-            'refresh_token' => 'plain-refresh-token',
-            'webhook_secret' => 'plain-webhook-secret',
-        ], $attributes));
-    }
-
     #[Test]
     public function credentials_round_trip_through_the_encrypted_cast(): void
     {
@@ -153,6 +143,16 @@ class IntegrationGroupCredentialEncryptionTest extends TestCase
         $this->assertStringNotContainsString('rotated-access-token', $serialised);
         $this->assertStringNotContainsString('plain-access-token', $serialised);
         $this->assertStringNotContainsString('plain-webhook-secret', $serialised);
+    }
+
+    private function makeGroup(array $attributes = []): IntegrationGroup
+    {
+        return IntegrationGroup::factory()->create(array_merge([
+            'user_id' => User::factory()->create()->id,
+            'access_token' => 'plain-access-token',
+            'refresh_token' => 'plain-refresh-token',
+            'webhook_secret' => 'plain-webhook-secret',
+        ], $attributes));
     }
 
     private function columnLabel(string $column): string
