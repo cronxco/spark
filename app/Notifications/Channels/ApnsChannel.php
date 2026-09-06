@@ -3,6 +3,7 @@
 namespace App\Notifications\Channels;
 
 use App\Models\PushSubscription;
+use App\Notifications\NotificationCatalogue;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Notification;
@@ -91,8 +92,16 @@ class ApnsChannel
             ? $notification->getNotificationType()
             : null;
 
-        if ($message->category === null && $type !== null) {
-            $message->category($type);
+        // The category identifier selects which UNNotificationCategory — and so
+        // which action buttons — the client shows. It must be one the client
+        // registered, and matching is case-sensitive. Sending the raw snake_case
+        // notification type meant no category ever matched, leaving every
+        // action button inert. threadId is a grouping key only, so the raw type
+        // remains correct there.
+        $category = $type === null ? null : ($this->clientCategories()[$type] ?? null);
+
+        if ($message->category === null && $category !== null) {
+            $message->category($category);
         }
 
         if ($message->threadId === null && $type !== null) {
@@ -193,5 +202,22 @@ class ApnsChannel
                     ->delete();
             }
         }
+    }
+
+    /**
+     * Notification type -> UNNotificationCategory identifier registered by the
+     * iOS client.
+     *
+     * Derived from NotificationCatalogue so the server and the client cannot
+     * drift: the categories the client registers are exactly
+     * NotificationCatalogue::apnsCategoryIdentifiers(). A type absent from the
+     * catalogue is sent without a category, which is a plain notification with
+     * no action buttons — the honest outcome until it is added there.
+     *
+     * @return array<string, string>
+     */
+    private function clientCategories(): array
+    {
+        return NotificationCatalogue::apnsCategories();
     }
 }

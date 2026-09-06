@@ -9,15 +9,34 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
+/**
+ * Metadata-only telemetry for the mobile API surface.
+ *
+ * Payloads are private by default: this middleware records the shape of a
+ * request, never its content. Query values, request bodies and response bodies
+ * are excluded outright rather than filtered, because a denylist of sensitive
+ * field names cannot keep pace with the API — the previous implementation
+ * redacted two keys and consequently wrote note text, financial data, search
+ * terms and freshly minted bearer-token plaintext into the log channel.
+ *
+ * Anything added here must be a bounded, non-identifying enumeration. If you
+ * find yourself wanting to log a value a user typed or a provider returned,
+ * the answer is no.
+ */
 class SentryMobileApiLogging
 {
-    private const BODY_SIZE_LIMIT = 4096;
-
-    /** Request fields that contain device/push tokens — logged as [REDACTED] */
-    private const SENSITIVE_FIELDS = ['apns_token', 'push_token'];
+    /**
+     * Response envelope keys safe to record: counts and opaque pagination
+     * cursors, never payload content.
+     *
+     * @var array<int, string>
+     */
+    private const SAFE_ENVELOPE_KEYS = ['has_more', 'next_cursor'];
 
     public function handle(Request $request, Closure $next): Response
     {
+        $startedAt = microtime(true);
+
         try {
             $response = $next($request);
         } catch (Throwable $e) {
@@ -30,12 +49,12 @@ class SentryMobileApiLogging
             $response = $handler->render($request, $e);
         }
 
-        $this->logRequest($request, $response);
+        $this->logRequest($request, $response, $startedAt);
 
         return $response;
     }
 
-    private function logRequest(Request $request, Response $response): void
+    private function logRequest(Request $request, Response $response, float $startedAt): void
     {
         $status = $response->getStatusCode();
         $content = $response->getContent();
@@ -43,78 +62,76 @@ class SentryMobileApiLogging
         $context = [
             'route' => $request->route()?->getName(),
             'method' => $request->method(),
-            'query' => $request->query() ?: null,
             'response_status' => $status,
             'response_size_bytes' => is_string($content) ? strlen($content) : 0,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
         ];
 
-        if (in_array($request->method(), ['POST', 'PATCH', 'PUT'], true) && $request->isJson()) {
-            $context['request_summary'] = $this->summarizeRequestBody($request);
-        }
-
-        if ($status !== 304 && $status !== 204 && is_string($content) && $content !== '') {
-            $decoded = json_decode($content, true);
-            if (is_array($decoded)) {
-                $context = array_merge($context, $this->summarizeResponsePayload($decoded, strlen($content)));
-            }
-        }
+        $context += $this->requestShape($request);
+        $context += $this->responseShape($status, $content);
 
         Log::channel('sentry_logs')->info(
-            'Mobile API: ' . $request->method() . ' ' . $request->path(),
+            'Mobile API: ' . $request->method(),
             array_filter($context, fn ($v) => $v !== null),
         );
     }
 
     /**
+     * Bounded facts about the request body — sizes and counts only.
+     *
      * @return array<string, mixed>
      */
-    private function summarizeRequestBody(Request $request): array
+    private function requestShape(Request $request): array
     {
+        if (! in_array($request->method(), ['POST', 'PATCH', 'PUT'], true) || ! $request->isJson()) {
+            return [];
+        }
+
         $body = $request->json()->all();
 
-        // HealthController batches up to 500 samples — log count only, never the data
+        if (! is_array($body)) {
+            return [];
+        }
+
+        $shape = ['request_field_count' => count($body)];
+
+        // HealthController batches up to 500 samples — the count is the useful signal.
         if (isset($body['samples']) && is_array($body['samples'])) {
-            return ['sample_count' => count($body['samples'])];
+            $shape['sample_count'] = count($body['samples']);
         }
 
-        foreach (self::SENSITIVE_FIELDS as $field) {
-            if (isset($body[$field])) {
-                $body[$field] = '[REDACTED]';
-            }
-        }
-
-        return $body;
+        return $shape;
     }
 
     /**
-     * @param  array<string, mixed>  $decoded
+     * Bounded facts about the response — item counts and pagination cursors.
+     *
      * @return array<string, mixed>
      */
-    private function summarizeResponsePayload(array $decoded, int $byteLength): array
+    private function responseShape(int $status, mixed $content): array
     {
-        // Paginated envelope — extract metadata, skip the items array
+        if ($status === 304 || $status === 204 || ! is_string($content) || $content === '') {
+            return [];
+        }
+
+        $decoded = json_decode($content, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $shape = [];
+
         if (isset($decoded['data']) && is_array($decoded['data'])) {
-            $summary = ['item_count' => count($decoded['data'])];
-
-            if (isset($decoded['has_more'])) {
-                $summary['has_more'] = $decoded['has_more'];
-            }
-
-            if (isset($decoded['next_cursor'])) {
-                $summary['next_cursor'] = $decoded['next_cursor'];
-            }
-
-            return $summary;
+            $shape['item_count'] = count($decoded['data']);
         }
 
-        // Small payload — include the full body
-        if ($byteLength <= self::BODY_SIZE_LIMIT) {
-            return ['response_body' => $decoded];
+        foreach (self::SAFE_ENVELOPE_KEYS as $key) {
+            if (array_key_exists($key, $decoded) && is_scalar($decoded[$key])) {
+                $shape[$key] = $decoded[$key];
+            }
         }
 
-        // Large non-paginated payload — top-level scalar fields only
-        $scalars = array_filter($decoded, fn ($v) => is_scalar($v));
-
-        return $scalars ? ['response_body' => $scalars] : [];
+        return $shape;
     }
 }

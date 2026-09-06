@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedJsonSecrets;
+use App\Traits\RedactsLoggedProperties;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class IntegrationGroup extends Model
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
 
     public $incrementing = false;
 
@@ -31,13 +33,32 @@ class IntegrationGroup extends Model
         'auth_metadata',
     ];
 
+    /**
+     * `access_token`, `refresh_token` and `webhook_secret` are encrypted at the
+     * application boundary per ADR 0018, so a database or backup disclosure does
+     * not yield reusable provider credentials. All three are `text` columns and
+     * appear in no `where()` clause anywhere in the application, so the cast
+     * needs no schema change and breaks no lookup.
+     *
+     * `auth_metadata` is `jsonb` and is read through SQL JSON paths (notably
+     * `auth_metadata->gocardless_reference`), so encrypting the whole column
+     * would break those lookups. EncryptedJsonSecrets encrypts only the secret
+     * leaves — API keys, tokens and Fetch session cookies — and leaves the JSON
+     * structurally valid, so the paths keep working.
+     *
+     * Run `integrations:encrypt-credentials` to convert existing plaintext rows;
+     * both casts read plaintext transparently until then.
+     */
     protected $casts = [
         'expiry' => 'datetime',
         'refresh_expiry' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
-        'auth_metadata' => 'array',
+        'auth_metadata' => EncryptedJsonSecrets::class,
+        'access_token' => 'encrypted',
+        'refresh_token' => 'encrypted',
+        'webhook_secret' => 'encrypted',
     ];
 
     protected static function booted(): void
@@ -112,6 +133,12 @@ class IntegrationGroup extends Model
         return LogOptions::defaults()
             ->useLogName('changelog')
             ->logFillable()
+            // logFillable() reads attributes through their casts, so without
+            // logExcept() the activity log would record decrypted credentials in
+            // its diffs whenever any other fillable attribute changed.
+            // dontLogIfAttributesChangedOnly() does not redact — it only skips
+            // the log when nothing else changed.
+            ->logExcept(['access_token', 'refresh_token', 'webhook_secret', 'auth_metadata'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at', 'access_token', 'refresh_token', 'expiry']);

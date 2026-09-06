@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Notifications\NotificationCatalogue;
 use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,14 +11,6 @@ use Illuminate\Validation\Rule;
 
 class NotificationSettingsController extends Controller
 {
-    private const CATEGORIES = [
-        'anomaly',
-        'digest',
-        'integration_failed',
-        'new_bookmark',
-        'calendar_event',
-    ];
-
     public function __construct(private ResourceVersion $versions) {}
 
     /**
@@ -33,7 +26,7 @@ class NotificationSettingsController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $categoryRules = collect(self::CATEGORIES)
+        $categoryRules = collect($this->categories())
             ->mapWithKeys(fn (string $category) => ["categories.{$category}" => ['required_unless:delivery_mode,work_hours', 'boolean']])
             ->all();
 
@@ -46,8 +39,8 @@ class NotificationSettingsController extends Controller
 
         $categories = $validated['categories'] ?? [];
         $categories = array_replace(
-            array_fill_keys(self::CATEGORIES, true),
-            array_intersect_key($categories, array_flip(self::CATEGORIES)),
+            array_fill_keys($this->categories(), true),
+            array_intersect_key($categories, array_flip($this->categories())),
         );
 
         $request->user()->updateNotificationPreferences([
@@ -66,6 +59,23 @@ class NotificationSettingsController extends Controller
             ->header('ETag', $this->versions->etag($request->user()->fresh()));
     }
 
+    /**
+     * The notification types a user may switch on and off.
+     *
+     * Derived from NotificationCatalogue rather than hand-listed: the five
+     * categories this used to name were invented for the mobile API and four of
+     * them gated notifications that are never sent, while three real types had
+     * no toggle at all. SparkNotification::via() gates on
+     * hasPushNotificationsEnabledForType(), which is keyed by the real type
+     * string, so these keys have to be those same strings to have any effect.
+     *
+     * @return array<int, string>
+     */
+    private function categories(): array
+    {
+        return NotificationCatalogue::configurableTypes();
+    }
+
     private function mobilePreferences(Request $request): array
     {
         $notifications = $request->user()->fresh()->settings['notifications'] ?? [];
@@ -73,7 +83,7 @@ class NotificationSettingsController extends Controller
         $delayedSending = $notifications['delayed_sending'] ?? [];
 
         return [
-            'categories' => collect(self::CATEGORIES)
+            'categories' => collect($this->categories())
                 ->mapWithKeys(fn (string $category) => [$category => $pushTypes[$category] ?? true])
                 ->all(),
             'delivery_mode' => $delayedSending['mode'] ?? 'immediate',

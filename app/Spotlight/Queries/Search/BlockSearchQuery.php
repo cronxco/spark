@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -21,6 +22,7 @@ class BlockSearchQuery
             }
 
             return Block::with(['event'])
+                ->whereHas('event.integration', fn ($q) => $q->where('user_id', Auth::id()))
                 ->where(function ($q) use ($query) {
                     $q->where('title', 'ilike', "%{$query}%")
                         ->orWhere('block_type', 'ilike', "%{$query}%");

@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Tags\Tag;
@@ -78,6 +80,31 @@ class TagsControllerTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', (string) $tagged->id)
             ->assertJsonPath('data.0.kind', 'event');
+    }
+
+    #[Test]
+    public function a_block_only_tag_is_visible_in_the_catalogue_and_detail_route(): void
+    {
+        $tag = Tag::findOrCreate('block-only', 'spark');
+        $block = Block::factory()->create(['event_id' => $this->createEvent('Parent')->id]);
+
+        DB::table('taggables')->insert([
+            'tag_id' => $tag->id,
+            'taggable_id' => $block->id,
+            'taggable_type' => Block::class,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/tags')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $tag->id);
+
+        $this->getJson("/api/v1/mobile/tags/{$tag->id}")
+            ->assertOk()
+            ->assertJsonPath('tag.id', (string) $tag->id)
+            ->assertJsonPath('data.0.kind', 'block')
+            ->assertJsonPath('data.0.id', (string) $block->id);
     }
 
     #[Test]

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Notifications\NotificationCatalogue;
 use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,14 +11,6 @@ use Illuminate\Validation\Rule;
 
 class NotificationPreferencesController extends Controller
 {
-    private const CATEGORIES = [
-        'anomaly',
-        'digest',
-        'integration_failed',
-        'new_bookmark',
-        'calendar_event',
-    ];
-
     public function __construct(private ResourceVersion $versions) {}
 
     /**
@@ -42,7 +35,7 @@ class NotificationPreferencesController extends Controller
         ]);
 
         $categories = $validated['categories'] ?? [];
-        $categories = array_intersect_key($categories, array_flip(self::CATEGORIES));
+        $categories = array_intersect_key($categories, array_flip($this->categories()));
 
         $request->user()->updateNotificationPreferences([
             'push_types' => $categories,
@@ -56,6 +49,23 @@ class NotificationPreferencesController extends Controller
     }
 
     /**
+     * The notification types a user may switch on and off.
+     *
+     * Derived from NotificationCatalogue rather than hand-listed: the five
+     * categories this used to name were invented for the mobile API and four of
+     * them gated notifications that are never sent, while three real types had
+     * no toggle at all. SparkNotification::via() gates on
+     * hasPushNotificationsEnabledForType(), which is keyed by the real type
+     * string, so these keys have to be those same strings to have any effect.
+     *
+     * @return array<int, string>
+     */
+    private function categories(): array
+    {
+        return NotificationCatalogue::configurableTypes();
+    }
+
+    /**
      * @param  array<string, mixed>  $preferences
      * @return array<string, mixed>
      */
@@ -65,7 +75,7 @@ class NotificationPreferencesController extends Controller
         $delayed = $preferences['delayed_sending'] ?? [];
 
         return [
-            'categories' => collect(self::CATEGORIES)
+            'categories' => collect($this->categories())
                 ->mapWithKeys(fn (string $category) => [$category => $pushTypes[$category] ?? true])
                 ->all(),
             'delivery_mode' => $delayed['mode'] ?? 'immediate',

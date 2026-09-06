@@ -60,7 +60,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
             'api_key' => [
                 'type' => 'string',
                 'label' => 'API Key',
-                'description' => 'Hevy API key used for requests (stored encrypted). If empty, the global HEVY_API_KEY will be used if configured.',
+                'description' => 'Hevy API key used for requests. If empty, the global HEVY_API_KEY will be used if configured.',
                 'required' => false,
             ],
             'update_frequency_minutes' => [

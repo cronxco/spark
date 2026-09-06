@@ -24,7 +24,20 @@ class FindReceiptForTransactionTask extends BaseTaskJob
         $startTime = $this->model->time->copy()->subHours(4);
         $endTime = $this->model->time->copy()->addHours(4);
 
-        $unmatchedReceipts = Event::where('service', 'receipt')
+        // Restrict candidates to the transaction's own owner. Without this a
+        // transaction can be matched to another tenant's receipt.
+        $ownerId = $this->model->integration?->user_id;
+
+        if ($ownerId === null) {
+            Log::warning('Receipt: Cannot resolve owning user for transaction', [
+                'transaction_id' => $this->model->id,
+            ]);
+
+            return;
+        }
+
+        $unmatchedReceipts = Event::forUser($ownerId)
+            ->where('service', 'receipt')
             ->where('domain', 'money')
             ->where('action', 'had_receipt_from')
             ->whereBetween('time', [$startTime, $endTime])

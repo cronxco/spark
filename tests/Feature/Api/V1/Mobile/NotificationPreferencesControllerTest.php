@@ -26,7 +26,7 @@ class NotificationPreferencesControllerTest extends TestCase
     {
         $this->user->updateNotificationPreferences([
             'push_types' => [
-                'anomaly' => false,
+                'integration_completed' => false,
                 'integration_failed' => true,
             ],
             'delayed_sending' => [
@@ -39,9 +39,10 @@ class NotificationPreferencesControllerTest extends TestCase
 
         $this->getJson('/api/v1/mobile/settings/notifications')
             ->assertOk()
-            ->assertJsonPath('categories.anomaly', false)
+            ->assertJsonPath('categories.integration_completed', false)
             ->assertJsonPath('categories.integration_failed', true)
-            ->assertJsonPath('categories.digest', true)
+            // Unset types default to on.
+            ->assertJsonPath('categories.cookie_expiry_warning', true)
             ->assertJsonPath('delivery_mode', 'daily_digest')
             ->assertJsonPath('digest_time', '08:30');
     }
@@ -66,8 +67,8 @@ class NotificationPreferencesControllerTest extends TestCase
         $this->user->refresh();
         $preferences = $this->user->getNotificationPreferences();
 
-        $this->assertFalse($preferences['push_types']['anomaly']);
-        $this->assertTrue($preferences['push_types']['digest']);
+        $this->assertFalse($preferences['push_types']['integration_completed']);
+        $this->assertTrue($preferences['push_types']['migration_completed']);
         $this->assertSame('work_hours', $preferences['delayed_sending']['mode']);
         $this->assertSame('10:15', $preferences['delayed_sending']['digest_time']);
     }
@@ -76,8 +77,8 @@ class NotificationPreferencesControllerTest extends TestCase
     {
         return [
             'categories' => [
-                'anomaly' => false,
-                'digest' => true,
+                'integration_completed' => false,
+                'migration_completed' => true,
             ],
             'delivery_mode' => 'work_hours',
             'digest_time' => '10:15',

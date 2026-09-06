@@ -20,13 +20,24 @@ This directory documents Spark's three programmatic surfaces — the general RES
 counterpart to the Spark MCP server; `/api` remains supported as a legacy
 surface and `/api/v1/mobile` remains an iOS-specific adapter.
 
-Use least-privilege Sanctum abilities per operation: `data:read`,
-`data:write`, `insights:read`, `insights:write`, `integrations:read`,
-`integrations:sync`, `flint:read`, `flint:write`, `finance:read`, and
-`finance:write`. `web:fetch` is a separate, MCP-only capability because it can
+Use least-privilege Sanctum abilities per operation. `App\Support\SparkAbility::DELEGABLE`
+is the authoritative list of what a personal access token may be granted:
+`bookmark:write`, `data:image`, `data:read`, `data:write`, `finance:read`,
+`finance:write`, `flint:read`, `flint:run`, `flint:write`, `insights:read`,
+`insights:write`, `integrations:read`, `integrations:sync`, and
+`tokens:manage`. `web:fetch` is a separate, MCP-only capability because it can
 use saved browser cookies. Existing `mcp:read` tokens are accepted as a
 read-only compatibility alias for `data:read`, `insights:read`,
-`integrations:read`, and `flint:read` during migration.
+`integrations:read`, and `flint:read` during migration, but are no longer
+issuable on a new token.
+
+**Authority attenuates, and wildcards are not a capability.** No creation path
+issues `["*"]`: a wildcard satisfies every `tokenCan()` check in the
+application, so it is an escape from the capability system rather than a point
+within it. Every token names its capabilities explicitly, drawn from the list
+above, and a token-authenticated caller may only request capabilities its own
+credential already holds. `ios:read` and `ios:write` are session scopes and are
+never delegable.
 
 Public API and MCP calls require a Sanctum bearer token; cookie sessions are
 not capability credentials (`SparkAbility::allows()` only grants access to a
@@ -40,14 +51,21 @@ rather than a timestamp — `updated_at` is whole-second precision, so two
 writes inside one second would otherwise hash to the same "version" and
 silently defeat the check. Both `/api/v1` and `/api/v1/mobile` require
 clients to send this in `If-Match` when changing an event, object, block,
-its relationships, an event note, tag assignment, integration, notification,
-or a manual finance account/balance — missing preconditions receive `428`,
+its relationships, an event note, tag assignment, integration, notification
+preferences, or a manual finance account/balance — missing preconditions
+receive `428`,
 stale tokens receive `412`, and both include the current `ETag`. The
 version check and the write happen inside one row-locked transaction, so a
 second writer can't slip a stale check in underneath the first. See
 [API_v1.md](API_v1.md#etag-and-if-match) for the verified route-by-route
 detail. Digest creation remains deliberately non-idempotent and does not use
 `If-Match` on either surface.
+
+Idempotent state transitions do not carry a precondition, because there is no
+update for a concurrent writer to lose: marking a notification read (singly or
+in bulk) and signing out are unconditional. `DELETE /notifications/{id}` is
+destructive and does require `If-Match`, satisfied by the `version` field each
+item carries in `GET /notifications`.
 
 ### Command retry semantics
 
@@ -70,7 +88,7 @@ and manual finance account/balance management, including archival.
 | User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available |
 | Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
 | Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
-| API-token administration                                         | No                         | Yes                           | No                            | Web settings and mobile only    |
+| API-token administration                                         | No                         | List/revoke only              | No                            | Creation requires `tokens:manage`, which no iOS session holds |
 | Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
 | Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
 
@@ -133,9 +151,11 @@ personal API-token management APIs.
 
 Device registration, APNs/Live Activities, HealthKit ingestion, and OAuth
 handoff are deliberately mobile-only: they remain necessary for the iOS app
-but are not general REST or MCP capabilities. API-token management is
-available in web settings and on the mobile adapter, but not through the
-general REST API or MCP. Browser HTML fetching stays MCP-only under
+but are not general REST or MCP capabilities. API-token management is a web
+settings journey: the mobile adapter can list and revoke tokens, but creation
+requires `tokens:manage`, which `OAuthController::scopeToAbilities` never
+issues to an iOS session — so a compromised app session cannot mint itself a
+longer-lived credential. Browser HTML fetching stays MCP-only under
 `web:fetch`.
 
 ## Standards this documentation follows

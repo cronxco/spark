@@ -1,11 +1,13 @@
 <?php
 
+use App\Notifications\NotificationCatalogue;
 use App\Notifications\TestPushNotification;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
-new class extends Component {
+new class extends Component
+{
     use Toast;
 
     public array $emailEnabled = [];
@@ -19,36 +21,17 @@ new class extends Component {
     public string $digestTime = '09:00';
     public array $pushSubscriptions = [];
 
-    public array $notificationTypes = [
-        'integration_completed' => [
-            'label' => 'Integration Completed',
-            'description' => 'Notify when an integration finishes syncing successfully'
-        ],
-        'integration_failed' => [
-            'label' => 'Integration Failed',
-            'description' => 'Notify when an integration sync fails (always sent immediately)'
-        ],
-        'integration_authentication_failed' => [
-            'label' => 'Authentication Required',
-            'description' => 'Notify when an integration needs re-authorization (always sent immediately)'
-        ],
-        'migration_completed' => [
-            'label' => 'Historical Data Import Complete',
-            'description' => 'Notify when historical data migration finishes successfully'
-        ],
-        'migration_failed' => [
-            'label' => 'Historical Data Import Failed',
-            'description' => 'Notify when historical data migration fails (always sent immediately)'
-        ],
-        'data_export_ready' => [
-            'label' => 'Data Export Ready',
-            'description' => 'Notify when your data export is ready for download'
-        ],
-        'system_maintenance' => [
-            'label' => 'System Maintenance',
-            'description' => 'Notify about system maintenance and updates (always sent immediately)'
-        ],
-    ];
+    /**
+     * The notification types a user may switch on and off.
+     *
+     * Derived from NotificationCatalogue so this page, the mobile settings
+     * endpoints and ApnsChannel cannot drift apart. This list was previously
+     * hand-maintained and had fallen three types behind the notifications the
+     * application actually sends.
+     *
+     * @var array<string, array{label: string, description: string, apns_category: ?string, configurable: bool}>
+     */
+    public array $notificationTypes = [];
 
     public array $timezones = [
         'UTC' => 'UTC',
@@ -66,6 +49,8 @@ new class extends Component {
 
     public function mount(): void
     {
+        $this->notificationTypes = NotificationCatalogue::configurable();
+
         $user = Auth::user();
         $preferences = $user->getNotificationPreferences();
 

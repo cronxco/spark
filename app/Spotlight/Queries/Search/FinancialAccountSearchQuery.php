@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Models\Event;
 use App\Models\EventObject;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -22,6 +23,7 @@ class FinancialAccountSearchQuery
 
             // Search for financial account objects
             $accounts = EventObject::query()
+                ->where('user_id', Auth::id())
                 ->where('concept', 'account')
                 ->whereIn('type', [
                     'manual_account',
@@ -40,7 +42,7 @@ class FinancialAccountSearchQuery
             // Batch fetch latest balances for all accounts in a single query
             // Using a lateral join equivalent with a subquery
             $accountIds = $accounts->pluck('id');
-            $latestBalances = Event::query()
+            $latestBalances = Event::forUser(Auth::id())
                 ->whereIn('actor_id', $accountIds)
                 ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
                 ->where('action', 'had_balance')

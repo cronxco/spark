@@ -3,6 +3,7 @@
 namespace App\Spotlight\Queries\Search;
 
 use App\Models\MetricStatistic;
+use Illuminate\Support\Facades\Auth;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -14,7 +15,8 @@ class MetricSearchQuery
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::forMode('metrics', function (string $query) {
-            $metricsQuery = MetricStatistic::with('trends')
+            $metricsQuery = MetricStatistic::where('user_id', Auth::id())
+                ->with('trends')
                 ->withCount(['trends as recent_anomalies_count' => function ($q) {
                     $q->where('detected_at', '>=', now()->subWeek())
                         ->where('type', 'like', 'anomaly_%');

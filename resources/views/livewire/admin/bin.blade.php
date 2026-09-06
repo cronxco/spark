@@ -307,15 +307,27 @@ new class extends Component
         throw new InvalidArgumentException('Unknown item type');
     }
 
+    /**
+     * Resolve a trashed record by id, restricted to records the signed-in user
+     * owns.
+     *
+     * Restore and permanent-delete both funnel through here with ids taken
+     * from public Livewire properties, so the ownership predicates must match
+     * the ones getDeletedItemsByType() uses for the listing — otherwise a
+     * tampered selection reaches another tenant's records.
+     */
     private function findDeletedItem(string $itemId)
     {
-        // Try to find the item in each model's trashed records
+        $userId = Auth::id();
+
         $models = [
-            'event' => Event::onlyTrashed(),
-            'object' => EventObject::onlyTrashed(),
-            'block' => Block::onlyTrashed(),
-            'integration' => Integration::onlyTrashed(),
-            'integration_group' => IntegrationGroup::onlyTrashed(),
+            'event' => Event::onlyTrashed()
+                ->whereHas('integration', fn($q) => $q->where('user_id', $userId)),
+            'object' => EventObject::onlyTrashed()->where('user_id', $userId),
+            'block' => Block::onlyTrashed()
+                ->whereHas('event.integration', fn($q) => $q->where('user_id', $userId)),
+            'integration' => Integration::onlyTrashed()->where('user_id', $userId),
+            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', $userId),
         ];
 
         foreach ($models as $type => $query) {

@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Integrations\PluginRegistry;
 use App\Models\EventObject;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -21,6 +22,7 @@ class ObjectSearchQuery
             }
 
             return EventObject::query()
+                ->where('user_id', Auth::id())
                 ->where('title', 'ilike', "%{$query}%")
                 ->limit(5)
                 ->get()

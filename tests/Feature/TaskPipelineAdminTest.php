@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
+use App\Models\Integration;
 use App\Models\TaskExecution;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +17,8 @@ use Tests\TestCase;
 class TaskPipelineAdminTest extends TestCase
 {
     use RefreshDatabase;
+
+    private ?User $adminUser = null;
 
     #[Test]
     public function admin_task_pipeline_page_loads_for_admin_user(): void
@@ -85,6 +88,7 @@ class TaskPipelineAdminTest extends TestCase
         $this->actingAs($this->admin());
 
         TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id,
             'task_key' => 'flint_digest_morning',
             'task_name' => 'Flint Morning Digest',
         ]);
@@ -103,6 +107,7 @@ class TaskPipelineAdminTest extends TestCase
         $this->actingAs($this->admin());
 
         TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id,
             'entity_type' => 'object',
             'task_key' => 'flint_digest_morning',
         ]);
@@ -120,11 +125,13 @@ class TaskPipelineAdminTest extends TestCase
         $this->actingAs($this->admin());
 
         $digestExecution = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id,
             'entity_type' => 'object',
             'task_key' => 'flint_digest_morning',
             'status' => 'success',
         ]);
-        $unrelated = TaskExecution::factory()->create(['task_key' => 'generate_embedding', 'status' => 'success']);
+        $unrelated = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'task_key' => 'generate_embedding', 'status' => 'success']);
 
         $ids = Volt::test('admin.task-pipeline-overview')
             ->set('execTaskFilter', 'flint_digest_morning')
@@ -143,7 +150,12 @@ class TaskPipelineAdminTest extends TestCase
         Queue::fake();
 
         $user = $this->admin();
-        $event = Event::factory()->create();
+
+        // The retry path re-resolves the event through the viewer's ownership,
+        // so the event has to hang off an integration this admin owns.
+        $event = Event::factory()->create([
+            'integration_id' => Integration::factory()->create(['user_id' => $user->id])->id,
+        ]);
         $execution = TaskExecution::factory()->create([
             'user_id' => $user->id,
             'entity_type' => 'event',
@@ -189,10 +201,14 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        $running = TaskExecution::factory()->create(['status' => 'running', 'task_key' => 'generate_embedding']);
-        $waiting = TaskExecution::factory()->create(['status' => 'waiting', 'task_key' => 'generate_embedding']);
-        $success = TaskExecution::factory()->create(['status' => 'success', 'task_key' => 'generate_embedding']);
-        $failed = TaskExecution::factory()->create(['status' => 'failed', 'task_key' => 'generate_embedding']);
+        $running = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'running', 'task_key' => 'generate_embedding']);
+        $waiting = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'waiting', 'task_key' => 'generate_embedding']);
+        $success = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'success', 'task_key' => 'generate_embedding']);
+        $failed = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'failed', 'task_key' => 'generate_embedding']);
 
         $activeIds = Volt::test('admin.task-pipeline-overview')
             ->instance()
@@ -211,8 +227,10 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        $running = TaskExecution::factory()->create(['status' => 'running', 'task_key' => 'generate_embedding']);
-        $blocked = TaskExecution::factory()->create(['status' => 'blocked', 'task_key' => 'generate_embedding']);
+        $running = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'running', 'task_key' => 'generate_embedding']);
+        $blocked = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'blocked', 'task_key' => 'generate_embedding']);
 
         $activeIds = Volt::test('admin.task-pipeline-overview')
             ->set('activeStatusFilter', 'blocked')
@@ -230,7 +248,8 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        $stalePending = TaskExecution::factory()->create(['status' => 'pending', 'task_key' => 'generate_embedding']);
+        $stalePending = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'pending', 'task_key' => 'generate_embedding']);
         $stalePending->timestamps = false;
         $stalePending->forceFill(['updated_at' => now()->subDays(10)])->saveQuietly();
 
@@ -247,11 +266,13 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        $stuck = TaskExecution::factory()->create(['status' => 'running', 'task_key' => 'generate_embedding']);
+        $stuck = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'running', 'task_key' => 'generate_embedding']);
         $stuck->timestamps = false;
         $stuck->forceFill(['updated_at' => now()->subMinutes(30)])->saveQuietly();
 
-        $fresh = TaskExecution::factory()->create(['status' => 'running', 'task_key' => 'generate_embedding']);
+        $fresh = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'running', 'task_key' => 'generate_embedding']);
 
         $instance = Volt::test('admin.task-pipeline-overview')->instance();
 
@@ -265,8 +286,10 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        $success = TaskExecution::factory()->create(['status' => 'success', 'task_key' => 'generate_embedding']);
-        $failed = TaskExecution::factory()->create(['status' => 'failed', 'task_key' => 'generate_embedding']);
+        $success = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'success', 'task_key' => 'generate_embedding']);
+        $failed = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id, 'status' => 'failed', 'task_key' => 'generate_embedding']);
 
         $ids = Volt::test('admin.task-pipeline-overview')
             ->set('execStatusFilter', 'success')
@@ -284,7 +307,8 @@ class TaskPipelineAdminTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        TaskExecution::factory()->count(15)->create(['task_key' => 'generate_embedding', 'status' => 'success']);
+        TaskExecution::factory()->count(15)->create([
+            'user_id' => $this->admin()->id, 'task_key' => 'generate_embedding', 'status' => 'success']);
 
         $page = Volt::test('admin.task-pipeline-overview')
             ->set('perPage', 10)
@@ -301,6 +325,7 @@ class TaskPipelineAdminTest extends TestCase
         $this->actingAs($this->admin());
 
         $execution = TaskExecution::factory()->create([
+            'user_id' => $this->admin()->id,
             'task_key' => 'generate_embedding',
             'status' => 'failed',
             'error' => 'Boom went the task',
@@ -314,12 +339,22 @@ class TaskPipelineAdminTest extends TestCase
             ->assertSet('showExecutionModal', false);
     }
 
+    /**
+     * The signed-in administrator.
+     *
+     * Memoised because the task-pipeline console is tenant-local: executions
+     * have to belong to the viewer to be visible, so tests need one stable
+     * admin identity rather than a fresh user per call.
+     */
     private function admin(): User
     {
-        $admin = User::factory()->create();
-        $admin->is_admin = true;
-        $admin->save();
+        if ($this->adminUser === null) {
+            $admin = User::factory()->create();
+            $admin->is_admin = true;
+            $admin->save();
+            $this->adminUser = $admin;
+        }
 
-        return $admin;
+        return $this->adminUser;
     }
 }

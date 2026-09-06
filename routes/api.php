@@ -30,9 +30,10 @@ use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController as V1UpToSpeedControl
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController as V1UpToSpeedReadController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\EventApiController;
+use App\Support\SparkAbility;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\Rule;
 
 /*
 |--------------------------------------------------------------------------
@@ -66,7 +67,28 @@ Route::middleware('sentry.api.logging')->group(function () {
 
         // Generate API token
         Route::post('tokens/create', function (Request $request) {
-            $token = $request->user()->createToken($request->input('token_name', 'API Token'));
+            $validated = $request->validate([
+                'token_name' => ['sometimes', 'string', 'max:255'],
+                'abilities' => ['required', 'array', 'min:1', 'max:20'],
+                'abilities.*' => ['string', 'distinct', Rule::in(SparkAbility::DELEGABLE)],
+            ]);
+
+            if (! $request->user()->tokenCan('tokens:manage')) {
+                return response()->json([
+                    'message' => 'The requested capabilities exceed those of the credential making this request.',
+                ], 403);
+            }
+
+            if (! SparkAbility::canDelegate($request->user(), $validated['abilities'])) {
+                return response()->json([
+                    'message' => 'The requested capabilities exceed those of the credential making this request.',
+                ], 403);
+            }
+
+            $token = $request->user()->createToken(
+                $validated['token_name'] ?? 'API Token',
+                array_values($validated['abilities']),
+            );
 
             return response()->json([
                 'token' => $token->plainTextToken,
@@ -126,21 +148,13 @@ Route::middleware('sentry.api.logging')->group(function () {
         Route::get('task-executions', [TaskExecutionController::class, 'index'])->name('api.task-executions.index');
         Route::get('task-executions/{taskExecution}', [TaskExecutionController::class, 'show'])->name('api.task-executions.show');
 
-        // Clear card stream cache
-        Route::post('clear-card-cache', function (Request $request) {
-            $userId = $request->user()->id;
-            $pattern = "card_stream_{$userId}_*";
-
-            // Clear all cache entries matching the pattern
-            $store = Cache::getStore();
-            if (method_exists($store, 'flush')) {
-                // For stores that support flushing specific patterns
-                // We'll just clear all card_stream entries for this user
-                Cache::flush(); // Note: This clears ALL cache. In production, use a more targeted approach
-            }
-
-            return response()->json(['message' => 'Cache cleared successfully']);
-        })->name('api.clear-card-cache');
+        /*
+         * `POST clear-card-cache` was removed: it ignored its own per-user key
+         * pattern and called Cache::flush(), letting any authenticated token
+         * evict every tenant's cache. Card-stream keys carry a uniqid() suffix
+         * and are already released by Cache::forget() in card-streams.blade.php,
+         * so there was no working behaviour to preserve.
+         */
     });
 });
 

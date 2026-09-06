@@ -3,6 +3,7 @@
 namespace App\Spotlight\Queries\Search;
 
 use App\Models\Event;
+use Illuminate\Support\Facades\Auth;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -16,7 +17,8 @@ class IntegrationEventsQuery
         return SpotlightQuery::forToken('integration', function (string $query, $integrationToken) {
             $integrationId = $integrationToken->getParameter('id');
 
-            $eventsQuery = Event::where('integration_id', $integrationId);
+            // $integrationId arrives from a client-supplied Spotlight token.
+            $eventsQuery = Event::forUser(Auth::id())->where('integration_id', $integrationId);
 
             if (! blank($query)) {
                 $eventsQuery->where('action', 'ilike', "%{$query}%");

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedJsonSecrets;
 use App\Integrations\PluginRegistry;
+use App\Traits\RedactsLoggedProperties;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +16,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Integration extends Model
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
 
     public $incrementing = false;
 
@@ -35,12 +37,20 @@ class Integration extends Model
         'migration_batch_id',
     ];
 
+    /**
+     * `configuration` is `jsonb` and is read through SQL JSON paths (the ten
+     * `configuration->migration_*` updates in the migration jobs), so encrypting
+     * the whole column would break them. EncryptedJsonSecrets encrypts only the
+     * secret leaves — the api_key several plugins keep here — and leaves the
+     * JSON structurally valid, so those paths keep working. Run
+     * `integrations:encrypt-credentials` to convert existing plaintext rows.
+     */
     protected $casts = [
         // tokens now live on IntegrationGroup
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
-        'configuration' => 'array',
+        'configuration' => EncryptedJsonSecrets::class,
         'last_triggered_at' => 'datetime',
         'last_successful_update_at' => 'datetime',
     ];
