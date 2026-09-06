@@ -148,49 +148,49 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 
 ### Summary
 
-| Method | Path                        | Description                                         |
-| ------ | --------------------------- | --------------------------------------------------- |
-| `GET`  | `/ping`                     | Health check                                        |
-| `GET`  | `/me`                       | Authenticated user profile                          |
-| `GET`  | `/briefing/today`           | Daily summary across all domains                    |
-| `GET`  | `/health/dashboard`         | Fitness-first Health tab dashboard                  |
-| `GET`  | `/feed`                     | Cursor-paginated reverse-chronological event feed   |
-| `GET`  | `/notifications`            | Cursor-paginated notifications inbox                |
-| `GET`  | `/events/{id}`              | Single event                                        |
-| `GET`  | `/objects/{id}`             | Single object with optional recent events           |
-| `GET`  | `/blocks/{id}`              | Single block                                        |
-| `GET`  | `/metrics`                  | All available metric identifiers and metadata       |
-| `GET`  | `/metrics/{metric}`         | Metric trend with baseline and daily values         |
-| `GET`  | `/widgets/today`            | Compact today widget payload (≤4 KB)                |
-| `GET`  | `/widgets/metrics/{metric}` | Tiny sparkline widget for a single metric           |
-| `GET`  | `/widgets/spend`            | Today's spend widget                                |
-| `GET`  | `/search`                   | Multi-mode search                                   |
-| `GET`  | `/integrations`             | List all user integrations                          |
-| `GET`  | `/integrations/{id}`        | Single integration                                  |
-| `GET`  | `/places/{id}`              | Single place (geo-aware EventObject)                |
-| `GET`  | `/map/data`                 | Geo-located events and places within a bounding box |
-| `GET`  | `/sync/delta`               | Incremental sync of changed events since a cursor   |
-| `GET`  | `/events/filter`            | Exact service/action/date-range event filtering, matching MCP |
-| `GET`  | `/context/day`               | Full raw day context (events, metrics, relationships) |
-| `GET`  | `/context/service-status`   | Sync coverage/freshness per service for a date       |
-| `GET`  | `/metrics/baselines`        | Baseline statistics for every computed metric         |
-| `GET`  | `/search/{type}`            | Typed semantic/keyword search (`events`, `objects`, or `blocks`) |
-| `GET`  | `/tags`                      | Cursor-paginated list of the user's tags              |
-| `GET`  | `/tags/suggest`              | Autocomplete tag suggestions                          |
-| `GET`  | `/tags/{id}`                 | A single tag plus the items tagged with it            |
-| `GET`  | `/{kind}/{id}/relationships` | List relationships on an owned event, object, or block |
-| `GET`  | `/settings/notifications`   | Current notification preferences                       |
-| `GET`  | `/check-ins`                 | Morning/afternoon check-in status for a date          |
-| `GET`  | `/check-ins/history`        | Check-in history for a date range (max 90 days)       |
-| `GET`  | `/check-ins/timezone`       | Effective timezone state (profile or time-travel override) |
-| `GET`  | `/up-to-speed`               | Ordered catch-up queue (Flint digests, check-ins, anomalies, news) |
-| `GET`  | `/flint/digests`             | Flint digest(s) for a date                            |
-| `GET`  | `/flint/digests/{id}`       | A single Flint digest                                  |
-| `GET`  | `/money/accounts`            | All non-archived manual/synced finance accounts        |
-| `GET`  | `/money/accounts/{id}`      | A single finance account                               |
-| `GET`  | `/money/accounts/{id}/balances` | Cursor-paginated balance history                   |
-| `GET`  | `/devices`                   | List registered push subscriptions                     |
-| `GET`  | `/api-tokens`                | List the user's personal access tokens (excluding the app's own session tokens) |
+| Method | Path                            | Description                                                                     |
+| ------ | ------------------------------- | ------------------------------------------------------------------------------- |
+| `GET`  | `/ping`                         | Health check                                                                    |
+| `GET`  | `/me`                           | Authenticated user profile                                                      |
+| `GET`  | `/briefing/today`               | Daily summary across all domains                                                |
+| `GET`  | `/health/dashboard`             | Fitness-first Health tab dashboard                                              |
+| `GET`  | `/feed`                         | Cursor-paginated reverse-chronological event feed                               |
+| `GET`  | `/notifications`                | Cursor-paginated notifications inbox                                            |
+| `GET`  | `/events/{id}`                  | Single event                                                                    |
+| `GET`  | `/objects/{id}`                 | Single object with optional recent events                                       |
+| `GET`  | `/blocks/{id}`                  | Single block                                                                    |
+| `GET`  | `/metrics`                      | All available metric identifiers and metadata                                   |
+| `GET`  | `/metrics/{metric}`             | Metric trend with baseline and daily values                                     |
+| `GET`  | `/widgets/today`                | Compact today widget payload (≤4 KB)                                            |
+| `GET`  | `/widgets/metrics/{metric}`     | Tiny sparkline widget for a single metric                                       |
+| `GET`  | `/widgets/spend`                | Today's spend widget                                                            |
+| `GET`  | `/search`                       | Multi-mode search                                                               |
+| `GET`  | `/integrations`                 | List all user integrations                                                      |
+| `GET`  | `/integrations/{id}`            | Single integration                                                              |
+| `GET`  | `/places/{id}`                  | Single place (geo-aware EventObject)                                            |
+| `GET`  | `/map/data`                     | Geo-located events and places within a bounding box                             |
+| `GET`  | `/sync/delta`                   | Incremental sync of changed events since a cursor                               |
+| `GET`  | `/events/filter`                | Exact service/action/date-range event filtering, matching MCP                   |
+| `GET`  | `/context/day`                  | Full raw day context (events, metrics, relationships)                           |
+| `GET`  | `/context/service-status`       | Sync coverage/freshness per service for a date                                  |
+| `GET`  | `/metrics/baselines`            | Baseline statistics for every computed metric                                   |
+| `GET`  | `/search/{type}`                | Typed semantic/keyword search (`events`, `objects`, or `blocks`)                |
+| `GET`  | `/tags`                         | Cursor-paginated list of the user's tags                                        |
+| `GET`  | `/tags/suggest`                 | Autocomplete tag suggestions                                                    |
+| `GET`  | `/tags/{id}`                    | A single tag plus the items tagged with it                                      |
+| `GET`  | `/{kind}/{id}/relationships`    | List relationships on an owned event, object, or block                          |
+| `GET`  | `/settings/notifications`       | Current notification preferences                                                |
+| `GET`  | `/check-ins`                    | Morning/afternoon check-in status for a date                                    |
+| `GET`  | `/check-ins/history`            | Check-in history for a date range (max 90 days)                                 |
+| `GET`  | `/check-ins/timezone`           | Effective timezone state (profile or time-travel override)                      |
+| `GET`  | `/up-to-speed`                  | Ordered catch-up queue (Flint digests, check-ins, anomalies, news)              |
+| `GET`  | `/flint/digests`                | Flint digest(s) for a date                                                      |
+| `GET`  | `/flint/digests/{id}`           | A single Flint digest                                                           |
+| `GET`  | `/money/accounts`               | All non-archived manual/synced finance accounts                                 |
+| `GET`  | `/money/accounts/{id}`          | A single finance account                                                        |
+| `GET`  | `/money/accounts/{id}/balances` | Cursor-paginated balance history                                                |
+| `GET`  | `/devices`                      | List registered push subscriptions                                              |
+| `GET`  | `/api-tokens`                   | List the user's personal access tokens (excluding the app's own session tokens) |
 
 ---
 
@@ -886,13 +886,13 @@ Exact service/action/date-range filtering — the mobile equivalent of MCP's
 
 **Query Parameters**
 
-| Parameter   | Type    | Required | Description                                        |
-| ----------- | ------- | -------- | --------------------------------------------------- |
-| `service`   | string  | Yes      | e.g. `monzo`, `oura`, `spotify` (max 100)            |
-| `action`    | string  | No       | Filter by action (max 255)                          |
-| `from_date` | string  | No       | ISO date or relative keyword (max 50)                |
-| `to_date`   | string  | No       | ISO date or relative keyword (max 50)                |
-| `limit`     | integer | No       | Max results (1–100, default 50)                    |
+| Parameter   | Type    | Required | Description                               |
+| ----------- | ------- | -------- | ----------------------------------------- |
+| `service`   | string  | Yes      | e.g. `monzo`, `oura`, `spotify` (max 100) |
+| `action`    | string  | No       | Filter by action (max 255)                |
+| `from_date` | string  | No       | ISO date or relative keyword (max 50)     |
+| `to_date`   | string  | No       | ISO date or relative keyword (max 50)     |
+| `limit`     | integer | No       | Max results (1–100, default 50)           |
 
 **Response `200`**
 
@@ -918,10 +918,10 @@ MCP resource.
 
 **Query Parameters**
 
-| Parameter | Type  | Default | Description                                   |
-| --------- | ----- | ------- | ---------------------------------------------- |
-| `date`    | string | today  | `YYYY-MM-DD`                                   |
-| `domains` | array  | all    | Up to 10 domain strings                        |
+| Parameter | Type   | Default | Description             |
+| --------- | ------ | ------- | ----------------------- |
+| `date`    | string | today   | `YYYY-MM-DD`            |
+| `domains` | array  | all     | Up to 10 domain strings |
 
 **Response `200`**: large structured payload — see
 [MCP.md](MCP.md#get-day-context-tool) for the shared shape.
@@ -973,24 +973,35 @@ Typed semantic or keyword search, scoped to one entity kind. `{type}` ∈
 
 **Query Parameters**
 
-| Parameter     | Type    | Required | Description                                          |
-| ------------- | ------- | -------- | ------------------------------------------------------ |
-| `query`       | string  | Yes      | Search text (max 500)                                 |
-| `semantic`    | boolean | No       | Default `true`                                         |
-| `limit`       | integer | No       | 1–50, default 20                                       |
-| `service`     | string  | No       | Events only (max 100)                                  |
-| `domain`      | string  | No       | Events only (max 100)                                  |
-| `concept`     | string  | No       | Objects only (max 100)                                 |
-| `object_type` | string  | No       | Objects only (max 100)                                 |
-| `block_type`  | string  | No       | Blocks only (max 100)                                  |
-| `from_date` / `to_date` | date | No  | Restrict by date                                        |
+| Parameter               | Type    | Required | Description            |
+| ----------------------- | ------- | -------- | ---------------------- |
+| `query`                 | string  | Yes      | Search text (max 500)  |
+| `semantic`              | boolean | No       | Default `true`         |
+| `limit`                 | integer | No       | 1–50, default 20       |
+| `service`               | string  | No       | Events only (max 100)  |
+| `domain`                | string  | No       | Events only (max 100)  |
+| `concept`               | string  | No       | Objects only (max 100) |
+| `object_type`           | string  | No       | Objects only (max 100) |
+| `block_type`            | string  | No       | Blocks only (max 100)  |
+| `from_date` / `to_date` | date    | No       | Restrict by date       |
 
 **Response `200`**
 
 ```json
 {
-    "events": [ { "id": "uuid", "similarity": 0.0842, "...": "full EventResource fields" } ],
-    "meta": { "query": "sleep score", "semantic": true, "count": 8, "limit": 20 }
+    "events": [
+        {
+            "id": "uuid",
+            "similarity": 0.0842,
+            "...": "full EventResource fields"
+        }
+    ],
+    "meta": {
+        "query": "sleep score",
+        "semantic": true,
+        "count": 8,
+        "limit": 20
+    }
 }
 ```
 
@@ -1015,7 +1026,14 @@ total usage then ID.
 ```json
 {
     "data": [
-        { "id": "12", "name": "running", "type": "spark", "events_count": 42, "objects_count": 3, "total_count": 45 }
+        {
+            "id": "12",
+            "name": "running",
+            "type": "spark",
+            "events_count": 42,
+            "objects_count": 3,
+            "total_count": 45
+        }
     ],
     "next_cursor": "MjA=",
     "has_more": false
@@ -1046,9 +1064,22 @@ objects, and blocks tagged with it, newest first.
 
 ```json
 {
-    "tag": { "id": "12", "name": "running", "type": "spark", "events_count": 42, "objects_count": 3, "total_count": 45 },
+    "tag": {
+        "id": "12",
+        "name": "running",
+        "type": "spark",
+        "events_count": 42,
+        "objects_count": 3,
+        "total_count": 45
+    },
     "data": [
-        { "kind": "event", "id": "uuid", "title": "5K Run", "subtitle": "2026-05-10T07:02:00+00:00", "domain": "health" }
+        {
+            "kind": "event",
+            "id": "uuid",
+            "title": "5K Run",
+            "subtitle": "2026-05-10T07:02:00+00:00",
+            "domain": "health"
+        }
     ],
     "next_cursor": null,
     "has_more": false
@@ -1081,20 +1112,40 @@ Current notification preferences.
 ```json
 {
     "categories": {
-        "anomaly": true,
-        "digest": true,
+        "integration_completed": true,
         "integration_failed": true,
-        "new_bookmark": true,
-        "calendar_event": true
+        "integration_authentication_failed": true,
+        "cookie_expiry_warning": true,
+        "fetch_multiple_failures": true,
+        "fetch_content_changed": true,
+        "migration_completed": true,
+        "migration_failed": true,
+        "data_export_ready": true,
+        "system_maintenance": true
     },
     "delivery_mode": "immediate",
     "digest_time": "08:00"
 }
 ```
 
+Each key is a real notification type — the string a notification's
+`getNotificationType()` returns — because that is what
+`SparkNotification::via()` gates delivery on. The set is derived from
+`App\Notifications\NotificationCatalogue`, which is also the source for the web
+settings page and for the APNs category mapping, so the three cannot drift.
+
+The categories this endpoint returned before v0.4 (`anomaly`, `digest`,
+`new_bookmark`, `calendar_event`) named notifications Spark never sends; toggling
+them had no effect and they have been withdrawn. Three types that are sent —
+`cookie_expiry_warning`, `fetch_content_changed`, `fetch_multiple_failures` — had
+no toggle at all and now do.
+
+Unset types default to `true`.
+
 The write counterpart, `PATCH /settings/notifications`, is handled by a
 separate controller (`NotificationSettingsController`, not
 `NotificationPreferencesController`) — see [Write Endpoints](#write-endpoints).
+It requires **every** key above unless `delivery_mode` is `work_hours`.
 
 ---
 
@@ -1133,7 +1184,14 @@ Day-by-day check-in summary for a date range.
     "days": [
         {
             "date": "2026-05-01",
-            "morning": { "completed": true, "physical": 4, "mental": 3, "combined": 3.5, "notes": null, "event_id": "uuid" },
+            "morning": {
+                "completed": true,
+                "physical": 4,
+                "mental": 3,
+                "combined": 3.5,
+                "notes": null,
+                "event_id": "uuid"
+            },
             "afternoon": { "completed": false }
         }
     ]
@@ -1212,50 +1270,50 @@ All write endpoints require `ios:write` ability.
 
 ### Summary
 
-| Method   | Path                               | Description                       |
-| -------- | ---------------------------------- | --------------------------------- |
-| `POST`   | `/devices`                         | Register an APNs device token     |
-| `DELETE` | `/devices/{id}`                    | Unregister a device               |
-| `POST`   | `/health/samples`                  | Ingest HealthKit samples (batch)  |
-| `POST`   | `/live-activities`                 | Start a Live Activity             |
-| `PATCH`  | `/live-activities/{id}`            | Push a Live Activity update       |
-| `DELETE` | `/live-activities/{id}`            | End a Live Activity               |
-| `POST`   | `/live-activities/{id}/tokens`     | Rotate a Live Activity push token |
-| `POST`   | `/check-ins`                       | Submit a daily mood check-in      |
-| `POST`   | `/anomalies/{id}/acknowledge`      | Acknowledge a metric anomaly      |
-| `POST`   | `/knowledge/events/{id}/reprocess` | Queue knowledge AI reprocessing   |
-| `POST`   | `/notifications/{id}/read`         | Mark one notification as read     |
-| `POST`   | `/notifications/read-all`          | Mark all notifications as read    |
-| `DELETE` | `/notifications/{id}`              | Delete one notification           |
-| `PATCH`  | `/{kind}/{id}`                      | Non-destructive update of an owned event/object/block |
-| `PATCH`  | `/events/{id}/note`                | Set or clear an event's note       |
-| `PATCH`  | `/{kind}/{id}/location`            | Set a location on an owned event/object |
-| `DELETE` | `/{kind}/{id}/location`            | Clear a location                   |
-| `POST`   | `/{kind}/{id}/location/geocode`    | Geocode an address and set it as the location |
-| `POST`   | `/events/{id}/tags`                | Attach a tag to an event            |
-| `DELETE` | `/events/{id}/tags/{tagId}`        | Detach a tag from an event          |
-| `POST`   | `/objects/{id}/tags`               | Attach a tag to an object           |
-| `DELETE` | `/objects/{id}/tags/{tagId}`       | Detach a tag from an object         |
-| `POST`   | `/integrations/{id}/sync`          | Trigger an immediate fetch for one integration |
-| `POST`   | `/integrations/sync`               | Trigger an immediate fetch for all instances of a service |
-| `POST`   | `/integrations/{id}/oauth/start`   | Start a PKCE re-authentication flow (mobile-only) |
-| `POST`   | `/{kind}/{id}/relationships`       | Create a relationship from an owned entity |
-| `DELETE` | `/relationships/{relationship}`    | Delete an owned relationship        |
-| `PATCH`  | `/settings/notifications`         | Update notification preferences     |
-| `POST`   | `/check-ins/timezone`              | Record an acknowledged timezone change |
-| `POST`   | `/check-ins/media`                 | Upload a check-in photo (raw binary body) |
-| `POST`   | `/up-to-speed/read`                | Mark Up to Speed items as caught up  |
-| `POST`   | `/flint/digests`                    | Create a Flint digest               |
-| `POST`   | `/flint/questions/{block}/answer`  | Answer a Flint user-question block  |
-| `POST`   | `/bookmarks`                        | Bookmark a URL                      |
-| `POST`   | `/money/accounts`                   | Create a manual finance account      |
-| `PATCH`  | `/money/accounts/{id}`             | Update a manual finance account      |
-| `DELETE` | `/money/accounts/{id}`             | Archive a manual finance account     |
-| `POST`   | `/money/accounts/{id}/balances`    | Add a balance entry                  |
-| `POST`   | `/devices/test`                     | Send a test push notification        |
-| `POST`   | `/logout`                            | End the calling session (revokes this token and its refresh token) |
-| `POST`   | `/api-tokens`                        | Create a personal access token (requires `tokens:manage`; unreachable from an iOS session) |
-| `DELETE` | `/api-tokens/{id}`                   | Revoke a personal access token         |
+| Method   | Path                               | Description                                                                                |
+| -------- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `POST`   | `/devices`                         | Register an APNs device token                                                              |
+| `DELETE` | `/devices/{id}`                    | Unregister a device                                                                        |
+| `POST`   | `/health/samples`                  | Ingest HealthKit samples (batch)                                                           |
+| `POST`   | `/live-activities`                 | Start a Live Activity                                                                      |
+| `PATCH`  | `/live-activities/{id}`            | Push a Live Activity update                                                                |
+| `DELETE` | `/live-activities/{id}`            | End a Live Activity                                                                        |
+| `POST`   | `/live-activities/{id}/tokens`     | Rotate a Live Activity push token                                                          |
+| `POST`   | `/check-ins`                       | Submit a daily mood check-in                                                               |
+| `POST`   | `/anomalies/{id}/acknowledge`      | Acknowledge a metric anomaly                                                               |
+| `POST`   | `/knowledge/events/{id}/reprocess` | Queue knowledge AI reprocessing                                                            |
+| `POST`   | `/notifications/{id}/read`         | Mark one notification as read                                                              |
+| `POST`   | `/notifications/read-all`          | Mark all notifications as read                                                             |
+| `DELETE` | `/notifications/{id}`              | Delete one notification                                                                    |
+| `PATCH`  | `/{kind}/{id}`                     | Non-destructive update of an owned event/object/block                                      |
+| `PATCH`  | `/events/{id}/note`                | Set or clear an event's note                                                               |
+| `PATCH`  | `/{kind}/{id}/location`            | Set a location on an owned event/object                                                    |
+| `DELETE` | `/{kind}/{id}/location`            | Clear a location                                                                           |
+| `POST`   | `/{kind}/{id}/location/geocode`    | Geocode an address and set it as the location                                              |
+| `POST`   | `/events/{id}/tags`                | Attach a tag to an event                                                                   |
+| `DELETE` | `/events/{id}/tags/{tagId}`        | Detach a tag from an event                                                                 |
+| `POST`   | `/objects/{id}/tags`               | Attach a tag to an object                                                                  |
+| `DELETE` | `/objects/{id}/tags/{tagId}`       | Detach a tag from an object                                                                |
+| `POST`   | `/integrations/{id}/sync`          | Trigger an immediate fetch for one integration                                             |
+| `POST`   | `/integrations/sync`               | Trigger an immediate fetch for all instances of a service                                  |
+| `POST`   | `/integrations/{id}/oauth/start`   | Start a PKCE re-authentication flow (mobile-only)                                          |
+| `POST`   | `/{kind}/{id}/relationships`       | Create a relationship from an owned entity                                                 |
+| `DELETE` | `/relationships/{relationship}`    | Delete an owned relationship                                                               |
+| `PATCH`  | `/settings/notifications`          | Update notification preferences                                                            |
+| `POST`   | `/check-ins/timezone`              | Record an acknowledged timezone change                                                     |
+| `POST`   | `/check-ins/media`                 | Upload a check-in photo (raw binary body)                                                  |
+| `POST`   | `/up-to-speed/read`                | Mark Up to Speed items as caught up                                                        |
+| `POST`   | `/flint/digests`                   | Create a Flint digest                                                                      |
+| `POST`   | `/flint/questions/{block}/answer`  | Answer a Flint user-question block                                                         |
+| `POST`   | `/bookmarks`                       | Bookmark a URL                                                                             |
+| `POST`   | `/money/accounts`                  | Create a manual finance account                                                            |
+| `PATCH`  | `/money/accounts/{id}`             | Update a manual finance account                                                            |
+| `DELETE` | `/money/accounts/{id}`             | Archive a manual finance account                                                           |
+| `POST`   | `/money/accounts/{id}/balances`    | Add a balance entry                                                                        |
+| `POST`   | `/devices/test`                    | Send a test push notification                                                              |
+| `POST`   | `/logout`                          | End the calling session (revokes this token and its refresh token)                         |
+| `POST`   | `/api-tokens`                      | Create a personal access token (requires `tokens:manage`; unreachable from an iOS session) |
+| `DELETE` | `/api-tokens/{id}`                 | Revoke a personal access token                                                             |
 
 ---
 
@@ -1743,7 +1801,7 @@ non-delegable value (including `*` and `ios:*`).
 > **Changed.** This endpoint previously accepted arbitrary ability strings,
 > defaulted a missing `abilities` to `["*"]`, and — because it stripped
 > `ios:*` scopes before checking emptiness — also returned `["*"]` when the
-> request asked for *only* those scopes. A `["*"]` token satisfies every
+> request asked for _only_ those scopes. A `["*"]` token satisfies every
 > capability check in the application, so an iOS session could mint itself
 > full authority. Callers that relied on the wildcard default must now name
 > their capabilities.
@@ -2209,15 +2267,15 @@ shapes.
 }
 ```
 
-| Field         | Type    | Description                                                |
-| ------------- | ------- | ---------------------------------------------------------- |
-| `id`          | UUID    | Database notification ID                                   |
-| `title`       | string  | Notification title, defaults to `"Notification"` if absent |
-| `body`        | string  | Optional message body                                      |
-| `domain`      | string  | Optional Spark domain, when the notification carries one   |
-| `is_read`     | boolean | `true` when `read_at` is set                               |
-| `received_at` | string  | ISO timestamp for notification creation                    |
-| `entity`      | object  | Optional deep-link target with `kind` and `id`             |
+| Field         | Type    | Description                                                           |
+| ------------- | ------- | --------------------------------------------------------------------- |
+| `id`          | UUID    | Database notification ID                                              |
+| `title`       | string  | Notification title, defaults to `"Notification"` if absent            |
+| `body`        | string  | Optional message body                                                 |
+| `domain`      | string  | Optional Spark domain, when the notification carries one              |
+| `is_read`     | boolean | `true` when `read_at` is set                                          |
+| `received_at` | string  | ISO timestamp for notification creation                               |
+| `entity`      | object  | Optional deep-link target with `kind` and `id`                        |
 | `version`     | string  | Strong entity tag; send as `If-Match` on `DELETE /notifications/{id}` |
 
 `body`, `domain`, and `entity` are `null` when not present. `entity.kind` is one of `event`, `object`, `metric`, `place`, `anomaly`, or `integration`.

@@ -3,6 +3,7 @@
 namespace App\Notifications\Channels;
 
 use App\Models\PushSubscription;
+use App\Notifications\NotificationCatalogue;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Notification;
@@ -20,27 +21,6 @@ class ApnsChannel
         'DeviceTokenNotForTopic',
         'TopicDisallowed',
         'Unregistered',
-    ];
-
-    /**
-     * Notification type -> UNNotificationCategory identifier registered by the
-     * iOS client.
-     *
-     * Only failure-shaped notifications currently map: INTEGRATION_FAILED is the
-     * one registered category with matching actions (VIEW, REAUTH). Types absent
-     * from this map are sent without a category, which is a plain notification —
-     * the honest outcome until either the client registers a matching category
-     * or the type is retired. The client's other registered categories (ANOMALY,
-     * DIGEST, NEW_BOOKMARK, CALENDAR_EVENT) have no server-side producer.
-     *
-     * @var array<string, string>
-     */
-    private const CLIENT_CATEGORIES = [
-        'integration_failed' => 'INTEGRATION_FAILED',
-        'integration_authentication_failed' => 'INTEGRATION_FAILED',
-        'fetch_multiple_failures' => 'INTEGRATION_FAILED',
-        'cookie_expiry_warning' => 'INTEGRATION_FAILED',
-        'migration_failed' => 'INTEGRATION_FAILED',
     ];
 
     public function __construct(
@@ -118,7 +98,7 @@ class ApnsChannel
         // notification type meant no category ever matched, leaving every
         // action button inert. threadId is a grouping key only, so the raw type
         // remains correct there.
-        $category = $type === null ? null : (self::CLIENT_CATEGORIES[$type] ?? null);
+        $category = $type === null ? null : ($this->clientCategories()[$type] ?? null);
 
         if ($message->category === null && $category !== null) {
             $message->category($category);
@@ -222,5 +202,22 @@ class ApnsChannel
                     ->delete();
             }
         }
+    }
+
+    /**
+     * Notification type -> UNNotificationCategory identifier registered by the
+     * iOS client.
+     *
+     * Derived from NotificationCatalogue so the server and the client cannot
+     * drift: the categories the client registers are exactly
+     * NotificationCatalogue::apnsCategoryIdentifiers(). A type absent from the
+     * catalogue is sent without a category, which is a plain notification with
+     * no action buttons — the honest outcome until it is added there.
+     *
+     * @return array<string, string>
+     */
+    private function clientCategories(): array
+    {
+        return NotificationCatalogue::apnsCategories();
     }
 }

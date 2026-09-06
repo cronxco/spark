@@ -6,6 +6,7 @@ use App\Models\Integration;
 use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\Channels\ApnsChannel;
+use App\Notifications\IntegrationAuthenticationFailed;
 use App\Notifications\IntegrationFailed;
 use App\Notifications\TestPushNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,11 +83,11 @@ class ApnsChannelTest extends TestCase
         $this->assertSame('Push notifications are working correctly!', $alert['aps']['alert']['body']);
         $this->assertSame('default', $alert['aps']['sound']);
         $this->assertSame(1, $alert['aps']['badge']);
-        // `test_push` has no counterpart among the five UNNotificationCategory
-        // identifiers the iOS client registers, so no category is sent. Sending
-        // the raw type — as this previously did — bound to nothing on the
+        // The category comes from NotificationCatalogue, which the client's
+        // UNNotificationCategory registrations mirror exactly. Sending the raw
+        // snake_case type — as this previously did — bound to nothing on the
         // client and left every action button inert.
-        $this->assertArrayNotHasKey('category', $alert['aps']);
+        $this->assertSame('SYSTEM', $alert['aps']['category']);
 
         // thread-id is a client-agnostic grouping key and still carries the type.
         $this->assertSame('test_push', $alert['aps']['thread-id']);
@@ -125,8 +126,34 @@ class ApnsChannelTest extends TestCase
         // SCREAMING_CASE, matching the UNNotificationCategory the client
         // registers. Category matching is case-sensitive, so the previous
         // snake_case `integration_failed` did not bind.
-        $this->assertSame('INTEGRATION_FAILED', $alert['aps']['category']);
+        $this->assertSame('INTEGRATION_STATUS', $alert['aps']['category']);
+        // thread-id is a client-agnostic grouping key and still carries the type.
         $this->assertSame('integration_failed', $alert['aps']['thread-id']);
+    }
+
+    #[Test]
+    public function a_reauthorization_notification_sends_the_attention_category(): void
+    {
+        $user = User::factory()->create();
+
+        $user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('c', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+            'app_environment' => 'sandbox',
+            'bundle_id' => 'co.cronx.spark',
+            'app_version' => '1.0.0',
+            'os_version' => '18.0',
+        ]);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+
+        $user->notifyNow(new IntegrationAuthenticationFailed($integration, 'Token expired'));
+
+        $alert = json_decode($this->capturedNotifications[0]->getPayload()->toJson(), true);
+
+        // Only this category carries the Reconnect action, which is the whole
+        // point of separating it from the informational failures.
+        $this->assertSame('INTEGRATION_ATTENTION', $alert['aps']['category']);
     }
 
     #[Test]

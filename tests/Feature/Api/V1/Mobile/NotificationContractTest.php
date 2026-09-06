@@ -3,7 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
-use App\Notifications\Channels\ApnsChannel;
+use App\Notifications\NotificationCatalogue;
 use App\Notifications\SystemMaintenance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -141,43 +141,180 @@ class NotificationContractTest extends TestCase
 
     /*
      |--------------------------------------------------------------------------
-     | APNs vocabulary (NOTIF-02)
+     | The notification taxonomy (NOTIF-02, NOTIF-03)
      |--------------------------------------------------------------------------
      |
      | The channel sent the raw snake_case notification type as the category
      | identifier. The client registers SCREAMING_CASE identifiers and matching
      | is case-sensitive, so no category ever bound and every action button was
      | inert.
+     |
+     | Separately, the mobile API invented five categories of which only one
+     | corresponded to a notification that is ever sent, while three real types
+     | had no toggle at all. NotificationCatalogue is now the one source of
+     | truth for all four consumers.
      */
+
+    #[Test]
+    public function every_catalogue_type_is_a_type_a_notification_actually_declares(): void
+    {
+        $declared = [];
+
+        foreach (glob(app_path('Notifications/*.php')) as $file) {
+            $class = 'App\\Notifications\\' . basename($file, '.php');
+
+            if (! class_exists($class) || ! method_exists($class, 'getNotificationType')) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isAbstract()) {
+                continue;
+            }
+
+            $declared[] = $reflection->newInstanceWithoutConstructor()->getNotificationType();
+        }
+
+        $this->assertNotEmpty($declared);
+        $this->assertSame(
+            [],
+            array_diff(array_keys(NotificationCatalogue::all()), $declared),
+            'The catalogue must not list a type no notification class declares.',
+        );
+    }
+
+    #[Test]
+    public function every_declared_notification_type_is_in_the_catalogue(): void
+    {
+        $missing = [];
+
+        foreach (glob(app_path('Notifications/*.php')) as $file) {
+            $class = 'App\\Notifications\\' . basename($file, '.php');
+
+            if (! class_exists($class) || ! method_exists($class, 'getNotificationType')) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isAbstract()) {
+                continue;
+            }
+
+            $type = $reflection->newInstanceWithoutConstructor()->getNotificationType();
+
+            if (! array_key_exists($type, NotificationCatalogue::all())) {
+                $missing[] = $type;
+            }
+        }
+
+        $this->assertSame([], $missing, 'A sent notification type with no catalogue entry has no toggle and no category.');
+    }
+
+    #[Test]
+    public function the_preferences_endpoint_offers_the_real_types(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $categories = $this->getJson('/api/v1/mobile/settings/notifications')->assertOk()->json('categories');
+
+        $this->assertSame(NotificationCatalogue::configurableTypes(), array_keys($categories));
+        $this->assertArrayHasKey('integration_failed', $categories);
+        $this->assertArrayHasKey('cookie_expiry_warning', $categories);
+    }
+
+    #[Test]
+    public function the_retired_categories_are_no_longer_offered(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $categories = $this->getJson('/api/v1/mobile/settings/notifications')->assertOk()->json('categories');
+
+        foreach (['anomaly', 'digest', 'new_bookmark', 'calendar_event'] as $retired) {
+            $this->assertArrayNotHasKey($retired, $categories, "{$retired} gates a notification that is never sent.");
+        }
+    }
+
+    #[Test]
+    public function a_toggle_saved_over_the_api_actually_gates_delivery(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $etag = $this->getJson('/api/v1/mobile/settings/notifications')->headers->get('ETag');
+
+        // The endpoint requires every toggle when the mode is not work_hours,
+        // so send the full set with one flipped off.
+        $categories = array_fill_keys(NotificationCatalogue::configurableTypes(), true);
+        $categories['integration_failed'] = false;
+
+        $this->withHeader('If-Match', $etag)
+            ->patchJson('/api/v1/mobile/settings/notifications', [
+                'delivery_mode' => 'immediate',
+                'categories' => $categories,
+            ])
+            ->assertSuccessful();
+
+        // SparkNotification::via() gates on the real type string, so this is
+        // the assertion the invented categories could never satisfy.
+        $this->assertFalse(
+            $this->user->fresh()->hasPushNotificationsEnabledForType('integration_failed'),
+        );
+    }
 
     #[Test]
     public function a_failure_notification_uses_a_category_the_client_registers(): void
     {
         $this->assertSame(
-            'INTEGRATION_FAILED',
+            'INTEGRATION_STATUS',
             $this->categoryFor('integration_failed'),
+        );
+    }
+
+    #[Test]
+    public function a_reauthorization_notification_uses_the_attention_category(): void
+    {
+        $this->assertSame(
+            'INTEGRATION_ATTENTION',
+            $this->categoryFor('integration_authentication_failed'),
+        );
+        $this->assertSame(
+            'INTEGRATION_ATTENTION',
+            $this->categoryFor('cookie_expiry_warning'),
         );
     }
 
     #[Test]
     public function every_mapped_category_is_one_the_client_registered(): void
     {
-        $registeredByClient = ['ANOMALY', 'DIGEST', 'INTEGRATION_FAILED', 'NEW_BOOKMARK', 'CALENDAR_EVENT'];
+        // Kept in step with SparkApp.swift registerNotificationCategories().
+        // A category identifier the client has not registered shows no action
+        // buttons, and matching is case-sensitive.
+        $registeredByClient = ['INTEGRATION_ATTENTION', 'INTEGRATION_STATUS', 'SYSTEM'];
 
-        $mapped = $this->clientCategories();
+        $mapped = NotificationCatalogue::apnsCategories();
 
         $this->assertNotEmpty($mapped);
         $this->assertSame(
             [],
             array_diff(array_values($mapped), $registeredByClient),
-            'A category identifier the client has not registered shows no action buttons.',
+        );
+        $this->assertSame(
+            [],
+            array_diff($registeredByClient, NotificationCatalogue::apnsCategoryIdentifiers()),
+            'The client registers a category no notification is ever sent with.',
         );
     }
 
     #[Test]
-    public function an_unmapped_type_sends_no_category_rather_than_an_unknown_one(): void
+    public function every_catalogue_type_carries_a_category(): void
     {
-        $this->assertNull($this->categoryFor('system_maintenance'));
+        foreach (array_keys(NotificationCatalogue::all()) as $type) {
+            $this->assertNotNull(
+                $this->categoryFor($type),
+                "{$type} would arrive with no action buttons.",
+            );
+        }
     }
 
     private function notifyUser(): string
@@ -187,16 +324,8 @@ class NotificationContractTest extends TestCase
         return (string) $this->user->notifications()->latest()->firstOrFail()->id;
     }
 
-    /** @return array<string, string> */
-    private function clientCategories(): array
-    {
-        $reflection = new ReflectionClass(ApnsChannel::class);
-
-        return $reflection->getConstant('CLIENT_CATEGORIES');
-    }
-
     private function categoryFor(string $notificationType): ?string
     {
-        return $this->clientCategories()[$notificationType] ?? null;
+        return NotificationCatalogue::apnsCategories()[$notificationType] ?? null;
     }
 }

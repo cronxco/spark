@@ -59,7 +59,11 @@ paths:
                 Strong user version. Echo as If-Match on routes guarded by
                 if-match:user, currently PATCH /settings/notifications.
               schema: { type: string }
-          content: { application/json: { schema: { $ref: '#/components/schemas/UserProfile' } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/UserProfile" } },
+            }
 
   /logout:
     post:
@@ -73,7 +77,10 @@ paths:
         credential: other devices and separately created personal access
         tokens are untouched.
       responses:
-        "204": { description: "No content. The bearer token used for this request is now invalid." }
+        "204":
+          {
+            description: "No content. The bearer token used for this request is now invalid.",
+          }
 
   /briefing/today:
     get:
@@ -82,7 +89,12 @@ paths:
       summary: Daily summary across all domains
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
-        - { name: domains, in: query, schema: { type: string }, description: "Comma-separated domain filter" }
+        - {
+            name: domains,
+            in: query,
+            schema: { type: string },
+            description: "Comma-separated domain filter",
+          }
       responses:
         "200": { description: OK }
 
@@ -93,10 +105,14 @@ paths:
       summary: Curated fitness-first health dashboard
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
-        - { name: range, in: query, schema: { type: string, enum: ["7d", "30d", "90d"], default: "7d" } }
+        - {
+            name: range,
+            in: query,
+            schema: { type: string, enum: ["7d", "30d", "90d"], default: "7d" },
+          }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /feed:
     get:
@@ -105,7 +121,11 @@ paths:
       summary: Cursor-paginated reverse-chronological event feed
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 20 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 100, default: 20 },
+          }
         - { name: domain, in: query, schema: { type: string } }
         - { name: date, in: query, schema: { type: string, format: date } }
       responses:
@@ -116,10 +136,14 @@ paths:
               schema:
                 type: object
                 properties:
-                  data: { type: array, items: { $ref: '#/components/schemas/CompactEvent' } }
+                  data:
+                    {
+                      type: array,
+                      items: { $ref: "#/components/schemas/CompactEvent" },
+                    }
                   next_cursor: { type: [string, "null"] }
                   has_more: { type: boolean }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /events/filter:
     get:
@@ -127,11 +151,20 @@ paths:
       tags: [feed]
       summary: Exact service/action/date-range event filtering
       parameters:
-        - { name: service, in: query, required: true, schema: { type: string, maxLength: 100 } }
+        - {
+            name: service,
+            in: query,
+            required: true,
+            schema: { type: string, maxLength: 100 },
+          }
         - { name: action, in: query, schema: { type: string, maxLength: 255 } }
         - { name: from_date, in: query, schema: { type: string } }
         - { name: to_date, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 100, default: 50 },
+          }
       responses:
         "200": { description: OK }
 
@@ -142,7 +175,11 @@ paths:
       summary: Full raw day context (events, metrics, relationships)
       parameters:
         - { name: date, in: query, schema: { type: string, format: date } }
-        - { name: domains, in: query, schema: { type: array, items: { type: string }, maxItems: 10 } }
+        - {
+            name: domains,
+            in: query,
+            schema: { type: array, items: { type: string }, maxItems: 10 },
+          }
       responses:
         "200": { description: OK }
 
@@ -163,7 +200,11 @@ paths:
       summary: Cursor-paginated notifications inbox
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 200, default: 50 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 200, default: 50 },
+          }
       responses:
         "200":
           description: OK
@@ -172,7 +213,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  data: { type: array, items: { $ref: '#/components/schemas/CompactNotification' } }
+                  data:
+                    {
+                      type: array,
+                      items:
+                        { $ref: "#/components/schemas/CompactNotification" },
+                    }
                   next_cursor: { type: [string, "null"] }
                   has_more: { type: boolean }
 
@@ -196,10 +242,10 @@ paths:
         Idempotent, so no If-Match precondition. The 204 carries the
         notification's refreshed ETag.
       parameters:
-        - { $ref: '#/components/parameters/NumericId' }
+        - { $ref: "#/components/parameters/NumericId" }
       responses:
         "204": { description: No content }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /notifications/{id}:
     delete:
@@ -207,36 +253,49 @@ paths:
       tags: [notifications]
       summary: Delete one notification
       parameters:
-        - { $ref: '#/components/parameters/NumericId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/NumericId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "204": { description: No content }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{id}:
     get:
       operationId: getEvent
       tags: [entities]
       summary: Single event with full embedded blocks
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactEvent' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{id}/note:
     patch:
       operationId: updateEventNote
       tags: [entities]
       summary: Set or clear an event's note
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { note: { type: [string, "null"] } } }
+            schema:
+              { type: object, properties: { note: { type: [string, "null"] } } }
       responses:
         "200": { description: OK }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /objects/{id}:
     get:
@@ -244,22 +303,46 @@ paths:
       tags: [entities]
       summary: Single object, optionally with recent events
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
-        - { name: include_events, in: query, schema: { type: boolean, default: true } }
-        - { name: event_limit, in: query, schema: { type: integer, minimum: 1, maximum: 25, default: 5 } }
+        - { $ref: "#/components/parameters/EntityId" }
+        - {
+            name: include_events,
+            in: query,
+            schema: { type: boolean, default: true },
+          }
+        - {
+            name: event_limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 25, default: 5 },
+          }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactObject' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactObject" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /blocks/{id}:
     get:
       operationId: getBlock
       tags: [entities]
       summary: Single block
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactBlock' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactBlock" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /{kind}/{id}:
     patch:
@@ -267,19 +350,23 @@ paths:
       tags: [entities]
       summary: Non-destructive update of an owned event, object, or block
       parameters:
-        - { $ref: '#/components/parameters/EntityKind' }
-        - { $ref: '#/components/parameters/EntityId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/EntityKind" }
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       requestBody:
         content:
           application/json:
-            schema: { type: object, description: "Allow-listed fields per kind — see MCP.md#update-entity" }
+            schema:
+              {
+                type: object,
+                description: "Allow-listed fields per kind — see MCP.md#update-entity",
+              }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationError' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /{kind}/{id}/location:
     patch:
@@ -287,27 +374,47 @@ paths:
       tags: [entities]
       summary: Set a location on an owned event or object (mobile-only)
       parameters:
-        - { name: kind, in: path, required: true, schema: { type: string, enum: [events, objects] } }
-        - { $ref: '#/components/parameters/EntityId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - {
+            name: kind,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [events, objects] },
+          }
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [latitude, longitude], properties: { latitude: { type: number, minimum: -90, maximum: 90 }, longitude: { type: number, minimum: -180, maximum: 180 }, address: { type: string, maxLength: 500 } } }
+            schema:
+              {
+                type: object,
+                required: [latitude, longitude],
+                properties:
+                  {
+                    latitude: { type: number, minimum: -90, maximum: 90 },
+                    longitude: { type: number, minimum: -180, maximum: 180 },
+                    address: { type: string, maxLength: 500 },
+                  },
+              }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: clearLocation
       tags: [entities]
       summary: Clear a location from an owned event or object
       parameters:
-        - { name: kind, in: path, required: true, schema: { type: string, enum: [events, objects] } }
-        - { $ref: '#/components/parameters/EntityId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - {
+            name: kind,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [events, objects] },
+          }
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /{kind}/{id}/location/geocode:
     post:
@@ -315,38 +422,72 @@ paths:
       tags: [entities]
       summary: Geocode an address and set it as the entity's location
       parameters:
-        - { name: kind, in: path, required: true, schema: { type: string, enum: [events, objects] } }
-        - { $ref: '#/components/parameters/EntityId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - {
+            name: kind,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [events, objects] },
+          }
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [address], properties: { address: { type: string, maxLength: 500 } } }
+            schema:
+              {
+                type: object,
+                required: [address],
+                properties: { address: { type: string, maxLength: 500 } },
+              }
       responses:
         "200": { description: OK }
-        "422": { description: Entity not found or address could not be geocoded }
+        "422":
+          { description: Entity not found or address could not be geocoded }
 
   /{kind}/{id}/relationships:
     get:
       operationId: listRelationships
       tags: [entities]
       summary: List relationships attached to an owned entity
-      parameters: [{ $ref: '#/components/parameters/EntityKind' }, { $ref: '#/components/parameters/EntityId' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityKind" },
+          { $ref: "#/components/parameters/EntityId" },
+        ]
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createRelationship
       tags: [entities]
       summary: Create a relationship from an owned entity
-      parameters: [{ $ref: '#/components/parameters/EntityKind' }, { $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityKind" },
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [to_kind, to_id, type], properties: { to_kind: { type: string }, to_id: { type: string, format: uuid }, type: { type: string }, value: { type: [number, "null"] }, value_multiplier: { type: [number, "null"] }, value_unit: { type: [string, "null"] }, metadata: { type: object } } }
+            schema:
+              {
+                type: object,
+                required: [to_kind, to_id, type],
+                properties:
+                  {
+                    to_kind: { type: string },
+                    to_id: { type: string, format: uuid },
+                    type: { type: string },
+                    value: { type: [number, "null"] },
+                    value_multiplier: { type: [number, "null"] },
+                    value_unit: { type: [string, "null"] },
+                    metadata: { type: object },
+                  },
+              }
       responses:
         "201": { description: Created }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /relationships/{relationship}:
     delete:
@@ -354,11 +495,16 @@ paths:
       tags: [entities]
       summary: Delete an owned relationship
       parameters:
-        - { name: relationship, in: path, required: true, schema: { type: string, format: uuid } }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - {
+            name: relationship,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "204": { description: No content }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /metrics:
     get:
@@ -366,7 +512,21 @@ paths:
       tags: [metrics]
       summary: All metric identifiers and metadata
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CompactMetric' } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: array,
+                        items: { $ref: "#/components/schemas/CompactMetric" },
+                      },
+                  },
+              },
+          }
 
   /metrics/baselines:
     get:
@@ -383,12 +543,16 @@ paths:
       summary: Metric trend with daily values and baseline
       parameters:
         - { name: metric, in: path, required: true, schema: { type: string } }
-        - { name: range, in: query, schema: { type: string, enum: ["7d", "30d", "90d", "1y"] } }
+        - {
+            name: range,
+            in: query,
+            schema: { type: string, enum: ["7d", "30d", "90d", "1y"] },
+          }
         - { name: from, in: query, schema: { type: string } }
         - { name: to, in: query, schema: { type: string } }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /widgets/today:
     get:
@@ -423,11 +587,20 @@ paths:
       summary: Multi-mode search across events, objects, integrations, metrics
       parameters:
         - { name: q, in: query, schema: { type: string } }
-        - { name: mode, in: query, schema: { type: string, enum: [default, semantic, tag, metric, integration], default: default } }
+        - {
+            name: mode,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [default, semantic, tag, metric, integration],
+                default: default,
+              },
+          }
         - { name: limit, in: query, schema: { type: integer, default: 10 } }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /search/{type}:
     get:
@@ -435,15 +608,41 @@ paths:
       tags: [search]
       summary: Typed semantic/keyword search scoped to one entity kind
       parameters:
-        - { name: type, in: path, required: true, schema: { type: string, enum: [events, objects, blocks] } }
-        - { name: query, in: query, required: true, schema: { type: string, maxLength: 500 } }
-        - { name: semantic, in: query, schema: { type: boolean, default: true } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - {
+            name: type,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [events, objects, blocks] },
+          }
+        - {
+            name: query,
+            in: query,
+            required: true,
+            schema: { type: string, maxLength: 500 },
+          }
+        - {
+            name: semantic,
+            in: query,
+            schema: { type: boolean, default: true },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
+          }
         - { name: service, in: query, schema: { type: string, maxLength: 100 } }
         - { name: domain, in: query, schema: { type: string, maxLength: 100 } }
         - { name: concept, in: query, schema: { type: string, maxLength: 100 } }
-        - { name: object_type, in: query, schema: { type: string, maxLength: 100 } }
-        - { name: block_type, in: query, schema: { type: string, maxLength: 100 } }
+        - {
+            name: object_type,
+            in: query,
+            schema: { type: string, maxLength: 100 },
+          }
+        - {
+            name: block_type,
+            in: query,
+            schema: { type: string, maxLength: 100 },
+          }
         - { name: from_date, in: query, schema: { type: string, format: date } }
         - { name: to_date, in: query, schema: { type: string, format: date } }
       responses:
@@ -457,7 +656,11 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string, maxLength: 255 } }
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 30 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 100, default: 30 },
+          }
       responses:
         "200": { description: OK }
 
@@ -468,7 +671,11 @@ paths:
       summary: Autocomplete tag suggestions
       parameters:
         - { name: q, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 25, default: 10 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 25, default: 10 },
+          }
       responses:
         "200": { description: OK }
 
@@ -480,24 +687,41 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 30 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 100, default: 30 },
+          }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{id}/tags:
     post:
       operationId: attachEventTag
       tags: [tags]
       summary: Attach a tag to an owned event
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { tag_id: { type: integer }, name: { type: string }, type: { type: string } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    tag_id: { type: integer },
+                    name: { type: string },
+                    type: { type: string },
+                  },
+              }
       responses:
         "201": { description: Created }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /events/{id}/tags/{tagId}:
     delete:
@@ -505,26 +729,39 @@ paths:
       tags: [tags]
       summary: Detach a tag from an owned event
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: "#/components/parameters/EntityId" }
         - { name: tagId, in: path, required: true, schema: { type: integer } }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /objects/{id}/tags:
     post:
       operationId: attachObjectTag
       tags: [tags]
       summary: Attach a tag to an owned object
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { tag_id: { type: integer }, name: { type: string }, type: { type: string } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    tag_id: { type: integer },
+                    name: { type: string },
+                    type: { type: string },
+                  },
+              }
       responses:
         "201": { description: Created }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /objects/{id}/tags/{tagId}:
     delete:
@@ -532,12 +769,12 @@ paths:
       tags: [tags]
       summary: Detach a tag from an owned object
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: "#/components/parameters/EntityId" }
         - { name: tagId, in: path, required: true, schema: { type: integer } }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /integrations:
     get:
@@ -545,24 +782,62 @@ paths:
       tags: [integrations]
       summary: All of the user's integrations
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/CompactIntegration' } } } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  {
+                                    $ref: "#/components/schemas/CompactIntegration",
+                                  },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
 
   /integrations/{id}:
     get:
       operationId: getIntegration
       tags: [integrations]
       summary: A single integration
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactIntegration' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/CompactIntegration" },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /integrations/{id}/sync:
     post:
       operationId: syncIntegration
       tags: [integrations]
       summary: Trigger an immediate fetch for one integration instance
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       responses:
         "200": { description: OK }
         "422": { description: Integration is paused }
@@ -575,7 +850,12 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [service], properties: { service: { type: string, maxLength: 100 } } }
+            schema:
+              {
+                type: object,
+                required: [service],
+                properties: { service: { type: string, maxLength: 100 } },
+              }
       responses:
         "200": { description: OK }
         "404": { description: No integrations found for that service }
@@ -585,20 +865,29 @@ paths:
       operationId: startIntegrationOauth
       tags: [integrations]
       summary: Start a PKCE re-authentication flow (mobile-only)
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200": { description: OK }
-        "422": { description: "Not connected, unknown service, or non-OAuth plugin" }
+        "422":
+          { description: "Not connected, unknown service, or non-OAuth plugin" }
 
   /places/{id}:
     get:
       operationId: getPlace
       tags: [places]
       summary: A single place
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactPlace' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactPlace" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /map/data:
     get:
@@ -606,10 +895,16 @@ paths:
       tags: [places]
       summary: Geo-located events and places within a bounding box
       parameters:
-        - { name: bbox, in: query, required: true, schema: { type: string }, description: "swLat,swLng,neLat,neLng" }
+        - {
+            name: bbox,
+            in: query,
+            required: true,
+            schema: { type: string },
+            description: "swLat,swLng,neLat,neLng",
+          }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /sync/delta:
     get:
@@ -637,7 +932,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [apns_token, app_environment, bundle_id, app_version, os_version]
+              required:
+                [
+                  apns_token,
+                  app_environment,
+                  bundle_id,
+                  app_version,
+                  os_version,
+                ]
               properties:
                 apns_token: { type: string, minLength: 64, maxLength: 64 }
                 app_environment: { type: string, enum: [sandbox, production] }
@@ -662,7 +964,21 @@ paths:
       tags: [profile]
       summary: List the user's personal access tokens (mobile-only; excludes the app's own session tokens)
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ApiToken' } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: array,
+                        items: { $ref: "#/components/schemas/ApiToken" },
+                      },
+                  },
+              },
+          }
     post:
       operationId: createApiToken
       tags: [profile]
@@ -684,7 +1000,7 @@ paths:
                   type: array
                   minItems: 1
                   maxItems: 20
-                  items: { $ref: '#/components/schemas/DelegableAbility' }
+                  items: { $ref: "#/components/schemas/DelegableAbility" }
       responses:
         "201":
           description: Created
@@ -701,28 +1017,35 @@ paths:
                       Shown only in this response. A bearer credential —
                       excluded from application telemetry, and must not be
                       logged.
-        "403": { description: "Requested capabilities exceed those of the calling credential" }
-        "422": { description: "abilities omitted, empty, or containing an unknown or non-delegable value" }
+        "403":
+          {
+            description: "Requested capabilities exceed those of the calling credential",
+          }
+        "422":
+          {
+            description: "abilities omitted, empty, or containing an unknown or non-delegable value",
+          }
 
   /api-tokens/{id}:
     delete:
       operationId: deleteApiToken
       tags: [profile]
       summary: Revoke a personal access token
-      parameters: [{ $ref: '#/components/parameters/NumericId' }]
+      parameters: [{ $ref: "#/components/parameters/NumericId" }]
       responses:
         "204": { description: No content }
-        "404": { description: "Not found, or one of the app's own session tokens" }
+        "404":
+          { description: "Not found, or one of the app's own session tokens" }
 
   /devices/{id}:
     delete:
       operationId: deleteDevice
       tags: [devices]
       summary: Unregister a device
-      parameters: [{ $ref: '#/components/parameters/NumericId' }]
+      parameters: [{ $ref: "#/components/parameters/NumericId" }]
       responses:
         "204": { description: No content }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /health/samples:
     post:
@@ -766,7 +1089,11 @@ paths:
                       type: object
                       properties:
                         external_id: { type: string }
-                        status: { type: string, enum: [created, duplicate, skipped, error] }
+                        status:
+                          {
+                            type: string,
+                            enum: [created, duplicate, skipped, error],
+                          }
 
   /live-activities:
     post:
@@ -786,26 +1113,52 @@ paths:
                 device_id: { type: [integer, "null"] }
                 content_state: { type: object }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/LiveActivityToken' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/LiveActivityToken" },
+                  },
+              },
+          }
 
   /live-activities/{id}:
     patch:
       operationId: updateLiveActivity
       tags: [live-activities]
       summary: Push a content state update (rate-limited to 16/hour/activity)
-      parameters: [{ $ref: '#/components/parameters/NumericId' }]
+      parameters: [{ $ref: "#/components/parameters/NumericId" }]
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [content_state], properties: { content_state: { type: object }, alert: { type: object } } }
+            schema:
+              {
+                type: object,
+                required: [content_state],
+                properties:
+                  { content_state: { type: object }, alert: { type: object } },
+              }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LiveActivityToken' } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/LiveActivityToken" },
+                  },
+              },
+          }
         "429": { description: Rate limit exceeded (16 pushes/hour) }
     delete:
       operationId: endLiveActivity
       tags: [live-activities]
       summary: End a Live Activity
-      parameters: [{ $ref: '#/components/parameters/NumericId' }]
+      parameters: [{ $ref: "#/components/parameters/NumericId" }]
       responses:
         "204": { description: No content }
 
@@ -814,13 +1167,28 @@ paths:
       operationId: rotateLiveActivityToken
       tags: [live-activities]
       summary: Rotate the push token for a running Live Activity
-      parameters: [{ $ref: '#/components/parameters/NumericId' }]
+      parameters: [{ $ref: "#/components/parameters/NumericId" }]
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [push_token], properties: { push_token: { type: string } } }
+            schema:
+              {
+                type: object,
+                required: [push_token],
+                properties: { push_token: { type: string } },
+              }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LiveActivityToken' } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/LiveActivityToken" },
+                  },
+              },
+          }
 
   /check-ins:
     get:
@@ -828,7 +1196,12 @@ paths:
       tags: [check-ins]
       summary: Morning/afternoon check-in status for a date
       parameters:
-        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
       responses:
         "200": { description: OK }
     post:
@@ -851,7 +1224,15 @@ paths:
                 address: { type: string, maxLength: 255 }
                 notes: { type: string, maxLength: 1000 }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/CompactEvent' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
 
   /check-ins/history:
     get:
@@ -859,11 +1240,21 @@ paths:
       tags: [check-ins]
       summary: Day-by-day check-in summary for a date range (max 90 days)
       parameters:
-        - { name: from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /check-ins/timezone:
     get:
@@ -884,7 +1275,11 @@ paths:
               required: [timezone]
               properties:
                 timezone: { type: string }
-                previous_timezone: { type: string, description: "Informational only — the effective prior timezone is derived server-side" }
+                previous_timezone:
+                  {
+                    type: string,
+                    description: "Informational only — the effective prior timezone is derived server-side",
+                  }
                 device_id: { type: string, maxLength: 255 }
       responses:
         "200": { description: Already effective (no-op) }
@@ -905,7 +1300,15 @@ paths:
           image/heif: { schema: { type: string, format: binary } }
           image/webp: { schema: { type: string, format: binary } }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/CompactEvent' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
         "415": { description: Unsupported Content-Type }
         "422": { description: Empty body or over the 25 MB cap }
 
@@ -915,12 +1318,35 @@ paths:
       tags: [settings]
       summary: Current notification preferences
       responses:
-        "200": { description: OK }
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: object
+                    description: >-
+                      Keyed by notification type. Unset types default to true.
+                    additionalProperties: { type: boolean }
+                    propertyNames:
+                      { $ref: "#/components/schemas/NotificationType" }
+                  delivery_mode:
+                    {
+                      type: string,
+                      enum: [immediate, work_hours, daily_digest],
+                    }
+                  digest_time: { type: string, pattern: "^\\d{2}:\\d{2}$" }
     patch:
       operationId: updateNotificationSettings
       tags: [settings]
       summary: Update notification preferences (handled by a distinct write controller)
-      parameters: [{ $ref: '#/components/parameters/IfMatch' }]
+      description: >-
+        Unless delivery_mode is work_hours, every notification type must be
+        present in categories — this endpoint replaces the whole set rather than
+        merging.
+      parameters: [{ $ref: "#/components/parameters/IfMatch" }]
       requestBody:
         content:
           application/json:
@@ -928,8 +1354,13 @@ paths:
               type: object
               required: [delivery_mode]
               properties:
-                categories: { type: object, additionalProperties: { type: boolean } }
-                delivery_mode: { type: string, enum: [immediate, work_hours, daily_digest] }
+                categories:
+                  type: object
+                  additionalProperties: { type: boolean }
+                  propertyNames:
+                    { $ref: "#/components/schemas/NotificationType" }
+                delivery_mode:
+                  { type: string, enum: [immediate, work_hours, daily_digest] }
                 digest_time: { type: string, pattern: "^\\d{2}:\\d{2}$" }
       responses:
         "204": { description: "No content (delivery_mode = work_hours)" }
@@ -940,29 +1371,53 @@ paths:
       operationId: acknowledgeAnomaly
       tags: [feed]
       summary: Acknowledge a metric anomaly
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { note: { type: string, maxLength: 500 }, suppress_until: { type: string, format: date } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    note: { type: string, maxLength: 500 },
+                    suppress_until: { type: string, format: date },
+                  },
+              }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /knowledge/events/{id}/reprocess:
     post:
       operationId: reprocessKnowledgeEvent
       tags: [entities]
       summary: Queue AI reprocessing for a Fetch or Newsletter knowledge event
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { mode: { type: string, enum: [auto, summary_only, refetch], default: auto } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    mode:
+                      {
+                        type: string,
+                        enum: [auto, summary_only, refetch],
+                        default: auto,
+                      },
+                  },
+              }
       responses:
         "202": { description: Queued }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /bookmarks:
     post:
@@ -972,11 +1427,17 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [url], properties: { url: { type: string, format: uri, maxLength: 2048 } } }
+            schema:
+              {
+                type: object,
+                required: [url],
+                properties:
+                  { url: { type: string, format: uri, maxLength: 2048 } },
+              }
       responses:
         "201": { description: Created }
         "200": { description: Already bookmarked }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /up-to-speed:
     get:
@@ -1005,7 +1466,11 @@ paths:
                   items:
                     type: object
                     properties:
-                      type: { type: string, enum: [flint_digest, anomaly, news_summary] }
+                      type:
+                        {
+                          type: string,
+                          enum: [flint_digest, anomaly, news_summary],
+                        }
                       id: { type: string, format: uuid }
       responses:
         "200": { description: OK }
@@ -1016,12 +1481,20 @@ paths:
       tags: [flint]
       summary: Flint digest(s) for a date
       parameters:
-        - { name: date, in: query, schema: { type: string, format: date, default: today } }
-        - { name: period, in: query, schema: { type: string, enum: [morning, afternoon, evening] } }
+        - {
+            name: date,
+            in: query,
+            schema: { type: string, format: date, default: today },
+          }
+        - {
+            name: period,
+            in: query,
+            schema: { type: string, enum: [morning, afternoon, evening] },
+          }
         - { name: all, in: query, schema: { type: boolean, default: false } }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createFlintDigest
       tags: [flint]
@@ -1029,7 +1502,19 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [title], properties: { title: { type: string }, period: { type: string }, date: { type: string, format: date }, summary: { type: string }, blocks: { type: array, items: { type: object } } } }
+            schema:
+              {
+                type: object,
+                required: [title],
+                properties:
+                  {
+                    title: { type: string },
+                    period: { type: string },
+                    date: { type: string, format: date },
+                    summary: { type: string },
+                    blocks: { type: array, items: { type: object } },
+                  },
+              }
       responses:
         "201": { description: Created }
 
@@ -1038,10 +1523,10 @@ paths:
       operationId: getFlintDigest
       tags: [flint]
       summary: A single Flint digest
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /flint/questions/{block}/answer:
     post:
@@ -1049,11 +1534,25 @@ paths:
       tags: [flint]
       summary: Record the user's answer to a flint_user_question block
       parameters:
-        - { name: block, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: block,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [answer], properties: { answer: { type: string, maxLength: 1000 }, answer_note: { type: string, maxLength: 1000 } } }
+            schema:
+              {
+                type: object,
+                required: [answer],
+                properties:
+                  {
+                    answer: { type: string, maxLength: 1000 },
+                    answer_note: { type: string, maxLength: 1000 },
+                  },
+              }
       responses:
         "200": { description: OK }
         "403": { description: Block does not belong to the caller }
@@ -1065,7 +1564,29 @@ paths:
       tags: [money]
       summary: All non-archived finance accounts with latest balance
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyAccount' } } } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  { $ref: "#/components/schemas/MoneyAccount" },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
     post:
       operationId: createMoneyAccount
       tags: [money]
@@ -1078,7 +1599,21 @@ paths:
               required: [name, account_type, currency]
               properties:
                 name: { type: string, maxLength: 255 }
-                account_type: { type: string, enum: [current_account, savings_account, mortgage, investment_account, credit_card, loan, pension, other] }
+                account_type:
+                  {
+                    type: string,
+                    enum:
+                      [
+                        current_account,
+                        savings_account,
+                        mortgage,
+                        investment_account,
+                        credit_card,
+                        loan,
+                        pension,
+                        other,
+                      ],
+                  }
                 currency: { type: string, enum: [GBP, USD, EUR] }
                 provider: { type: string }
                 account_number: { type: string }
@@ -1087,26 +1622,50 @@ paths:
                 start_date: { type: string, format: date }
                 is_negative_balance: { type: boolean }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MoneyAccount' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/MoneyAccount" } },
+              },
+          }
 
   /money/accounts/{id}:
     get:
       operationId: getMoneyAccount
       tags: [money]
       summary: A single finance account
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MoneyAccount' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/MoneyAccount" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateMoneyAccount
       tags: [money]
       summary: Update a manual finance account
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, description: "Same fields as create, all optional" }
+            schema:
+              {
+                type: object,
+                description: "Same fields as create, all optional",
+              }
       responses:
         "200": { description: OK }
         "422": { description: Account is not manual_account }
@@ -1114,7 +1673,11 @@ paths:
       operationId: archiveMoneyAccount
       tags: [money]
       summary: Archive a manual finance account (never hard-deletes)
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       responses:
         "200": { description: Archived }
         "422": { description: Account is not manual_account }
@@ -1124,21 +1687,65 @@ paths:
       operationId: listMoneyAccountBalances
       tags: [money]
       summary: Cursor-paginated balance history
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/BalanceEntry' } } } } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  { $ref: "#/components/schemas/BalanceEntry" },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: addMoneyAccountBalance
       tags: [money]
       summary: Add a balance entry
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [balance, date], properties: { balance: { type: number }, date: { type: string, format: date }, notes: { type: string, maxLength: 1000 } } }
+            schema:
+              {
+                type: object,
+                required: [balance, date],
+                properties:
+                  {
+                    balance: { type: number },
+                    date: { type: string, format: date },
+                    notes: { type: string, maxLength: 1000 },
+                  },
+              }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BalanceEntry' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/BalanceEntry" } },
+              },
+          }
 
 components:
   securitySchemes:
@@ -1180,22 +1787,22 @@ components:
       description: Not found or not owned by the caller
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
     ValidationError:
       description: Validation failed
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
     PreconditionRequired:
       description: Missing If-Match header
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
     PreconditionFailed:
       description: Stale If-Match value
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
     Error:
@@ -1233,7 +1840,8 @@ components:
         tldr: { type: string }
         note: { type: string }
         blocks_count: { type: integer }
-        blocks: { type: array, items: { $ref: '#/components/schemas/CompactBlock' } }
+        blocks:
+          { type: array, items: { $ref: "#/components/schemas/CompactBlock" } }
         display_name: { type: string }
         display_with_object: { type: boolean }
         hidden: { type: boolean }
@@ -1250,7 +1858,8 @@ components:
         content: { type: string }
         url: { type: string }
         media_url: { type: string }
-        recent_events: { type: array, items: { $ref: '#/components/schemas/CompactEvent' } }
+        recent_events:
+          { type: array, items: { $ref: "#/components/schemas/CompactEvent" } }
 
     CompactBlock:
       type: object
@@ -1308,7 +1917,11 @@ components:
         domain: { type: [string, "null"] }
         is_read: { type: boolean }
         received_at: { type: string, format: date-time }
-        entity: { type: [object, "null"], properties: { kind: { type: string }, id: { type: string } } }
+        entity:
+          {
+            type: [object, "null"],
+            properties: { kind: { type: string }, id: { type: string } },
+          }
         version:
           type: string
           description: >-
@@ -1337,6 +1950,27 @@ components:
         - integrations:read
         - integrations:sync
         - tokens:manage
+
+    NotificationType:
+      type: string
+      description: >-
+        A notification type a user may switch on and off
+        (App\Notifications\NotificationCatalogue::configurableTypes()). These are
+        the strings a notification's getNotificationType() returns, because that
+        is what SparkNotification::via() gates delivery on. The earlier
+        categories — anomaly, digest, new_bookmark, calendar_event — named
+        notifications Spark never sends and have been withdrawn.
+      enum:
+        - integration_completed
+        - integration_failed
+        - integration_authentication_failed
+        - cookie_expiry_warning
+        - fetch_multiple_failures
+        - fetch_content_changed
+        - migration_completed
+        - migration_failed
+        - data_export_ready
+        - system_maintenance
 
     ApiToken:
       type: object
@@ -1373,7 +2007,7 @@ components:
         interest_rate: { type: [number, "null"] }
         start_date: { type: [string, "null"], format: date }
         integration_id: { type: [string, "null"] }
-        latest_balance: { $ref: '#/components/schemas/BalanceEntry' }
+        latest_balance: { $ref: "#/components/schemas/BalanceEntry" }
         updated_at: { type: [string, "null"], format: date-time }
 
     BalanceEntry:
