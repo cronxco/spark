@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Integrations\PluginRegistry;
+use App\Traits\RedactsLoggedProperties;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Integration extends Model
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
 
     public $incrementing = false;
 
