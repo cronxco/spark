@@ -31,7 +31,13 @@ class RedactActivityLogCredentialsTest extends TestCase
         $id = $this->seedActivityRow(Integration::class, [
             'attributes' => [
                 'name' => 'My Hevy',
-                'configuration' => ['api_key' => 'hev_live_secret', 'days_back' => 30],
+                'configuration' => [
+                    'api_key' => 'hev_live_secret',
+                    'days_back' => 30,
+                    'key' => 'display-key',
+                    'auth' => 'basic',
+                    'server_url' => 'https://hevy.example.com',
+                ],
             ],
             'old' => [
                 'configuration' => ['api_key' => 'hev_live_previous', 'days_back' => 7],
@@ -47,6 +53,9 @@ class RedactActivityLogCredentialsTest extends TestCase
         $this->assertSame('My Hevy', $properties['attributes']['name']);
         $this->assertSame(30, $properties['attributes']['configuration']['days_back']);
         $this->assertSame(7, $properties['old']['configuration']['days_back']);
+        $this->assertSame('display-key', $properties['attributes']['configuration']['key']);
+        $this->assertSame('basic', $properties['attributes']['configuration']['auth']);
+        $this->assertSame('https://hevy.example.com', $properties['attributes']['configuration']['server_url']);
     }
 
     #[Test]
@@ -70,6 +79,30 @@ class RedactActivityLogCredentialsTest extends TestCase
         $this->assertSame('[REDACTED]', $properties['attributes']['access_token']);
         $this->assertSame('[REDACTED]', $properties['attributes']['auth_metadata']['api_key']);
         $this->assertSame('acc_123', $properties['attributes']['account_id']);
+        $this->assertSame('https://immich.example.com', $properties['attributes']['auth_metadata']['server_url']);
+    }
+
+    #[Test]
+    public function it_recursively_redacts_historical_cookie_values(): void
+    {
+        $canary = 'historical-private-cookie';
+        $id = $this->seedActivityRow(IntegrationGroup::class, [
+            'attributes' => [
+                'auth_metadata' => [
+                    'cookies' => [
+                        'sid' => $canary,
+                        'nested' => ['arbitrary_name' => $canary],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->artisan('activity-log:redact-credentials')->assertSuccessful();
+
+        $properties = $this->properties($id);
+        $this->assertSame('[REDACTED]', $properties['attributes']['auth_metadata']['cookies']['sid']);
+        $this->assertSame('[REDACTED]', $properties['attributes']['auth_metadata']['cookies']['nested']['arbitrary_name']);
+        $this->assertStringNotContainsString($canary, json_encode($properties));
     }
 
     #[Test]
@@ -135,6 +168,40 @@ class RedactActivityLogCredentialsTest extends TestCase
         $this->assertStringNotContainsString('hev_live_secret', $encoded);
         // The diff itself must survive — logExcept() would have thrown it away.
         $this->assertStringContainsString('days_back', $encoded);
+    }
+
+    #[Test]
+    public function updating_an_integration_does_not_log_arbitrary_cookie_values(): void
+    {
+        $canary = 'new-private-cookie';
+        $integration = Integration::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'configuration' => ['cookies' => ['sid' => 'old-cookie'], 'days_back' => 7],
+        ]);
+
+        $integration->update([
+            'configuration' => [
+                'cookies' => ['sid' => $canary],
+                'days_back' => 30,
+                'key' => 'display-key',
+                'auth' => 'basic',
+                'server_url' => 'https://service.example.com',
+            ],
+        ]);
+
+        $activity = Activity::query()
+            ->where('subject_type', Integration::class)
+            ->where('subject_id', $integration->id)
+            ->latest('id')
+            ->firstOrFail();
+        $properties = $activity->properties->toArray();
+        $encoded = json_encode($properties);
+
+        $this->assertStringNotContainsString($canary, $encoded);
+        $this->assertSame('[REDACTED]', $properties['attributes']['configuration']['cookies']['sid']);
+        $this->assertSame('display-key', $properties['attributes']['configuration']['key']);
+        $this->assertSame('basic', $properties['attributes']['configuration']['auth']);
+        $this->assertSame('https://service.example.com', $properties['attributes']['configuration']['server_url']);
     }
 
     /**

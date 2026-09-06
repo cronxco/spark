@@ -236,11 +236,20 @@ class OAuthController extends Controller
         $accessTokenId = $accessToken->getKey();
 
         DB::transaction(function () use ($user, $accessTokenId) {
-            OAuthRefreshToken::query()
+            $refresh = OAuthRefreshToken::query()
                 ->where('user_id', $user->getKey())
                 ->where('access_token_id', $accessTokenId)
-                ->whereNull('revoked_at')
-                ->update(['revoked_at' => now()]);
+                ->lockForUpdate()
+                ->first();
+
+            if ($refresh !== null && $refresh->revoked_at === null) {
+                $refresh->update(['revoked_at' => now()]);
+            } elseif ($refresh !== null) {
+                // Refresh rotation won the race after Sanctum authenticated the
+                // old access token. Revoke its device family so the successor
+                // access/refresh pair created by that rotation cannot survive.
+                $this->revokeDeviceTokens($refresh);
+            }
 
             $user->tokens()->whereKey($accessTokenId)->delete();
         });

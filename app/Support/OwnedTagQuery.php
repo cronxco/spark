@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
@@ -69,6 +70,14 @@ final class OwnedTagQuery
                         ->whereColumn('taggables.tag_id', 'tags.id')
                         ->where('taggables.taggable_type', EventObject::class)
                         ->where('objects.user_id', $user->id);
+                })->orWhereExists(function ($blocks) use ($integrationIds) {
+                    $blocks->selectRaw('1')
+                        ->from('taggables')
+                        ->join('blocks', 'blocks.id', '=', 'taggables.taggable_id')
+                        ->join('events', 'events.id', '=', 'blocks.event_id')
+                        ->whereColumn('taggables.tag_id', 'tags.id')
+                        ->where('taggables.taggable_type', Block::class)
+                        ->whereIn('events.integration_id', $integrationIds);
                 });
             });
 

@@ -148,6 +148,23 @@ class SentryMobileApiLoggingTest extends TestCase
     }
 
     #[Test]
+    public function route_parameters_are_absent_from_the_log_message_and_context(): void
+    {
+        $logs = $this->collectLogs();
+        $canary = '11111111-2222-4333-8444-555555555555';
+
+        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        $this->getJson("/api/v1/mobile/events/{$canary}")->assertNotFound();
+
+        $entry = $this->findMobileApiLog($logs);
+        $this->assertNotNull($entry);
+        $this->assertSame('Mobile API: GET', $entry['message']);
+        $this->assertStringNotContainsString($canary, $entry['message']);
+        $this->assertStringNotContainsString($canary, json_encode($entry['context']));
+        $this->assertStringStartsWith('api.v1.mobile.', $entry['context']['route'] ?? '');
+    }
+
+    #[Test]
     public function a_minted_token_plaintext_never_reaches_the_log(): void
     {
         $logs = $this->collectLogs();

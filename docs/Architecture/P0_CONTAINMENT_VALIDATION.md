@@ -369,9 +369,11 @@ the point of the table, and every non-secret field in each diff survives.
 `activity-log:redact-credentials` rewrites the rows already written. `App\Traits\RedactsLoggedProperties` stops new
 ones, on both `IntegrationGroup` and `Integration` — the latter is a gap the phase 1 write-up did not spot, since
 `Integration` logs `configuration` via `logFillable()` with no `logExcept`, so Hevy and Goodreads API keys kept landing
-in the changelog. The trait taps each activity through the existing `sanitizeData()`, so only the secret leaves are
-replaced and the rest of the diff is preserved — strictly better than widening `logExcept`, which would have thrown
-away every legitimate settings change alongside the secret.
+in the changelog. Both paths use the credential-specific `EncryptedJsonSecrets::SECRET_KEYS` policy and recursively
+redact the `cookies` subtree, while preserving ordinary configuration fields such as `key`, `auth`, and `server_url`.
+The rest of the diff survives — strictly better than widening `logExcept`, which would have thrown away every
+legitimate settings change alongside the secret. The broader `sanitizeData()` logging scrubber also treats the entire
+`cookies` subtree as sensitive, so arbitrary cookie names such as `sid` cannot leak through other logging paths.
 
 ---
 

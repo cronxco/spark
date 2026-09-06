@@ -36,44 +36,43 @@ class RevokeWildcardTokens extends Command
         $dryRun = (bool) $this->option('dry-run');
         $batchSize = max(1, (int) $this->option('batch-size'));
 
-        $wildcards = [];
-
-        DB::table('personal_access_tokens')
-            ->select(['id', 'name', 'tokenable_type', 'tokenable_id', 'abilities', 'created_at', 'last_used_at'])
-            ->orderBy('id')
-            ->chunk($batchSize, function ($tokens) use (&$wildcards) {
-                foreach ($tokens as $token) {
-                    if ($this->isWildcard($token->abilities)) {
-                        $wildcards[] = $token;
-                    }
-                }
-            });
-
-        if ($wildcards === []) {
-            $this->info('No wildcard tokens found.');
-
-            return self::SUCCESS;
-        }
-
-        $this->warn(sprintf(
-            '%s%d token(s) hold the "*" ability and can therefore do anything the owning user can.',
-            $dryRun ? '[dry run] ' : '',
-            count($wildcards),
-        ));
-
-        $this->newLine();
-        $this->table(
-            ['ID', 'Name', 'Owner', 'Created', 'Last used'],
-            array_map(fn ($token) => [
-                $token->id,
-                $token->name,
-                $token->tokenable_id,
-                $token->created_at,
-                $token->last_used_at ?? 'never',
-            ], $wildcards),
-        );
-
         if ($dryRun) {
+            $wildcards = [];
+
+            DB::table('personal_access_tokens')
+                ->select(['id', 'name', 'tokenable_type', 'tokenable_id', 'abilities', 'created_at', 'last_used_at'])
+                ->orderBy('id')
+                ->chunkById($batchSize, function ($tokens) use (&$wildcards) {
+                    foreach ($tokens as $token) {
+                        if ($this->isWildcard($token->abilities)) {
+                            $wildcards[] = $token;
+                        }
+                    }
+                });
+
+            if ($wildcards === []) {
+                $this->info('No wildcard tokens found.');
+
+                return self::SUCCESS;
+            }
+
+            $this->warn(sprintf(
+                '[dry run] %d token(s) hold the "*" ability and can therefore do anything the owning user can.',
+                count($wildcards),
+            ));
+
+            $this->newLine();
+            $this->table(
+                ['ID', 'Name', 'Owner', 'Created', 'Last used'],
+                array_map(fn ($token) => [
+                    $token->id,
+                    $token->name,
+                    $token->tokenable_id,
+                    $token->created_at,
+                    $token->last_used_at ?? 'never',
+                ], $wildcards),
+            );
+
             $this->newLine();
             $this->info('Dry run: nothing was revoked. Re-run without --dry-run to revoke these tokens.');
 
@@ -84,27 +83,43 @@ class RevokeWildcardTokens extends Command
         $refreshRevoked = 0;
         $failed = 0;
 
-        foreach ($wildcards as $token) {
-            try {
-                $refreshRevoked += DB::transaction(function () use ($token): int {
-                    // Deleting the access token alone would leave its paired
-                    // refresh token able to mint a replacement, so both go —
-                    // the same pairing OAuthController::logout() acts on.
-                    $revokedRefreshTokens = DB::table('oauth_refresh_tokens')
-                        ->where('access_token_id', $token->id)
-                        ->whereNull('revoked_at')
-                        ->update(['revoked_at' => now()]);
+        DB::table('personal_access_tokens')
+            ->select(['id', 'abilities'])
+            ->orderBy('id')
+            ->chunkById($batchSize, function ($tokens) use (&$revoked, &$refreshRevoked, &$failed) {
+                foreach ($tokens as $token) {
+                    if (! $this->isWildcard($token->abilities)) {
+                        continue;
+                    }
 
-                    DB::table('personal_access_tokens')->where('id', $token->id)->delete();
+                    try {
+                        [$deleted, $pairedRefreshRevoked] = DB::transaction(function () use ($token): array {
+                            // Deleting the access token alone would leave its paired
+                            // refresh token able to mint a replacement, so both go —
+                            // the same pairing OAuthController::logout() acts on.
+                            $pairedRefreshRevoked = DB::table('oauth_refresh_tokens')
+                                ->where('access_token_id', $token->id)
+                                ->whereNull('revoked_at')
+                                ->update(['revoked_at' => now()]);
 
-                    return $revokedRefreshTokens;
-                });
+                            $deleted = DB::table('personal_access_tokens')->where('id', $token->id)->delete();
 
-                $revoked++;
-            } catch (Throwable $e) {
-                $failed++;
-                $this->error("Failed to revoke token {$token->id}: {$e->getMessage()}");
-            }
+                            return [$deleted, $pairedRefreshRevoked];
+                        });
+
+                        $revoked += $deleted;
+                        $refreshRevoked += $pairedRefreshRevoked;
+                    } catch (Throwable $e) {
+                        $failed++;
+                        $this->error("Failed to revoke token {$token->id}: {$e->getMessage()}");
+                    }
+                }
+            });
+
+        if ($revoked === 0 && $failed === 0) {
+            $this->info('No wildcard tokens found.');
+
+            return self::SUCCESS;
         }
 
         $this->newLine();

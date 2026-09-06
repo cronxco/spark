@@ -90,15 +90,14 @@ new class extends Component
         }
 
         try {
-            DB::transaction(function () {
+            $count = DB::transaction(function () {
                 // $selectedRelationships is a public Livewire property; re-resolve
                 // it through the same ownership predicate the listing uses.
-                Relationship::where('user_id', Auth::id())
+                return Relationship::where('user_id', Auth::id())
                     ->whereIn('id', $this->selectedRelationships)
                     ->delete();
             });
 
-            $count = count($this->selectedRelationships);
             $this->success("Successfully deleted {$count} relationship(s).");
 
             $this->selectedRelationships = [];

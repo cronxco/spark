@@ -77,6 +77,7 @@ class EncryptIntegrationCredentials extends Command
         $converted = 0;
         $alreadyEncrypted = 0;
         $empty = 0;
+        $concurrentlyChanged = 0;
         $failed = 0;
 
         $bar = $this->output->createProgressBar($total);
@@ -85,7 +86,7 @@ class EncryptIntegrationCredentials extends Command
         DB::table('integration_groups')
             ->select(array_merge(['id'], self::ENCRYPTED_COLUMNS))
             ->orderBy('id')
-            ->chunk($batchSize, function ($groups) use ($dryRun, &$converted, &$alreadyEncrypted, &$empty, &$failed, $bar) {
+            ->chunk($batchSize, function ($groups) use ($dryRun, &$converted, &$alreadyEncrypted, &$empty, &$concurrentlyChanged, &$failed, $bar) {
                 foreach ($groups as $group) {
                     $updates = [];
 
@@ -121,7 +122,19 @@ class EncryptIntegrationCredentials extends Command
                     }
 
                     try {
-                        DB::table('integration_groups')->where('id', $group->id)->update($updates);
+                        $query = DB::table('integration_groups')->where('id', $group->id);
+
+                        foreach (array_keys($updates) as $column) {
+                            $query->where($column, $group->{$column});
+                        }
+
+                        if ($query->update($updates) === 0) {
+                            $concurrentlyChanged++;
+                            $bar->advance();
+
+                            continue;
+                        }
+
                         $converted += count($updates);
                     } catch (Throwable $e) {
                         $failed++;
@@ -142,6 +155,7 @@ class EncryptIntegrationCredentials extends Command
                 [$dryRun ? 'Would encrypt' : 'Encrypted', $converted],
                 ['Already encrypted', $alreadyEncrypted],
                 ['Empty (skipped)', $empty],
+                ['Concurrently changed (skipped)', $concurrentlyChanged],
                 ['Failed', $failed],
             ],
         );
@@ -168,6 +182,7 @@ class EncryptIntegrationCredentials extends Command
         $converted = 0;
         $alreadyEncrypted = 0;
         $empty = 0;
+        $concurrentlyChanged = 0;
         $failed = 0;
 
         foreach (self::JSON_COLUMNS as ['table' => $table, 'column' => $column]) {
@@ -186,7 +201,7 @@ class EncryptIntegrationCredentials extends Command
             DB::table($table)
                 ->select(['id', $column])
                 ->orderBy('id')
-                ->chunk($batchSize, function ($rows) use ($table, $column, $dryRun, &$converted, &$alreadyEncrypted, &$empty, &$failed, $bar) {
+                ->chunk($batchSize, function ($rows) use ($table, $column, $dryRun, &$converted, &$alreadyEncrypted, &$empty, &$concurrentlyChanged, &$failed, $bar) {
                     foreach ($rows as $row) {
                         $bar->advance();
 
@@ -213,7 +228,17 @@ class EncryptIntegrationCredentials extends Command
                         }
 
                         try {
-                            DB::table($table)->where('id', $row->id)->update([$column => json_encode($encrypted)]);
+                            $updated = DB::table($table)
+                                ->where('id', $row->id)
+                                ->where($column, $row->{$column})
+                                ->update([$column => json_encode($encrypted)]);
+
+                            if ($updated === 0) {
+                                $concurrentlyChanged++;
+
+                                continue;
+                            }
+
                             $converted++;
                         } catch (Throwable $e) {
                             $failed++;
@@ -233,6 +258,7 @@ class EncryptIntegrationCredentials extends Command
                 [$dryRun ? 'Would encrypt (json rows)' : 'Encrypted (json rows)', $converted],
                 ['Already encrypted', $alreadyEncrypted],
                 ['No secrets (skipped)', $empty],
+                ['Concurrently changed (skipped)', $concurrentlyChanged],
                 ['Failed', $failed],
             ],
         );

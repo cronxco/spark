@@ -71,7 +71,7 @@ class SentryMobileApiLogging
         $context += $this->responseShape($status, $content);
 
         Log::channel('sentry_logs')->info(
-            'Mobile API: ' . $request->method() . ' ' . $request->path(),
+            'Mobile API: ' . $request->method(),
             array_filter($context, fn ($v) => $v !== null),
         );
     }

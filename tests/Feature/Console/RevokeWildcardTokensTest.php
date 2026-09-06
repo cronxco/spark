@@ -26,7 +26,7 @@ class RevokeWildcardTokensTest extends TestCase
     {
         $token = User::factory()->create()->createToken('Legacy', ['*'])->accessToken;
 
-        $this->artisan('tokens:revoke-wildcard')->assertSuccessful();
+        $this->artisan('tokens:revoke-wildcard --batch-size=1')->assertSuccessful();
 
         $this->assertDatabaseMissing('personal_access_tokens', ['id' => $token->getKey()]);
     }
@@ -91,7 +91,7 @@ class RevokeWildcardTokensTest extends TestCase
         $alice = User::factory()->create()->createToken('Alice legacy', ['*'])->accessToken;
         $bob = User::factory()->create()->createToken('Bob legacy', ['*'])->accessToken;
 
-        $this->artisan('tokens:revoke-wildcard')->assertSuccessful();
+        $this->artisan('tokens:revoke-wildcard --batch-size=1')->assertSuccessful();
 
         $this->assertSame(0, PersonalAccessToken::query()->whereKey([$alice->getKey(), $bob->getKey()])->count());
     }

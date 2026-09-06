@@ -188,12 +188,13 @@ class ApiTokensControllerTest extends TestCase
     #[Test]
     public function store_cannot_delegate_more_than_the_issuing_token_holds(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'tokens:manage', 'data:read']);
+        $issuer = $this->user->createToken('Manager', ['ios:read', 'tokens:manage', 'data:read']);
 
-        $this->postJson('/api/v1/mobile/api-tokens', [
-            'name' => 'Widening',
-            'abilities' => ['data:read', 'finance:write'],
-        ])->assertStatus(403);
+        $this->withToken($issuer->plainTextToken)
+            ->postJson('/api/v1/mobile/api-tokens', [
+                'name' => 'Widening',
+                'abilities' => ['data:read', 'finance:write'],
+            ])->assertStatus(403);
 
         $this->assertDatabaseMissing('personal_access_tokens', [
             'tokenable_id' => $this->user->id,
@@ -204,15 +205,36 @@ class ApiTokensControllerTest extends TestCase
     #[Test]
     public function store_allows_a_strict_subset_of_the_issuing_token(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'tokens:manage', 'data:read', 'finance:read']);
+        $issuer = $this->user->createToken(
+            'Manager',
+            ['ios:read', 'tokens:manage', 'data:read', 'finance:read'],
+        );
 
-        $this->postJson('/api/v1/mobile/api-tokens', [
-            'name' => 'Narrower',
-            'abilities' => ['data:read'],
-        ])->assertStatus(201);
+        $this->withToken($issuer->plainTextToken)
+            ->postJson('/api/v1/mobile/api-tokens', [
+                'name' => 'Narrower',
+                'abilities' => ['data:read'],
+            ])->assertStatus(201);
 
         $token = $this->user->tokens()->where('name', 'Narrower')->first();
         $this->assertSame(['data:read'], $token->abilities);
+    }
+
+    #[Test]
+    public function a_legacy_wildcard_token_cannot_delegate_fresh_abilities(): void
+    {
+        $issuer = $this->user->createToken('Legacy wildcard', ['*']);
+
+        $this->withToken($issuer->plainTextToken)
+            ->postJson('/api/v1/mobile/api-tokens', [
+                'name' => 'Laundered',
+                'abilities' => ['data:read'],
+            ])->assertForbidden();
+
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $this->user->id,
+            'name' => 'Laundered',
+        ]);
     }
 
     #[Test]

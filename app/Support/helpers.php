@@ -446,7 +446,7 @@ if (! function_exists('sensitive_log_keys')) {
         return [
             'password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key',
             'access_token', 'refresh_token', 'authorization', 'webhook_secret',
-            'server_url', 'cronxtools_url',
+            'server_url', 'cronxtools_url', 'cookies',
             // `plaintext` is the one-time Sanctum bearer token returned by
             // ApiTokensController::store.
             'plaintext', 'plain_text_token', 'bearer',

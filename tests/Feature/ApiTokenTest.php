@@ -18,7 +18,7 @@ class ApiTokenTest extends TestCase
         $user = User::factory()->create();
         // Authority attenuates, so the issuing credential must itself hold what
         // it delegates.
-        Sanctum::actingAs($user, ['data:read']);
+        Sanctum::actingAs($user, ['tokens:manage', 'data:read']);
 
         $response = $this->postJson('/api/tokens/create', [
             'token_name' => 'Test Token',
@@ -45,7 +45,7 @@ class ApiTokenTest extends TestCase
     public function creating_a_token_requires_explicit_abilities(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['data:read']);
+        Sanctum::actingAs($user, ['tokens:manage', 'data:read']);
 
         // This endpoint previously omitted the abilities argument entirely and
         // so minted a ['*'] token, which satisfies every capability check in
@@ -61,12 +61,26 @@ class ApiTokenTest extends TestCase
     public function creating_a_token_rejects_a_non_delegable_ability(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['data:read']);
+        Sanctum::actingAs($user, ['tokens:manage', 'data:read']);
 
         $this->postJson('/api/tokens/create', [
             'token_name' => 'Wildcard',
             'abilities' => ['*'],
         ])->assertStatus(422);
+    }
+
+    #[Test]
+    public function creating_a_token_requires_the_manage_ability(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['data:read']);
+
+        $this->postJson('/api/tokens/create', [
+            'token_name' => 'Unauthorized',
+            'abilities' => ['data:read'],
+        ])->assertForbidden();
+
+        $this->assertSame(0, $user->tokens()->where('name', 'Unauthorized')->count());
     }
 
     #[Test]

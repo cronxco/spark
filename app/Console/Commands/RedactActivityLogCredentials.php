@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Casts\EncryptedJsonSecrets;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Illuminate\Console\Command;
@@ -73,7 +74,7 @@ class RedactActivityLogCredentials extends Command
                         continue;
                     }
 
-                    $sanitised = sanitizeData($properties);
+                    $sanitised = EncryptedJsonSecrets::redact($properties);
 
                     if ($sanitised === $properties) {
                         $alreadyClean++;

@@ -106,15 +106,17 @@ final class SparkAbility
         // A wildcard token is not treated as holding everything. Wildcards are
         // legacy credentials being retired; letting one mint fresh scoped tokens
         // would launder that authority forward indefinitely.
-        $held = $issuingToken->abilities;
+        $storedToken = $issuingToken->getKey() === null
+            ? null
+            : $issuer->tokens()->whereKey($issuingToken->getKey())->first();
+        $held = $storedToken?->abilities;
 
         if (is_array($held) && in_array('*', $held, true)) {
             return false;
         }
 
-        // tokenCan() rather than a direct array_diff, because Sanctum's testing
-        // helper substitutes a mock token whose `abilities` property is not a
-        // real array while `can()` still answers correctly.
+        // tokenCan() rather than a direct array_diff also keeps Sanctum's
+        // actingAs() test token usable without reading properties from it.
         foreach ($requested as $ability) {
             if (! $issuer->tokenCan($ability)) {
                 return false;

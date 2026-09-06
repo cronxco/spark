@@ -66,6 +66,39 @@ class LogoutTest extends TestCase
     }
 
     #[Test]
+    public function it_revokes_a_successor_session_when_refresh_rotation_won_the_race(): void
+    {
+        $user = User::factory()->create();
+        [$plain, $originalAccess] = $this->issueSession($user);
+        $originalRefresh = OAuthRefreshToken::create([
+            'user_id' => $user->getKey(),
+            'token_hash' => hash('sha256', 'original-refresh'),
+            'access_token_id' => $originalAccess->getKey(),
+            'client_id' => 'ios',
+            'device_name' => 'iPhone',
+            'scope' => 'ios:*',
+            'expires_at' => now()->addDays(30),
+            'revoked_at' => now(),
+        ]);
+        $successorAccess = $user->createToken('iPhone', ['ios:read', 'ios:write'])->accessToken;
+        $successorRefresh = OAuthRefreshToken::create([
+            'user_id' => $user->getKey(),
+            'token_hash' => hash('sha256', 'successor-refresh'),
+            'access_token_id' => $successorAccess->getKey(),
+            'client_id' => $originalRefresh->client_id,
+            'device_name' => $originalRefresh->device_name,
+            'scope' => $originalRefresh->scope,
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        $this->withToken($plain)->postJson('/api/v1/mobile/logout')->assertStatus(204);
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $originalAccess->getKey()]);
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $successorAccess->getKey()]);
+        $this->assertNotNull($successorRefresh->fresh()->revoked_at);
+    }
+
+    #[Test]
     public function it_leaves_other_devices_and_tokens_alone(): void
     {
         $user = User::factory()->create();

@@ -241,6 +241,21 @@ class LoggingHelpersTest extends TestCase
     }
 
     /** @test */
+    public function sanitize_data_redacts_arbitrary_cookie_names(): void
+    {
+        $canary = 'private-session-cookie';
+
+        $sanitized = sanitizeData([
+            'auth_metadata' => [
+                'cookies' => ['arbitrary_cookie_name' => $canary],
+            ],
+        ]);
+
+        $this->assertSame('[REDACTED]', $sanitized['auth_metadata']['cookies']);
+        $this->assertStringNotContainsString($canary, json_encode($sanitized));
+    }
+
+    /** @test */
     public function generate_api_log_filename_creates_correct_format(): void
     {
         $filename = generate_api_log_filename('test_service', $this->integration->id, false);

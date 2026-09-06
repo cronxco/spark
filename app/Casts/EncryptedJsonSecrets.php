@@ -58,6 +58,36 @@ class EncryptedJsonSecrets implements CastsAttributes
     public const SECRET_SUBTREES = ['cookies'];
 
     /**
+     * Redact the credential leaves governed by this cast while preserving the
+     * surrounding configuration structure for activity-log diffs.
+     *
+     * @param  array<mixed>  $data
+     * @return array<mixed>
+     */
+    public static function redact(array $data, bool $inheritedSecret = false): array
+    {
+        $result = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower((string) $key);
+            $isSecretSubtree = $inheritedSecret || in_array($lowerKey, self::SECRET_SUBTREES, true);
+            $isSecretLeaf = $isSecretSubtree || in_array($lowerKey, self::SECRET_KEYS, true);
+
+            if (is_array($value)) {
+                $result[$key] = self::redact($value, $isSecretSubtree);
+
+                continue;
+            }
+
+            $result[$key] = $isSecretLeaf && $value !== null && $value !== ''
+                ? '[REDACTED]'
+                : $value;
+        }
+
+        return $result;
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      * @return array<string, mixed>|null
      */

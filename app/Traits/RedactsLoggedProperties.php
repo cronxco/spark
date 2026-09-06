@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Casts\EncryptedJsonSecrets;
 use Spatie\Activitylog\Contracts\Activity;
 
 /**
@@ -14,9 +15,9 @@ use Spatie\Activitylog\Contracts\Activity;
  *
  * logExcept() would drop the whole attribute and with it every legitimate
  * setting change, so instead each activity is tapped on its way to the database
- * and only the secret leaves are replaced. sanitizeData() already recurses by
- * key name against sensitive_log_keys(), so there is one redaction list rather
- * than two that drift apart.
+ * and only the credential leaves governed by EncryptedJsonSecrets are replaced.
+ * The narrower list deliberately preserves ordinary configuration fields such
+ * as `key`, `auth`, and `server_url` while recursively redacting cookies.
  *
  * Spatie calls this from ActivityLogger::log() whenever the subject defines it.
  */
@@ -30,6 +31,6 @@ trait RedactsLoggedProperties
             return;
         }
 
-        $activity->properties = collect(sanitizeData($properties->toArray()));
+        $activity->properties = collect(EncryptedJsonSecrets::redact($properties->toArray()));
     }
 }

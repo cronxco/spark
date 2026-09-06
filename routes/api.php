@@ -73,6 +73,12 @@ Route::middleware('sentry.api.logging')->group(function () {
                 'abilities.*' => ['string', 'distinct', Rule::in(SparkAbility::DELEGABLE)],
             ]);
 
+            if (! $request->user()->tokenCan('tokens:manage')) {
+                return response()->json([
+                    'message' => 'The requested capabilities exceed those of the credential making this request.',
+                ], 403);
+            }
+
             if (! SparkAbility::canDelegate($request->user(), $validated['abilities'])) {
                 return response()->json([
                     'message' => 'The requested capabilities exceed those of the credential making this request.',
